@@ -35,6 +35,7 @@ import {
 } from './farcrysis-water-ripples';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { farcrysisTerrainHeight, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
+import { FARCRYSIS_WATERLINE_EDGE } from './farcrysis-shore-bands';
 
 describe('HF-394 farcrysis water presentation', () => {
   it('swell field is deterministic, directional and amplitude-bounded', () => {
@@ -241,6 +242,39 @@ describe('HF-394 farcrysis water presentation', () => {
       if (posAttr.getY(i) > FARCRYSIS_WATER_LEVEL + 0.100000001) terrainDominated++;
     }
     expect(terrainDominated).toBeGreaterThan(0);
+  });
+
+  it('foam rings follow the SQUARE shoreline, not a circular radius', () => {
+    // Round-4 audit: the old TorusGeometry rings at radius 52 collapsed to
+    // Chebyshev edge ~27.5 m on the corner diagonals — foam up to ~18 m
+    // inland of the real waterline, visible as a ghost circle across the
+    // jungle in the top-down frame. Proven RED against that exact geometry
+    // before this pin was written (max edge 27.50 m vs the 10.7 m band
+    // below). Every foam vertex must now sit inside the declared
+    // edge-distance envelope around the square waterline.
+    const scene = new THREE.Scene();
+    buildWaterFX(scene);
+    const group = scene.getObjectByName('farcrysis-water-fx-foam-ring');
+    expect(group).toBeInstanceOf(THREE.Group);
+    const bandMin = FARCRYSIS_WATERLINE_EDGE - 0.15;
+    const bandMax = FARCRYSIS_WATERLINE_EDGE + 1.7;
+    let checked = 0;
+    for (const child of group!.children) {
+      const mesh = child as THREE.Mesh;
+      const posAttr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < posAttr.count; i++) {
+        const edge = FARCRYSIS_BOUNDS.maxX - Math.max(Math.abs(posAttr.getX(i)), Math.abs(posAttr.getZ(i)));
+        expect(
+          edge,
+          `${mesh.name} vertex at edge distance ${edge.toFixed(2)} m leaves the square waterline band [${bandMin}, ${bandMax}]`,
+        ).toBeGreaterThanOrEqual(bandMin);
+        expect(edge).toBeLessThanOrEqual(bandMax);
+        checked += 1;
+      }
+    }
+    // Corners of the square are actually sampled — a circle would have no
+    // vertex anywhere near the corner diagonals' band edges.
+    expect(checked).toBeGreaterThan(1000);
   });
 
   it('wave surface animation writes the swell field and stays near the waterline', () => {

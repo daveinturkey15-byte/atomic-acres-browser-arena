@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "assetId": "terminal-generated-airport-dawn-sky-2026-08-02",
+  "generatedAt": "2026-08-02",
+  "creator": "Atomic Acres project / OpenAI image generation",
+  "provider": "OpenAI image generation",
+  "model": "not exposed in the generated artifact",
+  "generationArtifact": "exec-9fbf1a98-a9da-4fc8-be03-14ee97e3b2d5.png",
+  "sourceImage": "source-assets/skies/terminal-airport-dawn-generated.png",
+  "sourceImageSha256": "85d363e75f9bc36d084a9e28da4708b38fde6b0952ff95a2f338f00bfd6f8a68",
+  "sourceDimensions": [1774, 887],
+  "runtimeImage": "public/assets/original/skies/terminal-airport-dawn.webp",
+  "runtimeImageSha256": "e36b73cfe0c291d25815e04a67c36921a6a1259049531371d35d96a04b307600",
+  "runtimeDimensions": [4096, 2048],
+  "sourceScript": "scripts/assets/author-pass66-sky-backdrops.py",
+  "sourceScriptSha256": "56a388c7c270e338f09f0d7567a2a187c17055687a3bd39f4fe490cd38d06047",
+  "generationStages": [
+    {
+      "stage": 1,
+      "artifact": "exec-9fbf1a98-a9da-4fc8-be03-14ee97e3b2d5.png",
+      "prompt": "Use case stylized-concept; production Atomic Acres Terminal skybox; very high-detail seamless 360-degree 2:1 equirectangular early-morning sky; centered horizon; rich cobalt and pale turquoise upper atmosphere; warm peach-gold horizon light; layered realistic cumulus and high cirrus clouds with crisp multi-scale detail, cool slate-blue undersides, warm rim light and atmospheric depth; physically plausible cinematic sky photography; natural lower hemisphere and smooth poles; sky pixels only; no terrain, runway, airport, terminal, control tower, skyline, buildings, aircraft, helicopters, drones, contrails, birds, balloons, satellites, floating objects, people, lettering, logos, watermark, mirrored lower half, blocky texture, pixelation, grey-white wash, geometric cloud blobs, seam or vignette.",
+      "disposition": "admitted after object-free visual review and mechanical aspect, edge-continuity, mirror and compression checks"
+    }
+  ],
+  "selection": "The single generated candidate is admitted. It contains only atmosphere and clouds; no aircraft, contrails or horizon geometry is present.",
+  "transform": "The official xinntao Real-ESRGAN NCNN/Vulkan realesrgan-x4plus model restores the preserved 1774x887 source to 7096x3548 with a verified 256px tile, Pillow Lanczos downsamples to 4096x2048, a 48px periodic edge feather makes the equirectangular wrap continuous, and Pillow libwebp encodes exact-RGB lossy WebP at quality 96 and method 6. No crop or content replacement is performed.",
+  "authoringTool": {
+    "name": "xinntao Real-ESRGAN NCNN Vulkan",
+    "releaseUrl": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip",
+    "releaseArchiveSha256": "abc02804e17982a3be33675e4d471e91ea374e65b70167abc09e31acb412802d",
+    "executableSha256": "07e49f7cbb4ede01ae4dd4c399d3a7e5846e3d2085c3128eff881e55cb7b1a0c",
+    "model": "realesrgan-x4plus",
+    "modelBinSha256": "713ee713b0353afaa27976f0563a64a5043bd70b9bd8936c2e26e25ebcdbcddf",
+    "modelParamSha256": "35330ececcea33b6c397a72548e788d5d53becee4734c50b7fada36e89f10a86",
+    "scale": 4,
+    "tileSize": 256,
+    "gpuIndex": 0,
+    "restoredDimensions": [7096, 3548],
+    "temporaryToolPolicy": "downloaded authoring executable and model remain outside the repository",
+    "failurePolicy": "write a sibling temporary WebP and atomically replace the runtime only after source-relative luminance spread, RGB variance, entropy, adjacent detail, Laplacian detail, nonzero-pixel and minimum-byte gates pass"
+  },
+  "qualityEvidence": {
+    "aspectRatio": 2,
+    "brightestOnePercentCentroid": [0.2857, 0.4898],
+    "sourceLeftRightEdgeMae255": 4.138294,
+    "sourceHorizontalAdjacentMae255": 1.468008,
+    "verticalMirrorMae255": 26.973885,
+    "runtimeLeftRightEdgeMae255": 0.892415,
+    "runtimeHorizontalAdjacentMae255": 0.738812,
+    "runtimeLaplacianMae255": 2.426146,
+    "runtimeLuminanceSpread255": 124.383455,
+    "runtimeRgbVariance": 1974.345093,
+    "runtimeEntropyBits": 7.03654,
+    "runtimeBytes": 985934,
+    "sourceBytes": 1824020,
+    "manualSeamDiagnostic": "accepted at 4096x2048: no hard vertical stitch is visible in artifacts/pass66/sky-backdrops/source-seams/terminal-airport-dawn-runtime-4096-right-left-seam.png",
+    "manualObjectReview": "accepted after restoration: sky only; no aircraft, drones, contrails, birds, airport geometry, terrain, text, watermark, floating assets, tile seams or blocky artifacts"
+  },
+  "runtimeContract": {
+    "mapping": "THREE.EquirectangularReflectionMapping",
+    "colorSpace": "THREE.SRGBColorSpace",
+    "delivery": "asynchronous enhancement after immediate procedural CanvasTexture fallback",
+    "arenaPreset": "airport-dawn",
+    "failurePolicy": "retain procedural backdrop without blocking map admission"
+  },
+  "externalAssets": [],
+  "license": "Original project AI-assisted artwork",
+  "attributionRequired": false,
+  "notes": "Presentation-only sky pixels. The asset owns no geometry, gameplay, collision, fog, lighting, physics or networking authority."
+}

@@ -1,0 +1,15 @@
+ensure gun images are not squashed in field kit selection, use the space more? Maybe just 2 selections per row instead of 3 helps? when you finish a custom loadout, ensure its equipped and not still a default kit
+
+still issues with gun clippign through walls and floor, and arms dont look right, they need to go off the bottom of the screen not float in mid air, and be held like a noirmal human, not inverted or something
+
+Handgun should be 1 hand not 2, and it still looks like so many of the arms rigging are back to front or mirrored or something, sort it properly game wide
+
+chopper gunner model is still old and incomplete and the HUD is improved but has opaque assets, needs improvment like original screenshot reference images provided
+
+railgun ADS and scope is good now but its asset on the rifle before ADS should not be an opaque block
+
+door to killstream zone is still just dark black, it should have textures and lighting etc and look cool ike the Xmen danger room or cerebreo door?
+
+flare gun should be 3-5x wider and defo do damage whne colliding with humans, and timer needs to both reset to 2 mins and also pause when in killstreak room not continue down, same rules for all in multiplayer lobby, whether host or guest.
+
+eveyrthing else is great, get this work done then send another HITL version to test

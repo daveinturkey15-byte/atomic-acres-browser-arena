@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "arena-audio-evidence",
+  "arenaId": "skyline-terminal",
+  "ambienceEventId": "ambience.arena-bed",
+  "variantId": "skyline-terminal.apron",
+  "sourceBudget": 4,
+  "settledSourceCount": 0,
+  "artifactPath": "fixture-payloads/audio/arenas/skyline-terminal.json"
+}

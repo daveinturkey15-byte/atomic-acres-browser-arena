@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "captureKind": "real-gun-range-test-bay-runtime",
+  "capturedAt": "2026-08-02T00:05:32.056Z",
+  "gitHead": "17d8b8bd30e88ca0cc31ab181069579a5f25c94d",
+  "browserName": "chromium",
+  "renderer": "webgl2",
+  "route": "/?release=latest&map=gun-range&renderer=webgl2&render=blender&signal=off&grass=off&mist=off&rays=off&externalServices=off&seed=pass66-killstreak-demo",
+  "seed": "pass66-killstreak-demo",
+  "viewport": {
+    "width": 960,
+    "height": 540
+  },
+  "sourceInputs": [
+    {
+      "path": "src/legacy-main.ts",
+      "sha256": "ff409801f970c7824317c4e46d5c18a51ca2c99c6cb6eeb331213c7e0fb48ae1"
+    },
+    {
+      "path": "src/gun-range-test-bay.ts",
+      "sha256": "7bafaf38398b5d93fea246964a676e09b715c1eee2ab7141c9f76915921121aa"
+    },
+    {
+      "path": "src/killstreak-runtime.ts",
+      "sha256": "5a0b621b0431da18c48723712449fab04ffbf5968923865adb1bd4eb4df6a612"
+    },
+    {
+      "path": "src/killstreak-catalog.ts",
+      "sha256": "b451b78236501948e70aca71a9c6a18a08cbcbfb67a5a7b6c76ef3cfbcf8fe32"
+    },
+    {
+      "path": "src/killstreak-demo-capture-contract.ts",
+      "sha256": "0f1a276adebf4b73cc9537680a1eb8a6dde186a75ea20552f076c334fed4ae84"
+    },
+    {
+      "path": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
+      "sha256": "14b332f52e3d23fbc9836a1cffce223b32d4ce4c912e82cde45b4e4c917952d5"
+    }
+  ],
+  "captures": [
+    {
+      "id": "scout-sweep",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/scout-sweep.jpg",
+      "sha256": "536af552c9f19c4cd4f6d8ecde2c3eddbf33330cf2e6dd7e7ffd837577111230",
+      "sizeBytes": 94960,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:scout-sweep",
+      "fCommitTargetId": "test-bay-support:scout-sweep",
+      "revisionBefore": 2,
+      "revisionAfter": 16,
+      "proof": {
+        "kind": "scout-active",
+        "count": 1,
+        "activationIds": []
+      }
+    },
+    {
+      "id": "adrenaline",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/adrenaline.jpg",
+      "sha256": "b43a4bf89bf20b8392843a2652664e2823e3b3fdf25f300a64bc3bac618c3967",
+      "sizeBytes": 98250,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:adrenaline",
+      "fCommitTargetId": "test-bay-support:adrenaline",
+      "revisionBefore": 2,
+      "revisionAfter": 19,
+      "proof": {
+        "kind": "adrenaline-active",
+        "count": 1,
+        "activationIds": []
+      }
+    },
+    {
+      "id": "care-package",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/care-package.jpg",
+      "sha256": "67b0fff02ea1571f771f4be60a0e1fbab11c1507ba707772e5c914288f89931b",
+      "sizeBytes": 96226,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:care-package",
+      "fCommitTargetId": "test-bay-support:care-package",
+      "revisionBefore": 2,
+      "revisionAfter": 14,
+      "proof": {
+        "kind": "care-entities",
+        "count": 2,
+        "activationIds": [
+          "ks-activation-1-1"
+        ]
+      }
+    },
+    {
+      "id": "yardhawk",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/yardhawk.jpg",
+      "sha256": "2e799b9dd4dd41c1182cbcccfc45c5274420fbb1840835438dc0545c87665203",
+      "sizeBytes": 97459,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:yardhawk",
+      "fCommitTargetId": "test-bay-support:yardhawk",
+      "revisionBefore": 2,
+      "revisionAfter": 18,
+      "proof": {
+        "kind": "yardhawk-active",
+        "count": 1,
+        "activationIds": []
+      }
+    },
+    {
+      "id": "piloted-drone",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/piloted-drone.jpg",
+      "sha256": "c6ce8cd03ecfe47b48c449c23ec005e82c9bc9bb2ba3fe5e7ec44e850dc55d75",
+      "sizeBytes": 107909,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:piloted-drone",
+      "fCommitTargetId": "test-bay-support:piloted-drone",
+      "revisionBefore": 2,
+      "revisionAfter": 20,
+      "proof": {
+        "kind": "piloted-drone-entity",
+        "count": 1,
+        "activationIds": [
+          "ks-activation-1-1"
+        ]
+      }
+    },
+    {
+      "id": "tri-pass",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/tri-pass.jpg",
+      "sha256": "fb5df06a0a015313e6077c45e7e07a5121c3340e18f6b05ed75e4d8ea851b597",
+      "sizeBytes": 98406,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:tri-pass",
+      "fCommitTargetId": "test-bay-support:tri-pass",
+      "revisionBefore": 2,
+      "revisionAfter": 15,
+      "proof": {
+        "kind": "tri-pass-launches",
+        "count": 3,
+        "activationIds": []
+      }
+    },
+    {
+      "id": "carpet-bomber",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/carpet-bomber.jpg",
+      "sha256": "b4036f834f3e191cd7cd9244c89e7d3b2707c36367aaccfb41373242668912ab",
+      "sizeBytes": 92845,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:carpet-bomber",
+      "fCommitTargetId": "test-bay-support:carpet-bomber",
+      "revisionBefore": 2,
+      "revisionAfter": 16,
+      "proof": {
+        "kind": "carpet-aircraft-entity",
+        "count": 1,
+        "activationIds": [
+          "ks-activation-1-1"
+        ]
+      }
+    },
+    {
+      "id": "hunter-swarm",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/hunter-swarm.jpg",
+      "sha256": "4bd2d6024c13cf505e92e328bf69c88bc06517ada6793f7bf9fc23237cbf75b4",
+      "sizeBytes": 95779,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:hunter-swarm",
+      "fCommitTargetId": "test-bay-support:hunter-swarm",
+      "revisionBefore": 2,
+      "revisionAfter": 26,
+      "proof": {
+        "kind": "hunter-swarm-launches",
+        "count": 5,
+        "activationIds": []
+      }
+    },
+    {
+      "id": "chopper",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/chopper.jpg",
+      "sha256": "ebd2b82fb1cb08ad212ab28898524f9cd17d9435b18536150edf91c3bde1eda3",
+      "sizeBytes": 115727,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:chopper",
+      "fCommitTargetId": "test-bay-support:chopper",
+      "revisionBefore": 2,
+      "revisionAfter": 17,
+      "proof": {
+        "kind": "chopper-entity",
+        "count": 1,
+        "activationIds": [
+          "ks-activation-1-1"
+        ]
+      }
+    },
+    {
+      "id": "drone-swarm",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/drone-swarm.jpg",
+      "sha256": "b0f9cf5e353bb756795a01df5c119e4fcd05931857e627f7cade766b1989ea04",
+      "sizeBytes": 101132,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:drone-swarm",
+      "fCommitTargetId": "test-bay-support:drone-swarm",
+      "revisionBefore": 2,
+      "revisionAfter": 18,
+      "proof": {
+        "kind": "drone-swarm-entities",
+        "count": 24,
+        "activationIds": [
+          "ks-activation-1-1"
+        ]
+      }
+    },
+    {
+      "id": "nuke",
+      "artifactPath": "artifacts/pass66/killstreak-demo-capture/staged/nuke.jpg",
+      "sha256": "e092a02621160a7e547fddbaca18740760f6cf5176a01a3ef42023da55489f9c",
+      "sizeBytes": 99856,
+      "height": 540,
+      "width": 960,
+      "fCandidateTargetId": "test-bay-support:nuke",
+      "fCommitTargetId": "test-bay-support:nuke",
+      "revisionBefore": 2,
+      "revisionAfter": 6,
+      "proof": {
+        "kind": "nuke-sequence",
+        "count": 1,
+        "activationIds": []
+      }
+    }
+  ],
+  "pageErrors": [],
+  "videoPath": null
+}

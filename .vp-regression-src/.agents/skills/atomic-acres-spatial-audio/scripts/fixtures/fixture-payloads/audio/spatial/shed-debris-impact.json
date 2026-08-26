@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "eventId": "shed.debris-impact",
+  "sourceAzimuthDeg": -25,
+  "observedPan": -0.42,
+  "openGain": 0.65,
+  "occludedGain": 0.22,
+  "openLowPassHz": 15500,
+  "occludedLowPassHz": 1700,
+  "artifactPath": "fixture-payloads/audio/spatial/shed-debris-impact.json"
+}

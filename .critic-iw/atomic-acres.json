@@ -1,0 +1,904 @@
+{
+  "arena": "atomic-acres",
+  "backend": "webgpu",
+  "visibleMeshSampled": {
+    "count": 100,
+    "excluded": {
+      "cameraSubtree": 303,
+      "decorative": 9
+    }
+  },
+  "cellsTested": 120,
+  "movesTested": 474,
+  "reloadsSurvived": 2,
+  "findingsCount": 38,
+  "noColliderBlocksCount": 0,
+  "capturedFrames": 24,
+  "findings": [
+    {
+      "id": "atomic-acres-f1",
+      "cell": [
+        -31,
+        -25.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        -25.45
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f2",
+      "cell": [
+        -31,
+        -18.2
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        -18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        -18.18
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f3",
+      "cell": [
+        -31,
+        -10.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        -10.91
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        -10.91
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f4",
+      "cell": [
+        -31,
+        -3.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        -3.64
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        -3.64
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f5",
+      "cell": [
+        -31,
+        3.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        3.64
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        3.64
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f6",
+      "cell": [
+        -31,
+        10.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        10.91
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        10.91
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f7",
+      "cell": [
+        -31,
+        18.2
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        18.18
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f8",
+      "cell": [
+        -31,
+        25.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -30.99,
+        4.77,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -31.74,
+        3.87,
+        25.45
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f9",
+      "cell": [
+        -24.1,
+        -18.2
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -24.11,
+        1.73,
+        -18.32
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -24.11,
+        0.83,
+        -19.07
+      ],
+      "movedM": 0.138,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f10",
+      "cell": [
+        -24.1,
+        18.2
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -23.96,
+        1.73,
+        18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -23.21,
+        0.83,
+        18.18
+      ],
+      "movedM": 0.156,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f11",
+      "cell": [
+        -10.3,
+        -25.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -10.47,
+        1.73,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -11.22,
+        0.83,
+        -25.45
+      ],
+      "movedM": 0.137,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f12",
+      "cell": [
+        -10.3,
+        -18.2
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -10.47,
+        1.73,
+        -18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -11.22,
+        0.83,
+        -18.18
+      ],
+      "movedM": 0.137,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f13",
+      "cell": [
+        -10.3,
+        18.2
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -10.33,
+        5.36,
+        18.01
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -10.33,
+        4.46,
+        17.26
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f14",
+      "cell": [
+        -10.3,
+        25.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -10.33,
+        5.37,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -10.33,
+        4.47,
+        26.2
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f15",
+      "cell": [
+        -3.4,
+        -25.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -3.44,
+        5,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -3.44,
+        4.1,
+        -26.2
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f16",
+      "cell": [
+        -3.4,
+        -18.2
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -3.44,
+        5,
+        -18.02
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -3.44,
+        4.1,
+        -17.27
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f17",
+      "cell": [
+        -3.4,
+        18.2
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -3.44,
+        5,
+        18.02
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -3.44,
+        4.1,
+        17.27
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f18",
+      "cell": [
+        -3.4,
+        25.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -3.44,
+        5.01,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -3.44,
+        4.11,
+        26.2
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f19",
+      "cell": [
+        3.4,
+        -25.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        3.44,
+        5,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.44,
+        4.1,
+        -26.2
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f20",
+      "cell": [
+        3.4,
+        -18.2
+      ],
+      "direction": "south",
+      "blockedAt": [
+        3.44,
+        5,
+        -18.01
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.44,
+        4.1,
+        -17.26
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f21",
+      "cell": [
+        3.4,
+        18.2
+      ],
+      "direction": "north",
+      "blockedAt": [
+        3.44,
+        5,
+        18.02
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.44,
+        4.1,
+        17.27
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f22",
+      "cell": [
+        3.4,
+        18.2
+      ],
+      "direction": "south",
+      "blockedAt": [
+        3.44,
+        5,
+        18.39
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.44,
+        4.1,
+        19.14
+      ],
+      "movedM": 0.213,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f23",
+      "cell": [
+        3.4,
+        25.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        3.44,
+        5,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.44,
+        4.1,
+        26.2
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f24",
+      "cell": [
+        10.3,
+        -25.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        10.33,
+        5.37,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        10.33,
+        4.47,
+        -26.2
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f25",
+      "cell": [
+        10.3,
+        -18.2
+      ],
+      "direction": "north",
+      "blockedAt": [
+        10.33,
+        5.37,
+        -18.39
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        10.33,
+        4.47,
+        -19.14
+      ],
+      "movedM": 0.213,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f26",
+      "cell": [
+        10.3,
+        -18.2
+      ],
+      "direction": "south",
+      "blockedAt": [
+        10.33,
+        5.36,
+        -18.02
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        10.33,
+        4.46,
+        -17.27
+      ],
+      "movedM": 0.167
+    },
+    {
+      "id": "atomic-acres-f27",
+      "cell": [
+        10.3,
+        18.2
+      ],
+      "direction": "east",
+      "blockedAt": [
+        10.47,
+        1.73,
+        18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        11.22,
+        0.83,
+        18.18
+      ],
+      "movedM": 0.137,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f28",
+      "cell": [
+        10.3,
+        25.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        10.47,
+        1.72,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        11.22,
+        0.82,
+        25.45
+      ],
+      "movedM": 0.137,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f29",
+      "cell": [
+        17.2,
+        32.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        17.25,
+        0.02,
+        32.73
+      ],
+      "wallDistanceM": null,
+      "probePoint": [
+        18,
+        -0.88,
+        32.73
+      ],
+      "movedM": 0.026
+    },
+    {
+      "id": "atomic-acres-f30",
+      "cell": [
+        24.1,
+        -18.2
+      ],
+      "direction": "east",
+      "blockedAt": [
+        24.39,
+        1.73,
+        -18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        25.14,
+        0.83,
+        -18.18
+      ],
+      "movedM": 0.284,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_earth_edge",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f31",
+      "cell": [
+        31,
+        -25.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        -25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        -25.45
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f32",
+      "cell": [
+        31,
+        -18.2
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        -18.18
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        -18.18
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f33",
+      "cell": [
+        31,
+        -10.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        -10.91
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        -10.91
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f34",
+      "cell": [
+        31,
+        -3.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        -3.64
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        -3.64
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f35",
+      "cell": [
+        31,
+        3.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        3.64
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        3.64
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f36",
+      "cell": [
+        31,
+        10.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        10.9
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        10.9
+      ],
+      "movedM": 0.005,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f37",
+      "cell": [
+        31,
+        18.2
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        18.17
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        18.17
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "atomic-acres-f38",
+      "cell": [
+        31,
+        25.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        30.99,
+        4.77,
+        25.45
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        31.74,
+        3.87,
+        25.45
+      ],
+      "movedM": 0.006,
+      "nearestVisibleMesh": {
+        "name": "BLD_BATCH_MAT_trim_bone",
+        "gapM": 0
+      }
+    }
+  ],
+  "noColliderBlocks": []
+}

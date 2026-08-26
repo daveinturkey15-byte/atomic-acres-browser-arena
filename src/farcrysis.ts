@@ -280,10 +280,13 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // swimmable lagoon is actually reachable on foot. These flat planes remain
   // as presentation backstops under the sculpted terrain mesh only.
   //
-  // The mud plate shrinks from the full span so it ends where the seaward
-  // shore descent begins (edge distance 4 m): a full-size flat plate at y=0
-  // would poke through the submerged sand ramp. HF-396: rescaled for the
-  // 128 m island (span - 8 m).
+  // HF-396 rescaled these for the 128 m island, but the HF-393 waterline
+  // sits at Chebyshev ~55.18 (island half 55.5), so the 120 m plates
+  // (half 60) floated ABOVE the lagoon (-0.18/-0.2 vs water -0.25) from
+  // 55.2 out to 60 — a hard-edged yellow floor over the open water
+  // (HF-394 visual audit, 2026-08-26). They now end at the shore-descent
+  // start (edge distance 10 m -> half 54, size 108), where the sculpted
+  // terrain is still at/above joinHeight 0.2 and hides them.
   // Pass 76 z-fight fix: these three backstop plates used to stack at
   // y = 0 / 0.01 / 0.02, INSIDE the sculpted terrain surface wherever the
   // interior dipped toward its -0.01 minimum — shimmering through the ground
@@ -291,14 +294,14 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // only exist so a camera clipping through a seam sees ground-coloured
   // backstop instead of void, so they now sit safely BELOW the terrain's
   // interior minimum (still above the lagoon stack at -0.25 and the plates
-  // keep their occlusion role).
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(108, 108), mudMat);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), mudMat);
   ground.name = 'farcrysis-ground-plate';
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.2;
   ground.receiveShadow = true;
   root.add(ground);
-
+  const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(108, 108), sandMat);
   const beachRing = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), sandMat);
   beachRing.name = 'farcrysis-beach-ring';
   beachRing.rotation.x = -Math.PI / 2;

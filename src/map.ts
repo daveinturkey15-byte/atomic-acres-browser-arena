@@ -747,6 +747,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
   collisionProxy('service wall east', [28.5, 0.75, 9], [0.7, 1.5, 10]);
   for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
+  // Collider/visual parity audit 2026-08-26 (walk-through direction): the five
+  // greenhouse-frame-wall sills authored in environment-assets.ts addRouteArchitecture
+  // rendered as 3 m tall solid-looking walls with NO movement authority - the
+  // mechanical audit flagged the west wall and the east front sill, and the live
+  // WebGPU probe confirmed players walk straight through them. These proxies give
+  // every sill the exact footprint of its visual. The 2.8 m entry gap between the
+  // two front sills (x -27.4..-24.6) stays open, so the concealed-flank interior
+  // (patrol point, hydro beds) remains enterable from the yard.
+  for (const [x, z, sx, sz] of [
+    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8], [-26, 24.8, 8.5, 0.45],
+    [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
+  ] as const) collisionProxy('greenhouse frame wall', [x, 1.5, z], [sx, 3, sz]);
 
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -20], [4.4, 0.76, 4.4], palette.concrete);
@@ -757,9 +769,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const substantial = (name: string, position: [number, number, number], size: [number, number, number], material?: BallisticMaterialId) => {
     substantialPropColliders.push(authoredCollisionProxy(name, position, size, material).name);
   };
+  // Trunk collider width matches the authored trunk's BASE diameter (1.28 m at
+  // scale 1, environment-assets addTree CylinderGeometry r=0.64) plus its root
+  // flare skirts, so the visible base mass is solid instead of the capsule
+  // clipping into the bark at every tree.
   for (const [index, [x, z, scale]] of [
     [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
-  ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
+  ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [1.28 * scale, 4 * scale, 1.28 * scale], 'wood');
   for (const [index, [x, z]] of [[-24, -8], [24, 8], [-9, -27], [9, 27]].entries()) {
     substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8]);
   }

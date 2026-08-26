@@ -4,16 +4,21 @@
 // headless, channel:'chrome' (measured 2026-08-25: gets a real hardware WebGPU
 // device; bundled chromium fails requestDevice). No headed browser slot needed.
 //
-// v2 - WHY THE EXPLANATION RULE WAS REWRITTEN (2026-08-26):
-// v1 explained a blocked move with point-in-box tests against VISIBLE LEAF
-// MESH world AABBs ("same rule as the static audit"). Measured on live
-// atomic-acres (scripts/qa/probe-invisible-wall-boxes.mjs): the runtime scene
-// is MATERIAL-BATCHED, so single mesh AABBs span 50-120 m and THIRTY-THREE
-// boxes covered one arbitrary interior probe point - including particle,
-// rain, grass and effect meshes. Every blocked move was therefore "explained"
-// and the map read all-clear (rustworks-1v1.json: 139 blocks, 0 findings)
-// while players feel invisible walls. Asserting the input, not the output.
-//
+// v3 - WHY EVERY MOVE IS NOW GATED ON AN ACTIVE MATCH (2026-08-26):
+// v2 booted each arena once and swept ~10 minutes, but a solo match lasts
+// DEFAULT_PRIVATE_MATCH_CONFIG.durationMs = 300_000 ms (5 minutes; gun-range
+// its own GUN_RANGE_ROUND_MS). Every move after expiry ran with dead input:
+// moved ~= 0 was recorded as "blocked", flooding no-collider-blocks
+// (gun-range 274/379 moves) and producing fake all-four-direction sites.
+// Worse, the end-of-run frame capture pass ran AFTER the AFTER-ACTION screen
+// appeared, so every v2 PNG shows "DRAW - TIME LIMIT REACHED" instead of the
+// wall position. v3:
+//   - checks matchPhase === 'active' (plus gameStarted) with every placement;
+//     on expiry it re-boots the arena, re-samples visible meshes, and retries
+//   - captures each finding's frame INLINE, while the player still stands at
+//     the blocked position during active play
+//   - reports restarts as reloadsSurvived so a sweep that rebooted often is
+//     visible in the summary instead of hidden.
 // v2 rule per blocked stop:
 //   1. Locate the blocking surface with the GAME'S OWN AUTHORITY:
 //      march collisionProbeAt(...) forward until isBlocked fires -> tWall.
@@ -311,6 +316,20 @@ async function runArena(arena) {
   let cellsTested = 0;
   let movesTested = 0;
   let blockedExplained = 0;
+  let restarts = 0;
+  // v3: frames are captured INLINE at the blocked position during active
+  // play - the v2 end-of-run capture pass ran after the match timer expired
+  // and photographed the AFTER-ACTION screen instead of the wall.
+  const captureDir = resolve(OUT_DIR, arena.id);
+  mkdirSync(captureDir, { recursive: true });
+  let captured = 0;
+  const captureHere = async (id) => {
+    if (captured >= MAX_CAPTURES_PER_ARENA) return;
+    try {
+      await page.screenshot({ path: resolve(captureDir, `${id}.png`) });
+      captured += 1;
+    } catch { /* a lost frame must not kill the sweep */ }
+  };
 
   const [cellsX, cellsZ] = arena.cells;
   for (let cx = 0; cx < cellsX; cx += 1) {
@@ -319,20 +338,43 @@ async function runArena(arena) {
       const z = arena.minZ + (cellsZ === 1 ? 0.5 : cz / (cellsZ - 1)) * (arena.maxZ - arena.minZ);
       cellsTested += 1;
       for (const direction of DIRECTIONS) {
-        const placed = await evaluateWithDebugApi(([px, py, pz, yaw]) => {
+        const placeArgs = [x, arena.dropY, z, direction.yaw];
+        const placeOnce = () => evaluateWithDebugApi(([px, py, pz, yaw]) => {
           const debug = window.__ATOMIC_ACRES_DEBUG__;
           if (!debug) return false;
           if (!debug.snapshot().player.alive) debug.respawn();
           debug.teleportPlayer(px, py, pz, yaw, 0);
           return true;
-        }, [x, arena.dropY, z, direction.yaw]);
+        }, placeArgs);
+        const readBefore = () => evaluateWithDebugApi(() => {
+          const debug = window.__ATOMIC_ACRES_DEBUG__;
+          const snapshot = debug.snapshot();
+          return {
+            position: snapshot.player.position,
+            alive: snapshot.player.alive,
+            matchActive: snapshot.matchPhase === 'active' && snapshot.gameStarted === true,
+          };
+        });
+        let placed = await placeOnce();
         if (!placed) continue;
         await page.waitForTimeout(SETTLE_MS);
-        const before = await evaluateWithDebugApi(() => {
-          const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-          return { position: snapshot.player.position, alive: snapshot.player.alive };
-        });
+        let before = await readBefore();
+        if (before && before.matchActive === false) {
+          // v3: the 5-minute solo clock (gun-range round clock) lapsed
+          // mid-sweep; input is dead past expiry, so every reading would be
+          // a fake block. Re-boot the arena, re-sample visible meshes, retry.
+          restarts += 1;
+          console.error(`[wall-sweep] ${arena.id}: match expired mid-sweep, rebooting (restart ${restarts})`);
+          await bootArena(arena.id);
+          const resampled = await evaluateWithDebugApi(SAMPLE_MESHES_FN);
+          if (!resampled) console.error(`[wall-sweep] ${arena.id}: mesh resample after reboot failed`);
+          placed = await placeOnce();
+          if (!placed) continue;
+          await page.waitForTimeout(SETTLE_MS);
+          before = await readBefore();
+        }
         if (!before || !before.alive) continue;
+        if (before.matchActive === false) continue;
         // A cell that settled far from its drop is inside solid authority or
         // fell out of the sampled shell - direction results would be noise.
         if (Math.hypot(before.position[0] - x, before.position[2] - z) > 2.5) continue;
@@ -364,7 +406,6 @@ async function runArena(arena) {
         ).catch(() => null);
         if (!explanation || explanation.kind === 'probe-lost') continue;
 
-        if (explanation.kind === 'explained') { blockedExplained += 1; continue; }
         if (explanation.kind === 'no-collider-block') {
           noColliderBlocks.push({
             id: `${arena.id}-nc${noColliderBlocks.length + 1}`,
@@ -374,6 +415,7 @@ async function runArena(arena) {
             movedM: Number(moved.toFixed(3)),
             nearestVisibleMesh: explanation.nearestVisible,
           });
+          await captureHere(noColliderBlocks[noColliderBlocks.length - 1].id);
           continue;
         }
         findings.push({
@@ -386,42 +428,10 @@ async function runArena(arena) {
           movedM: Number(moved.toFixed(3)),
           nearestVisibleMesh: explanation.nearestVisible,
         });
+        await captureHere(findings[findings.length - 1].id);
       }
     }
     console.error(`[wall-sweep] ${arena.id}: column ${cx + 1}/${cellsX} done, findings=${findings.length} noCollider=${noColliderBlocks.length}`);
-  }
-
-  // Frame pass: teleport to each finding, face the blockage, capture what the
-  // player actually sees there. Bounded so a pathological arena cannot run away.
-  const dirYaw = Object.fromEntries(DIRECTIONS.map((entry) => [entry.label, entry.yaw]));
-  const captureDir = resolve(OUT_DIR, arena.id);
-  mkdirSync(captureDir, { recursive: true });
-  let captured = 0;
-  for (const finding of findings.slice(0, MAX_CAPTURES_PER_ARENA)) {
-    const placed = await evaluateWithDebugApi(([px, py, pz, yaw]) => {
-      const debug = window.__ATOMIC_ACRES_DEBUG__;
-      if (!debug) return false;
-      if (!debug.snapshot().player.alive) debug.respawn();
-      debug.teleportPlayer(px, py, pz, yaw, 0);
-      return true;
-    }, [finding.blockedAt[0], finding.blockedAt[1], finding.blockedAt[2], dirYaw[finding.direction]]);
-    if (!placed) continue;
-    await page.waitForTimeout(700);
-    await page.screenshot({ path: resolve(captureDir, `${finding.id}.png`) });
-    captured += 1;
-  }
-  for (const block of noColliderBlocks.slice(0, Math.max(0, MAX_CAPTURES_PER_ARENA - captured))) {
-    const placed = await evaluateWithDebugApi(([px, py, pz, yaw]) => {
-      const debug = window.__ATOMIC_ACRES_DEBUG__;
-      if (!debug) return false;
-      if (!debug.snapshot().player.alive) debug.respawn();
-      debug.teleportPlayer(px, py, pz, yaw, 0);
-      return true;
-    }, [block.blockedAt[0], block.blockedAt[1], block.blockedAt[2], dirYaw[block.direction]]);
-    if (!placed) continue;
-    await page.waitForTimeout(700);
-    await page.screenshot({ path: resolve(captureDir, `${block.id}.png`) });
-    captured += 1;
   }
 
   writeFileSync(resolve(OUT_DIR, `${arena.id}.json`), `${JSON.stringify({
@@ -430,8 +440,7 @@ async function runArena(arena) {
     visibleMeshSampled: sampled,
     cellsTested,
     movesTested,
-    blockedExplained,
-    reloadsSurvived: 0,
+    reloadsSurvived: restarts,
     findingsCount: findings.length,
     noColliderBlocksCount: noColliderBlocks.length,
     capturedFrames: captured,
@@ -476,7 +485,7 @@ writeFileSync(resolve(OUT_DIR, 'sweep.json'), `${JSON.stringify({
   gpu: gpuInfo,
   holdMs: HOLD_MS,
   thresholdM: BLOCKED_THRESHOLD_M,
-  method: 'v2: authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; decorative non-solid layers excluded',
+  method: 'v3: match-active gate with mid-sweep reboot; authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; inline frames during active play; decorative non-solid layers excluded',
   results,
 }, null, 2)}\n`);
 console.log(JSON.stringify({ results }, null, 2));

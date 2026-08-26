@@ -1,0 +1,3633 @@
+{
+  "schema": "atomic-acres-blender-arena-v1",
+  "authoredUnits": "metres",
+  "gameAxes": "x-right y-up z-forward",
+  "blenderAxes": "x-right y-forward z-up",
+  "direction": {
+    "title": "Original near-future military agricultural test suburb",
+    "constraints": [
+      "No Activision or Call of Duty assets, branding, textures, logos, map geometry, signage, or UI.",
+      "Use original silhouettes, materials, landmarks, faction colors, and lane dressing.",
+      "Blender geometry is presentation-only; TypeScript remains authoritative for collision and gameplay."
+    ]
+  },
+  "bounds": {
+    "minX": -31,
+    "maxX": 31,
+    "minZ": -30,
+    "maxZ": 30
+  },
+  "houses": [
+    {
+      "id": "aqua-irrigation-workshop",
+      "label": "Aqua House",
+      "team": 0,
+      "origin": {
+        "x": 4,
+        "z": -17.4,
+        "facing": 1
+      },
+      "dimensions": {
+        "width": 20.2,
+        "depth": 16.4,
+        "wallThickness": 0.42
+      },
+      "rooms": [
+        {
+          "id": "ground-front-room",
+          "level": "ground",
+          "centre": [
+            4,
+            0,
+            -13.399999999999999
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "ground-rear-room",
+          "level": "ground",
+          "centre": [
+            4,
+            0,
+            -21.4
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "upper-front-room",
+          "level": "upper",
+          "centre": [
+            4,
+            3.48,
+            -13.399999999999999
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "upper-rear-room",
+          "level": "upper",
+          "centre": [
+            4,
+            3.48,
+            -21.4
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        }
+      ],
+      "solids": [
+        {
+          "id": "aqua-irrigation-workshop:ground-west-wall",
+          "name": "ground-west-wall",
+          "position": [
+            -6.1,
+            1.675,
+            -17.4
+          ],
+          "size": [
+            0.42,
+            3.35,
+            15.979999999999999
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-east-wall",
+          "name": "ground-east-wall",
+          "position": [
+            14.1,
+            1.675,
+            -17.4
+          ],
+          "size": [
+            0.42,
+            3.35,
+            15.979999999999999
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-far-left",
+          "name": "rear-ground-far-left",
+          "position": [
+            -4.149999999999999,
+            1.675,
+            -25.599999999999998
+          ],
+          "size": [
+            3.9000000000000004,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-centre",
+          "name": "rear-ground-centre",
+          "position": [
+            3.65,
+            1.675,
+            -25.599999999999998
+          ],
+          "size": [
+            6.1,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-far-right",
+          "name": "rear-ground-far-right",
+          "position": [
+            11.5,
+            1.675,
+            -25.599999999999998
+          ],
+          "size": [
+            5.199999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-door-lintel",
+          "name": "rear-door-lintel",
+          "position": [
+            7.8,
+            3.05,
+            -25.599999999999998
+          ],
+          "size": [
+            2.2,
+            0.6,
+            0.42
+          ],
+          "surface": "trim",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-window-sill-wall",
+          "name": "rear-ground-window-sill-wall",
+          "position": [
+            -0.7999999999999998,
+            0.29,
+            -25.599999999999998
+          ],
+          "size": [
+            2.8,
+            0.58,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-window-lintel-wall",
+          "name": "rear-ground-window-lintel-wall",
+          "position": [
+            -0.7999999999999998,
+            2.95,
+            -25.599999999999998
+          ],
+          "size": [
+            2.8,
+            0.8000000000000003,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-ground-window-glass",
+          "name": "rear-ground-window-glass",
+          "position": [
+            -0.7999999999999998,
+            1.565,
+            -25.619999999999997
+          ],
+          "size": [
+            2.8,
+            1.9699999999999998,
+            0.08
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-ground-far-left",
+          "name": "front-ground-far-left",
+          "position": [
+            -3.5,
+            1.675,
+            -9.2
+          ],
+          "size": [
+            5.199999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-ground-centre",
+          "name": "front-ground-centre",
+          "position": [
+            4.35,
+            1.675,
+            -9.2
+          ],
+          "size": [
+            6.1,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-ground-far-right",
+          "name": "front-ground-far-right",
+          "position": [
+            12.149999999999999,
+            1.675,
+            -9.2
+          ],
+          "size": [
+            3.9000000000000004,
+            3.35,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-door-lintel",
+          "name": "front-door-lintel",
+          "position": [
+            0.20000000000000018,
+            3.05,
+            -9.2
+          ],
+          "size": [
+            2.2,
+            0.6,
+            0.42
+          ],
+          "surface": "trim",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-window-sill-wall",
+          "name": "ground-window-sill-wall",
+          "position": [
+            8.8,
+            0.29,
+            -9.2
+          ],
+          "size": [
+            2.8,
+            0.58,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-window-lintel-wall",
+          "name": "ground-window-lintel-wall",
+          "position": [
+            8.8,
+            2.95,
+            -9.2
+          ],
+          "size": [
+            2.8,
+            0.8000000000000003,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-window-glass",
+          "name": "ground-window-glass",
+          "position": [
+            8.8,
+            1.565,
+            -9.18
+          ],
+          "size": [
+            2.8,
+            1.9699999999999998,
+            0.08
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-entry-frame-left",
+          "name": "front-entry-frame-left",
+          "position": [
+            -0.9900000000000002,
+            1.42,
+            -8.899999999999999
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-entry-frame-right",
+          "name": "front-entry-frame-right",
+          "position": [
+            1.3900000000000001,
+            1.42,
+            -8.899999999999999
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-entry-frame-head",
+          "name": "front-entry-frame-head",
+          "position": [
+            0.20000000000000018,
+            2.78,
+            -8.899999999999999
+          ],
+          "size": [
+            2.56,
+            0.18,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-entry-frame-left",
+          "name": "rear-entry-frame-left",
+          "position": [
+            6.609999999999999,
+            1.42,
+            -25.9
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-entry-frame-right",
+          "name": "rear-entry-frame-right",
+          "position": [
+            8.99,
+            1.42,
+            -25.9
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:rear-entry-frame-head",
+          "name": "rear-entry-frame-head",
+          "position": [
+            7.8,
+            2.78,
+            -25.9
+          ],
+          "size": [
+            2.56,
+            0.18,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-room-partition-left",
+          "name": "ground-room-partition-left",
+          "position": [
+            -0.7000000000000002,
+            1.675,
+            -17.4
+          ],
+          "size": [
+            10.799999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-room-partition-right",
+          "name": "ground-room-partition-right",
+          "position": [
+            10.7,
+            1.675,
+            -17.4
+          ],
+          "size": [
+            6.8,
+            3.35,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ground-floor-slab",
+          "name": "ground-floor-slab",
+          "position": [
+            4,
+            0.06,
+            -17.4
+          ],
+          "size": [
+            20,
+            0.12,
+            16.2
+          ],
+          "surface": "concrete",
+          "collidable": false,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-ramp-side-wall-rear",
+          "name": "upper-ramp-side-wall-rear",
+          "position": [
+            -6.1,
+            5.205,
+            -24.445
+          ],
+          "size": [
+            0.42,
+            3.45,
+            1.8899999999999997
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-ramp-side-wall-front",
+          "name": "upper-ramp-side-wall-front",
+          "position": [
+            -6.1,
+            5.205,
+            -15.155
+          ],
+          "size": [
+            0.42,
+            3.45,
+            11.489999999999998
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-east-wall",
+          "name": "upper-east-wall",
+          "position": [
+            14.1,
+            5.205,
+            -17.4
+          ],
+          "size": [
+            0.42,
+            3.45,
+            15.979999999999999
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-rear-wall",
+          "name": "upper-rear-wall",
+          "position": [
+            4,
+            5.205,
+            -25.599999999999998
+          ],
+          "size": [
+            20.62,
+            3.45,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-upper-left",
+          "name": "front-upper-left",
+          "position": [
+            -1.8499999999999996,
+            5.205,
+            -9.2
+          ],
+          "size": [
+            8.5,
+            3.45,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:front-upper-right",
+          "name": "front-upper-right",
+          "position": [
+            9.85,
+            5.205,
+            -9.2
+          ],
+          "size": [
+            8.5,
+            3.45,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-window-sill-wall",
+          "name": "upper-window-sill-wall",
+          "position": [
+            4,
+            3.64,
+            -9.2
+          ],
+          "size": [
+            3.2,
+            0.32,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-window-lintel-wall",
+          "name": "upper-window-lintel-wall",
+          "position": [
+            4,
+            6.48,
+            -9.2
+          ],
+          "size": [
+            3.2,
+            0.9000000000000004,
+            0.42
+          ],
+          "surface": "aqua",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-window-glass",
+          "name": "upper-window-glass",
+          "position": [
+            4,
+            4.915,
+            -9.18
+          ],
+          "size": [
+            3.2,
+            2.23,
+            0.12
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-room-partition-left",
+          "name": "upper-room-partition-left",
+          "position": [
+            -0.7000000000000002,
+            5.205,
+            -17.4
+          ],
+          "size": [
+            10.799999999999999,
+            3.45,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-room-partition-right",
+          "name": "upper-room-partition-right",
+          "position": [
+            10.7,
+            5.205,
+            -17.4
+          ],
+          "size": [
+            6.8,
+            3.45,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-rear",
+          "name": "upper-ramp-entry-frame-rear",
+          "position": [
+            -6.4,
+            4.9,
+            -23.589999999999996
+          ],
+          "size": [
+            0.16,
+            2.84,
+            0.18
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-front",
+          "name": "upper-ramp-entry-frame-front",
+          "position": [
+            -6.4,
+            4.9,
+            -20.81
+          ],
+          "size": [
+            0.16,
+            2.84,
+            0.18
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-head",
+          "name": "upper-ramp-entry-frame-head",
+          "position": [
+            -6.4,
+            6.26,
+            -22.2
+          ],
+          "size": [
+            0.16,
+            0.18,
+            2.96
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:floor-seam-front",
+          "name": "floor-seam-front",
+          "position": [
+            4,
+            3.43,
+            -8.91
+          ],
+          "size": [
+            20.439999999999998,
+            0.18,
+            0.14
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:floor-seam-rear",
+          "name": "floor-seam-rear",
+          "position": [
+            4,
+            3.43,
+            -25.889999999999997
+          ],
+          "size": [
+            20.439999999999998,
+            0.18,
+            0.14
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:floor-seam-west",
+          "name": "floor-seam-west",
+          "position": [
+            -6.389999999999999,
+            3.43,
+            -17.4
+          ],
+          "size": [
+            0.14,
+            0.18,
+            16.4
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:floor-seam-east",
+          "name": "floor-seam-east",
+          "position": [
+            14.389999999999999,
+            3.43,
+            -17.4
+          ],
+          "size": [
+            0.14,
+            0.18,
+            16.4
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:entrance-canopy",
+          "name": "entrance-canopy",
+          "position": [
+            4.55,
+            3.05,
+            -8.62
+          ],
+          "size": [
+            4.4,
+            0.16,
+            1.4
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-floor-main",
+          "name": "upper-floor-main",
+          "position": [
+            2.3499999999999996,
+            3.48,
+            -17.4
+          ],
+          "size": [
+            16.7,
+            0.32,
+            16.2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-floor-ramp-front",
+          "name": "upper-floor-ramp-front",
+          "position": [
+            12.35,
+            3.48,
+            -10.299999999999999
+          ],
+          "size": [
+            3.3000000000000007,
+            0.32,
+            2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:upper-floor-ramp-rear",
+          "name": "upper-floor-ramp-rear",
+          "position": [
+            12.35,
+            3.48,
+            -21.4
+          ],
+          "size": [
+            3.3000000000000007,
+            0.32,
+            8.2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:ramp-top-landing",
+          "name": "ramp-top-landing",
+          "position": [
+            -7.949999999999999,
+            3.48,
+            -21.669999999999998
+          ],
+          "size": [
+            3.9,
+            0.32,
+            1.8600000000000003
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-top-landing",
+          "name": "interior-ramp-top-landing",
+          "position": [
+            12.075,
+            3.48,
+            -16.919999999999998
+          ],
+          "size": [
+            2.75,
+            0.32,
+            0.7600000000000001
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:exterior-access-ramp",
+          "name": "exterior-access-ramp",
+          "position": [
+            -7.949999999999999,
+            1.78,
+            -16.099999999999998
+          ],
+          "size": [
+            2.8,
+            0.18,
+            10.023492405344557
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "ramp",
+          "breakable": false,
+          "rotation": [
+            0.3545670518732277,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-access-ramp",
+          "name": "interior-access-ramp",
+          "position": [
+            12.35,
+            1.78,
+            -13.499999999999998
+          ],
+          "size": [
+            2.2,
+            0.18,
+            7.10988044906523
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "ramp",
+          "breakable": false,
+          "rotation": [
+            0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-rail-inner",
+          "name": "interior-ramp-rail-inner",
+          "position": [
+            11.18,
+            2.4,
+            -13.499999999999998
+          ],
+          "size": [
+            0.08,
+            0.08,
+            7.10988044906523
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false,
+          "rotation": [
+            0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-rail-outer",
+          "name": "interior-ramp-rail-outer",
+          "position": [
+            13.52,
+            2.4,
+            -13.499999999999998
+          ],
+          "size": [
+            0.08,
+            0.08,
+            7.10988044906523
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false,
+          "rotation": [
+            0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-post-0-0",
+          "name": "interior-ramp-post-0-0",
+          "position": [
+            11.18,
+            1.0064,
+            -11.515999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-post-0-1",
+          "name": "interior-ramp-post-0-1",
+          "position": [
+            13.52,
+            1.0064,
+            -11.515999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-post-1-0",
+          "name": "interior-ramp-post-1-0",
+          "position": [
+            11.18,
+            3.2335999999999996,
+            -15.483999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "aqua-irrigation-workshop:interior-ramp-post-1-1",
+          "name": "interior-ramp-post-1-1",
+          "position": [
+            13.52,
+            3.2335999999999996,
+            -15.483999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        }
+      ],
+      "openings": [
+        {
+          "id": "front-door",
+          "kind": "exterior-door",
+          "centre": [
+            0.20000000000000018,
+            1.4,
+            -9.2
+          ],
+          "width": 2.2,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "rear-door",
+          "kind": "exterior-door",
+          "centre": [
+            7.8,
+            1.4,
+            -25.599999999999998
+          ],
+          "width": 2.2,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "ground-room-opening",
+          "kind": "interior-opening",
+          "centre": [
+            6,
+            1.4,
+            -17.4
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "upper-room-opening",
+          "kind": "interior-opening",
+          "centre": [
+            6,
+            4.88,
+            -17.4
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "upper-ramp-entry",
+          "kind": "ramp-entry",
+          "centre": [
+            -6.1,
+            4.88,
+            -22.2
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "front-ground-window",
+          "kind": "window",
+          "centre": [
+            8.8,
+            1.565,
+            -9.2
+          ],
+          "width": 2.8,
+          "height": 1.9699999999999998,
+          "route": true
+        },
+        {
+          "id": "rear-ground-window",
+          "kind": "window",
+          "centre": [
+            -0.7999999999999998,
+            1.565,
+            -25.599999999999998
+          ],
+          "width": 2.8,
+          "height": 1.9699999999999998,
+          "route": true
+        },
+        {
+          "id": "upper-window",
+          "kind": "window",
+          "centre": [
+            4,
+            4.915,
+            -9.2
+          ],
+          "width": 3.2,
+          "height": 2.23,
+          "route": true
+        }
+      ],
+      "anchors": [
+        {
+          "id": "front-yard",
+          "position": [
+            0.20000000000000018,
+            1.7,
+            -7.499999999999998
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "front-door-inside",
+          "position": [
+            0.20000000000000018,
+            1.7,
+            -10.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-front",
+          "position": [
+            0.20000000000000018,
+            1.7,
+            -14.2
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-opening",
+          "position": [
+            6,
+            1.7,
+            -17.4
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-rear",
+          "position": [
+            7.8,
+            1.7,
+            -20.599999999999998
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "rear-door-inside",
+          "position": [
+            7.8,
+            1.7,
+            -24.4
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "rear-yard",
+          "position": [
+            7.8,
+            1.7,
+            -27.299999999999997
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-approach",
+          "position": [
+            -7.949999999999999,
+            1.7,
+            -9.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-foot",
+          "position": [
+            -7.949999999999999,
+            1.7,
+            -11.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-mid",
+          "position": [
+            -7.949999999999999,
+            3.44,
+            -16.099999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "ramp-top",
+          "position": [
+            -7.949999999999999,
+            5.18,
+            -20.799999999999997
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "landing-exit",
+          "position": [
+            -5.1,
+            5.18,
+            -22.2
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-ramp-foot",
+          "position": [
+            12.35,
+            1.7,
+            -10.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "indoor-ramp-mid",
+          "position": [
+            12.35,
+            3.44,
+            -13.499999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-ramp-top",
+          "position": [
+            12.35,
+            5.18,
+            -16.599999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-landing-exit",
+          "position": [
+            10.299999999999999,
+            5.18,
+            -16.599999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-rear",
+          "position": [
+            0,
+            5.18,
+            -20.9
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-opening",
+          "position": [
+            6,
+            5.18,
+            -17.4
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-front",
+          "position": [
+            6,
+            5.18,
+            -13.899999999999999
+          ],
+          "level": "upper"
+        }
+      ],
+      "routes": {
+        "ground-room-flow": [
+          "front-yard",
+          "front-door-inside",
+          "ground-front",
+          "ground-opening",
+          "ground-rear",
+          "rear-door-inside",
+          "rear-yard"
+        ],
+        "ramp-room-flow": [
+          "front-yard",
+          "ramp-approach",
+          "ramp-foot",
+          "ramp-mid",
+          "ramp-top",
+          "landing-exit",
+          "upper-rear",
+          "upper-opening",
+          "upper-front"
+        ],
+        "indoor-ramp-room-flow": [
+          "front-door-inside",
+          "ground-front",
+          "indoor-ramp-foot",
+          "indoor-ramp-mid",
+          "indoor-ramp-top",
+          "indoor-landing-exit",
+          "upper-front",
+          "upper-opening",
+          "upper-rear"
+        ]
+      }
+    },
+    {
+      "id": "coral-orchard-conservatory",
+      "label": "Coral House",
+      "team": 1,
+      "origin": {
+        "x": -4,
+        "z": 17.4,
+        "facing": -1
+      },
+      "dimensions": {
+        "width": 20.2,
+        "depth": 16.4,
+        "wallThickness": 0.42
+      },
+      "rooms": [
+        {
+          "id": "ground-front-room",
+          "level": "ground",
+          "centre": [
+            -4,
+            0,
+            13.399999999999999
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "ground-rear-room",
+          "level": "ground",
+          "centre": [
+            -4,
+            0,
+            21.4
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "upper-front-room",
+          "level": "upper",
+          "centre": [
+            -4,
+            3.48,
+            13.399999999999999
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        },
+        {
+          "id": "upper-rear-room",
+          "level": "upper",
+          "centre": [
+            -4,
+            3.48,
+            21.4
+          ],
+          "size": [
+            19.4,
+            7.6
+          ]
+        }
+      ],
+      "solids": [
+        {
+          "id": "coral-orchard-conservatory:ground-west-wall",
+          "name": "ground-west-wall",
+          "position": [
+            -14.1,
+            1.675,
+            17.4
+          ],
+          "size": [
+            0.42,
+            3.35,
+            15.979999999999999
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-east-wall",
+          "name": "ground-east-wall",
+          "position": [
+            6.1,
+            1.675,
+            17.4
+          ],
+          "size": [
+            0.42,
+            3.35,
+            15.979999999999999
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-far-left",
+          "name": "rear-ground-far-left",
+          "position": [
+            -12.149999999999999,
+            1.675,
+            25.599999999999998
+          ],
+          "size": [
+            3.9000000000000004,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-centre",
+          "name": "rear-ground-centre",
+          "position": [
+            -4.35,
+            1.675,
+            25.599999999999998
+          ],
+          "size": [
+            6.1,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-far-right",
+          "name": "rear-ground-far-right",
+          "position": [
+            3.5,
+            1.675,
+            25.599999999999998
+          ],
+          "size": [
+            5.199999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-door-lintel",
+          "name": "rear-door-lintel",
+          "position": [
+            -0.20000000000000018,
+            3.05,
+            25.599999999999998
+          ],
+          "size": [
+            2.2,
+            0.6,
+            0.42
+          ],
+          "surface": "trim",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-window-sill-wall",
+          "name": "rear-ground-window-sill-wall",
+          "position": [
+            -8.8,
+            0.29,
+            25.599999999999998
+          ],
+          "size": [
+            2.8,
+            0.58,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-window-lintel-wall",
+          "name": "rear-ground-window-lintel-wall",
+          "position": [
+            -8.8,
+            2.95,
+            25.599999999999998
+          ],
+          "size": [
+            2.8,
+            0.8000000000000003,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-ground-window-glass",
+          "name": "rear-ground-window-glass",
+          "position": [
+            -8.8,
+            1.565,
+            25.619999999999997
+          ],
+          "size": [
+            2.8,
+            1.9699999999999998,
+            0.08
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "coral-orchard-conservatory:front-ground-far-left",
+          "name": "front-ground-far-left",
+          "position": [
+            -11.5,
+            1.675,
+            9.2
+          ],
+          "size": [
+            5.199999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-ground-centre",
+          "name": "front-ground-centre",
+          "position": [
+            -3.65,
+            1.675,
+            9.2
+          ],
+          "size": [
+            6.1,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-ground-far-right",
+          "name": "front-ground-far-right",
+          "position": [
+            4.149999999999999,
+            1.675,
+            9.2
+          ],
+          "size": [
+            3.9000000000000004,
+            3.35,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-door-lintel",
+          "name": "front-door-lintel",
+          "position": [
+            -7.8,
+            3.05,
+            9.2
+          ],
+          "size": [
+            2.2,
+            0.6,
+            0.42
+          ],
+          "surface": "trim",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-window-sill-wall",
+          "name": "ground-window-sill-wall",
+          "position": [
+            0.7999999999999998,
+            0.29,
+            9.2
+          ],
+          "size": [
+            2.8,
+            0.58,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-window-lintel-wall",
+          "name": "ground-window-lintel-wall",
+          "position": [
+            0.7999999999999998,
+            2.95,
+            9.2
+          ],
+          "size": [
+            2.8,
+            0.8000000000000003,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-window-glass",
+          "name": "ground-window-glass",
+          "position": [
+            0.7999999999999998,
+            1.565,
+            9.18
+          ],
+          "size": [
+            2.8,
+            1.9699999999999998,
+            0.08
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "coral-orchard-conservatory:front-entry-frame-left",
+          "name": "front-entry-frame-left",
+          "position": [
+            -8.99,
+            1.42,
+            8.899999999999999
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-entry-frame-right",
+          "name": "front-entry-frame-right",
+          "position": [
+            -6.609999999999999,
+            1.42,
+            8.899999999999999
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-entry-frame-head",
+          "name": "front-entry-frame-head",
+          "position": [
+            -7.8,
+            2.78,
+            8.899999999999999
+          ],
+          "size": [
+            2.56,
+            0.18,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-entry-frame-left",
+          "name": "rear-entry-frame-left",
+          "position": [
+            -1.3900000000000001,
+            1.42,
+            25.9
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-entry-frame-right",
+          "name": "rear-entry-frame-right",
+          "position": [
+            0.9900000000000002,
+            1.42,
+            25.9
+          ],
+          "size": [
+            0.18,
+            2.84,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:rear-entry-frame-head",
+          "name": "rear-entry-frame-head",
+          "position": [
+            -0.20000000000000018,
+            2.78,
+            25.9
+          ],
+          "size": [
+            2.56,
+            0.18,
+            0.16
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-room-partition-left",
+          "name": "ground-room-partition-left",
+          "position": [
+            -8.7,
+            1.675,
+            17.4
+          ],
+          "size": [
+            10.799999999999999,
+            3.35,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-room-partition-right",
+          "name": "ground-room-partition-right",
+          "position": [
+            2.6999999999999993,
+            1.675,
+            17.4
+          ],
+          "size": [
+            6.8,
+            3.35,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ground-floor-slab",
+          "name": "ground-floor-slab",
+          "position": [
+            -4,
+            0.06,
+            17.4
+          ],
+          "size": [
+            20,
+            0.12,
+            16.2
+          ],
+          "surface": "concrete",
+          "collidable": false,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-west-wall",
+          "name": "upper-west-wall",
+          "position": [
+            -14.1,
+            5.205,
+            17.4
+          ],
+          "size": [
+            0.42,
+            3.45,
+            15.979999999999999
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-ramp-side-wall-rear",
+          "name": "upper-ramp-side-wall-rear",
+          "position": [
+            6.1,
+            5.205,
+            24.445
+          ],
+          "size": [
+            0.42,
+            3.45,
+            1.8899999999999997
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-ramp-side-wall-front",
+          "name": "upper-ramp-side-wall-front",
+          "position": [
+            6.1,
+            5.205,
+            15.155
+          ],
+          "size": [
+            0.42,
+            3.45,
+            11.489999999999998
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-rear-wall",
+          "name": "upper-rear-wall",
+          "position": [
+            -4,
+            5.205,
+            25.599999999999998
+          ],
+          "size": [
+            20.62,
+            3.45,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-upper-left",
+          "name": "front-upper-left",
+          "position": [
+            -9.85,
+            5.205,
+            9.2
+          ],
+          "size": [
+            8.5,
+            3.45,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:front-upper-right",
+          "name": "front-upper-right",
+          "position": [
+            1.8499999999999996,
+            5.205,
+            9.2
+          ],
+          "size": [
+            8.5,
+            3.45,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-window-sill-wall",
+          "name": "upper-window-sill-wall",
+          "position": [
+            -4,
+            3.64,
+            9.2
+          ],
+          "size": [
+            3.2,
+            0.32,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-window-lintel-wall",
+          "name": "upper-window-lintel-wall",
+          "position": [
+            -4,
+            6.48,
+            9.2
+          ],
+          "size": [
+            3.2,
+            0.9000000000000004,
+            0.42
+          ],
+          "surface": "coral",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-window-glass",
+          "name": "upper-window-glass",
+          "position": [
+            -4,
+            4.915,
+            9.18
+          ],
+          "size": [
+            3.2,
+            2.23,
+            0.12
+          ],
+          "surface": "glass",
+          "collidable": false,
+          "kind": "glass",
+          "breakable": true
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-room-partition-left",
+          "name": "upper-room-partition-left",
+          "position": [
+            -8.7,
+            5.205,
+            17.4
+          ],
+          "size": [
+            10.799999999999999,
+            3.45,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-room-partition-right",
+          "name": "upper-room-partition-right",
+          "position": [
+            2.6999999999999993,
+            5.205,
+            17.4
+          ],
+          "size": [
+            6.8,
+            3.45,
+            0.42
+          ],
+          "surface": "plaster",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-ramp-entry-frame-rear",
+          "name": "upper-ramp-entry-frame-rear",
+          "position": [
+            6.4,
+            4.9,
+            23.589999999999996
+          ],
+          "size": [
+            0.16,
+            2.84,
+            0.18
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-ramp-entry-frame-front",
+          "name": "upper-ramp-entry-frame-front",
+          "position": [
+            6.4,
+            4.9,
+            20.81
+          ],
+          "size": [
+            0.16,
+            2.84,
+            0.18
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-ramp-entry-frame-head",
+          "name": "upper-ramp-entry-frame-head",
+          "position": [
+            6.4,
+            6.26,
+            22.2
+          ],
+          "size": [
+            0.16,
+            0.18,
+            2.96
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:floor-seam-front",
+          "name": "floor-seam-front",
+          "position": [
+            -4,
+            3.43,
+            8.91
+          ],
+          "size": [
+            20.439999999999998,
+            0.18,
+            0.14
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:floor-seam-rear",
+          "name": "floor-seam-rear",
+          "position": [
+            -4,
+            3.43,
+            25.889999999999997
+          ],
+          "size": [
+            20.439999999999998,
+            0.18,
+            0.14
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:floor-seam-west",
+          "name": "floor-seam-west",
+          "position": [
+            -14.389999999999999,
+            3.43,
+            17.4
+          ],
+          "size": [
+            0.14,
+            0.18,
+            16.4
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:floor-seam-east",
+          "name": "floor-seam-east",
+          "position": [
+            6.389999999999999,
+            3.43,
+            17.4
+          ],
+          "size": [
+            0.14,
+            0.18,
+            16.4
+          ],
+          "surface": "trim",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:entrance-canopy",
+          "name": "entrance-canopy",
+          "position": [
+            -4.55,
+            3.05,
+            8.62
+          ],
+          "size": [
+            4.4,
+            0.16,
+            1.4
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-floor-main",
+          "name": "upper-floor-main",
+          "position": [
+            -2.3499999999999996,
+            3.48,
+            17.4
+          ],
+          "size": [
+            16.7,
+            0.32,
+            16.2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-floor-ramp-front",
+          "name": "upper-floor-ramp-front",
+          "position": [
+            -12.35,
+            3.48,
+            10.299999999999999
+          ],
+          "size": [
+            3.3000000000000007,
+            0.32,
+            2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:upper-floor-ramp-rear",
+          "name": "upper-floor-ramp-rear",
+          "position": [
+            -12.35,
+            3.48,
+            21.4
+          ],
+          "size": [
+            3.3000000000000007,
+            0.32,
+            8.2
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "floor",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:ramp-top-landing",
+          "name": "ramp-top-landing",
+          "position": [
+            7.949999999999999,
+            3.48,
+            21.669999999999998
+          ],
+          "size": [
+            3.9,
+            0.32,
+            1.8600000000000003
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-top-landing",
+          "name": "interior-ramp-top-landing",
+          "position": [
+            -12.075,
+            3.48,
+            16.919999999999998
+          ],
+          "size": [
+            2.75,
+            0.32,
+            0.7600000000000001
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "landing",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:exterior-access-ramp",
+          "name": "exterior-access-ramp",
+          "position": [
+            7.949999999999999,
+            1.78,
+            16.099999999999998
+          ],
+          "size": [
+            2.8,
+            0.18,
+            10.023492405344557
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "ramp",
+          "breakable": false,
+          "rotation": [
+            -0.3545670518732277,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-access-ramp",
+          "name": "interior-access-ramp",
+          "position": [
+            -12.35,
+            1.78,
+            13.499999999999998
+          ],
+          "size": [
+            2.2,
+            0.18,
+            7.10988044906523
+          ],
+          "surface": "timber",
+          "collidable": true,
+          "kind": "ramp",
+          "breakable": false,
+          "rotation": [
+            -0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-rail-inner",
+          "name": "interior-ramp-rail-inner",
+          "position": [
+            -11.18,
+            2.4,
+            13.499999999999998
+          ],
+          "size": [
+            0.08,
+            0.08,
+            7.10988044906523
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false,
+          "rotation": [
+            -0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-rail-outer",
+          "name": "interior-ramp-rail-outer",
+          "position": [
+            -13.52,
+            2.4,
+            13.499999999999998
+          ],
+          "size": [
+            0.08,
+            0.08,
+            7.10988044906523
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false,
+          "rotation": [
+            -0.5114700612440183,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-post-0-0",
+          "name": "interior-ramp-post-0-0",
+          "position": [
+            -11.18,
+            1.0064,
+            11.515999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-post-0-1",
+          "name": "interior-ramp-post-0-1",
+          "position": [
+            -13.52,
+            1.0064,
+            11.515999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-post-1-0",
+          "name": "interior-ramp-post-1-0",
+          "position": [
+            -11.18,
+            3.2335999999999996,
+            15.483999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        },
+        {
+          "id": "coral-orchard-conservatory:interior-ramp-post-1-1",
+          "name": "interior-ramp-post-1-1",
+          "position": [
+            -13.52,
+            3.2335999999999996,
+            15.483999999999998
+          ],
+          "size": [
+            0.08,
+            0.76,
+            0.08
+          ],
+          "surface": "metal",
+          "collidable": false,
+          "kind": "frame",
+          "breakable": false
+        }
+      ],
+      "openings": [
+        {
+          "id": "front-door",
+          "kind": "exterior-door",
+          "centre": [
+            -7.8,
+            1.4,
+            9.2
+          ],
+          "width": 2.2,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "rear-door",
+          "kind": "exterior-door",
+          "centre": [
+            -0.20000000000000018,
+            1.4,
+            25.599999999999998
+          ],
+          "width": 2.2,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "ground-room-opening",
+          "kind": "interior-opening",
+          "centre": [
+            -2,
+            1.4,
+            17.4
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "upper-room-opening",
+          "kind": "interior-opening",
+          "centre": [
+            -2,
+            4.88,
+            17.4
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "upper-ramp-entry",
+          "kind": "ramp-entry",
+          "centre": [
+            6.1,
+            4.88,
+            22.2
+          ],
+          "width": 2.6,
+          "height": 2.8,
+          "route": true
+        },
+        {
+          "id": "front-ground-window",
+          "kind": "window",
+          "centre": [
+            0.7999999999999998,
+            1.565,
+            9.2
+          ],
+          "width": 2.8,
+          "height": 1.9699999999999998,
+          "route": true
+        },
+        {
+          "id": "rear-ground-window",
+          "kind": "window",
+          "centre": [
+            -8.8,
+            1.565,
+            25.599999999999998
+          ],
+          "width": 2.8,
+          "height": 1.9699999999999998,
+          "route": true
+        },
+        {
+          "id": "upper-window",
+          "kind": "window",
+          "centre": [
+            -4,
+            4.915,
+            9.2
+          ],
+          "width": 3.2,
+          "height": 2.23,
+          "route": true
+        }
+      ],
+      "anchors": [
+        {
+          "id": "front-yard",
+          "position": [
+            -7.8,
+            1.7,
+            7.499999999999998
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "front-door-inside",
+          "position": [
+            -7.8,
+            1.7,
+            10.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-front",
+          "position": [
+            -7.8,
+            1.7,
+            14.2
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-opening",
+          "position": [
+            -2,
+            1.7,
+            17.4
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ground-rear",
+          "position": [
+            -0.20000000000000018,
+            1.7,
+            20.599999999999998
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "rear-door-inside",
+          "position": [
+            -0.20000000000000018,
+            1.7,
+            24.4
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "rear-yard",
+          "position": [
+            -0.20000000000000018,
+            1.7,
+            27.299999999999997
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-approach",
+          "position": [
+            7.949999999999999,
+            1.7,
+            9.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-foot",
+          "position": [
+            7.949999999999999,
+            1.7,
+            11.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "ramp-mid",
+          "position": [
+            7.949999999999999,
+            3.44,
+            16.099999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "ramp-top",
+          "position": [
+            7.949999999999999,
+            5.18,
+            20.799999999999997
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "landing-exit",
+          "position": [
+            5.1,
+            5.18,
+            22.2
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-ramp-foot",
+          "position": [
+            -12.35,
+            1.7,
+            10.399999999999999
+          ],
+          "level": "ground"
+        },
+        {
+          "id": "indoor-ramp-mid",
+          "position": [
+            -12.35,
+            3.44,
+            13.499999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-ramp-top",
+          "position": [
+            -12.35,
+            5.18,
+            16.599999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "indoor-landing-exit",
+          "position": [
+            -10.299999999999999,
+            5.18,
+            16.599999999999998
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-rear",
+          "position": [
+            0,
+            5.18,
+            20.9
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-opening",
+          "position": [
+            -2,
+            5.18,
+            17.4
+          ],
+          "level": "upper"
+        },
+        {
+          "id": "upper-front",
+          "position": [
+            -2,
+            5.18,
+            13.899999999999999
+          ],
+          "level": "upper"
+        }
+      ],
+      "routes": {
+        "ground-room-flow": [
+          "front-yard",
+          "front-door-inside",
+          "ground-front",
+          "ground-opening",
+          "ground-rear",
+          "rear-door-inside",
+          "rear-yard"
+        ],
+        "ramp-room-flow": [
+          "front-yard",
+          "ramp-approach",
+          "ramp-foot",
+          "ramp-mid",
+          "ramp-top",
+          "landing-exit",
+          "upper-rear",
+          "upper-opening",
+          "upper-front"
+        ],
+        "indoor-ramp-room-flow": [
+          "front-door-inside",
+          "ground-front",
+          "indoor-ramp-foot",
+          "indoor-ramp-mid",
+          "indoor-ramp-top",
+          "indoor-landing-exit",
+          "upper-front",
+          "upper-opening",
+          "upper-rear"
+        ]
+      }
+    }
+  ],
+  "garages": [
+    {
+      "x": 17.7,
+      "z": -12.5
+    },
+    {
+      "x": -17.7,
+      "z": 12.5
+    }
+  ],
+  "garageSize": [
+    7.2,
+    3.3,
+    6.6
+  ],
+  "cover": [
+    [
+      -12,
+      -6.5,
+      3.6,
+      2
+    ],
+    [
+      12,
+      6.5,
+      3.6,
+      2
+    ],
+    [
+      -20,
+      -2,
+      2.4,
+      3.6
+    ],
+    [
+      20,
+      2,
+      2.4,
+      3.6
+    ],
+    [
+      -8,
+      -22,
+      3,
+      2.2
+    ],
+    [
+      8,
+      22,
+      3,
+      2.2
+    ],
+    [
+      24,
+      -13,
+      2.8,
+      4.4
+    ],
+    [
+      -24,
+      13,
+      2.8,
+      4.4
+    ]
+  ],
+  "streetHedges": {
+    "front": [
+      {
+        "position": [
+          -15.5,
+          1.025,
+          -8.9
+        ],
+        "size": [
+          21,
+          2.05,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          19,
+          1.025,
+          -8.9
+        ],
+        "size": [
+          14,
+          2.05,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -19,
+          1.025,
+          8.9
+        ],
+        "size": [
+          14,
+          2.05,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          15.5,
+          1.025,
+          8.9
+        ],
+        "size": [
+          21,
+          2.05,
+          1.4
+        ]
+      }
+    ],
+    "fins": [
+      {
+        "position": [
+          11,
+          1.025,
+          -5.2
+        ],
+        "size": [
+          1.4,
+          2.05,
+          7.4
+        ]
+      },
+      {
+        "position": [
+          -11,
+          1.025,
+          5.2
+        ],
+        "size": [
+          1.4,
+          2.05,
+          7.4
+        ]
+      }
+    ],
+    "rear": [
+      {
+        "position": [
+          -3,
+          1.025,
+          -29.1
+        ],
+        "size": [
+          46,
+          2.05,
+          1.6
+        ]
+      },
+      {
+        "position": [
+          3,
+          1.025,
+          29.1
+        ],
+        "size": [
+          46,
+          2.05,
+          1.6
+        ]
+      }
+    ],
+    "corners": [
+      {
+        "position": [
+          -21.5,
+          1.025,
+          -25.7
+        ],
+        "size": [
+          5,
+          2.05,
+          5.2
+        ]
+      },
+      {
+        "position": [
+          21.5,
+          1.025,
+          -25.7
+        ],
+        "size": [
+          5,
+          2.05,
+          5.2
+        ]
+      },
+      {
+        "position": [
+          21.5,
+          1.025,
+          25.7
+        ],
+        "size": [
+          5,
+          2.05,
+          5.2
+        ]
+      },
+      {
+        "position": [
+          -21.5,
+          1.025,
+          25.7
+        ],
+        "size": [
+          5,
+          2.05,
+          5.2
+        ]
+      }
+    ],
+    "sideVerges": [
+      {
+        "position": [
+          -28.5,
+          1.025,
+          -17
+        ],
+        "size": [
+          5.6,
+          2.05,
+          1.6
+        ]
+      },
+      {
+        "position": [
+          -28.5,
+          1.025,
+          17
+        ],
+        "size": [
+          5.6,
+          2.05,
+          1.6
+        ]
+      },
+      {
+        "position": [
+          28.5,
+          1.025,
+          17
+        ],
+        "size": [
+          5.6,
+          2.05,
+          1.6
+        ]
+      },
+      {
+        "position": [
+          28.5,
+          1.025,
+          -17
+        ],
+        "size": [
+          5.6,
+          2.05,
+          1.6
+        ]
+      }
+    ]
+  },
+  "parkedVans": [
+    {
+      "id": "east-parked-van",
+      "position": [
+        16,
+        1.15,
+        0
+      ],
+      "size": [
+        4.6,
+        2.3,
+        1.9
+      ]
+    },
+    {
+      "id": "west-parked-van",
+      "position": [
+        -16,
+        1.15,
+        0
+      ],
+      "size": [
+        4.6,
+        2.3,
+        1.9
+      ]
+    }
+  ],
+  "roadway": {
+    "ground": {
+      "position": [
+        0,
+        -0.09,
+        0
+      ],
+      "size": [
+        70,
+        0.18,
+        68
+      ]
+    },
+    "road": {
+      "position": [
+        0,
+        0.015,
+        0
+      ],
+      "size": [
+        64,
+        0.03,
+        10
+      ]
+    },
+    "curbs": [
+      {
+        "position": [
+          0,
+          0.12,
+          -5.6
+        ],
+        "size": [
+          64,
+          0.24,
+          1.2
+        ]
+      },
+      {
+        "position": [
+          0,
+          0.12,
+          5.6
+        ],
+        "size": [
+          64,
+          0.24,
+          1.2
+        ]
+      }
+    ],
+    "sidewalks": [
+      {
+        "position": [
+          0,
+          0.07,
+          -7.5
+        ],
+        "size": [
+          64,
+          0.14,
+          2.6
+        ]
+      },
+      {
+        "position": [
+          0,
+          0.07,
+          7.5
+        ],
+        "size": [
+          64,
+          0.14,
+          2.6
+        ]
+      }
+    ],
+    "laneMarkers": [
+      {
+        "position": [
+          -28,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      },
+      {
+        "position": [
+          -20,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      },
+      {
+        "position": [
+          -12,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      },
+      {
+        "position": [
+          12,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      },
+      {
+        "position": [
+          20,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      },
+      {
+        "position": [
+          28,
+          0.055,
+          0
+        ],
+        "size": [
+          3.6,
+          0.03,
+          0.18
+        ]
+      }
+    ],
+    "crosswalks": [
+      {
+        "position": [
+          -16,
+          0.062,
+          -4.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          -3
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          -1.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          0
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          1.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          3
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          -16,
+          0.062,
+          4.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          -4.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          -3
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          -1.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          0
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          1.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          3
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      },
+      {
+        "position": [
+          16,
+          0.062,
+          4.5
+        ],
+        "size": [
+          3.2,
+          0.025,
+          1.4
+        ]
+      }
+    ]
+  },
+  "vehicles": [
+    {
+      "id": "armored-transit",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "facing": 1,
+      "length": 12.4
+    }
+  ],
+  "yardFences": [
+    {
+      "position": [
+        22,
+        0.525,
+        -18
+      ],
+      "size": [
+        0.25,
+        1.05,
+        14
+      ]
+    },
+    {
+      "position": [
+        -22,
+        0.525,
+        18
+      ],
+      "size": [
+        0.25,
+        1.05,
+        14
+      ]
+    },
+    {
+      "position": [
+        -11,
+        0.525,
+        -20
+      ],
+      "size": [
+        0.25,
+        1.05,
+        12
+      ]
+    },
+    {
+      "position": [
+        11,
+        0.525,
+        20
+      ],
+      "size": [
+        0.25,
+        1.05,
+        12
+      ]
+    }
+  ],
+  "routeStructures": [
+    {
+      "id": "west-hydroponics",
+      "position": [
+        -26,
+        0,
+        21
+      ]
+    },
+    {
+      "id": "east-service-channel",
+      "position": [
+        25.5,
+        0,
+        9
+      ]
+    },
+    {
+      "id": "east-solar-canopy",
+      "position": [
+        26.75,
+        0,
+        -19.5
+      ]
+    },
+    {
+      "id": "atomic-beacon",
+      "position": [
+        27,
+        0,
+        -20
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "id": "west",
+      "position": [
+        -31.3,
+        1.5,
+        0
+      ],
+      "size": [
+        0.6,
+        3,
+        61.6
+      ]
+    },
+    {
+      "id": "east",
+      "position": [
+        31.3,
+        1.5,
+        0
+      ],
+      "size": [
+        0.6,
+        3,
+        61.6
+      ]
+    },
+    {
+      "id": "north",
+      "position": [
+        0,
+        1.5,
+        -30.3
+      ],
+      "size": [
+        63,
+        3,
+        0.6
+      ]
+    },
+    {
+      "id": "south",
+      "position": [
+        0,
+        1.5,
+        30.3
+      ],
+      "size": [
+        63,
+        3,
+        0.6
+      ]
+    }
+  ]
+}

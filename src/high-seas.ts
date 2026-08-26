@@ -454,52 +454,56 @@ function generateMaterialTextureSet(
     }
 
     case 'wall': {
-      normalStrength = 3.5;
+      // Pass 79 hijacked-refinement: the old 4x4 grid of 1 m panels with a
+      // 0.70 seam and a deep bevel normal read as quilted padding, not
+      // marine joinery. Panels are now 2 m wide x 1 m tall with a paint-level
+      // seam (0.88), a shallow bevel and half the normal strength, so the
+      // superstructure reads as flush painted panelling with visible joints.
+      normalStrength = 2.2;
       for (let y = 0; y < size; y += 1) {
         for (let x = 0; x < size; x += 1) {
-          const px = x % 64;
+          const px = x % 128;
           const py = y % 64;
-          const distX = Math.min(px, 64 - px);
+          const distX = Math.min(px, 128 - px);
           const distY = Math.min(py, 64 - py);
           const edgeDist = Math.min(distX, distY);
           const isSeam = edgeDist < 2;
-          const bevel = edgeDist >= 2 ? Math.min(1.0, (edgeDist - 2) / 4.0) : 0;
+          const bevel = edgeDist >= 2 ? Math.min(1.0, (edgeDist - 2) / 3.0) : 0;
           const surfaceNoise = (smoothNoise2D(x * 0.1, y * 0.1, 13) - 0.5) * 0.03;
           const offset = (y * size + x) * 4;
           const pIndex = y * size + x;
 
           if (isSeam) {
-            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.70), 0, 255);
-            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.70), 0, 255);
-            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.70), 0, 255);
+            albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * 0.88), 0, 255);
+            albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * 0.88), 0, 255);
+            albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * 0.88), 0, 255);
             albedoData[offset + 3] = 255;
 
-            roughnessData[offset] = 175;
-            roughnessData[offset + 1] = 175;
-            roughnessData[offset + 2] = 175;
+            roughnessData[offset] = 165;
+            roughnessData[offset + 1] = 165;
+            roughnessData[offset + 2] = 165;
             roughnessData[offset + 3] = 255;
 
-            heightData[pIndex] = 0.15;
+            heightData[pIndex] = 0.35;
           } else {
-            const factor = (1 + surfaceNoise) * (0.88 + 0.12 * bevel);
+            const factor = (1 + surfaceNoise) * (0.965 + 0.035 * bevel);
             albedoData[offset] = THREE.MathUtils.clamp(Math.round(baseR * factor), 0, 255);
             albedoData[offset + 1] = THREE.MathUtils.clamp(Math.round(baseG * factor), 0, 255);
             albedoData[offset + 2] = THREE.MathUtils.clamp(Math.round(baseB * factor), 0, 255);
             albedoData[offset + 3] = 255;
 
-            const rough = THREE.MathUtils.clamp(Math.round((0.40 + (1.0 - bevel) * 0.18) * 255), 0, 255);
+            const rough = THREE.MathUtils.clamp(Math.round((0.42 + (1.0 - bevel) * 0.08) * 255), 0, 255);
             roughnessData[offset] = rough;
             roughnessData[offset + 1] = rough;
             roughnessData[offset + 2] = rough;
             roughnessData[offset + 3] = 255;
 
-            heightData[pIndex] = 0.30 + 0.65 * bevel + surfaceNoise * 0.05;
+            heightData[pIndex] = 0.55 + 0.35 * bevel + surfaceNoise * 0.05;
           }
         }
       }
       break;
     }
-
     case 'roof': {
       normalStrength = 3.2;
       for (let y = 0; y < size; y += 1) {
@@ -908,8 +912,20 @@ function pbrMaterial(
   emissiveIntensity = 0,
 ): THREE.MeshStandardMaterial {
   const textures = generateMaterialTextureSet(family, color);
+  // Pass 79 hijacked-refinement: `color` used to feed BOTH the texture
+  // generator and `material.color`, so every textured albedo was SQUARED
+  // (map texel x material channel). Honey deck 0xb78653 squared to burnt
+  // maroon that the sun then clipped to crimson; dark stair 0x5a4032 and
+  // teal trim 0x164c58 squared to near-black, reading the external stairs,
+  // window frames and rails as holes. Below-deck families are excluded:
+  // their response is deliberately compensated by BELOW_DECK_FILL and was
+  // measured against the squared response (median 117-121/255), so they keep
+  // the exact numbers that evidence was recorded against.
+  const MAP_CARRIES_ALBEDO: ReadonlySet<HighSeasTextureFamily> = new Set([
+    'deck', 'stair', 'hull', 'wall', 'roof', 'teal-trim', 'upholstery',
+  ]);
   const value = new THREE.MeshStandardMaterial({
-    color,
+    color: textures.map && MAP_CARRIES_ALBEDO.has(family) ? 0xffffff : color,
     roughness,
     metalness,
     emissive,
@@ -2515,6 +2531,15 @@ export function buildHighSeas(scene: THREE.Scene): HighSeasArenaMap {
     ...(glassTextures.roughnessMap ? { roughnessMap: glassTextures.roughnessMap } : {}),
   });
   glassMaterial.name = 'high-seas-side-glass';
+  // Pass 79 hijacked-refinement: from an oblique exterior angle a dielectric
+  // pane has only the dark cabin behind it to show, so every window band read
+  // as a black slot cut into the shell (the owner's HF-392 "windows in the
+  // top of the ship"). A faint warm emissive - the deckhouse lit from inside
+  // - gives the pane something to show at every angle while the tinted
+  // straight-on read and sun glint are unchanged. Bound well below the
+  // practical strips so glazing never reads as a light fixture.
+  glassMaterial.emissive = new THREE.Color(0x35322b);
+  glassMaterial.emissiveIntensity = 0.55;
   glassMaterial.userData.assetOwner = 'high-seas';
   glassMaterial.userData.assetKind = 'procedural-original-material';
   glassMaterial.userData.textureFamily = 'glass';

@@ -1,0 +1,1512 @@
+import * as THREE from 'three';
+import { auditLocalLightOcclusion } from './rendering/light-occlusion';
+import { describe, expect, it } from 'vitest';
+import type { Point3 } from './collision';
+import { isBlocked, pointInsideBounds } from './collision';
+import {
+  GUN_RANGE_FIRING_LINE_BARRIER,
+  GUN_RANGE_FIRING_LINE_Z,
+  RUSTWORKS_TOWER,
+  RUSTWORKS_CONTAINER_LIGHTS,
+  RUSTWORKS_WORK_LIGHTS,
+  applyAdditionalMapPresentationProfile,
+  applyRustworksPresentationProfile,
+  buildGunRange,
+  buildRustworks1v1,
+  buildSkylineTerminal,
+  fitCanvasText,
+  rustworksDeckTopY,
+  updateGunRangePresentation,
+  updateGunRangeTestBayDoor,
+} from './additional-maps';
+import {
+  GUN_RANGE_TEST_BAY_CONTRACT,
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+} from './gun-range-test-bay';
+import type { ArenaMap } from './map';
+import { WEAPONS, type Stance } from './gameplay';
+import { CharacterPhysics, STANCE_SHAPES } from './physics';
+import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
+import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
+import { definition as terminalVisualDefinition } from './rendering/arenas/skyline-terminal';
+
+type RouteAnchor = { id: string; position: [number, number, number] };
+
+function installCanvasDocument(): () => void {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const contextState: Record<PropertyKey, unknown> = { font: '900 30px sans-serif' };
+  const context = new Proxy(contextState, {
+    get(target, property) {
+      if (property === 'measureText') {
+        return (text: string) => ({ width: text.length * Number.parseInt(String(target.font).match(/(\d+)px/)?.[1] ?? '30', 10) * 0.58 });
+      }
+      if (property === 'createLinearGradient') return () => ({ addColorStop: () => undefined });
+      if (property in target) return target[property];
+      return () => undefined;
+    },
+    set(target, property, value) {
+      target[property] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+  const fakeDocument = {
+    createElement(tagName: string) {
+      if (tagName !== 'canvas') throw new Error(`Unexpected test element ${tagName}`);
+      return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
+    },
+  } as unknown as Document;
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: fakeDocument });
+  return () => {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else Reflect.deleteProperty(globalThis, 'document');
+  };
+}
+
+function expectRustworksSpawnContract(map: ReturnType<typeof buildRustworks1v1>): void {
+  for (const team of [0, 1] as const) {
+    expect(map.spawns[team].length).toBeGreaterThanOrEqual(6);
+    for (const spawn of map.spawns[team]) {
+      expect(Number.isFinite(spawn.x)).toBe(true);
+      expect(Number.isFinite(spawn.z)).toBe(true);
+      expect(pointInsideBounds({ x: spawn.x, y: spawn.y, z: spawn.z }, map.bounds, 0.5)).toBe(true);
+      expect(map.colliders.some((box) => spawn.x > box.minX && spawn.x < box.maxX && spawn.z > box.minZ && spawn.z < box.maxZ)).toBe(false);
+      // Keep spawns off the central tower apron so private lobbies open cleanly.
+      expect(Math.hypot(spawn.x, spawn.z)).toBeGreaterThan(12);
+    }
+  }
+}
+
+function expectGunRangeSpawnContract(map: ReturnType<typeof buildGunRange>): void {
+  for (const team of [0, 1] as const) {
+    expect(map.spawns[team].length).toBeGreaterThan(0);
+    for (const spawn of map.spawns[team]) {
+      expect(Number.isFinite(spawn.x)).toBe(true);
+      expect(Number.isFinite(spawn.z)).toBe(true);
+      expect(pointInsideBounds({ x: spawn.x, y: spawn.y, z: spawn.z }, map.bounds, 0.5)).toBe(true);
+      expect(map.colliders.some((box) => spawn.x > box.minX && spawn.x < box.maxX && spawn.z > box.minZ && spawn.z < box.maxZ)).toBe(false);
+    }
+  }
+}
+
+function namedCount(root: THREE.Object3D, name: string): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (node.name === name) count += 1;
+  });
+  return count;
+}
+
+function namedPrefixCount(root: THREE.Object3D, prefix: string): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (node.name.startsWith(prefix)) count += 1;
+  });
+  return count;
+}
+
+function visibleMeshDrawUpperBound(root: THREE.Object3D): number {
+  let count = 0;
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !node.visible) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material.visible)) return;
+    count += node instanceof THREE.InstancedMesh ? node.count : 1;
+  });
+  return count;
+}
+
+async function walkToward(physics: CharacterPhysics, target: Point3, maxSteps = 2_400): Promise<Point3> {
+  for (let step = 0; step < maxSteps; step += 1) {
+    const current = physics.eyePosition();
+    const dx = target.x - current.x;
+    const dz = target.z - current.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.16 && Math.abs(target.y - current.y) < 0.28) return current;
+    const amount = Math.min(0.034, distance);
+    physics.move({
+      x: distance > 0 ? (dx / distance) * amount : 0,
+      y: -0.002,
+      z: distance > 0 ? (dz / distance) * amount : 0,
+    }, 1 / 120);
+  }
+  return physics.eyePosition();
+}
+
+async function traverseRoute(
+  map: Pick<ArenaMap, 'physicsColliders' | 'bounds'>,
+  anchors: readonly RouteAnchor[],
+  reverse = false,
+  stance: Stance = 'stand',
+): Promise<void> {
+  const ordered = reverse ? [...anchors].reverse() : [...anchors];
+  const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+  try {
+    expect(physics.setStance(stance), `${stance} stance transition`).toBe(true);
+    const shape = STANCE_SHAPES[stance];
+    const stanceEyeHeight = shape.halfHeight + shape.radius + shape.eyeFromCenter;
+    const stanceAnchor = ([x, y, z]: [number, number, number]): Point3 => ({
+      x,
+      y: y - 1.7 + stanceEyeHeight,
+      z,
+    });
+    const start = ordered[0].position;
+    physics.teleportEye(stanceAnchor(start));
+    for (const anchor of ordered.slice(1)) {
+      const target = stanceAnchor(anchor.position);
+      const result = await walkToward(physics, target);
+      const horizontalError = Math.hypot(result.x - target.x, result.z - target.z);
+      expect(
+        horizontalError,
+        `${anchor.id}:${stance}:horizontal result=${JSON.stringify(result)} target=${JSON.stringify(target)}`,
+      ).toBeLessThan(0.55);
+      expect(Math.abs(result.y - target.y), `${anchor.id}:${stance}:vertical`).toBeLessThan(0.55);
+    }
+  } finally {
+    physics.dispose();
+  }
+}
+
+describe('additional authored maps', () => {
+  it('shrinks long world-sign copy until it fits the drawable panel width', () => {
+    let currentFont = '';
+    const context = {
+      get font() { return currentFont; },
+      set font(value: string) { currentFont = value; },
+      measureText(text: string) {
+        const size = Number.parseInt(currentFont.match(/900 (\d+)px/)?.[1] ?? '0', 10);
+        return { width: text.length * size * 0.58 };
+      },
+    } as unknown as CanvasRenderingContext2D;
+    const layout = fitCanvasText(context, 'WALLBANG TEST · MATERIAL / THICKNESS', 120, 620, 18);
+    expect(layout.measuredWidth).toBeLessThanOrEqual(layout.availableWidth);
+    expect(layout.fontSize).toBeLessThan(120);
+  });
+
+  it('builds an original compact collision-backed industrial 1v1 arena', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    expect(map.id).toBe('rustworks-1v1');
+    expect(map.label).toBe('RustRig');
+    expect(map.root.name).toContain('Rustworks');
+    expect(map.colliders.length).toBeGreaterThanOrEqual(25);
+    expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(25);
+    expect(map.patrolPoints.length).toBeGreaterThanOrEqual(8);
+    expect(map.targets).toHaveLength(0);
+    expect(map.root.getObjectByName('rustworks-lower-deck')).toBeTruthy();
+    expect(map.root.getObjectByName('rustworks-upper-deck')).toBeTruthy();
+    expect(map.root.getObjectByName('rustworks-lower-ramp')).toBeTruthy();
+    expect(map.root.getObjectByName('rustworks-upper-deck')?.position.y).toBe(RUSTWORKS_TOWER.upperDeckCenterY);
+    const towerLeg = map.root.getObjectByName('rustworks-tower-leg') as THREE.Mesh;
+    towerLeg.geometry.computeBoundingBox();
+    expect(towerLeg.geometry.boundingBox?.max.y).toBeCloseTo(5.4);
+    expect(map.root.getObjectByName('rustworks-derrick-service-platform')?.position.y).toBeCloseTo(11.23);
+    expect(map.root.getObjectByName('rustworks-derrick-beacon')?.position.y).toBe(15.78);
+    expect(map.root.getObjectByName('rustworks-canopy-roof')).toBeUndefined();
+    expect(map.root.getObjectByName('rustworks-crane-boom')).toBeUndefined();
+    expect(map.root.getObjectByName('rustworks-crane-cable')).toBeUndefined();
+    expect(map.root.getObjectByName('rustworks-crane-hook')).toBeUndefined();
+    expectRustworksSpawnContract(map);
+  });
+
+
+  it('shows only the quality derrick details under the blender profile', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const servicePlatform = map.root.getObjectByName('rustworks-derrick-service-platform');
+    const derrickLeg = map.root.getObjectByName('rustworks-derrick-leg');
+    expect(servicePlatform).toBeTruthy();
+    expect(derrickLeg).toBeTruthy();
+    applyRustworksPresentationProfile(map.root, 'performance');
+    expect(servicePlatform?.visible).toBe(false);
+    expect(derrickLeg?.userData.staticBatchRendered).toBe(true);
+    expect(map.root.children.some((node) => node.name.startsWith('rustworks-presentation-batch-') && node.visible)).toBe(true);
+    expect(map.root.getObjectByName('rustworks-lower-ramp')?.visible).not.toBe(false);
+    applyRustworksPresentationProfile(map.root, 'blender');
+    expect(servicePlatform?.visible).toBe(true);
+  });
+
+  it('mounts emissive RustRig work lights and removes coplanar deck overlays', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const lightAudit = map.root.userData.rustworksWorkLightAudit as {
+      fixtures: Array<{ id: string; position: number[]; target: number[]; emissiveOnlyLens: boolean; shadowedLocalVolume: boolean }>;
+      containerFixtures: Array<{ id: string; position: number[]; target: number[]; color: number; shadowedLocalVolume: boolean }>;
+      shadowedLocalVolumes: number;
+      maximumShadowCastersIncludingMoon: number;
+    };
+    expect(lightAudit).toMatchObject({
+      shadowedLocalVolumes: 6,
+      maximumShadowCastersIncludingMoon: 7,
+    });
+    expect(lightAudit.fixtures).toHaveLength(2);
+    expect(lightAudit.containerFixtures).toHaveLength(4);
+    expect(lightAudit.containerFixtures.map(({ id }) => id)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => id));
+    expect(lightAudit.containerFixtures.map(({ color }) => color)).toEqual(RUSTWORKS_CONTAINER_LIGHTS.map(({ color }) => color));
+    expect(lightAudit.fixtures.map((fixture) => fixture.id)).toEqual(RUSTWORKS_WORK_LIGHTS.map((fixture) => fixture.id));
+    for (const fixture of RUSTWORKS_WORK_LIGHTS) {
+      const lens = map.root.getObjectByName(`rustworks-work-light-lens-${fixture.id}`) as THREE.Mesh;
+      const housing = map.root.getObjectByName(`rustworks-work-light-housing-${fixture.id}`) as THREE.Mesh;
+      const mount = map.root.getObjectByName(`rustworks-work-light-mount-${fixture.id}`) as THREE.Mesh;
+      expect(lens, `${fixture.id}:lens`).toBeInstanceOf(THREE.Mesh);
+      expect(housing, `${fixture.id}:housing`).toBeInstanceOf(THREE.Mesh);
+      expect(mount, `${fixture.id}:mount`).toBeInstanceOf(THREE.Mesh);
+      expect(lens.position.toArray()).toEqual([...fixture.position]);
+      expect((lens.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThanOrEqual(4);
+      expect(lens.userData.occlusionPolicy).toBe('emissive-only');
+    }
+
+    expect(map.root.userData.rustworksDeckSurfaceAudit).toEqual({
+      perimeterEdgeSegments: 4,
+      serviceLaneSegments: 4,
+      fullDeckLipOverlay: false,
+      coplanarOverlapPairs: [],
+    });
+    expect(map.root.getObjectByName('rustworks-rig-deck-edge')).toBeUndefined();
+    expect(namedPrefixCount(map.root, 'rustworks-rig-deck-edge-')).toBe(4);
+    expect(namedPrefixCount(map.root, 'rustworks-service-lane-')).toBe(4);
+    for (const profile of ['performance', 'blender'] as const) {
+      applyRustworksPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(rustworksVisualDefinition.budgets.maximumDrawCalls);
+    }
+  });
+
+  it('exposes clean access, undercroft, trench, and useful inner-yard freight cover', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const required = [
+      'rustworks-lower-ramp',
+      'rustworks-lower-ramp-landing',
+      'rustworks-upper-access',
+      'rustworks-ship-ladder',
+      'rustworks-ship-ladder-lower-landing',
+      'rustworks-ship-ladder-upper-landing',
+      'rustworks-ship-ladder-rail-east',
+      'rustworks-ship-ladder-rail-west',
+      'rustworks-ship-ladder-rung-0',
+      'rustworks-structural-brace',
+      'rustworks-undercroft-module',
+      'rustworks-undercroft-portal-header',
+      'rustworks-service-trench-wall',
+      'rustworks-derrick-leg',
+      'rustworks-tower-hardstand',
+      'rustworks-shipping-container',
+      'rustworks-open-container-wall-a',
+      'rustworks-rig-deck-top',
+      'rustworks-rig-leg',
+      'rustworks-perimeter-rail',
+    ];
+    for (const name of required) {
+      expect(map.root.getObjectByName(name), name).toBeTruthy();
+    }
+    const deckMaterial = (map.root.getObjectByName('rustworks-rig-deck-top') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(deckMaterial.map?.name).toBe('rustrig-deck-surface-v1');
+    expect(deckMaterial.userData).toMatchObject({ assetOwner: 'rustworks-1v1', assetKind: 'deterministic-industrial-surface' });
+    expect(namedPrefixCount(map.root, 'rustworks-ship-ladder-rung-')).toBeGreaterThanOrEqual(8);
+    expect(namedCount(map.root, 'rustworks-structural-brace')).toBeGreaterThanOrEqual(12);
+    expect(namedCount(map.root, 'rustworks-freight-crate')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-container-placement')).toBe(16);
+    expect(namedCount(map.root, 'rustworks-shipping-container')).toBe(8);
+    expect(namedCount(map.root, 'rustworks-open-container-wall-a')).toBe(8);
+    expect(namedCount(map.root, 'rustworks-lower-ramp')).toBe(1);
+    expect(namedCount(map.root, 'rustworks-lower-ramp-rail')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-barrier-low')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-tank-collider')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-horizontal-process-tank')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-pallet-stack')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-process-riser')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-process-pipe-run')).toBe(0);
+    expect(namedCount(map.root, 'rustworks-rig-leg')).toBeGreaterThanOrEqual(8);
+    const batches = map.root.userData.rustworksPresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(40);
+    expect(batches.batches).toBeGreaterThan(0);
+    expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(35);
+    expect(map.root.children.filter((node) => node.userData.staticBatchRendered === true && node.visible).length)
+      .toBe(batches.batches);
+    expect(map.root.userData.rustworksRoutes?.['ground-to-lower']).toBeTruthy();
+    expect(map.root.userData.rustworksRoutes?.['lower-to-upper']).toBeTruthy();
+    expect(map.root.userData.rustworksRoutes?.['undercroft-east-west']).toBeTruthy();
+    expect(map.root.userData.rustworksRoutes?.['undercroft-north-south']).toBeTruthy();
+    expect(map.root.userData.rustworksRoutes?.['west-service-trench']).toBeTruthy();
+  });
+
+  it('uses four playable shipping-container clusters instead of an outer container wall', async () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const placements: THREE.Group[] = [];
+    const closed: THREE.Mesh[] = [];
+    const openShells: THREE.Mesh[] = [];
+    const oneEndWalls: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Group && node.name === 'rustworks-container-placement') placements.push(node);
+      if (node instanceof THREE.Mesh && node.name === 'rustworks-shipping-container') closed.push(node);
+      if (node instanceof THREE.Mesh && node.name.startsWith('rustworks-open-container-') && !node.name.includes('-floor-')) openShells.push(node);
+      if (node instanceof THREE.Mesh && node.name === 'rustworks-open-one-container-closed-end') oneEndWalls.push(node);
+    });
+    expect(placements).toHaveLength(16);
+    expect(closed).toHaveLength(8);
+    expect(openShells).toHaveLength(24);
+    expect(oneEndWalls).toHaveLength(4);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'closed')).toHaveLength(8);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-both')).toHaveLength(4);
+    expect(placements.filter((placement) => placement.userData.rustworksContainerType === 'open-one')).toHaveLength(4);
+    for (const cluster of ['north-west', 'north-east', 'south-west', 'south-east']) {
+      const clusterPlacements = placements.filter((placement) => placement.userData.rustworksContainerCluster === cluster);
+      expect(clusterPlacements, cluster).toHaveLength(4);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'closed'), `${cluster}:closed`).toHaveLength(2);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'open-both'), `${cluster}:open-both`).toHaveLength(1);
+      expect(clusterPlacements.filter((placement) => placement.userData.rustworksContainerType === 'open-one'), `${cluster}:open-one`).toHaveLength(1);
+    }
+    expect(placements.every((placement) => Math.max(Math.abs(placement.position.x), Math.abs(placement.position.z)) < 21.5)).toBe(true);
+
+    const authoritativeMeshes = [...closed, ...openShells, ...oneEndWalls];
+    for (const mesh of authoritativeMeshes) {
+      const geometry = mesh.geometry as THREE.BoxGeometry;
+      const { width, height, depth } = geometry.parameters;
+      const expected = {
+        minX: mesh.position.x - width / 2,
+        maxX: mesh.position.x + width / 2,
+        minY: mesh.position.y - height / 2,
+        maxY: mesh.position.y + height / 2,
+        minZ: mesh.position.z - depth / 2,
+        maxZ: mesh.position.z + depth / 2,
+      };
+      const matches = (box: (typeof map.colliders)[number]) =>
+        Math.abs(box.minX - expected.minX) < 1e-6
+        && Math.abs(box.maxX - expected.maxX) < 1e-6
+        && Math.abs((box.minY ?? -Infinity) - expected.minY) < 1e-6
+        && Math.abs((box.maxY ?? Infinity) - expected.maxY) < 1e-6
+        && Math.abs(box.minZ - expected.minZ) < 1e-6
+        && Math.abs(box.maxZ - expected.maxZ) < 1e-6;
+      expect(map.colliders.some(matches), `${mesh.name} player collider`).toBe(true);
+      expect(map.physicsColliders.some(matches), `${mesh.name} physics collider`).toBe(true);
+      expect(map.raycastMeshes).toContain(mesh);
+    }
+
+    const layout = map.root.userData.rustworksContainerLayout as {
+      total: number;
+      closed: number;
+      open: number;
+      openBothEnds: number;
+      openOneEnd: number;
+      closedPercent: number;
+      openPercent: number;
+      clusters: number;
+      perCluster: number;
+      perimeterWall: boolean;
+      minimumTowerDistance: number;
+      onlyShippingContainers: boolean;
+    };
+    expect(layout).toMatchObject({
+      total: 16,
+      closed: 8,
+      open: 8,
+      openBothEnds: 4,
+      openOneEnd: 4,
+      closedPercent: 50,
+      openPercent: 50,
+      clusters: 4,
+      perCluster: 4,
+      perimeterWall: false,
+      onlyShippingContainers: true,
+    });
+    expect(layout.minimumTowerDistance).toBeGreaterThan(15);
+    const practicalAudit = map.root.userData.rustworksContainerPracticalAudit as {
+      ids: string[];
+      count: number;
+      palette: number[];
+      fixtureOcclusionPolicy: string;
+      dynamicOcclusionPolicy: string;
+      shadowedDynamicFill: string;
+      dynamicPracticalIds: string[];
+    };
+    expect(practicalAudit).toMatchObject({
+      count: 8,
+      palette: [0xff4d2e, 0xff9a3d, 0xffd25a],
+      fixtureOcclusionPolicy: 'emissive-only',
+      dynamicOcclusionPolicy: 'shadowed-local',
+      shadowedDynamicFill: 'four-cluster-container-practical-pulse',
+    });
+    expect(practicalAudit.dynamicPracticalIds).toEqual(
+      RUSTWORKS_CONTAINER_LIGHTS.map(({ id }) => `container-dynamic-${id}`),
+    );
+    expect(practicalAudit.ids).toHaveLength(8);
+    const practicalColours = new Set<number>();
+    const practicalPaletteIndexes = new Set<number>();
+    for (const id of practicalAudit.ids) {
+      const practical = map.root.getObjectByName(id) as THREE.Mesh;
+      expect(practical).toBeInstanceOf(THREE.Mesh);
+      expect(practical.userData).toMatchObject({
+        occlusionPolicy: 'emissive-only',
+        practicalPolicyId: 'container-interior-warm-practicals',
+        containerInterior: true,
+      });
+      const material = practical.material as THREE.MeshStandardMaterial;
+      expect(material.emissiveIntensity).toBeGreaterThanOrEqual(1.55);
+      practicalColours.add(material.emissive.getHex());
+      practicalPaletteIndexes.add(Number(practical.userData.paletteIndex));
+    }
+    expect([...practicalColours].sort((a, b) => a - b)).toEqual([0xff4d2e, 0xff9a3d, 0xffd25a].sort((a, b) => a - b));
+    expect([...practicalPaletteIndexes].sort()).toEqual([0, 1, 2]);
+    for (const fixture of RUSTWORKS_CONTAINER_LIGHTS) {
+      const visibleFixture = practicalAudit.ids
+        .map((id) => map.root.getObjectByName(id) as THREE.Mesh)
+        .find((mesh) => mesh.position.distanceTo(new THREE.Vector3(...fixture.position)) < 0.1);
+      expect(visibleFixture, `${fixture.id}:visible-fixture`).toBeInstanceOf(THREE.Mesh);
+      expect((visibleFixture!.material as THREE.MeshStandardMaterial).emissive.getHex()).toBe(fixture.color);
+    }
+    expect(RUSTWORKS_TOWER.openContainerClearWidth).toBeGreaterThan(0.38 * 2 + 1.4);
+    expect(RUSTWORKS_TOWER.openContainerClearHeight).toBeGreaterThan(1.82 + 0.5);
+    const openRoutes = map.root.userData.rustworksOpenContainerRoutes as Array<{
+      id: string; anchors: [number, number, number][];
+    }>;
+    expect(openRoutes).toHaveLength(4);
+    for (const route of openRoutes) {
+      for (const [x, y, z] of route.anchors) {
+        expect(isBlocked({ x, y, z }, map.colliders, 0.38), `${route.id}@${x},${z}`).toBe(false);
+      }
+      for (const stance of ['stand', 'crouch', 'prone'] as const) {
+        const anchors = route.anchors.map((position, index) => ({ id: `${route.id}-${index}`, position }));
+        await traverseRoute(map, anchors, false, stance);
+        await traverseRoute(map, anchors, true, stance);
+      }
+    }
+    expectRustworksSpawnContract(map);
+  }, 20_000);
+
+  it('keeps ramp and ship-ladder surfaces at or under the 50 degree climb limit with coherent landings', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const access = map.root.userData.rustworksAccess as {
+      lowerRampAngleDegrees: number;
+      shipLadderAngleDegrees: number;
+      lowerRamp: {
+        position: [number, number, number];
+        size: [number, number, number];
+        rotation: [number, number, number];
+        landingPosition: [number, number, number];
+        landingSize: [number, number, number];
+      };
+      shipLadder: {
+        position: [number, number, number];
+        size: [number, number, number];
+        rotation: [number, number, number];
+        lowerLandingPosition: [number, number, number];
+        lowerLandingSize: [number, number, number];
+        upperLandingPosition: [number, number, number];
+        upperLandingSize: [number, number, number];
+      };
+    };
+    expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
+    expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(RUSTWORKS_TOWER.maxClimbDegrees);
+    expect(access.lowerRampAngleDegrees).toBeLessThanOrEqual(18);
+    expect(access.shipLadderAngleDegrees).toBeLessThanOrEqual(38);
+    expect(access.lowerRamp.size[0]).toBeGreaterThanOrEqual(4.8);
+    expect(access.shipLadder.size[0]).toBeGreaterThanOrEqual(2.6);
+    const lowerRampMeshes = map.root.children.filter((node) => node.name === 'rustworks-lower-ramp');
+    expect(lowerRampMeshes).toHaveLength(1);
+    expect(lowerRampMeshes[0].visible).toBe(true);
+    expect(map.root.children.filter((node) => node.name === 'rustworks-lower-ramp-rail')).toHaveLength(0);
+    const [rampX, rampY, rampZ] = access.lowerRamp.position;
+    const [rampWidth, rampHeight, rampDepth] = access.lowerRamp.size;
+    const rampAuthorities = map.physicsColliders.filter((bounds) =>
+      Math.abs(bounds.minX - (rampX - rampWidth / 2)) < 1e-6
+      && Math.abs(bounds.maxX - (rampX + rampWidth / 2)) < 1e-6
+      && Math.abs((bounds.minY ?? -Infinity) - (rampY - rampHeight / 2)) < 1e-6
+      && Math.abs((bounds.maxY ?? Infinity) - (rampY + rampHeight / 2)) < 1e-6
+      && Math.abs(bounds.minZ - (rampZ - rampDepth / 2)) < 1e-6
+      && Math.abs(bounds.maxZ - (rampZ + rampDepth / 2)) < 1e-6
+      && Math.abs((bounds.rotation?.[0] ?? 0) - access.lowerRamp.rotation[0]) < 1e-6
+    );
+    expect(rampAuthorities).toHaveLength(1);
+
+    const lowerAngle = Math.abs(access.lowerRamp.rotation[0]);
+    const lowerHalfRun = Math.cos(lowerAngle) * access.lowerRamp.size[2] / 2;
+    const lowerTopZ = access.lowerRamp.position[2] + lowerHalfRun; // negative X-rot → uphill +Z
+    const landingDownhillZ = access.lowerRamp.landingPosition[2] - access.lowerRamp.landingSize[2] / 2;
+    const lowerOverlap = Math.abs(landingDownhillZ - lowerTopZ);
+    const lowerTopSurface = access.lowerRamp.position[1]
+      + Math.sin(lowerAngle) * access.lowerRamp.size[2] / 2
+      + Math.cos(lowerAngle) * access.lowerRamp.size[1] / 2;
+    const lowerRampLandingTop = rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]);
+    const lowerLip = lowerRampLandingTop - (lowerTopSurface - Math.tan(lowerAngle) * lowerOverlap);
+    expect(lowerOverlap, 'lower-ramp landing overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap);
+    expect(Math.abs(lowerLip), 'lower-ramp landing lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+
+    const shipAngle = Math.abs(access.shipLadder.rotation[0]);
+    const shipHalfRun = Math.cos(shipAngle) * access.shipLadder.size[2] / 2;
+    // Positive X rotation: local +Z downhill, local -Z uphill.
+    const shipLowZ = access.shipLadder.position[2] + shipHalfRun;
+    const shipHighZ = access.shipLadder.position[2] - shipHalfRun;
+    const lowerLandingInnerZ = access.shipLadder.lowerLandingPosition[2] - access.shipLadder.lowerLandingSize[2] / 2;
+    const upperLandingOuterZ = access.shipLadder.upperLandingPosition[2] + access.shipLadder.upperLandingSize[2] / 2;
+    const lowOverlap = Math.abs(lowerLandingInnerZ - shipLowZ);
+    const highOverlap = Math.abs(upperLandingOuterZ - shipHighZ);
+    const shipHighSurface = access.shipLadder.position[1]
+      + Math.sin(shipAngle) * access.shipLadder.size[2] / 2
+      + Math.cos(shipAngle) * access.shipLadder.size[1] / 2;
+    const shipLowSurface = access.shipLadder.position[1]
+      - Math.sin(shipAngle) * access.shipLadder.size[2] / 2
+      + Math.cos(shipAngle) * access.shipLadder.size[1] / 2;
+    const upperLandingTop = rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]);
+    const shipLowerLandingTop = rustworksDeckTopY(access.shipLadder.lowerLandingPosition[1], access.shipLadder.lowerLandingSize[1]);
+    const highLip = upperLandingTop - (shipHighSurface - Math.tan(shipAngle) * highOverlap);
+    const lowLip = shipLowerLandingTop - (shipLowSurface - Math.tan(shipAngle) * lowOverlap);
+    expect(lowOverlap, 'ship-ladder lower overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap + 0.02);
+    expect(highOverlap, 'ship-ladder upper overlap').toBeLessThanOrEqual(RUSTWORKS_TOWER.maxLandingOverlap + 0.02);
+    expect(Math.abs(highLip), 'ship-ladder upper lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+    expect(Math.abs(lowLip), 'ship-ladder lower lip').toBeLessThan(RUSTWORKS_TOWER.maxTransitionLip);
+  });
+
+  it('walks tower climbs, both undercroft tunnels, and the west trench bidirectionally', async () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const routes = map.root.userData.rustworksRoutes as Record<string, RouteAnchor[]>;
+    await traverseRoute(map, routes['ground-to-lower']);
+    await traverseRoute(map, routes['ground-to-lower'], true);
+    await traverseRoute(map, routes['lower-to-upper']);
+    await traverseRoute(map, routes['lower-to-upper'], true);
+    for (const id of ['undercroft-east-west', 'undercroft-north-south', 'west-service-trench'] as const) {
+      for (const stance of ['stand', 'crouch', 'prone'] as const) {
+        await traverseRoute(map, routes[id], false, stance);
+        await traverseRoute(map, routes[id], true, stance);
+      }
+    }
+  }, 20_000);
+
+  it('keeps the undercroft portals and trench exit gaps clear for every stance capsule', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const undercroft = map.root.userData.rustworksUndercroft as {
+      passageWidth: number; clearHeight: number; portals: string[];
+    };
+    expect(undercroft.portals).toEqual(['north', 'south', 'west', 'east']);
+    expect(undercroft.passageWidth).toBeGreaterThan(0.38 * 2 + 2.2);
+    expect(undercroft.clearHeight).toBeGreaterThan(1.82 + 0.8);
+    for (const stance of ['stand', 'crouch', 'prone'] as const) {
+      const shape = STANCE_SHAPES[stance];
+      const eyeHeight = shape.halfHeight + shape.radius + shape.eyeFromCenter;
+      for (const [x, z] of [[-4.1, 0], [4.1, 0], [0, -4.1], [0, 4.1], [0, 0]] as const) {
+        expect(isBlocked({ x, y: eyeHeight, z }, map.colliders, shape.radius), `${stance} undercroft ${x},${z}`).toBe(false);
+      }
+    }
+
+    const trench = map.root.userData.rustworksTrench as {
+      side: string; x: number; width: number; lateralExitGaps: number;
+    };
+    expect(trench).toMatchObject({ side: 'west', x: -13.8, width: 3.4, lateralExitGaps: 4 });
+    for (const stance of ['stand', 'crouch', 'prone'] as const) {
+      const shape = STANCE_SHAPES[stance];
+      const eyeHeight = shape.halfHeight + shape.radius + shape.eyeFromCenter;
+      for (const z of [-17, -6, 6, 17]) {
+        expect(isBlocked({ x: trench.x, y: eyeHeight, z }, map.colliders, shape.radius), `${stance} trench centre ${z}`).toBe(false);
+      }
+      for (const z of [-6, 6]) {
+        expect(isBlocked({ x: trench.x - 2.4, y: eyeHeight, z }, map.colliders, shape.radius), `${stance} trench west exit ${z}`).toBe(false);
+        expect(isBlocked({ x: trench.x + 2.4, y: eyeHeight, z }, map.colliders, shape.radius), `${stance} trench east exit ${z}`).toBe(false);
+      }
+    }
+  });
+
+  it('keeps thin split rails clear of both authored access corridors', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const access = map.root.userData.rustworksAccess as {
+      lowerRamp: { landingPosition: [number, number, number]; landingSize: [number, number, number] };
+      shipLadder: {
+        upperLandingPosition: [number, number, number];
+        upperLandingSize: [number, number, number];
+        bridgePosition: [number, number, number];
+        bridgeSize: [number, number, number];
+      };
+    };
+    const solidMeshes: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && /deck-rail|rail-post/i.test(node.name) && !node.name.includes('ship-ladder')) {
+        solidMeshes.push(node);
+      }
+    });
+    expect(solidMeshes.length).toBeGreaterThanOrEqual(10);
+    const corridors = [
+      {
+        minX: access.lowerRamp.landingPosition[0] - access.lowerRamp.landingSize[0] / 2,
+        maxX: access.lowerRamp.landingPosition[0] + access.lowerRamp.landingSize[0] / 2,
+        minY: rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]),
+        maxY: rustworksDeckTopY(access.lowerRamp.landingPosition[1], access.lowerRamp.landingSize[1]) + 2.0,
+        minZ: access.lowerRamp.landingPosition[2] - access.lowerRamp.landingSize[2] / 2,
+        maxZ: access.lowerRamp.landingPosition[2] + access.lowerRamp.landingSize[2] / 2,
+      },
+      {
+        minX: access.shipLadder.upperLandingPosition[0] - access.shipLadder.upperLandingSize[0] / 2,
+        maxX: access.shipLadder.upperLandingPosition[0] + access.shipLadder.upperLandingSize[0] / 2,
+        minY: rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]),
+        maxY: rustworksDeckTopY(access.shipLadder.upperLandingPosition[1], access.shipLadder.upperLandingSize[1]) + 2.0,
+        minZ: access.shipLadder.upperLandingPosition[2] - access.shipLadder.upperLandingSize[2] / 2,
+        maxZ: access.shipLadder.upperLandingPosition[2] + access.shipLadder.upperLandingSize[2] / 2,
+      },
+      {
+        minX: access.shipLadder.bridgePosition[0] - access.shipLadder.bridgeSize[0] / 2,
+        maxX: access.shipLadder.bridgePosition[0] + access.shipLadder.bridgeSize[0] / 2,
+        minY: rustworksDeckTopY(access.shipLadder.bridgePosition[1], access.shipLadder.bridgeSize[1]),
+        maxY: rustworksDeckTopY(access.shipLadder.bridgePosition[1], access.shipLadder.bridgeSize[1]) + 2.0,
+        minZ: access.shipLadder.bridgePosition[2] - access.shipLadder.bridgeSize[2] / 2,
+        maxZ: access.shipLadder.bridgePosition[2] + access.shipLadder.bridgeSize[2] / 2,
+      },
+    ];
+    for (const mesh of solidMeshes) {
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      for (const corridor of corridors) {
+        const overlaps = box.max.x > corridor.minX + 0.05
+          && box.min.x < corridor.maxX - 0.05
+          && box.max.y > corridor.minY + 0.05
+          && box.min.y < corridor.maxY - 0.05
+          && box.max.z > corridor.minZ + 0.05
+          && box.min.z < corridor.maxZ - 0.05;
+        expect(overlaps, `${mesh.name}@${mesh.position.toArray().join(',')} blocks access corridor`).toBe(false);
+      }
+    }
+  });
+
+  it('builds an untimed three-distance score range with reusable targets', () => {
+    const map = buildGunRange(new THREE.Scene());
+    expect(map.id).toBe('gun-range');
+    expect(map.label).toBe('Indoor Gun Range');
+    const scoreRangeTargets = map.targets.filter((target) => target.kind !== 'training-dummy');
+    expect(scoreRangeTargets).toHaveLength(16);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
+    expect(scoreRangeTargets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
+      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
+    ]);
+    expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
+    expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
+    const staticPlates = map.targets.filter((target) => target.kind === 'plate' && !target.id.startsWith('lateral-'));
+    expect(staticPlates.every((target) => target.root.getObjectByName('range-bullseye')?.userData.hitZone === 'head')).toBe(true);
+    expect(staticPlates.every((target) => target.root.children.some((child) => /point-range-plate/.test(child.name) && child.userData.hitZone === 'body'))).toBe(true);
+    const cat = map.targets.find((target) => target.id === 'flying-black-cat');
+    expect(cat).toMatchObject({ kind: 'flying-cat', maxHealth: 100, health: 100, scoreValue: 500, respawnDelayMs: 30_000, alwaysCritical: true });
+    expect(map.root.getObjectByName('gun-range-flying-black-cat')).toBeTruthy();
+    expect(map.root.children.find((child) => child.name === 'gun-range-flying-black-cat')?.children.filter((child) => child.name === 'flying-black-cat-trail-star')).toHaveLength(8);
+    expect(map.root.getObjectByName('gun-range-firing-line')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-firing-line')?.position.z).toBe(GUN_RANGE_FIRING_LINE_Z);
+    expect(map.physicsColliders).toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
+    expect(map.colliders).not.toContainEqual(GUN_RANGE_FIRING_LINE_BARRIER);
+    expect(map.raycastMeshes.some((mesh) => mesh.name === 'gun-range-firing-line')).toBe(false);
+    expect(GUN_RANGE_FIRING_LINE_BARRIER.maxY).toBeGreaterThan(5);
+    expect(map.root.getObjectByName('gun-range-backstop')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-ceiling')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-left-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-right-wall')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-control-room')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
+    expect(map.root.getObjectByName('gun-range-wallbang-panel-glass')).toBeTruthy();
+    const wallbangSurfaces = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
+    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
+    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-floor-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-strip')).toHaveLength(2);
+    expect(map.root.children.filter((child) => child.name === 'gun-range-ceiling-neon-rib')).toHaveLength(4);
+    const presentationBatches = map.root.userData.gunRangePresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(presentationBatches.sourceMeshes).toBeGreaterThanOrEqual(30);
+    expect(presentationBatches.batches).toBeGreaterThan(0);
+    expect(presentationBatches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+    expect(map.root.children.some((node) => node.name.startsWith('gun-range-presentation-batch-') && node.visible)).toBe(true);
+    expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(gunRangeVisualDefinition.budgets.maximumDrawCalls);
+    expect(auditLocalLightOcclusion(map.root)).toMatchObject({
+      activeLocalLights: 0,
+      emissiveOnlySources: 16,
+      violations: [],
+    });
+    expect(map.root.getObjectByName('gun-range-moderate-ambient')).toBeInstanceOf(THREE.HemisphereLight);
+    const wallMaterial = (map.root.getObjectByName('gun-range-left-wall') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const ceilingMaterial = (map.root.getObjectByName('gun-range-ceiling') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(wallMaterial.userData.gunRangeShell).toBe('white-silver-wall');
+    expect(ceilingMaterial.userData.gunRangeShell).toBe('white-silver-ceiling');
+    expect(wallMaterial.color.getHex()).toBe(0xb8c1c4);
+    expect(ceilingMaterial.color.getHex()).toBe(0xd7dbdc);
+    const neon = map.root.children.find((child) => child.name === 'gun-range-cycling-neon-light') as THREE.PointLight;
+    const before = neon.color.getHex();
+    const lateralTarget = map.root.getObjectByName('gun-range-lateral-illuminated-target') as THREE.Group;
+    const lateralTargetStart = lateralTarget.position.clone();
+    const bayMaterial = map.root.userData.gunRangeBayLightMaterial as THREE.MeshStandardMaterial;
+    const bayIntensity = bayMaterial.emissiveIntensity;
+    updateGunRangePresentation(map.root, 9_000);
+    expect(neon.color.getHex()).not.toBe(before);
+    expect(lateralTarget.position.equals(lateralTargetStart)).toBe(false);
+    expect(lateralTarget.userData.lateralAmplitudeM).toBeGreaterThanOrEqual(3);
+    const lateralPlate = lateralTarget.getObjectByName('gun-range-lateral-target-plate') as THREE.Mesh;
+    expect(lateralPlate).toBeInstanceOf(THREE.Mesh);
+    expect((lateralPlate.material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(2.8);
+    expect(bayMaterial.emissiveIntensity).not.toBe(bayIntensity);
+    const boothDividers = map.root.children.filter((child) => child.name === 'gun-range-booth-divider');
+    expect(boothDividers.map((divider) => divider.position.x)).toEqual([-15, -9, -3, 3, 9, 15]);
+    expect(boothDividers.every((divider) => Math.abs(divider.position.x) > 0.08)).toBe(true);
+    const stations = map.root.children.filter((child) => child.name.startsWith('gun-range-weapon-station-'));
+    expect(stations).toHaveLength(5);
+    expect(stations.map((station) => station.userData.weapon)).toEqual(['carbine', 'smg', 'lmg', 'scattergun', 'sniper']);
+    const testDummies = map.targets.filter((target) => target.kind === 'training-dummy');
+    expect(testDummies).toHaveLength(4);
+    expect(testDummies.every((target) => target.maxHealth === 300 && target.root.userData.armed === false)).toBe(true);
+    expect(map.bounds.maxX - map.bounds.minX).toBeGreaterThanOrEqual(40);
+    expect(map.bounds.maxZ - map.bounds.minZ).toBeGreaterThanOrEqual(67);
+    expectGunRangeSpawnContract(map);
+  });
+
+  it('builds a collision-backed five-second tunnel and a fail-closed canonical test-bay plan', async () => {
+    const map = buildGunRange(new THREE.Scene());
+    const requiredGeometry = [
+      'gun-range-test-bay-corridor-floor',
+      'gun-range-test-bay-corridor-north-wall',
+      'gun-range-test-bay-corridor-south-wall',
+      'gun-range-test-bay-corridor-ceiling',
+      'gun-range-test-bay-secure-door-leaf',
+      'gun-range-test-bay-floor',
+      'gun-range-test-bay-ceiling',
+      'gun-range-test-bay-east-wall',
+      'gun-range-test-bay-north-wall',
+      'gun-range-test-bay-south-wall',
+    ];
+    for (const name of requiredGeometry) expect(map.root.getObjectByName(name), name).toBeTruthy();
+    expect(map.root.userData.gunRangeTestBayContract).toBe(GUN_RANGE_TEST_BAY_CONTRACT);
+    expect(map.root.userData.gunRangeTestBayRuntime).toEqual({
+      structure: 'implemented',
+      slowUnarmedTargets: 'implemented',
+      doorHelper: 'integrated-by-main-runtime',
+      supportActivation: 'host-authoritative-training-integration',
+      weaponInteraction: 'canonical-training-integration',
+    });
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-support-pad-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.supportStations.length,
+    );
+    expect(namedPrefixCount(map.root, 'gun-range-test-bay-weapon-marker-')).toBe(
+      GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.length,
+    );
+
+    // The east wall really is split: movement and ballistics have no static
+    // blocker through the corridor aperture, while both jamb regions remain solid.
+    const portalProbe = { x: 20.5, y: 1.7, z: 12 };
+    expect(isBlocked(portalProbe, map.colliders, 0.38)).toBe(false);
+    expect(isBlocked({ x: 20.5, y: 1.7, z: 5 }, map.colliders, 0.38)).toBe(true);
+    expect(map.shotSurfaces.some((surface) => (
+      surface.bounds.minX <= portalProbe.x && surface.bounds.maxX >= portalProbe.x
+      && surface.bounds.minZ <= portalProbe.z && surface.bounds.maxZ >= portalProbe.z
+      && (surface.bounds.minY ?? -Infinity) <= portalProbe.y && (surface.bounds.maxY ?? Infinity) >= portalProbe.y
+    ))).toBe(false);
+
+    await traverseRoute(map, [
+      { id: 'range-entry', position: [18, 1.7, 12] },
+      { id: 'corridor-entry', position: [22, 1.7, 12] },
+      { id: 'secure-door', position: [51, 1.7, 12] },
+      { id: 'test-bay-centre', position: [72, 1.7, 6] },
+    ]);
+
+    const closed = createGunRangeTestBayDoorState(0);
+    expect(gunRangeTestBayDoorDynamicColliders(closed)).toHaveLength(1);
+    const frame = updateGunRangeTestBayDoor(map.root, 0, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+    expect(frame).toMatchObject({ audioIntent: 'secure-door-opening-thump' });
+    expect(frame.dynamicColliders).toHaveLength(1);
+    const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf');
+    expect(leaf?.userData.phase).toBe('opening');
+  });
+
+  it('attaches a textured two-face door assembly and labels every canonical test-bay weapon', () => {
+    const restoreDocument = installCanvasDocument();
+    try {
+      const map = buildGunRange(new THREE.Scene());
+      const labels = GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map((station) => {
+        const label = map.root.getObjectByName(`gun-range-test-bay-weapon-label-${station.id}`) as THREE.Mesh;
+        expect(label, station.id).toBeInstanceOf(THREE.Mesh);
+        expect(label.parent?.name).toBe(`gun-range-test-bay-weapon-marker-${station.id}`);
+        expect(label.userData).toMatchObject({
+          weaponId: station.id,
+          canonicalWeaponName: WEAPONS[station.id].name,
+          text: WEAPONS[station.id].name.toUpperCase(),
+        });
+        expect((label.material as THREE.MeshBasicMaterial).side).toBe(THREE.DoubleSide);
+        return label;
+      });
+      expect(labels).toHaveLength(GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.length);
+      expect(map.root.userData.gunRangeTestBayWeaponLabels).toEqual(
+        GUN_RANGE_TEST_BAY_CONTRACT.weaponStations.map((station) => ({
+          id: station.id,
+          name: WEAPONS[station.id].name,
+          objectName: `gun-range-test-bay-weapon-label-${station.id}`,
+        })),
+      );
+
+      const leaf = map.root.getObjectByName('gun-range-test-bay-secure-door-leaf') as THREE.Mesh;
+      expect(leaf.position.y).toBe(3.25);
+      const panel = leaf.material as THREE.MeshStandardMaterial;
+      expect(panel.name).toBe('GunRange_TestBay_SecureDoor_PanelTexture');
+      expect(panel.userData.surfacePattern).toBe('panel');
+      expect(panel.map).toBeInstanceOf(THREE.CanvasTexture);
+      const fixtureNames = [
+        'gun-range-test-bay-door-edge-north',
+        'gun-range-test-bay-door-edge-south',
+        'gun-range-test-bay-door-status-range-face',
+        'gun-range-test-bay-door-status-bay-face',
+      ];
+      const fixtures = fixtureNames.map((name) => map.root.getObjectByName(name) as THREE.Mesh);
+      expect(fixtures.every((fixture) => fixture.parent === leaf && fixture.userData.dynamic === true)).toBe(true);
+      expect(map.root.children.some((child) => fixtureNames.includes(child.name))).toBe(false);
+      expect(fixtures.slice(0, 2).map((fixture) => Math.abs(fixture.position.z))).toEqual([3.86, 3.86]);
+      expect(fixtures.slice(2).map((fixture) => Math.sign(fixture.position.x))).toEqual([-1, 1]);
+      expect(fixtures.slice(2).every((fixture) => (
+        fixture.userData.doorAssemblyRole === 'status-light'
+        && (fixture.material as THREE.MeshStandardMaterial).emissiveIntensity > 3
+      ))).toBe(true);
+
+      const assembly = map.root.getObjectByName('gun-range-test-bay-secure-door-assembly') as THREE.Group;
+      expect(assembly.userData.fixtureDepthPlanes).toEqual({
+        leafHalfThicknessM: 0.35,
+        armourFaceM: 0.358,
+        braceFaceM: 0.37,
+        spineFaceM: 0.382,
+        detailFaceM: 0.394,
+        emissiveFaceM: 0.406,
+        emissiveSecondaryFaceM: 0.418,
+        minimumGapM: 0.004,
+      });
+      expect(assembly.userData.emissiveIndicatorAnimation).toBe('static');
+
+      const exactWorldBounds = (mesh: THREE.Mesh): THREE.Box3 => {
+        mesh.geometry.computeBoundingBox();
+        return mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
+      };
+      const overlapsWithVolume = (left: THREE.Box3, right: THREE.Box3): boolean => {
+        const intersection = left.clone().intersect(right);
+        const size = intersection.getSize(new THREE.Vector3());
+        return size.x > 1e-7 && size.y > 1e-7 && size.z > 1e-7;
+      };
+      map.root.updateMatrixWorld(true);
+      const leafBounds = exactWorldBounds(leaf);
+      const leafFixtures = leaf.children.filter((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+      for (const fixture of leafFixtures) {
+        expect(overlapsWithVolume(leafBounds, exactWorldBounds(fixture)), fixture.name).toBe(false);
+      }
+      for (let left = 0; left < leafFixtures.length; left += 1) {
+        for (let right = left + 1; right < leafFixtures.length; right += 1) {
+          expect(
+            overlapsWithVolume(exactWorldBounds(leafFixtures[left]!), exactWorldBounds(leafFixtures[right]!)),
+            `${leafFixtures[left]!.name} overlaps ${leafFixtures[right]!.name}`,
+          ).toBe(false);
+        }
+      }
+      const practicals = [
+        'gun-range-test-bay-door-practical-housing',
+        'gun-range-test-bay-door-practical-emitter',
+        'gun-range-test-bay-door-bay-practical-housing',
+        'gun-range-test-bay-door-bay-practical-emitter',
+      ].map((name) => map.root.getObjectByName(name) as THREE.Mesh);
+      expect(overlapsWithVolume(exactWorldBounds(practicals[0]!), exactWorldBounds(practicals[1]!))).toBe(false);
+      expect(overlapsWithVolume(exactWorldBounds(practicals[2]!), exactWorldBounds(practicals[3]!))).toBe(false);
+
+      const statusMaterials = assembly.userData.statusLightMaterials as THREE.MeshStandardMaterial[];
+      const statusBefore = statusMaterials.map((material) => ({
+        color: material.color.getHex(),
+        emissive: material.emissive.getHex(),
+        intensity: material.emissiveIntensity,
+      }));
+      for (const nowMs of [0, 8_000, 34_000]) updateGunRangePresentation(map.root, nowMs);
+      expect(statusMaterials.map((material) => ({
+        color: material.color.getHex(),
+        emissive: material.emissive.getHex(),
+        intensity: material.emissiveIntensity,
+      }))).toEqual(statusBefore);
+
+      map.root.updateMatrixWorld(true);
+      const before = fixtures[2].getWorldPosition(new THREE.Vector3());
+      updateGunRangeTestBayDoor(map.root, 0, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+      updateGunRangeTestBayDoor(map.root, GUN_RANGE_TEST_BAY_CONTRACT.door.openDurationMs, GUN_RANGE_TEST_BAY_CONTRACT.door.trigger);
+      map.root.updateMatrixWorld(true);
+      const after = fixtures[2].getWorldPosition(new THREE.Vector3());
+      expect(after.y - before.y).toBeCloseTo(GUN_RANGE_TEST_BAY_CONTRACT.door.travelM, 6);
+      expect(after.x).toBeCloseTo(before.x, 6);
+      expect(after.z).toBeCloseTo(before.z, 6);
+    } finally {
+      restoreDocument();
+    }
+  });
+
+  it('physically contains the Gun Range player at all four map edges', async () => {
+    const map = buildGunRange(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      for (const direction of [
+        { x: 0.3, z: 0 }, { x: -0.3, z: 0 }, { x: 0, z: 0.3 }, { x: 0, z: -0.3 },
+      ]) {
+        physics.teleportEye({ x: 0, y: 1.7, z: -17 });
+        let position = physics.eyePosition();
+        for (let step = 0; step < 240; step += 1) {
+          position = physics.move({ x: direction.x, y: -0.01, z: direction.z }, 1 / 120).position;
+        }
+        expect(position.x).toBeGreaterThan(map.bounds.minX);
+        expect(position.x).toBeLessThan(map.bounds.maxX);
+        expect(position.z).toBeGreaterThan(map.bounds.minZ);
+        expect(position.z).toBeLessThan(map.bounds.maxZ);
+        expect(position.y).toBeGreaterThan(1.5);
+      }
+    } finally {
+      physics.dispose();
+    }
+  });
+
+  it('builds an original airport-terminal arena with concourse, jet bridge, fuselage, and tarmac apron', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.id).toBe('skyline-terminal');
+    expect(map.label).toBe('Terminal');
+    expect(map.root.name).toContain('Skyline Terminal');
+    expect(map.colliders.length).toBeGreaterThanOrEqual(15);
+    expect(map.raycastMeshes.length).toBeGreaterThanOrEqual(15);
+    expect(map.spawns[0].length).toBeGreaterThanOrEqual(6);
+    expect(map.spawns[1].length).toBeGreaterThanOrEqual(6);
+    expect(map.patrolPoints.length).toBeGreaterThanOrEqual(12);
+    expect(map.breakableWindows.length).toBeGreaterThanOrEqual(4);
+    expect(map.physicalCover.length).toBeGreaterThanOrEqual(5);
+    expect(map.root.getObjectByName('skyline-tarmac-apron')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-concourse-floor')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetbridge-floor')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetliner-fuselage-top')).toBeTruthy();
+  });
+
+  it('exposes coherent terminal-story clusters and presentation batching', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const mainSign = map.root.getObjectByName('skyline-terminal-main-sign');
+    expect(mainSign).toBeTruthy();
+    expect(mainSign?.userData.label).toBe('TERMINAL - GATES 1-12');
+
+    const flightDisplay = map.root.getObjectByName('skyline-flight-display-board');
+    expect(flightDisplay).toBeTruthy();
+    expect(flightDisplay?.userData.label).toBe('DEPARTURES - FLIGHT AERO 86');
+
+    expect(map.root.getObjectByName('skyline-baggage-claim-carousel')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-fuel-trailer')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-fuel-trailer-tank')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-jetliner-cockpit-partition')).toBeUndefined();
+    expect(map.root.getObjectByName('skyline-upper-kiosk--12')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-upper-kiosk-12')).toBeTruthy();
+    expect(map.root.getObjectByName('skyline-wood-pallet-west-deck-0-0')).toBeTruthy();
+
+    const clusterIds = [
+      'floor-language',
+      'wall-structure',
+      'escalator-detail',
+      'window-frame',
+      'aircraft-skin',
+      'apron-marking',
+      'terminal-story',
+      'concourse-cover',
+      'boarding-route',
+      'quality-aircraft',
+      'service-equipment',
+    ];
+    expect(map.root.userData.skylineDetailClusters).toEqual(clusterIds);
+    for (const clusterId of clusterIds) {
+      let semanticNodes = 0;
+      map.root.traverse((node) => {
+        if (node.userData.skylineCluster === clusterId) semanticNodes += 1;
+      });
+      expect(semanticNodes, clusterId).toBeGreaterThan(0);
+    }
+
+    const batches = map.root.userData.skylinePresentationBatches as {
+      sourceMeshes: number;
+      batches: number;
+      savedDrawCalls: number;
+    };
+    expect(batches.sourceMeshes).toBeGreaterThanOrEqual(30);
+    expect(batches.batches).toBeGreaterThan(0);
+    expect(batches.savedDrawCalls).toBeGreaterThanOrEqual(24);
+  });
+
+  it('ships the Pass 60 white-silver terminal reskin as an obvious authored environment', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.root.userData.skylineReskin).toEqual({
+      version: 'pass-60-total-overhaul',
+      palette: 'white-silver-cyan-magenta',
+      routeGeometryChanged: false,
+      authoritativeCeiling: true,
+    });
+
+    for (const name of [
+      'skyline-terminal-silver-ceiling',
+      'skyline-floor-cyan-runner-west',
+      'skyline-floor-magenta-crossing',
+      'skyline-mezzanine-coffer-0',
+      'skyline-mezzanine-coffer-light-0',
+      'skyline-overhead-gate-sign--18',
+      'skyline-overhead-gate-sign-18',
+      'skyline-airside-roof-crown',
+      'skyline-airside-identity--18',
+      'skyline-airside-identity-18',
+      'skyline-roof-sculptural-fin-0',
+      'skyline-apron-cyan-guidance-west',
+      'skyline-apron-magenta-guidance-east',
+      'skyline-aircraft-livery-cyan-north-forward',
+      'skyline-aircraft-livery-cyan-north-aft',
+      'skyline-aircraft-livery-magenta-south',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+
+    const ceiling = map.root.getObjectByName('skyline-terminal-silver-ceiling') as THREE.Mesh;
+    expect(map.raycastMeshes).toContain(ceiling);
+    expect(ceiling.userData.ballisticSurfaceId).toEqual(expect.any(String));
+    expect((ceiling.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xf2f5f1);
+
+    const cyan = map.root.getObjectByName('skyline-floor-cyan-runner-west') as THREE.Mesh;
+    const magenta = map.root.getObjectByName('skyline-floor-magenta-crossing') as THREE.Mesh;
+    expect((cyan.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
+    expect((magenta.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(1);
+  });
+
+  it('provides UVs for every textured Terminal mesh, including both authored wing prisms', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const missingUv: string[] = [];
+    const texturedProperties = [
+      'map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'lightMap', 'emissiveMap',
+    ] as const;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      const textured = materials.some((material) => texturedProperties.some(
+        (property) => (material as THREE.Material & Record<string, unknown>)[property] instanceof THREE.Texture,
+      ));
+      if (textured && !node.geometry.getAttribute('uv')) missingUv.push(node.name || node.uuid);
+    });
+    expect(missingUv).toEqual([]);
+
+    for (const name of ['skyline-quality-wing-port', 'skyline-quality-wing-starboard']) {
+      const wing = map.root.getObjectByName(name) as THREE.Mesh;
+      const position = wing.geometry.getAttribute('position');
+      const uv = wing.geometry.getAttribute('uv');
+      expect(uv.itemSize, name).toBe(2);
+      expect(uv.count, name).toBe(position.count);
+      expect(Array.from(uv.array), name).toSatisfy((values: number[]) => (
+        values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+      ));
+    }
+  });
+
+  it('keeps six breakable facade panes independent from the added mullion frames', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.breakableWindows.map((window) => window.id)).toEqual([
+      'skyline-window--22',
+      'skyline-window--14',
+      'skyline-window--6',
+      'skyline-window-6',
+      'skyline-window-14',
+      'skyline-window-22',
+    ]);
+    for (const window of map.breakableWindows) {
+      expect(window.mesh.userData.dynamic).toBe(true);
+      expect(window.mesh.userData.breakableWindowId).toBe(window.id);
+    }
+    for (const winX of [-22, -14, -6, 6, 14, 22]) {
+      expect(map.root.getObjectByName(`skyline-window-frame-top-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+      expect(map.root.getObjectByName(`skyline-window-mullion-${winX}`)?.userData.breakableWindowId).toBeUndefined();
+    }
+  });
+
+  it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const team of [0, 1] as const) {
+      expect(map.spawns[team]).toHaveLength(6);
+      for (const spawn of map.spawns[team]) {
+        expect(pointInsideBounds(spawn, map.bounds, 0.5)).toBe(true);
+        expect(isBlocked(spawn, map.colliders, 0.44), `${team}:${spawn.toArray().join(',')}`).toBe(false);
+      }
+      for (let first = 0; first < map.spawns[team].length; first += 1) {
+        for (let second = first + 1; second < map.spawns[team].length; second += 1) {
+          expect(map.spawns[team][first].distanceTo(map.spawns[team][second])).toBeGreaterThanOrEqual(6);
+        }
+      }
+    }
+  });
+
+  it('keeps primary Skyline silhouettes visible while reserving secondary detail for Quality', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const performanceSign = map.root.getObjectByName('skyline-terminal-main-sign');
+    const qualityBoard = map.root.getObjectByName('skyline-flight-display-board');
+    const qualityNacelles = map.root.getObjectByName('skyline-aircraft-engine-nacelles');
+    const qualityShells = [
+      map.root.getObjectByName('skyline-quality-fuselage-shell-forward'),
+      map.root.getObjectByName('skyline-quality-fuselage-shell-aft'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward'),
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft'),
+    ];
+    const fuselagePlaceholder = map.root.getObjectByName('skyline-jetliner-fuselage-top') as THREE.Mesh;
+    const coreFloor = map.root.getObjectByName('skyline-concourse-floor');
+    expect(performanceSign).toBeTruthy();
+    expect(qualityBoard).toBeTruthy();
+    expect(qualityNacelles).toBeTruthy();
+    expect(qualityShells.every(Boolean)).toBe(true);
+    expect(qualityShells.every((shell) => shell?.userData.assetOwner === 'skyline-terminal')).toBe(true);
+    applyAdditionalMapPresentationProfile(map.root, 'performance');
+    expect(performanceSign?.visible).toBe(true);
+    expect(qualityBoard?.visible).toBe(false);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+    expect(coreFloor?.visible).not.toBe(false);
+    applyAdditionalMapPresentationProfile(map.root, 'blender');
+    expect(performanceSign?.visible).toBe(true);
+    expect(qualityBoard?.visible).toBe(true);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+    applyAdditionalMapPresentationProfile(map.root, 'compat');
+    expect(qualityBoard?.visible).toBe(false);
+    expect(qualityNacelles?.visible).toBe(true);
+    expect(qualityShells.every((shell) => shell?.visible === true)).toBe(true);
+    expect((fuselagePlaceholder.material as THREE.Material).colorWrite).toBe(false);
+  });
+
+  it('HF-188 binds every retained Terminal placeholder collider to visible authored presentation in every profile', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineCollisionPresentationAudit as {
+      version: string;
+      entries: Array<{ placeholder: string; authorityId: string | null; presentationNames: string[] }>;
+      unownedPlaceholders: string[];
+    };
+    expect(audit.version).toBe('hf-188-profile-authority-v1');
+    expect(audit.entries.length).toBeGreaterThan(0);
+    expect(audit.unownedPlaceholders).toEqual([]);
+    expect(audit.entries.every((entry) => entry.authorityId && entry.presentationNames.length > 0)).toBe(true);
+
+    for (const profile of ['performance', 'blender', 'compat'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      for (const entry of audit.entries) {
+        const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+        const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+        expect(placeholder.userData.skylineCollisionPresentationVisible, `${profile}:${entry.placeholder}:binding`).toBe(true);
+        expect(materials.every((material) => !material.colorWrite && !material.depthWrite), `${profile}:${entry.placeholder}:hidden-proxy`).toBe(true);
+        expect(entry.presentationNames.some((name) => map.root.getObjectByName(name)?.visible), `${profile}:${entry.placeholder}:presentation`).toBe(true);
+      }
+    }
+
+    const engine = map.root.getObjectByName('skyline-jetliner-engine-1') as THREE.Mesh<THREE.BoxGeometry>;
+    const fuel = map.root.getObjectByName('skyline-fuel-trailer') as THREE.Mesh<THREE.BoxGeometry>;
+    expect(engine.geometry.parameters).toMatchObject({ width: 1.9, height: 1.9, depth: 4.1 });
+    expect(fuel.geometry.parameters).toMatchObject({ width: 5.2, height: 2.2, depth: 2.2 });
+    expect(audit.entries.filter((entry) => entry.placeholder.includes('skyline-tarmac-cargo-'))).toHaveLength(10);
+
+    for (const name of new Set(audit.entries.flatMap((entry) => entry.presentationNames))) {
+      const presentation = map.root.getObjectByName(name);
+      if (presentation) presentation.visible = false;
+    }
+    applyAdditionalMapPresentationProfile(map.root, 'performance');
+    for (const entry of audit.entries) {
+      const placeholder = map.root.getObjectByName(entry.placeholder) as THREE.Mesh;
+      const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
+      expect(placeholder.userData.skylineCollisionPresentationVisible, entry.placeholder).toBe(false);
+      expect(materials.every((material) => material.colorWrite && material.depthWrite), entry.placeholder).toBe(true);
+    }
+  });
+
+  it('gives the Quality aircraft a separate BackSide cabin roof without closing the boarding aperture', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const ceilingShells = [
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-forward') as THREE.Mesh,
+      map.root.getObjectByName('skyline-quality-cabin-ceiling-shell-aft') as THREE.Mesh,
+    ];
+    expect(ceilingShells.every((shell) => shell instanceof THREE.Mesh)).toBe(true);
+    for (const shell of ceilingShells) {
+      const material = shell.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-aircraft-interior-ceiling-material');
+      expect(material.side).toBe(THREE.BackSide);
+      expect(material.side).not.toBe(THREE.DoubleSide);
+      expect(shell.userData.interiorFaceOrientation).toBe('back-side');
+      expect(shell.userData.boardingAperturePreserved).toBe(true);
+    }
+    const forwardBounds = new THREE.Box3().setFromObject(ceilingShells[0]);
+    const aftBounds = new THREE.Box3().setFromObject(ceilingShells[1]);
+    expect(forwardBounds.max.x).toBeLessThan(-1.8);
+    expect(aftBounds.min.x).toBeGreaterThan(1.8);
+    expect(isBlocked({ x: 0, y: 5.02, z: 0.4 }, map.colliders, 0.35)).toBe(false);
+  });
+
+  it('authors an open boarding walkway and cabin aisle without opaque door panels', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const removed of [
+      'skyline-aircraft-door-jamb-left',
+      'skyline-aircraft-door-jamb-right',
+      'skyline-aircraft-door-header',
+      'skyline-aircraft-door-threshold-seal',
+      'skyline-aircraft-boarding-sign',
+      'skyline-aircraft-open-door-leaf',
+      'skyline-aircraft-door-handle',
+      'skyline-cockpit-door-panel',
+      'skyline-cockpit-door-mark',
+      'skyline-jetliner-cockpit-partition',
+      'skyline-jetbridge-bellows',
+      'skyline-quality-fuselage-shell',
+      'skyline-jetliner-nose',
+    ]) expect(map.root.getObjectByName(removed), removed).toBeUndefined();
+    const clearance = map.root.userData.skylineCabinClearance as {
+      aisleMetres: number;
+      physicsPlayerDiameterMetres: number;
+      clearanceProbeDiameterMetres: number;
+      doorVisibleApertureMetres: number;
+      cockpitVisibleApertureMetres: number;
+      cockpitAccessibleDepthMetres: number;
+      opaqueDoorPanels: number;
+    };
+    expect(clearance.aisleMetres).toBeGreaterThanOrEqual(1.15);
+    expect(clearance.physicsPlayerDiameterMetres).toBe(0.76);
+    expect(clearance.clearanceProbeDiameterMetres).toBe(0.88);
+    expect(clearance.aisleMetres).toBeGreaterThan(clearance.clearanceProbeDiameterMetres);
+    expect(clearance.doorVisibleApertureMetres).toBeGreaterThanOrEqual(1.8);
+    expect(clearance.cockpitVisibleApertureMetres).toBeGreaterThanOrEqual(2.5);
+    expect(clearance.cockpitAccessibleDepthMetres).toBeGreaterThanOrEqual(2.5);
+    expect(clearance.opaqueDoorPanels).toBe(0);
+    for (const name of [
+      'skyline-jetbridge-bellows-side--1.93',
+      'skyline-jetbridge-bellows-side-1.93',
+      'skyline-jetbridge-bellows-header',
+      'skyline-cockpit-floor',
+      'skyline-cockpit-glass-front',
+      'skyline-quality-fuselage-shell-forward',
+      'skyline-quality-fuselage-shell-aft',
+    ]) expect(map.root.getObjectByName(name), name).toBeTruthy();
+  });
+
+  it('proves every open Terminal aperture has visual, movement, and shot parity in both profiles', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineOpeningAudit as Record<'performance' | 'quality', Array<{
+      id: string;
+      movementBlockers: number;
+      shotBlockers: number;
+      opaquePresentationBlockers: number;
+      opaquePresentationBlockerNames: string[];
+    }>>;
+    for (const profile of ['performance', 'quality'] as const) {
+      expect(audit[profile].map((entry) => entry.id)).toEqual([
+        'terminal-gate',
+        'aircraft-boarding',
+        'cockpit-entry',
+      ]);
+      for (const opening of audit[profile]) {
+        expect(opening, `${profile}:${opening.id}`).toMatchObject({
+          movementBlockers: 0,
+          shotBlockers: 0,
+          opaquePresentationBlockers: 0,
+          opaquePresentationBlockerNames: [],
+        });
+      }
+    }
+  });
+
+  it('uses transparent depth-safe glazing for cockpit and cabin apertures while keeping flight screens opaque', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const name of [
+      'skyline-cockpit-glass-front',
+      'skyline-cockpit-glass-north',
+      'skyline-cockpit-glass-south',
+      'skyline-cabin-window-north--13.5',
+      'skyline-cabin-window-inner-south-13.5',
+    ]) {
+      const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+      expect(mesh, name).toBeInstanceOf(THREE.Mesh);
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      expect(material.name).toBe('skyline-cockpit-glass-material');
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBeLessThan(0.5);
+      expect(material.depthWrite).toBe(false);
+      expect(material.side).toBe(THREE.DoubleSide);
+    }
+    const screen = map.root.getObjectByName('skyline-flight-screen--29') as THREE.Mesh;
+    const screenMaterial = screen.material as THREE.MeshStandardMaterial;
+    expect(screenMaterial.name).toBe('skyline-flight-screen-material');
+    expect(screenMaterial.transparent).toBe(false);
+    expect(screenMaterial.depthWrite).toBe(true);
+    expect(screenMaterial.emissiveIntensity).toBeGreaterThan(0.5);
+    const screenFace = map.root.getObjectByName('skyline-flight-screen-face--29--19.895');
+    expect(screenFace?.userData.label).toBe('FLIGHT INFO - GATES 01—03');
+    expect(map.root.getObjectByName('skyline-flight-screen-frame-top--29')).toBeTruthy();
+  });
+
+  it('adds deliberate concourse cover while preserving centre and flank lanes', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    expect(map.physicalCover.map((cover) => cover.id)).toEqual(expect.arrayContaining([
+      'concourse-seating-west',
+      'concourse-seating-east',
+      'concourse-planter-west',
+      'concourse-planter-east',
+    ]));
+    for (const [x, z] of [[0, -16.7], [-18, -16.7], [18, -16.7]] as const) {
+      expect(isBlocked({ x, y: 0, z }, map.colliders, 0.44), `${x}:${z}`).toBe(false);
+    }
+  });
+
+  it('walks every Skyline route in both directions with Rapier-backed collision', async () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
+    for (const id of ['concourse-to-mezzanine', 'mezzanine-to-jetbridge', 'fuselage-to-tarmac', 'cabin-through-aisle', 'cabin-to-cockpit']) {
+      await traverseRoute(map, routes[id]);
+      await traverseRoute(map, routes[id], true);
+    }
+  }, 30_000);
+
+  it('keeps both mezzanine side routes and retained Quality wings physically supported', async () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylinePlatformAuthorityAudit as {
+      version: string;
+      wingSliceCount: number;
+      wingAuthorityMaximumOverhang: number;
+      platforms: Array<{
+        id: string;
+        qualityPresentationName: string | null;
+        movementAuthority: boolean;
+        physicsAuthority: boolean;
+        shotAuthority: boolean;
+      }>;
+    };
+    expect(audit.version).toBe('pass64-shared-platform-authority-v1');
+    expect(audit.wingSliceCount).toBe(8);
+    expect(audit.wingAuthorityMaximumOverhang).toBeLessThan(STANCE_SHAPES.stand.radius);
+    expect(audit.platforms.every((platform) => platform.movementAuthority && platform.physicsAuthority && platform.shotAuthority)).toBe(true);
+    expect(audit.platforms.filter((platform) => platform.id.startsWith('jetliner-wing-'))).toHaveLength(16);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-port')).toHaveLength(8);
+    expect(audit.platforms.filter((platform) => platform.qualityPresentationName === 'skyline-quality-wing-starboard')).toHaveLength(8);
+    expect(terminalVisualDefinition.reviewCameras.map((camera) => camera.id)).toEqual(expect.arrayContaining([
+      'terminal-port-wing-authority',
+      'terminal-starboard-wing-authority',
+    ]));
+    for (const profile of ['performance', 'blender'] as const) {
+      applyAdditionalMapPresentationProfile(map.root, profile);
+      expect(visibleMeshDrawUpperBound(map.root)).toBeLessThanOrEqual(terminalVisualDefinition.budgets.maximumDrawCalls);
+    }
+    for (const [rootZ, tipDeltaZ] of [[3.6, 16.8], [0.4, -16.8]] as const) {
+      for (let sample = 0; sample <= 32; sample += 1) {
+        const t = sample / 32;
+        const z = rootZ + tipDeltaZ * t;
+        const left = -3.2 + 1.9 * t;
+        const right = 2.7 - 0.9 * t;
+        for (const x of [left, (left + right) / 2, right]) {
+          expect(
+            map.physicsColliders.some((collider) => x >= collider.minX - 1e-6
+              && x <= collider.maxX + 1e-6
+              && z >= collider.minZ - 1e-6
+              && z <= collider.maxZ + 1e-6
+              && (collider.minY ?? -Infinity) <= 2.82
+              && (collider.maxY ?? Infinity) >= 2.82),
+            `wing support x=${x.toFixed(3)} z=${z.toFixed(3)}`,
+          ).toBe(true);
+        }
+      }
+    }
+
+    const platformRuns = [
+      { start: { x: -23.8, y: 5.04, z: -33.4 }, target: { x: -23.8, y: 5.04, z: -22.4 } },
+      { start: { x: 23.8, y: 5.04, z: -33.4 }, target: { x: 23.8, y: 5.04, z: -22.4 } },
+      { start: { x: -0.2, y: 4.66, z: 3.9 }, target: { x: 0.18, y: 4.66, z: 20.0 } },
+      { start: { x: -0.2, y: 4.66, z: 0.1 }, target: { x: 0.18, y: 4.66, z: -16.0 } },
+    ];
+    for (const run of platformRuns) {
+      const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+      try {
+        physics.teleportEye(run.start);
+        const result = await walkToward(physics, run.target, 1_200);
+        expect(Math.hypot(result.x - run.target.x, result.z - run.target.z)).toBeLessThan(0.55);
+        expect(Math.abs(result.y - run.target.y)).toBeLessThan(0.55);
+      } finally {
+        physics.dispose();
+      }
+    }
+  }, 30_000);
+
+  it('provides climbable access angles and coherent route anchors across terminal zones', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const access = map.root.userData.skylineAccess as {
+      escalatorAngleDegrees: number;
+      airstairAngleDegrees: number;
+      maxClimbDegrees: number;
+    };
+    expect(access.escalatorAngleDegrees).toBeLessThanOrEqual(access.maxClimbDegrees);
+    expect(access.airstairAngleDegrees).toBeLessThanOrEqual(access.maxClimbDegrees);
+
+    const routes = map.root.userData.skylineRoutes as Record<string, RouteAnchor[]>;
+    expect(routes['concourse-to-mezzanine']).toHaveLength(3);
+    expect(routes['mezzanine-to-jetbridge']).toHaveLength(5);
+    expect(routes['fuselage-to-tarmac']).toHaveLength(4);
+    expect(routes['cabin-through-aisle']).toHaveLength(3);
+    expect(routes['cabin-to-cockpit']).toHaveLength(3);
+  });
+});
+
+describe('Pass 59 map mechanical audits', () => {
+  it('removes the mixed Rustworks centre debris and retains only grounded container yard cover', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const audit = map.root.userData.rustworksCentreCoverAudit as {
+      styles: string[];
+      count: number;
+      minimumTowerDistance: null;
+      removedMixedCover: boolean;
+    };
+    expect(audit).toMatchObject({
+      styles: [],
+      count: 0,
+      minimumTowerDistance: null,
+      removedMixedCover: true,
+    });
+    const forbidden: THREE.Object3D[] = [];
+    map.root.traverse((node) => {
+      if (/centre-cover|freight-crate|pallet-stack|service-trench-crossover/i.test(node.name)) forbidden.push(node);
+    });
+    expect(forbidden).toEqual([]);
+    expect(map.root.getObjectByName('rustworks-quality-welsh-flag')).toBeTruthy();
+    expect(map.root.userData.rustworksFlagAudit).toMatchObject({
+      nation: 'Wales',
+      animated: true,
+      width: 6,
+      height: 3.6,
+      dragon: 'four-legged-passant',
+      legs: 4,
+      wings: 2,
+      tongue: 'forked',
+    });
+  });
+
+  it('keeps a central north-south service lane between the new cover clusters in Rapier', async () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
+    try {
+      physics.teleportEye({ x: 0, y: 1.7, z: -21 });
+      const lane = await walkToward(physics, { x: 0, y: 1.7, z: -15 }, 650);
+      expect(Math.abs(lane.z + 15)).toBeLessThan(0.55);
+    } finally {
+      physics.dispose();
+    }
+  });
+  it('preserves container collision and Welsh flag visibility across all profiles', () => {
+    const map = buildRustworks1v1(new THREE.Scene());
+    const colliderCount = map.colliders.length;
+    for (const profile of ['compat', 'performance', 'blender'] as const) {
+      applyRustworksPresentationProfile(map.root, profile);
+      expect(map.colliders).toHaveLength(colliderCount);
+      expect(map.root.getObjectByName('rustworks-quality-welsh-flag-cloth')?.visible).toBe(true);
+      expect(isBlocked({ x: 8, y: 1.7, z: -14.18 }, map.colliders, 0.44)).toBe(true);
+      expect(isBlocked({ x: -18, y: 1.7, z: -21.5 }, map.colliders, 0.44)).toBe(false);
+    }
+  });
+  it('labels Skyline open passages and mechanically closed staff doors coherently', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const audit = map.root.userData.skylineDoorAudit as Array<{ id: string; state: string; mechanicalAuthority: string; clearWidth: number }>;
+    expect(audit).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'terminal-gate', state: 'open', clearWidth: 3.5 }),
+      expect.objectContaining({ id: 'aircraft-boarding', state: 'open', clearWidth: 2.68 }),
+      expect.objectContaining({ id: 'cockpit-entry', state: 'open', mechanicalAuthority: 'open-cabin-shell-gap', clearWidth: 2.8 }),
+      expect.objectContaining({ id: 'staff-west', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
+      expect.objectContaining({ id: 'staff-east', state: 'closed', mechanicalAuthority: 'skyline-terminal-backwall' }),
+    ]));
+    for (const name of ['skyline-terminal-gate-jamb-left', 'skyline-terminal-gate-jamb-right', 'skyline-terminal-gate-header', 'skyline-staff-door-west', 'skyline-staff-door-east']) {
+      expect(map.root.getObjectByName(name), name).toBeTruthy();
+    }
+    expect(isBlocked({ x: 0, y: 5.02, z: -11.8 }, map.colliders, 0.35)).toBe(false);
+    expect(isBlocked({ x: -22, y: 1.25, z: -34 }, map.colliders, 0.35)).toBe(true);
+    expect(isBlocked({ x: 22, y: 1.25, z: -34 }, map.colliders, 0.35)).toBe(true);
+  });
+});

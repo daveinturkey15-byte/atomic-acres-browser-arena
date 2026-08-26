@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "designation": "user-approved-best-ever-netcode",
+  "designatedAt": "2026-07-25T00:52:56Z",
+  "releasePass": "PASS 62",
+  "immutable": true,
+  "sourceSha": "249a7ee77dce761eb237f3eb0e0d0ea1d0356317",
+  "pagesSha": "27c90967bdaf5387c0372933c7965a60ce75a765",
+  "pagesPath": "channels/experimental-netcode-pass",
+  "runtimeFileCount": 118,
+  "runtimeTreeSha256": "035e868ad80a7d81aeac6a08c17db4123feb6a1343f1b8eb24bbd8b1971c1d5d",
+  "runtimeDigestPolicy": {
+    "excludedFiles": [
+      "channel-provenance.json"
+    ],
+    "completeSubtreeFileCount": 119,
+    "wrapperProvenanceFile": "pinned-channel-provenance.json"
+  },
+  "acceptanceManifestSha256": "5ed8e2ec6062006e2a1caa79f252d1b51b9768db6204a744229cb4736bbeb914",
+  "requiredChecksRun": 30105747548,
+  "productionWorkflowRun": 30109672269,
+  "pagesWorkflowRun": 30109872134,
+  "productionReceiptArtifact": {
+    "id": 8603121431,
+    "name": "production-release-receipt-249a7ee77dce761eb237f3eb0e0d0ea1d0356317"
+  },
+  "basis": {
+    "ownerAssessment": "Best yet; really good netcode.",
+    "mechanicalEvidence": "Exact-main checks, accepted requirements, protected production receipt, byte-identical Pages subtree, and canonical live smoke all passed."
+  },
+  "retainedContracts": [
+    "immutable authored fire and target-view timelines",
+    "host-only damage resolution with exactly-once shot results",
+    "epoch, life, and connection continuity isolation",
+    "bounded adaptive movement cadence and shared interpolation delay",
+    "reliable ordered gameplay events separated from unreliable movement"
+  ],
+  "rollbackPolicy": "Serve this exact Pages subtree from the pinned commit; never rebuild or reinterpret Pass 62 through a newer renderer or shared runtime."
+}

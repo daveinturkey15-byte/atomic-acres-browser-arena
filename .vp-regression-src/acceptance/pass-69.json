@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 69",
+  "feedbackReceivedAt": "2026-08-10T14:00:00Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-55-e1b22b7c2450f2eb818980d6889123133db2d5f7",
+    "sourceSha": "e1b22b7c2450f2eb818980d6889123133db2d5f7",
+    "createdAt": "2026-08-10T14:46:07.627Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-08-10T14:50:46Z",
+    "evidence": "Dave tested the SHA-keyed local staged preview at 95788909eab9727ed1dc82d7ef9a9d64d519830e and repeatedly instructed Codex to publish Pass 69. The immutable GitHub Actions preview at e1b22b7c2450f2eb818980d6889123133db2d5f7 contains the same approved runtime and release-shell bytes; intervening changes are restricted to acceptance, test, and process files and are checked by approval parity."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Publish the exact locally approved Pass 69 gameplay candidate",
+      "expected": "Production serves the exact gameplay, weapon, support, mobile and visual candidate that Dave tested locally at source SHA 95788909eab9727ed1dc82d7ef9a9d64d519830e.",
+      "falsifier": "Production uses another source SHA, the staged runtime digest changes after approval, or a runtime/release-shell path changes after the approved preview.",
+      "acceptance": "human",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "owner-hitl://pass69/95788909eab9727ed1dc82d7ef9a9d64d519830e",
+          "note": "Dave tested the SHA-keyed local staged preview and explicitly authorized publication of this exact candidate."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "The public chooser exposes exactly Pass 69 and stable Pass 63 WebGL",
+      "expected": "The root chooser has exactly two selectable cards: Pass 69 at channels/the-big-one and Pass 63 Stable WebGL at channels/pass63-rollback; Pass 67.1 is retained internally but is not selectable.",
+      "falsifier": "A third card appears, Pass 67.1 is selectable, either required card is absent, or either card routes to the wrong subtree.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served staged chooser requires exactly two cards and verifies both direct destinations."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://local-hitl-preview/95788909eab9727ed1dc82d7ef9a9d64d519830e/pass69-pass63-chooser",
+          "note": "Dave inspected the local production-style chooser showing only Pass 69 and Pass 63 Stable WebGL."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Current player-facing branding is Pass 69 rather than The Big One",
+      "expected": "The chooser, runtime identity, command shell and current project information present the release as Pass 69 without current The Big One branding.",
+      "falsifier": "The chooser or current runtime shell still presents The Big One, a versioned 69.3 public label replaces Pass 69, or player-facing release surfaces disagree.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/project-map.test.ts src/ui/pass64-shell.test.ts",
+          "note": "Release identity, chooser copy and current runtime shell are pinned to Pass 69 and reject The Big One branding."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/release-channel-chooser.spec.ts",
+          "command": "npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The real staged chooser and Pass 69 route display Pass 69 and reject current The Big One copy."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://local-hitl-preview/95788909eab9727ed1dc82d7ef9a9d64d519830e/pass69-branding",
+          "note": "The owner-reviewed chooser visibly identifies the candidate as Pass 69."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Stable Pass 63 WebGL remains pinned to its approved source",
+      "expected": "The selectable fallback is rebuilt only from Pass 63 source ac85e9b8b46cc2370aee903d564ecf3c4682b24c and is staged at channels/pass63-rollback with separate provenance.",
+      "falsifier": "The fallback uses a different source, is rebuilt with Pass 69 shared runtime bytes, loses provenance, or the stable card routes elsewhere.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "release-channels.json",
+          "command": "npx vitest run src/release-topology.test.ts src/release-channel.test.ts",
+          "note": "The Pass 63 source SHA and route remain exact while the public config maps the stable card to the rollback subtree."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/release/stage-release-topology.mjs",
+          "command": "node scripts/release/stage-release-topology.mjs",
+          "note": "The production topology stages Pass 63 from its separately rebuilt dist and emits its own source-bound provenance."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Known remaining hand framing and cosmetic refinements move to Pass 70",
+      "expected": "Pass 69 publishes the owner-approved improved state without claiming the hands or remaining cosmetic issues are final; all new changes are isolated to Pass 70.",
+      "falsifier": "Pass 69 is blocked indefinitely on the acknowledged cosmetic work, the limitations are described as complete, or Pass 70 changes enter the approved Pass 69 SHA.",
+      "acceptance": "human",
+      "state": "deferred",
+      "deferApproval": {
+        "approvedBy": "Dave",
+        "approvedAt": "2026-08-10T14:25:05Z",
+        "reason": "Dave judged the current build good enough to publish and explicitly assigned remaining hands and other improvements to Pass 70."
+      }
+    },
+    {
+      "id": "R6",
+      "summary": "Release-shell and retained gameplay contracts remain green",
+      "expected": "Focused release topology, routing, project-map, changelog and shell tests pass; TypeScript and production build complete without weakening release or rollback guards.",
+      "falsifier": "A focused contract fails, TypeScript fails, the build fails, release provenance is weakened, or a required browser route emits a new error.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/release-topology.test.ts",
+          "command": "npx vitest run src/release-topology.test.ts src/release-channel.test.ts src/project-map.test.ts src/changelog.test.ts src/ui/pass64-shell.test.ts",
+          "note": "All focused release and player-facing identity tests pass on the approved SHA."
+        },
+        {
+          "kind": "contract",
+          "ref": "package.json",
+          "command": "npx tsc --noEmit --pretty false && npm run build",
+          "note": "TypeScript and the production build pass on the approved candidate."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/atomic-acres.spec.ts",
+          "command": "npx playwright test tests/e2e/atomic-acres.spec.ts --project=chromium --workers=1 --retries=0 --grep \"falls back to the authored procedural arena\"",
+          "note": "The forced Blender-load failure keeps the normal 60-second admission contract and uses a dedicated 120-second hosted-SwiftShader allowance; the focused Windows test passes without changing shipped runtime bytes."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/qa/verify-release-topology.mjs",
+          "command": "npm run verify:release-topology && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The static and served-browser topology verifiers require exactly the public Pass 69 and Pass 63 Stable WebGL choices while continuing to validate the retained internal Pass 67.1 subtree provenance."
+        }
+      ]
+    }
+  ]
+}

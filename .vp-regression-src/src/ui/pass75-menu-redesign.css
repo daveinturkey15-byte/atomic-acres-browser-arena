@@ -1,0 +1,364 @@
+/*
+ * Pass 75 - command deck stylisation redesign.
+ *
+ * Owner brief: the menu's "stylisation is outdated", same verdict as the HUD.
+ * Layout and functionality are fine, so nothing here moves a surface, renames
+ * an id, or changes a grid. It changes the material and the voice.
+ *
+ * What read as dated in the captured frames:
+ *   - The deck was flat #ffffff/#f8faf8 with no material at all: no grade, no
+ *     texture, no framing. It read as an admin dashboard, not a game.
+ *   - The command header was an undifferentiated white strip carrying the
+ *     product identity, so the app had no "chrome vs content" distinction.
+ *   - Primary actions looked identical in weight to secondary ones.
+ *   - Panels had no edge language - nothing said "instrument" or "console".
+ *   - Large empty regions with no visual rhythm.
+ *
+ * The direction, chosen to stay inside the AGENTS.md brightness rule (this
+ * must NOT regress to a dark monolith): keep the bright deck, but give it
+ *   MATERIAL - a faint graded paper with a hairline grid, so light falls
+ *             across it instead of being uniformly blank
+ *   FRAMING  - corner ticks and edge rules that read as tactical instrument
+ *             chrome without adding weight
+ *   VOICE    - a decisive primary action, quiet secondaries, and one accent
+ *
+ * Loaded after pass74-visual-refresh.css (unlayered, for the documented
+ * cascade reason). Every motion rule is gated by both reduced-motion switches.
+ */
+
+:root {
+  --p75-deck-ink: #2d1c11;
+  --p75-deck-ink-soft: #5e544a;
+  --p75-deck-line: rgba(63, 38, 21, 0.10);
+  --p75-deck-line-strong: rgba(63, 38, 21, 0.20);
+  --p75-deck-tick: rgba(198, 97, 30, 0.55);
+}
+
+/* ---------------------------------------------------------------------------
+ * 1. Material. A very faint dual gradient plus a hairline grid gives the deck
+ * a surface. Both are near-invisible individually; together they stop the
+ * background reading as an empty white page.
+ * ------------------------------------------------------------------------ */
+
+#menu.pass64-command-deck {
+  background-image:
+    radial-gradient(ellipse at 12% 0%, rgba(198, 97, 30, 0.05), transparent 46%),
+    radial-gradient(ellipse at 100% 100%, rgba(198, 97, 30, 0.04), transparent 42%),
+    linear-gradient(0deg, rgba(63, 38, 21, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 38, 21, 0.028) 1px, transparent 1px),
+    linear-gradient(168deg, #ffffff 0%, #f6f5f4 100%);
+  background-size: auto, auto, 28px 28px, 28px 28px, auto;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Chrome vs content. The command header becomes a distinct bar with its own
+ * ground and a live accent rule, so the product identity stops floating in the
+ * same plane as the workspace.
+ * ------------------------------------------------------------------------ */
+
+#menu .command-header {
+  border-bottom: 1px solid var(--p75-deck-line-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(245, 244, 242, 0.92) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 6px 18px rgba(49, 31, 19, 0.05);
+}
+
+#menu .command-brand strong {
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Instrument framing. Corner ticks on the workspace panels - four small
+ * accent marks, drawn with one pseudo-element and a conic-free gradient set so
+ * they cost nothing and never intercept pointer events.
+ * ------------------------------------------------------------------------ */
+
+#menu .command-workspace .menu-panel {
+  position: relative;
+}
+
+#menu .command-workspace .menu-panel::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) left top / 12px 1px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) left top / 1px 12px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) right top / 12px 1px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) right top / 1px 12px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) left bottom / 12px 1px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) left bottom / 1px 12px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) right bottom / 12px 1px no-repeat,
+    linear-gradient(var(--p75-deck-tick), var(--p75-deck-tick)) right bottom / 1px 12px no-repeat;
+  opacity: 0.55;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Voice. One decisive primary action; secondaries stay quiet. Previously
+ * every button carried the same weight, so nothing directed the player.
+ * ------------------------------------------------------------------------ */
+
+#menu .menu-actions button.primary,
+#menu .menu-actions #solo {
+  background: linear-gradient(180deg, #2f1f14 0%, #22150d 100%);
+  border-color: #22150d;
+  color: #fcf8f6;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 2px 4px rgba(49, 31, 19, 0.16),
+    0 10px 24px rgba(49, 31, 19, 0.12);
+}
+
+#menu .menu-actions button.primary:hover:not(:disabled),
+#menu .menu-actions #solo:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3f2819 0%, #2c1c11 100%);
+}
+
+#menu .menu-actions #resume {
+  background: linear-gradient(180deg, var(--p74-accent-bright, #e17d39) 0%, var(--p74-accent, #c6611e) 100%);
+  border-color: var(--p74-accent, #c6611e);
+  color: #211207;
+}
+
+/* A quiet, consistent secondary rather than four different treatments. */
+#menu .menu-actions button:not(.primary):not(#resume):not(#solo),
+#menu .join-row button {
+  background: #ffffff;
+  border: 1px solid var(--p75-deck-line-strong);
+  color: var(--p75-deck-ink);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Section rhythm. Headings get a short accent rule so the eye can find the
+ * start of each block in an otherwise even field.
+ * ------------------------------------------------------------------------ */
+
+#menu .manifest-heading small,
+#menu .map-selector-heading span,
+#menu .kit-heading small {
+  position: relative;
+  padding-left: 12px;
+}
+
+#menu .manifest-heading small::before,
+#menu .map-selector-heading span::before,
+#menu .kit-heading small::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translateY(-50%) rotate(45deg);
+  background: var(--p74-accent, #c6611e);
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. The active rail tab gets a live indicator, so "where am I" is answered
+ * without reading. Motion is a slow pulse, fully gated below.
+ * ------------------------------------------------------------------------ */
+
+#menu .command-rail .menu-tabs button.active {
+  position: relative;
+}
+
+#menu .command-rail .menu-tabs button.active::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--p74-accent-bright, #e17d39);
+  box-shadow: 0 0 0 0 rgba(225, 125, 57, 0.55);
+  animation: p75-rail-pulse 2.4s ease-out infinite;
+}
+
+@keyframes p75-rail-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(225, 125, 57, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(225, 125, 57, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 125, 57, 0); }
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. Motion gates - both switches, per the accessibility contract.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] #menu .command-rail .menu-tabs button.active::after {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #menu .command-rail .menu-tabs button.active::after {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 8. The OPERATOR panel (Pass 75). Skins are chosen from art, not a dropdown;
+ * stance and emote are cards with the same selection language as everything
+ * else in the deck, so the whole menu behaves one way.
+ * ------------------------------------------------------------------------ */
+
+.operator-appearance-layout {
+  display: grid;
+  gap: clamp(18px, 1.6vw, 28px);
+  align-content: start;
+}
+
+.operator-group > h3 {
+  margin: 0 0 10px;
+  font-family: var(--ui-display, 'Barlow Condensed', sans-serif);
+  font-size: var(--pass66-label, 14px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--p74-accent, #c6611e);
+}
+
+.operator-skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.operator-anim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.operator-skin-card,
+.operator-anim-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--p74-card-edge, rgba(59, 37, 23, 0.16));
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f5f4 100%);
+  box-shadow: var(--p74-lift-1);
+  transition:
+    transform 160ms var(--p74-ease, ease),
+    border-color 160ms var(--p74-ease, ease),
+    box-shadow 160ms var(--p74-ease, ease);
+}
+
+.operator-skin-card:hover,
+.operator-anim-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--p74-accent-line, rgba(198, 97, 30, 0.34));
+  box-shadow: var(--p74-lift-2);
+}
+
+.operator-skin-card > strong,
+.operator-anim-card > strong {
+  font-family: var(--ui-display, 'Barlow Condensed', sans-serif);
+  font-size: var(--pass66-label, 14px);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: var(--p74-ink, #2f1f14);
+}
+
+.operator-skin-card > small,
+.operator-anim-card > small {
+  font-size: var(--pass66-copy, 13px);
+  line-height: 1.45;
+  color: var(--p74-ink-soft, #5d534a);
+}
+
+.operator-skin-art {
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #efedeb 0%, #e5e2de 100%);
+  aspect-ratio: 4 / 3;
+}
+
+.operator-skin-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* One selection language across the whole deck: fill, accent bar, lift. */
+.operator-skin-card[aria-pressed='true'],
+.operator-anim-card[aria-pressed='true'] {
+  border-color: var(--p74-accent, #c6611e);
+  background: linear-gradient(180deg, #ffffff 0%, var(--p74-accent-soft, rgba(198, 97, 30, 0.12)) 100%);
+  box-shadow: inset 4px 0 0 var(--p74-accent, #c6611e), var(--p74-lift-3);
+}
+
+.operator-skin-card[aria-pressed='true'] > strong,
+.operator-anim-card[aria-pressed='true'] > strong {
+  color: var(--p74-accent, #c6611e);
+}
+
+.operator-appearance-status {
+  margin: 0;
+  padding-top: 4px;
+  font-size: var(--pass66-copy, 13px);
+  color: var(--p74-ink-soft, #5d534a);
+}
+
+html[data-reduced-motion='true'] .operator-skin-card,
+html[data-reduced-motion='true'] .operator-anim-card {
+  transition: none;
+}
+
+html[data-reduced-motion='true'] .operator-skin-card:hover,
+html[data-reduced-motion='true'] .operator-anim-card:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .operator-skin-card,
+  .operator-anim-card { transition: none; }
+  .operator-skin-card:hover,
+  .operator-anim-card:hover { transform: none; }
+}
+
+/* The standard operator ships no authored render, so its card carries a
+   typographic emblem rather than a fabricated portrait. */
+.operator-skin-art[data-operator-art='emblem'] {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(135deg, rgba(198, 97, 30, 0.07) 0 10px, transparent 10px 20px),
+    linear-gradient(160deg, #34251b 0%, #221710 100%);
+}
+
+.operator-skin-emblem {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-family: var(--ui-display, 'Barlow Condensed', sans-serif);
+  font-size: clamp(15px, 1.1vw, 19px);
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: rgba(244, 233, 225, 0.86);
+}
+
+.operator-skin-emblem > b {
+  color: var(--p74-accent-bright, #e17d39);
+  letter-spacing: 0.3em;
+}
+
+/* HF-381. The generated operator portraits are 448x576 (tall). The card art box
+   is a 4:3 landscape well, so without object-fit the face is squashed. Cover and
+   top-bias the crop so the head is never the part that gets trimmed. */
+.operator-skin-art .operator-skin-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "eventId": "weapon.report.world",
+  "sourceAzimuthDeg": -35,
+  "observedPan": -0.55,
+  "openGain": 0.8,
+  "occludedGain": 0.35,
+  "openLowPassHz": 18000,
+  "occludedLowPassHz": 2400,
+  "artifactPath": "fixture-payloads/audio/spatial/weapon-report-world.json"
+}

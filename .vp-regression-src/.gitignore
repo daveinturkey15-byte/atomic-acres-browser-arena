@@ -1,0 +1,29 @@
+node_modules/
+dist/
+.vite/
+.swarm/
+__pycache__/
+*.blend1
+qwen_swarm.py
+*.log
+.DS_Store
+.env
+.env.*
+!.env.production
+.hermes/
+playwright-report/
+test-results/
+artifacts/
+*.tsbuildinfo
+*.blend1
+docs/assets/pass65-weapons/firearms/pass65-weapon-family-preview-contact-sheet.png
+.wrangler/
+.dev.vars*
+
+# Build outputs from verification and hand-off builds. Only `dist/` was ignored, so every
+# dist-<name>/ a verify tier or an agent produced was untracked-but-addable - and the round
+# commit uses `git add -A`. Two of them (518 MB) were one commit away from the history on
+# 2026-08-25. This does NOT untrack the ~22.6k dist files already in the index; that is a
+# separate, deliberate cleanup.
+dist-*/
+.gauntlet-tmp/

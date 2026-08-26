@@ -1,11 +1,14 @@
-cell=0.25m radius=0.39 totalWalkable=37412 components=1
-component 0: 37412 cells (2338 m2) e.g. (24.8,-31.0) (25.5,-30.8) (24.5,-30.5)
-probe west street (-10,0): component 0 (size 37412)
-probe north crossing mouth (0,-4): component 0 (size 37412)
-probe east street (15,0): component 0 (size 37412)
+cell=0.25m radius=0.39 totalWalkable=37073 components=4
+component 0: 36514 cells (2282 m2) e.g. (24.8,-31.0) (25.5,-30.8) (24.5,-30.5)
+component 3: 342 cells (21 m2) e.g. (-29.8,25.5) (-28.0,25.5) (-26.3,25.5)
+component 1: 112 cells (7 m2) e.g. (-24.3,18.0) (-24.5,18.5) (-24.8,19.0)
+component 2: 105 cells (7 m2) e.g. (-27.5,19.3) (-27.8,19.8) (-27.0,20.0)
+probe west street (-10,0): component 0 (size 36514)
+probe north crossing mouth (0,-4): component 0 (size 36514)
+probe east street (15,0): component 0 (size 36514)
 probe NW spawn corner (-29,-27): BLOCKED cell
 probe SE spawn corner (29,27): BLOCKED cell
-probe NE yard (20,-20): component 0 (size 37412)
-probe SW yard (-20,20): component 0 (size 37412)
-probe patrol east (19,7): component 0 (size 37412)
-probe patrol far east (24,20): component 0 (size 37412)
+probe NE yard (20,-20): component 0 (size 36514)
+probe SW yard (-20,20): component 0 (size 36514)
+probe patrol east (19,7): component 0 (size 36514)
+probe patrol far east (24,20): component 0 (size 36514)

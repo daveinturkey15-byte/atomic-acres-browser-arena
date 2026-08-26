@@ -1,0 +1,904 @@
+import * as THREE from 'three';
+import { texturedMaterial } from './art-kit';
+import {
+  ARENA_BOUNDS,
+  CENTRAL_BUS,
+  PARKED_VAN_LAYOUT,
+  FRONT_HEDGE_LAYOUT,
+  FRONT_HEDGE_FIN_LAYOUT,
+  REAR_HEDGE_LAYOUT,
+  REAR_HEDGE_SIZE,
+  SIDE_HEDGE_LAYOUT,
+  SIDE_HEDGE_SIZE,
+  FRONT_HEDGE_FIN_SIZE,
+  FRONT_HEDGE_SIZE,
+  PARKED_VAN_SIZE,
+  COVER_LAYOUT,
+  GARAGE_LAYOUT,
+  GARAGE_SIZE,
+  HOUSE_LAYOUT,
+  NEIGHBOURHOOD_BENCH_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BENCH_LAYOUT,
+  NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
+  NEIGHBOURHOOD_BIN_POSITIONS,
+  PATROL_LAYOUT,
+  SPAWN_LAYOUT,
+  STREET_HALF_WIDTH,
+  YARD_FENCE_HEIGHT,
+  CORNER_HEDGE_LAYOUT,
+  CORNER_HEDGE_SIZE,
+  YARD_FENCE_LAYOUT,
+} from './arena-layout';
+import { classifyImpactSurface } from './combat-feedback';
+import { Box2 } from './collision';
+import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
+import { createHouseArchitecture, HouseSurface, solidBounds, type HouseArchitecture } from './house-navigation';
+import {
+  HOUSE_DESTRUCTION_DEFINITION_SET_ID,
+  createAtomicHouseFragmentDefinitions,
+  type HouseFragmentDefinition,
+} from './house-destruction';
+import { Team } from './protocol';
+import type { GlassState } from './glass-authority';
+import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
+import type { ArenaId } from './map-selection';
+
+export type PracticeTarget = {
+  id: string;
+  root: THREE.Group;
+  active: boolean;
+  respawnAt: number;
+  respawnDelayMs?: number;
+  scoreValue: number;
+  distanceBand: 'near' | 'mid' | 'far';
+  maxHealth: number;
+  health: number;
+  alwaysCritical?: boolean;
+  kind?: 'plate' | 'flying-cat' | 'training-dummy';
+};
+export type BreakableWindow = { id: string; mesh: THREE.Mesh; broken: boolean; glassState?: GlassState };
+export type ArenaMap = {
+  id: ArenaId;
+  label: string;
+  root: THREE.Group;
+  colliders: Box2[];
+  physicsColliders: Box2[];
+  raycastMeshes: THREE.Object3D[];
+  /** Canonical shot authority shared by local fire, bots, and multiplayer verification. */
+  shotSurfaces: BallisticSurface[];
+  spawns: Record<Team, THREE.Vector3[]>;
+  patrolPoints: THREE.Vector3[];
+  targets: PracticeTarget[];
+  houses: readonly HouseArchitecture[];
+  houseDestruction?: Readonly<{
+    definitions: readonly HouseFragmentDefinition[];
+    staticColliders: readonly Box2[];
+    staticBallisticSurfaceIds: readonly string[];
+  }>;
+  breakableWindows: BreakableWindow[];
+  physicalCover: Array<{
+    id: string;
+    bounds: Box2;
+    blocksMovement: true;
+    blocksShots: true;
+    performanceVisualKind?: 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+    performanceVisualMeshes?: number;
+  }>;
+  bounds: Box2;
+  /** Optional physics-only fail-safe floor. Defaults to y=0 for legacy arenas. */
+  physicsSafetyFloorY?: number;
+  houseTelemetry: {
+    houses: number;
+    groundRooms: number;
+    upperRooms: number;
+    doors: number;
+    windows: number;
+    ramps: number;
+    wallMaterialVariants: number;
+    pbrMaterialFamilies: number;
+  };
+};
+
+const material = (color: number, roughness = 0.78, metalness = 0.03) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness });
+
+export function buildArena(scene: THREE.Scene): ArenaMap {
+  const colliders: Box2[] = [];
+  const physicsColliders: Box2[] = [];
+  const raycastMeshes: THREE.Object3D[] = [];
+  const shotSurfaces: BallisticSurface[] = [];
+  let ballisticSurfaceSequence = 0;
+  const targets: PracticeTarget[] = [];
+  const houses: HouseArchitecture[] = [];
+  const houseFragmentDefinitions: HouseFragmentDefinition[] = [];
+  const staticHouseFragmentColliders: Box2[] = [];
+  const staticHouseFragmentBallisticSurfaceIds: string[] = [];
+  const breakableWindows: BreakableWindow[] = [];
+  const physicalCover: ArenaMap['physicalCover'] = [];
+  const houseTelemetry = {
+    houses: 0, groundRooms: 0, upperRooms: 0, doors: 0, windows: 0, ramps: 0,
+    wallMaterialVariants: 6,
+    pbrMaterialFamilies: 9,
+  };
+  const world = new THREE.Group();
+  world.name = 'Atomic Acres arena';
+  scene.add(world);
+
+  const pbrTexture = (stem: string, options: Parameters<typeof texturedMaterial>[1] = {}) => texturedMaterial(
+    `./assets/original/textures/${stem}.png`,
+    {
+      ...options,
+      normalPath: `./assets/original/textures/${stem}-normal.png`,
+      roughnessPath: `./assets/original/textures/${stem}-roughness.png`,
+    },
+  );
+
+  const palette = {
+    grass: pbrTexture('grass-turf', { roughness: 1, repeatX: 12, repeatY: 16, normalScale: 0.24 }),
+    grassDark: texturedMaterial('./assets/original/textures/grass-turf.png', { color: 0x7e916a, roughness: 1, repeatX: 8, repeatY: 8 }),
+    road: pbrTexture('asphalt-aged', { roughness: 0.98, repeatX: 5, repeatY: 20, normalScale: 0.32 }),
+    concrete: pbrTexture('concrete-poured', { roughness: 0.94, repeatX: 3, repeatY: 3, normalScale: 0.38 }),
+    cream: pbrTexture('plaster-warm', { roughness: 0.92, repeatX: 3, repeatY: 3, normalScale: 0.36 }),
+    aqua: pbrTexture('siding-aqua', { roughness: 0.76, repeatX: 4, repeatY: 4, normalScale: 0.5 }),
+    aquaUpper: pbrTexture('siding-aqua', { color: 0xc1e4dd, roughness: 0.8, repeatX: 6, repeatY: 5, normalScale: 0.65 }),
+    coral: pbrTexture('siding-coral', { roughness: 0.76, repeatX: 4, repeatY: 4, normalScale: 0.5 }),
+    coralUpper: pbrTexture('brick-warm', { color: 0xe7c0ad, roughness: 0.91, repeatX: 7, repeatY: 4, normalScale: 0.72 }),
+    mustard: material(0xd9a43b, 0.58, 0.18),
+    dark: texturedMaterial('./assets/original/textures/weapon-gunmetal.png', { roughness: 0.56, metalness: 0.3, repeatX: 3, repeatY: 2 }),
+    timber: pbrTexture('wood-deck', { roughness: 0.92, repeatX: 4, repeatY: 2, normalScale: 0.42 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x78bad0, roughness: 0.1, metalness: 0.04, transparent: true, opacity: 0.54, transmission: 0.12 }),
+    white: material(0xf0e4c9, 0.68),
+    chrome: material(0xaebdc1, 0.23, 0.76),
+    brick: pbrTexture('brick-warm', { roughness: 0.9, repeatX: 5, repeatY: 3, normalScale: 0.65 }),
+    roof: pbrTexture('roof-shingles', { roughness: 0.86, repeatX: 5, repeatY: 6, normalScale: 0.48 }),
+  };
+  // Performance batching otherwise lifts reflective chrome to near-white and lets
+  // stair rails overpower route geometry. Quality preserves the authored material.
+  palette.chrome.userData.batchColor = 0x5f6d72;
+
+  function box(
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    mat: THREE.Material,
+    solid = true,
+    cast = true,
+    blocksShots = solid,
+    ballisticMaterial?: BallisticMaterialId,
+    breakableWindowId?: string,
+  ): THREE.Mesh {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    mesh.name = name;
+    mesh.userData.impactSurface = classifyImpactSurface({
+      name,
+      metalness: mat instanceof THREE.MeshStandardMaterial ? mat.metalness : undefined,
+    });
+    mesh.position.set(...position);
+    mesh.castShadow = cast;
+    mesh.receiveShadow = true;
+    world.add(mesh);
+    const bounds = {
+      minX: position[0] - size[0] / 2,
+      maxX: position[0] + size[0] / 2,
+      minZ: position[2] - size[2] / 2,
+      maxZ: position[2] + size[2] / 2,
+      minY: position[1] - size[1] / 2,
+      maxY: position[1] + size[1] / 2,
+    };
+    if (blocksShots) {
+      raycastMeshes.push(mesh);
+      const surface = createBallisticSurface(
+        `atomic-acres:${ballisticSurfaceSequence}:${name}`,
+        name,
+        bounds,
+        {
+          impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface>,
+          material: ballisticMaterial,
+        },
+        breakableWindowId,
+      );
+      ballisticSurfaceSequence += 1;
+      shotSurfaces.push(surface);
+      mesh.userData.ballisticSurfaceId = surface.id;
+      mesh.userData.ballisticMaterial = surface.material;
+    }
+    if (solid) {
+      colliders.push(bounds);
+      physicsColliders.push(bounds);
+    }
+    return mesh;
+  }
+
+  function collisionProxy(name: string, position: [number, number, number], size: [number, number, number]): void {
+    const proxy = box(name, position, size, palette.dark, true, false);
+    // This simple shell is intentionally visible in Performance so every
+    // authoritative route collider has a readable visual counterpart. Quality
+    // replaces it with the rounded authored route art in environment-assets.
+    proxy.visible = true;
+    proxy.userData.collisionProxy = true;
+  }
+
+  function authoredCollisionProxy(
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    ballisticMaterial: BallisticMaterialId = 'structural-metal',
+  ): THREE.Mesh {
+    const proxy = box(name, position, size, palette.dark, true, false, true, ballisticMaterial);
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+    proxy.userData.authoredCollisionAuthority = true;
+    return proxy;
+  }
+
+  function performanceCoverBox(
+    coverId: string,
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    mat: THREE.Material,
+  ): THREE.Mesh {
+    const mesh = box(name, position, size, mat, false, false, false);
+    mesh.userData.performanceCoverId = coverId;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.blocksShots = false;
+    return mesh;
+  }
+
+  function performanceCoverCylinder(
+    coverId: string,
+    name: string,
+    position: [number, number, number],
+    radius: number,
+    length: number,
+    mat: THREE.Material,
+    rotation: [number, number, number],
+    hollow = false,
+  ): THREE.Mesh {
+    let geometry: THREE.BufferGeometry;
+    if (hollow) {
+      const profile = new THREE.Shape();
+      profile.absarc(0, 0, radius, 0, Math.PI * 2, false);
+      const opening = new THREE.Path();
+      opening.absarc(0, 0, radius * 0.58, 0, Math.PI * 2, true);
+      profile.holes.push(opening);
+      geometry = new THREE.ExtrudeGeometry(profile, {
+        depth: length,
+        bevelEnabled: false,
+        steps: 1,
+        curveSegments: 6,
+      });
+      geometry.translate(0, 0, -length / 2);
+      geometry.rotateX(-Math.PI / 2);
+    } else {
+      geometry = new THREE.CylinderGeometry(radius, radius, length, 6);
+    }
+    const mesh = new THREE.Mesh(geometry, mat);
+    mesh.name = name;
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    mesh.receiveShadow = true;
+    mesh.userData.performanceCoverId = coverId;
+    mesh.userData.presentationOnly = true;
+    mesh.userData.blocksShots = false;
+    mesh.userData.impactSurface = 'metal';
+    world.add(mesh);
+    return mesh;
+  }
+
+  function addPerformanceLargeCover(
+    id: 'north-cargo-stack' | 'south-pipe-stack' | 'west-service-skip' | 'east-generator-trailer',
+    x: number,
+    z: number,
+  ): { kind: NonNullable<ArenaMap['physicalCover'][number]['performanceVisualKind']>; meshes: number } {
+    let meshes = 0;
+    const addBox = (name: string, position: [number, number, number], size: [number, number, number], mat: THREE.Material) => {
+      performanceCoverBox(id, name, position, size, mat);
+      meshes += 1;
+    };
+    const addCylinder = (name: string, position: [number, number, number], radius: number, length: number, mat: THREE.Material, rotation: [number, number, number], hollow = false) => {
+      performanceCoverCylinder(id, name, position, radius, length, mat, rotation, hollow);
+      meshes += 1;
+    };
+
+    if (id === 'north-cargo-stack') {
+      // HF-387 player-body half: the lower crates used to span x +/- 1.925
+      // while the frozen COVER_LAYOUT authority for this anchor is only
+      // +/- 1.4 wide, so a player hugging the stack put the camera eye up to
+      // 5 cm inside visible crate mass that nothing blocked. The silhouette
+      // now sits INSIDE the frozen authority envelope (visible mass matches
+      // movement/shot authority) instead of widening the frozen gameplay
+      // layout, which world-identity pins forbid.
+      for (const offset of [-0.7, 0.7]) addBox('performance-cargo-lower', [x + offset, 0.52, z], [1.4, 1.04, 1.82], offset < 0 ? palette.aqua : palette.mustard);
+      addBox('performance-cargo-upper', [x, 1.62, z], [2.15, 1.04, 1.82], palette.aqua);
+      for (const offset of [-0.62, 0.62]) addBox('performance-cargo-lock-rail', [x + offset, 1.62, z - 0.93], [0.12, 0.9, 0.08], palette.dark);
+      return { kind: 'cargo-stack', meshes };
+    }
+
+    if (id === 'south-pipe-stack') {
+      // HF-387: same authority-wrap rule as the cargo stack - pipe extents
+      // stay inside the +/- 1.4 m frozen cover width.
+      for (const offset of [-0.85, 0, 0.85]) addCylinder('performance-concrete-pipe', [x + offset, 0.53, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
+      for (const offset of [-0.58, 0.58]) addCylinder('performance-concrete-pipe', [x + offset, 1.52, z], 0.52, 1.82, palette.concrete, [Math.PI / 2, 0, 0], true);
+      return { kind: 'pipe-stack', meshes };
+    }
+
+    if (id === 'west-service-skip') {
+      addBox('performance-skip-floor', [x, 0.18, z], [2.8, 0.28, 4.75], palette.dark);
+      for (const offset of [-1.35, 1.35]) addBox('performance-skip-side', [x + offset, 1.02, z], [0.22, 1.72, 4.65], palette.aqua);
+      addBox('performance-skip-rear', [x, 1.02, z + 2.3], [2.7, 1.72, 0.22], palette.aqua);
+      addBox('performance-skip-front', [x, 0.62, z - 2.3], [2.7, 0.92, 0.22], palette.mustard);
+      for (const offset of [-1.35, 1.35]) addBox('performance-skip-top-rail', [x + offset, 1.92, z], [0.28, 0.16, 4.72], palette.mustard);
+      return { kind: 'service-skip', meshes };
+    }
+
+    addBox('performance-generator-chassis', [x, 0.48, z], [2.8, 0.22, 4.65], palette.dark);
+    addBox('performance-generator-body', [x, 1.28, z + 0.28], [2.42, 1.5, 3.05], palette.mustard);
+    addBox('performance-generator-panel', [x - 1.23, 1.3, z + 0.28], [0.08, 0.92, 1.75], palette.dark);
+    addBox('performance-generator-drawbar', [x, 0.48, z - 2.02], [0.18, 0.18, 1.0], palette.chrome);
+    for (const wheelX of [-1.34, 1.34]) for (const wheelZ of [-1.08, 1.08]) {
+      addCylinder('performance-generator-wheel', [x + wheelX, 0.48, z + wheelZ], 0.38, 0.24, palette.dark, [0, 0, Math.PI / 2]);
+    }
+    addCylinder('performance-generator-exhaust', [x + 0.83, 1.75, z + 0.82], 0.1, 0.82, palette.dark, [0, 0, 0]);
+    return { kind: 'generator-trailer', meshes };
+  }
+
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 68), palette.grass);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  ground.userData.impactSurface = 'soil';
+  world.add(ground);
+  raycastMeshes.push(ground);
+  const groundSurface = createBallisticSurface(
+    `atomic-acres:${ballisticSurfaceSequence}:ground`,
+    'atomic-acres-ground',
+    { minX: -35, maxX: 35, minY: -8, maxY: 0, minZ: -34, maxZ: 34 },
+    { impactSurface: 'soil', material: 'earth' },
+  );
+  ballisticSurfaceSequence += 1;
+  shotSurfaces.push(groundSurface);
+  ground.userData.ballisticSurfaceId = groundSurface.id;
+  ground.userData.ballisticMaterial = groundSurface.material;
+
+  // The street runs the long axis with a house on each kerb, so the road plane
+  // is laid out along X and both houses face across it.
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(64, STREET_HALF_WIDTH * 2), palette.road);
+  road.name = 'aged asphalt road';
+  road.rotation.x = -Math.PI / 2;
+  road.position.y = 0.025;
+  road.receiveShadow = true;
+  road.userData.impactSurface = 'concrete';
+  world.add(road);
+  raycastMeshes.push(road);
+  const roadSurface = createBallisticSurface(
+    `atomic-acres:${ballisticSurfaceSequence}:road`,
+    'atomic-acres-road',
+    { minX: -32, maxX: 32, minY: -0.25, maxY: 0.03, minZ: -STREET_HALF_WIDTH, maxZ: STREET_HALF_WIDTH },
+    { impactSurface: 'concrete', material: 'concrete' },
+  );
+  ballisticSurfaceSequence += 1;
+  shotSurfaces.push(roadSurface);
+  road.userData.ballisticSurfaceId = roadSurface.id;
+  road.userData.ballisticMaterial = roadSurface.material;
+  for (const z of [-5.6, 5.6]) box('curb', [0, 0.12, z], [64, 0.24, 1.2], palette.concrete, false, false);
+  for (const z of [-7.5, 7.5]) box('sidewalk', [0, 0.07, z], [64, 0.14, 2.6], palette.concrete, false, false);
+  for (const x of [-28, -20, -12, 12, 20, 28]) box('lane marker', [x, 0.055, 0], [3.6, 0.03, 0.18], palette.mustard, false, false);
+  for (const x of [-16, 16]) {
+    for (let z = -4.5; z <= 4.5; z += 1.5) box('crosswalk stripe', [x, 0.062, z], [3.2, 0.025, 1.4], palette.white, false, false);
+  }
+
+  function addHouse(team: Team, x: number, z: number, facing: 1 | -1): void {
+    const architecture = createHouseArchitecture(team, x, z, facing);
+    const destructionDefinitions = createAtomicHouseFragmentDefinitions([architecture]);
+    houseFragmentDefinitions.push(...destructionDefinitions);
+    houses.push(architecture);
+    houseTelemetry.houses += 1;
+    houseTelemetry.groundRooms += architecture.rooms.filter((room) => room.level === 'ground').length;
+    houseTelemetry.upperRooms += architecture.rooms.filter((room) => room.level === 'upper').length;
+    houseTelemetry.doors += architecture.openings.filter((opening) => opening.kind === 'exterior-door').length;
+    houseTelemetry.windows += architecture.openings.filter((opening) => opening.kind === 'window').length;
+    houseTelemetry.ramps += architecture.solids.filter((solid) => solid.kind === 'ramp').length;
+    const surfaceMaterial: Record<HouseSurface, THREE.Material> = {
+      aqua: palette.aqua,
+      coral: palette.coral,
+      plaster: palette.cream,
+      brick: palette.brick,
+      timber: palette.timber,
+      concrete: palette.concrete,
+      trim: palette.white,
+      glass: palette.glass,
+      metal: palette.chrome,
+      ceiling: palette.cream,
+      light: new THREE.MeshBasicMaterial({ color: 0xffe2a3, toneMapped: false }),
+    };
+    const wallMaterial = (solid: HouseArchitecture['solids'][number]): THREE.Material => {
+      if (solid.surface === 'glass' && solid.name.includes('upper-window')) {
+        return new THREE.MeshPhysicalMaterial({
+          color: 0xb9eef2,
+          roughness: 0.06,
+          metalness: 0,
+          transparent: true,
+          opacity: 0.2,
+          transmission: 0.48,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+      }
+      if (solid.surface === 'aqua') {
+        if (solid.name.includes('upper')) return palette.aquaUpper;
+        if (solid.name.startsWith('rear-ground')) return palette.cream;
+      }
+      if (solid.surface === 'coral') {
+        if (solid.name.includes('upper')) return palette.coralUpper;
+        if (solid.name.startsWith('rear-ground')) return palette.cream;
+      }
+      return surfaceMaterial[solid.surface];
+    };
+    const wallBallistics: Record<HouseSurface, BallisticMaterialId> = {
+      aqua: 'interior-wall',
+      coral: 'interior-wall',
+      plaster: 'interior-wall',
+      brick: 'brick',
+      timber: 'wood',
+      concrete: 'concrete',
+      trim: 'wood',
+      glass: 'glass',
+      metal: 'thin-metal',
+      ceiling: 'interior-wall',
+      light: 'reinforced',
+    };
+
+    const bindPreauthoredFragment = (
+      rendered: THREE.Mesh,
+      definition: HouseFragmentDefinition,
+    ): void => {
+      const collider = colliders.at(-1);
+      const physicsCollider = physicsColliders.at(-1);
+      const surface = shotSurfaces.at(-1);
+      if (!collider || physicsCollider !== collider || !surface || rendered.userData.ballisticSurfaceId !== surface.id) {
+        throw new Error(`Atomic house fragment ${definition.id} did not bind one static authority tuple`);
+      }
+      physicsColliders.pop();
+      staticHouseFragmentColliders.push(collider);
+      staticHouseFragmentBallisticSurfaceIds.push(surface.id);
+      shotSurfaces[shotSurfaces.length - 1] = Object.freeze({
+        ...surface,
+        houseFragment: Object.freeze({
+          definitionSetId: HOUSE_DESTRUCTION_DEFINITION_SET_ID,
+          fragmentId: definition.id,
+        }),
+      });
+      rendered.visible = false;
+      rendered.userData.preAuthoredHouseFragmentId = definition.id;
+      rendered.userData.dynamicAuthorityReplacement = true;
+    };
+
+    for (const solid of architecture.solids) {
+      const solidMaterial = wallMaterial(solid);
+      if (solid.kind === 'ramp') {
+        const rendered = box(solid.name, solid.position, solid.size, solidMaterial, false, true, false);
+        if (solid.rotation) rendered.rotation.set(...solid.rotation);
+        bindPass73CollisionVisualOwner(rendered, architecture, solid);
+        physicsColliders.push(solidBounds(solid));
+        continue;
+      }
+      const isBreakableGlass = solid.kind === 'glass' && solid.breakable;
+      const destructionDefinition = destructionDefinitions.find((definition) => (
+        definition.sourceKind === 'architecture-solid' && definition.sourceId === solid.id
+      ));
+      const rendered = box(
+        solid.name,
+        solid.position,
+        solid.size,
+        solidMaterial,
+        solid.collidable,
+        solid.kind !== 'glass',
+        isBreakableGlass || solid.collidable,
+        wallBallistics[solid.surface],
+        isBreakableGlass ? solid.id : undefined,
+      );
+      if (solid.rotation) rendered.rotation.set(...solid.rotation);
+      bindPass73CollisionVisualOwner(rendered, architecture, solid);
+      if (destructionDefinition) bindPreauthoredFragment(rendered, destructionDefinition);
+      if (isBreakableGlass) {
+        rendered.userData.breakableWindowId = solid.id;
+        rendered.userData.dynamic = true;
+        breakableWindows.push({ id: solid.id, mesh: rendered, broken: false });
+      }
+    }
+
+    for (const definition of destructionDefinitions.filter((candidate) => candidate.role === 'roof')) {
+      const rendered = box(
+        definition.sourceId,
+        [definition.position.x, definition.position.y, definition.position.z],
+        [definition.halfExtents.x * 2, definition.halfExtents.y * 2, definition.halfExtents.z * 2],
+        palette.roof,
+        true,
+        true,
+        true,
+        definition.ballisticMaterial,
+      );
+      bindPreauthoredFragment(rendered, definition);
+    }
+  }
+
+  for (const house of HOUSE_LAYOUT) addHouse(house.team, house.x, house.z, house.facing);
+
+  // The authored street-life layer is presentation-only. These shared layout
+  // bounds make every player-sized bench and recycling bin physical without
+  // coupling gameplay authority to render-profile meshes.
+  for (const [index, [x, z, rotation]] of NEIGHBOURHOOD_BENCH_LAYOUT.entries()) {
+    const [width, height, depth] = NEIGHBOURHOOD_BENCH_COLLIDER_SIZE;
+    const rotated = Math.abs(Math.sin(rotation)) > 0.5;
+    const proxy = box(
+      `street-bench-collider-${index}`,
+      [x, height / 2, z],
+      [rotated ? depth : width, height, rotated ? width : depth],
+      palette.timber,
+      true,
+      false,
+      true,
+      'wood',
+    );
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
+  for (const [index, [x, z]] of NEIGHBOURHOOD_BIN_POSITIONS.entries()) {
+    const [width, height, depth] = NEIGHBOURHOOD_BIN_COLLIDER_SIZE;
+    const proxy = box(
+      `street-recycling-bin-collider-${index}`,
+      [x, height / 2, z],
+      [width, height, depth],
+      palette.dark,
+      true,
+      false,
+      true,
+      'thin-metal',
+    );
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
+
+  // One transit anchor, parked broadside across the middle of the street. This
+  // is the map's single unmistakable piece of central hard cover: it splits the
+  // road sightline in half and is the first thing both teams contest.
+  const [busLength, busHeight, busWidth] = CENTRAL_BUS.size;
+  box('central transit bus', [CENTRAL_BUS.x, busHeight / 2, CENTRAL_BUS.z], [busLength, busHeight, busWidth], palette.mustard);
+  physicalCover.push({ id: 'central-transit-bus', bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
+  box('coach roof', [CENTRAL_BUS.x, busHeight - 0.18, CENTRAL_BUS.z], [busLength - 0.45, 0.25, busWidth - 0.5], palette.white, false);
+  for (const x of [-4.6, -1.6, 1.6, 4.6]) {
+    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z - busWidth / 2 - 0.03], [2.3, 1.1, 0.12], palette.glass, false, false);
+    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z + busWidth / 2 + 0.03], [2.3, 1.1, 0.12], palette.glass, false, false);
+  }
+  for (const x of [-4.4, 4.4]) {
+    for (const z of [-1.2, 1.2]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.38, 8), palette.dark);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(CENTRAL_BUS.x + x, 0.7, CENTRAL_BUS.z + z);
+      world.add(wheel);
+    }
+  }
+
+  // Two delivery vans parked in the road, one beyond each end of the bus.
+  // They are the diagonal-lane authority: without them a standing player sees
+  // corner to corner across the yards and the open road (65 m measured). The
+  // visible body wraps the collider so presentation never hides authority.
+  const [vanLength, vanHeight, vanWidth] = PARKED_VAN_SIZE;
+  for (const van of PARKED_VAN_LAYOUT) {
+    box(van.id, [van.x, vanHeight / 2, van.z], [vanLength, vanHeight, vanWidth], palette.white, true, true, true, 'vehicle');
+    physicalCover.push({ id: van.id, bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
+    // Cab and windscreen sit inside the collider envelope; wheels are
+    // presentation-only below the body line.
+    box(`${van.id} windscreen`, [van.x + (van.x > 0 ? -1.45 : 1.45), 1.85, van.z], [0.9, 0.7, vanWidth - 0.2], palette.glass, false, false);
+    for (const wheelX of [-vanLength / 2 + 0.95, vanLength / 2 - 0.95]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 8), palette.dark);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.position.set(van.x + wheelX, 0.42, van.z);
+      world.add(wheel);
+    }
+  }
+
+  // Each garage is attached to the outboard end of its own house with the door
+  // on the same building line, so both yards read as one property.
+  const [garageWidth, garageHeight, garageDepth] = GARAGE_SIZE;
+  for (const [index, garage] of GARAGE_LAYOUT.entries()) {
+    const facing = garage.z < 0 ? 1 : -1;
+    box(`garage ${index}`, [garage.x, garageHeight / 2, garage.z], [garageWidth, garageHeight, garageDepth], palette.cream);
+    // These read as closed, opaque doors, so movement and projectile authority
+    // must match the facade instead of relying on the slightly recessed shell.
+    box('garage door', [garage.x, 1.35, garage.z + facing * (garageDepth / 2)], [garageWidth - 1.8, 2.5, 0.18], palette.chrome, true, false, true);
+  }
+
+  // Waist-high yard fencing divides the two properties without sealing a route.
+  for (const [index, [x, z, width, depth]] of YARD_FENCE_LAYOUT.entries()) {
+    box(`yard fence ${index}`, [x, YARD_FENCE_HEIGHT / 2, z], [width, YARD_FENCE_HEIGHT, depth], palette.timber, true, true, true, 'wood');
+  }
+
+  // Front-garden hedges: the sightline authority for the street flanks. The
+  // houses alone leave shallow corner-to-corner rays that thread the verges
+  // beside them (60 m+ measured); these close those lanes the way the
+  // reference map's garden hedges do. Visible mass matches each collider.
+  for (const [index, hedge] of FRONT_HEDGE_LAYOUT.entries()) {
+    box(`front hedge ${index}`, [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z], [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth], palette.grassDark);
+  }
+  for (const [index, fin] of FRONT_HEDGE_FIN_LAYOUT.entries()) {
+    const [finWidth, finHeight, finDepth] = FRONT_HEDGE_FIN_SIZE;
+    box(`front hedge fin ${index}`, [fin.x, finHeight / 2, fin.z], [finWidth, finHeight, finDepth], palette.grassDark);
+  }
+  for (const [index, rear] of REAR_HEDGE_LAYOUT.entries()) {
+    const [rearLength, rearHeight, rearDepth] = REAR_HEDGE_SIZE;
+    box(`rear hedge ${index}`, [rear.x, rearHeight / 2, rear.z], [rearLength, rearHeight, rearDepth], palette.grassDark);
+  }
+  // Back-corner blocks: the Pass 79 ray audit measured a 57 m standing
+  // eye-line running the full map width through each back-fence corridor;
+  // these seat each corner and split that lane.
+  for (const [index, corner] of CORNER_HEDGE_LAYOUT.entries()) {
+    const [cornerWidth, cornerHeight, cornerDepth] = CORNER_HEDGE_SIZE;
+    box(`corner hedge ${index}`, [corner.x, cornerHeight / 2, corner.z], [cornerWidth, cornerHeight, cornerDepth], palette.grassDark);
+  }
+  for (const [index, side] of SIDE_HEDGE_LAYOUT.entries()) {
+    const [sideDepth, sideHeight, sideLength] = SIDE_HEDGE_SIZE;
+    box(`side hedge ${index}`, [side.x, sideHeight / 2, side.z], [sideDepth, sideHeight, sideLength], palette.grassDark);
+  }
+
+  // Pass 59 collision audit objects: visible soft terrain keeps conservative AABB
+  // movement/ballistic authority, and the irrigation vessel has matching hard cover.
+  const moundAudit: Array<{ id: string; collider: string; bottomY: number }> = [];
+  for (const [id, x, z, sx, sz] of [
+    // HF-383 remainder: mounds follow the deeper rear fence (z -28 -> -29.5).
+    ['west-verge', -24, -29.5, 4.6, 3.4],
+    ['east-verge', 24, 29.5, 4.6, 3.4],
+  ] as const) {
+    const colliderName = `terrain-mound-${id}-collider`;
+    const authority = box(colliderName, [x, 0.55, z], [sx, 1.1, sz], palette.grass, true, false, true, 'earth');
+    authority.visible = false;
+    authority.userData.collisionAuthorityFor = `terrain-mound-${id}`;
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10), palette.grass);
+    mound.name = `terrain-mound-${id}`;
+    mound.position.set(x, 0.28, z);
+    mound.scale.set(sx / 2, 0.72, sz / 2);
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    mound.userData.impactSurface = 'soil';
+    mound.userData.collisionAuthority = colliderName;
+    world.add(mound);
+    moundAudit.push({ id, collider: colliderName, bottomY: -0.44 });
+  }
+  // The large Quality-profile earth banks overlap the playable side of the
+  // boundary. Mirror their silhouettes in Performance and approximate each
+  // ellipsoid with tiered authority boxes so both render profiles have exactly
+  // the same movement and shot physics without blocking empty corner space.
+  const qualityEarthBankAudit: Array<{ id: string; colliders: string[] }> = [];
+  for (const bank of [
+    { id: 'north-west', position: [-40, -0.8, -34] as const, scale: [18, 5, 12] as const, slices: [[-30, 3, 16, 3], [-27.5, 2.5, 10, 1.8], [-25.5, 2, 5, 1]] as const },
+    { id: 'north-east', position: [42, -0.8, -34] as const, scale: [16, 4.5, 12] as const, slices: [[30, 3, 14, 2.8], [27.5, 2.5, 8, 1.5]] as const },
+    { id: 'south-west', position: [-42, -0.8, 34] as const, scale: [16, 4.5, 12] as const, slices: [[-30, 3, 14, 2.8], [-27.5, 2.5, 8, 1.5]] as const },
+    { id: 'south-east', position: [40, -0.8, 34] as const, scale: [18, 5, 12] as const, slices: [[30, 3, 16, 3], [27.5, 2.5, 10, 1.8], [25.5, 2, 5, 1]] as const },
+  ]) {
+    const visual = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), palette.grass);
+    visual.name = `quality-earth-bank-${bank.id}`;
+    visual.position.set(bank.position[0], bank.position[1], bank.position[2]);
+    visual.scale.set(bank.scale[0], bank.scale[1], bank.scale[2]);
+    visual.castShadow = true;
+    visual.receiveShadow = true;
+    visual.userData.impactSurface = 'soil';
+    visual.userData.performanceMirrorFor = `P33_SKYLINE_earth_bank_${qualityEarthBankAudit.length}`;
+    world.add(visual);
+    const bankColliders = bank.slices.map(([x, width, depth, height], index) => {
+      const name = `quality-earth-bank-${bank.id}-collider-${index}`;
+      const proxy = authoredCollisionProxy(name, [x, height / 2, bank.position[2]], [width, height, depth], 'earth');
+      proxy.userData.collisionAuthorityFor = visual.name;
+      return name;
+    });
+    visual.userData.collisionAuthorities = bankColliders;
+    qualityEarthBankAudit.push({ id: bank.id, colliders: bankColliders });
+  }
+  const vesselCollider = box('east-irrigation-vessel-collider', [27, 1.65, 24], [3.8, 3.3, 3.8], palette.chrome, true, false, true, 'structural-metal');
+  vesselCollider.visible = false;
+  vesselCollider.userData.collisionAuthorityFor = 'east-irrigation-vessel';
+  const irrigationVessel = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 3.3, 20), palette.chrome);
+  irrigationVessel.name = 'east-irrigation-vessel';
+  irrigationVessel.position.set(27, 1.65, 24);
+  irrigationVessel.castShadow = true;
+  irrigationVessel.receiveShadow = true;
+  irrigationVessel.userData.impactSurface = 'metal';
+  irrigationVessel.userData.collisionAuthority = vesselCollider.name;
+  world.add(irrigationVessel);
+  world.userData.atomicCollisionAudit = {
+    terrainMounds: moundAudit,
+    qualityEarthBanks: qualityEarthBankAudit,
+    largeCylinder: { id: irrigationVessel.name, collider: vesselCollider.name, bottomY: 0 },
+  };
+  // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
+  // outer anchors receive taller collision aligned to recognisable authored
+  // cargo/utility assets in the Blender and fallback art layers.
+  const authoredLargeCoverIds = new Map<number, string>([
+    [4, 'north-cargo-stack'],
+    [5, 'south-pipe-stack'],
+    [6, 'west-service-skip'],
+    [7, 'east-generator-trailer'],
+  ]);
+  COVER_LAYOUT.forEach(([x, z, w, d], index) => {
+    const height = authoredLargeCoverIds.has(index) ? 2.2 : 1.6;
+    const authoritativeCover = box(`cover ${index}`, [x, height / 2, z], [w, height, d], index % 2 ? palette.coral : palette.aqua);
+    const id = authoredLargeCoverIds.get(index);
+    if (id) {
+      // Keep one simple AABB for movement/projectile authority, but render a
+      // recognisable low-cost semantic silhouette on the representative
+      // Performance profile instead of a generic coloured block.
+      authoritativeCover.visible = false;
+      const visual = addPerformanceLargeCover(id as Parameters<typeof addPerformanceLargeCover>[0], x, z);
+      physicalCover.push({
+        id,
+        bounds: { ...colliders[colliders.length - 1] },
+        blocksMovement: true,
+        blocksShots: true,
+        performanceVisualKind: visual.kind,
+        performanceVisualMeshes: visual.meshes,
+      });
+    }
+  });
+
+  // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
+  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55]);
+  // The Blender hydroponics landmark is an open frame with beds rather than a full-height perimeter.
+  // Older west/east/north/south proxy walls created an unseen enclosure; keep those routes open.
+  collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
+  collisionProxy('service wall east', [28.5, 0.75, 9], [0.7, 1.5, 10]);
+  for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
+
+  // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
+  box('atomic landmark plinth', [27, 0.38, -20], [4.4, 0.76, 4.4], palette.concrete);
+
+  // Player-sized authored objects need one shared authority contract even when
+  // Quality replaces the procedural presentation with its Blender scene.
+  const substantialPropColliders: string[] = [];
+  const substantial = (name: string, position: [number, number, number], size: [number, number, number], material?: BallisticMaterialId) => {
+    substantialPropColliders.push(authoredCollisionProxy(name, position, size, material).name);
+  };
+  for (const [index, [x, z, scale]] of [
+    [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
+  ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
+  for (const [index, [x, z]] of [[-24, -8], [24, 8], [-9, -27], [9, 27]].entries()) {
+    substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8]);
+  }
+  for (const [index, [x, z]] of [[-30, -8], [30, 8]].entries()) {
+    substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3]);
+  }
+  for (const [index, x] of [-29, -26, -23].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 21], [1.1, 0.7, 6.2], 'concrete');
+  substantial('authored-reclamation-tank-collider', [-29.5, 3.05, -14], [2.7, 5.6, 2.7]);
+  for (const [index, z] of [-6.5, 6.5].entries()) substantial(`authored-civic-post-collider-${index}`, [0, 3.25, z], [0.32, 6.5, 0.32]);
+  for (const [houseIndex, house] of HOUSE_LAYOUT.entries()) {
+    const { x, z, facing } = house;
+    const tableX = x - 3;
+    const tableZ = z - facing * 2.7;
+    substantial(`authored-house-${houseIndex}-dining-collider`, [tableX, 0.62, tableZ], [2.8, 1.24, 1.45], 'wood');
+    for (const [chairIndex, [chairX, chairZ]] of [
+      [tableX - 1.72, tableZ], [tableX + 1.72, tableZ], [tableX, tableZ - 1.05], [tableX, tableZ + 1.05],
+    ].entries()) substantial(`authored-house-${houseIndex}-chair-collider-${chairIndex}`, [chairX, 0.6, chairZ], [0.72, 1.2, 0.72], 'wood');
+    const sofaX = x + 3.7;
+    const sofaZ = z + facing * 2.7;
+    substantial(`authored-house-${houseIndex}-sofa-collider`, [sofaX, 0.85, sofaZ], [3.25, 1.7, 1.3], 'wood');
+    substantial(`authored-house-${houseIndex}-kitchen-collider`, [x - 3.75, 1.15, z - facing * 5.25], [6.5, 2.3, 0.85], 'wood');
+    substantial(`authored-house-${houseIndex}-coffee-table-collider`, [sofaX - 0.3, 0.36, sofaZ - facing * 1.5], [1.9, 0.72, 0.9], 'wood');
+    substantial(`authored-house-${houseIndex}-media-collider`, [x + 3.7, 1.1, z - facing * 3.1], [2.6, 2.2, 0.82]);
+    // Keep the bed out of the upper partition sightline. Its old x + 3.6
+    // placement made the dark headboard fill the opening and read as a sealed
+    // black door even though the route was physically open.
+    substantial(`authored-house-${houseIndex}-upper-bed-collider`, [x + 6.1, 4.0, z - facing * 2.5], [3.2, 1.05, 2.2], 'wood');
+    substantial(`authored-house-${houseIndex}-upper-desk-collider`, [x - 3.2, 4.25, z + facing * 2.8], [2.7, 1.65, 0.92], 'wood');
+  }
+  world.userData.atomicCollisionAudit.substantialProps = substantialPropColliders;
+
+  // Boundary fencing, with substantial visual posts rather than invisible
+  // walls. HF-383 remainder: the north/south fences follow ARENA_BOUNDS out
+  // to +/-31.5 (fence centreline +/-31.8); the west/east runs lengthen to
+  // span the deeper map.
+  box('west fence', [-31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
+  box('east fence', [31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
+  box('north fence', [0, 1.5, -31.8], [63, 3, 0.6], palette.timber);
+  box('south fence', [0, 1.5, 31.8], [63, 3, 0.6], palette.timber);
+  // HF-387 player-body half: these posts used to sit at +/-30.9, protruding
+  // ~0.5 m into the play space past the world-boundary collider with NO
+  // movement authority of their own. The audit marched the real capsule into
+  // the boundary and measured the camera eye up to 1.4 cm from the post mesh
+  // (stand) and inside its slab when prone/crouched - a near-plane clip the
+  // owner reads as "clipping through walls". Posts now sit proud on the
+  // outside face of the fence run, fully beyond ARENA_BOUNDS, so visible mass
+  // and reachable eye shells agree again. Purely visual relocation; no
+  // clearance constant or gameplay value changed.
+  for (let z = -28.5; z <= 28.5; z += 7.125) {
+    box('fence post', [-31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+    box('fence post', [31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+  }
+
+  function sign(text: string, x: number, y: number, z: number, rotationY = 0): void {
+    if (typeof document === 'undefined') return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 192;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#13242b';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#f3c34d';
+    ctx.lineWidth = 16;
+    ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+    ctx.fillStyle = '#f6ead6';
+    ctx.font = '900 58px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(7, 2.65), new THREE.MeshBasicMaterial({ map: texture }));
+    board.position.set(x, y, z);
+    board.rotation.y = rotationY;
+    world.add(board);
+  }
+  sign('NUKE TOWN', 0, 4.7, -29.9, 0);
+  sign('TEST BLOCK 86', 0, 4.7, 29.9, Math.PI);
+
+  function target(id: string, x: number, z: number, team: Team): void {
+    const root = new THREE.Group();
+    root.name = 'practice-target';
+    root.userData.targetId = id;
+    root.position.set(x, 0, z);
+    const targetMat = team === 0 ? palette.aqua : palette.coral;
+    // Named so camera-clip audits can attribute eye-in-geometry hits to the
+    // soft practice dummies instead of an anonymous mesh.
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 5, 10), targetMat);
+    torso.name = `${id}-torso`;
+    torso.position.y = 1.05;
+    torso.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8), palette.cream);
+    head.name = `${id}-head`;
+    head.position.y = 1.92;
+    head.castShadow = true;
+    root.add(torso, head);
+    root.traverse((child) => { child.userData.targetRoot = root; });
+    world.add(root);
+    targets.push({ id, root, active: true, respawnAt: 0, scoreValue: 1, distanceBand: 'mid', maxHealth: 1, health: 1 });
+  }
+  target('north-yard', -20, -20, 1);
+  target('north-lane', 18, -6, 1);
+  target('south-yard', 20, 20, 0);
+  target('south-lane', -18, 6, 0);
+  target('mid-coach', 8, 3, 1);
+  target('mid-truck', -8, -3, 0);
+
+  // Street lamps and a few decorative trees add depth without texture downloads.
+  for (const [x, z] of [[-18, -16], [18, 16], [-26, -2], [26, 2]] as Array<[number, number]>) {
+    box('lamp pole', [x, 2.8, z], [0.15, 5.6, 0.15], palette.dark, true, true, true, 'structural-metal');
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffefb5, emissive: 0xffb84d, emissiveIntensity: 2.2 }));
+    lamp.position.set(x, 5.55, z);
+    world.add(lamp);
+  }
+  // Original trees and street props are assembled in environment-assets.ts.
+
+  return {
+    id: 'atomic-acres',
+    label: 'Nuke Town',
+    root: world,
+    colliders,
+    physicsColliders,
+    raycastMeshes,
+    shotSurfaces,
+    patrolPoints: PATROL_LAYOUT.map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    targets,
+    houses,
+    houseDestruction: Object.freeze({
+      definitions: Object.freeze([...houseFragmentDefinitions].sort((left, right) => left.id.localeCompare(right.id))),
+      staticColliders: Object.freeze(staticHouseFragmentColliders),
+      staticBallisticSurfaceIds: Object.freeze(staticHouseFragmentBallisticSurfaceIds),
+    }),
+    breakableWindows,
+    physicalCover,
+    houseTelemetry,
+    bounds: { ...ARENA_BOUNDS },
+    spawns: {
+      0: SPAWN_LAYOUT[0].map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
+      1: SPAWN_LAYOUT[1].map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
+    },
+  };
+}

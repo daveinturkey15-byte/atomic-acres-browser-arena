@@ -1,0 +1,37 @@
+Once pass 69 is live - work on everything below as pass 70, then provide me with a HITL local test again
+
+OK continue with the work for pass 70 yourself, we dont need to handoff elsewhere
+
+mini uzi looks better, but the carbine and that gun go see thorugh, not the right way to fix it really, should just te the actual centre reticle area which is modified
+
+hands looking improved but yes still needs some work, not 100%
+
+Carpet bomber looks good now
+chopper gunner still bad, both its model and its first person HUD view
+Care package plain is good
+
+gun clipping still very bad when prone or near walls
+
+still lacking decals on many or all surfaces with some guns or graphics modes, should always be present
+
+ADS doesnt bring up a scope view with the railgun, and its scope should not be an opqabue block?
+
+still need better lighfting/teaxture/mapping on killstreak room door, and also the timer should freeze whilst in there
+
+the bots in there should be illuminated with a colour and walking forward not backwards
+
+flare gun and flamethroer are good now, make flare do its damag eon initial hit before it hits the ground and make its napalm damage and the carpet bomber both 10 per second remaining in the fire, fire lasts 5 seconds?
+
+Walls, floors and bots collision needs fixing in killstreak zone, so can test most guns and crossbow, ensure the bolt isnt going through the lense
+
+the lense on all guns should actually be glass or just clear, not ever a blocked opaque asset. ensure palaintr logo on drone swarm matches provided screenshot
+
+sometimes glass breaks and its fragments float in the air, fix it
+
+Overall i am really happy with this build, nice
+
+when selecting field kit, ensure the stat bars are visible and their text and values cleanly on both PC and mobile
+I want to see a large DPS number at the top (no value bar needed)
+then Damage, Fire Rate, Falloff(range), Control, and wallbanging metric (periecing?) These should be clear and visible like when you select your weapon to manage/rename your custom classes. Also ensure its clearer which field kit or custom 1/2/3 is selected
+
+Also make it auto hide the manage/rename menu when you click save loadout

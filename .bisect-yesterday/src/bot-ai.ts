@@ -1,0 +1,271 @@
+export {
+  BOT_GRENADE_POOL,
+  BOT_WEAPON_DEFINITIONS,
+  BOT_WEAPON_POOL,
+  BOT_STARTING_WEAPON_POOL,
+  assignBotGrenades,
+  assignBotWeapons,
+  botWeaponBurstSize,
+  botWeaponDefinition,
+  botWeaponFireAdapter,
+  botWeaponFireInterval,
+  botSignalFlareAimDirection,
+  createShuffleBag,
+  grenadeDefinition,
+  projectBotGrenadeIds,
+  projectBotWeaponIds,
+} from './bot-arsenal';
+
+export type BotMovement = 'idle' | 'advance' | 'retreat' | 'strafe-left' | 'strafe-right';
+
+export type BotSense = {
+  alive: boolean;
+  distanceToPlayer: number;
+  hasLineOfSight: boolean;
+  health: number;
+  now: number;
+  lastShotAt: number;
+  waypointReached: boolean;
+  random: number;
+  lineOfSightSince?: number;
+  reactionDelay?: number;
+  burstShotsRemaining?: number;
+  fireIntervalMs?: number;
+  fireSuppressed?: boolean;
+};
+
+export type BotIntent = {
+  movement: BotMovement;
+  fire: boolean;
+  changeWaypoint: boolean;
+};
+
+export const SOLO_BOT_COUNT = 1;
+export const MAX_SOLO_BOTS = 6;
+export const BOT_DEATHS_PER_REINFORCEMENT = 10;
+export const BOT_FIRE_RANGE = 22;
+export const BOT_REACTION_DELAY = 650;
+export const BOT_GRENADE_MIN_RANGE = 7;
+export const BOT_GRENADE_MAX_RANGE = 18;
+export const BOT_GRENADE_COOLDOWN_MS = 12_000;
+export type BotGrenadeSense = Readonly<{
+  alive: boolean;
+  hasLineOfSight: boolean;
+  reacted: boolean;
+  distanceToPlayer: number;
+  now: number;
+  nextGrenadeAt: number;
+  botGrenadeActive: boolean;
+  activeBotGrenades: number;
+  random: number;
+}>;
+
+export function shouldBotThrowGrenade(sense: BotGrenadeSense): boolean {
+  return sense.alive
+    && sense.hasLineOfSight
+    && sense.reacted
+    && sense.distanceToPlayer >= BOT_GRENADE_MIN_RANGE
+    && sense.distanceToPlayer <= BOT_GRENADE_MAX_RANGE
+    && sense.now >= sense.nextGrenadeAt
+    && !sense.botGrenadeActive
+    && sense.activeBotGrenades === 0
+    && Number.isFinite(sense.random)
+    && sense.random < 0.32;
+}
+
+/** Ten-defeat Nuke Town reinforcements, capped so an uncapped score race stays performant. */
+export function soloBotTargetForDeaths(botDeaths: number): number {
+  const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
+  return Math.min(MAX_SOLO_BOTS, SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
+}
+
+/** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */
+export function operatorYawToward(from: { x: number; z: number }, target: { x: number; z: number }): number {
+  return Math.atan2(-(target.x - from.x), -(target.z - from.z));
+}
+
+/** Eye height a bot aims FROM, matching the standing eye used by its sight checks. */
+export const BOT_AIM_ORIGIN_HEIGHT_M = 1.42;
+
+/**
+ * Pass 77 / HF-375. Aim pitch toward a target, positive up, matching the camera
+ * and protocol pitch convention (`aimDirection` builds its ray with
+ * `Euler(pitch, yaw, 0, 'YXZ')`, whose Y component is `sin(pitch)`).
+ *
+ * Every bot `poseOperator` call passed a literal 0 for pitch, so a bot firing up
+ * a stairwell or down off a superstructure stood perfectly level. Bots aim in 3D
+ * already - `botHasLineOfSight` raycasts from eye height to a target's eyes -
+ * so the number existed; nothing had ever computed it for presentation.
+ */
+export function operatorPitchToward(
+  from: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number },
+  originHeightM = BOT_AIM_ORIGIN_HEIGHT_M,
+): number {
+  const dx = target.x - from.x;
+  const dz = target.z - from.z;
+  const dy = target.y - (from.y + originHeightM);
+  const horizontal = Math.hypot(dx, dz);
+  if (!Number.isFinite(dy) || !Number.isFinite(horizontal)) return 0;
+  if (horizontal < 1e-4) return dy > 0 ? Math.PI / 2 : dy < 0 ? -Math.PI / 2 : 0;
+  return Math.atan2(dy, horizontal);
+}
+
+export type SpawnCandidate = {
+  index: number;
+  nearestPlayerDistanceSq: number;
+  visibleThreats: number;
+};
+
+export type SpawnSidePressure = Readonly<{
+  minimumVisibleThreats: number;
+  safestNearestThreatDistanceSq: number;
+}>;
+
+export const SPAWN_FLIP_SUSTAIN_MS = 1_200;
+export type SpawnFlipHysteresis = Readonly<{ pressuredSince: number | null }>;
+
+export function createSpawnFlipHysteresis(): SpawnFlipHysteresis {
+  return { pressuredSince: null };
+}
+
+/** A transient pressure sample starts observation; only sustained pressure flips the authored side. */
+export function advanceSpawnFlipHysteresis(
+  state: SpawnFlipHysteresis,
+  pressured: boolean,
+  now: number,
+): { state: SpawnFlipHysteresis; flip: boolean } {
+  if (!pressured || !Number.isFinite(now)) return { state: createSpawnFlipHysteresis(), flip: false };
+  const pressuredSince = state.pressuredSince ?? now;
+  return {
+    state: { pressuredSince },
+    flip: now - pressuredSince >= SPAWN_FLIP_SUSTAIN_MS,
+  };
+}
+
+/** Flip only when the home side is materially pressured and the authored opposite side is safer. */
+export function shouldFlipSpawnSide(home: SpawnSidePressure, opposite: SpawnSidePressure): boolean {
+  const homeVisible = Math.max(0, home.minimumVisibleThreats);
+  const oppositeVisible = Math.max(0, opposite.minimumVisibleThreats);
+  const homeDistance = Number.isFinite(home.safestNearestThreatDistanceSq)
+    ? Math.max(0, home.safestNearestThreatDistanceSq)
+    : Number.POSITIVE_INFINITY;
+  const oppositeDistance = Number.isFinite(opposite.safestNearestThreatDistanceSq)
+    ? Math.max(0, opposite.safestNearestThreatDistanceSq)
+    : Number.POSITIVE_INFINITY;
+  if (homeVisible >= 2 && oppositeVisible < homeVisible) return true;
+  return homeVisible >= 1
+    && oppositeVisible <= homeVisible
+    && homeDistance < 12 * 12
+    && oppositeDistance > homeDistance * 1.8;
+}
+
+/**
+ * Selects from the least-exposed spawn tier first, then the farthest bounded
+ * pool. A previous spawn is avoided when another equally covered option exists.
+ */
+export function selectFarthestSpawnCandidate(
+  candidates: readonly SpawnCandidate[],
+  random: number,
+  poolSize = 3,
+  avoidIndex = -1,
+): number {
+  if (candidates.length === 0) return -1;
+  const leastVisibleThreats = Math.min(...candidates.map((candidate) => Math.max(0, candidate.visibleThreats)));
+  const coveredTier = candidates.filter((candidate) => Math.max(0, candidate.visibleThreats) === leastVisibleThreats);
+  const freshTier = coveredTier.filter((candidate) => candidate.index !== avoidIndex);
+  const eligible = freshTier.length > 0 ? freshTier : coveredTier;
+  const ranked = [...eligible].sort((a, b) =>
+    b.nearestPlayerDistanceSq - a.nearestPlayerDistanceSq
+    || a.index - b.index,
+  );
+  const allUncontested = ranked.every((candidate) => !Number.isFinite(candidate.nearestPlayerDistanceSq));
+  const pool = allUncontested
+    ? ranked
+    : ranked.slice(0, Math.max(1, Math.min(Math.floor(poolSize), ranked.length)));
+  const boundedRandom = Number.isFinite(random) ? Math.max(0, Math.min(0.999999999, random)) : 0;
+  return pool[Math.floor(boundedRandom * pool.length)].index;
+}
+
+export type BotSpawnScore = {
+  nearestThreatDistanceSq: number;
+  visibleThreats: number;
+  occupied: boolean;
+  preferred: boolean;
+};
+
+/** Larger scores are safer; occupation and exposure are hard tiers ahead of distance/preference. */
+export function scoreBotSpawn(candidate: BotSpawnScore): number {
+  const distance = Number.isFinite(candidate.nearestThreatDistanceSq)
+    ? Math.min(1_000_000, Math.max(0, candidate.nearestThreatDistanceSq))
+    : 0;
+  return distance
+    - Math.max(0, candidate.visibleThreats) * 1_000_000_000
+    - (candidate.occupied ? 1_000_000_000_000 : 0)
+    + (candidate.preferred ? 1 : 0);
+}
+
+export function botCanFireWhileProtected(intentFire: boolean, now: number, invulnerableUntil: number): boolean {
+  return intentFire && now >= invulnerableUntil;
+}
+
+export type TacticalWaypointCandidate = {
+  index: number;
+  distanceFromBot: number;
+  distanceFromPlayer: number;
+  seesPlayer: boolean;
+};
+
+/** Chooses an intercept/reacquisition point without requiring a heavyweight navigation mesh. */
+export function chooseTacticalWaypoint(
+  candidates: TacticalWaypointCandidate[],
+  currentIndex: number,
+  variationSeed = 0,
+): number {
+  if (candidates.length === 0) return currentIndex;
+  const scored = candidates.map((candidate) => {
+    const travelCost = Math.max(0, candidate.distanceFromBot) * 0.42;
+    const engagementBandPenalty = Math.abs(Math.max(0, candidate.distanceFromPlayer) - 13) * 0.34;
+    const reacquisitionBonus = candidate.seesPlayer ? 7 : 0;
+    const routeChangeBonus = candidate.index === currentIndex ? -4 : 0.8;
+    const tieBreak = ((candidate.index * 17 + variationSeed * 7) % 11) * 0.001;
+    return { index: candidate.index, score: reacquisitionBonus + routeChangeBonus + tieBreak - travelCost - engagementBandPenalty };
+  });
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored[0].index;
+}
+
+/** Close-range bots remain readable; their aim becomes deliberately poor toward medium range. */
+export function botAimJitter(distance: number): number {
+  const rangeFraction = Math.max(0, Math.min(1, (distance - 6) / (BOT_FIRE_RANGE - 6)));
+  return 0.024 + rangeFraction * rangeFraction * 0.076;
+}
+
+export function chooseBotIntent(sense: BotSense): BotIntent {
+  if (!sense.alive) return { movement: 'idle', fire: false, changeWaypoint: false };
+  const reacted = sense.hasLineOfSight
+    && sense.now - (sense.lineOfSightSince ?? sense.now) >= (sense.reactionDelay ?? 0);
+  const shotInterval = Number.isFinite(sense.fireIntervalMs)
+    ? Math.max(40, sense.fireIntervalMs!)
+    : (sense.burstShotsRemaining ?? 0) > 0 ? 135 : 620;
+  const fire = reacted
+    && !sense.fireSuppressed
+    && sense.distanceToPlayer <= BOT_FIRE_RANGE
+    && sense.distanceToPlayer >= 2.5
+    && sense.now - sense.lastShotAt >= shotInterval;
+  let movement: BotMovement;
+  if (sense.health < 35 && sense.hasLineOfSight && sense.distanceToPlayer < 18) movement = 'retreat';
+  else if (sense.distanceToPlayer < 5.5) movement = 'retreat';
+  else if (!sense.hasLineOfSight || sense.distanceToPlayer > 18) movement = 'advance';
+  else movement = sense.random < 0.5 ? 'strafe-right' : 'strafe-left';
+  return { movement, fire, changeWaypoint: sense.waypointReached || (!sense.hasLineOfSight && sense.random > 0.88) };
+}
+
+export function respawnBotState(now: number): {
+  health: number;
+  alive: boolean;
+  invulnerableUntil: number;
+  lastShotAt: number;
+} {
+  return { health: 100, alive: true, invulnerableUntil: now + 1_000, lastShotAt: 0 };
+}

@@ -1,0 +1,17 @@
+the rotary blades on the videop in the menu needs improvbing, currently looks stupid, needs a smarter implementation for the perspective our camera gives. the rest of the UI looks good for the chopper and the level and video etc. same deal on the loading scren once i select a map
+
+all the direction contrls are inverted on the piloted drone, sort that, and ensure it moves faster when not being controled by me, double its move speed
+
+ensure the pilolted drone and drone swarm always spawn in the center of the map in a spread out pattern
+
+carpet bomb should feel like using the care package, you select it, put the red X on your UI where you want, then it flies in, currently doesnt
+
+yes the arms need a massive re work this is wht worst part of the game, everything else feeling pretty good
+
+chopper gunner needs to have the back of the vehicle it only has the front atm, and whne entering it shouldnt see the rotary blades just the UI and cross hair and be able to gun
+
+the explosive damage should be more able to blow the phyical green shed asset we have apart
+
+make all of these iimprovbments then do another large pass to ensure our code is clean and tidyh and we are not having freezing or issues
+
+ensure the railgun can hit multiple targets and its clear when they die and attributed to yourself as a kill. always 50 deamage, no more , no less, no crits, etc, should have epic projection animation that hangs around for 1 second and is big scary lazer and noisy too, all can see not just the shooter, same case for all animations and sounds etc too where it makes sense

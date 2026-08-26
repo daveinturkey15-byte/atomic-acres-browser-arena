@@ -1,0 +1,63 @@
+{
+  "schema": "atomic-acres.pass65.blender-source-recovery.v1",
+  "recordedAtUtc": "2026-07-29T14:03:47.3450801Z",
+  "scope": "Isolated DJMaesen first-person-arms authoring prototype only; no production integration or release files were changed.",
+  "incident": {
+    "observedLocalDate": "2026-07-29",
+    "corruptPath": "scripts/blender/prototype-pass65-djmaesen-first-person-arms.py",
+    "bytes": 90157,
+    "nulBytes": 90157,
+    "sha256": "40E4B7F9E641015B9FF6467C63B2B0639C1F0D1863336345218E5018F63B3005",
+    "excludedFromCommit": true,
+    "context": "The original untracked file was found entirely NUL-filled after an unexpected machine shutdown. The corrupt file is retained locally and is not authoritative."
+  },
+  "recovered": {
+    "path": "scripts/blender/build-pass65-djmaesen-first-person-arms.py",
+    "bytes": 89842,
+    "lines": 2087,
+    "sha256": "9D5E95D4B7DB48E0F2A8E3E4D7FB0817C99EDF31BBA63069B42714BE53DF7395",
+    "strictUtf8": true,
+    "nulBytes": 0,
+    "pythonCompile": "pass"
+  },
+  "reconstruction": {
+    "method": "Replay the ordered apply_patch inputs captured in two local Codex session event streams, then independently compare the compiled code object and a frozen Blender render.",
+    "sources": [
+      {
+        "sessionFile": "rollout-2026-07-29T10-30-27-019fad36-085a-7301-88c7-a3cedfb93f45.jsonl",
+        "relevantLines": "9535-10213"
+      },
+      {
+        "sessionFile": "rollout-2026-07-29T13-07-28-019fadc5-c9e0-7cb3-ac5b-93fc0f21f663.jsonl",
+        "relevantLines": "20659-21533"
+      }
+    ]
+  },
+  "compiledCodeProof": {
+    "survivingPyc": "scripts/blender/__pycache__/prototype-pass65-djmaesen-first-person-arms.cpython-311.pyc",
+    "pycSha256": "CB7E838851ABB6E3630B9C2B9640345FA8DAE0DE3A3629AB58798D4DFA138122",
+    "headerSourceBytes": 89842,
+    "headerSourceLocalTime": "2026-07-29T13:57:32",
+    "recursiveCodeObjectEquality": true
+  },
+  "frozenRenderProof": {
+    "review": "pass65-djmaesen-arms-m4a1-hip-procedural-wrap-lower-palm-v4",
+    "knownReceiptSha256": "A86170F56648F86F382C1E477CF065A252AE93190F7A7607D93F140938861664",
+    "reproducedReceiptSha256": "A86170F56648F86F382C1E477CF065A252AE93190F7A7607D93F140938861664",
+    "decodedImage": {
+      "width": 960,
+      "height": 540,
+      "format": "RGBA",
+      "changedPixels": 0,
+      "totalPixels": 518400,
+      "maximumChannelDelta": 0
+    },
+    "forensicDirectory": "artifacts/blender-operator-arms/djmaesen-prototype/forensic-recovery-20260729"
+  },
+  "conclusion": {
+    "sourceRecoveryAccepted": true,
+    "productionUntouched": true,
+    "visualIntegrationApproved": false,
+    "nextGate": "Fix the terminal-phalanx invariant and rejected support-hand/forearm silhouette, then review the same-camera M4 hip, ADS, reload and knife views plus pistol and MP5 before any integration proposal."
+  }
+}

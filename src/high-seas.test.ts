@@ -635,6 +635,36 @@ describe('High Seas clean-room arena geometry', () => {
     }
   });
 
+  it('keeps the deckhouse window framing bright enough to read as painted teal, not black slots (HF-392 round 3)', () => {
+    // Measured on real WebGPU frames (artifacts/hf392-headless/current-*):
+    // with the round-2 dielectric fix in place the trim STILL rendered
+    // 0-10/255 in the cabin's shaded mounting, because albedo 0x164c58 is
+    // only ~26% sRGB luminance and the sill/header/mullion bands sit in the
+    // roof's shadow both inside and out - so every window frame, the roof
+    // inlay and the fascia read as pure black slots. The trim must carry a
+    // painted-teal albedo bright enough to answer hemisphere light, and must
+    // stay dielectric so that albedo actually reaches the eye.
+    const map = buildHighSeas(new THREE.Scene());
+    let mat: THREE.MeshStandardMaterial | undefined;
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && !mat) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mat = mats.find(
+          (candidate): candidate is THREE.MeshStandardMaterial =>
+            candidate instanceof THREE.MeshStandardMaterial && candidate.name === 'high-seas-deep-teal-trim',
+        );
+      }
+    });
+    expect(mat, 'deep-teal-trim material should exist in the scene').toBeDefined();
+    const srgbLuminance =
+      (0.2126 * mat!.color.r + 0.7152 * mat!.color.g + 0.0722 * mat!.color.b);
+    expect(
+      srgbLuminance,
+      'window framing trim must stay a readable painted teal in shade',
+    ).toBeGreaterThanOrEqual(0.4);
+    expect(mat!.metalness, 'painted marine trim is dielectric').toBeLessThanOrEqual(0.25);
+  });
+
   it('equips deck, hull, and superstructure with procedural PBR textures (albedo, normal, roughness)', () => {
     const map = buildHighSeas(new THREE.Scene());
     const inventory = getHighSeasMaterialInventory();

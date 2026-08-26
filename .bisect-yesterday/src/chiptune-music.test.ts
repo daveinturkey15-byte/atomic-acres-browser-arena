@@ -1,0 +1,140 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHIPTUNE_TRACKS,
+  CHIPTUNE_TRACK_IDS,
+  chiptuneBarSeconds,
+  chiptuneLoopEvents,
+  chiptuneLoopSeconds,
+  chiptuneMaxConcurrency,
+  midiToFrequency,
+  selectChiptuneTrack,
+  type ChiptuneTrackId,
+} from './chiptune-music';
+import { AUDIO_RUNTIME_BUDGET } from './spatial-audio';
+
+/** Semitone classes of a natural-minor scale, used to prove notes stay in key. */
+const MINOR_DEGREES = new Set([0, 2, 3, 5, 7, 8, 10]);
+
+function pitchClassRelativeToTonic(frequencyHz: number, tonicMidi: number): number {
+  const midi = Math.round(69 + 12 * Math.log2(frequencyHz / 440));
+  return ((midi - tonicMidi) % 12 + 12) % 12;
+}
+
+describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackId) => {
+  const track = CHIPTUNE_TRACKS[id];
+  const events = chiptuneLoopEvents(id);
+
+  it('fits the two-voice game-music budget without widening it', () => {
+    // Assert against the real budget constant rather than a copy. If someone
+    // writes a chord needing a third simultaneous voice, it fails here instead of
+    // stealing a voice from gunfire at runtime.
+    const peak = chiptuneMaxConcurrency(events);
+    expect(peak.lead).toBe(1);
+    expect(peak.bass).toBe(1);
+    expect(peak.lead + peak.bass).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus['game-music']);
+  });
+
+  it('stays in key - no note can be an accidental', () => {
+    for (const event of events) {
+      const tonic = event.channel === 'lead' ? track.leadTonicMidi : track.bassTonicMidi;
+      const degree = pitchClassRelativeToTonic(event.frequencyHz, tonic);
+      expect(MINOR_DEGREES.has(degree), `${id} ${event.channel} ${event.frequencyHz.toFixed(2)}Hz out of key`).toBe(true);
+    }
+  });
+
+  it('is quiet enough to sit under gameplay audio', () => {
+    // The owner asked for background music that does not overpower game sounds.
+    // These peaks are pre-bus: the game-music bus multiplies by 0.16 and the
+    // player's music volume by up to 1.0 on top of that.
+    for (const event of events) expect(event.gain).toBeGreaterThan(0);
+    expect(Math.max(...events.map((event) => event.gain))).toBeLessThan(0.12);
+  });
+
+  it('never overruns its loop, so it can repeat seamlessly', () => {
+    const loop = chiptuneLoopSeconds(id);
+    expect(loop).toBeCloseTo(chiptuneBarSeconds(id) * track.progression.length, 10);
+    for (const event of events) {
+      expect(event.offsetSeconds).toBeGreaterThanOrEqual(0);
+      // A note running past the loop boundary would collide with the first note
+      // of the next iteration on the same channel - the seam the concurrency
+      // check above cannot see.
+      expect(event.offsetSeconds + event.durationSeconds).toBeLessThanOrEqual(loop + 1e-9);
+    }
+  });
+
+  it('uses both channels in every bar so the loop never thins out', () => {
+    const bar = chiptuneBarSeconds(id);
+    for (let index = 0; index < track.progression.length; index += 1) {
+      const start = index * bar;
+      const inBar = events.filter((event) =>
+        event.offsetSeconds >= start - 1e-9 && event.offsetSeconds < start + bar - 1e-9);
+      expect(inBar.some((event) => event.channel === 'lead'), `${id} bar ${index} has no lead`).toBe(true);
+      expect(inBar.some((event) => event.channel === 'bass'), `${id} bar ${index} has no bass`).toBe(true);
+    }
+  });
+
+  it('is deterministic, so any loop iteration can be rescheduled from scratch', () => {
+    expect(chiptuneLoopEvents(id)).toEqual(events);
+  });
+});
+
+describe('the two tracks are actually distinguishable', () => {
+  // Rotation is only worth having if a listener can tell the tracks apart.
+  // Asserting the contrast stops a future edit quietly converging them into two
+  // sections of the same piece.
+  it('differ in tempo, key, loop length and density', () => {
+    const [a, b] = CHIPTUNE_TRACK_IDS.map((id) => CHIPTUNE_TRACKS[id]);
+    expect(a.tempoBpm).not.toBe(b.tempoBpm);
+    expect(a.leadTonicMidi % 12).not.toBe(b.leadTonicMidi % 12);
+    expect(a.progression.length).not.toBe(b.progression.length);
+    expect(chiptuneLoopSeconds(a.id)).not.toBeCloseTo(chiptuneLoopSeconds(b.id), 2);
+
+    const density = (id: ChiptuneTrackId) => chiptuneLoopEvents(id).length / chiptuneLoopSeconds(id);
+    expect(Math.abs(density(a.id) - density(b.id))).toBeGreaterThan(0.5);
+  });
+});
+
+describe('track rotation', () => {
+  it('never repeats the previous track back to back', () => {
+    // Straight random selection would replay the same track about half the time,
+    // which reads as "the music never changed" rather than as variety.
+    for (const previous of CHIPTUNE_TRACK_IDS) {
+      for (const roll of [0, 0.25, 0.5, 0.75, 0.999999]) {
+        expect(selectChiptuneTrack(previous, roll)).not.toBe(previous);
+      }
+    }
+  });
+
+  it('can pick either track on a cold start', () => {
+    const picked = new Set([0, 0.49, 0.5, 0.99].map((roll) => selectChiptuneTrack(null, roll)));
+    expect(picked.size).toBe(CHIPTUNE_TRACK_IDS.length);
+  });
+
+  it('survives a hostile roll rather than returning undefined', () => {
+    // Math.random cannot produce these, but a caller mistake or a stubbed RNG can,
+    // and an out-of-range index here would silently start no music at all.
+    for (const roll of [-1, 0, 1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(CHIPTUNE_TRACK_IDS).toContain(selectChiptuneTrack(null, roll));
+      expect(CHIPTUNE_TRACK_IDS).toContain(selectChiptuneTrack('siren-groves', roll));
+    }
+  });
+
+  it('alternates across a run of matches', () => {
+    let previous: ChiptuneTrackId | null = null;
+    const played: ChiptuneTrackId[] = [];
+    for (let match = 0; match < 8; match += 1) {
+      previous = selectChiptuneTrack(previous, (match * 0.37) % 1);
+      played.push(previous);
+    }
+    expect(new Set(played).size).toBe(CHIPTUNE_TRACK_IDS.length);
+    for (let i = 1; i < played.length; i += 1) expect(played[i]).not.toBe(played[i - 1]);
+  });
+});
+
+describe('pitch conversion', () => {
+  it('converts MIDI to frequency at concert pitch', () => {
+    expect(midiToFrequency(69)).toBeCloseTo(440, 9);
+    expect(midiToFrequency(57)).toBeCloseTo(220, 9);
+    expect(midiToFrequency(81)).toBeCloseTo(880, 9);
+  });
+});

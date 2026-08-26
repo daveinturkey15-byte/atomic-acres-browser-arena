@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "9fecada75693c528d0ff2667ddad1f415d71ffe4",
+  "buildId": "pass65-synthetic-world-v1",
+  "decisionBinding": {
+    "id": "DEC-09",
+    "scope": "synthetic-fixture-only",
+    "receiptSha256": "75f0ff564e6246fb3eb9a589a8547dbf4175b2c9ecd1b730211d867db8adcba9"
+  },
+  "consumers": ["movement", "ballistics", "grenades", "ai-los", "support-targeting", "spawn-nav", "rendering"],
+  "globalBudgets": {
+    "maxAperturesPerShed": 32,
+    "maxDentsPerShed": 24,
+    "maxMajorChunksPerShed": 6,
+    "maxAwakeMajorBodiesArenaWide": 18
+  },
+  "objects": [
+    {
+      "id": "field-shed",
+      "kind": "destructible-shed",
+      "authority": "host",
+      "revisioned": true,
+      "worldCollisionSnapshotId": "world-collision-v1",
+      "collisionPolicyId": "shed-collision-v1",
+      "materialPolicyId": "corrugated-steel-v1",
+      "damageThresholds": {"dent": 10, "perforate": 25, "detach": 100},
+      "maxDentsPerObject": 24,
+      "preauthoredChunkIds": [
+        "shed-wall-north",
+        "shed-wall-south",
+        "shed-wall-east",
+        "shed-wall-west",
+        "shed-roof-left",
+        "shed-roof-right"
+      ],
+      "lods": [
+        {"id": "shed-lod0", "maxDistanceM": 25, "triangleBudget": 12000},
+        {"id": "shed-lod1", "maxDistanceM": 100, "triangleBudget": 3000}
+      ],
+      "placements": [
+        {"arenaId": "atomic-acres", "zoneId": "whole-arena", "count": 2},
+        {"arenaId": "skyline-terminal", "zoneId": "terminal-apron", "count": 2},
+        {"arenaId": "rustworks-1v1", "zoneId": "whole-arena", "count": 2}
+      ],
+      "door": {
+        "durationMs": 1000,
+        "commandSequenced": true,
+        "canonicalTicks": true,
+        "hostAdmission": {"hostOnly": true, "requiresRange": true, "requiresLineOfSight": true},
+        "obstructionKinds": ["player", "major-debris", "bullet"],
+        "obstructionPolicy": "reverse-resume",
+        "trajectoryFields": ["command-id", "command-sequence", "target-angle", "direction", "started-tick", "completes-tick", "blocked-by", "resume-policy"]
+      },
+      "apertures": {
+        "canonicalSharedRepresentation": true,
+        "maxPerObject": 32,
+        "saturation": "merge-exact-region"
+      },
+      "surfaces": ["wall", "roof", "door", "detached-chunk"],
+      "debris": {
+        "maxMajorChunks": 6,
+        "hostSimulated": true,
+        "shotWakeFlat": true,
+        "explosionWakeFlat": true,
+        "contactNudgeNonFlat": true,
+        "awakeArenaWideCap": 18
+      },
+      "persistence": {
+        "lateJoin": true,
+        "resetOnRematch": true,
+        "resetOnArenaChange": true,
+        "matchEpochRequired": true,
+        "snapshotHashAlgorithm": "sha256"
+      },
+      "lifecycle": {
+        "generationAware": true,
+        "idempotentDispose": true,
+        "settlesAfterRematch": true,
+        "settlesAfterArenaSwitch": true
+      },
+      "budgets": {
+        "maxStateBytes": 16384,
+        "maxCollisionQueriesPerTick": 128,
+        "maxNetworkBytesPerSnapshot": 8192,
+        "maxParticlesPerShed": 256
+      },
+      "provenance": {
+        "source": "authored/field-shed-v1.blend",
+        "license": "project-owned",
+        "derivativeNotes": "Original Atomic Acres fixture asset; no third-party source material.",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "evidenceIds": ["shed-aperture-parity", "shed-consumer-parity", "shed-late-join-reset", "shed-resource-budget", "shed-vertical-slice"]
+    }
+  ],
+  "evidenceBinding": {
+    "scope": "synthetic-fixture-only",
+    "path": ".agents/skills/atomic-acres-destructible-world/scripts/fixtures/synthetic-shed-evidence.json",
+    "receiptSha256": "73b4ac6079fb7ccf8572e737a8a8cf9f57571a2f865c5f49a98ceb9eaaedd4aa"
+  }
+}

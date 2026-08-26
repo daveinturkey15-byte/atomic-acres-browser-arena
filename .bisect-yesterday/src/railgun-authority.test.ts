@@ -1,0 +1,281 @@
+import { describe, expect, it } from 'vitest';
+import {
+  RAILGUN_DAMAGE,
+  RAILGUN_MAX_TARGET_OUTCOMES,
+  RAILGUN_TARGET_HALF_HEIGHT_M,
+  RAILGUN_TARGET_RADIUS_M,
+  RAILGUN_PENETRATION_MULTIPLIER,
+  RAILGUN_RECHAMBER_MS,
+  RAILGUN_SPAWN_DELAY_MS,
+  RAILGUN_STATE_RESYNC_MS,
+  RAILGUN_TOTAL_ROUNDS,
+  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  advanceRailgunAuthority,
+  advanceRailgunChamber,
+  admitRailgunTargets,
+  chooseRailgunUpperRoom,
+  claimRailgun,
+  createRailgunBeamAuthority,
+  createRailgunAuthorityState,
+  dropRailgun,
+  fireRailgun,
+  grantTrainingRailgun,
+  isRailgunBeamAuthority,
+  isStaleRailgunAuthorityState,
+  railgunStateResyncDue,
+  isRailgunProtocolMessage,
+  railgunThermalTargetEligible,
+  replenishRailgunAmmo,
+} from './railgun-authority';
+
+describe('host-authoritative railgun', () => {
+  it('schedules only on Nuke Town and selects each authored upper room uniformly', () => {
+    expect(createRailgunAuthorityState('skyline-terminal', 10_000, 0).status).toBe('disabled');
+    const scheduled = createRailgunAuthorityState('atomic-acres', 10_000, 0.5);
+    expect(scheduled).toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 10_000 + RAILGUN_SPAWN_DELAY_MS });
+    expect([0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999].map(chooseRailgunUpperRoom).map((site) => site.id))
+      .toEqual(['aqua-front', 'aqua-front', 'aqua-rear', 'aqua-rear', 'coral-front', 'coral-front', 'coral-rear', 'coral-rear']);
+    expect(new Set(RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => site.position[1]))).toEqual(new Set([4.18]));
+  });
+
+  it('spawns and announces exactly once at 180 seconds', () => {
+    const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 7);
+    expect(advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS - 1).spawned).toBe(false);
+    const spawned = advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS);
+    expect(spawned).toMatchObject({ spawned: true, announcement: 'RARE WEAPON SPAWNED' });
+    expect(advanceRailgunAuthority(spawned.state, 999_999)).toMatchObject({ spawned: false, announcement: null });
+  });
+
+  it('orders every mutation within a generation and rejects stale equal-generation snapshots', () => {
+    const scheduled = createRailgunAuthorityState('atomic-acres', 0, 0, 9);
+    const available = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS).state;
+    const held = claimRailgun(available, 'player-a', 9).state;
+    const fired = fireRailgun(held, 'player-a', 'revision-shot', 200_000).state;
+    expect([scheduled.revision, available.revision, held.revision, fired.revision]).toEqual([0, 1, 2, 3]);
+    expect(isStaleRailgunAuthorityState(held, available)).toBe(true);
+    expect(isStaleRailgunAuthorityState(held, held)).toBe(false);
+    expect(isStaleRailgunAuthorityState(available, held)).toBe(false);
+    expect(isStaleRailgunAuthorityState(held, createRailgunAuthorityState('atomic-acres', 0, 0, 10))).toBe(false);
+  });
+
+  it('periodically resends authoritative state so every guest converges after a missed event', () => {
+    expect(railgunStateResyncDue(-Infinity, 0)).toBe(true);
+    expect(railgunStateResyncDue(10_000, 10_000 + RAILGUN_STATE_RESYNC_MS - 1)).toBe(false);
+    expect(railgunStateResyncDue(10_000, 10_000 + RAILGUN_STATE_RESYNC_MS)).toBe(true);
+  });
+
+  it('fires 50-damage full-penetration shots, breaks ADS, and rechambers for 1.5 seconds', () => {
+    const available = advanceRailgunAuthority(createRailgunAuthorityState('atomic-acres', 0, 0), RAILGUN_SPAWN_DELAY_MS).state;
+    let state = claimRailgun(available, 'player-a', 1).state;
+    const first = fireRailgun(state, 'player-a', 'shot-0001', 200_000);
+    expect(first).toMatchObject({
+      accepted: true,
+      damage: RAILGUN_DAMAGE,
+      penetrationMultiplier: RAILGUN_PENETRATION_MULTIPLIER,
+      adsAfterShot: false,
+      rechamberMs: RAILGUN_RECHAMBER_MS,
+    });
+    state = first.state;
+    expect(fireRailgun(state, 'player-a', 'shot-0002', 200_000 + RAILGUN_RECHAMBER_MS - 1).reason).toBe('not-ready');
+    state = advanceRailgunChamber(state, 200_000 + RAILGUN_RECHAMBER_MS);
+    expect(advanceRailgunChamber(state, 200_000 + RAILGUN_RECHAMBER_MS)).toBe(state);
+    expect(fireRailgun(state, 'player-a', 'shot-0002', 200_000 + RAILGUN_RECHAMBER_MS).accepted).toBe(true);
+  });
+
+  it('has exactly eight lifetime rounds, rejects duplicate shots, and cannot replenish', () => {
+    const available = advanceRailgunAuthority(createRailgunAuthorityState('atomic-acres', 0, 0), RAILGUN_SPAWN_DELAY_MS).state;
+    let state = claimRailgun(available, 'player-a', 1).state;
+    for (let index = 0; index < RAILGUN_TOTAL_ROUNDS; index += 1) {
+      const now = 200_000 + index * RAILGUN_RECHAMBER_MS;
+      state = advanceRailgunChamber(state, now);
+      const fired = fireRailgun(state, 'player-a', `shot-${String(index).padStart(4, '0')}`, now);
+      expect(fired.accepted).toBe(true);
+      if (index === 0) {
+        const duplicate = fireRailgun(fired.state, 'player-a', 'shot-0000', now + 10);
+        expect(duplicate).toMatchObject({ accepted: false, duplicate: true, reason: 'duplicate' });
+        expect(duplicate.state.roundsRemaining).toBe(RAILGUN_TOTAL_ROUNDS - 1);
+      }
+      state = fired.state;
+    }
+    expect(state).toMatchObject({ status: 'depleted', roundsRemaining: 0 });
+    expect(replenishRailgunAmmo(state)).toEqual({ replenished: false, state });
+    expect(fireRailgun(state, 'player-a', 'shot-9999', 999_999).accepted).toBe(false);
+  });
+
+  it('re-arms only at the secure host/offline Gun Range test station', () => {
+    const disabled = createRailgunAuthorityState('gun-range', 0, 0, 4);
+    const granted = grantTrainingRailgun(disabled, 'player-a', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'offline',
+    });
+    expect(granted).toMatchObject({
+      accepted: true,
+      state: { generation: 4, revision: 1, status: 'held', holderId: 'player-a', roundsRemaining: RAILGUN_TOTAL_ROUNDS },
+    });
+    expect(grantTrainingRailgun(granted.state, 'player-a', {
+      arenaId: 'atomic-acres', stationKind: 'secure-test-bay', authorityRole: 'host',
+    } as unknown as Parameters<typeof grantTrainingRailgun>[2])).toEqual({ accepted: false, state: granted.state });
+    expect(grantTrainingRailgun(granted.state, 'player-a', {
+      arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: 'client',
+    } as unknown as Parameters<typeof grantTrainingRailgun>[2])).toEqual({ accepted: false, state: granted.state });
+  });
+
+  it('drops and reclaims remaining rounds without refilling', () => {
+    const available = advanceRailgunAuthority(createRailgunAuthorityState('atomic-acres', 0, 0), RAILGUN_SPAWN_DELAY_MS).state;
+    const held = claimRailgun(available, 'player-a', 1).state;
+    const fired = fireRailgun(held, 'player-a', 'shot-drop', 200_000).state;
+    const dropped = dropRailgun(fired, 'player-a', [1, 2, 3]);
+    expect(dropped).toMatchObject({ dropped: true, state: { status: 'available', holderId: null, roundsRemaining: 7, pickupPosition: [1, 2, 3] } });
+    const reclaimed = claimRailgun(dropped.state, 'player-b', 1);
+    expect(reclaimed).toMatchObject({ accepted: true, state: { status: 'held', holderId: 'player-b', roundsRemaining: 7 } });
+    expect(fireRailgun(reclaimed.state, 'player-b', 'reclaim-1', 200_100).reason).toBe('not-ready');
+    expect(fireRailgun(reclaimed.state, 'player-b', 'reclaim-1', 200_000 + RAILGUN_RECHAMBER_MS).accepted).toBe(true);
+  });
+
+  it('reveals only living hostile players and bots through thermal ADS', () => {
+    const observer = { id: 'a', team: 0 as const };
+    expect(railgunThermalTargetEligible(observer, { id: 'b', team: 1, alive: true, kind: 'player' }, 'tdm')).toBe(true);
+    expect(railgunThermalTargetEligible(observer, { id: 'bot', team: 1, alive: true, kind: 'bot' }, 'tdm')).toBe(true);
+    expect(railgunThermalTargetEligible(observer, { id: 'ally', team: 0, alive: true, kind: 'player' }, 'tdm')).toBe(false);
+    expect(railgunThermalTargetEligible(observer, { id: 'dead', team: 1, alive: false, kind: 'player' }, 'tdm')).toBe(false);
+    expect(railgunThermalTargetEligible(observer, { id: 'other', team: 0, alive: true, kind: 'player' }, 'ffa')).toBe(true);
+  });
+
+  it('admits every aligned hostile once in deterministic near-to-far order and excludes friendly or off-axis actors', () => {
+    const admitted = admitRailgunTargets([0, 1, 0], [0, 0, -1], [
+      { target: 'hostile-far', position: [0, 1, -29], alive: true, hostile: true },
+      { target: 'friendly-middle', position: [0, 1, -19], alive: true, hostile: false },
+      { target: 'hostile-near', position: [0.2, 1, -9], alive: true, hostile: true },
+      { target: 'hostile-off-axis', position: [0.7, 1, -14], alive: true, hostile: true },
+      { target: 'hostile-middle', position: [-0.1, 1, -19], alive: true, hostile: true },
+      { target: 'dead-aligned', position: [0, 1, -24], alive: false, hostile: true },
+    ]);
+    expect(admitted).toEqual({
+      accepted: true,
+      reason: 'accepted',
+      targets: [
+        { target: 'hostile-near', distanceMeters: 9 },
+        { target: 'hostile-middle', distanceMeters: 19 },
+        { target: 'hostile-far', distanceMeters: 29 },
+      ],
+    });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], [
+      { target: 'duplicate', position: [0, 0, -5], alive: true, hostile: true },
+      { target: 'duplicate', position: [0, 0, -10], alive: true, hostile: true },
+    ])).toMatchObject({ accepted: false, reason: 'duplicate-candidate', targets: [] });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], Array.from(
+      { length: RAILGUN_MAX_TARGET_OUTCOMES + 1 },
+      (_, index) => ({ target: `target-${index}`, position: [0, 0, -(index + 1)] as const, alive: true, hostile: true }),
+    ))).toMatchObject({ accepted: false, reason: 'candidate-cap', targets: [] });
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], Array.from(
+      { length: RAILGUN_MAX_TARGET_OUTCOMES },
+      (_, index) => ({ target: `maximum-actor-${index}`, position: [0, 0, -(index + 1)] as const, alive: true, hostile: true }),
+    )).targets).toHaveLength(9);
+  });
+
+  it('uses a vertical operator capsule so body and head-height aim remain admitted at the 0.62 m radial boundary', () => {
+    const atDistance = 20;
+    const aimedHeight = RAILGUN_TARGET_HALF_HEIGHT_M;
+    const magnitude = Math.hypot(0, aimedHeight, atDistance);
+    const headDirection = [0, aimedHeight / magnitude, -atDistance / magnitude] as const;
+    expect(admitRailgunTargets([0, 0, 0], headDirection, [
+      { target: 'head-height', position: [0, 0, -atDistance], alive: true, hostile: true },
+    ]).targets).toHaveLength(1);
+    expect(admitRailgunTargets([0, 0, 0], [0, 0, -1], [
+      { target: 'radial-inside', position: [RAILGUN_TARGET_RADIUS_M - 0.001, 0, -20], alive: true, hostile: true },
+      { target: 'radial-outside', position: [RAILGUN_TARGET_RADIUS_M + 0.001, 0, -30], alive: true, hostile: true },
+    ]).targets.map(({ target }) => target)).toEqual(['radial-inside']);
+  });
+
+  it('validates bounded railgun protocol messages', () => {
+    const beam = createRailgunBeamAuthority(1, 'shot-0001', [1, 2, 3], [0, 0, -1]);
+    const authorityState = createRailgunAuthorityState('atomic-acres', 1_000, 0, 1);
+    const claim = {
+      type: 'railgun-claim-request', protocolVersion: 6, by: 'player-a', generation: 1,
+      position: [1, 2, 3], nonce: 1,
+    } as const;
+    const request = {
+      type: 'railgun-shot-request', protocolVersion: 6, by: 'player-a', generation: 1,
+      shotId: 'shot-0001', origin: [1, 2, 3], direction: [0, 0, -1], fireTimeMs: 2_000, nonce: 2,
+    } as const;
+    const result = {
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+        { target: 'player-c', damageRequested: 50, damageApplied: 40, resultingHealth: 0, died: true, distanceMeters: 24 },
+        { target: 'player-d', damageRequested: 50, damageApplied: 10, resultingHealth: 0, died: true, distanceMeters: 36 },
+      ], beam, nonce: 3,
+    } as const;
+    const stateMessage = {
+      type: 'railgun-state', protocolVersion: 6, by: 'host', state: authorityState, nonce: 4,
+    } as const;
+    expect(beam).toEqual({ generation: 1, shotId: 'shot-0001', start: [1, 2, 3], end: [1, 2, -177] });
+    expect(isRailgunBeamAuthority(beam)).toBe(true);
+    expect(isRailgunProtocolMessage(claim, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(request, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(result, 6)).toBe(true);
+    expect(isRailgunProtocolMessage(stateMessage, 6)).toBe(true);
+    for (const message of [claim, request, result, stateMessage]) {
+      expect(isRailgunProtocolMessage({ ...message, unreviewedExtension: true }, 6)).toBe(false);
+    }
+    expect(isRailgunProtocolMessage({
+      ...stateMessage,
+      state: { ...authorityState, unreviewedExtension: true },
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      ...stateMessage,
+      state: { ...authorityState, spawnSite: { ...authorityState.spawnSite!, unreviewedExtension: true } },
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [{ target: 'player-b', damageRequested: 51, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 }], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [{
+        target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50,
+        died: false, distanceMeters: 12, critical: true,
+      }], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 24 },
+        { target: 'player-c', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+      ], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-hit', reason: 'accepted',
+      outcomes: [
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 12 },
+        { target: 'player-b', damageRequested: 50, damageApplied: 50, resultingHealth: 50, died: false, distanceMeters: 24 },
+      ], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: null, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'rejected', reason: 'not-ready', outcomes: [], beam, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'rejected', reason: 'not-ready', outcomes: [], beam: null, nonce: 3,
+    }, 6)).toBe(true);
+    expect(isRailgunBeamAuthority({ ...beam, shotId: 'shot-0002' })).toBe(true);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-shot-result', protocolVersion: 6, by: 'host', forPlayerId: 'player-a', generation: 1,
+      shotId: 'shot-0001', status: 'accepted-miss', reason: 'accepted', outcomes: [], beam: { ...beam, shotId: 'shot-0002' }, nonce: 3,
+    }, 6)).toBe(false);
+    expect(isRailgunBeamAuthority({ ...beam, end: [1, 2, -7] })).toBe(false);
+    expect(isRailgunProtocolMessage({
+      type: 'railgun-claim-request', protocolVersion: 5, by: 'player-a', generation: 1,
+      position: [1, 2, 3], nonce: 1,
+    }, 6)).toBe(false);
+  });
+});

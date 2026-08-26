@@ -1,0 +1,2089 @@
+{
+  "schemaVersion": 2,
+  "releasePass": "PASS 65",
+  "candidateName": "THE BIG ONE",
+  "scope": "active WebGPU presentation features plus explicitly requested but unavailable renderer controls",
+  "generatedBy": "npx tsx scripts/qa/generate-pass65-renderer-feature-inventory.ts",
+  "settings": [
+    {
+      "key": "graphics.preset",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "preset-resolver",
+      "runtimeEvidence": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveDisplayedGraphicsPreset",
+          "telemetryPath": "settings.displayedGraphicsPreset + render.profile"
+        }
+      ]
+    },
+    {
+      "key": "graphics.renderScale",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveActiveGraphicsConfig",
+          "telemetryPath": "render.pixelRatio + render.adaptive.pixelRatioCap"
+        }
+      ]
+    },
+    {
+      "key": "graphics.adaptiveResolution",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/adaptive-quality.ts",
+          "symbol": "configuredAdaptiveQualityLevels",
+          "telemetryPath": "render.adaptive.enabled + render.adaptive.levels"
+        }
+      ]
+    },
+    {
+      "key": "graphics.targetFps",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "adaptive-quality",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "1_000 / graphicsRuntime.targetFps",
+          "telemetryPath": "settings.graphics.targetFps + render.adaptive.targetFrameMs"
+        }
+      ]
+    },
+    {
+      "key": "graphics.frameRateLimit",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "frame-scheduler",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "presentationFrameDue",
+          "telemetryPath": "settings.graphics.frameRateLimit + render.framePacing"
+        }
+      ]
+    },
+    {
+      "key": "graphics.antiAliasing",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "renderer-init",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "pass(scene, camera, { samples: graphics.principalSamples })",
+          "telemetryPath": "render.atomicSignal.principalHdrSamples"
+        }
+      ]
+    },
+    {
+      "key": "graphics.geometryDetail",
+      "applyMode": "arena-reload",
+      "authorityAffecting": false,
+      "runtimeConsumer": "arena-stream",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "const reducedRenderMode = activeRenderConfig.reducedPresentationDetail",
+          "telemetryPath": "render.reducedMode + render.representation"
+        }
+      ]
+    },
+    {
+      "key": "graphics.shadows",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "renderRuntime.configureShadows",
+          "telemetryPath": "render.authoredShadows + render.shadows"
+        }
+      ]
+    },
+    {
+      "key": "graphics.shadowResolution",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "Math.min(definition.shadows.mapSize, activeRenderConfig.shadowMapSize)",
+          "telemetryPath": "settings.graphics.shadowMapSize + arena visual receipt"
+        }
+      ]
+    },
+    {
+      "key": "graphics.shadowUpdateMode",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "activeRenderConfig.shadowMode === 'dynamic'",
+          "telemetryPath": "render.shadowMode + render.shadowAutoUpdate"
+        }
+      ]
+    },
+    {
+      "key": "graphics.shadowFilter",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "shadow-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "shadowMapTypeForFilter",
+          "telemetryPath": "settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler"
+        }
+      ]
+    },
+    {
+      "key": "graphics.indirectLighting",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "arena-lighting",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "graphicsRuntime.indirectLightScale",
+          "telemetryPath": "settings.graphics.indirectLightScale + render.lighting"
+        }
+      ]
+    },
+    {
+      "key": "graphics.ambientOcclusion",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "ambient-occlusion",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "ao(sceneDepth, sceneNormal, camera)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.ambientOcclusion"
+        }
+      ]
+    },
+    {
+      "key": "graphics.screenSpaceReflections",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "screen-space-reflections",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.reflections"
+        }
+      ]
+    },
+    {
+      "key": "graphics.screenSpaceGi",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "screen-space-gi",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.globalIllumination"
+        }
+      ]
+    },
+    {
+      "key": "graphics.reflectionQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "effectivePbrRoughness",
+          "telemetryPath": "render.graphicsRefinement.reflectionScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.environmentIntensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/arena-environment-ibl.ts",
+          "symbol": "scene.environmentIntensity",
+          "telemetryPath": "settings.graphics.environmentIntensity + scene.environmentIntensity product"
+        }
+      ]
+    },
+    {
+      "key": "graphics.volumetricQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "atmosphere-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const volumetricScale = THREE.MathUtils.clamp",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.volumetricScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.volumetricLightShafts",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "volumetric-light-shafts",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.godrays"
+        }
+      ]
+    },
+    {
+      "key": "graphics.smokeQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "smoke-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)",
+          "telemetryPath": "settings.graphics.smokeScale + smoke presentation telemetry"
+        }
+      ]
+    },
+    {
+      "key": "graphics.particleQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "presentation-budget",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "budget.particleDensityScale * graphicsRuntime.particleScale",
+          "telemetryPath": "settings.graphics.particleScale + render.graphicsRefinement.budget"
+        }
+      ]
+    },
+    {
+      "key": "graphics.anisotropy",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "material-refinement",
+      "runtimeEvidence": [
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "texture.anisotropy = anisotropy",
+          "telemetryPath": "render.graphicsRefinement.requestedAnisotropy"
+        }
+      ]
+    },
+    {
+      "key": "graphics.decalQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "presentation-budget",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "budget.decalLifetimeScale * graphicsRuntime.decalScale",
+          "telemetryPath": "settings.graphics.decalScale + impact presentation budget"
+        }
+      ]
+    },
+    {
+      "key": "graphics.bloomQuality",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "bloom(sceneColor, graphics.post.bloomStrength",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.bloomStrength"
+        }
+      ]
+    },
+    {
+      "key": "graphics.exposure",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "authoredExposure * graphicsRuntime.post.exposureScale",
+          "telemetryPath": "settings.graphics.post.exposureScale + renderer exposure"
+        }
+      ]
+    },
+    {
+      "key": "graphics.toneMapping",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "graphicsRuntime.post.toneMapping",
+          "telemetryPath": "settings.graphics.post.toneMapping + documentElement.dataset.graphicsToneMapping"
+        }
+      ]
+    },
+    {
+      "key": "graphics.filmicProfile",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "effectiveGradeProfileId",
+          "telemetryPath": "settings.graphics.filmicProfile + render.gradeProfileId"
+        }
+      ]
+    },
+    {
+      "key": "graphics.sharpness",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-cas-sharpen",
+          "telemetryPath": "settings.graphics.sharpness + grade chain stage receipt"
+        }
+      ]
+    },
+    {
+      "key": "graphics.filmGrain",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "renderRuntime.setGradeGrainStrength",
+          "telemetryPath": "settings.graphics.post.filmGrainScale + per-frame-luminance-grain stage uniform"
+        }
+      ]
+    },
+    {
+      "key": "graphics.vignette",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "hdr-pipeline",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "setDisplayVignetteStrength",
+          "telemetryPath": "settings.graphics.vignette + display-vignette-falloff stage uniform"
+        }
+      ]
+    },
+    {
+      "key": "graphics.depthOfField",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "depth-of-field",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.depthOfField"
+        }
+      ]
+    },
+    {
+      "key": "graphics.depthOfFieldStrength",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "depth-of-field",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "assertDepthOfFieldCombatSafety",
+          "telemetryPath": "settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale"
+        }
+      ]
+    },
+    {
+      "key": "graphics.motionBlur",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "motion-blur",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.motionBlur"
+        }
+      ]
+    },
+    {
+      "key": "graphics.spatialUpscaling",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "spatial-upscaling",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-fsr1-easu-rcas-upscale",
+          "telemetryPath": "settings.graphics.spatialUpscaling + grade chain stage receipt"
+        }
+      ]
+    },
+    {
+      "key": "graphics.weatherIntensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "presentationRung(available, presentation.ceilingState)",
+          "telemetryPath": "settings.graphics.weatherIntensity + sampleWeather().rain.weatherIntensity"
+        }
+      ]
+    },
+    {
+      "key": "graphics.rainDensity",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "rain-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "this.presentation.rainDensity",
+          "telemetryPath": "settings.graphics.rainDensity + sampleWeather().rain.streakInstances"
+        }
+      ]
+    },
+    {
+      "key": "graphics.windStrength",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "* presentation.windStrength",
+          "telemetryPath": "settings.graphics.windStrength + sampleWeather().rain.windSpeed"
+        }
+      ]
+    },
+    {
+      "key": "graphics.lightning",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "weather-presentation",
+      "runtimeEvidence": [
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "RAIN_LIGHTNING.peakLightIntensity",
+          "telemetryPath": "settings.graphics.lightning + sampleWeather().rain.lightningFlash"
+        }
+      ]
+    },
+    {
+      "key": "accessibility.reducedMotion",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.reducedDamageFlash",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.reducedSensoryEffects",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.damageFlashScale",
+      "applyMode": "live",
+      "authorityAffecting": false
+    },
+    {
+      "key": "accessibility.weaponMotionScale",
+      "applyMode": "live",
+      "authorityAffecting": false
+    }
+  ],
+  "advancedGraphicsTrace": {
+    "registry": {
+      "path": "src/graphics-settings-registry.ts",
+      "symbol": "ADVANCED_GRAPHICS_CONTROLS"
+    },
+    "ui": {
+      "path": "src/ui/advanced-graphics-controls.ts",
+      "symbol": "bindAdvancedGraphicsControls"
+    },
+    "normalization": {
+      "path": "src/graphics-settings-registry.ts",
+      "symbol": "normalizeAdvancedGraphicsValues"
+    },
+    "persistence": {
+      "path": "src/player-profile.ts",
+      "symbol": "class PlayerProfileStore"
+    },
+    "runtime": {
+      "path": "src/pass65-settings-inventory.ts",
+      "symbol": "runtimeEvidence"
+    },
+    "telemetry": {
+      "path": "src/legacy-main.ts",
+      "symbol": "advancedGraphicsRegistry"
+    }
+  },
+  "profiles": {
+    "performance": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "performance",
+        "renderScale": 0.75,
+        "adaptiveResolution": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antiAliasing": "off",
+        "geometryDetail": "reduced",
+        "shadows": "off",
+        "shadowResolution": "medium",
+        "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
+        "indirectLighting": "low",
+        "ambientOcclusion": "off",
+        "screenSpaceReflections": "off",
+        "screenSpaceGi": "off",
+        "reflectionQuality": "low",
+        "environmentIntensity": 1,
+        "volumetricQuality": "low",
+        "volumetricLightShafts": "off",
+        "smokeQuality": "low",
+        "particleQuality": "low",
+        "anisotropy": 4,
+        "decalQuality": "low",
+        "bloomQuality": "subtle",
+        "exposure": 1,
+        "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
+        "filmGrain": 0.1,
+        "vignette": 0.08,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off",
+        "weatherIntensity": "light",
+        "rainDensity": 0.5,
+        "windStrength": 1,
+        "lightning": false
+      },
+      "effective": {
+        "requestedPreset": "performance",
+        "effectivePreset": "performance",
+        "renderProfile": "performance",
+        "renderScale": 0.75,
+        "adaptive": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antialiasSamples": 0,
+        "postAntiAliasing": "off",
+        "shadows": false,
+        "shadowMapSize": 1024,
+        "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
+        "indirectLightScale": 0.62,
+        "ambientOcclusion": {
+          "quality": "off",
+          "enabled": false,
+          "resolutionScale": 0,
+          "samples": 0,
+          "radius": 0,
+          "strength": 0,
+          "denoise": false
+        },
+        "reflectionScale": 0.62,
+        "reflectionQuality": "low",
+        "environmentIntensity": 0.62,
+        "screenSpace": {
+          "godrays": {
+            "quality": "off",
+            "enabled": false,
+            "unavailableReason": null,
+            "raymarchSteps": 0,
+            "resolutionScale": 0,
+            "density": 0,
+            "maximumDensity": 0,
+            "distanceAttenuation": 0,
+            "additiveGain": 0,
+            "bilateralBlur": false
+          },
+          "reflections": {
+            "quality": "off",
+            "enabled": false,
+            "resolutionScale": 0,
+            "marchQuality": 0,
+            "maximumDistance": 0,
+            "thickness": 0,
+            "intensity": 0,
+            "screenEdgeFade": 0,
+            "binaryRefine": false,
+            "reflectNonMetals": false
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
+        "volumetricScale": 0.5,
+        "maximumAnisotropy": 4,
+        "particleScale": 0.5,
+        "decalScale": 0.5,
+        "smokeScale": 0.5,
+        "post": {
+          "bloomStrength": 0.065,
+          "exposureScale": 1,
+          "toneMapping": "aces",
+          "filmGrainScale": 0.1,
+          "vignetteStrength": 0.08,
+          "sharpness": 0
+        },
+        "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "light",
+          "ceilingState": "overcast",
+          "rainDensity": 0.5,
+          "windStrength": 1,
+          "lightning": false,
+          "weatherEnabled": true
+        },
+        "reason": null
+      },
+      "profile": {
+        "profile": "performance",
+        "representation": "responsive",
+        "reducedRepresentation": true,
+        "reducedWorldDetail": true,
+        "reducedPresentationDetail": true,
+        "staticMaterialMode": "vertex-lit",
+        "antialias": false,
+        "shadows": false,
+        "shadowMode": "off",
+        "pixelRatioCap": 0.75,
+        "shadowMapSize": 0
+      },
+      "effects": {
+        "tier": "balanced",
+        "environmentIntensity": 0.5,
+        "contactShadowStrength": 0,
+        "bloomStrength": 0.055,
+        "bloomResolutionScale": 0.25,
+        "depthFogStrength": 0.035,
+        "particleDensityScale": 0.72,
+        "decalLifetimeScale": 0.72
+      }
+    },
+    "high": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "high",
+        "renderScale": 1,
+        "adaptiveResolution": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antiAliasing": "msaa-4x",
+        "geometryDetail": "full",
+        "shadows": "high",
+        "shadowResolution": "high",
+        "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
+        "indirectLighting": "high",
+        "ambientOcclusion": "off",
+        "screenSpaceReflections": "low",
+        "screenSpaceGi": "off",
+        "reflectionQuality": "high",
+        "environmentIntensity": 1,
+        "volumetricQuality": "high",
+        "volumetricLightShafts": "low",
+        "smokeQuality": "high",
+        "particleQuality": "high",
+        "anisotropy": 8,
+        "decalQuality": "high",
+        "bloomQuality": "cinematic",
+        "exposure": 1,
+        "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
+        "filmGrain": 0.32,
+        "vignette": 0.16,
+        "depthOfField": false,
+        "depthOfFieldStrength": 0.3,
+        "motionBlur": 0,
+        "spatialUpscaling": "off",
+        "weatherIntensity": "storm",
+        "rainDensity": 1,
+        "windStrength": 1,
+        "lightning": true
+      },
+      "effective": {
+        "requestedPreset": "high",
+        "effectivePreset": "high",
+        "renderProfile": "blender",
+        "renderScale": 1,
+        "adaptive": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antialiasSamples": 4,
+        "postAntiAliasing": "off",
+        "shadows": true,
+        "shadowMapSize": 2048,
+        "shadowUpdateMode": "static",
+        "shadowFilter": "auto",
+        "indirectLightScale": 1,
+        "ambientOcclusion": {
+          "quality": "off",
+          "enabled": false,
+          "resolutionScale": 0,
+          "samples": 0,
+          "radius": 0,
+          "strength": 0,
+          "denoise": false
+        },
+        "reflectionScale": 1,
+        "reflectionQuality": "high",
+        "environmentIntensity": 1,
+        "screenSpace": {
+          "godrays": {
+            "quality": "low",
+            "enabled": true,
+            "unavailableReason": null,
+            "raymarchSteps": 24,
+            "resolutionScale": 0.35,
+            "density": 0.35,
+            "maximumDensity": 0.12,
+            "distanceAttenuation": 2.6,
+            "additiveGain": 0.14,
+            "bilateralBlur": true
+          },
+          "reflections": {
+            "quality": "low",
+            "enabled": true,
+            "resolutionScale": 0.5,
+            "marchQuality": 0.35,
+            "maximumDistance": 6,
+            "thickness": 0.18,
+            "intensity": 0.5,
+            "screenEdgeFade": 0.24,
+            "binaryRefine": false,
+            "reflectNonMetals": true
+          },
+          "globalIllumination": {
+            "quality": "off",
+            "enabled": false,
+            "sliceCount": 0,
+            "stepCount": 0,
+            "giIntensity": 0,
+            "radius": 0,
+            "thickness": 0,
+            "expFactor": 0,
+            "denoise": false
+          },
+          "depthOfField": {
+            "enabled": false,
+            "strength": 0.3,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 0
+          },
+          "motionBlur": {
+            "enabled": false,
+            "strength": 0,
+            "samples": 0,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
+        "volumetricScale": 0.8,
+        "maximumAnisotropy": 8,
+        "particleScale": 0.8,
+        "decalScale": 0.8,
+        "smokeScale": 0.8,
+        "post": {
+          "bloomStrength": 0.14,
+          "exposureScale": 1,
+          "toneMapping": "aces",
+          "filmGrainScale": 0.32,
+          "vignetteStrength": 0.16,
+          "sharpness": 0
+        },
+        "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "storm",
+          "ceilingState": "storm",
+          "rainDensity": 1,
+          "windStrength": 1,
+          "lightning": true,
+          "weatherEnabled": true
+        },
+        "reason": null
+      },
+      "profile": {
+        "profile": "blender",
+        "representation": "blender",
+        "reducedRepresentation": false,
+        "reducedWorldDetail": false,
+        "reducedPresentationDetail": false,
+        "staticMaterialMode": "preserve",
+        "antialias": true,
+        "shadows": true,
+        "shadowMode": "static",
+        "pixelRatioCap": 1,
+        "shadowMapSize": 2048
+      },
+      "effects": {
+        "tier": "full",
+        "environmentIntensity": 1,
+        "contactShadowStrength": 0.16,
+        "bloomStrength": 0.16,
+        "bloomResolutionScale": 0.5,
+        "depthFogStrength": 0.085,
+        "particleDensityScale": 1,
+        "decalLifetimeScale": 1
+      }
+    },
+    "max": {
+      "requested": {
+        "schemaVersion": 1,
+        "preset": "max",
+        "renderScale": 1.15,
+        "adaptiveResolution": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antiAliasing": "msaa-4x",
+        "geometryDetail": "full",
+        "shadows": "high",
+        "shadowResolution": "high",
+        "shadowUpdateMode": "dynamic",
+        "shadowFilter": "auto",
+        "indirectLighting": "high",
+        "ambientOcclusion": "ultra",
+        "screenSpaceReflections": "high",
+        "screenSpaceGi": "high",
+        "reflectionQuality": "ultra",
+        "environmentIntensity": 1,
+        "volumetricQuality": "ultra",
+        "volumetricLightShafts": "high",
+        "smokeQuality": "ultra",
+        "particleQuality": "ultra",
+        "anisotropy": 16,
+        "decalQuality": "ultra",
+        "bloomQuality": "cinematic",
+        "exposure": 1,
+        "toneMapping": "aces",
+        "filmicProfile": "arena-default",
+        "sharpness": 0,
+        "filmGrain": 0.4,
+        "vignette": 0.18,
+        "depthOfField": true,
+        "depthOfFieldStrength": 0.6,
+        "motionBlur": 0.35,
+        "spatialUpscaling": "off",
+        "weatherIntensity": "storm",
+        "rainDensity": 1.35,
+        "windStrength": 1,
+        "lightning": true
+      },
+      "effective": {
+        "requestedPreset": "max",
+        "effectivePreset": "max",
+        "renderProfile": "blender",
+        "renderScale": 1.15,
+        "adaptive": true,
+        "targetFps": 240,
+        "frameRateLimit": 0,
+        "antialiasSamples": 4,
+        "postAntiAliasing": "off",
+        "shadows": true,
+        "shadowMapSize": 2048,
+        "shadowUpdateMode": "dynamic",
+        "shadowFilter": "auto",
+        "indirectLightScale": 1,
+        "ambientOcclusion": {
+          "quality": "ultra",
+          "enabled": true,
+          "resolutionScale": 0.75,
+          "samples": 16,
+          "radius": 0.25,
+          "strength": 0.62,
+          "denoise": true
+        },
+        "reflectionScale": 1,
+        "reflectionQuality": "ultra",
+        "environmentIntensity": 1,
+        "screenSpace": {
+          "godrays": {
+            "quality": "high",
+            "enabled": true,
+            "unavailableReason": null,
+            "raymarchSteps": 48,
+            "resolutionScale": 0.5,
+            "density": 0.5,
+            "maximumDensity": 0.18,
+            "distanceAttenuation": 2.2,
+            "additiveGain": 0.22,
+            "bilateralBlur": true
+          },
+          "reflections": {
+            "quality": "high",
+            "enabled": true,
+            "resolutionScale": 0.75,
+            "marchQuality": 0.6,
+            "maximumDistance": 12,
+            "thickness": 0.12,
+            "intensity": 0.7,
+            "screenEdgeFade": 0.24,
+            "binaryRefine": true,
+            "reflectNonMetals": true
+          },
+          "globalIllumination": {
+            "quality": "high",
+            "enabled": true,
+            "sliceCount": 2,
+            "stepCount": 12,
+            "giIntensity": 4,
+            "radius": 8,
+            "thickness": 1,
+            "expFactor": 2,
+            "denoise": true
+          },
+          "depthOfField": {
+            "enabled": true,
+            "strength": 0.6,
+            "focusDistanceM": 26,
+            "focalLengthM": 120,
+            "bokehScale": 2.56
+          },
+          "motionBlur": {
+            "enabled": true,
+            "strength": 0.35,
+            "samples": 8,
+            "deadZoneNdc": 0.006,
+            "kneeNdc": 0.024,
+            "maximumUvOffset": 0.008749999999999999
+          },
+          "upscaling": {
+            "mode": "off",
+            "enabled": false,
+            "sceneResolutionScale": 1,
+            "label": "Off"
+          }
+        },
+        "volumetricScale": 1,
+        "maximumAnisotropy": 16,
+        "particleScale": 1,
+        "decalScale": 1,
+        "smokeScale": 1,
+        "post": {
+          "bloomStrength": 0.14,
+          "exposureScale": 1,
+          "toneMapping": "aces",
+          "filmGrainScale": 0.4,
+          "vignetteStrength": 0.18,
+          "sharpness": 0
+        },
+        "gradeProfile": "arena-default",
+        "weather": {
+          "intensity": "storm",
+          "ceilingState": "storm",
+          "rainDensity": 1.35,
+          "windStrength": 1,
+          "lightning": true,
+          "weatherEnabled": true
+        },
+        "reason": null
+      },
+      "profile": {
+        "profile": "blender",
+        "representation": "blender",
+        "reducedRepresentation": false,
+        "reducedWorldDetail": false,
+        "reducedPresentationDetail": false,
+        "staticMaterialMode": "preserve",
+        "antialias": true,
+        "shadows": true,
+        "shadowMode": "static",
+        "pixelRatioCap": 1,
+        "shadowMapSize": 2048
+      },
+      "effects": {
+        "tier": "full",
+        "environmentIntensity": 1,
+        "contactShadowStrength": 0.16,
+        "bloomStrength": 0.16,
+        "bloomResolutionScale": 0.5,
+        "depthFogStrength": 0.085,
+        "particleDensityScale": 1,
+        "decalLifetimeScale": 1
+      }
+    }
+  },
+  "tslPipelines": [
+    {
+      "id": "pass64.sky-atmosphere.tsl.v1",
+      "owner": "src/legacy-main.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.hdr-grade-grain.tsl.v1",
+      "owner": "src/atomic-signal.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-mist.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-smoke.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.atmosphere-dust.tsl.v1",
+      "owner": "src/atmosphere-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.grass.tsl.v1",
+      "owner": "src/grass-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.water.tsl.v1",
+      "owner": "src/water-system.ts",
+      "status": "verified"
+    }
+  ],
+  "features": [
+    {
+      "id": "required-webgpu-backend",
+      "title": "Required WebGPU backend",
+      "availability": "active",
+      "owner": "src/rendering/render-runtime.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/render-runtime.ts",
+          "symbol": "class WebGpuRenderRuntime"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "WebGPU required; WebGL2 is an explicit compatibility route",
+        "rationale": "Backend choice is a release route, not an in-match graphics option. The candidate fails closed instead of silently falling back."
+      },
+      "budget": "Zero device loss, uncaptured GPU errors, completion failures, or presentation stalls.",
+      "verifier": "scripts/qa/verify-pass65-webgpu-endurance.mjs",
+      "authorityAffecting": false
+    },
+    {
+      "id": "render-resolution",
+      "title": "Render scale and adaptive resolution",
+      "availability": "active",
+      "owner": "src/pass65-settings.ts + src/adaptive-quality.ts",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "resolveGraphicsRuntime"
+        },
+        {
+          "path": "src/adaptive-quality.ts",
+          "symbol": "class AdaptiveQualityController"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.renderScale",
+          "graphics.adaptiveResolution",
+          "graphics.targetFps"
+        ],
+        "effectiveValue": "50-125% effective WebGPU scale; target FPS drives adaptive-budget selection",
+        "rationale": "Render scale is canonicalized to the implemented framebuffer range. The adaptive target remains deliberately separate from the output frame limiter."
+      },
+      "budget": "Profile-specific bounded DPR tiers with sustained-p95 downshift and cooldown-controlled recovery.",
+      "verifier": "src/pass65-settings.test.ts + src/adaptive-quality.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "presentation-profile",
+      "title": "Performance, Quality, Max and Custom presentation profiles",
+      "availability": "active",
+      "owner": "src/pass65-settings.ts + src/render-profile.ts",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom'"
+        },
+        {
+          "path": "src/render-profile.ts",
+          "symbol": "renderProfileConfig"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.preset",
+          "graphics.geometryDetail"
+        ],
+        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
+        "rationale": "Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics."
+      },
+      "budget": "Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.",
+      "verifier": "src/pass65-settings.test.ts + src/render-profile.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "arena-lighting-and-shadows",
+      "title": "Arena-authored lighting and shadows",
+      "availability": "active",
+      "owner": "src/rendering/arena-visual-definition.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/arena-visual-definition.ts",
+          "symbol": "type ArenaVisualDefinition"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "adaptiveShadowsEnabled"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "shadowMapTypeForFilter"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.shadows",
+          "graphics.shadowResolution",
+          "graphics.shadowUpdateMode",
+          "graphics.shadowFilter",
+          "graphics.indirectLighting",
+          "graphics.preset",
+          "graphics.adaptiveResolution"
+        ],
+        "effectiveValue": "Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, an auto/PCF/PCSS-soft filter override, and bounded indirect-light scaling",
+        "rationale": "Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work. The filter override respects the WebKit basic-depth engine floor."
+      },
+      "budget": "Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.",
+      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "principal-hdr-msaa",
+      "title": "Principal HDR render target and MSAA",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const scenePass = pass(scene, camera, { samples: graphics.principalSamples })"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.antiAliasing"
+        ],
+        "effectiveValue": "Off, 2x or 4x multisampling on the principal linear-sRGB HDR target; bloom chain remains single-sampled",
+        "rationale": "The renderer is rebuilt after a setting change so the selected sample count owns a real target allocation rather than a cosmetic label."
+      },
+      "budget": "At most four principal HDR samples and zero bloom-target samples, asserted in runtime telemetry.",
+      "verifier": "tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "post-anti-aliasing",
+      "title": "Display-side post anti-aliasing (FXAA/SMAA)",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-post-antialiasing-fxaa"
+        },
+        {
+          "path": "src/rendering/render-runtime.ts",
+          "symbol": "setPostAntiAliasing"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.antiAliasing"
+        ],
+        "effectiveValue": "FXAA or SMAA as an optional trailing stage after the filmic grade chain on the WebGPU route; MSAA values keep owning the principal-target path",
+        "rationale": "The anti-aliasing selector honestly routes to two different mechanisms: MSAA rebuilds the principal HDR target, while FXAA/SMAA rebuild only the display-side output graph. WebGL2 has no grade chain, so post AA degrades to a no-op there."
+      },
+      "budget": "At most one post AA stage; its render targets are retired on every chain rebuild and chain disposal.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "cas-sharpen",
+      "title": "Contrast-adaptive (RCAS) display sharpening",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-cas-sharpen"
+        },
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "rcasSharpnessFor"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.sharpness"
+        ],
+        "effectiveValue": "0-100% player sharpness mapped onto the RCAS parameter; zero removes the stage entirely instead of running an idle pass",
+        "rationale": "Sharpening runs after tone mapping and after any post AA (the AMD-canonical order), moves through a live uniform, and only crossing zero changes graph topology. WebGL2 has no grade chain, so the control degrades to a no-op there."
+      },
+      "budget": "At most one RCAS stage and one half-float target, retired with the chain.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "filmic-grade-profile",
+      "title": "Player-selectable filmic grade profile",
+      "availability": "active",
+      "owner": "src/rendering/grade-profile.ts + src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/grade-profile.ts",
+          "symbol": "GRADE_PROFILES"
+        },
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "installFilmicGradeChain"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "effectiveGradeProfileId"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.filmicProfile"
+        ],
+        "effectiveValue": "Arena Default keeps the HF-363 preset-matched profile; Performance/Quality/Max select an authored frozen profile directly",
+        "rationale": "Every selectable profile is a frozen authored catalog entry inside the proven combat-safety envelope; the setting can only choose between them, never invent values."
+      },
+      "budget": "One installed grade chain; profile switches update uniforms and bloom tuning only.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "aces-grade-exposure",
+      "title": "ACES output, deterministic grade and arena exposure",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts + ArenaVisualDefinition",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const contrasted = saturated.sub(0.5).mul(contrast).add(0.5)"
+        },
+        {
+          "path": "src/rendering/arena-visual-definition.ts",
+          "symbol": "toneMap: 'aces-filmic'"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.exposure",
+          "graphics.toneMapping",
+          "graphics.filmGrain",
+          "graphics.vignette"
+        ],
+        "effectiveValue": "Arena-authored base exposure with 0.75-1.25 multiplier, ACES/AgX/Neutral output, and bounded TSL grain/vignette",
+        "rationale": "Every selector is compiled or applied by the active renderer and deterministic review telemetry records the requested runtime values."
+      },
+      "budget": "One controlled HDR owner and one ACES-to-sRGB output transform.",
+      "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/pass64-tsl-scene.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "depth-aware-bloom",
+      "title": "Depth-aware full-scene bloom",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92)"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.bloomQuality"
+        ],
+        "effectiveValue": "Off, subtle or cinematic TSL bloom with scene-depth occlusion",
+        "rationale": "The selected tier changes the actual bloom-node strength while preserving the verified depth-aware graph and bounded transient allocation."
+      },
+      "budget": "Arena maximum post-texture samples and transient-byte limits.",
+      "verifier": "tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tsl-atmosphere",
+      "title": "TSL sky, mist, smoke and dust atmosphere",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeSky"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeMist"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeSmoke"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeDust"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.sky-atmosphere.tsl.v1",
+        "pass64.atmosphere-mist.tsl.v1",
+        "pass64.atmosphere-smoke.tsl.v1",
+        "pass64.atmosphere-dust.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.volumetricQuality"
+        ],
+        "effectiveValue": "Low, High or Ultra density scaling over arena-authored placement, cloud state and deterministic time",
+        "rationale": "Density and draw ranges are presentation-only; every tier retains at least one layer so atmosphere never disappears as an accidental gameplay cue."
+      },
+      "budget": "Fixed maximum mist layers, fixed-seed dust counts, bounded opacity, and no depth writes.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tsl-grass-and-water",
+      "title": "TSL grass and perimeter water",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeGrass"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "makeWater"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.grass.tsl.v1",
+        "pass64.water.tsl.v1"
+      ],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Grass is arena-owned for Nuke Town; perimeter water is arena-owned for RustRig",
+        "rationale": "Player toggles are not exposed because these are curated arena identity features. They remain presentation-only and may not enter authority collections."
+      },
+      "budget": "Fixed-seed grass instance count; one non-reflective perimeter-water plane with three bounded wave bands.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts + src/rendering/arena-visual-definition.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "material-texture-quality",
+      "title": "Material, texture and anisotropy quality",
+      "availability": "active",
+      "owner": "src/render-profile.ts + src/graphics-refinement.ts",
+      "sourceProbes": [
+        {
+          "path": "src/render-profile.ts",
+          "symbol": "staticMaterialMode"
+        },
+        {
+          "path": "src/graphics-refinement.ts",
+          "symbol": "this.requestedAnisotropy"
+        },
+        {
+          "path": "src/rendering/arena-environment-ibl.ts",
+          "symbol": "scene.environmentIntensity"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.anisotropy",
+          "graphics.reflectionQuality",
+          "graphics.environmentIntensity"
+        ],
+        "effectiveValue": "1x-16x requested anisotropy clamped to GPU capability, Off/Low/High/Ultra PMREM tiers (128/256/512), and a bounded 0-2x environment-map intensity multiplier",
+        "rationale": "The controls reach actual texture and PBR material properties; hardware clamps, the effective reflection scale and the applied scene.environmentIntensity product are exposed in telemetry."
+      },
+      "budget": "Arena texture-byte and triangle budgets plus renderer maximum-anisotropy clamp.",
+      "verifier": "src/render-profile.test.ts + tests/e2e/pass64-renderer-foundation.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "impact-particles-and-decals",
+      "title": "Material impacts, particles and persistent decals",
+      "availability": "active",
+      "owner": "src/impact-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/impact-presentation.ts",
+          "symbol": "MAX_IMPACT_PARTICLES = 72"
+        },
+        {
+          "path": "src/impact-presentation.ts",
+          "symbol": "MAX_IMPACT_MARKS = 48"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.particleQuality",
+          "graphics.decalQuality",
+          "graphics.preset",
+          "graphics.adaptiveResolution"
+        ],
+        "effectiveValue": "Independent Low/High/Ultra particle-density and round-persistent decal-capacity scaling composes with the adaptive effects budget",
+        "rationale": "The canonical controls modify the bounded presentation budget without changing admitted impacts, hit outcomes, collision, or authoritative destruction."
+      },
+      "budget": "At most 72 pooled particles and 48 pooled marks before effective-budget scaling.",
+      "verifier": "src/impact-presentation.test.ts + src/surface-impact-registry.test.ts + src/graphics-refinement.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tracer-pool",
+      "title": "Weapon tracers",
+      "availability": "active",
+      "owner": "src/tracer-pool.ts",
+      "sourceProbes": [
+        {
+          "path": "src/tracer-pool.ts",
+          "symbol": "MAX_TRACERS = 32"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Bounded presentation for admitted shots",
+        "rationale": "Tracer visibility is part of combat readability and is capped rather than exposed as an authority-adjacent player toggle."
+      },
+      "budget": "Exactly 32 reusable tracer slots.",
+      "verifier": "src/tracer-pool.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "pooled-explosions",
+      "title": "Grenade and support explosion presentation",
+      "availability": "active",
+      "owner": "src/grenade-explosion-presentation.ts + src/support-explosion-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/grenade-explosion-presentation.ts",
+          "symbol": "GRENADE_EXPLOSION_POOL_CAPACITY = 4"
+        },
+        {
+          "path": "src/support-explosion-presentation.ts",
+          "symbol": "SUPPORT_EXPLOSION_POOL_CAPACITY = 12"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Pooled authored presentation with fixed lifetimes",
+        "rationale": "Explosion presentation follows host-authored effects and remains capped. No player density control is currently implemented."
+      },
+      "budget": "Four grenade and twelve support presentation slots; 280 ms and 460 ms authored lifetimes.",
+      "verifier": "src/grenade-explosion-presentation.test.ts + src/support-explosion-presentation.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "semantic-smoke-presentation",
+      "title": "Semantic smoke volume presentation",
+      "availability": "active",
+      "owner": "src/smoke-volume-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/smoke-volume-presentation.ts",
+          "symbol": "SMOKE_PRESENTATION_CARD_COUNT = 3"
+        },
+        {
+          "path": "src/smoke-volume-presentation.ts",
+          "symbol": "SMOKE_VOLUME_PRESENTATION_POOL_CAPACITY = 12"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.smokeQuality"
+        ],
+        "effectiveValue": "One, two or three cards per authoritative smoke volume with a twelve-volume pool",
+        "rationale": "Quality changes card detail and opacity within a nonzero floor; authoritative volume, obstruction semantics, lifetime and damage rules remain identical."
+      },
+      "budget": "Twelve pooled volumes, three cards each, 12 second presentation lifetime.",
+      "verifier": "src/smoke-volume-presentation.test.ts + src/ordnance.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "damage-and-low-health-feedback",
+      "title": "Directional damage and low-health feedback",
+      "availability": "active",
+      "owner": "src/sensory-feedback.ts + DOM presentation",
+      "sourceProbes": [
+        {
+          "path": "src/sensory-feedback.ts",
+          "symbol": "directionalDamagePresentation"
+        },
+        {
+          "path": "src/sensory-feedback.ts",
+          "symbol": "sampleLowHealthFeedback"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.reducedDamageFlash",
+          "accessibility.reducedSensoryEffects",
+          "accessibility.damageFlashScale"
+        ],
+        "effectiveValue": "Most-restrictive accessibility composition scales flash/vignette presentation without changing damage",
+        "rationale": "These controls are live presentation settings and never alter combat authority."
+      },
+      "budget": "Four concurrent directional sources and bounded low-health pulse/opacity envelopes.",
+      "verifier": "src/sensory-feedback.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "weapon-motion",
+      "title": "First-person weapon motion",
+      "availability": "active",
+      "owner": "src/weapon-presentation.ts + src/legacy-main.ts",
+      "sourceProbes": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "accessibilityRuntime.weaponMotionScale"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.weaponMotionScale",
+          "accessibility.reducedSensoryEffects"
+        ],
+        "effectiveValue": "0-100% requested motion; reduced sensory caps effective motion at 35%",
+        "rationale": "Motion scaling changes viewmodel presentation only and never the authoritative camera ray."
+      },
+      "budget": "One viewmodel root with bounded additive idle/inertia offsets.",
+      "verifier": "src/weapon-presentation.test.ts + src/pass65-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "menu-preview-motion",
+      "title": "Helicopter and cat menu-preview choreography",
+      "availability": "active",
+      "owner": "src/ui/menu-preview-video.ts + offline authored media",
+      "sourceProbes": [
+        {
+          "path": "src/ui/menu-preview-video.ts",
+          "symbol": "class MenuPreviewVideoController"
+        },
+        {
+          "path": "src/ui/menu-preview-video.ts",
+          "symbol": "rendererSubmissions: 0"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "accessibility.reducedMotion",
+          "accessibility.reducedSensoryEffects"
+        ],
+        "effectiveValue": "Distinct prerecorded compressed video, or its deterministic poster under reduced motion",
+        "rationale": "Menu browsing owns no arena renderer: helicopter and cat paths are authored offline, while the runtime switches one bounded media decoder and reports zero renderer submissions."
+      },
+      "budget": "One selected video decoder, detached stale sources, one poster fallback, and zero menu-preview arena constructions or WebGPU submissions.",
+      "verifier": "src/ui/menu-preview-video.test.ts + tests/e2e/pass65-preview-choreography.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "destructible-shed-presentation",
+      "title": "Destructible shed holes, dents, doors and debris",
+      "availability": "active",
+      "owner": "src/destructible-shed-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/destructible-shed-presentation.ts",
+          "symbol": "class DestructibleShedPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Presentation reconstructs bounded host-authored shed state in every profile",
+        "rationale": "Major debris, apertures, and doors cannot be hidden or simplified independently because visible geometry must agree with movement, ballistics, LOS, and physics authority."
+      },
+      "budget": "Definition-capped apertures, dents, detached panels, debris bodies, geometry retirement, and per-arena placement counts.",
+      "verifier": "src/destructible-shed-presentation.test.ts + src/interactive-world-runtime.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "thermal-optics",
+      "title": "Railgun and DMR thermal presentation",
+      "availability": "active",
+      "owner": "src/railgun-presentation.ts + src/dmr-thermal-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/railgun-presentation.ts",
+          "symbol": "class RailgunPresentation"
+        },
+        {
+          "path": "src/dmr-thermal-presentation.ts",
+          "symbol": "class DmrThermalPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Weapon-capability gated; DMR bypasses smoke but never solid-wall occlusion",
+        "rationale": "This is a weapon capability, not a general graphics option. Disabling it would change intended information semantics."
+      },
+      "budget": "One bounded overlay/contact set per equipped optic; solid geometry remains the occlusion oracle.",
+      "verifier": "src/dmr-thermal-presentation.test.ts + tests/e2e/pass64-railgun.spec.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "support-entity-presentation",
+      "title": "Aircraft, chopper and drone presentation",
+      "availability": "active",
+      "owner": "src/killstreak-presentation.ts",
+      "sourceProbes": [
+        {
+          "path": "src/killstreak-presentation.ts",
+          "symbol": "class KillstreakPresentation"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "fixed",
+        "settingKeys": [],
+        "effectiveValue": "Host-seeded, host-owned support state with bounded presentation lifetimes",
+        "rationale": "Support entities are targetable gameplay actors. Their visibility and identity are fixed instead of exposed as graphics toggles."
+      },
+      "budget": "Catalog/entity caps, pooled explosion roots, hard lifetimes, and generation-aware retirement.",
+      "verifier": "src/killstreak-presentation.test.ts + src/killstreak-runtime.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "ambient-contact-effects",
+      "title": "WebGPU ground-truth ambient occlusion",
+      "availability": "active",
+      "owner": "src/rendering/pass64-tsl-scene.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "ao(sceneDepth, sceneNormal, camera)"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.hdr-grade-grain.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.ambientOcclusion"
+        ],
+        "effectiveValue": "Off, Low, High or Ultra GTAO from the principal scene depth buffer; High and Ultra add the depth/normal-aware spatial denoise pass",
+        "rationale": "The installed Three.js WebGPU GTAO node now owns a bounded depth-derived contact pass; each active tier selects a real sample count and resolution scale, and High/Ultra wrap the raw target in the upstream DenoiseNode (temporal filtering stays off without a TRAA resolve). Performance and default Quality keep it off after the native transition stress falsified always-on GTAO."
+      },
+      "budget": "At most one view-normal MRT attachment plus one GTAO red-channel target and one denoise target, 16 samples and 0.75 resolution scale; exact resources dispose with the arena pipeline.",
+      "verifier": "src/rendering/pass64-tsl-scene.test.ts + scripts/qa/verify-pass64-webgpu.mjs",
+      "authorityAffecting": false
+    },
+    {
+      "id": "frame-cap",
+      "title": "Frame-rate cap",
+      "availability": "active",
+      "owner": "src/pass65-settings.ts + src/legacy-main.ts",
+      "sourceProbes": [
+        {
+          "path": "src/pass65-settings.ts",
+          "symbol": "presentationFrameDue"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.frameRateLimit"
+        ],
+        "effectiveValue": "30-360 FPS or uncapped output work; graphics.targetFps remains adaptive-quality target only",
+        "rationale": "A phase-preserving requestAnimationFrame gate caps presentation work without changing the fixed-step simulation contract."
+      },
+      "budget": "At most one presentation update per selected interval, with browser requestAnimationFrame as the upper cadence bound.",
+      "verifier": "src/pass65-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "hardware-ray-tracing",
+      "title": "Hardware ray tracing",
+      "availability": "unsupported",
+      "owner": "not available in current Three.js WebGPU route",
+      "sourceProbes": [
+        {
+          "path": "src/graphics-settings-registry.ts",
+          "symbol": "id: 'path-tracing'"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "unsupported",
+        "settingKeys": [],
+        "effectiveValue": "Unavailable",
+        "rationale": "The RTX 5080 is the review GPU, but WebGPU exposes no ray-tracing pipeline, acceleration structures or ray queries in any shipping browser, so the renderer cannot implement hardware ray tracing. No RTX-specific ray-tracing claim or toggle is permitted, and the screen-space GI row is labelled as screen-space precisely so it is never mistaken for this one."
+      },
+      "budget": "Zero ray-tracing acceleration structures or passes.",
+      "verifier": "Generated inventory unsupported-feature gate.",
+      "authorityAffecting": false
+    },
+    {
+      "id": "weather-and-wind",
+      "title": "Weather, rain, wind and surface wetness",
+      "availability": "active",
+      "owner": "src/weather/weather-state.ts + src/weather/rain-presentation.ts + src/weather/wind-field.ts",
+      "sourceProbes": [
+        {
+          "path": "src/weather/weather-state.ts",
+          "symbol": "export function sampleWeather"
+        },
+        {
+          "path": "src/weather/weather-settings.ts",
+          "symbol": "export function resolveWeatherPresentation"
+        },
+        {
+          "path": "src/weather/rain-presentation.ts",
+          "symbol": "export function assertRainCombatSafety"
+        },
+        {
+          "path": "src/weather/wind-field.ts",
+          "symbol": "export function sampleWind"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.weatherIntensity",
+          "graphics.rainDensity",
+          "graphics.windStrength",
+          "graphics.lightning"
+        ],
+        "effectiveValue": "Weather ceiling off/light/moderate/heavy/storm, rain density 0.25x-1.5x, wind strength 0x-2x, lightning on or off",
+        "rationale": "The weather itself is a pure function of the arena, the host-derived match seed and elapsed time, so every peer computes the same sky over zero bytes of network traffic. The four settings are LOCAL PRESENTATION CLAMPS on top of that: they can show the same weather or less of it, never more, and never a state the arena did not author. Readability is arithmetic rather than taste - at the maximum instance ceiling and the maximum streak opacity the whole rain volume removes under 3% of the light along a sightline, the aim cylinder is emptied outright while aiming down sights, and lightning only ever adds light, capped, for at most 0.26 s."
+      },
+      "budget": "Exactly two instanced draws and one shadowless hemisphere light at every density and on every arena; zero per-frame allocations; the wet-surface scan is bounded to 128 materials and runs at most every 2.5 s while the ground is wet.",
+      "verifier": "src/weather/weather-state.test.ts + src/weather/rain-presentation.test.ts + src/weather/wind-field.test.ts + src/weather/weather-settings.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "volumetric-light-shafts",
+      "title": "Volumetric light shafts (screen-space raymarch)",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "GODRAY_MAXIMUM_ADDITIVE_GAIN"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.volumetricLightShafts",
+          "graphics.shadows"
+        ],
+        "effectiveValue": "Off, Low or High raymarch through the sun shadow map; requires Sun shadows and reports why when they are off",
+        "rationale": "The shafts are occluded by the same shadow map the arena already casts, so they agree with the lighting instead of approximating it. The composite is additive and gain-capped at a fifth of the upstream maximum density, and it reuses the bloom path depth-discontinuity guard rather than the upstream flat-colour blend, so a shaft can brighten a silhouette but never replace one."
+      },
+      "budget": "At most one half-or-lower resolution godray target plus one bilateral blur target; both dispose with the arena pipeline. Adaptive pressure drops the march resolution, step count and additive gain.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "screen-space-gi",
+      "title": "Screen-space global illumination (ray-marched bounce light)",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "SSGI_MAXIMUM_GI_INTENSITY"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.screenSpaceGi"
+        ],
+        "effectiveValue": "Off, Low or High ray-marched bounce light from the depth and normal buffers",
+        "rationale": "This is screen-space ray marching, not ray tracing: WebGPU exposes no ray-tracing pipeline in any browser, so the label is SCREEN-SPACE GI everywhere it appears. Only the node bounce buffer is consumed and its ambient-occlusion buffer is discarded, because GTAO already owns contact darkening and stacking a second occlusion term would darken exactly the shaded pockets a player uses for cover."
+      },
+      "budget": "One SSGI render target with two attachments plus one spatial denoise target, at most two hemisphere slices and twelve steps; temporal filtering stays off without a TRAA resolve.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "screen-space-reflections",
+      "title": "Screen-space reflections",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "packedMaterialMrtNode(metalness, roughness)"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.screenSpaceReflections"
+        ],
+        "effectiveValue": "Off, Low or High ray-marched reflections driven by a packed metalness/roughness MRT attachment",
+        "rationale": "Dielectrics reflect deliberately: water and wet decking are the surfaces this tier exists for and the upstream non-metal early-out would skip them. Off-screen geometry cannot reflect, which is the technique rather than a defect. The composite is additive and intensity-capped, so it can only ever add light to a sightline."
+      },
+      "budget": "One SSR target plus one blur target at 0.75 resolution scale or lower, one packed material MRT attachment, and at most 60% of the 64-step march; all dispose with the arena pipeline.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "depth-of-field",
+      "title": "Depth of field",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "assertDepthOfFieldCombatSafety"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.depthOfField",
+          "graphics.depthOfFieldStrength"
+        ],
+        "effectiveValue": "Off by default; on, a bokeh defocus that only opens up past the combat midfield",
+        "rationale": "The three gates that blocked this are all closed by construction rather than by review. Focus is fixed, so there are no focus transitions to get wrong. The focal length is far longer than any arena, so the first-person weapon and every target inside the engagement band stay sharp. The sub-pixel midfield ceiling is asserted at graph construction across the whole band at every strength, so a future tuning edit fails the arena build instead of softening a target."
+      },
+      "budget": "One circle-of-confusion target pair, one blurred-CoC target and two bokeh targets; the midfield blur radius is capped below one pixel at every strength.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "motion-blur",
+      "title": "Motion blur",
+      "availability": "active",
+      "owner": "src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))"
+        },
+        {
+          "path": "src/rendering/screen-space-post-profile.ts",
+          "symbol": "MOTION_BLUR_DEAD_ZONE_NDC"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.motionBlur"
+        ],
+        "effectiveValue": "Off by default; a bounded per-pixel camera and object smear from the scene pass velocity MRT",
+        "rationale": "The velocity buffer is a real MRT attachment allocated only when the control is non-zero. A dead zone holds the smear at exactly zero below a real angular rate, so aim adjustments and slow strafes never smear, and the total screen offset is capped at 2.5% of the screen so a fast flick cannot erase a target from the frame."
+      },
+      "budget": "One velocity MRT attachment and eight taps; zero allocations while the control reads zero.",
+      "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "spatial-upscaling",
+      "title": "FSR 1 spatial upscaling",
+      "availability": "active",
+      "owner": "src/rendering/filmic-grade-chain.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/filmic-grade-chain.ts",
+          "symbol": "display-fsr1-easu-rcas-upscale"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "scenePass.setResolutionScale(screenSpaceRuntime.upscaling.sceneResolutionScale)"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.spatialUpscaling",
+          "graphics.sharpness"
+        ],
+        "effectiveValue": "Off, or AMD FSR 1 at the published Quality (1.5x), Balanced (1.7x) or Performance (2.0x) ratio",
+        "rationale": "This is the honest replacement for the former AI-upscaling notice: FSR 1 is a real vendor-published SPATIAL upscaler that runs as an ordinary shader, so it is available where DLSS, Ray Reconstruction and frame generation are not. The scene pass and the display chain render at the same reduced fraction and EASU reconstructs to the drawing buffer, which is what separates it from render scale handing the upsample to the browser blit. FSR 1 ends in RCAS, so it takes over the sharpen stage instead of stacking a second one."
+      },
+      "budget": "One reduced-resolution RTT plus the EASU and RCAS targets; mutually exclusive with the standalone sharpen stage, enforced by the grade chain order contract.",
+      "verifier": "src/rendering/filmic-grade-chain.test.ts + src/rendering/screen-space-post-profile.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "ai-upscaling-frame-generation",
+      "title": "AI upscaling and frame generation",
+      "availability": "unsupported",
+      "owner": "browser renderer capability boundary",
+      "sourceProbes": [
+        {
+          "path": "src/graphics-settings-registry.ts",
+          "symbol": "id: 'ai-upscaling-frame-generation'"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "unsupported",
+        "settingKeys": [],
+        "effectiveValue": "Unavailable",
+        "rationale": "Vendor-native DLSS, FSR frame generation and Ray Reconstruction are driver technologies with no browser API, and are never simulated by labels. The spatial upscaler that IS available ships under its own name as FSR 1 in the spatial-upscaling row."
+      },
+      "budget": "Zero vendor-native reconstruction or generated-frame resources allocated.",
+      "verifier": "src/graphics-settings-registry.test.ts",
+      "authorityAffecting": false
+    }
+  ],
+  "summary": {
+    "total": 34,
+    "active": 32,
+    "unsupported": 2,
+    "adjustable": 25,
+    "fixedWithRationale": 7
+  },
+  "inventorySha256": "583a21e9a9b9fde21538141b5c43be5b763a7fbab40c094c0b809d0226f8e7db"
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "world.projectile-impact",
+  "family": "world-impact",
+  "bus": "sfx",
+  "delivery": "world-spatial",
+  "spatialProfileId": "impact-world",
+  "maxConcurrent": 6,
+  "priority": 150,
+  "cooldownMs": 15,
+  "owner": "match-epoch",
+  "evidenceId": "audio-world-impact",
+  "variantId": "world-impact-a",
+  "source": "fixture-payloads/audio/variants/world-impact-a.txt",
+  "license": "cc0",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "ambience.arena-bed",
+  "family": "arena-ambience",
+  "bus": "ambience",
+  "delivery": "world-spatial",
+  "spatialProfileId": "ambience-wide",
+  "maxConcurrent": 4,
+  "priority": 40,
+  "cooldownMs": 0,
+  "owner": "arena-generation",
+  "evidenceId": "audio-arena-bed",
+  "variantId": "atomic-acres.wind",
+  "source": "fixture-payloads/audio/variants/atomic-acres-wind.txt",
+  "license": "project-owned",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

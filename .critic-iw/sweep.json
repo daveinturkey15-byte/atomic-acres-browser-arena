@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-08-26T02:14:56.239Z",
+  "base": "http://127.0.0.1:41911",
+  "gpu": {
+    "ok": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "holdMs": 500,
+  "thresholdM": 0.35,
+  "method": "v3: match-active gate with mid-sweep reboot; authority-march collisionProbeAt + triangle raycast vs visible non-camera meshes; inline frames during active play; decorative non-solid layers excluded",
+  "results": [
+    {
+      "arena": "rustworks-1v1",
+      "cellsTested": 81,
+      "movesTested": 309,
+      "blockedExplained": 0,
+      "findings": 0,
+      "noColliderBlocks": 1,
+      "captured": 1
+    }
+  ]
+}

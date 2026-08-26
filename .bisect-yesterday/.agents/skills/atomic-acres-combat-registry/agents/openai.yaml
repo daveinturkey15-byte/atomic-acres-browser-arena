@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atomic Acres Combat Registry"
+  short_description: "Author and verify typed combat catalogs"
+  default_prompt: "Use $atomic-acres-combat-registry to add or audit an Atomic Acres weapon or ordnance definition."

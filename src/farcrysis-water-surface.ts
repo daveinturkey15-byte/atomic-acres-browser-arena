@@ -62,11 +62,15 @@ import { swellDepthFactor } from './farcrysis-water-fx';
 export const FARCRYSIS_WATER_DEPTH_ATTRIBUTE = 'aWaterDepth';
 
 /**
- * Sky-reflection palette, from the in-repo golden-hour water polish recipe:
- * deep teal straight down, warm zenith at grazing incidence. Both <= 1.
+ * Sky-reflection palette. HF-394 visual audit (real-WebGPU captures,
+ * 2026-08-26): the retired golden-hour pair (deep teal / warm 0xffb469
+ * zenith) rendered grazing water as yellow mud against the arena's bright
+ * DAY sky. The live farcrysis sky is blue with warm FogExp2 haze at the
+ * horizon, so the gradient now agrees with it (threejs-webgpu-water skill:
+ * sky, fog, horizon and water palette must agree). Both <= 1.
  */
-const SKY_TEAL = 0x0b4a5a;
-const SKY_WARM_ZENITH = 0xffb469;
+export const SKY_REFLECTION_HORIZON = 0xe3e7e4;
+export const SKY_REFLECTION_ZENITH = 0x3a86ad;
 
 /** Water Schlick F0 (dielectric). */
 const FRESNEL_F0 = 0.02;
@@ -157,12 +161,14 @@ export function createFarcrysisSeaSurfaceMaterial(
     float(1 - FRESNEL_F0).mul(pow(cosTheta.oneMinus(), 5)),
   );
 
-  // Analytic sky by reflected-ray elevation (no render targets): deep teal
-  // looking up through the ray, warm zenith at grazing incidence.
+  // Analytic sky by reflected-ray elevation (no render targets): pale haze at
+  // the horizon (R.y ~ 0, where grazing Fresnel is strongest), day blue up
+  // the ray. The old mapping put the warm colour at HIGH R.y — the one angle
+  // Fresnel almost never shows — and left grazing views a 50/50 teal/warm mud.
   const reflected = reflect(incident, surfaceNormal);
   const skyGradient = mix(
-    color(SKY_TEAL),
-    color(SKY_WARM_ZENITH),
+    color(SKY_REFLECTION_HORIZON),
+    color(SKY_REFLECTION_ZENITH),
     clamp(reflected.y.mul(0.55).add(0.5), 0, 1),
   );
 

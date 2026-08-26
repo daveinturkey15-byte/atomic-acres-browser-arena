@@ -1,0 +1,3249 @@
+import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { expect, test, type Page } from '@playwright/test';
+import { BOT_GRENADE_POOL, BOT_STARTING_WEAPON_POOL } from '../../src/bot-ai';
+import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
+
+const releaseChannels = JSON.parse(readFileSync('release-channels.json', 'utf8')) as {
+  experimental: { pass: string };
+};
+
+type DebugState = {
+  bootstrap: { stage: string; error: string | null };
+  gameStarted: boolean;
+  frameCount: number;
+  gameMode: string;
+  matchPhase: 'warmup' | 'active' | 'ended';
+  matchEndReason: 'score' | 'time' | null;
+  scores: [number, number];
+  player: {
+    hp: number;
+    kills: number;
+    deaths: number;
+    weapon: string;
+    primaryWeapon: string;
+    equippedWeapons: string[];
+    ammo: number;
+    reserve: number;
+    reloading: boolean;
+    stance: 'stand' | 'crouch' | 'prone';
+    crouched: boolean;
+    prone: boolean;
+    sprinting: boolean;
+    grenades: number;
+    position: number[];
+  };
+  spawnSelection: {
+    previousIndex: number;
+    selectedIndex: number;
+    selectedVisibleThreats: number;
+    minimumVisibleThreats: number;
+    safeTierCount: number;
+    selectedSide: 0 | 1;
+    flipped: boolean;
+  } | null;
+  bots: Array<{
+    id: string;
+    hp: number;
+    alive: boolean;
+    kills: number;
+    weapon: string;
+    grenade: string;
+    position: number[];
+    waypoint: number;
+    blockedSince: number;
+    hasLineOfSight: boolean;
+    rootVisible: boolean;
+    visibleMeshCount: number;
+    screenPosition: number[];
+    presentationReady: boolean;
+    presentationWeaponSafe: boolean;
+    operatorModel: {
+      source: string;
+      assetUrl: string;
+      appearance: string;
+      lod: 0 | 1;
+      skinnedMeshes: number;
+      pbrMaterials: number;
+      materialContract: string;
+      visibleSkinnedMeshes: number;
+      mergedVertexLod: boolean;
+      clips: number;
+      weaponChildren: number;
+      activeClip: string;
+      embeddedWeaponsSuppressed: number;
+      visibleEmbeddedWeapons: number;
+      armBonesPresent: number;
+      meleeKnifeVisible: boolean;
+      muzzleForwardDot: number;
+      animationContract: { stance: 'stand' | 'crouch' | 'prone'; crouchBlend: number; proneBlend: number; pivotHeight: number; pivotPitch: number };
+      weaponMount: { modelId: string; finishId: string; forwardCorrection: string; directChild: boolean; finite: boolean; localScale: number[] };
+      supportGrip: { supportError: number; finite: boolean; torsoClear: boolean; torsoRelativeBendHint: boolean };
+    } | null;
+    neonHaze: boolean;
+  }>;
+  corpses: {
+    active: number;
+    lifetimeMs: number;
+    remainingMs: number[];
+    models: Array<{ source: string; appearance: string; skinnedMeshes: number; weaponChildren: number; activeClip: string } | null>;
+  };
+  botEscalation: { deaths: number; initialBots: number; targetBots: number; activeBots: number; nextReinforcementAt: number };
+  remotes: number;
+  remotePlayers: Array<{ id: string; stance: 'stand' | 'crouch' | 'prone'; position: number[] }>;
+  grenades: number;
+  grenadeVisual: {
+    status: 'idle' | 'loading' | 'ready' | 'fallback';
+    asset: string;
+    sourceMeshCount: number;
+    sourceMaxDimension: number;
+    targetMaxDimension: number;
+    active: Array<{ name: string; authored: boolean; meshes: number }>;
+  };
+  grenadeExplosion: {
+    total: number;
+    activeVisuals: number;
+    poolCapacity: number;
+    dynamicLights: number;
+    prewarmed: boolean;
+    lastExplosionAgeMs: number | null;
+    profile: { disposeMs: number; audioMs: number; visualMs: number; targetDamageMs: number; selfDamageMs: number; totalSyncMs: number };
+  };
+  audio: {
+    ambience: { continuousSources: number; busGain: number };
+    grenadeFuse: { beeps: number; startMs: number };
+    support: { cues: number };
+    buses: Record<string, { configuredGain: number; muted: boolean; effectiveGain: number }>;
+  };
+  sensory: {
+    directions: Array<{ sourceId: string; sourceType: 'local' | 'remote' | 'bot' | 'world'; sector: number; opacity: number }>;
+    lowHealthActive: boolean;
+    lowHealthOpacity: number;
+  };
+  fieldSupport: {
+    streak: number;
+    rewardCycle: number;
+    bestStreakThisMatch: number;
+    available: Record<'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke', boolean>;
+    availableCharges: Record<'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke', number>;
+    scoutActive: boolean;
+    yardhawk: { active: boolean; phase: 'thrown' | 'homing' | null; targetId?: string; position?: number[]; armedInMs?: number };
+    yardhawkExplosions: number;
+    tacticalMapOpen: boolean;
+    tacticalTargets: Array<{ x: number; z: number }>;
+    strikeMissiles: Array<{ target: number[]; impactInMs: number; position: number[] }>;
+    triPassLaunches: number;
+    triPassImpacts: number;
+    triPassLastImpactDelayMs: number | null;
+    hunterDrones: Array<{ index: number; targetId: string; position: number[]; diveInMs: number; expiresInMs: number }>;
+    hunterSwarmLaunches: number;
+    hunterSwarmImpacts: number;
+    gamepadSelection: 'scout-sweep' | 'yardhawk' | 'tri-pass' | 'hunter-swarm' | 'nuke';
+    nuke: { active: boolean; detonated: boolean; detonateInMs: number; finishInMs: number };
+    nukeActivations: number;
+    nukeDetonations: number;
+    explosionProfile: { source: string | null; totalSyncMs: number };
+    explosionFrameProfile: { sources: string[]; impacts: number; totalSyncMs: number; maxImpactSyncMs: number };
+    prewarmedNuke: { shockwaveInScene: boolean; prewarmed: boolean; dynamicLights: number };
+  };
+  overdrive: {
+    generation: number;
+    available: boolean;
+    nextSpawnAt: number;
+    holderId: string | null;
+    activeUntil: number;
+    position: number[];
+    damageMultiplier: number;
+    remainingMs: number;
+    spawns: number;
+    pickups: number;
+    expiries: number;
+    presentationPrewarmed: boolean;
+    visible: boolean;
+    renderResident: boolean;
+    worldIconVisible: boolean;
+    worldIconName: string;
+    minimapSymbol: string;
+  };
+  deathDrops: Array<{ id: string; weapon: string; ammoAvailable: boolean; weaponAvailable: boolean; position: number[]; expiresInMs: number }>;
+  breakableWindows: Array<{
+    id: string; broken: boolean; visible: boolean; position: number[]; persistentDebrisId: string | null;
+  }>;
+  persistentWindowDebris: Array<{
+    id: string; windowId: string; position: number[]; visible: boolean; physical: boolean;
+  }>;
+  physicalCover: Array<{
+    id: string;
+    bounds: { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
+    blocksMovement: true;
+    blocksShots: true;
+    performanceVisualKind: 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer' | null;
+    performanceVisualMeshes: number;
+  }>;
+  minimap: {
+    backingWidth: number;
+    cssWidth: number;
+    headingDegrees: number;
+    landmarks: Array<{
+      id: string;
+      kind: 'bus' | 'cargo-stack' | 'pipe-stack' | 'service-skip' | 'generator-trailer';
+      label: string;
+    }>;
+  };
+  spawnSafety: Array<{ team: 0 | 1; authored: number; valid: number }>;
+  houseNavigation: Array<{
+    id: string;
+    dimensions: { width: number; depth: number; wallThickness: number };
+    rampWidth: number;
+    indoorRampWidth: number;
+    rampNames: string[];
+    floorSections: string[];
+    routeAnchors: number;
+    indoorRouteAnchors: number;
+  }>;
+  activeImpactParticles: number;
+  activeImpactMarks: number;
+  activeTracers: number;
+  originalArtLoaded: boolean;
+  worldIdentity: {
+    pass: 'world-identity-27';
+    routes: Array<{ id: string; label: string; role: string; landmark: string }>;
+    cuesInsideBounds: boolean;
+  };
+  worldIdentityPresentation: { routeLights: number; routeSigns: number; cueInstances: number; atmosphericParticles: number };
+  neighbourhoodLife: {
+    loaded: boolean;
+    floraInstances: number;
+    faunaInstances: number;
+    streetItems: number;
+    flowerBeds: number;
+    benches: number;
+    bins: number;
+    bicycles: number;
+    genericMarkers: number;
+  };
+  arenaZone: string;
+  arenaStoryReady: boolean;
+  interiorTelemetry: {
+    houses: number;
+    groundRooms: number;
+    upperRooms: number;
+    doors: number;
+    windows: number;
+    ramps: number;
+    wallMaterialVariants: number;
+    pbrMaterialFamilies: number;
+    furnishings: number;
+    fixtures: number;
+    visibleCollisionProxies: number;
+    visibleRamps: number;
+    furnishingSets: number;
+    furnishingSourcePieces: number;
+    furnishingBatches: number;
+    furnishingMaterialFamilies: string[];
+    texturedFurnishingMaterialFamilies: string[];
+    profileAuthorityParity: {
+      schema: 'atomic-acres/house-profile-authority-parity@1';
+      profile: 'performance' | 'quality' | 'quality-fallback';
+      expectedBindings: number;
+      passedBindings: number;
+      pass: boolean;
+      issues: string[];
+      entries: Array<{
+        colliderId: string;
+        semantic: string;
+        authorityPresent: boolean;
+        presentationPresent: boolean;
+        presentationBoundToAuthority: boolean;
+        qualityAssetSetPresent: boolean | null;
+        matchingQualityVertices: number;
+        issues: string[];
+      }>;
+    } | null;
+  };
+  weaponReady: boolean;
+  weaponPresentation: {
+    weapon: string;
+    heat: number;
+    shotsPresented: number;
+    activeCasings: number;
+    activeSmoke: number;
+    detailsReady: boolean;
+    modelKind: 'licensed-imported' | 'original-authored' | 'project-original-blender';
+    firstPersonSource: string;
+    weaponModelId: string;
+    weaponFinishId: string;
+    modelVisibleMeshCount: number;
+    adsProgress: number;
+    surfaceRetreat: number;
+    surfaceLift: number;
+    sightOffset: [number, number] | null;
+    armsVisible: boolean;
+    armMeshCount: number;
+    armMaterials: { contract: string; total: number; transparent: number; nonOpaque: number; depthWriteDisabled: number };
+    attachedWeaponBatchStats: { sourceMeshes: number; batches: number };
+    knifeVisible: boolean;
+    armsSource: string;
+    authoredFingerBoneCount: number;
+    authoredArmAnimation: {
+      clips: number;
+      activeAction: string | null;
+      blendPolicy: string;
+      trackPolicy: string;
+      runtimeTracks: number;
+      upperChainTracksExcluded: number;
+    } | null;
+    riggedArms: Array<{
+      side: 'left' | 'right'; weapon: string; active: boolean; stowed?: boolean;
+      finite: boolean; withinStableReach?: boolean; authoredSegmentDirectionsPreserved?: boolean;
+      contactError?: number; palmOrientationError?: number; shoulderEntryNdc?: [number, number, number];
+    }>;
+    importedModel: { source: string; weapon: string; clips: number; meshes: number; renderPrimitives: number; triangles: number; detailMeshes: number; socketContractReady: boolean; muzzleForwardDot: number | null; sightForwardDot: number | null } | null;
+  };
+  sniperScope: { active: boolean; magnification: number; baseFov: number; cameraFov: number; viewmodelVisible: boolean };
+  weaponActionHistory: string[];
+  menuVisible: boolean;
+  networkSync: { stateIntervalMs: number; interpolationRate: number };
+  networkLifecycle: { role: string; joinDeadlineActive: boolean; peerPresent: boolean; hostConnectionPresent: boolean };
+  render: {
+    profile: 'performance' | 'blender' | 'compat';
+    representation: 'responsive' | 'blender' | 'compat';
+    atomicSignal: {
+      enabled: boolean;
+      profile: 'performance' | 'blender' | 'compat';
+      fallbackReason: string | null;
+      bypassReason: string | null;
+      passCpuMs: number;
+      averagePassCpuMs: number;
+      samples: number;
+      textureSamples: number;
+      targetValidated: boolean;
+      outputValidated: boolean;
+      width: number;
+      height: number;
+    };
+    materialCompatibility: {
+      materials: number;
+      colorTexturesCorrected: number;
+      dataTexturesCorrected: number;
+      anisotropyAdjusted: number;
+      darkSurfacesLifted: number;
+      roughnessAdjusted: number;
+      metalnessAdjusted: number;
+    };
+    fpsCounter: { value: string | null; pacing: string; visible: boolean; anchor: 'top-right' };
+    calls: number;
+    triangles: number;
+    points: number;
+    lines: number;
+    sceneObjects: number;
+    reducedMode: boolean;
+    shadows: boolean;
+    shadowMode: 'off' | 'static' | 'dynamic';
+    pixelRatio: number;
+    drawingBuffer: number[];
+    antialias: boolean;
+    lighting: {
+      exposure: number;
+      hemisphereIntensity: number;
+      ambientIntensity: number;
+      sunIntensity: number;
+      shadowBias: number;
+      shadowNormalBias: number;
+      softShadows: boolean;
+      fogColor: number;
+      fogNear: number;
+      fogFar: number;
+      skyTop: number;
+      skyHorizon: number;
+      skyBottom: number;
+      routeLightIntensity: number;
+    };
+    sky: {
+      pass: 30;
+      top: string;
+      horizon: string;
+      bottom: string;
+      cloudShadow: string;
+      cloudLight: string;
+      cloudBands: number;
+      fogColor: string;
+      fogNear: number;
+      fogFar: number;
+      godRayStrength: number;
+      godRayLobes: number;
+      extraDraws: number;
+    };
+    grass: {
+      pass: 30;
+      enabled: boolean;
+      bypassReason: string | null;
+      blades: number;
+      submissions: number;
+      authoritative: false;
+    };
+    atmosphere: {
+      pass: 30;
+      enabled: boolean;
+      bypassReason: string | null;
+      mistCards: number;
+      smokeCards: number;
+      dustMotes: number;
+      triangles: number;
+      submissions: number;
+      volumetricRayMarching: false;
+    };
+    framePacing: { ready: boolean; cadenceHz: number; medianMs: number; p95Ms: number; displayLimited: boolean };
+    minimapRenders: number;
+    minimapTargetHz: number;
+    staticBatchPalette: Array<string | null>;
+    blenderEnvironment: {
+      status: 'idle' | 'loading' | 'ready' | 'fallback';
+      asset: string;
+      meshCount: number;
+      materialCount: number;
+      texturedMaterials: number;
+      pbrMaterials: number;
+      textureCount: number;
+      triangleCount: number;
+      semanticWindows: number;
+      boundWindows: number;
+      transparentUpperWindows: number;
+      routeLandmarks: number;
+      modeledBuses: number;
+      largeCoverAssets: number;
+      housePropSets: number;
+      worldIdentityPass: boolean;
+      proceduralWorldHidden: boolean;
+      error: string | null;
+    };
+  };
+};
+
+async function debug(page: Page): Promise<DebugState> {
+  return page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot());
+}
+
+async function pageReadyAt(page: Page, path: string, timeoutMs = 30_000): Promise<void> {
+  const url = new URL(path, 'http://atomic-acres.qa');
+  if (!url.searchParams.has('release')) url.searchParams.set('release', 'latest');
+  if (!url.searchParams.has('renderer')) url.searchParams.set('renderer', 'webgl2');
+  await page.goto(`${url.pathname}${url.search}`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.waitForFunction(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return status?.dataset.kind === 'ok'
+        && solo?.disabled === false
+        && snapshot?.weaponReady === true
+        && snapshot.bootstrap.stage === 'ready';
+    }, undefined, { timeout: timeoutMs });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => {
+      const status = document.querySelector<HTMLElement>('#network-status');
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      const debugApi = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      const snapshot = debugApi?.snapshot();
+      return {
+        path: window.location.pathname + window.location.search,
+        statusKind: status?.dataset.kind ?? null,
+        statusText: status?.textContent ?? null,
+        soloDisabled: solo?.disabled ?? null,
+        debugApiReady: Boolean(debugApi),
+        weaponReady: snapshot?.weaponReady ?? null,
+        originalArtLoaded: snapshot?.originalArtLoaded ?? null,
+        bootstrap: snapshot?.bootstrap ?? null,
+        blenderEnvironment: snapshot?.render.blenderEnvironment ?? null,
+      };
+    }).catch((diagnosticError: unknown) => ({
+      diagnosticError: diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError),
+    }));
+    if (error instanceof Error) error.message += `\nReadiness diagnostic: ${JSON.stringify(diagnostic)}`;
+    throw error;
+  }
+}
+
+async function pageReady(page: Page): Promise<void> {
+  await pageReadyAt(page, '/?render=performance');
+}
+
+async function startSolo(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
+  // Pass 68 defers arena construction and killstreak/weapon prewarm to
+  // deployment. Hosted CI renders through SwiftShader, where the full
+  // admission pipeline legitimately needs tens of seconds (locally 7-17s).
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
+    undefined,
+    { timeout: 60_000 },
+  );
+  await expect(page.locator('#hud')).toBeVisible();
+}
+
+async function startSoloWithExtendedFallbackAdmission(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
+    undefined,
+    { timeout: 120_000 },
+  );
+  await expect(page.locator('#hud')).toBeVisible();
+}
+
+async function startSoloForStateOnlySupportLadder(page: Page): Promise<void> {
+  await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { startSolo: () => void } }).__ATOMIC_ACRES_DEBUG__.startSolo());
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { gameStarted: boolean } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().gameStarted,
+    undefined,
+    { timeout: 60_000 },
+  );
+  await page.waitForFunction(
+    () => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { admissionState: () => { matchPhase: DebugState['matchPhase'] } };
+    }).__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
+    undefined,
+    { timeout: 30_000 },
+  );
+  await expect(page.locator('#hud')).toBeVisible();
+}
+
+// Browser gameplay tests must never read from or write to the production
+// leaderboard. Unit/Worker suites exercise the real schema independently.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/v1/leaderboard?*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [] }) });
+  });
+  await page.route('**/v1/streak', async (route) => {
+    await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ accepted: true }) });
+  });
+});
+
+test.describe('boot and authored presentation', () => {
+  test('keeps the reduced desktop gameplay HUD and tall Field Support column legible', async ({ page }) => {
+    await pageReady(page);
+    await startSolo(page);
+    const layout = await page.evaluate(() => {
+      const minimap = document.querySelector<HTMLElement>('#minimap');
+      const support = document.querySelector<HTMLElement>('#support-block');
+      const weapon = document.querySelector<HTMLElement>('#weapon-block');
+      if (!minimap || !support || !weapon) throw new Error('Gameplay HUD is incomplete');
+      return {
+        minimapZoom: getComputedStyle(minimap).zoom,
+        minimapWidth: minimap.getBoundingClientRect().width,
+        supportWidth: support.getBoundingClientRect().width,
+        supportHeight: support.getBoundingClientRect().height,
+        weaponRight: weapon.getBoundingClientRect().right,
+        viewportWidth: window.innerWidth,
+      };
+    });
+    expect(layout.minimapZoom).toBe('1');
+    expect(layout.minimapWidth).toBeGreaterThanOrEqual(190);
+    expect(layout.minimapWidth).toBeLessThanOrEqual(220);
+    // Pass 65+ HUD defines the tall Field Support rail via
+    // --hud-support-width: clamp(246px, 14vw, 360px). The floor is the
+    // designed minimum on the 1100px test viewport; the cap bounds wide hosts.
+    expect(layout.supportWidth).toBeGreaterThanOrEqual(246);
+    expect(layout.supportWidth).toBeLessThanOrEqual(360);
+    expect(layout.supportHeight).toBeGreaterThanOrEqual(150);
+    expect(layout.weaponRight).toBeLessThanOrEqual(layout.viewportWidth);
+  });
+
+  test('boots without runtime errors and loads original art/weapons', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReady(page);
+    const state = await debug(page);
+    expect(state.originalArtLoaded).toBe(true);
+    expect(state.weaponReady).toBe(true);
+    expect(state.weaponPresentation.detailsReady).toBe(true);
+    expect(state.menuVisible).toBe(true);
+    // Pass 68 defers arena construction (route markers, authored art) to the
+    // deployment admission; the menu owns the prerecorded preview. Arena story
+    // readiness is asserted after a real solo deployment below.
+    await expect(page.locator('html')).toHaveAttribute('data-ui-contract', 'pass64-command-v2');
+    await expect(page.locator('#arena-title')).toContainText('NUKE TOWN');
+    await expect(page.locator('.command-brand span')).toContainText(releaseChannels.experimental.pass);
+    await expect(page.locator('.command-brand span')).not.toContainText('THE BIG ONE');
+    expect([20, 30, 40]).toContain(state.networkSync.selectedRateHz);
+    expect(state.networkSync.stateIntervalMs).toBeCloseTo(1_000 / state.networkSync.selectedRateHz, 5);
+    expect(state.networkSync.hostTime).toMatchObject({
+      sampleCount: 0,
+      rejectedOutliers: 0,
+    });
+    expect(state.networkSync).toMatchObject({
+      localContinuity: 1,
+      receiverSequenceGaps: 0,
+      receiverReordered: 0,
+      outboundFeedbackSequenceGaps: 0,
+      outboundFeedbackReordered: 0,
+      interpolationDelay: {
+        delayMs: 60,
+        sourceSnapshotRateHz: 40,
+        targetViewRewindHeadroomMs: 190,
+      },
+    });
+    expect(errors).toEqual([]);
+    // Deployment-time arena construction: the authored art root, route markers
+    // and spawn safety commit when a real solo match starts (verified live on
+    // the Pass 68 line; the menu preview alone intentionally defers them).
+    await startSolo(page);
+    const deployedState = await debug(page);
+    expect(deployedState.arenaStoryReady).toBe(true);
+    expect(deployedState.spawnSafety).toEqual([
+      { team: 0, authored: 12, valid: 12 },
+      { team: 1, authored: 12, valid: 12 },
+    ]);
+    await page.screenshot({ path: 'test-results/menu-structured-pass.png', fullPage: true });
+  });
+
+  test('aligns the LMG ADS and renders readable white damage text in Shooting Range', async ({ page }) => {
+    await pageReadyAt(page, '/?render=performance&map=gun-range');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipWeapon: (weapon: 'lmg') => void;
+        setAds: (held: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('lmg');
+      api.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+    await expect.poll(async () => {
+      const offset = (await debug(page)).weaponPresentation.sightOffset;
+      return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
+    }).toBeLessThan(0.006);
+    const damageStyle = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        snapshot: () => { rangePractice: { targets: Array<{ id: string }> } };
+        hitRangeTarget: (id: string, damage: number, zone: 'body') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.hitRangeTarget(api.snapshot().rangePractice.targets[0].id, 31, 'body');
+      const container = document.querySelector<HTMLElement>('#damage-numbers');
+      const node = container?.querySelector<HTMLElement>('strong:last-of-type');
+      if (!container || !node) return null;
+      const style = getComputedStyle(node);
+      return {
+        dataLastDamage: container.dataset.lastDamage,
+        visible: node.getClientRects().length > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+        color: style.color,
+        fontWeight: style.fontWeight,
+      };
+    });
+    expect(damageStyle).not.toBeNull();
+    expect(damageStyle).toMatchObject({ dataLastDamage: '31', visible: true });
+    if (!damageStyle) throw new Error('Damage text was not created');
+    expect(damageStyle.color).toBe('rgb(255, 255, 255)');
+    const numericWeight = damageStyle.fontWeight === 'normal' ? 400 : Number.parseInt(damageStyle.fontWeight, 10);
+    expect(Number.isFinite(numericWeight), `computed font weight: ${damageStyle.fontWeight}`).toBe(true);
+    expect(numericWeight).toBeLessThanOrEqual(600);
+    await page.screenshot({ path: 'test-results/pass59-range-lmg-damage.png', animations: 'disabled' });
+  });
+
+  test('requires an intentional callsign before any deployment and remembers it across builds', async ({ page }) => {
+    test.setTimeout(180_000);
+    await pageReady(page);
+    await page.locator('#player-name').fill('');
+    await page.locator('#solo').click();
+    await expect(page.locator('#menu')).toBeVisible();
+    await expect(page.locator('#player-name-error')).toBeVisible();
+    expect((await debug(page)).gameStarted).toBe(false);
+
+    await page.locator('#player-name').fill('Dave');
+    await page.locator('#room-input').fill('');
+    await page.locator('#join').click();
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem('atomic-acres:player-name:v1'))).toBe('Dave');
+    expect((await debug(page)).gameStarted).toBe(false);
+    await page.reload();
+    await pageReady(page);
+    await expect(page.locator('#player-name')).toHaveValue('Dave');
+  });
+
+  test('loads versioned high scores and surfaces real-time same-origin updates', async ({ page }) => {
+    const recordedAt = Date.UTC(2026, 6, 17, 12);
+    await page.addInitScript(({ recordedAt, storageKey, schemaVersion }) => {
+      localStorage.setItem(storageKey, JSON.stringify({
+        version: schemaVersion,
+        entries: [{ id: 'score:dave:one', name: 'Dave', kills: 14, deaths: 4, bestStreak: 9, won: true, recordedAt }],
+      }));
+    }, { recordedAt, storageKey: HIGH_SCORE_STORAGE_KEY, schemaVersion: HIGH_SCORE_SCHEMA_VERSION });
+    await pageReady(page);
+    await expect(page.locator('#high-score-list')).toContainText('Dave');
+    await expect(page.locator('#high-score-list')).toContainText('14 KILLS');
+
+    await page.evaluate(({ recordedAt, channelName }) => {
+      const channel = new BroadcastChannel(channelName);
+      channel.postMessage([{ id: 'score:ellis:one', name: 'Ellis', kills: 18, deaths: 2, bestStreak: 12, won: true, recordedAt }]);
+      channel.close();
+    }, { recordedAt, channelName: HIGH_SCORE_STORAGE_KEY });
+    await expect(page.locator('#high-score-list')).toContainText('Ellis');
+    await expect(page.locator('#high-score-list')).toContainText('18 KILLS');
+  });
+
+  test('records a completed match with the continuous best streak in durable storage', async ({ page }) => {
+    await pageReady(page);
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; setKills: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(7);
+      api.setKills(30);
+      api.endMatch();
+    });
+    await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
+    const entries = await page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+    }, HIGH_SCORE_STORAGE_KEY);
+    expect(entries.find((entry) => entry.name === 'QA Operator')).toMatchObject({ name: 'QA Operator', kills: 30, bestStreak: 7, won: true });
+  });
+
+  test('persists a named streak when the match ends and retains it after a reload', async ({ page }) => {
+    // The approved pass-68 runtime persists high-score entries at endMatch.
+    // In solo/offline mode broadcastKillstreakState does not self-deliver, so
+    // the recordImmediateStreak path only fires during networked or elimination
+    // handler rounds. Use the endMatch path, which test 1 in this group already
+    // validates, and then verify the entry survives a full page reload.
+    await pageReady(page);
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void; setKills: (kills: number) => void; endMatch: () => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      api.setKills(8);
+      api.earnSupport(8);
+      api.endMatch();
+    });
+    await expect.poll(async () => (await debug(page)).matchPhase).toBe('ended');
+    await expect.poll(async () => page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
+      const entries = raw ? (JSON.parse(raw) as { entries: Array<Record<string, unknown>> }).entries : [];
+      return entries.find((entry) => entry.name === 'QA Operator');
+    }, HIGH_SCORE_STORAGE_KEY)).toMatchObject({ name: 'QA Operator', bestStreak: 8 });
+    await page.reload();
+    await pageReady(page);
+    const qaScore = page.locator('#high-score-list li').filter({ hasText: 'QA Operator' });
+    await expect(qaScore).toContainText('QA Operator');
+    await expect(qaScore).toContainText('×8 STREAK');
+  });
+
+  test('defaults new players to Quality Graphics while retaining explicit slow-PC profiles', async ({ page }) => {
+    // This contract performs two complete WebGL boots. Hosted Windows uses
+    // SwiftShader, where the pair can legitimately exceed the 60 s default.
+    test.setTimeout(120_000);
+    const shaderErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' && /Atomic Signal|Shader Error|WebGLProgram/.test(message.text())) shaderErrors.push(message.text());
+    });
+    // Pass 68 defaults new players to the Quality preset only on capable
+    // machines (>= 8 cores and >= 8 GB device memory); weaker hosts and
+    // software-rendered CI lanes legitimately default to Performance. Read the
+    // same capability hints the runtime uses so the assertion tracks the
+    // designed behavior on any runner.
+    const capabilities = await page.evaluate(() => ({
+      cores: navigator.hardwareConcurrency,
+      memoryGb: (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8,
+    }));
+    const expectedQuality = capabilities.cores >= 8 && capabilities.memoryGb >= 8;
+    await pageReadyAt(page, '/?signal=on');
+    const defaultState = await debug(page);
+    expect(defaultState.render).toMatchObject({
+      profile: expectedQuality ? 'blender' : 'performance',
+      representation: expectedQuality ? 'blender' : 'responsive',
+      atomicSignal: { enabled: true, fallbackReason: null },
+    });
+    if (expectedQuality) {
+      expect(defaultState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(5);
+      await expect(page.locator('#graphics-profile')).toHaveValue('high');
+      // Material compatibility, HDR target validation and spawn safety commit
+      // with arena construction at deployment admission on Pass 68.
+      await startSolo(page);
+      const deployedState = await debug(page);
+      expect(deployedState.render.materialCompatibility.materials).toBeGreaterThan(0);
+      expect(deployedState.render.atomicSignal.targetValidated).toBe(true);
+      expect(deployedState.render.atomicSignal.outputValidated).toBe(true);
+      expect(deployedState.spawnSafety).toEqual([
+        { team: 0, authored: 12, valid: 12 },
+        { team: 1, authored: 12, valid: 12 },
+      ]);
+    } else {
+      expect(defaultState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(1);
+      await expect(page.locator('#graphics-profile')).toHaveValue('performance');
+    }
+    await pageReadyAt(page, '/?render=performance&signal=on');
+    const performanceState = await debug(page);
+    expect(performanceState.render).toMatchObject({
+      profile: 'performance',
+      representation: 'responsive',
+      atomicSignal: { enabled: true, fallbackReason: null },
+    });
+    expect(performanceState.render.atomicSignal.textureSamples).toBeGreaterThanOrEqual(1);
+    if (expectedQuality) {
+      expect(performanceState.render.atomicSignal.textureSamples).toBeLessThan(
+        defaultState.render.atomicSignal.textureSamples,
+      );
+    }
+    expect(shaderErrors).toEqual([]);
+  });
+
+  test('keeps the compatibility profile on the direct renderer fallback', async ({ page }) => {
+    await pageReadyAt(page, '/?render=compat');
+    const state = await debug(page);
+    expect(state.render.atomicSignal).toMatchObject({
+      enabled: false,
+      profile: 'compat',
+      fallbackReason: null,
+      bypassReason: 'compat-profile',
+      textureSamples: 0,
+      targetValidated: false,
+      outputValidated: false,
+    });
+    await expect(page.locator('html')).not.toHaveClass(/atomic-signal-render/);
+    await expect(page.locator('#vignette')).not.toHaveCSS('display', 'none');
+  });
+
+  test('uses the default direct path only when the live renderer is classified as software', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance');
+    const state = await debug(page);
+    const rendererKind = await page.evaluate(() => document.documentElement.dataset.atomicSignalRenderer);
+    if (rendererKind === 'software') {
+      expect(state.render.atomicSignal).toMatchObject({
+        enabled: false,
+        fallbackReason: null,
+        bypassReason: 'software-renderer',
+        textureSamples: 0,
+        samples: 0,
+      });
+    } else {
+      expect(rendererKind).toBe('hardware');
+      expect(state.render.atomicSignal).toMatchObject({
+        enabled: true,
+        fallbackReason: null,
+        bypassReason: null,
+      });
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('falls back to the authored procedural arena if the default Blender asset cannot load', async ({ page }) => {
+    // Hosted Windows routes the GLB stream-to-fallback through SwiftShader,
+    // where deferred admission + asset abort may exceed the default 60 s.
+    test.setTimeout(180_000);
+    await page.route('**/atomic-acres-blender-arena.glb*', (route) => route.abort('failed'));
+    // Force the Blender lane explicitly: Pass 68 defaults new players to
+    // Performance on weak hosts, which never requests the GLB at all.
+    await pageReadyAt(page, '/?render=blender');
+    // Pass 68 streams the Blender GLB during deployment admission rather than
+    // at menu preview. Exercise the real fallback path by starting a solo match
+    // with the asset blocked, then assert the authored procedural arena owns
+    // the presentation.
+    await startSoloWithExtendedFallbackAdmission(page);
+    await expect.poll(async () => (await debug(page)).render.blenderEnvironment.status, { timeout: 60_000 }).toBe('fallback');
+    const state = await debug(page);
+    expect(state.render.profile).toBe('blender');
+    expect(state.render.blenderEnvironment.proceduralWorldHidden).toBe(false);
+    expect(state.originalArtLoaded).toBe(true);
+    expect(state.arenaStoryReady).toBe(true);
+  });
+
+  test('loads the complete Quality Graphics arena and binds authored breakable windows', async ({ page }) => {
+    // Hosted Windows exercises Quality through SwiftShader and can cross the
+    // prior three-minute limit while loading and disposing the full GLB scene.
+    // Keep the assertions unchanged but retain a finite five-minute bound.
+    test.setTimeout(300_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    // Freeze the renderer-backed menu flyover at its deterministic review
+    // instant before sampling draw-call budgets. Runner speed must not select
+    // a different point along the animated camera path.
+    await pageReadyAt(page, '/?render=blender&mist=on&previewTime=0', 240_000);
+    const menuState = await debug(page);
+    expect(menuState.render).toMatchObject({
+      // Hosted SwiftShader CI reports antialias: false even when the profile
+      // advertises it — the rendering backend truthfully reports capability.
+      profile: 'blender', representation: 'blender',
+      shadows: true, shadowMode: 'static',
+      lighting: {
+        exposure: 1, hemisphereIntensity: 0.72, ambientIntensity: 0.18,
+        sunIntensity: 3.25, fogNear: 52, fogFar: 142,
+        routeLightIntensity: 3, streetLightIntensity: 3.8, interiorLightIntensity: 10,
+        routeLightCount: 3, streetLightCount: 4, interiorLightCount: 4,
+        godRayStrength: 0.05, godRayLobes: 2,
+      },
+    });
+    expect(menuState.render.calls).toBeLessThanOrEqual(75);
+    // The atmosphere layout is authored per arena (10 mist, 5 smoke, 64 dust
+    // for Nuke Town) and scaled by the effects-budget densityScale, which is
+    // runner-dependent (SwiftShader CI budgets lower than a capable GPU).
+    // Assert the invariant: enabled, unhidden, no bypass, and every card
+    // family present in proportional budget-scaled counts.
+    expect(menuState.render.atmosphere).toMatchObject({
+      enabled: true, bypassReason: null, volumetricRayMarching: false,
+    });
+    expect(menuState.render.atmosphere.mistCards).toBeGreaterThanOrEqual(4);
+    expect(menuState.render.atmosphere.smokeCards).toBeGreaterThanOrEqual(2);
+    expect(menuState.render.atmosphere.dustMotes).toBeGreaterThan(0);
+    expect(menuState.render.atmosphere.triangles).toBe(
+      2 * (menuState.render.atmosphere.mistCards + menuState.render.atmosphere.smokeCards),
+    );
+    await expect(page.locator('#graphics-profile')).toHaveValue('high');
+    // Pass 68 constructs the Blender arena during deployment admission; the
+    // menu preview alone keeps the GLB idle. Sample the authored environment,
+    // world identity and physical cover after a real solo deployment.
+    await startSolo(page);
+    const deployedState = await debug(page);
+    expect(deployedState.render).toMatchObject({
+      blenderEnvironment: {
+        status: 'ready', meshCount: 48, materialCount: 29, texturedMaterials: 20, pbrMaterials: 20, textureCount: 33, triangleCount: 44_300,
+        semanticWindows: 6, boundWindows: 6, transparentUpperWindows: 2, routeLandmarks: 3, modeledBuses: 2, largeCoverAssets: 4, housePropSets: 2, worldIdentityPass: true,
+        proceduralWorldHidden: true, error: null,
+      },
+    });
+    const collisionRoute = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: {
+        collisionRouteAuthority: () => { report: {
+          schema: string; profile: string; pass: boolean; expectedOwners: number; passedOwners: number;
+          expectedRouteClearances: number; passedRouteClearances: number; issues: string[];
+        } } | null;
+      };
+    }).__ATOMIC_ACRES_DEBUG__.collisionRouteAuthority());
+    expect(collisionRoute?.report).toMatchObject({
+      schema: 'atomic-acres/collision-route-authority@1',
+      profile: 'quality',
+      pass: true,
+      expectedOwners: 10,
+      passedOwners: 10,
+      expectedRouteClearances: 48,
+      passedRouteClearances: 48,
+      issues: [],
+    });
+    expect(deployedState.worldIdentity).toMatchObject({ pass: 'world-identity-27', cuesInsideBounds: true });
+    expect(deployedState.worldIdentity.routes).toHaveLength(3);
+    expect(deployedState.worldIdentityPresentation).toEqual({
+      routeLights: 0,
+      routeSigns: 3,
+      cueInstances: 0,
+      atmosphericParticles: 0,
+      practicalLights: 0,
+      streetLights: 0,
+      interiorLights: 0,
+      fixtureInstances: 8,
+      ceilingInstances: 10,
+    });
+    expect(deployedState.physicalCover.map((cover) => cover.id)).toEqual([
+      'north-tour-bus', 'south-shuttle-bus',
+      'north-cargo-stack', 'south-pipe-stack', 'west-service-skip', 'east-generator-trailer',
+    ]);
+    for (const cover of deployedState.physicalCover) {
+      expect(cover.blocksMovement).toBe(true);
+      expect(cover.blocksShots).toBe(true);
+      expect(cover.bounds.maxY! - cover.bounds.minY!).toBeGreaterThanOrEqual(2.2);
+    }
+    for (const cover of deployedState.physicalCover.filter((entry) => entry.id.includes('bus'))) {
+      expect(cover.bounds.maxY! - cover.bounds.minY!).toBeGreaterThanOrEqual(3.5);
+      expect(Math.max(cover.bounds.maxX - cover.bounds.minX, cover.bounds.maxZ - cover.bounds.minZ)).toBeGreaterThanOrEqual(10);
+    }
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        stageWindow: (index: number, distance?: number) => void;
+        equipWeapon: (weapon: string) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.stageWindow(0, 5);
+      api.equipWeapon('carbine');
+    });
+    await page.waitForTimeout(150);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().breakableWindows[0]?.broken === true, undefined, { timeout: 10_000 });
+    // The tracer pool is a separate transient draw batch whose exact lifetime is
+    // renderer-scheduling dependent. Sample the breakable-window budget after
+    // that batch drains while impact/fragment presentation may still be active.
+    await page.waitForFunction(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().activeTracers === 0, undefined, { timeout: 30_000 });
+    const activeState = await debug(page);
+    expect(activeState.breakableWindows[0]).toMatchObject({ broken: true, visible: false });
+    expect(activeState.render.blenderEnvironment.status).toBe('ready');
+    // Pass 68's quality arena is substantially denser than the original
+    // authored scene (measured ~160K active triangles; the authored arena
+    // budget contract is maximumTriangles 1.6M). The bound tracks the v68
+    // quality presentation with headroom below the declared budget.
+    expect(activeState.render.triangles).toBeLessThanOrEqual(260_000);
+    await page.waitForFunction(() => {
+      const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.activeImpactParticles === 0 && state.activeTracers === 0;
+    }, undefined, { timeout: 30_000 });
+    await page.waitForTimeout(1_100);
+    const stableState = await debug(page);
+    // Pass 64 keeps the already-compiled 2x-damage presentation resident at
+    // sub-pixel scale during active play. Its six audited mesh/sprite batches
+    // deliberately trade a tiny, bounded steady-state cost for removing the
+    // synchronized first-spawn shader/upload hitch across every client.
+    // Pass 68's denser quality arena measures ~187 calls in the settled view
+    // (declared arena budget: maximumDrawCalls 560).
+    expect(stableState.render.calls).toBeLessThanOrEqual(300);
+    // Compare the transient window-break frame with its own settled view. This
+    // isolates the bounded glass shards, pooled impact presentation and combat
+    // overlays from camera-dependent culling and the resident pickup baseline.
+    expect(activeState.render.calls - stableState.render.calls).toBeLessThanOrEqual(24);
+    expect(stableState.render.triangles).toBeLessThanOrEqual(260_000);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: 'test-results/blender-render-gameplay.png', timeout: 60_000 });
+  });
+
+  test('keeps substantial Atomic Acres collision identical in Performance and Quality', async ({ page }) => {
+    test.setTimeout(180_000);
+    const probes = [
+      { id: 'north-west-earth-bank', point: [-27, 0.7, -34] },
+      { id: 'north-east-earth-bank', point: [30, 0.7, -26] },
+      { id: 'authored-tree-trunk', point: [-31, 2, -30] },
+      { id: 'authored-terminal', point: [-18, 0.85, 10] },
+      { id: 'reclamation-tank', point: [-31, 3.05, 4] },
+      { id: 'aqua-dining-table', point: [-12, 0.62, -30.7] },
+      { id: 'aqua-kitchen', point: [-12.75, 1.15, -33.25] },
+      { id: 'coral-sofa', point: [12.7, 0.85, 25.3] },
+      { id: 'coral-kitchen', point: [5.25, 1.15, 33.25] },
+    ] as const;
+    const profiles: Array<'performance' | 'blender'> = ['performance', 'blender'];
+    const results: Array<{ collisions: boolean[]; parity: NonNullable<DebugState['interiorTelemetry']['profileAuthorityParity']> }> = [];
+    for (const profile of profiles) {
+      await pageReadyAt(page, `/?render=${profile}&signal=off`, 90_000);
+      await startSolo(page);
+      const state = await debug(page);
+      expect(state.render.profile).toBe(profile);
+      const collisions = await page.evaluate((namedProbes) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { collisionProbeAt: (x: number, y: number, z: number) => boolean } }).__ATOMIC_ACRES_DEBUG__;
+        return namedProbes.map(({ point: [x, y, z] }) => api.collisionProbeAt(x, y, z));
+      }, probes);
+      const parity = state.interiorTelemetry.profileAuthorityParity;
+      expect(parity, `${profile}: missing semantic profile-authority receipt`).not.toBeNull();
+      expect(parity).toMatchObject({ pass: true, expectedBindings: 22, passedBindings: 22, issues: [] });
+      expect(parity!.entries.filter(({ semantic }) => semantic === 'kitchen')).toHaveLength(2);
+      expect(parity!.entries.filter(({ semantic }) => semantic === 'sofa')).toHaveLength(2);
+      expect(parity!.entries.every((entry) => entry.authorityPresent
+        && entry.presentationPresent
+        && entry.presentationBoundToAuthority)).toBe(true);
+      if (profile === 'blender') {
+        expect(parity!.profile).toBe('quality');
+        expect(parity!.entries.every((entry) => entry.qualityAssetSetPresent === true
+          && entry.matchingQualityVertices >= 8)).toBe(true);
+      } else expect(parity!.profile).toBe('performance');
+      results.push({ collisions, parity: parity! });
+    }
+    expect(results[0].collisions).toEqual(results[1].collisions);
+    expect(results[0].collisions.map((blocked, index) => ({ id: probes[index].id, blocked })))
+      .toEqual(probes.map(({ id }) => ({ id, blocked: true })));
+  });
+
+  test('keeps all three Pass 27 route identities legible from representative approaches', async ({ page }) => {
+    test.setTimeout(300_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    // The cache-busted authored GLB is intentionally larger after the collision
+    // and house fixes. A shared Windows CI worker can need more than 30 seconds
+    // to decode it after the preceding Quality-profile tests.
+    await pageReadyAt(page, '/?render=blender', 90_000);
+    await startSolo(page);
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
+
+    const samples = [
+      { id: 'verdant', position: [-18, 1.7, 12, Math.PI / 2, 0] as const, zone: 'west-garden', label: 'VERDANT ARRAY' },
+      { id: 'transit', position: [5, 1.7, -24, Math.PI, 0] as const, zone: 'central-transit', label: 'CIVIC TRANSIT' },
+      { id: 'helio', position: [18, 1.7, -14, -Math.PI / 2, 0] as const, zone: 'east-service', label: 'HELIO SERVICE' },
+    ];
+
+    for (const sample of samples) {
+      await page.evaluate(({ position }) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+        api.teleportPlayer(position[0], position[1], position[2], position[3], position[4]);
+      }, sample);
+      // Zone state advances on the render/physics loop. Keep the assertion
+      // exact while allowing a starved hosted software renderer to schedule it.
+      await expect.poll(async () => (await debug(page)).arenaZone, { timeout: 30_000 }).toBe(sample.zone);
+      await expect(page.locator('#location-label')).toHaveText(sample.label);
+      const state = await debug(page);
+      expect(state.worldIdentityPresentation).toMatchObject({ routeLights: 0, routeSigns: 3, cueInstances: 0 });
+      expect(state.render.blenderEnvironment).toMatchObject({ routeLandmarks: 3, worldIdentityPass: true });
+      await page.screenshot({ path: `test-results/pass27-route-${sample.id}.png`, timeout: 60_000 });
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('menu exposes controls and accessibility settings', async ({ page }) => {
+    await pageReady(page);
+    await expect(page.locator('#solo')).toHaveText('1 BOT SKIRMISH');
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
+    await expect(page.locator('#sensitivity')).toBeVisible();
+    await expect(page.locator('#controller-sensitivity')).toBeVisible();
+    await expect(page.locator('#field-of-view')).toBeVisible();
+    await expect(page.locator('#graphics-profile')).toBeVisible();
+    await expect(page.locator('#graphics-profile')).toHaveValue('performance');
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
+    await expect(page.locator('#audio-settings')).toBeVisible();
+    await expect(page.locator('#accessibility-settings')).toBeVisible();
+    expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
+    await page.locator('#controller-sensitivity').evaluate((input) => {
+      const slider = input as HTMLInputElement;
+      slider.value = '1.45';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#audio-movement-gain').evaluate((input) => {
+      const slider = input as HTMLInputElement;
+      slider.value = '37';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.locator('#reduced-sensory-effects').check();
+    expect((await debug(page)).audio.buses.movement).toMatchObject({ configuredGain: 37, muted: false });
+    await expect(page.locator('html')).toHaveAttribute('data-reduced-sensory', 'true');
+    await expect(page.locator('#damage-flash')).toHaveCSS('--damage-flash-scale', '0.2');
+    await page.reload();
+    await pageReady(page);
+    await page.getByRole('tab', { name: 'OPTIONS' }).click();
+    await expect(page.locator('#controller-sensitivity')).toHaveValue('1.45');
+    await expect(page.locator('#audio-movement-gain')).toHaveValue('37');
+    await expect(page.locator('#reduced-sensory-effects')).toBeChecked();
+    await expect(page.locator('.controls')).toContainText('crouch');
+    await expect(page.locator('.controls')).toContainText('prone');
+    await expect(page.locator('.controls')).toContainText('knife');
+    await expect(page.locator('.controls')).toContainText('selected grenade');
+  });
+
+  test('times out an invalid room and leaves a clean retryable state', async ({ page }) => {
+    test.setTimeout(120_000);
+    await pageReady(page);
+    await page.locator('#player-name').fill('Retry QA');
+    await page.locator('#room-input').fill('missing-room-pass17');
+    await page.locator('#join').click();
+    await expect(page.locator('#network-status')).toContainText('Connection timed out', { timeout: 15_000 });
+    await expect(page.locator('#network-status')).toHaveAttribute('data-kind', 'error');
+    await expect(page.locator('#join')).toBeEnabled();
+    expect((await debug(page)).networkLifecycle).toMatchObject({
+      role: 'offline', joinDeadlineActive: false, peerPresent: false, hostConnectionPresent: false,
+    });
+  });
+
+  test('selects and persists an allowlisted field kit for deployment', async ({ page }) => {
+    test.setTimeout(120_000);
+    await pageReady(page);
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
+    const runner = page.locator('[data-kit-id="runner"]');
+    await runner.click();
+    await expect(runner).toHaveClass(/selected/);
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
+    await expect(page.locator('#selected-kit-summary')).toContainText('Circuit Runner');
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#solo')?.disabled === false);
+    await expect(page.locator('#selected-kit-summary')).toContainText('FN P90');
+    await startSolo(page);
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'smg',
+      undefined,
+      { timeout: 20_000 },
+    );
+    expect((await debug(page)).player.equippedWeapons).toEqual(['smg', 'pistol']);
+    // Pass 68 drives the menu through a lifecycle state machine (surface,
+    // pointer-lock and inert attributes). Use the debug return-to-menu
+    // transition instead of force-removing the hidden class, which leaves the
+    // menu inert and unreachable by pointer.
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { returnToMainMenu: () => void } }).__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
+    await expect(page.locator('#menu')).toBeVisible();
+    await page.getByRole('tab', { name: 'FIELD KIT' }).click();
+    await page.locator('[data-kit-id="breacher"]').click();
+    // Pass 68 applies the selected field kit immediately (applyMenuLoadoutImmediately),
+    // so the player's primary weapon changes to the breacher's scattergun right
+    // away instead of being queued for the next deployment.
+    await page.waitForFunction(
+      () => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().player.weapon === 'scattergun',
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.getByRole('tab', { name: 'DEPLOY' }).click();
+    // Pass 68 applies the field kit immediately, so the deployment manifest
+    // reports the active loadout rather than a queued next-deployment row and
+    // the queue-based redeploy control is retired.
+    await expect(page.locator('#selected-kit-summary')).toContainText('ACTIVE LOADOUT');
+    await expect(page.getByRole('button', { name: /REDEPLOY NOW/ })).toBeHidden();
+    const applied = await debug(page);
+    expect(applied.player.equippedWeapons).toEqual(['scattergun', 'pistol']);
+    expect(applied.player.weapon).toBe('scattergun');
+  });
+});
+
+test.describe('solo mechanics', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    const stateOnlySupportLadder = testInfo.title === 'loops the selected five-slot ladder at its final threshold without requiring banked rewards to be spent';
+    const simulationOnly = /routes the bot|routes the mirrored|sky missiles/.test(testInfo.title) || stateOnlySupportLadder;
+    await pageReadyAt(page, simulationOnly ? '/?render=compat&renderPaused=1' : '/?render=performance');
+    if (stateOnlySupportLadder) await startSoloForStateOnlySupportLadder(page);
+    else await startSolo(page);
+    await page.evaluate((pauseRenderer) => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void; respawn: () => void; setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.respawn();
+      if (pauseRenderer) api.setRenderPaused(true);
+    }, simulationOnly);
+  });
+
+  test('keeps a broken house pane as persistent physical major debris', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        stageWindow: (index: number, distance: number) => void;
+        equipWeapon: (weapon: string) => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(0, 4);
+      api.equipWeapon('carbine');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0]?.broken).toBe(true);
+    await expect.poll(async () => (await debug(page)).persistentWindowDebris.length).toBe(1);
+    await expect.poll(async () => (await debug(page)).persistentWindowDebris[0]?.physical).toBe(true);
+    const initial = (await debug(page)).persistentWindowDebris[0];
+    await page.waitForTimeout(1_250);
+    const settled = await debug(page);
+    expect(settled.breakableWindows[0].persistentDebrisId).toBe(initial.id);
+    expect(settled.persistentWindowDebris[0]).toMatchObject({ id: initial.id, visible: true, physical: true });
+    expect(settled.persistentWindowDebris[0].position.every(Number.isFinite)).toBe(true);
+  });
+
+  test('loads the consolidated M4A1 anchor inside its runtime primitive budget', async ({ page }) => {
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } })
+        .__ATOMIC_ACRES_DEBUG__.equipWeapon('m4a1');
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('m4a1');
+    const presentation = (await debug(page)).weaponPresentation;
+    expect(presentation).toMatchObject({
+      weapon: 'm4a1',
+      detailsReady: true,
+      modelKind: 'project-original-blender',
+      firstPersonSource: 'project-original-blender-pass65-firearm',
+      modelVisibleMeshCount: 8,
+    });
+    expect(presentation.importedModel).toMatchObject({
+      weapon: 'm4a1',
+      clips: 13,
+      meshes: 8,
+      renderPrimitives: 8,
+      triangles: 32112,
+      socketContractReady: true,
+    });
+    expect(presentation.importedModel?.muzzleForwardDot ?? -1).toBeGreaterThan(0.85);
+    expect(presentation.importedModel?.sightForwardDot ?? -1).toBeGreaterThan(0.995);
+  });
+
+  test('captures accepted arms v5 on the integrated M4 neutral, ADS and reload paths', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipWeapon: (weapon: 'm4a1') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('m4a1');
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('m4a1');
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-neutral.png', animations: 'disabled' });
+
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } })
+        .__ATOMIC_ACRES_DEBUG__.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-ads.png', animations: 'disabled' });
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setAds: (held: boolean) => void;
+        setAmmo: (weapon: 'm4a1', ammo: number, reserve: number) => void;
+        reload: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setAmmo('m4a1', 10, 60);
+      api.reload();
+    });
+    await expect.poll(async () => (await debug(page)).player.reloading).toBe(true);
+    await page.waitForTimeout(380);
+    const reloadState = await debug(page);
+    expect(reloadState.weaponPresentation.armsVisible).toBe(true);
+    expect(reloadState.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(4);
+    expect(reloadState.weaponPresentation.armMeshCount).toBeLessThanOrEqual(6);
+    expect(reloadState.weaponPresentation.importedModel).toMatchObject({
+      weapon: 'm4a1', clips: 13, socketContractReady: true,
+    });
+    await page.screenshot({ path: 'test-results/pass65-arms-v5-m4-reload.png', animations: 'disabled' });
+  });
+
+  test('sprints smoothly from the foot to the landing of both house ramps', async ({ page }) => {
+    type RampStage = { kind: 'interior' | 'exterior'; start: number[]; top: number[]; uphill: number[]; run: number };
+    for (const kind of ['interior', 'exterior'] as const) {
+      const stage = await page.evaluate((rampKind) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageHouseRamp: (value: 'interior' | 'exterior') => RampStage | null } }).__ATOMIC_ACRES_DEBUG__;
+        return api.stageHouseRamp(rampKind);
+      }, kind);
+      expect(stage, `${kind}:stage`).not.toBeNull();
+      if (!stage) throw new Error(`Unable to stage ${kind} ramp`);
+      await page.waitForTimeout(120);
+      const traversalStart = await page.evaluate(() => ({
+        frame: (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot().frameCount,
+        now: performance.now(),
+      }));
+      await page.keyboard.down('ShiftLeft');
+      await page.keyboard.down('KeyW');
+      await page.waitForFunction(
+        (target) => {
+          const snapshot = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+          const dx = snapshot.player.position[0] - target.stage.start[0];
+          const dz = snapshot.player.position[2] - target.stage.start[2];
+          const progress = dx * target.stage.uphill[0] + dz * target.stage.uphill[2];
+          return performance.now() - target.now >= 1_200
+            && snapshot.frameCount - target.frame >= 20
+            && progress >= target.stage.run + 0.35
+            && snapshot.player.position[1] > target.stage.top[1] - 0.5;
+        },
+        { ...traversalStart, stage },
+        { timeout: 20_000 },
+      );
+      await page.keyboard.up('KeyW');
+      await page.keyboard.up('ShiftLeft');
+      const state = await debug(page);
+      const completedFrames = state.frameCount - traversalStart.frame;
+      const dx = state.player.position[0] - stage.start[0];
+      const dz = state.player.position[2] - stage.start[2];
+      const progress = dx * stage.uphill[0] + dz * stage.uphill[2];
+      expect(progress, `${kind}:progress frames=${completedFrames} start=${JSON.stringify(stage.start)} end=${JSON.stringify(state.player.position)}`).toBeGreaterThanOrEqual(stage.run + 0.35);
+      expect(state.player.position[1], `${kind}:landing-height`).toBeGreaterThan(stage.top[1] - 0.5);
+    }
+  });
+
+  test('spawns one rigged low-damage combat bot and it navigates', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setBotsFrozen: (frozen: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setBotsFrozen(false));
+    const before = await debug(page);
+    expect(before.bots).toHaveLength(1);
+    expect(before.bots.every((bot) => bot.alive)).toBe(true);
+    expect(before.bots.every((bot) => bot.operatorModel !== null
+      && bot.operatorModel.source === 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative'
+      && /pass65-third-person-operator-lod[01]\.glb$/u.test(bot.operatorModel.assetUrl)
+      && bot.operatorModel.appearance === 'neon-purple'
+      && bot.operatorModel.skinnedMeshes === 9
+      && bot.operatorModel.visibleSkinnedMeshes === 9
+      && bot.operatorModel.pbrMaterials === 4
+      && bot.operatorModel.materialContract === 'opaque-embedded-pbr-depth-writing'
+      && bot.neonHaze)).toBe(true);
+    expect(new Set(before.bots.map((bot) => JSON.stringify({
+      source: bot.operatorModel?.source,
+      appearance: bot.operatorModel?.appearance,
+      skinnedMeshes: bot.operatorModel?.skinnedMeshes,
+      mergedVertexLod: bot.operatorModel?.mergedVertexLod,
+      clips: bot.operatorModel?.clips,
+    }))).size).toBe(1);
+    await page.waitForTimeout(1_200);
+    const after = await debug(page);
+    const moved = after.bots.some((bot, index) => {
+      const previous = before.bots[index].position;
+      return Math.hypot(bot.position[0] - previous[0], bot.position[2] - previous[2]) > 0.05;
+    });
+    expect(moved).toBe(true);
+    expect(after.bots.every((bot) => bot.position[0] >= -33.56 && bot.position[0] <= 33.56
+      && bot.position[2] >= -42.56 && bot.position[2] <= 42.56)).toBe(true);
+    expect(after.bots.every((bot) => Number.isInteger(bot.waypoint) && bot.waypoint >= 0 && bot.waypoint < 8
+      && Number.isFinite(bot.blockedSince))).toBe(true);
+    expect(after.bots.every((bot) => bot.presentationReady && bot.presentationWeaponSafe)).toBe(true);
+  });
+
+  test('only gun provenance progresses the vertical killstreak column', async ({ page }) => {
+    const streaks = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        damageBotWithCause: (cause: 'gun' | 'grenade' | 'melee' | 'environment' | 'killstreak') => void;
+        snapshot: () => { fieldSupport: { streak: number } };
+      } }).__ATOMIC_ACRES_DEBUG__;
+      const values: number[] = [];
+      for (const cause of ['grenade', 'melee', 'environment', 'killstreak', 'gun', 'killstreak'] as const) {
+        api.damageBotWithCause(cause);
+        values.push(api.snapshot().fieldSupport.streak);
+      }
+      return values;
+    });
+    expect(streaks).toEqual([0, 0, 0, 0, 1, 1]);
+    const supportCards = await page.locator('.support-list [data-support]').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().top));
+    expect(supportCards.slice(1).every((top, index) => top >= supportCards[index])).toBe(true);
+    await page.screenshot({ path: 'test-results/pass59-kill-provenance-support-column.png', animations: 'disabled' });
+  });
+
+  test('adds one matching hostile reinforcement on the tenth cumulative bot defeat', async ({ page }) => {
+    const initial = await debug(page);
+    const observedWeapons = new Set(initial.bots.map((bot) => bot.weapon));
+    const observedGrenades = new Set(initial.bots.map((bot) => bot.grenade));
+    expect(initial.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
+    expect(initial.botEscalation).toMatchObject({
+      deaths: 0,
+      initialBots: 1,
+      targetBots: 1,
+      activeBots: 1,
+      dormantBots: 5,
+      dormantBotsPrewarmed: true,
+      dynamicReinforcementLights: 0,
+      maximumBots: 6,
+      nextReinforcementAt: 10,
+    });
+    for (let death = 1; death <= 10; death += 1) {
+      await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
+      await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
+      await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(death === 10 ? 2 : 1);
+      const respawned = await debug(page);
+      expect(respawned.bots.every((bot) => bot.presentationWeaponSafe)).toBe(true);
+      respawned.bots.forEach((bot) => {
+        observedWeapons.add(bot.weapon);
+        observedGrenades.add(bot.grenade);
+      });
+    }
+    const escalated = await debug(page);
+    expect(escalated.botEscalation).toMatchObject({
+      deaths: 10,
+      initialBots: 1,
+      targetBots: 2,
+      activeBots: 2,
+      dormantBots: 4,
+      dormantBotsPrewarmed: true,
+      dynamicReinforcementLights: 0,
+      maximumBots: 6,
+      nextReinforcementAt: 20,
+    });
+    expect(escalated.bots).toHaveLength(2);
+    expect(escalated.bots[1]).toMatchObject({ alive: true, neonHaze: true, presentationReady: true, presentationWeaponSafe: true });
+    escalated.bots.forEach((bot) => {
+      observedWeapons.add(bot.weapon);
+      observedGrenades.add(bot.grenade);
+    });
+
+    // Starting with one bot yields twelve visible arsenal assignments through
+    // the tenth defeat (initial + ten respawns + the earned reinforcement).
+    // Exercise two more ordinary respawns so the served shuffle bag still
+    // demonstrates every canonical starting weapon without allowing host-owned
+    // timed pickups to leak into random spawn kits.
+    for (let death = 11; death <= 12; death += 1) {
+      await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damageBot: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damageBot(999));
+      await expect.poll(async () => (await debug(page)).botEscalation.deaths).toBe(death);
+      await expect.poll(async () => (await debug(page)).bots.filter((bot) => bot.alive).length, { timeout: 5_000 }).toBe(2);
+      const respawned = await debug(page);
+      respawned.bots.forEach((bot) => {
+        observedWeapons.add(bot.weapon);
+        observedGrenades.add(bot.grenade);
+      });
+    }
+    expect(observedWeapons).toEqual(new Set(BOT_STARTING_WEAPON_POOL));
+    expect(observedGrenades).toEqual(new Set(BOT_GRENADE_POOL));
+    expect(escalated.bots[1].operatorModel).toMatchObject({
+      source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
+      appearance: 'neon-purple', skinnedMeshes: 9, pbrMaterials: 4,
+    });
+  });
+
+  test('renders every distinct project-original Blender firearm through neutral, ADS and reload evidence', async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotAhead: (distance: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(5);
+    });
+    await page.waitForTimeout(150);
+    const designs = {
+      carbine: 'hk416-short-stroke-rail-v1', smg: 'p90-bullpup-top-feed-v1', lmg: 'm249-belt-fed-support-v1',
+      scattergun: 'remington870-pump-v1', sniper: 'm40a5-bolt-action-v1', railgun: 'emrg-twin-coil-capacitor-v1',
+      pistol: 'glock17-service-v1', magnum: 'desert-eagle-heavy-gas-v1', 'machine-pistol': 'glock18-ported-auto-v1',
+      'mini-uzi': 'mini-uzi-stamped-telescoping-v1', mp5: 'mp5-roller-delayed-v1', m4a1: 'm4a1-direct-impingement-v1',
+      'ak-47': 'ak47-long-stroke-laminate-v1', minigun: 'm134-six-barrel-rotary-v1', 'm14-ebr': 'm14ebr-sage-chassis-v1',
+      'slug-shotgun': 'benelli-m4-gas-slug-v1', 'flashlight-pistol': 'usp45-tactical-light-v1',
+    } as const;
+    const weapons = Object.keys(designs) as Array<keyof typeof designs>;
+    const captureViewmodel = async (path: string) => {
+      await page.evaluate(() => (
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+      try {
+        await page.screenshot({ path, animations: 'disabled', timeout: 60_000 });
+      } finally {
+        await page.evaluate(() => (
+          window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }
+        ).__ATOMIC_ACRES_DEBUG__.setRenderPaused(false));
+      }
+    };
+    const finishIds = new Set<string>();
+    for (const weapon of weapons) {
+      await page.evaluate((selected) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }).__ATOMIC_ACRES_DEBUG__.equipWeapon(selected);
+      }, weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe(weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe(weapon);
+      await expect.poll(async () => {
+        const arms = (await debug(page)).weaponPresentation.riggedArms;
+        return arms.length === 2 && arms.every((arm) => arm.weapon === weapon);
+      }).toBe(true);
+      const weaponState = (await debug(page)).weaponPresentation;
+      expect(weaponState.armsVisible, `${weapon}:armsVisible`).toBe(true);
+      expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.armMeshCount, `${weapon}:armMeshCount`).toBeLessThanOrEqual(6);
+      expect(weaponState.armMaterials, `${weapon}:opaqueArmMaterials`).toMatchObject({
+        contract: 'opaque-depth-writing', transparent: 0, nonOpaque: 0, depthWriteDisabled: 0,
+      });
+      expect(weaponState.armMaterials.total, `${weapon}:armMaterialCount`).toBeGreaterThan(0);
+      expect(weaponState.armsSource, `${weapon}:armsSource`).toBe('authored-two-chain');
+      expect(weaponState.authoredFingerBoneCount, `${weapon}:fingerBoneCount`).toBe(30);
+      expect(weaponState.authoredArmAnimation, `${weapon}:armAnimation`).toMatchObject({
+        clips: 13,
+        blendPolicy: 'finger-tracks-first-runtime-ik-last',
+        trackPolicy: 'finger-bones-only',
+      });
+      expect(weaponState.authoredArmAnimation?.runtimeTracks ?? 0, `${weapon}:runtimeFingerTracks`).toBeGreaterThan(0);
+      expect(weaponState.authoredArmAnimation?.upperChainTracksExcluded ?? 0, `${weapon}:excludedChainTracks`).toBeGreaterThan(0);
+      expect(weaponState.modelKind, `${weapon}:modelKind`).toBe('project-original-blender');
+      expect(weaponState.firstPersonSource, `${weapon}:firstPersonSource`).toBe('project-original-blender-pass65-firearm');
+      expect(weaponState.weaponModelId, `${weapon}:modelId`).toBe(designs[weapon]);
+      expect(weaponState.weaponFinishId, `${weapon}:finishId`).toBe(`${weapon}-project-original-pbr-v1`);
+      expect(weaponState.importedModel, `${weapon}:importedModel`).toMatchObject({
+        weapon, clips: 13, socketContractReady: true,
+      });
+      expect(weaponState.importedModel?.source, `${weapon}:source`).toBe(
+        `./assets/original/models/weapons/pass65-firearms/${weapon}/${weapon}-fp-lod0.glb`,
+      );
+      expect(weaponState.importedModel?.meshes, `${weapon}:runtimeMeshes`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.importedModel?.meshes, `${weapon}:runtimeMeshes`).toBeLessThanOrEqual(16);
+      expect(weaponState.importedModel?.renderPrimitives, `${weapon}:runtimeRenderPrimitives`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.importedModel?.renderPrimitives, `${weapon}:runtimeRenderPrimitives`).toBeLessThanOrEqual(16);
+      expect(weaponState.importedModel?.triangles, `${weapon}:runtimeTriangles`).toBeGreaterThanOrEqual(1_200);
+      expect(weaponState.importedModel?.triangles, `${weapon}:runtimeTriangles`).toBeLessThanOrEqual(35_000);
+      if (weapon === 'm4a1') {
+        expect(weaponState.importedModel?.triangles, 'm4a1:runtimeTriangles').toBe(32112);
+      }
+      expect(weaponState.detailsReady, `${weapon}:detailsReady`).toBe(true);
+      expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeGreaterThanOrEqual(4);
+      expect(weaponState.modelVisibleMeshCount, `${weapon}:modelVisibleMeshCount`).toBeLessThanOrEqual(16);
+      expect(weaponState.attachedWeaponBatchStats, `${weapon}:qualityPathPreservesPbrParts`).toBeNull();
+      expect(weaponState.riggedArms, `${weapon}:riggedArms`).toHaveLength(2);
+      const activeArms = weaponState.riggedArms.filter((arm) => arm.active);
+      const handgun = ['pistol', 'magnum', 'machine-pistol', 'flashlight-pistol', 'flare-gun'].includes(weapon);
+      expect(activeArms, `${weapon}:activeArmCount`).toHaveLength(handgun ? 1 : 2);
+      expect(activeArms.every((arm) => arm.finite
+        && arm.withinStableReach === true
+        && arm.authoredSegmentDirectionsPreserved === true
+        && (arm.contactError ?? Number.POSITIVE_INFINITY) <= 0.01
+        && (arm.palmOrientationError ?? Number.POSITIVE_INFINITY) <= 0.2
+        && (arm.shoulderEntryNdc?.[1] ?? Number.POSITIVE_INFINITY) <= -1.02), `${weapon}:authoredPalmAndSleeveContract`).toBe(true);
+      if (handgun) expect(weaponState.riggedArms.find((arm) => arm.side === 'left')).toMatchObject({ stowed: true, active: false });
+      expect(weaponState.sightOffset?.every(Number.isFinite), `${weapon}:sightOffset`).toBe(true);
+      finishIds.add(weaponState.weaponFinishId);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-neutral.png`);
+
+      await page.evaluate(() => (
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setAds(true));
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-ads.png`);
+
+      await page.evaluate(() => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setAds: (held: boolean) => void;
+          setReloadCaptureProgress: (progress: number | null) => void;
+        } }).__ATOMIC_ACRES_DEBUG__;
+        api.setAds(false);
+        api.setReloadCaptureProgress(0.46);
+      });
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeLessThan(0.02);
+      await captureViewmodel(`test-results/pass65-${weapon}-first-person-reload.png`);
+      await page.evaluate(() => (
+        window as unknown as { __ATOMIC_ACRES_DEBUG__: { setReloadCaptureProgress: (progress: number | null) => void } }
+      ).__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
+    }
+    expect(finishIds.size).toBe(weapons.length);
+
+    // The crossbow uses its own authored delivery pipeline, but must satisfy
+    // the same two-chain hand-contact and digit-animation contract.
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (weapon: string) => void } }
+    ).__ATOMIC_ACRES_DEBUG__.equipWeapon('explosive-crossbow'));
+    await expect.poll(async () => (await debug(page)).weaponPresentation.weapon).toBe('explosive-crossbow');
+    await expect.poll(async () => (await debug(page)).weaponPresentation.importedModel?.weapon ?? null).toBe('explosive-crossbow');
+    const crossbowState = (await debug(page)).weaponPresentation;
+    expect(crossbowState).toMatchObject({
+      armsVisible: true,
+      armsSource: 'authored-two-chain',
+      authoredFingerBoneCount: 30,
+      modelKind: 'project-original-blender',
+      firstPersonSource: 'project-original-blender-pass65-crossbow',
+      authoredArmAnimation: {
+        clips: 13,
+        blendPolicy: 'finger-tracks-first-runtime-ik-last',
+        trackPolicy: 'finger-bones-only',
+      },
+    });
+    expect(crossbowState.importedModel).toMatchObject({
+      source: './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb',
+      weapon: 'explosive-crossbow',
+      clips: 13,
+      socketContractReady: true,
+    });
+    expect(crossbowState.riggedArms).toHaveLength(2);
+    expect(crossbowState.riggedArms.every((arm) => arm.active && arm.finite
+      && arm.authoredSegmentDirectionsPreserved === true
+      && (arm.contactError ?? Number.POSITIVE_INFINITY) <= 0.01
+      && (arm.palmOrientationError ?? Number.POSITIVE_INFINITY) <= 0.2)).toBe(true);
+    await captureViewmodel('test-results/pass65-explosive-crossbow-first-person-neutral.png');
+
+    const state = await debug(page);
+    expect(state.bots[0].rootVisible).toBe(true);
+    expect(state.bots[0].visibleMeshCount).toBeGreaterThanOrEqual(9);
+    expect(state.bots[0].screenPosition).toEqual([expect.any(Number), expect.any(Number), expect.any(Number)]);
+    expect(state.bots[0].operatorModel).toMatchObject({
+      skinnedMeshes: 9, visibleSkinnedMeshes: 9, mergedVertexLod: false,
+      pbrMaterials: 4, materialContract: 'opaque-embedded-pbr-depth-writing', clips: 24, weaponChildren: 1,
+    });
+    expect(Math.abs(state.bots[0].screenPosition[0])).toBeLessThan(0.5);
+    expect(Math.abs(state.bots[0].screenPosition[1])).toBeLessThan(0.8);
+  });
+
+  test('holds one forward-facing weapon through smooth sprint, crouch and prone operator poses', async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone?: 'head' | 'body' | 'limb') => void;
+        setCaptureViewmodelHidden: (hidden: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(4);
+      api.aimAtBot('body');
+      api.setCaptureViewmodelHidden(true);
+    });
+    const staged = await debug(page);
+    const [botX, , botZ] = staged.bots[0].position;
+    const [playerX, , playerZ] = staged.player.position;
+    const towardPlayerX = playerX - botX;
+    const towardPlayerZ = playerZ - botZ;
+    const towardPlayerLength = Math.hypot(towardPlayerX, towardPlayerZ) || 1;
+    const forwardX = towardPlayerX / towardPlayerLength;
+    const forwardZ = towardPlayerZ / towardPlayerLength;
+    const diagonalX = forwardX + forwardZ * 0.85;
+    const diagonalZ = forwardZ - forwardX * 0.85;
+    const diagonalLength = Math.hypot(diagonalX, diagonalZ) || 1;
+    const cameraX = botX + diagonalX / diagonalLength * 2.35;
+    const cameraZ = botZ + diagonalZ / diagonalLength * 2.35;
+    const cameraYaw = Math.atan2(-(botX - cameraX), -(botZ - cameraZ));
+    await page.evaluate(({ x, z, yaw }) => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setCaptureCameraPose: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__.setCaptureCameraPose(x, 0.9, z, yaw, 0);
+    }, { x: cameraX, z: cameraZ, yaw: cameraYaw });
+
+    const designs = {
+      carbine: 'hk416-short-stroke-rail-v1', smg: 'p90-bullpup-top-feed-v1', lmg: 'm249-belt-fed-support-v1',
+      scattergun: 'remington870-pump-v1', sniper: 'm40a5-bolt-action-v1', railgun: 'emrg-twin-coil-capacitor-v1',
+      pistol: 'glock17-service-v1', magnum: 'desert-eagle-heavy-gas-v1', 'machine-pistol': 'glock18-ported-auto-v1',
+      'mini-uzi': 'mini-uzi-stamped-telescoping-v1', mp5: 'mp5-roller-delayed-v1', m4a1: 'm4a1-direct-impingement-v1',
+      'ak-47': 'ak47-long-stroke-laminate-v1', minigun: 'm134-six-barrel-rotary-v1', 'm14-ebr': 'm14ebr-sage-chassis-v1',
+      'slug-shotgun': 'benelli-m4-gas-slug-v1', 'flashlight-pistol': 'usp45-tactical-light-v1',
+    } as const;
+    const weapons = Object.keys(designs) as Array<keyof typeof designs>;
+    const poseWeapons = ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const;
+    const modelIds = new Set<string>();
+    const finishIds = new Set<string>();
+    for (const weapon of weapons) {
+      await page.evaluate((selected) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setBotPresentation: (stance: 'stand', speed: number, weapon: typeof selected) => void;
+        } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation('stand', 0, selected);
+      }, weapon);
+      await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.weaponMount?.modelId ?? null).toBe(designs[weapon]);
+      const operator = (await debug(page)).bots[0].operatorModel!;
+      expect.soft(operator.embeddedWeaponsSuppressed, `${weapon}:source weapon removed before export`).toBe(0);
+      expect.soft(operator.visibleEmbeddedWeapons, `${weapon}:spareWeapon`).toBe(0);
+      expect.soft(operator.weaponChildren, `${weapon}:socketChildren`).toBe(1);
+      expect.soft(operator.weaponMount, `${weapon}:mount`).toMatchObject({
+        directChild: true, finite: true, forwardCorrection: 'stable-body-mount-minus-z',
+        modelId: designs[weapon], finishId: `${weapon}-project-original-pbr-v1`,
+      });
+      expect.soft(Math.max(...operator.weaponMount.localScale), `${weapon}:third-person scale`).toBeLessThanOrEqual(0.54);
+      expect.soft(operator.armBonesPresent, `${weapon}:complete arm chains`).toBe(6);
+      expect.soft(operator.muzzleForwardDot, `${weapon}:forward`).toBeGreaterThan(0.82);
+      expect.soft(operator.supportGrip.supportError, `${weapon}:supportError ${JSON.stringify(operator.supportGrip)}`).toBeLessThanOrEqual(0.025);
+      expect.soft(operator.supportGrip, `${weapon}:supportGrip ${JSON.stringify(operator.supportGrip)}`).toMatchObject({
+        finite: true, torsoClear: true, torsoRelativeBendHint: true, bothHandsConnected: true,
+        dominantGrip: { finite: true, torsoClear: true },
+      });
+      modelIds.add(operator.weaponMount.modelId);
+      finishIds.add(operator.weaponMount.finishId);
+      await page.screenshot({ path: `test-results/pass65-operator-${weapon}.png`, animations: 'disabled' });
+    }
+    expect(modelIds.size).toBe(weapons.length);
+    expect(finishIds.size).toBe(weapons.length);
+
+    const poses = [
+      { name: 'idle', stance: 'stand' as const, speed: 0 },
+      { name: 'sprint', stance: 'stand' as const, speed: 7 },
+      { name: 'crouch', stance: 'crouch' as const, speed: 1.2 },
+      { name: 'prone', stance: 'prone' as const, speed: 0.8 },
+    ];
+    for (const pose of poses) {
+      await page.evaluate(({ stance, speed }) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          setBotPresentation: (stance: 'stand' | 'crouch' | 'prone', speed: number, weapon: 'carbine') => void;
+        } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation(stance, speed, 'carbine');
+      }, pose);
+      await page.waitForTimeout(520);
+      const operator = (await debug(page)).bots[0].operatorModel!;
+      expect.soft(operator.animationContract.stance, pose.name).toBe(pose.stance);
+      expect.soft(operator.visibleEmbeddedWeapons, pose.name).toBe(0);
+      expect.soft(operator.headBoneWorld, `${pose.name}: head bone`).not.toBeNull();
+      expect.soft(operator.hitProxyHeadWorld, `${pose.name}: head proxy`).not.toBeNull();
+      expect.soft(operator.hitProxyHeadDelta, `${pose.name}: proxy must cover the visible skull`).toBeLessThan(0.3);
+      expect.soft(operator.muzzleForwardDot, pose.name).toBeGreaterThan(0.82);
+      const gripEvidence = `${pose.name}:${JSON.stringify(operator.supportGrip)}`;
+      expect.soft(operator.supportGrip.finite, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.torsoClear, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.bothHandsConnected, gripEvidence).toBe(true);
+      expect.soft(operator.supportGrip.dominantGrip.torsoClear, gripEvidence).toBe(true);
+      if (pose.stance === 'crouch') expect.soft(operator.animationContract.crouchBlend, pose.name).toBeGreaterThan(0.98);
+      if (pose.stance === 'prone') {
+        expect.soft(operator.animationContract.proneBlend, pose.name).toBeGreaterThan(0.98);
+        expect.soft(operator.animationContract.pivotHeight, pose.name).toBeGreaterThan(0.35);
+        expect.soft(operator.animationContract.pivotHeight, pose.name).toBeLessThan(0.55);
+      }
+      await page.screenshot({ path: `test-results/refined-operator-pose-${pose.name}.png`, animations: 'disabled' });
+      for (const poseWeapon of poseWeapons) {
+        if (poseWeapon === 'carbine') continue;
+        await page.evaluate(({ stance, speed, weapon }) => {
+          (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+            setBotPresentation: (
+              stance: 'stand' | 'crouch' | 'prone', speed: number, weapon: typeof weapon,
+            ) => void;
+          } }).__ATOMIC_ACRES_DEBUG__.setBotPresentation(stance, speed, weapon);
+        }, { stance: pose.stance, speed: pose.speed, weapon: poseWeapon });
+        await page.waitForTimeout(140);
+        const weaponPose = (await debug(page)).bots[0].operatorModel!;
+        const weaponPoseEvidence = `${pose.name}/${poseWeapon}:${JSON.stringify(weaponPose.supportGrip)}`;
+        expect.soft(weaponPose.muzzleForwardDot, weaponPoseEvidence).toBeGreaterThan(0.82);
+        expect.soft(weaponPose.supportGrip, weaponPoseEvidence).toMatchObject({
+          finite: true,
+          torsoClear: true,
+          bothHandsConnected: true,
+          dominantGrip: { finite: true, torsoClear: true },
+        });
+      }
+    }
+  });
+
+  test('plays the canonical rigged death animation before a clean respawn', async ({ page }) => {
+    const dying = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        damageBot: (amount: number) => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(5);
+      api.damageBot(999);
+      return api.snapshot().bots[0];
+    });
+    expect(dying.alive).toBe(false);
+    expect(dying.rootVisible).toBe(true);
+    expect(dying.operatorModel?.activeClip).toBe('Death');
+    expect((await debug(page)).corpses).toMatchObject({ active: 1, lifetimeMs: 7_500 });
+    expect((await debug(page)).corpses.models[0]).toMatchObject({
+      source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
+      appearance: 'team',
+      skinnedMeshes: 9,
+      weaponChildren: 1,
+      activeClip: 'Death',
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 8_000 }).toBe(true);
+    const respawned = (await debug(page)).bots[0];
+    expect(respawned.rootVisible).toBe(true);
+    expect(respawned.operatorModel?.activeClip).toBe('Idle_Gun_Pointing');
+    expect((await debug(page)).corpses.active).toBe(1);
+  });
+
+  test('animates the knife on misses while keeping first-person arms visible', async ({ page }) => {
+    const melee = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        respawn: () => void;
+        setBotsFrozen: (frozen: boolean) => void;
+        melee: () => { accepted: boolean };
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.respawn();
+      const result = api.melee();
+      return { result, state: api.snapshot() };
+    });
+    expect(melee.result.accepted).toBe(true);
+    expect(melee.state.weaponPresentation.knifeVisible).toBe(true);
+    const active = melee.state;
+    expect(active.weaponPresentation.armsVisible).toBe(true);
+    expect(active.weaponPresentation.armMeshCount).toBeGreaterThanOrEqual(2);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.knifeVisible, { timeout: 3_000 }).toBe(false);
+  });
+
+  test('keeps the rigged arms and knife complete during third-person melee', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        meleeBot: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(4);
+      api.meleeBot();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible).toBe(true);
+    const operator = (await debug(page)).bots[0].operatorModel!;
+    expect(operator.armBonesPresent).toBe(6);
+    expect(operator.weaponChildren).toBe(1);
+    await page.screenshot({ path: 'test-results/player-feedback-rigged-knife.png', animations: 'disabled' });
+    await expect.poll(async () => (await debug(page)).bots[0].operatorModel?.meleeKnifeVisible, { timeout: 3_000 }).toBe(false);
+  });
+
+  test('blocks street props while keeping the upper house entrance open', async ({ page }) => {
+    const collision = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        collisionProbe: (x: number, z: number) => boolean;
+        collisionProbeAt: (x: number, y: number, z: number) => boolean;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      return {
+        bins: [[-21.4, -33], [21.4, 33], [-14.3, 12], [14.3, -12], [-28, -34], [28, 34]]
+          .map(([x, z]) => api.collisionProbe(x, z)),
+        benches: [[-15.2, -7], [15.2, 7], [-15.2, 26], [15.2, -26]]
+          .map(([x, z]) => api.collisionProbe(x, z)),
+        upperFacade: api.collisionProbeAt(-9, 6, -19.78),
+        upperInteriorClear: api.collisionProbeAt(-9, 6, -20.5),
+      };
+    });
+    expect(collision.bins.every(Boolean)).toBe(true);
+    expect(collision.benches.every(Boolean)).toBe(true);
+    expect(collision.upperFacade).toBe(false);
+    expect(collision.upperInteriorClear).toBe(false);
+  });
+
+  test('shows critical damage, clears prone sprint intent on respawn, and surfaces round stats', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        respawn: () => void;
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.respawn();
+      api.setBotsFrozen(true);
+      api.placeBotAhead(4);
+      api.aimAtBot('head');
+      api.fireOnce();
+    });
+    await expect.poll(async () => page.locator('#damage-numbers').getAttribute('data-last-critical')).toBe('true');
+    expect(Number(await page.locator('#damage-numbers').getAttribute('data-last-damage'))).toBeGreaterThan(0);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', /CRIT/);
+    await expect(page.locator('#damage-done-feed [data-damage-dealt]')).toBeVisible();
+    await expect(page.locator('#damage-done-label')).toHaveCount(0);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setStance: (stance: 'prone') => void;
+        setMovement: (forward: boolean, sprint: boolean) => void;
+        damage: (amount: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setStance('prone');
+      api.setMovement(true, true);
+      api.damage(999);
+    });
+    await expect(page.locator('#damage-taken-feed [data-damage-taken]')).toBeVisible();
+    await expect(page.locator('#damage-taken-label')).toHaveCount(0);
+    await expect.poll(async () => (await debug(page)).player.hp, { timeout: 6_000 }).toBe(100);
+    const respawned = (await debug(page)).player;
+    expect(respawned.stance).toBe('stand');
+    expect(respawned.sprinting).toBe(false);
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setMovement: (forward: boolean, sprint?: boolean) => void;
+        endMatch: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setMovement(false);
+      api.endMatch();
+    });
+    const roundStats = page.locator('.round-stats');
+    await expect(roundStats).toBeVisible();
+    await expect(roundStats).toContainText('K/D');
+    await expect(roundStats).toContainText('ACCURACY');
+    await expect(roundStats).toContainText('DAMAGE');
+    await expect(roundStats).toContainText('HEADSHOTS');
+    await page.screenshot({ path: 'test-results/player-feedback-round-stats.png', animations: 'disabled' });
+    const summaryDownloadPromise = page.waitForEvent('download');
+    await page.locator('#download-match-summary').click();
+    const summaryDownload = await summaryDownloadPromise;
+    expect(summaryDownload.suggestedFilename()).toMatch(/^atomic-acres-match-summary-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/);
+    const summaryPath = await summaryDownload.path();
+    expect(summaryPath).not.toBeNull();
+    const summary = JSON.parse(await readFile(summaryPath!, 'utf8')) as {
+      schemaVersion: number;
+      reportType: string;
+      stats: { accuracyPercent: number };
+      participants: Array<{ name: string }>;
+      damageTimeline: Array<{ timestamp: string; from: string; to: string }>;
+    };
+    expect(summary).toMatchObject({ schemaVersion: 2, reportType: 'human-readable-match-summary' });
+    expect(summary.stats.accuracyPercent).toBeGreaterThanOrEqual(0);
+    expect(summary.participants.length).toBeGreaterThan(1);
+    expect(summary.damageTimeline.length).toBeGreaterThan(0);
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#download-match-diagnostics').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^atomic-acres-match-atomic-acres-p-[a-f0-9]{8}\.json$/);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const diagnostics = JSON.parse(await readFile(downloadPath!, 'utf8')) as { schemaVersion: number; context: { role: string }; events: Array<{ eventType: string }>; damageLedger: unknown[]; finalState: { participants: unknown[] } };
+    expect(diagnostics.schemaVersion).toBe(2);
+    expect(diagnostics.context.role).toBe('offline');
+    expect(diagnostics.events.some((event) => event.eventType === 'match-end')).toBe(true);
+    expect(diagnostics.damageLedger.length).toBeGreaterThan(0);
+    expect(diagnostics.finalState.participants.length).toBeGreaterThan(1);
+    await page.locator('#match-main-menu').click();
+    await expect(page.locator('#last-match-reports')).toBeVisible();
+    await expect(page.locator('#menu-download-match-summary')).toHaveText('HUMAN SUMMARY JSON');
+    await expect(page.locator('#menu-download-match-technical')).toHaveText('TECHNICAL DEBUG JSON');
+  });
+
+  test('retreats and lifts the first-person weapon before wall or prone-floor intersection', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      // The Pass 66 Gun Range extension turned the old 12/-32.55 fixture into
+      // open floor. Face the retained west-wall collider so this continues to
+      // exercise a real forward obstruction as well as prone-floor clearance.
+      api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeGreaterThan(0.15);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setStance: (stance: 'prone') => void } })
+        .__ATOMIC_ACRES_DEBUG__.setStance('prone');
+    });
+    await expect.poll(async () => (await debug(page)).player.stance).toBe('prone');
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceLift).toBeGreaterThanOrEqual(0.13);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeGreaterThan(0.15);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw: number, pitch: number) => void } })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(0, 0.7, 0, Math.PI / 2, 0);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceRetreat).toBeCloseTo(0.09, 2);
+    await expect.poll(async () => (await debug(page)).weaponPresentation.surfaceLift).toBeGreaterThanOrEqual(0.13);
+  });
+
+  test('throws a homing Yardhawk and resolves its hunter-killer explosion', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        placeBotAhead: (distance: number) => void;
+        activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(7);
+      api.placeBotAhead(4);
+    });
+    expect((await debug(page)).fieldSupport.available).toEqual({
+      'scout-sweep': true,
+      yardhawk: true,
+      'tri-pass': true,
+      'hunter-swarm': false,
+      nuke: false,
+    });
+    const activated = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        activateSupport: (id: 'scout-sweep' | 'yardhawk' | 'tri-pass') => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.activateSupport('scout-sweep');
+      api.activateSupport('yardhawk');
+      return api.snapshot().fieldSupport;
+    });
+    expect(activated.scoutActive).toBe(true);
+    expect(activated.yardhawk.active).toBe(true);
+    expect(['thrown', 'homing']).toContain(activated.yardhawk.phase);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 12_000 }).toBe(1);
+    const exploded = (await debug(page)).fieldSupport;
+    expect(exploded.available.yardhawk).toBe(false);
+    expect(exploded.explosionProfile.source).toBe('yardhawk');
+    expect(exploded.explosionProfile.totalSyncMs).toBeLessThan(12);
+  });
+
+  test('Yardhawk collides with solid walls and cannot damage its target through cover', async ({ page }) => {
+    const staged = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { stageYardhawkWall: () => boolean };
+    }).__ATOMIC_ACRES_DEBUG__.stageYardhawkWall());
+    expect(staged).toBe(true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.yardhawkExplosions, { timeout: 5_000 }).toBe(1);
+    const state = await debug(page);
+    expect(state.bots[0].hp).toBe(100);
+    expect(state.fieldSupport.yardhawk.active).toBe(false);
+  });
+
+  test('loops the selected five-slot ladder at its final threshold without requiring banked rewards to be spent', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'scout-sweep') => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(15);
+      api.activateSupport('scout-sweep');
+    });
+    await expect.poll(
+      async () => (await debug(page)).fieldSupport.available['scout-sweep'],
+      { timeout: 2_000 },
+    ).toBe(false);
+    const firstCycle = (await debug(page)).fieldSupport;
+    expect(firstCycle.streak).toBe(15);
+    expect(firstCycle.rewardCycle).toBe(0);
+    expect(firstCycle.available['scout-sweep']).toBe(false);
+    expect(firstCycle.available.yardhawk).toBe(true);
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { earnSupport: (kills: number) => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      api.earnSupport(15);
+      api.earnSupport(3);
+    });
+    const looped = (await debug(page)).fieldSupport;
+    expect(looped.streak).toBe(33);
+    expect(looped.rewardCycle).toBe(3);
+    expect(looped.bestStreakThisMatch).toBe(33);
+    expect(looped.available['scout-sweep']).toBe(true);
+    expect(looped.availableCharges['scout-sweep']).toBe(2);
+    expect(looped.availableCharges.yardhawk).toBe(2);
+    await expect(page.locator('[data-support="scout-sweep"] .support-state')).toHaveText('READY ×2');
+  });
+
+  test('routes the bot from the interior ramp foot onto the upper floor instead of jamming', async ({ page }) => {
+    const staged = await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { stageBotAtIndoorRamp: () => boolean; setRenderPaused: (paused: boolean) => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      const result = api.stageBotAtIndoorRamp();
+      api.setRenderPaused(true);
+      return result;
+    });
+    expect(staged).toBe(true);
+    await expect.poll(async () => (await debug(page)).bots[0].position[1], { timeout: 12_000 }).toBeGreaterThan(2.5);
+    expect((await debug(page)).bots[0].blockedSince).toBe(0);
+  });
+
+  test('routes the mirrored bot down the interior ramp without abandoning traversal mid-slope', async ({ page }) => {
+    const staged = await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: { stageBotAtIndoorRamp: (team?: 0 | 1, descending?: boolean) => boolean; setRenderPaused: (paused: boolean) => void };
+      }).__ATOMIC_ACRES_DEBUG__;
+      const result = api.stageBotAtIndoorRamp(1, true);
+      api.setRenderPaused(true);
+      return result;
+    });
+    expect(staged).toBe(true);
+    expect((await debug(page)).bots[0].position[1]).toBeGreaterThan(3);
+    await expect.poll(async () => (await debug(page)).bots[0].position[1], { timeout: 15_000 }).toBeLessThan(0.15);
+  });
+
+  test('resolves three player-selected sky missiles after one second', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        setRenderPaused: (paused: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setRenderPaused(true);
+      api.earnSupport(7);
+    });
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { activateSupport: (id: 'tri-pass') => void } }).__ATOMIC_ACRES_DEBUG__.activateSupport('tri-pass'));
+    await page.waitForFunction(() => document.querySelector<HTMLElement>('#strike-map-overlay')?.hidden === false);
+    await page.evaluate(() => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setRenderPaused: (paused: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setRenderPaused(true);
+      const map = document.querySelector<HTMLCanvasElement>('#strike-map')!;
+      const rect = map.getBoundingClientRect();
+      for (const [x, y] of [[95, 100], [240, 250], [385, 360]]) {
+        map.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: rect.left + x, clientY: rect.top + y }));
+      }
+    });
+    const scheduled = (await debug(page)).fieldSupport;
+    expect(scheduled.triPassLaunches).toBe(3);
+    expect(scheduled.available).toMatchObject({
+      'scout-sweep': true,
+      yardhawk: true,
+      'tri-pass': false,
+      nuke: false,
+    });
+    await page.waitForFunction(() => document.querySelector<HTMLElement>('#strike-map-overlay')?.hidden === true);
+    await expect.poll(async () => (await debug(page)).fieldSupport.triPassImpacts, { timeout: 12_000 }).toBe(3);
+    const impacted = (await debug(page)).fieldSupport;
+    const impactDelay = impacted.triPassLastImpactDelayMs;
+    expect(impactDelay).not.toBeNull();
+    expect(impactDelay!).toBeGreaterThanOrEqual(950);
+    expect(impacted.explosionFrameProfile).toMatchObject({
+      sources: ['tri-pass', 'tri-pass', 'tri-pass'],
+      impacts: 3,
+    });
+    expect(impacted.explosionFrameProfile.totalSyncMs).toBeLessThan(30);
+  });
+
+  test('launches exactly five deterministic Hunter Swarm drones at eight eliminations', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'hunter-swarm') => void;
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotAhead: (distance: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.placeBotAhead(8);
+      api.earnSupport(8);
+      api.activateSupport('hunter-swarm');
+    });
+    const launched = (await debug(page)).fieldSupport;
+    expect(launched.hunterSwarmLaunches).toBe(5);
+    expect(launched.hunterDrones).toHaveLength(5);
+    expect(launched.available['hunter-swarm']).toBe(false);
+    await expect.poll(async () => (await debug(page)).fieldSupport.hunterSwarmImpacts, { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+    const impacted = (await debug(page)).fieldSupport;
+    expect(impacted.explosionProfile.source).toBe('hunter-swarm');
+    expect(impacted.explosionProfile.totalSyncMs).toBeLessThan(12);
+  });
+
+  test('arms and detonates the 15-elimination Nuke with a bounded warning sequence', async ({ page }) => {
+    test.setTimeout(120_000);
+    expect((await debug(page)).fieldSupport.prewarmedNuke).toEqual({ shockwaveInScene: true, prewarmed: true, dynamicLights: 0 });
+    await page.evaluate(() => {
+      const flash = document.querySelector<HTMLElement>('#nuke-flash')!;
+      document.documentElement.dataset.qaNukeFlashObserved = String(!flash.hidden);
+      const flashObserver = new MutationObserver(() => {
+        if (flash.hidden) return;
+        document.documentElement.dataset.qaNukeFlashObserved = 'true';
+        flashObserver.disconnect();
+      });
+      flashObserver.observe(flash, { attributes: true, attributeFilter: ['hidden'] });
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        earnSupport: (kills: number) => void;
+        activateSupport: (id: 'nuke') => void;
+        setBotsFrozen: (frozen: boolean) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.earnSupport(15);
+      api.activateSupport('nuke');
+    });
+    await expect(page.locator('#nuke-warning')).toBeVisible();
+    expect((await debug(page)).fieldSupport.nukeActivations).toBe(1);
+    await expect.poll(async () => (await debug(page)).fieldSupport.nukeDetonations, { timeout: 15_000 }).toBe(1);
+    const detonated = (await debug(page)).fieldSupport;
+    expect(detonated.explosionProfile.source).toBe('nuke');
+    expect(detonated.explosionProfile.totalSyncMs).toBeLessThan(12);
+    expect(detonated.explosionFrameProfile).toMatchObject({ sources: ['nuke'], impacts: 1 });
+    await expect(page.locator('html')).toHaveAttribute('data-qa-nuke-flash-observed', 'true');
+    await expect(page.locator('#nuke-warning')).toBeHidden({ timeout: 8_000 });
+  });
+
+  test('makes the strengthened Remington 870 decisive at close range', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        equipWeapon: (weapon: 'scattergun') => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'body') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.equipWeapon('scattergun');
+      api.placeBotAhead(3);
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+  });
+
+  test('sniper lethality, marksman auto sidearm, walk-over scavenging and independent F weapon pickup all hold', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        equipKit: (id: 'marksman') => void;
+        respawn: () => void;
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'body' | 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.equipKit('marksman');
+      // In-match class choices are deliberately queued until deployment.
+      // Apply that selected loadout through the normal respawn boundary before
+      // measuring weapon authority, instead of accidentally firing the prior kit.
+      api.respawn();
+      api.placeBotAhead(5);
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    // The animated centre-mass ray can reach the torso (67) or foreground arm
+    // (67 × 0.9) depending on the pinned SWAT pose. Both are valid accepted
+    // non-head zones; the explicit head sample below is the 3× one-shot gate.
+    await expect.poll(async () => (await debug(page)).bots[0].hp).toBeLessThan(100);
+    let state = await debug(page);
+    expect(state.bots[0].hp).toBeGreaterThanOrEqual(33);
+    expect(state.bots[0].hp).toBeLessThanOrEqual(40);
+    expect(state.player.primaryWeapon).toBe('sniper');
+    expect(state.player.ammo).toBe(4);
+    expect(state.weaponPresentation.weapon).toBe('sniper');
+
+    await page.waitForTimeout(1_120);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { aimAtBot: (zone: 'body') => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(1);
+
+    await expect.poll(async () => (await debug(page)).bots[0].alive, { timeout: 4_000 }).toBe(true);
+    // Respect the bot's authored post-respawn protection before proving the
+    // follow-up ADS headshot; the first life already verifies raw sniper damage.
+    await page.waitForTimeout(1_100);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(true);
+    });
+    await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        placeBotAhead: (distance: number) => void;
+        aimAtBot: (zone: 'head') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.placeBotAhead(8);
+      api.aimAtBot('head');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].alive).toBe(false);
+    await expect.poll(async () => (await debug(page)).deathDrops.length).toBe(2);
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-damage', '201');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-overkill', '101');
+    await expect(page.locator('#damage-numbers')).toHaveAttribute('data-last-label', 'CRIT 201 · +101 OVERKILL');
+
+    state = await debug(page);
+    expect(state.player.equippedWeapons).toEqual(['sniper', 'machine-pistol']);
+    await page.keyboard.press('Digit2');
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('machine-pistol');
+    const targetDrop = state.deathDrops[0];
+    const [x, y, z] = targetDrop.position;
+    await page.evaluate(([dropX, dropY, dropZ]) => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setAmmo: (weapon: 'machine-pistol', ammo: number, reserve: number) => void;
+        setGrenades: (count: number) => void;
+        teleportPlayer: (x: number, y: number, z: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAmmo('machine-pistol', 3, 0);
+      api.setGrenades(0);
+      api.teleportPlayer(dropX, dropY + 1.5, dropZ);
+    }, [x, y, z]);
+    await expect.poll(async () => (await debug(page)).player.reserve).toBeGreaterThan(0);
+    state = await debug(page);
+    expect(state.player.primaryWeapon).toBe('sniper');
+    expect(state.player.weapon).toBe('machine-pistol');
+    expect(state.player.ammo).toBe(3);
+    expect(state.player.grenades).toBe(1);
+    const scavenged = state.deathDrops.find((drop) => drop.id === targetDrop.id);
+    expect(scavenged).toMatchObject({ ammoAvailable: false, weaponAvailable: true });
+
+    // A same-weapon drop is intentionally not consumed after its ammunition
+    // was already scavenged. Equip a different primary so this assertion
+    // always exercises the independent F weapon-pickup path.
+    if (state.player.primaryWeapon === targetDrop.weapon) {
+      const replacement = targetDrop.weapon === 'carbine' ? 'smg' : 'carbine';
+      await page.evaluate((weapon) => {
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: { equipWeapon: (id: 'carbine' | 'smg') => void } })
+          .__ATOMIC_ACRES_DEBUG__.equipWeapon(weapon);
+      }, replacement);
+    }
+
+    const swappedOutPrimary = (await debug(page)).player.primaryWeapon;
+    await page.keyboard.press('KeyF');
+    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(targetDrop.weapon);
+    await expect.poll(async () => (await debug(page)).deathDrops.find((drop) => drop.id === targetDrop.id)).toMatchObject({
+      weapon: swappedOutPrimary,
+      weaponAvailable: true,
+    });
+
+    // Exact owner regression: the gun just swapped onto the ground remains an
+    // independent pickup at the player's feet, so pressing F again swaps back
+    // instead of deleting it or selecting a different nearby corpse drop.
+    await page.keyboard.press('KeyF');
+    await expect.poll(async () => (await debug(page)).player.primaryWeapon).toBe(swappedOutPrimary);
+    await expect.poll(async () => (await debug(page)).deathDrops.find((drop) => drop.id === targetDrop.id)).toMatchObject({
+      weapon: targetDrop.weapon,
+      weaponAvailable: true,
+    });
+  });
+
+  test('keeps the permanent reticle and every physical ADS sight on the authoritative centre ray', async ({ page }) => {
+    test.setTimeout(180_000);
+    const reticle = await page.evaluate(() => {
+      const crosshair = document.querySelector<HTMLElement>('#crosshair')!;
+      const rect = crosshair.getBoundingClientRect();
+      const dot = getComputedStyle(crosshair, '::after');
+      return {
+        offsetX: rect.left + rect.width / 2 - innerWidth / 2,
+        offsetY: rect.top + rect.height / 2 - innerHeight / 2,
+        dotVisible: dot.content !== 'none' && Number.parseFloat(dot.width) >= 3 && Number.parseFloat(dot.height) >= 3,
+      };
+    });
+    expect(reticle).toEqual({ offsetX: 0, offsetY: 0, dotVisible: true });
+
+    const sightSignatures = new Map<string, string>();
+    for (const weapon of ['carbine', 'smg', 'lmg', 'scattergun', 'sniper', 'pistol', 'machine-pistol'] as const) {
+      await page.evaluate((weaponId) => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+          equipWeapon: (id: typeof weaponId) => void;
+          setAds: (held: boolean) => void;
+          setMovement: (forward: boolean) => void;
+          fireOnce: () => void;
+        } }).__ATOMIC_ACRES_DEBUG__;
+        api.setAds(false);
+        api.setMovement(false);
+        api.equipWeapon(weaponId);
+        api.setAds(true);
+      }, weapon);
+      await expect.poll(async () => (await debug(page)).weaponPresentation.adsProgress).toBeGreaterThan(0.98);
+      const sightSignature = await page.locator('#crosshair').evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [
+          (node as HTMLElement).dataset.weapon,
+          (node as HTMLElement).dataset.adsMarker,
+          style.getPropertyValue('--ads-color').trim(),
+          style.getPropertyValue('--ads-ring-size').trim(),
+          style.getPropertyValue('--ads-dot-size').trim(),
+        ].join('|');
+      });
+      expect(sightSignatures.has(sightSignature), `${weapon} reused another weapon's ADS signature`).toBe(false);
+      sightSignatures.set(sightSignature, weapon);
+      await expect.poll(async () => {
+        const offset = (await debug(page)).weaponPresentation.sightOffset;
+        return offset ? Math.hypot(...offset) : Number.POSITIVE_INFINITY;
+      }).toBeLessThan(0.006);
+      if (weapon === 'sniper') await expect.poll(async () => (await debug(page)).sniperScope.active).toBe(true);
+      const settledState = await debug(page);
+      if (weapon === 'sniper') {
+        expect(settledState.sniperScope).toMatchObject({ active: true, magnification: 3, viewmodelVisible: false });
+        const angularRatio = Math.tan(settledState.sniperScope.baseFov * Math.PI / 360)
+          / Math.tan(settledState.sniperScope.cameraFov * Math.PI / 360);
+        expect(angularRatio).toBeCloseTo(3, 1);
+        const scopePicture = await page.evaluate(() => {
+          const scope = document.querySelector<HTMLElement>('#sniper-scope')!;
+          const reticle = scope.querySelector<HTMLElement>('.scope-reticle')!;
+          const rect = reticle.getBoundingClientRect();
+          return {
+            hidden: scope.hidden,
+            centreX: rect.left + rect.width / 2 - innerWidth / 2,
+            centreY: rect.top + rect.height / 2 - innerHeight / 2,
+            diameter: rect.width,
+          };
+        });
+        expect(scopePicture.hidden).toBe(false);
+        expect(Math.abs(scopePicture.centreX)).toBeLessThan(0.01);
+        expect(Math.abs(scopePicture.centreY)).toBeLessThan(0.01);
+        expect(scopePicture.diameter).toBeGreaterThan(300);
+      } else {
+        expect(settledState.sniperScope.active).toBe(false);
+        expect(settledState.sniperScope.viewmodelVisible).toBe(true);
+      }
+
+      await page.evaluate(() => {
+        const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setMovement: (forward: boolean) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+        api.setMovement(true);
+        api.fireOnce();
+      });
+      await page.waitForTimeout(90);
+      const firingOffset = (await debug(page)).weaponPresentation.sightOffset;
+      expect(firingOffset, `${weapon} sight telemetry`).not.toBeNull();
+      expect(Math.hypot(...firingOffset!), `${weapon} sight moved off the bullet ray during recoil`).toBeLessThan(0.012);
+    }
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void; setMovement: (forward: boolean) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setMovement(false);
+    });
+  });
+
+  test('broken semantic windows stop blocking player shots and grenade blasts shatter intact panes', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        stageWindow: (index: number, distance: number) => void;
+        placeBotAhead: (distance: number) => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.stageWindow(0, 3);
+      api.placeBotAhead(5);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0].broken).toBe(true);
+    await page.waitForTimeout(120);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        aimAtBot: (zone: 'body') => void;
+        fireOnce: () => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.aimAtBot('body');
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).bots[0].hp).toBeLessThan(100);
+
+    const grenadeBreaks = await page.evaluate(() => (window as unknown as {
+      __ATOMIC_ACRES_DEBUG__: { detonateGrenadeAtWindow: (index: number) => number };
+    }).__ATOMIC_ACRES_DEBUG__.detonateGrenadeAtWindow(1));
+    expect(grenadeBreaks).toBeGreaterThanOrEqual(1);
+    expect((await debug(page)).breakableWindows[1].broken).toBe(true);
+  });
+
+  test('keeps the reported west greenhouse route free of hidden wall planes', async ({ page }) => {
+    const probes = await page.evaluate(() => {
+      const probe = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        collisionProbe: (x: number, z: number) => boolean;
+      } }).__ATOMIC_ACRES_DEBUG__.collisionProbe;
+      return [
+        probe(-29, 16),
+        probe(-22, 14),
+        probe(-25.5, 19.8),
+        probe(-28, 12.2),
+        probe(-23, 12.2),
+      ];
+    });
+    expect(probes).toEqual([false, false, false, false, false]);
+  });
+
+  test('doubles the minimap, exposes heading, enlarges house flow, and breaks glass with gun and knife', async ({ page }) => {
+    let state = await debug(page);
+    expect(state.minimap.backingWidth).toBe(360);
+    expect(state.minimap.cssWidth).toBeGreaterThanOrEqual(299);
+    expect(state.houseNavigation).toHaveLength(2);
+    expect(state.houseNavigation.every((house) => house.dimensions.width === 20.2 && house.dimensions.depth === 16.4)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.rampWidth >= 2.8 && house.routeAnchors >= 9)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.indoorRampWidth >= 2.2 && house.indoorRampWidth < house.rampWidth && house.indoorRouteAnchors >= 9)).toBe(true);
+    expect(state.houseNavigation.every((house) => house.rampNames.includes('exterior-access-ramp') && house.rampNames.includes('interior-access-ramp'))).toBe(true);
+    expect(state.houseNavigation.every((house) => ['upper-floor-main', 'upper-floor-ramp-front', 'upper-floor-ramp-rear'].every((name) => house.floorSections.includes(name)))).toBe(true);
+    expect(state.houseNavigation.every((house) => !house.floorSections.includes('upper-floor-slab'))).toBe(true);
+    expect(state.breakableWindows).toHaveLength(6);
+
+    const [px, py, pz] = state.player.position;
+    await page.evaluate(([x, y, z]) => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number, yaw?: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(x, y, z, -Math.PI / 2);
+    }, [px, py, pz]);
+    await expect.poll(async () => (await debug(page)).minimap.headingDegrees).toBe(90);
+    await expect(page.locator('#map-heading')).toContainText('PLAYER UP');
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(0, 4);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[0].broken).toBe(true);
+    expect((await debug(page)).breakableWindows[0].visible).toBe(false);
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void } }).__ATOMIC_ACRES_DEBUG__.stageWindow(0, 1.1));
+    const windowZ = (await debug(page)).breakableWindows[0].position[2];
+    const standingBeforeZ = (await debug(page)).player.position[2];
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(520);
+    await page.keyboard.up('KeyW');
+    const standingAfterZ = (await debug(page)).player.position[2];
+    expect(Math.sign(standingAfterZ - windowZ)).toBe(Math.sign(standingBeforeZ - windowZ));
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void } }).__ATOMIC_ACRES_DEBUG__.stageWindow(0, 1.1));
+    const jumpBeforeZ = (await debug(page)).player.position[2];
+    await page.keyboard.down('KeyW');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(55);
+    await page.keyboard.press('KeyC');
+    await expect.poll(async () => (await debug(page)).player.crouched).toBe(true);
+    await page.waitForTimeout(2_000);
+    await page.keyboard.up('KeyW');
+    const jumpAfter = await debug(page);
+    expect(Math.sign(jumpAfter.player.position[2] - windowZ)).toBe(-Math.sign(jumpBeforeZ - windowZ));
+
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { stageWindow: (index: number, distance: number) => void; melee: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.stageWindow(1, 1.25);
+      api.melee();
+    });
+    await expect.poll(async () => (await debug(page)).breakableWindows[1].broken).toBe(true);
+  });
+
+  test('keeps Field Support below the map and collision-free at every supported HUD size', async ({ page }) => {
+    const viewports = [
+      { width: 1280, height: 720 },
+      { width: 960, height: 540 },
+      { width: 700, height: 700 },
+      { width: 390, height: 844 },
+    ];
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      const metrics = await page.evaluate(() => {
+        const visibleBox = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          return element && getComputedStyle(element).display !== 'none' ? element.getBoundingClientRect() : null;
+        };
+        const intersects = (a: DOMRect, b: DOMRect) => !(
+          a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top
+        );
+        const ammo = document.querySelector<HTMLElement>('#ammo')!;
+        const support = document.querySelector<HTMLElement>('#support-block')!;
+        const cards = [...document.querySelectorAll<HTMLElement>('[data-support]')];
+        const supportBox = support.getBoundingClientRect();
+        const minimapBox = visibleBox('#minimap')!;
+        const boxes = cards.map((card) => card.getBoundingClientRect());
+        const persistentRegions = [
+          '#matchbar', '#objective', '#network-strip', '#killfeed', '#location-label',
+          '#equipment-block', '#health-block', '#combat-stats', '#weapon-block',
+        ].map((selector) => ({ selector, box: visibleBox(selector) }))
+          .filter((entry): entry is { selector: string; box: DOMRect } => entry.box !== null && entry.box.width > 0 && entry.box.height > 0);
+        const cardOverlap = boxes.some((box, index) => boxes.slice(index + 1).some((other) => intersects(box, other)));
+        const overflow = cards.some((card) => [...card.querySelectorAll<HTMLElement>('*')].some((child) => (
+          child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1
+        )));
+        return {
+          ammoFont: Number.parseFloat(getComputedStyle(ammo).fontSize),
+          cardCount: cards.length,
+          supportWidth: supportBox.width,
+          supportHeight: supportBox.height,
+          leftGap: supportBox.left,
+          rightGap: window.innerWidth - supportBox.right,
+          minimapGap: supportBox.top - (visibleBox('#location-label')?.bottom ?? minimapBox.bottom),
+          leftAnchored: supportBox.left < window.innerWidth * 0.5,
+          verticallyStacked: boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom),
+          persistentOverlap: persistentRegions.some((region) => intersects(supportBox, region.box)),
+          overlapSelectors: persistentRegions.filter((region) => intersects(supportBox, region.box)).map((region) => region.selector),
+          cardOverlap,
+          overflow,
+        };
+      });
+      expect(metrics.ammoFont, JSON.stringify(viewport)).toBeGreaterThanOrEqual(viewport.width <= 700 ? 40 : 64);
+      expect(metrics.cardCount, JSON.stringify(viewport)).toBe(5);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeGreaterThanOrEqual(145);
+      expect(metrics.supportWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(viewport.width <= 700 ? 525 : 180);
+      expect(metrics.supportHeight, JSON.stringify(viewport)).toBeGreaterThan(viewport.width <= 700 ? 55 : 150);
+      expect(metrics.leftGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.rightGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.minimapGap, JSON.stringify(viewport)).toBeGreaterThanOrEqual(8);
+      expect(metrics.leftAnchored, JSON.stringify(viewport)).toBe(true);
+      expect(metrics.verticallyStacked, JSON.stringify(viewport)).toBe(true);
+      expect(metrics.persistentOverlap, JSON.stringify({ viewport, metrics })).toBe(false);
+      expect(metrics.cardOverlap, JSON.stringify(viewport)).toBe(false);
+      expect(metrics.overflow, JSON.stringify(viewport)).toBe(false);
+    }
+  });
+
+  test('spawns and awards the contested centre Overdrive Core for exactly 2× damage', async ({ page }) => {
+    const initialSpawnInMs = await page.evaluate(() => {
+      const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__.snapshot();
+      return state.overdrive.nextSpawnAt - performance.now();
+    });
+    expect(initialSpawnInMs).toBeGreaterThan(105_000);
+    expect(initialSpawnInMs).toBeLessThanOrEqual(120_000);
+    expect((await debug(page)).overdrive).toMatchObject({
+      available: false,
+      visible: false,
+      renderResident: true,
+      presentationPrewarmed: true,
+    });
+    const spawnAnnouncement = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setOverdrive: (mode: 'available' | 'expired') => void;
+        teleportPlayer: (x: number, y: number, z: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(12, 0.02, 0);
+      api.setOverdrive('available');
+      const announcement = document.querySelector<HTMLElement>('#power-announcement');
+      return { hidden: announcement?.hidden ?? true, text: announcement?.textContent ?? '' };
+    });
+    expect(spawnAnnouncement.hidden).toBe(false);
+    expect(spawnAnnouncement.text).toContain('2× DAMAGE ONLINE');
+    await expect.poll(async () => (await debug(page)).overdrive.visible).toBe(true);
+    expect((await debug(page)).overdrive).toMatchObject({
+      available: true, presentationPrewarmed: true, renderResident: true, worldIconVisible: true, worldIconName: 'quad-damage-world-icon', minimapSymbol: '2×',
+    });
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.teleportPlayer(0, 0.02, 0);
+    });
+    let active: DebugState['overdrive'] | null = null;
+    await expect.poll(async () => {
+      active = (await debug(page)).overdrive;
+      return active.damageMultiplier;
+    }).toBe(2);
+    expect(active).not.toBeNull();
+    const observedActive = active as unknown as {
+      available: boolean;
+      pickups: number;
+      remainingMs: number;
+    };
+    expect(observedActive.available).toBe(false);
+    expect(observedActive.pickups).toBe(1);
+    expect(observedActive.remainingMs).toBeGreaterThan(12_000);
+    expect(observedActive.remainingMs).toBeLessThanOrEqual(30_000);
+    await expect(page.locator('#overdrive-hud')).toBeVisible();
+    await expect(page.locator('#overdrive-hud')).toContainText('2× DAMAGE');
+    await expect(page.locator('#power-announcement')).toContainText('2× DAMAGE');
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setOverdrive: (mode: 'expired') => void } }).__ATOMIC_ACRES_DEBUG__.setOverdrive('expired'));
+    await expect(page.locator('#overdrive-hud')).toBeHidden();
+  });
+
+  test('reaches Hunter Swarm and Nuke through the standard gamepad support selector', async ({ page }) => {
+    await page.evaluate(() => {
+      const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+      const pad = { connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons } as unknown as Gamepad;
+      Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] });
+      (window as unknown as { __PASS31_PAD__: { buttons: Array<{ pressed: boolean; touched: boolean; value: number }> } }).__PASS31_PAD__ = { buttons };
+    });
+    const pulse = async (index: number) => {
+      await page.evaluate((button) => {
+        const target = (window as unknown as { __PASS31_PAD__: { buttons: Array<{ pressed: boolean; value: number }> } }).__PASS31_PAD__.buttons[button];
+        target.pressed = true; target.value = 1;
+      }, index);
+      await page.waitForTimeout(60);
+      await page.evaluate((button) => {
+        const target = (window as unknown as { __PASS31_PAD__: { buttons: Array<{ pressed: boolean; value: number }> } }).__PASS31_PAD__.buttons[button];
+        target.pressed = false; target.value = 0;
+      }, index);
+      await page.waitForTimeout(60);
+    };
+    await pulse(15); await pulse(15); await pulse(15);
+    expect((await debug(page)).fieldSupport.gamepadSelection).toBe('hunter-swarm');
+    await pulse(15);
+    expect((await debug(page)).fieldSupport.gamepadSelection).toBe('nuke');
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { earnSupport: (count: number) => void } }).__ATOMIC_ACRES_DEBUG__.earnSupport(15));
+    await pulse(12);
+    await expect.poll(async () => (await debug(page)).fieldSupport.nukeActivations).toBe(1);
+  });
+
+  test('keeps the doubled map responsive and bottom-left HUD cards separated at 960x540', async ({ page }) => {
+    await page.setViewportSize({ width: 960, height: 540 });
+    const metrics = await page.evaluate(() => {
+      const minimap = document.querySelector<HTMLElement>('#minimap')!.getBoundingClientRect();
+      const location = document.querySelector<HTMLElement>('#location-label')!.getBoundingClientRect();
+      const equipment = document.querySelector<HTMLElement>('#equipment-block')!.getBoundingClientRect();
+      const health = document.querySelector<HTMLElement>('#health-block')!.getBoundingClientRect();
+      return {
+        minimapWidth: minimap.width,
+        locationEquipmentGap: equipment.top - location.bottom,
+        equipmentHealthGap: health.top - equipment.bottom,
+      };
+    });
+    expect(metrics.minimapWidth).toBe(240);
+    expect(metrics.locationEquipmentGap).toBeGreaterThanOrEqual(6);
+    expect(metrics.equipmentHealthGap).toBeGreaterThanOrEqual(6);
+  });
+
+  test('opening the deployment menu neutralizes movement input', async ({ page }) => {
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { openMenu: () => void } }).__ATOMIC_ACRES_DEBUG__.openMenu());
+    await expect(page.locator('#menu')).toBeVisible();
+    const before = await debug(page);
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(450);
+    await page.keyboard.up('KeyW');
+    const after = await debug(page);
+    expect(Math.hypot(
+      after.player.position[0] - before.player.position[0],
+      after.player.position[2] - before.player.position[2],
+    )).toBeLessThan(0.02);
+  });
+
+  test('menu interruption cancels a pre-seat reload without stale action events', async ({ page }) => {
+    const interruption = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        fireOnce: () => void;
+        reload: () => void;
+        openMenu: () => void;
+        snapshot: () => DebugState;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.fireOnce();
+      api.reload();
+      const started = api.snapshot().player.reloading;
+      api.openMenu();
+      const interrupted = api.snapshot();
+      return { started, interrupted };
+    });
+    expect(interruption.started).toBe(true);
+    expect(interruption.interrupted.player.reloading).toBe(false);
+    const eventCount = interruption.interrupted.weaponActionHistory.length;
+    await page.waitForTimeout(900);
+    expect((await debug(page)).weaponActionHistory).toHaveLength(eventCount);
+  });
+
+  test('walk, sprint, crouch and prone alter the real player stance', async ({ page }) => {
+    const before = await debug(page);
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(650);
+    await page.keyboard.up('KeyW');
+    const walked = await debug(page);
+    expect(Math.hypot(walked.player.position[0] - before.player.position[0], walked.player.position[2] - before.player.position[2])).toBeGreaterThan(0.4);
+
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(160);
+    expect((await debug(page)).player.sprinting).toBe(true);
+    await page.waitForTimeout(490);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyW');
+
+    await page.keyboard.down('KeyC');
+    await page.waitForTimeout(120);
+    const crouched = await debug(page);
+    expect(crouched.player.crouched).toBe(true);
+    await page.keyboard.up('KeyC');
+
+    await page.keyboard.down('KeyS');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(180);
+    const backwardSprintAttempt = await debug(page);
+    expect(backwardSprintAttempt.player.stance).toBe('crouch');
+    expect(backwardSprintAttempt.player.sprinting).toBe(false);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyS');
+
+    await page.keyboard.press('KeyZ');
+    await page.waitForTimeout(180);
+    const prone = await debug(page);
+    expect(prone.player.stance).toBe('prone');
+    expect(prone.player.prone).toBe(true);
+    expect(prone.player.position[1]).toBeLessThan(crouched.player.position[1] - 0.45);
+
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('ShiftLeft');
+    await page.waitForTimeout(180);
+    const recovered = await debug(page);
+    expect(recovered.player.stance).toBe('stand');
+    expect(recovered.player.sprinting).toBe(true);
+    await page.keyboard.up('ShiftLeft');
+    await page.keyboard.up('KeyW');
+  });
+
+  test('fires, switches only between the class primary and issued sidearm, then reloads', async ({ page }) => {
+    const before = await debug(page);
+    expect(before.player.primaryWeapon).toBe('carbine');
+    expect(before.player.equippedWeapons).toEqual(['carbine', 'pistol']);
+    const fired = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void; snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      api.fireOnce();
+      return api.snapshot();
+    });
+    expect(fired.player.ammo).toBeLessThan(before.player.ammo);
+    expect(fired.activeImpactParticles).toBeGreaterThan(0);
+    expect(fired.activeImpactMarks).toBeGreaterThan(0);
+    expect(fired.activeImpactMarks).toBeLessThanOrEqual(32);
+    expect(fired.activeTracers).toBeLessThanOrEqual(18);
+    expect(fired.weaponPresentation.weapon).toBe('carbine');
+    expect(fired.weaponPresentation.detailsReady).toBe(true);
+    expect(fired.weaponPresentation.shotsPresented).toBe(before.weaponPresentation.shotsPresented + 1);
+    expect(fired.weaponPresentation.heat).toBeGreaterThan(0);
+    // Non-scattergun casings are admitted at the same presentation boundary as
+    // the shot. Assert that exact snapshot rather than racing a short-lived
+    // pooled mesh against a long software-rendered frame.
+    expect(fired.weaponPresentation.activeCasings).toBeGreaterThan(0);
+    expect(fired.weaponPresentation.activeCasings).toBeLessThanOrEqual(16);
+    expect(fired.weaponPresentation.activeSmoke).toBeGreaterThan(0);
+    expect(fired.weaponPresentation.activeSmoke).toBeLessThanOrEqual(8);
+
+    await page.keyboard.press('Digit2');
+    await page.waitForTimeout(450);
+    expect((await debug(page)).player.weapon).toBe('pistol');
+    expect((await debug(page)).weaponPresentation.detailsReady).toBe(true);
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { fireOnce: () => void } }).__ATOMIC_ACRES_DEBUG__.fireOnce());
+    await page.waitForTimeout(120);
+    const beforeReload = await debug(page);
+    await page.keyboard.press('KeyR');
+    await page.waitForTimeout(1_750);
+    const afterReload = await debug(page);
+    expect(afterReload.player.ammo).toBeGreaterThan(beforeReload.player.ammo);
+    expect(afterReload.player.reserve).toBeLessThan(beforeReload.player.reserve);
+    expect(afterReload.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
+
+    await page.keyboard.press('Digit3');
+    await page.waitForTimeout(250);
+    expect((await debug(page)).player.weapon).toBe('pistol');
+    await page.keyboard.press('Digit1');
+    await expect.poll(async () => (await debug(page)).player.weapon).toBe('carbine');
+  });
+
+  test('automatically completes a reload when the final round empties the magazine', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as {
+        __ATOMIC_ACRES_DEBUG__: {
+          equipWeapon: (weapon: 'carbine') => void;
+          setAmmo: (weapon: 'carbine', ammo: number, reserve: number) => void;
+          fireOnce: () => void;
+        };
+      }).__ATOMIC_ACRES_DEBUG__;
+      api.equipWeapon('carbine');
+      api.setAmmo('carbine', 1, 30);
+      api.fireOnce();
+    });
+    await expect.poll(async () => (await debug(page)).player.ammo).toBe(0);
+    await expect.poll(async () => (await debug(page)).player.reloading).toBe(true);
+    await expect.poll(async () => (await debug(page)).player.ammo, { timeout: 3_000 }).toBe(30);
+    const after = await debug(page);
+    expect(after.player.reloading).toBe(false);
+    expect(after.player.reserve).toBe(0);
+    expect(after.weaponActionHistory).toEqual(['mag-release', 'mag-out', 'mag-in', 'mag-seat', 'bolt-release']);
+  });
+
+  test('starts with one selected frag, accelerates the fuse beep, and resolves the prewarmed explosion without a hitch', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState; throwGrenade: () => void; teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__;
+      const before = api.snapshot();
+      const frames: Array<{ end: number; duration: number }> = [];
+      const longTasks: Array<{ start: number; duration: number }> = [];
+      let last = performance.now();
+      let sampling = true;
+      const tick = (now: number) => {
+        frames.push({ end: now, duration: now - last });
+        last = now;
+        if (sampling) requestAnimationFrame(tick);
+      };
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) longTasks.push({ start: entry.startTime, duration: entry.duration });
+      });
+      try { observer.observe({ type: 'longtask', buffered: false }); } catch { /* unsupported browser */ }
+      requestAnimationFrame(tick);
+      const throwAt = performance.now();
+      api.throwGrenade();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const thrown = api.snapshot();
+      await new Promise((resolve) => setTimeout(resolve, 3_250));
+      sampling = false;
+      observer.disconnect();
+      const after = api.snapshot();
+      const explosionAt = performance.now() - (after.grenadeExplosion.lastExplosionAgeMs ?? 0);
+      const baselineFrames = frames.filter((sample) => sample.end >= throwAt + 350 && sample.end <= throwAt + 1_700);
+      const baselineLongTasks = longTasks.filter((task) => task.start >= throwAt + 350 && task.start <= throwAt + 1_700);
+      const detonationFrames = frames.filter((sample) => {
+        const start = sample.end - sample.duration;
+        return start <= explosionAt + 500 && sample.end >= explosionAt - 50;
+      });
+      const detonationLongTasks = longTasks.filter((task) => task.start <= explosionAt + 500 && task.start + task.duration >= explosionAt - 50);
+      const percentile95 = (values: number[]) => {
+        if (values.length === 0) return 0;
+        const ordered = [...values].sort((a, b) => a - b);
+        return ordered[Math.min(ordered.length - 1, Math.floor((ordered.length - 1) * 0.95))];
+      };
+      return {
+        before,
+        thrown,
+        after,
+        baselineP95FrameMs: percentile95(baselineFrames.map((sample) => sample.duration)),
+        baselineP95LongTaskMs: percentile95(baselineLongTasks.map((task) => task.duration)),
+        detonationMaxFrameMs: Math.max(0, ...detonationFrames.map((sample) => sample.duration)),
+        detonationMaxLongTaskMs: Math.max(0, ...detonationLongTasks.map((task) => task.duration)),
+      };
+    });
+
+    expect(result.before.player.grenades).toBe(1);
+    expect(result.before.grenadeVisual.status).toBe('ready');
+    expect(result.before.grenadeVisual.asset).toBe('./assets/original/models/frag-grenade.glb');
+    expect(result.before.grenadeVisual.sourceMeshCount).toBeGreaterThanOrEqual(12);
+    expect(result.before.grenadeExplosion).toMatchObject({ poolCapacity: 4, dynamicLights: 0, prewarmed: true });
+    expect(result.before.audio).toMatchObject({
+      ambience: { continuousSources: 0 },
+      grenadeFuse: { beeps: 0, startMs: 1_450 },
+    });
+    expect(result.before.audio.ambience.busGain).toBeCloseTo(0.12, 5);
+    expect(result.thrown.player.grenades).toBe(0);
+    expect(result.thrown.grenades).toBe(1);
+    expect(result.thrown.grenadeVisual.active).toHaveLength(1);
+    expect(result.thrown.grenadeVisual.active[0]).toMatchObject({ name: 'frag-grenade-authored-glb', authored: true });
+    expect(result.thrown.grenadeVisual.active[0].meshes).toBeGreaterThanOrEqual(12);
+    expect(result.after.grenadeExplosion.total).toBe(1);
+    expect(result.after.grenadeExplosion.activeVisuals).toBe(0);
+    expect(result.after.grenades).toBe(0);
+    expect(result.after.audio.grenadeFuse.beeps).toBeGreaterThanOrEqual(4);
+    const hitchEvidence = `baselineFrameP95=${result.baselineP95FrameMs.toFixed(1)}ms detonationFrame=${result.detonationMaxFrameMs.toFixed(1)}ms baselineLongTaskP95=${result.baselineP95LongTaskMs.toFixed(1)}ms detonationLongTask=${result.detonationMaxLongTaskMs.toFixed(1)}ms sync=${JSON.stringify(result.after.grenadeExplosion.profile)}`;
+    expect(result.after.grenadeExplosion.profile.totalSyncMs, hitchEvidence).toBeLessThan(12);
+    expect(result.detonationMaxFrameMs - result.baselineP95FrameMs, hitchEvidence).toBeLessThan(100);
+    expect(result.detonationMaxLongTaskMs - result.baselineP95LongTaskMs, hitchEvidence).toBeLessThan(100);
+
+    const [x, y, z] = result.after.player.position;
+    const heartbeatBefore = result.after.frameCount;
+    await page.evaluate(([px, py, pz]) => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { teleportPlayer: (x: number, y: number, z: number) => void } }).__ATOMIC_ACRES_DEBUG__.teleportPlayer(px + 1, py, pz), [x, y, z]);
+    await expect.poll(async () => (await debug(page)).player.position[0]).toBeCloseTo(x + 1, 2);
+    await page.waitForTimeout(350);
+    expect((await debug(page)).frameCount).toBeGreaterThan(heartbeatBefore);
+  });
+
+  test('HUD reports match, stance, equipment and bots in roster', async ({ page }) => {
+    await expect(page.locator('#connection-pill')).toHaveText('1V1 BOT');
+    await expect(page.locator('#objective')).toContainText('FIVE MINUTES · MOST KILLS WINS');
+    await expect(page.locator('#grenades')).toHaveText('FRAG ×1');
+    await expect(page.locator('#minimap')).toBeVisible();
+    await expect(page.locator('#location-label')).toHaveText(/AQUA HABITAT|CORAL HABITAT|VERDANT ARRAY|CIVIC TRANSIT|HELIO SERVICE/);
+    await page.keyboard.down('Tab');
+    await expect(page.locator('#roster-list > div')).toHaveCount(3);
+    await page.keyboard.up('Tab');
+    await page.screenshot({ path: 'test-results/gameplay-structured-pass.png', fullPage: true });
+  });
+
+  test('ends Atomic Acres on the five-minute time limit and performs a complete rematch reset', async ({ page }) => {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setKills: (kills: number) => void; endMatch: () => void } }).__ATOMIC_ACRES_DEBUG__;
+      api.setKills(30);
+      api.endMatch();
+    });
+    const ended = await debug(page);
+    expect(ended.matchPhase).toBe('ended');
+    expect(ended.matchEndReason).toBe('time');
+    expect(ended.scores[0] + ended.scores[1]).toBeGreaterThanOrEqual(30);
+    await expect(page.locator('#banner')).toContainText('VICTORY');
+    await expect(page.locator('#rematch')).toBeVisible();
+    await page.locator('#rematch').click();
+    await expect.poll(async () => (await debug(page)).matchPhase, { timeout: 6_000 }).toBe('active');
+    expect((await debug(page)).scores).toEqual([0, 0]);
+    await expect(page.locator('#banner')).toBeHidden();
+  });
+
+  test('shows directional damage, ADS telemetry and delayed health recovery', async ({ page }) => {
+    const initialAds = await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void; snapshot: () => DebugState } }).__ATOMIC_ACRES_DEBUG__;
+      api.setAds(true);
+      return {
+        progress: api.snapshot().weaponPresentation.adsProgress,
+        crosshairAds: document.querySelector('#crosshair')?.classList.contains('ads') ?? false,
+      };
+    });
+    expect(initialAds.progress).toBeLessThan(0.9);
+    expect(initialAds.crosshairAds).toBe(false);
+    await page.waitForTimeout(150);
+    expect((await debug(page)).weaponPresentation.adsProgress).toBeGreaterThanOrEqual(0.9);
+    await expect(page.locator('#crosshair')).toHaveClass(/ads/);
+    await expect(page.locator('#crosshair i').first()).toHaveCSS('opacity', '0');
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { setAds: (held: boolean) => void } }).__ATOMIC_ACRES_DEBUG__.setAds(false));
+
+    await page.evaluate(() => (window as unknown as { __ATOMIC_ACRES_DEBUG__: { damage: (amount: number) => void } }).__ATOMIC_ACRES_DEBUG__.damage(70));
+    const damaged = await debug(page);
+    expect(damaged.player.hp).toBeLessThanOrEqual(30);
+    expect(damaged.sensory.directions).toHaveLength(1);
+    expect(damaged.sensory.directions[0]).toMatchObject({ sourceType: 'bot' });
+    await expect(page.locator('#low-health-vignette')).not.toHaveCSS('opacity', '0');
+    await page.waitForTimeout(5_700);
+    expect((await debug(page)).player.hp).toBeGreaterThan(damaged.player.hp);
+    await expect(page.locator('#low-health-vignette')).toHaveCSS('opacity', '0');
+  });
+});
+
+test('keeps Field Support visible and audible on Terminal', async ({ page }) => {
+  await pageReadyAt(page, '/?render=performance&map=terminal');
+  await startSolo(page);
+  await expect(page.locator('#support-block')).toBeVisible();
+  const result = await page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+      snapshot: () => DebugState;
+      earnSupport: (eliminations: number) => void;
+      activateSupport: (id: 'yardhawk') => void;
+    } }).__ATOMIC_ACRES_DEBUG__;
+    const before = api.snapshot();
+    api.earnSupport(5);
+    api.activateSupport('yardhawk');
+    return { before, after: api.snapshot() };
+  });
+  expect(result.after.fieldSupport.yardhawk.active).toBe(true);
+  expect(result.after.audio.support.cues).toBeGreaterThan(result.before.audio.support.cues);
+  await expect(page.locator('#killfeed')).toContainText('YARDHAWK THROWN');
+});
+
+test.describe('performance and stability', () => {
+  test('Performance keeps readable art within its smooth rendering budget', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance&signal=on');
+    await startSolo(page);
+    await page.waitForTimeout(500);
+    const state = await debug(page);
+    expect(state.render.profile).toBe('performance');
+    expect(state.render.representation).toBe('responsive');
+    expect(state.render.reducedMode).toBe(true);
+    expect(state.render.shadows).toBe(false);
+    expect(state.render.shadowMode).toBe('off');
+    expect(state.render.lighting).toMatchObject({
+      exposure: 1.02, hemisphereIntensity: 1.05, ambientIntensity: 0.32,
+      sunIntensity: 2.65, shadowBias: -0.00028, shadowNormalBias: 0.025, softShadows: false,
+      fogNear: 36, fogFar: 112,
+      routeLightIntensity: 3, streetLightIntensity: 4, interiorLightIntensity: 11,
+      routeLightCount: 3, streetLightCount: 4, interiorLightCount: 2,
+      godRayStrength: 0.08, godRayLobes: 2,
+    });
+    expect(state.worldIdentityPresentation).toEqual({
+      routeLights: 0,
+      routeSigns: 3,
+      cueInstances: 0,
+      atmosphericParticles: 0,
+      practicalLights: 0,
+      streetLights: 0,
+      interiorLights: 0,
+      fixtureInstances: 8,
+      ceilingInstances: 10,
+    });
+    expect(state.render.grass).toMatchObject({
+      pass: 30,
+      enabled: false,
+      bypassReason: 'software-renderer',
+      blades: 0,
+      submissions: 0,
+      authoritative: false,
+    });
+    expect(state.render.atmosphere).toMatchObject({
+      pass: 30,
+      enabled: false,
+      bypassReason: 'software-renderer',
+      mistCards: 0,
+      volumetricRayMarching: false,
+    });
+    expect(state.render.sky).toMatchObject({ pass: 30, cloudBands: 0, godRayStrength: 0, godRayLobes: 0, extraDraws: 0 });
+    expect(state.render.pixelRatio).toBeCloseTo(0.75, 5);
+    expect(state.render.antialias).toBe(false);
+    expect(state.render.atomicSignal).toMatchObject({
+      enabled: true,
+      fallbackReason: null,
+      textureSamples: 1,
+      targetValidated: true,
+      outputValidated: true,
+    });
+    const overlays = await page.evaluate(() => ({
+      grade: getComputedStyle(document.querySelector('#color-grade')!).display,
+      grain: getComputedStyle(document.querySelector('#film-grain')!).display,
+    }));
+    expect(overlays).toEqual({ grade: 'none', grain: 'none' });
+    const viewport = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
+    expect(state.render.drawingBuffer[0]).toBeLessThanOrEqual(Math.ceil(viewport[0] * 0.75));
+    expect(state.render.drawingBuffer[1]).toBeLessThanOrEqual(Math.ceil(viewport[1] * 0.75));
+    // Retain the draw-call ceiling. Pass 32 spends a tightly bounded 8k-triangle
+    // envelope above the old 150k cap on four recognisable Performance-profile
+    // physical-cover silhouettes instead of generic collider boxes.
+    expect(state.render.calls).toBeLessThanOrEqual(147);
+    expect(state.render.triangles).toBeLessThanOrEqual(158_000);
+    expect(state.render.staticBatchPalette).toEqual(expect.arrayContaining(['789d55', '4eaaa7', 'c66d5a']));
+    expect(state.physicalCover.slice(2).map((cover) => ({
+      id: cover.id,
+      kind: cover.performanceVisualKind,
+      meshes: cover.performanceVisualMeshes,
+    }))).toEqual([
+      { id: 'north-cargo-stack', kind: 'cargo-stack', meshes: 5 },
+      { id: 'south-pipe-stack', kind: 'pipe-stack', meshes: 5 },
+      { id: 'west-service-skip', kind: 'service-skip', meshes: 7 },
+      { id: 'east-generator-trailer', kind: 'generator-trailer', meshes: 9 },
+    ]);
+    expect(state.interiorTelemetry).toEqual({
+      houses: 2,
+      groundRooms: 4,
+      upperRooms: 4,
+      doors: 4,
+      windows: 6,
+      ramps: 4,
+      wallMaterialVariants: 6,
+      pbrMaterialFamilies: 9,
+      furnishings: 40,
+      fixtures: 0,
+      visibleCollisionProxies: 0,
+      visibleRamps: 4,
+      furnishingSets: 2,
+      furnishingSourcePieces: 40,
+      furnishingBatches: 4,
+      furnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
+      texturedFurnishingMaterialFamilies: ['dark-equipment', 'fabric', 'metal', 'timber'],
+      profileAuthorityParity: expect.objectContaining({
+        schema: 'atomic-acres/house-profile-authority-parity@1',
+        profile: 'performance',
+        expectedBindings: 22,
+        passedBindings: 22,
+        pass: true,
+        issues: [],
+      }),
+    });
+    expect(state.neighbourhoodLife).toEqual({
+      loaded: true,
+      floraInstances: 48,
+      faunaInstances: 0,
+      streetItems: 13,
+      flowerBeds: 6,
+      benches: 4,
+      bins: 6,
+      bicycles: 0,
+      genericMarkers: 0,
+    });
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await expect.poll(async () => {
+      const resized = await debug(page);
+      return resized.render.atomicSignal.width === resized.render.drawingBuffer[0]
+        && resized.render.atomicSignal.height === resized.render.drawingBuffer[1];
+    }).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('Performance hardware tier retains bounded mist, smoke and low-altitude dust', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance&mist=on');
+    await startSolo(page);
+    await page.waitForTimeout(300);
+    const atmosphere = (await debug(page)).render.atmosphere;
+    expect(atmosphere).toMatchObject({
+      pass: 30,
+      enabled: true,
+      bypassReason: null,
+      mistCards: 10,
+      smokeCards: 5,
+      dustMotes: 64,
+      triangles: 30,
+      textureSamples: 0,
+      volumetricRayMarching: false,
+      perFrameAllocations: 0,
+    });
+    expect(atmosphere.submissions).toBeLessThanOrEqual(3);
+    expect(errors).toEqual([]);
+  });
+
+  test('legacy Quality alias loads Quality Graphics', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=quality');
+    await expect(page.locator('#graphics-profile option')).toHaveCount(4);
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
+    await startSolo(page);
+    await page.waitForTimeout(1_000);
+    const state = await debug(page);
+    expect(state.render.profile).toBe('blender');
+    expect(state.render.representation).toBe('blender');
+    expect(state.render.blenderEnvironment.status).toBe('ready');
+    expect(state.render.pixelRatio).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test('Performance gameplay shows a live FPS counter in the top right', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance&signal=on');
+    await startSolo(page);
+    const fpsCounter = page.locator('#fps-counter');
+    await expect(fpsCounter).toBeVisible();
+    await expect(fpsCounter.locator('b')).toHaveText(/^\d{1,3}$/);
+    const box = await fpsCounter.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(box!.x + box!.width).toBeGreaterThan(viewport!.width - 140);
+    expect(box!.y).toBeLessThan(80);
+    const signalState = await debug(page);
+    expect(signalState.render.fpsCounter).toMatchObject({ visible: true, anchor: 'top-right' });
+    expect(signalState.render.atomicSignal).toMatchObject({ enabled: true, fallbackReason: null, textureSamples: 1 });
+    expect(signalState.render.atomicSignal.samples).toBeGreaterThan(0);
+    const cadenceStart = signalState;
+    expect(cadenceStart.render.minimapTargetHz).toBe(60);
+    await page.waitForFunction((targetFrame) => (
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
+        .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame
+    ), cadenceStart.frameCount + 12, { timeout: 15_000 });
+    const cadenceEnd = await debug(page);
+    const renderedFrames = cadenceEnd.frameCount - cadenceStart.frameCount;
+    const minimapFrames = cadenceEnd.render.minimapRenders - cadenceStart.render.minimapRenders;
+    expect(minimapFrames).toBeGreaterThanOrEqual(1);
+    expect(minimapFrames).toBeLessThanOrEqual(renderedFrames);
+    if (cadenceEnd.render.framePacing.cadenceHz > 75) expect(minimapFrames).toBeLessThan(renderedFrames);
+    expect(errors).toEqual([]);
+  });
+
+  test('camera-relative map, damage direction and respawn safety agree on left and right', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await pageReadyAt(page, '/?render=performance');
+    await startSolo(page);
+    await page.evaluate(() => {
+      const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__: {
+        setBotsFrozen: (frozen: boolean) => void;
+        placeBotRelative: (right: number, forward: number) => void;
+      } }).__ATOMIC_ACRES_DEBUG__;
+      api.setBotsFrozen(true);
+      api.placeBotRelative(7, 0);
+    });
+
+    const markerCentreX = async (): Promise<number> => page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#minimap')!;
+      const context = canvas.getContext('2d')!;
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      let weightedX = 0;
+      let pixels = 0;
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const offset = (y * canvas.width + x) * 4;
+          const r = image.data[offset];
+          const g = image.data[offset + 1];
+          const b = image.data[offset + 2];
+          const a = image.data[offset + 3];
+          if (r >= 248 && g >= 112 && g <= 124 && b >= 89 && b <= 101 && a >= 245) {
+            weightedX += x;
+            pixels += 1;
+          }
+        }
+      }
+      if (pixels < 20) throw new Error(`Expected enemy minimap marker pixels, found ${pixels}`);
+      return weightedX / pixels;
+    });
+
+    const waitForTwoFrames = async (): Promise<void> => {
+      const state = await debug(page);
+      await page.waitForFunction((targetFrame) => (
+        (window as unknown as { __ATOMIC_ACRES_DEBUG__: { snapshot: () => DebugState } })
+          .__ATOMIC_ACRES_DEBUG__.snapshot().frameCount >= targetFrame
+      ), state.frameCount + 2, { timeout: 15_000 });
+    };
+
+    await waitForTwoFrames();
+    const minimapState = await debug(page);
+    expect(minimapState.minimap.landmarks).toEqual([
+      { id: 'north-tour-bus', kind: 'bus', label: 'BUS' },
+      { id: 'south-shuttle-bus', kind: 'bus', label: 'BUS' },
+      { id: 'north-cargo-stack', kind: 'cargo-stack', label: 'CRGO' },
+      { id: 'south-pipe-stack', kind: 'pipe-stack', label: 'PIPE' },
+      { id: 'west-service-skip', kind: 'service-skip', label: 'SKIP' },
+      { id: 'east-generator-trailer', kind: 'generator-trailer', label: 'GEN' },
+    ]);
+    expect(await markerCentreX()).toBeGreaterThan(180);
+    const rightDamage = await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { showBotDamageDirection: () => number | null } }
+    ).__ATOMIC_ACRES_DEBUG__.showBotDamageDirection());
+    expect(rightDamage).toBeCloseTo(Math.PI / 2);
+    const rightCssAngle = Number.parseFloat(await page.locator('#damage-direction').evaluate((node) => (
+      node as HTMLElement
+    ).style.getPropertyValue('--damage-angle')));
+    expect(rightCssAngle).toBeGreaterThan(1);
+
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { placeBotRelative: (right: number, forward: number) => void } }
+    ).__ATOMIC_ACRES_DEBUG__.placeBotRelative(-7, 0));
+    await waitForTwoFrames();
+    expect(await markerCentreX()).toBeLessThan(180);
+    const leftDamage = await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { showBotDamageDirection: () => number | null } }
+    ).__ATOMIC_ACRES_DEBUG__.showBotDamageDirection());
+    expect(leftDamage).toBeCloseTo(-Math.PI / 2);
+
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { respawn: () => void } }
+    ).__ATOMIC_ACRES_DEBUG__.respawn());
+    const firstRespawn = (await debug(page)).spawnSelection!;
+    expect(firstRespawn.selectedVisibleThreats).toBe(firstRespawn.minimumVisibleThreats);
+    if (firstRespawn.safeTierCount > 1) expect(firstRespawn.selectedIndex).not.toBe(firstRespawn.previousIndex);
+    await page.evaluate(() => (
+      window as unknown as { __ATOMIC_ACRES_DEBUG__: { respawn: () => void } }
+    ).__ATOMIC_ACRES_DEBUG__.respawn());
+    const secondRespawn = (await debug(page)).spawnSelection!;
+    expect(secondRespawn.selectedVisibleThreats).toBe(secondRespawn.minimumVisibleThreats);
+    if (secondRespawn.safeTierCount > 1) expect(secondRespawn.selectedIndex).not.toBe(secondRespawn.previousIndex);
+    expect(errors).toEqual([]);
+  });
+});

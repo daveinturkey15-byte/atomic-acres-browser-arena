@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "assetFamilyId": "pass65-project-original-firearm-corpus-v1",
+  "runtimeForwardAxis": "-Z",
+  "sourcePolicy": "Project-original Blender geometry and procedural PBR textures; real platform names are catalog labels only; no copied commercial-game geometry, textures, logos, or extracted assets.",
+  "deliveries": [
+    { "variant": "first-person-lod0", "bucket": "firstPersonGlbs", "lod": 0, "detail": 1.0, "suffix": "fp-lod0" },
+    { "variant": "first-person-lod1", "bucket": "firstPersonGlbs", "lod": 1, "detail": 0.68, "suffix": "fp-lod1" },
+    { "variant": "world-lod0", "bucket": "worldGlbs", "lod": 0, "detail": 0.84, "suffix": "world-lod0" },
+    { "variant": "world-lod1", "bucket": "worldGlbs", "lod": 1, "detail": 0.5, "suffix": "world-lod1" },
+    { "variant": "world-lod2", "bucket": "worldGlbs", "lod": 2, "detail": 0.24, "suffix": "world-lod2" },
+    { "variant": "drop-lod0", "bucket": "dropGlbs", "lod": 0, "detail": 0.58, "suffix": "drop-lod0" }
+  ],
+  "weapons": [
+    {
+      "id": "carbine", "displayName": "HK416", "family": "assault-rifle", "designId": "hk416-short-stroke-rail-v1",
+      "length": 1.36, "width": 0.26, "height": 0.24, "receiverLength": 0.62, "barrelRadius": 0.037,
+      "primary": "34444c", "accent": "d39a3f", "polymer": "151b1e", "magazineStyle": "stanag", "stockStyle": "telescoping", "opticStyle": "holographic", "actionStyle": "bolt", "motionScale": 0.91,
+      "signatureNodes": ["hk416-piston-block", "hk416-quad-rail", "hk416-telescoping-stock"]
+    },
+    {
+      "id": "smg", "displayName": "FN P90", "family": "smg", "designId": "p90-bullpup-top-feed-v1",
+      "length": 0.92, "width": 0.34, "height": 0.27, "receiverLength": 0.7, "barrelRadius": 0.032,
+      "primary": "2d5860", "accent": "55d6cf", "polymer": "182426", "magazineStyle": "top-feed", "stockStyle": "thumbhole", "opticStyle": "ring", "actionStyle": "bolt", "motionScale": 0.78,
+      "signatureNodes": ["p90-top-magazine", "p90-thumbhole-stock", "p90-forward-grip"]
+    },
+    {
+      "id": "lmg", "displayName": "M249 SAW", "family": "lmg", "designId": "m249-belt-fed-support-v1",
+      "length": 1.72, "width": 0.34, "height": 0.3, "receiverLength": 0.78, "barrelRadius": 0.045,
+      "primary": "49563d", "accent": "bd8b46", "polymer": "1a201b", "magazineStyle": "box", "stockStyle": "fixed", "opticStyle": "aperture", "actionStyle": "bolt", "motionScale": 1.08,
+      "signatureNodes": ["m249-box-magazine", "m249-carry-handle", "m249-bipod"]
+    },
+    {
+      "id": "scattergun", "displayName": "Remington 870", "family": "shotgun", "designId": "remington870-pump-v1",
+      "length": 1.32, "width": 0.22, "height": 0.19, "receiverLength": 0.42, "barrelRadius": 0.052,
+      "primary": "39464c", "accent": "c96e4d", "polymer": "201919", "magazineStyle": "tube", "stockStyle": "fixed", "opticStyle": "bead", "actionStyle": "pump", "motionScale": 1.24,
+      "signatureNodes": ["remington870-pump", "remington870-tube-magazine", "remington870-shell-saddle"]
+    },
+    {
+      "id": "sniper", "displayName": "M40A5", "family": "marksman", "designId": "m40a5-bolt-action-v1",
+      "length": 1.58, "width": 0.25, "height": 0.24, "receiverLength": 0.63, "barrelRadius": 0.036,
+      "primary": "52604a", "accent": "72b8b1", "polymer": "1c211c", "magazineStyle": "short-box", "stockStyle": "precision", "opticStyle": "long-scope", "actionStyle": "bolt-handle", "motionScale": 1.31,
+      "signatureNodes": ["m40a5-bolt-handle", "m40a5-long-scope", "m40a5-cheek-riser"]
+    },
+    {
+      "id": "railgun", "displayName": "EMRG Railgun", "family": "marksman", "designId": "emrg-twin-coil-capacitor-v1",
+      "length": 1.78, "width": 0.42, "height": 0.31, "receiverLength": 1.0, "barrelRadius": 0.029,
+      "primary": "303c48", "accent": "38dceb", "polymer": "171f27", "magazineStyle": "capacitor", "stockStyle": "skeletal", "opticStyle": "thermal", "actionStyle": "coil", "motionScale": 1.46,
+      "signatureNodes": ["emrg-coil-left", "emrg-coil-right", "emrg-capacitor-bank", "emrg-thermal-optic"]
+    },
+    {
+      "id": "pistol", "displayName": "Glock 17", "family": "sidearm", "designId": "glock17-service-v1",
+      "length": 0.58, "width": 0.2, "height": 0.22, "receiverLength": 0.48, "barrelRadius": 0.027,
+      "primary": "343b3f", "accent": "d1b76a", "polymer": "14191b", "magazineStyle": "pistol", "stockStyle": "none", "opticStyle": "iron", "actionStyle": "slide", "motionScale": 0.72,
+      "signatureNodes": ["glock17-slide", "glock17-polymer-frame", "glock17-trigger-safety"]
+    },
+    {
+      "id": "magnum", "displayName": "Desert Eagle .50 AE", "family": "sidearm", "designId": "desert-eagle-heavy-gas-v1",
+      "length": 0.76, "width": 0.25, "height": 0.25, "receiverLength": 0.58, "barrelRadius": 0.04,
+      "primary": "6f6045", "accent": "e0b75b", "polymer": "241e18", "magazineStyle": "pistol-heavy", "stockStyle": "none", "opticStyle": "iron", "actionStyle": "slide", "motionScale": 1.18,
+      "signatureNodes": ["deagle-heavy-slide", "deagle-gas-rib", "deagle-oversized-grip"]
+    },
+    {
+      "id": "machine-pistol", "displayName": "Glock 18", "family": "sidearm", "designId": "glock18-ported-auto-v1",
+      "length": 0.62, "width": 0.21, "height": 0.23, "receiverLength": 0.5, "barrelRadius": 0.028,
+      "primary": "30383d", "accent": "e8793e", "polymer": "111719", "magazineStyle": "extended-pistol", "stockStyle": "none", "opticStyle": "iron", "actionStyle": "slide", "motionScale": 0.84,
+      "signatureNodes": ["glock18-ported-slide", "glock18-selector", "glock18-extended-magazine"]
+    },
+    {
+      "id": "mini-uzi", "displayName": "Mini Uzi", "family": "smg", "designId": "mini-uzi-stamped-telescoping-v1",
+      "length": 0.78, "width": 0.25, "height": 0.31, "receiverLength": 0.46, "barrelRadius": 0.034,
+      "primary": "354247", "accent": "c7a55e", "polymer": "161c1e", "magazineStyle": "grip-feed", "stockStyle": "wire", "opticStyle": "iron", "actionStyle": "bolt", "motionScale": 0.88,
+      "signatureNodes": ["mini-uzi-stamped-receiver", "mini-uzi-stock-rods", "mini-uzi-side-charging-handle"]
+    },
+    {
+      "id": "mp5", "displayName": "MP5", "family": "smg", "designId": "mp5-roller-delayed-v1",
+      "length": 0.94, "width": 0.23, "height": 0.24, "receiverLength": 0.58, "barrelRadius": 0.033,
+      "primary": "2f373b", "accent": "56cdb2", "polymer": "121719", "magazineStyle": "curved-smg", "stockStyle": "collapsing", "opticStyle": "diopter", "actionStyle": "bolt", "motionScale": 0.81,
+      "signatureNodes": ["mp5-tubular-receiver", "mp5-curved-magazine", "mp5-diopter-sight"]
+    },
+    {
+      "id": "m4a1", "displayName": "M4A1", "family": "assault-rifle", "designId": "m4a1-direct-impingement-v1",
+      "length": 1.32, "width": 0.25, "height": 0.24, "receiverLength": 0.61, "barrelRadius": 0.035,
+      "primary": "303a40", "accent": "c6aa6b", "polymer": "111719", "magazineStyle": "stanag", "stockStyle": "buffer", "opticStyle": "carry-rail", "actionStyle": "bolt", "motionScale": 0.94,
+      "signatureNodes": ["m4a1-delta-sight", "m4a1-stanag-magazine", "m4a1-buffer-stock"]
+    },
+    {
+      "id": "ak-47", "displayName": "AK-47", "family": "assault-rifle", "designId": "ak47-long-stroke-laminate-v1",
+      "length": 1.42, "width": 0.28, "height": 0.26, "receiverLength": 0.66, "barrelRadius": 0.039,
+      "primary": "394146", "accent": "a75d35", "polymer": "382119", "magazineStyle": "curved-rifle", "stockStyle": "laminate", "opticStyle": "tangent", "actionStyle": "bolt", "motionScale": 1.03,
+      "signatureNodes": ["ak47-gas-tube", "ak47-laminate-handguard", "ak47-curved-magazine"]
+    },
+    {
+      "id": "minigun", "displayName": "M134 Minigun", "family": "lmg", "designId": "m134-six-barrel-rotary-v1",
+      "length": 1.94, "width": 0.54, "height": 0.48, "receiverLength": 0.72, "barrelRadius": 0.027,
+      "primary": "38444b", "accent": "d7823c", "polymer": "171d21", "magazineStyle": "drum", "stockStyle": "carry-frame", "opticStyle": "reflex", "actionStyle": "rotary", "motionScale": 1.39,
+      "signatureNodes": ["m134-barrel-cluster", "m134-ammo-drum", "m134-carry-frame", "m134-drive-motor"]
+    },
+    {
+      "id": "m14-ebr", "displayName": "M14 EBR", "family": "marksman", "designId": "m14ebr-sage-chassis-v1",
+      "length": 1.55, "width": 0.29, "height": 0.25, "receiverLength": 0.74, "barrelRadius": 0.038,
+      "primary": "515c57", "accent": "75c0b6", "polymer": "1a211f", "magazineStyle": "short-box", "stockStyle": "skeletal", "opticStyle": "thermal", "actionStyle": "bolt", "motionScale": 1.12,
+      "signatureNodes": ["m14ebr-sage-chassis", "m14ebr-thermal-optic", "m14ebr-skeletal-stock"]
+    },
+    {
+      "id": "slug-shotgun", "displayName": "Benelli M4 Slug", "family": "shotgun", "designId": "benelli-m4-gas-slug-v1",
+      "length": 1.36, "width": 0.24, "height": 0.22, "receiverLength": 0.48, "barrelRadius": 0.049,
+      "primary": "3d464a", "accent": "c58a55", "polymer": "161b1d", "magazineStyle": "tube", "stockStyle": "skeleton-grip", "opticStyle": "ghost-ring", "actionStyle": "charging-handle", "motionScale": 1.29,
+      "signatureNodes": ["benelli-m4-gas-pistons", "benelli-m4-tube-magazine", "benelli-m4-shell-saddle"]
+    },
+    {
+      "id": "flashlight-pistol", "displayName": "HK USP .45 Tactical", "family": "sidearm", "designId": "usp45-tactical-light-v1",
+      "length": 0.66, "width": 0.22, "height": 0.24, "receiverLength": 0.5, "barrelRadius": 0.03,
+      "primary": "354047", "accent": "d7b26a", "polymer": "151b1e", "magazineStyle": "pistol-heavy", "stockStyle": "none", "opticStyle": "iron", "actionStyle": "slide", "motionScale": 0.97,
+      "signatureNodes": ["usp45-threaded-barrel", "usp45-underbarrel-flashlight", "usp45-paddle-control"]
+    },
+    {
+      "id": "flamethrower", "displayName": "M2 Flamethrower", "family": "launcher", "designId": "m2-pressure-wand-twin-tank-v1",
+      "length": 1.72, "width": 0.55, "height": 0.62, "receiverLength": 0.68, "barrelRadius": 0.046,
+      "primary": "4a4037", "accent": "e26f2b", "polymer": "171b1b", "magazineStyle": "twin-pressure-tank", "stockStyle": "shoulder-brace", "opticStyle": "open-iron", "actionStyle": "valve", "motionScale": 0.99,
+      "signatureNodes": ["m2-flamethrower-pressure-platform", "m2-flamethrower-twin-fuel-tanks", "m2-flamethrower-armoured-hose", "m2-flamethrower-pilot-igniter"]
+    },
+    {
+      "id": "flare-gun", "displayName": "Orion Flare Pistol", "family": "launcher", "designId": "orion-break-action-signal-v1",
+      "length": 0.78, "width": 0.24, "height": 0.34, "receiverLength": 0.45, "barrelRadius": 0.092,
+      "primary": "a93427", "accent": "f2a33b", "polymer": "241819", "magazineStyle": "single-signal-cartridge", "stockStyle": "none", "opticStyle": "open-iron", "actionStyle": "break-action", "motionScale": 0.77,
+      "signatureNodes": ["orion-flare-pistol-break-action", "orion-flare-pistol-break-barrel", "orion-flare-pistol-hinge-latch", "orion-flare-pistol-signal-cartridge"]
+    }
+  ]
+}

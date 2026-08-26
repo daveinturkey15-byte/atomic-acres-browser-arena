@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atomic Acres WebGPU Frame Pacing"
+  short_description: "Guard native WebGPU frame pacing and readbacks"
+  default_prompt: "Use $atomic-acres-webgpu-frame-pacing to verify a clean native-WebGPU Atomic Acres candidate for frame stalls and forbidden gameplay readbacks."

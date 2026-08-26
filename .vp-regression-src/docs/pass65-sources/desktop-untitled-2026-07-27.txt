@@ -1,0 +1,74 @@
+
+the video on the loading screen actually needs to be the real map we have of each level, for each level we select
+
+the UI and hud is too busy on the video for the helecoprter and the cat, make it about half the side, move the hele roters up to top of screen, move the rest of the helecropter HUD down to be about 50% of its size, and make the cat UI 50% too but properly spaced
+
+i cant collect killstreak from the crate when pressing F
+
+carpet bomber and care package should be I call it in where I am looking like my crosshair, not on a overview map pop up. make it do 3x damage og fucrrent
+
+also the carbet bomb needs bomb shells dropping and big explosion and smoke/fire noise and aniation
+
+its better that hands and arms are black bu tthey are not rigged well it looks bad from first person POV, find a smarter way
+
+piloted drone feels clunky and makes the game lag/freezes, and needs a cool UI when you fly it too if possible?
+chopper gun one is improved but has assets infront of the crosshair, sort it
+
+also the knife and stab and arm anhimations need much imrpobment
+
+smnoke grenades explode instantly no beeping noise please
+
+like I said before when you have a drone or chopper gun going, pressing F near a door/crate etc should take priority, so you can actually interact
+
+Drone swarm should always be more spread out and they individual or in small groups go off in diff directions to explore the map, double the amount of them, and they don't spawn on you, they fly in from behind you at a fast speed then slow to normal speed.
+
+exxplodable shed seems to not blow up well any more, sort that, the bulletholes etc are great though
+
+I went through all killstreaks and its not cyucling back for a second time now, its broken? I should be able to keep getting them once used all, not die before
+
+game seems to freeze/crash sometimes, needs better stability, refine the codebase to be more efficient and not break anything
+
+Semtex should stick to people and bots not just the environment, double its range and damage if its stuck to a person and it says STUCK on their screen
+
+advanced graphics menu is too dark to see and read and interact with, make it ligher like the rest of the menus
+
+re add a 3rd graphics option
+
+I want -
+Performance
+Quality
+Max
+
+I think current quality is actually max
+
+Quality should just look and feel great but still give decent FPS and not crank stuff for no good reason
+
+Max is everything cranked
+performance is everything mega low for bad pcs
+
+
+ok thanks its launched, ensure teh videos in the menu are of the actual level, and the helecopter HUD should be half the size and lower on the screen, i specced this already but its been missed somehow?  cat paws and hands should be black/grey and smaller too maybe 50% of the size and moved to the top and bottom of screen as makes sense. also this is called pass 65 and should have the notes for it in the latest releases?
+
+I selected quality but its limited me to 60fps, that should never happen, always max fps.. and when you click on performance, quality, or max, then go to custom, the custom should actually be the settings of the one you picked, so you can see what they wqhere, then if you save it, it becomes custom
+
+I think we always want any profile or player to always be on max fps, main prio lol
+
+I tried to call in care package and its saying something about pressing F rather than calling it in then letter me get int? grr
+
+shoiuyld be able to change graphics etc options anytime without it kicking you out of game. sort that
+
+game still freezes and has stability issues
+
+flight time of the crossbolt bolt shuld be 3x faster and if it sticks and says stuck, double dmg and area
+
+I am at 179 fps, I click off and back in and am stuck at 45? sort it?
+
+Sort black ops 2, its regresesd loads, so annoying, i think it was deepseeks fault, ensure you stay on glm 5.2 high aswe have a key nowevery time I change a graphic, should not kick me out of graphic menu either, let me change a few then it saves when exit or click save /exit, and save preference for each visit
+
+one of the adaptaive settings messing with my fps even thought on good pc? start at 180, drops to 60 and 90 a lot, annoying, sort it
+
+PIoloted drone needs a fix, only moves forward and back??
+
+ensure regressions like this don't exist?
+
+same issue as care package with carpet bomb, cant do anything cant call it in etc?

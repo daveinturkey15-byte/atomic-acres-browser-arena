@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "policyId": "atomic-acres-webgpu-frame-pacing-v1",
+  "activeGameplay": {
+    "nativeWebgpuCanvasReadback": "forbidden",
+    "nativeWebgpuCanvasTo2dCopy": "forbidden",
+    "periodicCanvasCapture": "forbidden"
+  },
+  "pauseBackdrop": {
+    "nativeWebgpu": "css-compositor",
+    "webgl2Compatibility": "one-pause-open-copy",
+    "maximumCopiesPerPauseOpen": 1,
+    "noCompositorFallback": "generated-no-source-pixels"
+  },
+  "evidence": {
+    "sourceIdentity": "exact-clean-git-sha-before-and-after",
+    "browser": "installed-google-chrome",
+    "backend": "native-webgpu-required-no-software-adapter",
+    "viewport": {
+      "width": 2560,
+      "height": 1440,
+      "deviceScaleFactor": 1
+    },
+    "graphics": "Quality/high",
+    "arenas": [
+      "atomic-acres",
+      "skyline-terminal"
+    ],
+    "comparison": "alternating-fresh-contexts-paired-and-aggregate",
+    "minimumWindowMs": 10000,
+    "metrics": [
+      "p50Ms",
+      "p95Ms",
+      "p99Ms",
+      "maxMs",
+      "over20Ms",
+      "over33Ms",
+      "over50Ms",
+      "over100Ms"
+    ],
+    "longTasks": "performance-observer-required-zero-steady",
+    "runtimeSignals": [
+      "queue-completion-failures",
+      "device-loss",
+      "uncaptured-errors",
+      "browser-page-request-errors"
+    ],
+    "ownerHitl": "headed-exact-sha-required-before-publish",
+    "commands": [
+      "npm run qa:pass65:frame-pacing",
+      "npm run qa:pass65:menu-lifecycle",
+      "npm run qa:multiplayer:lifecycle"
+    ]
+  }
+}

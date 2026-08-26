@@ -15,6 +15,7 @@ import {
   farcrysisTerrainHeight as terrainHeight,
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
+import { FARCRYSIS_WATERLINE_EDGE } from './farcrysis-shore-bands';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { animateWaterRippleTextures } from './farcrysis-water-ripples';
 
@@ -174,14 +175,57 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
     _foamWashRings.push(Object.freeze({ mesh, lobes, washSpeed, washOffset }));
   };
 
-  // Main foam torus: circular ring at the inner beach boundary. HF-396: the
-  // ring tracks the doubled island (edgeDist ~12 m, where the shelf meets
-  // the shore descent), not the old 20 m radius.
-  const majorR = FARCRYSIS_BOUNDS.maxX - 12;
-  const minorR = 0.38;
-  const torusGeom = new THREE.TorusGeometry(majorR, minorR, 16, 128);
-  torusGeom.rotateX(-Math.PI / 2); // lay flat in XZ plane
-  conformToShoreline(torusGeom, 0.1, 0.05);
+  // Square-shore foam path. The island's waterline is a SQUARE (constant
+  // Chebyshev edge distance, FARCRYSIS_WATERLINE_EDGE), not a circle: the
+  // old tori at radius 52 collapsed to Chebyshev 36.8 on the corner
+  // diagonals, drawing foam up to ~18 m inland of the real waterline — the
+  // ghost circle crossing the jungle interior in the round-4 top-down audit
+  // frame. Each ring is now a triangle strip between two concentric squares
+  // (an edge-distance band), densely sampled so per-vertex terrain conform
+  // and the travelling wash still vary along the run. Bands derive from the
+  // shore-band module, so they track any future island rescale.
+  const squareRingGeometry = (edgeOuter: number, edgeInner: number, samplesPerSide: number): THREE.BufferGeometry => {
+    const halfOuter = FARCRYSIS_BOUNDS.maxX - edgeOuter;
+    const halfInner = FARCRYSIS_BOUNDS.maxX - edgeInner;
+    const scale = halfInner / halfOuter;
+    // Point on a square of half-extent `half` at parameter t in [0, 1):
+    // four sides walked corner to corner, arc-length parameterised.
+    const onSquare = (half: number, t: number): [number, number] => {
+      const s = t * 4;
+      const side = Math.floor(s) % 4;
+      const a = -half + (s - Math.floor(s)) * 2 * half;
+      if (side === 0) return [a, -half];
+      if (side === 1) return [half, a];
+      if (side === 2) return [-a, half];
+      return [-half, -a];
+    };
+    const segments = samplesPerSide * 4;
+    const positions: number[] = [];
+    const indices: number[] = [];
+    for (let i = 0; i < segments; i += 1) {
+      const [ox, oz] = onSquare(halfOuter, i / segments);
+      // Inner edge sits radially inward on the same azimuth, so the strip
+      // has constant width along the run and mitered corners.
+      positions.push(ox, 0, oz, ox * scale, 0, oz * scale);
+    }
+    for (let i = 0; i < segments; i += 1) {
+      const j = (i + 1) % segments;
+      const a = i * 2;
+      const b = i * 2 + 1;
+      const c = j * 2;
+      const d = j * 2 + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setIndex(indices);
+    return geom;
+  };
+
+  // Main foam band: centred just inside the waterline, where the shelf
+  // slope meets the sea.
+  const foamGeom = squareRingGeometry(FARCRYSIS_WATERLINE_EDGE + 0.45, FARCRYSIS_WATERLINE_EDGE + 1.2, 64);
+  conformToShoreline(foamGeom, 0.1, 0.05);
 
   const foamMat = new THREE.MeshBasicMaterial({
     color: 0xf8f8ff,
@@ -190,9 +234,10 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: true,
+    side: THREE.DoubleSide,
   });
 
-  const foamRing = new THREE.Mesh(torusGeom, foamMat);
+  const foamRing = new THREE.Mesh(foamGeom, foamMat);
   foamRing.name = 'farcrysis-water-fx-foam-ring-main';
   foamRing.position.y = 0; // absolute shoreline heights are baked per-vertex
   foamRing.renderOrder = 5;
@@ -200,10 +245,9 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   attachFoamWash(foamRing, 9, 1.15, 0);
   group.add(foamRing);
 
-  // Secondary thinner ring (slightly larger, adds depth to the foam band)
-  const torusGeom2 = new THREE.TorusGeometry(majorR + 0.55, minorR * 0.6, 12, 96);
-  torusGeom2.rotateX(-Math.PI / 2);
-  conformToShoreline(torusGeom2, 0.09, 0.06);
+  // Secondary thinner band just seaward of the waterline (adds depth).
+  const foamGeom2 = squareRingGeometry(FARCRYSIS_WATERLINE_EDGE - 0.1, FARCRYSIS_WATERLINE_EDGE + 0.5, 64);
+  conformToShoreline(foamGeom2, 0.09, 0.06);
   const foamMat2 = new THREE.MeshBasicMaterial({
     color: 0xe0f4ff,
     transparent: true,
@@ -211,8 +255,9 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: true,
+    side: THREE.DoubleSide,
   });
-  const foamRing2 = new THREE.Mesh(torusGeom2, foamMat2);
+  const foamRing2 = new THREE.Mesh(foamGeom2, foamMat2);
   foamRing2.name = 'farcrysis-water-fx-foam-ring-outer';
   foamRing2.position.y = 0;
   foamRing2.renderOrder = 5;
@@ -220,10 +265,9 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   attachFoamWash(foamRing2, 11, 0.95, 2.1);
   group.add(foamRing2);
 
-  // Tertiary thin ring inside (lighter, inner foam edge)
-  const torusGeom3 = new THREE.TorusGeometry(majorR - 0.45, minorR * 0.4, 10, 80);
-  torusGeom3.rotateX(-Math.PI / 2);
-  conformToShoreline(torusGeom3, 0.11, 0.04);
+  // Tertiary thin band landward of the main foam (lighter, inner foam edge).
+  const foamGeom3 = squareRingGeometry(FARCRYSIS_WATERLINE_EDGE + 1.1, FARCRYSIS_WATERLINE_EDGE + 1.65, 64);
+  conformToShoreline(foamGeom3, 0.11, 0.04);
   const foamMat3 = new THREE.MeshBasicMaterial({
     color: 0xf0faff,
     transparent: true,
@@ -231,8 +275,9 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: true,
+    side: THREE.DoubleSide,
   });
-  const foamRing3 = new THREE.Mesh(torusGeom3, foamMat3);
+  const foamRing3 = new THREE.Mesh(foamGeom3, foamMat3);
   foamRing3.name = 'farcrysis-water-fx-foam-ring-inner';
   foamRing3.position.y = 0;
   foamRing3.renderOrder = 5;

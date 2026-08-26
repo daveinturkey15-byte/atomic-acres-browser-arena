@@ -1,0 +1,5698 @@
+{
+  "arena": "gun-range",
+  "backend": "webgpu",
+  "visibleMeshSampled": {
+    "count": 217,
+    "excluded": {
+      "cameraSubtree": 303,
+      "decorative": 6
+    }
+  },
+  "cellsTested": 96,
+  "movesTested": 379,
+  "blockedExplained": 3,
+  "reloadsSurvived": 0,
+  "findingsCount": 38,
+  "noColliderBlocksCount": 274,
+  "capturedFrames": 24,
+  "findings": [
+    {
+      "id": "gun-range-f1",
+      "cell": [
+        -16,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -16,
+        1.73,
+        12.72
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -16,
+        0.83,
+        13.47
+      ],
+      "movedM": 0.007,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f2",
+      "cell": [
+        -11.4,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 2.04,
+      "probePoint": [
+        -10.68,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f3",
+      "cell": [
+        -11.4,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -11.43,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f4",
+      "cell": [
+        -11.4,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -12.18,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f5",
+      "cell": [
+        -11.4,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -11.43,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f6",
+      "cell": [
+        -11.4,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -10.68,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f7",
+      "cell": [
+        -6.9,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -8.55
+      ],
+      "wallDistanceM": 1.32,
+      "probePoint": [
+        -7.61,
+        4.1,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f8",
+      "cell": [
+        -6.9,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 1.8,
+      "probePoint": [
+        -7.61,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f9",
+      "cell": [
+        -6.9,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -6.86,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f10",
+      "cell": [
+        -6.9,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -7.61,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f11",
+      "cell": [
+        -6.9,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -6.86,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f12",
+      "cell": [
+        -6.9,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -6.11,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f13",
+      "cell": [
+        -2.3,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 0.36,
+      "probePoint": [
+        -3.04,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f14",
+      "cell": [
+        -2.3,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -2.29,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f15",
+      "cell": [
+        -2.3,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -3.04,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f16",
+      "cell": [
+        -2.3,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -2.29,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f17",
+      "cell": [
+        -2.3,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        -1.54,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f18",
+      "cell": [
+        2.3,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 0.36,
+      "probePoint": [
+        3.04,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f19",
+      "cell": [
+        2.3,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        2.29,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f20",
+      "cell": [
+        2.3,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        1.54,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f21",
+      "cell": [
+        2.3,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        2.29,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f22",
+      "cell": [
+        2.3,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        3.04,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f23",
+      "cell": [
+        6.9,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 1.8,
+      "probePoint": [
+        7.61,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f24",
+      "cell": [
+        6.9,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        6.86,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f25",
+      "cell": [
+        6.9,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        6.11,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f26",
+      "cell": [
+        6.9,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        6.86,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f27",
+      "cell": [
+        6.9,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        7.61,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f28",
+      "cell": [
+        11.4,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 2.04,
+      "probePoint": [
+        10.68,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f29",
+      "cell": [
+        11.4,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        11.43,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f30",
+      "cell": [
+        11.4,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        10.68,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f31",
+      "cell": [
+        11.4,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        11.43,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f32",
+      "cell": [
+        11.4,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        12.18,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f33",
+      "cell": [
+        16,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 0.6,
+      "probePoint": [
+        15.25,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f34",
+      "cell": [
+        16,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        5.64
+      ],
+      "wallDistanceM": 0.84,
+      "probePoint": [
+        16.75,
+        4.1,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f35",
+      "cell": [
+        16,
+        19.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        16,
+        4.1,
+        19.07
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f36",
+      "cell": [
+        16,
+        19.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        15.25,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f37",
+      "cell": [
+        16,
+        19.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        16,
+        4.1,
+        20.57
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-f38",
+      "cell": [
+        16,
+        19.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        19.82
+      ],
+      "wallDistanceM": 0.24,
+      "probePoint": [
+        16.75,
+        4.1,
+        19.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    }
+  ],
+  "noColliderBlocks": [
+    {
+      "id": "gun-range-nc1",
+      "cell": [
+        -11.4,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc2",
+      "cell": [
+        -11.4,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc3",
+      "cell": [
+        -11.4,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc4",
+      "cell": [
+        -11.4,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc5",
+      "cell": [
+        -11.4,
+        -1.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc6",
+      "cell": [
+        -11.4,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc7",
+      "cell": [
+        -11.4,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc8",
+      "cell": [
+        -11.4,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc9",
+      "cell": [
+        -11.4,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc10",
+      "cell": [
+        -11.4,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc11",
+      "cell": [
+        -11.4,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc12",
+      "cell": [
+        -11.4,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc13",
+      "cell": [
+        -11.4,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc14",
+      "cell": [
+        -11.4,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc15",
+      "cell": [
+        -11.4,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc16",
+      "cell": [
+        -11.4,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc17",
+      "cell": [
+        -11.4,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc18",
+      "cell": [
+        -11.4,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc19",
+      "cell": [
+        -11.4,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc20",
+      "cell": [
+        -11.4,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc21",
+      "cell": [
+        -6.9,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc22",
+      "cell": [
+        -6.9,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc23",
+      "cell": [
+        -6.9,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc24",
+      "cell": [
+        -6.9,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc25",
+      "cell": [
+        -6.9,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc26",
+      "cell": [
+        -6.9,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc27",
+      "cell": [
+        -6.9,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc28",
+      "cell": [
+        -6.9,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc29",
+      "cell": [
+        -6.9,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc30",
+      "cell": [
+        -6.9,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc31",
+      "cell": [
+        -6.9,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc32",
+      "cell": [
+        -6.9,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc33",
+      "cell": [
+        -6.9,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc34",
+      "cell": [
+        -6.9,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc35",
+      "cell": [
+        -6.9,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc36",
+      "cell": [
+        -6.9,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc37",
+      "cell": [
+        -6.9,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc38",
+      "cell": [
+        -6.9,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc39",
+      "cell": [
+        -6.9,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc40",
+      "cell": [
+        -6.9,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc41",
+      "cell": [
+        -6.9,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc42",
+      "cell": [
+        -6.9,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc43",
+      "cell": [
+        -6.9,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc44",
+      "cell": [
+        -6.9,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc45",
+      "cell": [
+        -6.9,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc46",
+      "cell": [
+        -6.9,
+        -1.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc47",
+      "cell": [
+        -6.9,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc48",
+      "cell": [
+        -6.9,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc49",
+      "cell": [
+        -6.9,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc50",
+      "cell": [
+        -6.9,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc51",
+      "cell": [
+        -6.9,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc52",
+      "cell": [
+        -6.9,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc53",
+      "cell": [
+        -6.9,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc54",
+      "cell": [
+        -6.9,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc55",
+      "cell": [
+        -6.9,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc56",
+      "cell": [
+        -6.9,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc57",
+      "cell": [
+        -6.9,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc58",
+      "cell": [
+        -6.9,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc59",
+      "cell": [
+        -6.9,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc60",
+      "cell": [
+        -6.9,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc61",
+      "cell": [
+        -6.9,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc62",
+      "cell": [
+        -6.9,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc63",
+      "cell": [
+        -2.3,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc64",
+      "cell": [
+        -2.3,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc65",
+      "cell": [
+        -2.3,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc66",
+      "cell": [
+        -2.3,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc67",
+      "cell": [
+        -2.3,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc68",
+      "cell": [
+        -2.3,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc69",
+      "cell": [
+        -2.3,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc70",
+      "cell": [
+        -2.3,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc71",
+      "cell": [
+        -2.3,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc72",
+      "cell": [
+        -2.3,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc73",
+      "cell": [
+        -2.3,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc74",
+      "cell": [
+        -2.3,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc75",
+      "cell": [
+        -2.3,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc76",
+      "cell": [
+        -2.3,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc77",
+      "cell": [
+        -2.3,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc78",
+      "cell": [
+        -2.3,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc79",
+      "cell": [
+        -2.3,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc80",
+      "cell": [
+        -2.3,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc81",
+      "cell": [
+        -2.3,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc82",
+      "cell": [
+        -2.3,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc83",
+      "cell": [
+        -2.3,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc84",
+      "cell": [
+        -2.3,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc85",
+      "cell": [
+        -2.3,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc86",
+      "cell": [
+        -2.3,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc87",
+      "cell": [
+        -2.3,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc88",
+      "cell": [
+        -2.3,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc89",
+      "cell": [
+        -2.3,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc90",
+      "cell": [
+        -2.3,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc91",
+      "cell": [
+        -2.3,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc92",
+      "cell": [
+        -2.3,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc93",
+      "cell": [
+        -2.3,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc94",
+      "cell": [
+        -2.3,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc95",
+      "cell": [
+        -2.3,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc96",
+      "cell": [
+        -2.3,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc97",
+      "cell": [
+        -2.3,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc98",
+      "cell": [
+        -2.3,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc99",
+      "cell": [
+        -2.3,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc100",
+      "cell": [
+        -2.3,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc101",
+      "cell": [
+        -2.3,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        -2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc102",
+      "cell": [
+        -2.3,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        -2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc103",
+      "cell": [
+        -2.3,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        -2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc104",
+      "cell": [
+        -2.3,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        -2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc105",
+      "cell": [
+        2.3,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc106",
+      "cell": [
+        2.3,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc107",
+      "cell": [
+        2.3,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc108",
+      "cell": [
+        2.3,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc109",
+      "cell": [
+        2.3,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc110",
+      "cell": [
+        2.3,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc111",
+      "cell": [
+        2.3,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc112",
+      "cell": [
+        2.3,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc113",
+      "cell": [
+        2.3,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc114",
+      "cell": [
+        2.3,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc115",
+      "cell": [
+        2.3,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc116",
+      "cell": [
+        2.3,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc117",
+      "cell": [
+        2.3,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc118",
+      "cell": [
+        2.3,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc119",
+      "cell": [
+        2.3,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc120",
+      "cell": [
+        2.3,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc121",
+      "cell": [
+        2.3,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc122",
+      "cell": [
+        2.3,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc123",
+      "cell": [
+        2.3,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc124",
+      "cell": [
+        2.3,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc125",
+      "cell": [
+        2.3,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc126",
+      "cell": [
+        2.3,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc127",
+      "cell": [
+        2.3,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc128",
+      "cell": [
+        2.3,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc129",
+      "cell": [
+        2.3,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc130",
+      "cell": [
+        2.3,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc131",
+      "cell": [
+        2.3,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc132",
+      "cell": [
+        2.3,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc133",
+      "cell": [
+        2.3,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc134",
+      "cell": [
+        2.3,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc135",
+      "cell": [
+        2.3,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc136",
+      "cell": [
+        2.3,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc137",
+      "cell": [
+        2.3,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc138",
+      "cell": [
+        2.3,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc139",
+      "cell": [
+        2.3,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc140",
+      "cell": [
+        2.3,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc141",
+      "cell": [
+        2.3,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc142",
+      "cell": [
+        2.3,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc143",
+      "cell": [
+        2.3,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc144",
+      "cell": [
+        2.3,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc145",
+      "cell": [
+        2.3,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc146",
+      "cell": [
+        2.3,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        2.29,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc147",
+      "cell": [
+        6.9,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc148",
+      "cell": [
+        6.9,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc149",
+      "cell": [
+        6.9,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc150",
+      "cell": [
+        6.9,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc151",
+      "cell": [
+        6.9,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc152",
+      "cell": [
+        6.9,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc153",
+      "cell": [
+        6.9,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc154",
+      "cell": [
+        6.9,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc155",
+      "cell": [
+        6.9,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc156",
+      "cell": [
+        6.9,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc157",
+      "cell": [
+        6.9,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc158",
+      "cell": [
+        6.9,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc159",
+      "cell": [
+        6.9,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc160",
+      "cell": [
+        6.9,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc161",
+      "cell": [
+        6.9,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc162",
+      "cell": [
+        6.9,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc163",
+      "cell": [
+        6.9,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc164",
+      "cell": [
+        6.9,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc165",
+      "cell": [
+        6.9,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc166",
+      "cell": [
+        6.9,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc167",
+      "cell": [
+        6.9,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc168",
+      "cell": [
+        6.9,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc169",
+      "cell": [
+        6.9,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc170",
+      "cell": [
+        6.9,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc171",
+      "cell": [
+        6.9,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc172",
+      "cell": [
+        6.9,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc173",
+      "cell": [
+        6.9,
+        -1.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc174",
+      "cell": [
+        6.9,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc175",
+      "cell": [
+        6.9,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc176",
+      "cell": [
+        6.9,
+        5.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc177",
+      "cell": [
+        6.9,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc178",
+      "cell": [
+        6.9,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc179",
+      "cell": [
+        6.9,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc180",
+      "cell": [
+        6.9,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc181",
+      "cell": [
+        6.9,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc182",
+      "cell": [
+        6.9,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc183",
+      "cell": [
+        6.9,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc184",
+      "cell": [
+        6.9,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc185",
+      "cell": [
+        6.9,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc186",
+      "cell": [
+        6.9,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc187",
+      "cell": [
+        6.9,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc188",
+      "cell": [
+        6.9,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc189",
+      "cell": [
+        6.9,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        6.86,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc190",
+      "cell": [
+        11.4,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc191",
+      "cell": [
+        11.4,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc192",
+      "cell": [
+        11.4,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc193",
+      "cell": [
+        11.4,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc194",
+      "cell": [
+        11.4,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc195",
+      "cell": [
+        11.4,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc196",
+      "cell": [
+        11.4,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc197",
+      "cell": [
+        11.4,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc198",
+      "cell": [
+        11.4,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc199",
+      "cell": [
+        11.4,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc200",
+      "cell": [
+        11.4,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc201",
+      "cell": [
+        11.4,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc202",
+      "cell": [
+        11.4,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc203",
+      "cell": [
+        11.4,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc204",
+      "cell": [
+        11.4,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc205",
+      "cell": [
+        11.4,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc206",
+      "cell": [
+        11.4,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc207",
+      "cell": [
+        11.4,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc208",
+      "cell": [
+        11.4,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc209",
+      "cell": [
+        11.4,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc210",
+      "cell": [
+        11.4,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc211",
+      "cell": [
+        11.4,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc212",
+      "cell": [
+        11.4,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc213",
+      "cell": [
+        11.4,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc214",
+      "cell": [
+        11.4,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc215",
+      "cell": [
+        11.4,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc216",
+      "cell": [
+        11.4,
+        -1.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc217",
+      "cell": [
+        11.4,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc218",
+      "cell": [
+        11.4,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc219",
+      "cell": [
+        11.4,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc220",
+      "cell": [
+        11.4,
+        5.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc221",
+      "cell": [
+        11.4,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc222",
+      "cell": [
+        11.4,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc223",
+      "cell": [
+        11.4,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc224",
+      "cell": [
+        11.4,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc225",
+      "cell": [
+        11.4,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc226",
+      "cell": [
+        11.4,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc227",
+      "cell": [
+        11.4,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc228",
+      "cell": [
+        11.4,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc229",
+      "cell": [
+        11.4,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc230",
+      "cell": [
+        11.4,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc231",
+      "cell": [
+        11.4,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc232",
+      "cell": [
+        11.4,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        11.43,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc233",
+      "cell": [
+        16,
+        -44
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc234",
+      "cell": [
+        16,
+        -44
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc235",
+      "cell": [
+        16,
+        -44
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc236",
+      "cell": [
+        16,
+        -44
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -44
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc237",
+      "cell": [
+        16,
+        -36.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc238",
+      "cell": [
+        16,
+        -36.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc239",
+      "cell": [
+        16,
+        -36.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc240",
+      "cell": [
+        16,
+        -36.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -36.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc241",
+      "cell": [
+        16,
+        -29.8
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc242",
+      "cell": [
+        16,
+        -29.8
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc243",
+      "cell": [
+        16,
+        -29.8
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc244",
+      "cell": [
+        16,
+        -29.8
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -29.82
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc245",
+      "cell": [
+        16,
+        -22.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc246",
+      "cell": [
+        16,
+        -22.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc247",
+      "cell": [
+        16,
+        -22.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc248",
+      "cell": [
+        16,
+        -22.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -22.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc249",
+      "cell": [
+        16,
+        -15.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc250",
+      "cell": [
+        16,
+        -15.6
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc251",
+      "cell": [
+        16,
+        -15.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc252",
+      "cell": [
+        16,
+        -15.6
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -15.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc253",
+      "cell": [
+        16,
+        -8.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc254",
+      "cell": [
+        16,
+        -8.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc255",
+      "cell": [
+        16,
+        -8.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc256",
+      "cell": [
+        16,
+        -8.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -8.55
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc257",
+      "cell": [
+        16,
+        -1.5
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc258",
+      "cell": [
+        16,
+        -1.5
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc259",
+      "cell": [
+        16,
+        -1.5
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc260",
+      "cell": [
+        16,
+        -1.5
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        -1.45
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc261",
+      "cell": [
+        16,
+        5.6
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc262",
+      "cell": [
+        16,
+        5.6
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        5.64
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc263",
+      "cell": [
+        16,
+        12.7
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc264",
+      "cell": [
+        16,
+        12.7
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc265",
+      "cell": [
+        16,
+        12.7
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc266",
+      "cell": [
+        16,
+        12.7
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        12.73
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": {
+        "name": "(unnamed)",
+        "gapM": 0
+      }
+    },
+    {
+      "id": "gun-range-nc267",
+      "cell": [
+        16,
+        26.9
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc268",
+      "cell": [
+        16,
+        26.9
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc269",
+      "cell": [
+        16,
+        26.9
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc270",
+      "cell": [
+        16,
+        26.9
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        26.91
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc271",
+      "cell": [
+        16,
+        34
+      ],
+      "direction": "north",
+      "blockedAt": [
+        16,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc272",
+      "cell": [
+        16,
+        34
+      ],
+      "direction": "west",
+      "blockedAt": [
+        16,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc273",
+      "cell": [
+        16,
+        34
+      ],
+      "direction": "south",
+      "blockedAt": [
+        16,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    },
+    {
+      "id": "gun-range-nc274",
+      "cell": [
+        16,
+        34
+      ],
+      "direction": "east",
+      "blockedAt": [
+        16,
+        5,
+        34
+      ],
+      "movedM": 0,
+      "nearestVisibleMesh": null
+    }
+  ]
+}

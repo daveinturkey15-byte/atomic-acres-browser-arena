@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "eventId": "ambience.arena-bed",
+  "sourceAzimuthDeg": 20,
+  "observedPan": 0.3,
+  "openGain": 0.5,
+  "occludedGain": 0.25,
+  "openLowPassHz": 14000,
+  "occludedLowPassHz": 2000,
+  "artifactPath": "fixture-payloads/audio/spatial/ambience-arena-bed.json"
+}

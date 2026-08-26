@@ -1,0 +1,370 @@
+/*
+ * Pass 74 visual refresh (HF-362 / owner feedback 2026-08-22).
+ *
+ * The owner's report: the menu "is a big stale", and the killstreak selection
+ * screen specifically is "hard to see, read and use". Both had concrete causes
+ * that this sheet fixes rather than repaints over:
+ *
+ *   1. TWO THEMES FIGHTING. Four unreconciled token sets ship at once - a dark
+ *      legacy palette (style.css), a light tactical set (tactical-ui.css), a
+ *      light paper set (pass66-overhaul.css) and a dark glass HUD set
+ *      (pass65-hud.css). The killstreak panel drew from the dark set inside the
+ *      bright deck, so it read as a near-black island (#0c1a20 -> #071116) in a
+ *      white menu. That is the exact regression the owner saw, and it also
+ *      violated the AGENTS.md brightness rule.
+ *   2. TEXT BELOW THE CONTRACT FLOOR. AGENTS.md requires >= 9px labels and
+ *      >= 12px primary values at 1280x720. Several surfaces shipped 8px, and
+ *      the killstreak description - the entire plain-language explanation of
+ *      each reward - sat at the 10px floor of --pass66-micro.
+ *   3. NO DEPTH, NO MOTION. Selection changed a 1px border and nothing else, so
+ *      "which one is active" was nearly invisible.
+ *
+ * WHY THIS FILE IS UNLAYERED AND LOADED LAST: pass66-readability.css is itself
+ * unlayered, so it outranks every @layer in the cascade. A refresh written into
+ * a layer could not override it. This sheet is deliberately the final word.
+ *
+ * Every id and class in the surface registry is preserved - this file only
+ * restyles. Motion is gated behind the existing reduced-motion switches.
+ */
+
+:root {
+  /* One accent family, so the HUD and the menu stop looking like two products. */
+  --p74-accent: #c6611e;
+  --p74-accent-bright: #e17d39;
+  --p74-accent-soft: rgba(198, 97, 30, 0.12);
+  --p74-accent-line: rgba(198, 97, 30, 0.34);
+
+  /* Surfaces for the bright command deck. */
+  --p74-card: #ffffff;
+  --p74-card-2: #f6f5f4;
+  --p74-card-edge: rgba(59, 37, 23, 0.16);
+  --p74-ink: #2f1f14;
+  --p74-ink-soft: #5d534a;
+
+  /* One elevation ramp instead of ad-hoc shadows. */
+  --p74-lift-1: 0 1px 2px rgba(49, 31, 19, 0.06), 0 2px 6px rgba(49, 31, 19, 0.06);
+  --p74-lift-2: 0 2px 4px rgba(49, 31, 19, 0.08), 0 8px 20px rgba(49, 31, 19, 0.1);
+  --p74-lift-3: 0 4px 10px rgba(49, 31, 19, 0.1), 0 18px 42px rgba(49, 31, 19, 0.14);
+
+  --p74-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Type floors raised to the contract minimums. The clamp mechanism is kept;
+     only the floors move, so wide viewports are unchanged. */
+  --pass66-micro: clamp(11px, 0.66vw, 13px);
+  --pass66-copy: clamp(13px, 0.74vw, 15px);
+}
+
+/* ---------------------------------------------------------------------------
+ * 1. Killstreak selection - the owner's specific complaint.
+ * The cards join the bright deck, the description becomes readable body text,
+ * and the selected card is unmistakable (fill + accent bar + lift) rather than
+ * a 1px border colour change.
+ * ------------------------------------------------------------------------ */
+
+.killstreak-slot-card {
+  padding: 16px 18px;
+  border: 1px solid var(--p74-card-edge);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--p74-card) 0%, var(--p74-card-2) 100%);
+  box-shadow: var(--p74-lift-1);
+  transition:
+    transform 160ms var(--p74-ease),
+    border-color 160ms var(--p74-ease),
+    box-shadow 160ms var(--p74-ease),
+    background-color 160ms var(--p74-ease);
+}
+
+.killstreak-slot-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--p74-accent-line);
+  box-shadow: var(--p74-lift-2);
+}
+
+/* Slot + key wayfinding: this is how a player finds "KEY 3", so it is a real
+   label, not the smallest text on the panel. */
+.killstreak-slot-card > span {
+  color: var(--p74-accent);
+  font-size: var(--pass66-micro);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.killstreak-slot-card > strong {
+  color: var(--p74-ink);
+  font-size: var(--pass66-label);
+  letter-spacing: 0.01em;
+}
+
+/* The plain-language explanation of the reward. Previously 10px #a3b8ba on
+   near-black; now body-sized with contrast that survives daylight. */
+.killstreak-slot-card small {
+  color: var(--p74-ink-soft);
+  font-size: var(--pass66-copy);
+  line-height: 1.45;
+}
+
+.killstreak-slot-card select {
+  min-height: 44px;
+  border: 1px solid var(--p74-card-edge);
+  border-radius: 8px;
+  background: var(--p74-card);
+  color: var(--p74-ink);
+  font-weight: 700;
+  transition: border-color 140ms var(--p74-ease), box-shadow 140ms var(--p74-ease);
+}
+
+.killstreak-slot-card select:hover {
+  border-color: var(--p74-accent-line);
+}
+
+.killstreak-slot-card select:focus-visible {
+  outline: none;
+  border-color: var(--p74-accent);
+  box-shadow: 0 0 0 3px var(--p74-accent-soft);
+}
+
+/* Selected state: fill, a solid accent bar and a lift. Three redundant signals,
+   so it reads at a glance and never relies on colour alone. */
+.killstreak-slot-card.is-previewed {
+  border-color: var(--p74-accent);
+  background: linear-gradient(180deg, #ffffff 0%, var(--p74-accent-soft) 100%);
+  box-shadow: inset 4px 0 0 var(--p74-accent), var(--p74-lift-3);
+}
+
+.killstreak-slot-card.is-previewed > strong {
+  color: var(--p74-accent);
+}
+
+.killstreak-loadout-status {
+  color: var(--p74-ink-soft);
+  font-size: var(--pass66-copy);
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Contract floors - AGENTS.md requires >= 9px labels at 1280x720. These
+ * surfaces shipped 8px. Raised rather than removed, so density is preserved.
+ * ------------------------------------------------------------------------ */
+
+.audio-setting-row,
+.settings-section > header span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+/* Advanced graphics shipped 8px category notes and a 7px capability note - the
+   smallest text in the product, explaining why a control is unavailable.
+   advanced-graphics.css is unlayered and imported from the shell, so it can
+   land after this sheet; the leading `html` outranks it rather than relying on
+   load order. */
+html #advanced-graphics .advanced-graphics-category > header small,
+html #advanced-graphics .advanced-graphics-unavailable b {
+  font-size: 10px;
+}
+
+html #advanced-graphics .advanced-graphics-unavailable em {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+/* High-score card: the leaderboard heading and its privacy note. */
+#high-score-card small,
+#high-score-card p {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+ * 1b. The streaks PANEL itself, not just its cards.
+ *
+ * pass66-readability.css:391 painted this one panel as a near-black console
+ * plate (rgba(8,24,29,.98) -> rgba(4,12,16,.99)) while every other panel in the
+ * deck is light. That is why the owner singled this screen out, and it is what
+ * the AGENTS.md "no near-black monolith" rule exists to prevent. It now shares
+ * the deck's surface, so the whole menu reads as one product.
+ * ------------------------------------------------------------------------ */
+
+#menu-panel-streaks {
+  background:
+    radial-gradient(circle at 82% 10%, var(--p74-accent-soft), transparent 40%),
+    linear-gradient(160deg, #ffffff 0%, #f3f2f0 100%);
+  color: var(--p74-ink);
+  border-color: var(--p74-card-edge);
+}
+
+#menu-panel-streaks .kit-heading h2,
+#menu-panel-streaks .kit-heading strong {
+  color: var(--p74-ink);
+}
+
+#menu-panel-streaks .kit-heading p,
+#menu-panel-streaks .kit-heading small {
+  color: var(--p74-ink-soft);
+}
+
+/* ---------------------------------------------------------------------------
+ * 2b. Navigation rail label collision - a real layout bug, not a taste call.
+ *
+ * tactical-ui.css:382 absolutely positions the `01` badge (an older design
+ * where it floated). pass66-overhaul.css:174 later re-laid the button out as
+ * `grid-template-columns: 30px minmax(0,1fr)` ASSUMING the badge still occupied
+ * column 1. With the badge out of flow, the title fell into the 30px badge
+ * column and overflowed underneath the sublabel: "DEPLOY" printed on top of
+ * "ARENA + LOBBY" on every tab.
+ *
+ * Explicit areas fix it regardless of which sheet wins the `position` battle.
+ * ------------------------------------------------------------------------ */
+
+#menu .command-rail .menu-tabs button {
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-areas:
+    'badge title'
+    'badge sub';
+  align-content: center;
+  align-items: start;
+  row-gap: 3px;
+}
+
+#menu .command-rail .menu-tabs button i {
+  position: static;
+  grid-area: badge;
+  align-self: center;
+}
+
+#menu .command-rail .menu-tabs button span {
+  grid-area: title;
+  line-height: 1.05;
+}
+
+#menu .command-rail .menu-tabs button small {
+  grid-area: sub;
+  line-height: 1.25;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Command deck polish - depth and one interactive language.
+ * ------------------------------------------------------------------------ */
+
+.map-card,
+.kit-card {
+  border-radius: 10px;
+  box-shadow: var(--p74-lift-1);
+  transition:
+    transform 160ms var(--p74-ease),
+    box-shadow 160ms var(--p74-ease),
+    border-color 160ms var(--p74-ease);
+}
+
+.map-card:hover,
+.kit-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--p74-lift-2);
+  border-color: var(--p74-accent-line);
+}
+
+.map-card.selected,
+.kit-card.selected {
+  border-color: var(--p74-accent);
+  box-shadow: inset 4px 0 0 var(--p74-accent), var(--p74-lift-2);
+}
+
+.menu-actions button,
+.join-row button,
+.small-button {
+  border-radius: 8px;
+  transition:
+    transform 120ms var(--p74-ease),
+    box-shadow 120ms var(--p74-ease),
+    filter 120ms var(--p74-ease);
+}
+
+.menu-actions button:hover:not(:disabled),
+.join-row button:hover:not(:disabled),
+.small-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--p74-lift-2);
+}
+
+.menu-actions button:active:not(:disabled),
+.join-row button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--p74-lift-1);
+}
+
+/* A visible keyboard path through the whole deck - focus was previously
+   whatever the UA happened to draw. */
+.menu-tabs button:focus-visible,
+.menu-actions button:focus-visible,
+.map-card:focus-visible,
+.kit-card:focus-visible,
+.join-row input:focus-visible,
+.join-row button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--p74-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. HUD legibility - the readouts stay dark glass by design (they sit over
+ * the world), but gain enough contrast to read against a bright sky as well as
+ * a dark interior, and stop jittering on changing digits.
+ * ------------------------------------------------------------------------ */
+
+#health-block,
+#weapon-block,
+#support-block,
+#equipment-block,
+#matchbar {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+#ammo,
+#health,
+#timer {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Motion gates. Every transition above collapses under either switch, so
+ * the accessibility contract is preserved.
+ * ------------------------------------------------------------------------ */
+
+html[data-reduced-motion='true'] .killstreak-slot-card,
+html[data-reduced-motion='true'] .map-card,
+html[data-reduced-motion='true'] .kit-card,
+html[data-reduced-motion='true'] .menu-actions button,
+html[data-reduced-motion='true'] .join-row button,
+html[data-reduced-motion='true'] .small-button {
+  transition: none;
+}
+
+html[data-reduced-motion='true'] .killstreak-slot-card:hover,
+html[data-reduced-motion='true'] .map-card:hover,
+html[data-reduced-motion='true'] .kit-card:hover,
+html[data-reduced-motion='true'] .menu-actions button:hover:not(:disabled),
+html[data-reduced-motion='true'] .join-row button:hover:not(:disabled),
+html[data-reduced-motion='true'] .small-button:hover:not(:disabled) {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .killstreak-slot-card,
+  .map-card,
+  .kit-card,
+  .menu-actions button,
+  .join-row button,
+  .small-button {
+    transition: none;
+  }
+
+  .killstreak-slot-card:hover,
+  .map-card:hover,
+  .kit-card:hover,
+  .menu-actions button:hover:not(:disabled),
+  .join-row button:hover:not(:disabled),
+  .small-button:hover:not(:disabled) {
+    transform: none;
+  }
+}

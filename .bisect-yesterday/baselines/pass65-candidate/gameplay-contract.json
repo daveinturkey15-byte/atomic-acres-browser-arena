@@ -1,0 +1,4111 @@
+{
+  "contract": {
+    "arena": {
+      "bounds": {
+        "maxX": 31,
+        "maxZ": 30,
+        "minX": -31,
+        "minZ": -30
+      },
+      "coverLayout": [
+        [
+          -12,
+          -6.5,
+          3.6,
+          2
+        ],
+        [
+          12,
+          6.5,
+          3.6,
+          2
+        ],
+        [
+          -20,
+          -2,
+          2.4,
+          3.6
+        ],
+        [
+          20,
+          2,
+          2.4,
+          3.6
+        ],
+        [
+          -8,
+          -22,
+          3,
+          2.2
+        ],
+        [
+          8,
+          22,
+          3,
+          2.2
+        ],
+        [
+          24,
+          -13,
+          2.8,
+          4.4
+        ],
+        [
+          -24,
+          13,
+          2.8,
+          4.4
+        ]
+      ],
+      "garageLayout": [
+        {
+          "x": 17.7,
+          "z": -12.5
+        },
+        {
+          "x": -17.7,
+          "z": 12.5
+        }
+      ],
+      "houseLayout": [
+        {
+          "facing": 1,
+          "team": 0,
+          "x": 4,
+          "z": -17.4
+        },
+        {
+          "facing": -1,
+          "team": 1,
+          "x": -4,
+          "z": 17.4
+        }
+      ],
+      "houses": [
+        {
+          "anchors": [
+            {
+              "id": "front-yard",
+              "level": "ground",
+              "position": [
+                0.20000000000000018,
+                1.7,
+                -7.499999999999998
+              ]
+            },
+            {
+              "id": "front-door-inside",
+              "level": "ground",
+              "position": [
+                0.20000000000000018,
+                1.7,
+                -10.399999999999999
+              ]
+            },
+            {
+              "id": "ground-front",
+              "level": "ground",
+              "position": [
+                0.20000000000000018,
+                1.7,
+                -14.2
+              ]
+            },
+            {
+              "id": "ground-opening",
+              "level": "ground",
+              "position": [
+                6,
+                1.7,
+                -17.4
+              ]
+            },
+            {
+              "id": "ground-rear",
+              "level": "ground",
+              "position": [
+                7.8,
+                1.7,
+                -20.599999999999998
+              ]
+            },
+            {
+              "id": "rear-door-inside",
+              "level": "ground",
+              "position": [
+                7.8,
+                1.7,
+                -24.4
+              ]
+            },
+            {
+              "id": "rear-yard",
+              "level": "ground",
+              "position": [
+                7.8,
+                1.7,
+                -27.299999999999997
+              ]
+            },
+            {
+              "id": "ramp-approach",
+              "level": "ground",
+              "position": [
+                -7.949999999999999,
+                1.7,
+                -9.399999999999999
+              ]
+            },
+            {
+              "id": "ramp-foot",
+              "level": "ground",
+              "position": [
+                -7.949999999999999,
+                1.7,
+                -11.399999999999999
+              ]
+            },
+            {
+              "id": "ramp-mid",
+              "level": "upper",
+              "position": [
+                -7.949999999999999,
+                3.44,
+                -16.099999999999998
+              ]
+            },
+            {
+              "id": "ramp-top",
+              "level": "upper",
+              "position": [
+                -7.949999999999999,
+                5.18,
+                -20.799999999999997
+              ]
+            },
+            {
+              "id": "landing-exit",
+              "level": "upper",
+              "position": [
+                -5.1,
+                5.18,
+                -22.2
+              ]
+            },
+            {
+              "id": "indoor-ramp-foot",
+              "level": "ground",
+              "position": [
+                12.35,
+                1.7,
+                -10.399999999999999
+              ]
+            },
+            {
+              "id": "indoor-ramp-mid",
+              "level": "upper",
+              "position": [
+                12.35,
+                3.44,
+                -13.499999999999998
+              ]
+            },
+            {
+              "id": "indoor-ramp-top",
+              "level": "upper",
+              "position": [
+                12.35,
+                5.18,
+                -16.599999999999998
+              ]
+            },
+            {
+              "id": "indoor-landing-exit",
+              "level": "upper",
+              "position": [
+                10.299999999999999,
+                5.18,
+                -16.599999999999998
+              ]
+            },
+            {
+              "id": "upper-rear",
+              "level": "upper",
+              "position": [
+                0,
+                5.18,
+                -20.9
+              ]
+            },
+            {
+              "id": "upper-opening",
+              "level": "upper",
+              "position": [
+                6,
+                5.18,
+                -17.4
+              ]
+            },
+            {
+              "id": "upper-front",
+              "level": "upper",
+              "position": [
+                6,
+                5.18,
+                -13.899999999999999
+              ]
+            }
+          ],
+          "dimensions": {
+            "depth": 16.4,
+            "wallThickness": 0.42,
+            "width": 20.2
+          },
+          "id": "aqua-irrigation-workshop",
+          "openings": [
+            {
+              "centre": [
+                0.20000000000000018,
+                1.4,
+                -9.2
+              ],
+              "height": 2.8,
+              "id": "front-door",
+              "kind": "exterior-door",
+              "route": true,
+              "width": 2.2
+            },
+            {
+              "centre": [
+                7.8,
+                1.4,
+                -25.599999999999998
+              ],
+              "height": 2.8,
+              "id": "rear-door",
+              "kind": "exterior-door",
+              "route": true,
+              "width": 2.2
+            },
+            {
+              "centre": [
+                6,
+                1.4,
+                -17.4
+              ],
+              "height": 2.8,
+              "id": "ground-room-opening",
+              "kind": "interior-opening",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                6,
+                4.88,
+                -17.4
+              ],
+              "height": 2.8,
+              "id": "upper-room-opening",
+              "kind": "interior-opening",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                -6.1,
+                4.88,
+                -22.2
+              ],
+              "height": 2.8,
+              "id": "upper-ramp-entry",
+              "kind": "ramp-entry",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                8.8,
+                1.565,
+                -9.2
+              ],
+              "height": 1.9699999999999998,
+              "id": "front-ground-window",
+              "kind": "window",
+              "route": true,
+              "width": 2.8
+            },
+            {
+              "centre": [
+                -0.7999999999999998,
+                1.565,
+                -25.599999999999998
+              ],
+              "height": 1.9699999999999998,
+              "id": "rear-ground-window",
+              "kind": "window",
+              "route": true,
+              "width": 2.8
+            },
+            {
+              "centre": [
+                4,
+                4.915,
+                -9.2
+              ],
+              "height": 2.23,
+              "id": "upper-window",
+              "kind": "window",
+              "route": true,
+              "width": 3.2
+            }
+          ],
+          "origin": {
+            "facing": 1,
+            "x": 4,
+            "z": -17.4
+          },
+          "routes": {
+            "ground-room-flow": [
+              "front-yard",
+              "front-door-inside",
+              "ground-front",
+              "ground-opening",
+              "ground-rear",
+              "rear-door-inside",
+              "rear-yard"
+            ],
+            "indoor-ramp-room-flow": [
+              "front-door-inside",
+              "ground-front",
+              "indoor-ramp-foot",
+              "indoor-ramp-mid",
+              "indoor-ramp-top",
+              "indoor-landing-exit",
+              "upper-front",
+              "upper-opening",
+              "upper-rear"
+            ],
+            "ramp-room-flow": [
+              "front-yard",
+              "ramp-approach",
+              "ramp-foot",
+              "ramp-mid",
+              "ramp-top",
+              "landing-exit",
+              "upper-rear",
+              "upper-opening",
+              "upper-front"
+            ]
+          },
+          "solids": [
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-west-wall",
+              "kind": "wall",
+              "position": [
+                -6.1,
+                1.675,
+                -17.4
+              ],
+              "size": [
+                0.42,
+                3.35,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-east-wall",
+              "kind": "wall",
+              "position": [
+                14.1,
+                1.675,
+                -17.4
+              ],
+              "size": [
+                0.42,
+                3.35,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-ground-far-left",
+              "kind": "wall",
+              "position": [
+                -4.149999999999999,
+                1.675,
+                -25.599999999999998
+              ],
+              "size": [
+                3.9000000000000004,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-ground-centre",
+              "kind": "wall",
+              "position": [
+                3.65,
+                1.675,
+                -25.599999999999998
+              ],
+              "size": [
+                6.1,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-ground-far-right",
+              "kind": "wall",
+              "position": [
+                11.5,
+                1.675,
+                -25.599999999999998
+              ],
+              "size": [
+                5.199999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-door-lintel",
+              "kind": "wall",
+              "position": [
+                7.8,
+                3.05,
+                -25.599999999999998
+              ],
+              "size": [
+                2.2,
+                0.6,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-ground-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                -0.7999999999999998,
+                0.29,
+                -25.599999999999998
+              ],
+              "size": [
+                2.8,
+                0.58,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:rear-ground-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                -0.7999999999999998,
+                2.95,
+                -25.599999999999998
+              ],
+              "size": [
+                2.8,
+                0.8000000000000003,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:rear-ground-window-glass",
+              "kind": "glass",
+              "position": [
+                -0.7999999999999998,
+                1.565,
+                -25.619999999999997
+              ],
+              "size": [
+                2.8,
+                1.9699999999999998,
+                0.08
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-ground-far-left",
+              "kind": "wall",
+              "position": [
+                -3.5,
+                1.675,
+                -9.2
+              ],
+              "size": [
+                5.199999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-ground-centre",
+              "kind": "wall",
+              "position": [
+                4.35,
+                1.675,
+                -9.2
+              ],
+              "size": [
+                6.1,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-ground-far-right",
+              "kind": "wall",
+              "position": [
+                12.149999999999999,
+                1.675,
+                -9.2
+              ],
+              "size": [
+                3.9000000000000004,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-door-lintel",
+              "kind": "wall",
+              "position": [
+                0.20000000000000018,
+                3.05,
+                -9.2
+              ],
+              "size": [
+                2.2,
+                0.6,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                8.8,
+                0.29,
+                -9.2
+              ],
+              "size": [
+                2.8,
+                0.58,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                8.8,
+                2.95,
+                -9.2
+              ],
+              "size": [
+                2.8,
+                0.8000000000000003,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:ground-window-glass",
+              "kind": "glass",
+              "position": [
+                8.8,
+                1.565,
+                -9.18
+              ],
+              "size": [
+                2.8,
+                1.9699999999999998,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:front-entry-frame-left",
+              "kind": "frame",
+              "position": [
+                -0.9900000000000002,
+                1.42,
+                -8.899999999999999
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:front-entry-frame-right",
+              "kind": "frame",
+              "position": [
+                1.3900000000000001,
+                1.42,
+                -8.899999999999999
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:front-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                0.20000000000000018,
+                2.78,
+                -8.899999999999999
+              ],
+              "size": [
+                2.56,
+                0.18,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:rear-entry-frame-left",
+              "kind": "frame",
+              "position": [
+                6.609999999999999,
+                1.42,
+                -25.9
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:rear-entry-frame-right",
+              "kind": "frame",
+              "position": [
+                8.99,
+                1.42,
+                -25.9
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:rear-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                7.8,
+                2.78,
+                -25.9
+              ],
+              "size": [
+                2.56,
+                0.18,
+                0.16
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-room-partition-left",
+              "kind": "wall",
+              "position": [
+                -0.7000000000000002,
+                1.675,
+                -17.4
+              ],
+              "size": [
+                10.799999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ground-room-partition-right",
+              "kind": "wall",
+              "position": [
+                10.7,
+                1.675,
+                -17.4
+              ],
+              "size": [
+                6.8,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:ground-floor-slab",
+              "kind": "floor",
+              "position": [
+                4,
+                0.06,
+                -17.4
+              ],
+              "size": [
+                20,
+                0.12,
+                16.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-ramp-side-wall-rear",
+              "kind": "wall",
+              "position": [
+                -6.1,
+                5.205,
+                -24.445
+              ],
+              "size": [
+                0.42,
+                3.45,
+                1.8899999999999997
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-ramp-side-wall-front",
+              "kind": "wall",
+              "position": [
+                -6.1,
+                5.205,
+                -15.155
+              ],
+              "size": [
+                0.42,
+                3.45,
+                11.489999999999998
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-east-wall",
+              "kind": "wall",
+              "position": [
+                14.1,
+                5.205,
+                -17.4
+              ],
+              "size": [
+                0.42,
+                3.45,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-rear-wall",
+              "kind": "wall",
+              "position": [
+                4,
+                5.205,
+                -25.599999999999998
+              ],
+              "size": [
+                20.62,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-upper-left",
+              "kind": "wall",
+              "position": [
+                -1.8499999999999996,
+                5.205,
+                -9.2
+              ],
+              "size": [
+                8.5,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:front-upper-right",
+              "kind": "wall",
+              "position": [
+                9.85,
+                5.205,
+                -9.2
+              ],
+              "size": [
+                8.5,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                4,
+                3.64,
+                -9.2
+              ],
+              "size": [
+                3.2,
+                0.32,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                4,
+                6.48,
+                -9.2
+              ],
+              "size": [
+                3.2,
+                0.9000000000000004,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:upper-window-glass",
+              "kind": "glass",
+              "position": [
+                4,
+                4.915,
+                -9.18
+              ],
+              "size": [
+                3.2,
+                2.23,
+                0.12
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-room-partition-left",
+              "kind": "wall",
+              "position": [
+                -0.7000000000000002,
+                5.205,
+                -17.4
+              ],
+              "size": [
+                10.799999999999999,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-room-partition-right",
+              "kind": "wall",
+              "position": [
+                10.7,
+                5.205,
+                -17.4
+              ],
+              "size": [
+                6.8,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-rear",
+              "kind": "frame",
+              "position": [
+                -6.4,
+                4.9,
+                -23.589999999999996
+              ],
+              "size": [
+                0.16,
+                2.84,
+                0.18
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-front",
+              "kind": "frame",
+              "position": [
+                -6.4,
+                4.9,
+                -20.81
+              ],
+              "size": [
+                0.16,
+                2.84,
+                0.18
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:upper-ramp-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                -6.4,
+                6.26,
+                -22.2
+              ],
+              "size": [
+                0.16,
+                0.18,
+                2.96
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:floor-seam-front",
+              "kind": "frame",
+              "position": [
+                4,
+                3.43,
+                -8.91
+              ],
+              "size": [
+                20.439999999999998,
+                0.18,
+                0.14
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:floor-seam-rear",
+              "kind": "frame",
+              "position": [
+                4,
+                3.43,
+                -25.889999999999997
+              ],
+              "size": [
+                20.439999999999998,
+                0.18,
+                0.14
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:floor-seam-west",
+              "kind": "frame",
+              "position": [
+                -6.389999999999999,
+                3.43,
+                -17.4
+              ],
+              "size": [
+                0.14,
+                0.18,
+                16.4
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:floor-seam-east",
+              "kind": "frame",
+              "position": [
+                14.389999999999999,
+                3.43,
+                -17.4
+              ],
+              "size": [
+                0.14,
+                0.18,
+                16.4
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:entrance-canopy",
+              "kind": "landing",
+              "position": [
+                4.55,
+                3.05,
+                -8.62
+              ],
+              "size": [
+                4.4,
+                0.16,
+                1.4
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-floor-main",
+              "kind": "floor",
+              "position": [
+                2.3499999999999996,
+                3.48,
+                -17.4
+              ],
+              "size": [
+                16.7,
+                0.32,
+                16.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-floor-ramp-front",
+              "kind": "floor",
+              "position": [
+                12.35,
+                3.48,
+                -10.299999999999999
+              ],
+              "size": [
+                3.3000000000000007,
+                0.32,
+                2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:upper-floor-ramp-rear",
+              "kind": "floor",
+              "position": [
+                12.35,
+                3.48,
+                -21.4
+              ],
+              "size": [
+                3.3000000000000007,
+                0.32,
+                8.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:ramp-top-landing",
+              "kind": "landing",
+              "position": [
+                -7.949999999999999,
+                3.48,
+                -21.669999999999998
+              ],
+              "size": [
+                3.9,
+                0.32,
+                1.8600000000000003
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:interior-ramp-top-landing",
+              "kind": "landing",
+              "position": [
+                12.075,
+                3.48,
+                -16.919999999999998
+              ],
+              "size": [
+                2.75,
+                0.32,
+                0.7600000000000001
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:exterior-access-ramp",
+              "kind": "ramp",
+              "position": [
+                -7.949999999999999,
+                1.78,
+                -16.099999999999998
+              ],
+              "rotation": [
+                0.3545670518732277,
+                0,
+                0
+              ],
+              "size": [
+                2.8,
+                0.18,
+                10.023492405344557
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "aqua-irrigation-workshop:interior-access-ramp",
+              "kind": "ramp",
+              "position": [
+                12.35,
+                1.78,
+                -13.499999999999998
+              ],
+              "rotation": [
+                0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                2.2,
+                0.18,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-rail-inner",
+              "kind": "frame",
+              "position": [
+                11.18,
+                2.4,
+                -13.499999999999998
+              ],
+              "rotation": [
+                0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                0.08,
+                0.08,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-rail-outer",
+              "kind": "frame",
+              "position": [
+                13.52,
+                2.4,
+                -13.499999999999998
+              ],
+              "rotation": [
+                0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                0.08,
+                0.08,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-post-0-0",
+              "kind": "frame",
+              "position": [
+                11.18,
+                1.0064,
+                -11.515999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-post-0-1",
+              "kind": "frame",
+              "position": [
+                13.52,
+                1.0064,
+                -11.515999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-post-1-0",
+              "kind": "frame",
+              "position": [
+                11.18,
+                3.2335999999999996,
+                -15.483999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "aqua-irrigation-workshop:interior-ramp-post-1-1",
+              "kind": "frame",
+              "position": [
+                13.52,
+                3.2335999999999996,
+                -15.483999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            }
+          ],
+          "team": 0
+        },
+        {
+          "anchors": [
+            {
+              "id": "front-yard",
+              "level": "ground",
+              "position": [
+                -7.8,
+                1.7,
+                7.499999999999998
+              ]
+            },
+            {
+              "id": "front-door-inside",
+              "level": "ground",
+              "position": [
+                -7.8,
+                1.7,
+                10.399999999999999
+              ]
+            },
+            {
+              "id": "ground-front",
+              "level": "ground",
+              "position": [
+                -7.8,
+                1.7,
+                14.2
+              ]
+            },
+            {
+              "id": "ground-opening",
+              "level": "ground",
+              "position": [
+                -2,
+                1.7,
+                17.4
+              ]
+            },
+            {
+              "id": "ground-rear",
+              "level": "ground",
+              "position": [
+                -0.20000000000000018,
+                1.7,
+                20.599999999999998
+              ]
+            },
+            {
+              "id": "rear-door-inside",
+              "level": "ground",
+              "position": [
+                -0.20000000000000018,
+                1.7,
+                24.4
+              ]
+            },
+            {
+              "id": "rear-yard",
+              "level": "ground",
+              "position": [
+                -0.20000000000000018,
+                1.7,
+                27.299999999999997
+              ]
+            },
+            {
+              "id": "ramp-approach",
+              "level": "ground",
+              "position": [
+                7.949999999999999,
+                1.7,
+                9.399999999999999
+              ]
+            },
+            {
+              "id": "ramp-foot",
+              "level": "ground",
+              "position": [
+                7.949999999999999,
+                1.7,
+                11.399999999999999
+              ]
+            },
+            {
+              "id": "ramp-mid",
+              "level": "upper",
+              "position": [
+                7.949999999999999,
+                3.44,
+                16.099999999999998
+              ]
+            },
+            {
+              "id": "ramp-top",
+              "level": "upper",
+              "position": [
+                7.949999999999999,
+                5.18,
+                20.799999999999997
+              ]
+            },
+            {
+              "id": "landing-exit",
+              "level": "upper",
+              "position": [
+                5.1,
+                5.18,
+                22.2
+              ]
+            },
+            {
+              "id": "indoor-ramp-foot",
+              "level": "ground",
+              "position": [
+                -12.35,
+                1.7,
+                10.399999999999999
+              ]
+            },
+            {
+              "id": "indoor-ramp-mid",
+              "level": "upper",
+              "position": [
+                -12.35,
+                3.44,
+                13.499999999999998
+              ]
+            },
+            {
+              "id": "indoor-ramp-top",
+              "level": "upper",
+              "position": [
+                -12.35,
+                5.18,
+                16.599999999999998
+              ]
+            },
+            {
+              "id": "indoor-landing-exit",
+              "level": "upper",
+              "position": [
+                -10.299999999999999,
+                5.18,
+                16.599999999999998
+              ]
+            },
+            {
+              "id": "upper-rear",
+              "level": "upper",
+              "position": [
+                0,
+                5.18,
+                20.9
+              ]
+            },
+            {
+              "id": "upper-opening",
+              "level": "upper",
+              "position": [
+                -2,
+                5.18,
+                17.4
+              ]
+            },
+            {
+              "id": "upper-front",
+              "level": "upper",
+              "position": [
+                -2,
+                5.18,
+                13.899999999999999
+              ]
+            }
+          ],
+          "dimensions": {
+            "depth": 16.4,
+            "wallThickness": 0.42,
+            "width": 20.2
+          },
+          "id": "coral-orchard-conservatory",
+          "openings": [
+            {
+              "centre": [
+                -7.8,
+                1.4,
+                9.2
+              ],
+              "height": 2.8,
+              "id": "front-door",
+              "kind": "exterior-door",
+              "route": true,
+              "width": 2.2
+            },
+            {
+              "centre": [
+                -0.20000000000000018,
+                1.4,
+                25.599999999999998
+              ],
+              "height": 2.8,
+              "id": "rear-door",
+              "kind": "exterior-door",
+              "route": true,
+              "width": 2.2
+            },
+            {
+              "centre": [
+                -2,
+                1.4,
+                17.4
+              ],
+              "height": 2.8,
+              "id": "ground-room-opening",
+              "kind": "interior-opening",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                -2,
+                4.88,
+                17.4
+              ],
+              "height": 2.8,
+              "id": "upper-room-opening",
+              "kind": "interior-opening",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                6.1,
+                4.88,
+                22.2
+              ],
+              "height": 2.8,
+              "id": "upper-ramp-entry",
+              "kind": "ramp-entry",
+              "route": true,
+              "width": 2.6
+            },
+            {
+              "centre": [
+                0.7999999999999998,
+                1.565,
+                9.2
+              ],
+              "height": 1.9699999999999998,
+              "id": "front-ground-window",
+              "kind": "window",
+              "route": true,
+              "width": 2.8
+            },
+            {
+              "centre": [
+                -8.8,
+                1.565,
+                25.599999999999998
+              ],
+              "height": 1.9699999999999998,
+              "id": "rear-ground-window",
+              "kind": "window",
+              "route": true,
+              "width": 2.8
+            },
+            {
+              "centre": [
+                -4,
+                4.915,
+                9.2
+              ],
+              "height": 2.23,
+              "id": "upper-window",
+              "kind": "window",
+              "route": true,
+              "width": 3.2
+            }
+          ],
+          "origin": {
+            "facing": -1,
+            "x": -4,
+            "z": 17.4
+          },
+          "routes": {
+            "ground-room-flow": [
+              "front-yard",
+              "front-door-inside",
+              "ground-front",
+              "ground-opening",
+              "ground-rear",
+              "rear-door-inside",
+              "rear-yard"
+            ],
+            "indoor-ramp-room-flow": [
+              "front-door-inside",
+              "ground-front",
+              "indoor-ramp-foot",
+              "indoor-ramp-mid",
+              "indoor-ramp-top",
+              "indoor-landing-exit",
+              "upper-front",
+              "upper-opening",
+              "upper-rear"
+            ],
+            "ramp-room-flow": [
+              "front-yard",
+              "ramp-approach",
+              "ramp-foot",
+              "ramp-mid",
+              "ramp-top",
+              "landing-exit",
+              "upper-rear",
+              "upper-opening",
+              "upper-front"
+            ]
+          },
+          "solids": [
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-west-wall",
+              "kind": "wall",
+              "position": [
+                -14.1,
+                1.675,
+                17.4
+              ],
+              "size": [
+                0.42,
+                3.35,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-east-wall",
+              "kind": "wall",
+              "position": [
+                6.1,
+                1.675,
+                17.4
+              ],
+              "size": [
+                0.42,
+                3.35,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-ground-far-left",
+              "kind": "wall",
+              "position": [
+                -12.149999999999999,
+                1.675,
+                25.599999999999998
+              ],
+              "size": [
+                3.9000000000000004,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-ground-centre",
+              "kind": "wall",
+              "position": [
+                -4.35,
+                1.675,
+                25.599999999999998
+              ],
+              "size": [
+                6.1,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-ground-far-right",
+              "kind": "wall",
+              "position": [
+                3.5,
+                1.675,
+                25.599999999999998
+              ],
+              "size": [
+                5.199999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-door-lintel",
+              "kind": "wall",
+              "position": [
+                -0.20000000000000018,
+                3.05,
+                25.599999999999998
+              ],
+              "size": [
+                2.2,
+                0.6,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-ground-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                -8.8,
+                0.29,
+                25.599999999999998
+              ],
+              "size": [
+                2.8,
+                0.58,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:rear-ground-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                -8.8,
+                2.95,
+                25.599999999999998
+              ],
+              "size": [
+                2.8,
+                0.8000000000000003,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:rear-ground-window-glass",
+              "kind": "glass",
+              "position": [
+                -8.8,
+                1.565,
+                25.619999999999997
+              ],
+              "size": [
+                2.8,
+                1.9699999999999998,
+                0.08
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-ground-far-left",
+              "kind": "wall",
+              "position": [
+                -11.5,
+                1.675,
+                9.2
+              ],
+              "size": [
+                5.199999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-ground-centre",
+              "kind": "wall",
+              "position": [
+                -3.65,
+                1.675,
+                9.2
+              ],
+              "size": [
+                6.1,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-ground-far-right",
+              "kind": "wall",
+              "position": [
+                4.149999999999999,
+                1.675,
+                9.2
+              ],
+              "size": [
+                3.9000000000000004,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-door-lintel",
+              "kind": "wall",
+              "position": [
+                -7.8,
+                3.05,
+                9.2
+              ],
+              "size": [
+                2.2,
+                0.6,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                0.7999999999999998,
+                0.29,
+                9.2
+              ],
+              "size": [
+                2.8,
+                0.58,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                0.7999999999999998,
+                2.95,
+                9.2
+              ],
+              "size": [
+                2.8,
+                0.8000000000000003,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:ground-window-glass",
+              "kind": "glass",
+              "position": [
+                0.7999999999999998,
+                1.565,
+                9.18
+              ],
+              "size": [
+                2.8,
+                1.9699999999999998,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:front-entry-frame-left",
+              "kind": "frame",
+              "position": [
+                -8.99,
+                1.42,
+                8.899999999999999
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:front-entry-frame-right",
+              "kind": "frame",
+              "position": [
+                -6.609999999999999,
+                1.42,
+                8.899999999999999
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:front-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                -7.8,
+                2.78,
+                8.899999999999999
+              ],
+              "size": [
+                2.56,
+                0.18,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:rear-entry-frame-left",
+              "kind": "frame",
+              "position": [
+                -1.3900000000000001,
+                1.42,
+                25.9
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:rear-entry-frame-right",
+              "kind": "frame",
+              "position": [
+                0.9900000000000002,
+                1.42,
+                25.9
+              ],
+              "size": [
+                0.18,
+                2.84,
+                0.16
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:rear-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                -0.20000000000000018,
+                2.78,
+                25.9
+              ],
+              "size": [
+                2.56,
+                0.18,
+                0.16
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-room-partition-left",
+              "kind": "wall",
+              "position": [
+                -8.7,
+                1.675,
+                17.4
+              ],
+              "size": [
+                10.799999999999999,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ground-room-partition-right",
+              "kind": "wall",
+              "position": [
+                2.6999999999999993,
+                1.675,
+                17.4
+              ],
+              "size": [
+                6.8,
+                3.35,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:ground-floor-slab",
+              "kind": "floor",
+              "position": [
+                -4,
+                0.06,
+                17.4
+              ],
+              "size": [
+                20,
+                0.12,
+                16.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-west-wall",
+              "kind": "wall",
+              "position": [
+                -14.1,
+                5.205,
+                17.4
+              ],
+              "size": [
+                0.42,
+                3.45,
+                15.979999999999999
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-ramp-side-wall-rear",
+              "kind": "wall",
+              "position": [
+                6.1,
+                5.205,
+                24.445
+              ],
+              "size": [
+                0.42,
+                3.45,
+                1.8899999999999997
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-ramp-side-wall-front",
+              "kind": "wall",
+              "position": [
+                6.1,
+                5.205,
+                15.155
+              ],
+              "size": [
+                0.42,
+                3.45,
+                11.489999999999998
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-rear-wall",
+              "kind": "wall",
+              "position": [
+                -4,
+                5.205,
+                25.599999999999998
+              ],
+              "size": [
+                20.62,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-upper-left",
+              "kind": "wall",
+              "position": [
+                -9.85,
+                5.205,
+                9.2
+              ],
+              "size": [
+                8.5,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:front-upper-right",
+              "kind": "wall",
+              "position": [
+                1.8499999999999996,
+                5.205,
+                9.2
+              ],
+              "size": [
+                8.5,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-window-sill-wall",
+              "kind": "wall",
+              "position": [
+                -4,
+                3.64,
+                9.2
+              ],
+              "size": [
+                3.2,
+                0.32,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-window-lintel-wall",
+              "kind": "wall",
+              "position": [
+                -4,
+                6.48,
+                9.2
+              ],
+              "size": [
+                3.2,
+                0.9000000000000004,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:upper-window-glass",
+              "kind": "glass",
+              "position": [
+                -4,
+                4.915,
+                9.18
+              ],
+              "size": [
+                3.2,
+                2.23,
+                0.12
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-room-partition-left",
+              "kind": "wall",
+              "position": [
+                -8.7,
+                5.205,
+                17.4
+              ],
+              "size": [
+                10.799999999999999,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-room-partition-right",
+              "kind": "wall",
+              "position": [
+                2.6999999999999993,
+                5.205,
+                17.4
+              ],
+              "size": [
+                6.8,
+                3.45,
+                0.42
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:upper-ramp-entry-frame-rear",
+              "kind": "frame",
+              "position": [
+                6.4,
+                4.9,
+                23.589999999999996
+              ],
+              "size": [
+                0.16,
+                2.84,
+                0.18
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:upper-ramp-entry-frame-front",
+              "kind": "frame",
+              "position": [
+                6.4,
+                4.9,
+                20.81
+              ],
+              "size": [
+                0.16,
+                2.84,
+                0.18
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:upper-ramp-entry-frame-head",
+              "kind": "frame",
+              "position": [
+                6.4,
+                6.26,
+                22.2
+              ],
+              "size": [
+                0.16,
+                0.18,
+                2.96
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:floor-seam-front",
+              "kind": "frame",
+              "position": [
+                -4,
+                3.43,
+                8.91
+              ],
+              "size": [
+                20.439999999999998,
+                0.18,
+                0.14
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:floor-seam-rear",
+              "kind": "frame",
+              "position": [
+                -4,
+                3.43,
+                25.889999999999997
+              ],
+              "size": [
+                20.439999999999998,
+                0.18,
+                0.14
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:floor-seam-west",
+              "kind": "frame",
+              "position": [
+                -14.389999999999999,
+                3.43,
+                17.4
+              ],
+              "size": [
+                0.14,
+                0.18,
+                16.4
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:floor-seam-east",
+              "kind": "frame",
+              "position": [
+                6.389999999999999,
+                3.43,
+                17.4
+              ],
+              "size": [
+                0.14,
+                0.18,
+                16.4
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:entrance-canopy",
+              "kind": "landing",
+              "position": [
+                -4.55,
+                3.05,
+                8.62
+              ],
+              "size": [
+                4.4,
+                0.16,
+                1.4
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-floor-main",
+              "kind": "floor",
+              "position": [
+                -2.3499999999999996,
+                3.48,
+                17.4
+              ],
+              "size": [
+                16.7,
+                0.32,
+                16.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-floor-ramp-front",
+              "kind": "floor",
+              "position": [
+                -12.35,
+                3.48,
+                10.299999999999999
+              ],
+              "size": [
+                3.3000000000000007,
+                0.32,
+                2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:upper-floor-ramp-rear",
+              "kind": "floor",
+              "position": [
+                -12.35,
+                3.48,
+                21.4
+              ],
+              "size": [
+                3.3000000000000007,
+                0.32,
+                8.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:ramp-top-landing",
+              "kind": "landing",
+              "position": [
+                7.949999999999999,
+                3.48,
+                21.669999999999998
+              ],
+              "size": [
+                3.9,
+                0.32,
+                1.8600000000000003
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:interior-ramp-top-landing",
+              "kind": "landing",
+              "position": [
+                -12.075,
+                3.48,
+                16.919999999999998
+              ],
+              "size": [
+                2.75,
+                0.32,
+                0.7600000000000001
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:exterior-access-ramp",
+              "kind": "ramp",
+              "position": [
+                7.949999999999999,
+                1.78,
+                16.099999999999998
+              ],
+              "rotation": [
+                -0.3545670518732277,
+                0,
+                0
+              ],
+              "size": [
+                2.8,
+                0.18,
+                10.023492405344557
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:interior-access-ramp",
+              "kind": "ramp",
+              "position": [
+                -12.35,
+                1.78,
+                13.499999999999998
+              ],
+              "rotation": [
+                -0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                2.2,
+                0.18,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-rail-inner",
+              "kind": "frame",
+              "position": [
+                -11.18,
+                2.4,
+                13.499999999999998
+              ],
+              "rotation": [
+                -0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                0.08,
+                0.08,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-rail-outer",
+              "kind": "frame",
+              "position": [
+                -13.52,
+                2.4,
+                13.499999999999998
+              ],
+              "rotation": [
+                -0.5114700612440183,
+                0,
+                0
+              ],
+              "size": [
+                0.08,
+                0.08,
+                7.10988044906523
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-post-0-0",
+              "kind": "frame",
+              "position": [
+                -11.18,
+                1.0064,
+                11.515999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-post-0-1",
+              "kind": "frame",
+              "position": [
+                -13.52,
+                1.0064,
+                11.515999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-post-1-0",
+              "kind": "frame",
+              "position": [
+                -11.18,
+                3.2335999999999996,
+                15.483999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            },
+            {
+              "collidable": false,
+              "id": "coral-orchard-conservatory:interior-ramp-post-1-1",
+              "kind": "frame",
+              "position": [
+                -13.52,
+                3.2335999999999996,
+                15.483999999999998
+              ],
+              "size": [
+                0.08,
+                0.76,
+                0.08
+              ]
+            }
+          ],
+          "team": 1
+        }
+      ],
+      "patrolLayout": [
+        [
+          -15,
+          -12
+        ],
+        [
+          15,
+          12
+        ],
+        [
+          -6,
+          -6
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          -19,
+          -7
+        ],
+        [
+          19,
+          7
+        ],
+        [
+          -24,
+          -20
+        ],
+        [
+          24,
+          20
+        ]
+      ],
+      "spawnLayout": {
+        "0": [
+          [
+            -2,
+            -27
+          ],
+          [
+            3,
+            -27
+          ],
+          [
+            8,
+            -27
+          ],
+          [
+            13,
+            -27
+          ],
+          [
+            -12,
+            -26
+          ],
+          [
+            -17,
+            -24
+          ],
+          [
+            -21,
+            -20
+          ],
+          [
+            -24,
+            -16
+          ],
+          [
+            18,
+            -25
+          ],
+          [
+            25,
+            -25
+          ],
+          [
+            28,
+            -13
+          ],
+          [
+            27,
+            -10
+          ]
+        ],
+        "1": [
+          [
+            2,
+            27
+          ],
+          [
+            -3,
+            27
+          ],
+          [
+            -8,
+            27
+          ],
+          [
+            -13,
+            27
+          ],
+          [
+            12,
+            26
+          ],
+          [
+            17,
+            24
+          ],
+          [
+            21,
+            20
+          ],
+          [
+            24,
+            16
+          ],
+          [
+            -18,
+            25
+          ],
+          [
+            -25,
+            25
+          ],
+          [
+            -28,
+            13
+          ],
+          [
+            -27,
+            10
+          ]
+        ]
+      }
+    },
+    "authority": "Pass 24 gameplay feel with owner-approved Pass 25A through Pass 54 deltas",
+    "combat": {
+      "botDamageMultiplier": 0.25,
+      "botGrenade": {
+        "cooldownMs": 12000,
+        "damageMultiplier": 0.25,
+        "families": [
+          "frag",
+          "smoke",
+          "flash",
+          "semtex"
+        ],
+        "maximumActive": 1,
+        "maximumRange": 18,
+        "minimumRange": 7
+      },
+      "botWeapons": [
+        "carbine",
+        "smg",
+        "lmg",
+        "scattergun",
+        "sniper",
+        "pistol",
+        "magnum",
+        "machine-pistol",
+        "mini-uzi",
+        "mp5",
+        "m4a1",
+        "ak-47",
+        "m14-ebr",
+        "slug-shotgun"
+      ],
+      "grenade": {
+        "maximumDamage": 230,
+        "radius": 16
+      },
+      "match": {
+        "arenas": [
+          {
+            "durationMs": 300000,
+            "id": "atomic-acres",
+            "maximumSoloBots": 6,
+            "multiplayer": true,
+            "reinforcementEveryDefeats": 10,
+            "scoreLimit": null,
+            "soloBotCount": 1
+          },
+          {
+            "durationMs": 300000,
+            "id": "rustworks-1v1",
+            "maximumSoloBots": 1,
+            "multiplayer": true,
+            "reinforcementEveryDefeats": null,
+            "scoreLimit": null,
+            "soloBotCount": 1
+          },
+          {
+            "durationMs": 120000,
+            "id": "gun-range",
+            "maximumSoloBots": 0,
+            "multiplayer": true,
+            "reinforcementEveryDefeats": null,
+            "scoreLimit": null,
+            "soloBotCount": 0
+          },
+          {
+            "durationMs": 300000,
+            "id": "skyline-terminal",
+            "maximumSoloBots": 6,
+            "multiplayer": true,
+            "reinforcementEveryDefeats": null,
+            "scoreLimit": null,
+            "soloBotCount": 1
+          }
+        ],
+        "defaultDurationMs": 300000,
+        "warmupMs": 3000
+      },
+      "melee": {
+        "cooldownMs": 650,
+        "damage": 100,
+        "range": 1.75
+      },
+      "overdrive": {
+        "damageMultiplier": 2,
+        "durationMs": 30000,
+        "pickupRadius": 1.65,
+        "position": [
+          0,
+          0.82,
+          0
+        ],
+        "spawnIntervalMs": 120000
+      },
+      "soloBotCount": 1,
+      "weapons": [
+        {
+          "adsRecoilMultiplier": 0.72,
+          "adsSpreadMultiplier": 0.28,
+          "automatic": true,
+          "color": 16765286,
+          "crouchRecoilMultiplier": 0.84,
+          "crouchSpreadMultiplier": 0.78,
+          "damage": 31,
+          "falloffEnd": 72,
+          "falloffStart": 24,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.012,
+          "id": "carbine",
+          "limbMultiplier": 0.82,
+          "mag": 30,
+          "maximumSpread": 0.045,
+          "minimumDamage": 20,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.65,
+          "muzzleFlashScale": 1,
+          "name": "HK416",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.25,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "5.56 mm",
+            "energyFalloffEnd": 76,
+            "energyFalloffStart": 20,
+            "fmjMultiplier": 1.12,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.48,
+            "minimumWallDamageMultiplier": 0.34,
+            "penetrationPower": 5.8,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.65,
+          "recoilPitch": 0.016,
+          "recoilRecovery": 12,
+          "recoilYaw": 0.006,
+          "reload": 1.8,
+          "reportGain": 1,
+          "reserve": 120,
+          "rpm": 650,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0016,
+          "switchSeconds": 0.48
+        },
+        {
+          "adsRecoilMultiplier": 0.78,
+          "adsSpreadMultiplier": 0.42,
+          "automatic": true,
+          "color": 6678527,
+          "crouchRecoilMultiplier": 0.88,
+          "crouchSpreadMultiplier": 0.82,
+          "damage": 23,
+          "falloffEnd": 52,
+          "falloffStart": 15,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.018,
+          "id": "smg",
+          "limbMultiplier": 0.8,
+          "mag": 32,
+          "maximumSpread": 0.058,
+          "minimumDamage": 14,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.45,
+          "muzzleFlashScale": 0.78,
+          "name": "FN P90",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 38,
+            "energyFalloffStart": 8,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.22,
+            "minimumWallDamageMultiplier": 0.22,
+            "penetrationPower": 3.05,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.72,
+          "recoilPitch": 0.011,
+          "recoilRecovery": 15,
+          "recoilYaw": 0.009,
+          "reload": 1.5,
+          "reportGain": 0.86,
+          "reserve": 128,
+          "rpm": 860,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0021,
+          "switchSeconds": 0.4
+        },
+        {
+          "adsRecoilMultiplier": 0.76,
+          "adsSpreadMultiplier": 0.34,
+          "automatic": true,
+          "color": 10476146,
+          "crouchRecoilMultiplier": 0.8,
+          "crouchSpreadMultiplier": 0.7,
+          "damage": 27,
+          "falloffEnd": 82,
+          "falloffStart": 30,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.022,
+          "id": "lmg",
+          "limbMultiplier": 0.82,
+          "mag": 62,
+          "maximumSpread": 0.064,
+          "minimumDamage": 18,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.78,
+          "muzzleFlashScale": 1.14,
+          "name": "M249 SAW",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.25,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 90,
+            "energyFalloffStart": 30,
+            "fmjMultiplier": 1.14,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.58,
+            "minimumWallDamageMultiplier": 0.4,
+            "penetrationPower": 6.9,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.6,
+          "recoilPitch": 0.019,
+          "recoilRecovery": 10,
+          "recoilYaw": 0.01,
+          "reload": 3.25,
+          "reportGain": 1.06,
+          "reserve": 186,
+          "rpm": 720,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0025,
+          "switchSeconds": 0.78
+        },
+        {
+          "adsRecoilMultiplier": 0.84,
+          "adsSpreadMultiplier": 0.74,
+          "automatic": false,
+          "color": 16747099,
+          "crouchRecoilMultiplier": 0.9,
+          "crouchSpreadMultiplier": 0.88,
+          "damage": 13,
+          "falloffEnd": 38,
+          "falloffStart": 10,
+          "fireKind": "pellet",
+          "flashlight": null,
+          "headMultiplier": 1.35,
+          "hipSpread": 0.082,
+          "id": "scattergun",
+          "limbMultiplier": 0.86,
+          "mag": 8,
+          "maximumSpread": 0.112,
+          "minimumDamage": 5,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.24,
+          "muzzleFlashScale": 1.45,
+          "name": "Remington 870",
+          "optic": null,
+          "pellets": 9,
+          "penetration": {
+            "caliber": "12 ga pellet",
+            "energyFalloffEnd": 20,
+            "energyFalloffStart": 4,
+            "fmjMultiplier": 1,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.16,
+            "minimumWallDamageMultiplier": 0.18,
+            "penetrationPower": 2.15,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.8,
+          "recoilPitch": 0.052,
+          "recoilRecovery": 8,
+          "recoilYaw": 0.012,
+          "reload": 2.35,
+          "reportGain": 1.14,
+          "reserve": 40,
+          "rpm": 95,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0024,
+          "switchSeconds": 0.62
+        },
+        {
+          "adsRecoilMultiplier": 0.6,
+          "adsSpreadMultiplier": 0.05,
+          "automatic": false,
+          "color": 11134975,
+          "crouchRecoilMultiplier": 0.76,
+          "crouchSpreadMultiplier": 0.72,
+          "damage": 67,
+          "falloffEnd": 120,
+          "falloffStart": 96,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 3,
+          "hipSpread": 0.052,
+          "id": "sniper",
+          "limbMultiplier": 0.9,
+          "mag": 5,
+          "maximumSpread": 0.07,
+          "minimumDamage": 67,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.8,
+          "muzzleFlashScale": 1.22,
+          "name": "M40A5",
+          "optic": {
+            "kind": "standard",
+            "magnification": 4,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 120,
+            "energyFalloffStart": 58,
+            "fmjMultiplier": 1.16,
+            "maxPenetratedSurfaces": 3,
+            "minimumEnergyRetention": 0.7,
+            "minimumWallDamageMultiplier": 0.48,
+            "penetrationPower": 9.4,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.52,
+          "recoilPitch": 0.072,
+          "recoilRecovery": 6.5,
+          "recoilYaw": 0.016,
+          "reload": 2.6,
+          "reportGain": 1.12,
+          "reserve": 25,
+          "rpm": 55,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.004,
+          "switchSeconds": 0.68
+        },
+        {
+          "adsRecoilMultiplier": 0.74,
+          "adsSpreadMultiplier": 0.34,
+          "automatic": false,
+          "color": 15255419,
+          "crouchRecoilMultiplier": 0.86,
+          "crouchSpreadMultiplier": 0.8,
+          "damage": 36,
+          "falloffEnd": 58,
+          "falloffStart": 20,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.02,
+          "id": "pistol",
+          "limbMultiplier": 0.84,
+          "mag": 15,
+          "maximumSpread": 0.052,
+          "minimumDamage": 22,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.42,
+          "muzzleFlashScale": 0.7,
+          "name": "Glock 17",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 48,
+            "energyFalloffStart": 12,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.3,
+            "minimumWallDamageMultiplier": 0.26,
+            "penetrationPower": 3.65,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.7,
+          "recoilPitch": 0.021,
+          "recoilRecovery": 14,
+          "recoilYaw": 0.008,
+          "reload": 1.35,
+          "reportGain": 0.82,
+          "reserve": 60,
+          "rpm": 420,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0024,
+          "switchSeconds": 0.28
+        },
+        {
+          "adsRecoilMultiplier": 0.74,
+          "adsSpreadMultiplier": 0.3,
+          "automatic": false,
+          "color": 16765802,
+          "crouchRecoilMultiplier": 0.84,
+          "crouchSpreadMultiplier": 0.8,
+          "damage": 52,
+          "falloffEnd": 55,
+          "falloffStart": 18,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.9,
+          "hipSpread": 0.026,
+          "id": "magnum",
+          "limbMultiplier": 0.75,
+          "mag": 6,
+          "maximumSpread": 0.06,
+          "minimumDamage": 34,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.5,
+          "muzzleFlashScale": 1.12,
+          "name": "Desert Eagle .50 AE",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": ".50 AE",
+            "energyFalloffEnd": 82,
+            "energyFalloffStart": 30,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.4,
+            "minimumWallDamageMultiplier": 0.3,
+            "penetrationPower": 4.7,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.68,
+          "recoilPitch": 0.05,
+          "recoilRecovery": 8,
+          "recoilYaw": 0.012,
+          "reload": 1.75,
+          "reportGain": 1.2,
+          "reserve": 30,
+          "rpm": 90,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.006,
+          "switchSeconds": 0.34
+        },
+        {
+          "adsRecoilMultiplier": 0.82,
+          "adsSpreadMultiplier": 0.46,
+          "automatic": true,
+          "color": 16752451,
+          "crouchRecoilMultiplier": 0.9,
+          "crouchSpreadMultiplier": 0.82,
+          "damage": 18,
+          "falloffEnd": 34,
+          "falloffStart": 11,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.026,
+          "id": "machine-pistol",
+          "limbMultiplier": 0.8,
+          "mag": 20,
+          "maximumSpread": 0.072,
+          "minimumDamage": 11,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.55,
+          "muzzleFlashScale": 0.76,
+          "name": "Glock 18",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 30,
+            "energyFalloffStart": 6,
+            "fmjMultiplier": 1.06,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.18,
+            "minimumWallDamageMultiplier": 0.2,
+            "penetrationPower": 2.75,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.78,
+          "recoilPitch": 0.014,
+          "recoilRecovery": 13,
+          "recoilYaw": 0.012,
+          "reload": 1.55,
+          "reportGain": 0.84,
+          "reserve": 80,
+          "rpm": 900,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0032,
+          "switchSeconds": 0.3
+        },
+        {
+          "adsRecoilMultiplier": 0.84,
+          "adsSpreadMultiplier": 0.5,
+          "automatic": true,
+          "color": 16757339,
+          "crouchRecoilMultiplier": 0.9,
+          "crouchSpreadMultiplier": 0.86,
+          "damage": 19,
+          "falloffEnd": 36,
+          "falloffStart": 9,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.45,
+          "hipSpread": 0.022,
+          "id": "mini-uzi",
+          "limbMultiplier": 0.78,
+          "mag": 32,
+          "maximumSpread": 0.078,
+          "minimumDamage": 8,
+          "movementMultiplier": 1.05,
+          "movementSpreadMultiplier": 1.35,
+          "muzzleFlashScale": 0.82,
+          "name": "Mini Uzi",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 26,
+            "energyFalloffStart": 5,
+            "fmjMultiplier": 1.05,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.14,
+            "minimumWallDamageMultiplier": 0.18,
+            "penetrationPower": 2.35,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.78,
+          "recoilPitch": 0.013,
+          "recoilRecovery": 14,
+          "recoilYaw": 0.013,
+          "reload": 1.55,
+          "reportGain": 0.86,
+          "reserve": 128,
+          "rpm": 1050,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.003,
+          "switchSeconds": 0.34
+        },
+        {
+          "adsRecoilMultiplier": 0.72,
+          "adsSpreadMultiplier": 0.34,
+          "automatic": true,
+          "color": 6743751,
+          "crouchRecoilMultiplier": 0.84,
+          "crouchSpreadMultiplier": 0.8,
+          "damage": 25,
+          "falloffEnd": 58,
+          "falloffStart": 18,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.016,
+          "id": "mp5",
+          "limbMultiplier": 0.82,
+          "mag": 30,
+          "maximumSpread": 0.052,
+          "minimumDamage": 16,
+          "movementMultiplier": 1.02,
+          "movementSpreadMultiplier": 1.38,
+          "muzzleFlashScale": 0.72,
+          "name": "MP5",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.2,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "9 mm",
+            "energyFalloffEnd": 44,
+            "energyFalloffStart": 10,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.24,
+            "minimumWallDamageMultiplier": 0.23,
+            "penetrationPower": 3.15,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.7,
+          "recoilPitch": 0.01,
+          "recoilRecovery": 16,
+          "recoilYaw": 0.0065,
+          "reload": 1.65,
+          "reportGain": 0.82,
+          "reserve": 120,
+          "rpm": 800,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0017,
+          "switchSeconds": 0.38
+        },
+        {
+          "adsRecoilMultiplier": 0.7,
+          "adsSpreadMultiplier": 0.27,
+          "automatic": true,
+          "color": 16767372,
+          "crouchRecoilMultiplier": 0.82,
+          "crouchSpreadMultiplier": 0.76,
+          "damage": 29,
+          "falloffEnd": 78,
+          "falloffStart": 26,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.011,
+          "id": "m4a1",
+          "limbMultiplier": 0.82,
+          "mag": 30,
+          "maximumSpread": 0.042,
+          "minimumDamage": 19,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.58,
+          "muzzleFlashScale": 0.96,
+          "name": "M4A1",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.25,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "5.56 mm",
+            "energyFalloffEnd": 78,
+            "energyFalloffStart": 22,
+            "fmjMultiplier": 1.12,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.47,
+            "minimumWallDamageMultiplier": 0.34,
+            "penetrationPower": 5.7,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.64,
+          "recoilPitch": 0.014,
+          "recoilRecovery": 13.5,
+          "recoilYaw": 0.005,
+          "reload": 1.75,
+          "reportGain": 0.96,
+          "reserve": 120,
+          "rpm": 700,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0014,
+          "switchSeconds": 0.46
+        },
+        {
+          "adsRecoilMultiplier": 0.76,
+          "adsSpreadMultiplier": 0.32,
+          "automatic": true,
+          "color": 16756070,
+          "crouchRecoilMultiplier": 0.82,
+          "crouchSpreadMultiplier": 0.78,
+          "damage": 35,
+          "falloffEnd": 86,
+          "falloffStart": 28,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.5,
+          "hipSpread": 0.015,
+          "id": "ak-47",
+          "limbMultiplier": 0.82,
+          "mag": 30,
+          "maximumSpread": 0.054,
+          "minimumDamage": 22,
+          "movementMultiplier": 0.96,
+          "movementSpreadMultiplier": 1.7,
+          "muzzleFlashScale": 1.16,
+          "name": "AK-47",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.15,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62x39 mm",
+            "energyFalloffEnd": 94,
+            "energyFalloffStart": 30,
+            "fmjMultiplier": 1.15,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.6,
+            "minimumWallDamageMultiplier": 0.42,
+            "penetrationPower": 7.35,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.62,
+          "recoilPitch": 0.021,
+          "recoilRecovery": 10,
+          "recoilYaw": 0.009,
+          "reload": 2.05,
+          "reportGain": 1.12,
+          "reserve": 120,
+          "rpm": 600,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.0021,
+          "switchSeconds": 0.54
+        },
+        {
+          "adsRecoilMultiplier": 0.9,
+          "adsSpreadMultiplier": 0.7,
+          "automatic": true,
+          "color": 16773018,
+          "crouchRecoilMultiplier": 0.86,
+          "crouchSpreadMultiplier": 0.82,
+          "damage": 11.25,
+          "falloffEnd": 74,
+          "falloffStart": 24,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1,
+          "hipSpread": 0.026,
+          "id": "minigun",
+          "limbMultiplier": 0.85,
+          "mag": 240,
+          "maximumSpread": 0.06,
+          "minimumDamage": 8.4375,
+          "movementMultiplier": 0.8,
+          "movementSpreadMultiplier": 1.8,
+          "muzzleFlashScale": 1.25,
+          "name": "M134 Minigun",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 82,
+            "energyFalloffStart": 24,
+            "fmjMultiplier": 1.12,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.52,
+            "minimumWallDamageMultiplier": 0.38,
+            "penetrationPower": 6.5,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.72,
+          "recoilPitch": 0.008,
+          "recoilRecovery": 14,
+          "recoilYaw": 0.008,
+          "reload": 5.4,
+          "reportGain": 1.04,
+          "reserve": 480,
+          "rpm": 1200,
+          "spinUpMs": 1200,
+          "sustainedSpreadPerShot": 0.0012,
+          "switchSeconds": 1.05
+        },
+        {
+          "adsRecoilMultiplier": 0.62,
+          "adsSpreadMultiplier": 0.08,
+          "automatic": false,
+          "color": 10283775,
+          "crouchRecoilMultiplier": 0.74,
+          "crouchSpreadMultiplier": 0.7,
+          "damage": 37.2,
+          "falloffEnd": 100,
+          "falloffStart": 38,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1.7,
+          "hipSpread": 0.032,
+          "id": "m14-ebr",
+          "limbMultiplier": 0.82,
+          "mag": 20,
+          "maximumSpread": 0.062,
+          "minimumDamage": 24,
+          "movementMultiplier": 0.94,
+          "movementSpreadMultiplier": 1.85,
+          "muzzleFlashScale": 1.08,
+          "name": "M14 EBR",
+          "optic": {
+            "authority": "presentation-only",
+            "kind": "thermal-smoke-only",
+            "magnification": 2.5,
+            "solidOcclusion": "required",
+            "targetPolicy": "living-targets-through-smoke"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "7.62 mm",
+            "energyFalloffEnd": 112,
+            "energyFalloffStart": 45,
+            "fmjMultiplier": 1.16,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.68,
+            "minimumWallDamageMultiplier": 0.12,
+            "penetrationPower": 0.55,
+            "wallPenetrationMultiplier": 1.5
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.5,
+          "recoilPitch": 0.045,
+          "recoilRecovery": 7.5,
+          "recoilYaw": 0.012,
+          "reload": 2.35,
+          "reportGain": 1.08,
+          "reserve": 80,
+          "rpm": 37,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.004,
+          "switchSeconds": 0.66
+        },
+        {
+          "adsRecoilMultiplier": 0.68,
+          "adsSpreadMultiplier": 0.16,
+          "automatic": false,
+          "color": 16760184,
+          "crouchRecoilMultiplier": 0.78,
+          "crouchSpreadMultiplier": 0.72,
+          "damage": 88,
+          "falloffEnd": 72,
+          "falloffStart": 20,
+          "fireKind": "slug",
+          "flashlight": null,
+          "headMultiplier": 1.35,
+          "hipSpread": 0.025,
+          "id": "slug-shotgun",
+          "limbMultiplier": 0.72,
+          "mag": 8,
+          "maximumSpread": 0.052,
+          "minimumDamage": 45,
+          "movementMultiplier": 0.96,
+          "movementSpreadMultiplier": 1.72,
+          "muzzleFlashScale": 1.35,
+          "name": "Benelli M4 Slug",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.35,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "12 ga slug",
+            "energyFalloffEnd": 78,
+            "energyFalloffStart": 18,
+            "fmjMultiplier": 1.1,
+            "maxPenetratedSurfaces": 2,
+            "minimumEnergyRetention": 0.62,
+            "minimumWallDamageMultiplier": 0.45,
+            "penetrationPower": 8.1,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.62,
+          "recoilPitch": 0.082,
+          "recoilRecovery": 5.5,
+          "recoilYaw": 0.015,
+          "reload": 2.55,
+          "reportGain": 1.16,
+          "reserve": 32,
+          "rpm": 85,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.006,
+          "switchSeconds": 0.68
+        },
+        {
+          "adsRecoilMultiplier": 0.72,
+          "adsSpreadMultiplier": 0.32,
+          "automatic": false,
+          "color": 16766881,
+          "crouchRecoilMultiplier": 0.84,
+          "crouchSpreadMultiplier": 0.8,
+          "damage": 45,
+          "falloffEnd": 56,
+          "falloffStart": 18,
+          "fireKind": "hitscan",
+          "flashlight": {
+            "colorHex": 15135999,
+            "coneAngleRadians": 0.42,
+            "intensity": 8,
+            "kind": "always-on",
+            "rangeM": 18,
+            "solidOcclusion": "required"
+          },
+          "headMultiplier": 1.5,
+          "hipSpread": 0.022,
+          "id": "flashlight-pistol",
+          "limbMultiplier": 0.82,
+          "mag": 10,
+          "maximumSpread": 0.055,
+          "minimumDamage": 28,
+          "movementMultiplier": 1,
+          "movementSpreadMultiplier": 1.48,
+          "muzzleFlashScale": 1.08,
+          "name": "HK USP .45 Tactical",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": ".45 ACP",
+            "energyFalloffEnd": 52,
+            "energyFalloffStart": 14,
+            "fmjMultiplier": 1.08,
+            "maxPenetratedSurfaces": 1,
+            "minimumEnergyRetention": 0.34,
+            "minimumWallDamageMultiplier": 0.28,
+            "penetrationPower": 4.1,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.7,
+          "recoilPitch": 0.032,
+          "recoilRecovery": 10,
+          "recoilYaw": 0.01,
+          "reload": 1.5,
+          "reportGain": 1.4,
+          "reserve": 50,
+          "rpm": 300,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0.003,
+          "switchSeconds": 0.3
+        },
+        {
+          "adsRecoilMultiplier": 0.72,
+          "adsSpreadMultiplier": 0.12,
+          "automatic": false,
+          "color": 16740943,
+          "crouchRecoilMultiplier": 0.82,
+          "crouchSpreadMultiplier": 0.72,
+          "damage": 45,
+          "falloffEnd": 121,
+          "falloffStart": 120,
+          "fireKind": "projectile",
+          "flashlight": null,
+          "headMultiplier": 1,
+          "hipSpread": 0.028,
+          "id": "explosive-crossbow",
+          "limbMultiplier": 1,
+          "mag": 1,
+          "maximumSpread": 0.028,
+          "minimumDamage": 45,
+          "movementMultiplier": 0.94,
+          "movementSpreadMultiplier": 1.8,
+          "muzzleFlashScale": 0.2,
+          "name": "TAC-15 Explosive Crossbow",
+          "optic": {
+            "kind": "standard",
+            "magnification": 1.5,
+            "solidOcclusion": "required"
+          },
+          "pellets": 1,
+          "penetration": {
+            "caliber": "explosive bolt",
+            "energyFalloffEnd": 1,
+            "energyFalloffStart": 0,
+            "fmjMultiplier": 1,
+            "maxPenetratedSurfaces": 0,
+            "minimumEnergyRetention": 0,
+            "minimumWallDamageMultiplier": 0,
+            "penetrationPower": 0,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": "explosive-bolt-v1",
+          "proneRecoilMultiplier": 0.58,
+          "recoilPitch": 0.024,
+          "recoilRecovery": 8,
+          "recoilYaw": 0.004,
+          "reload": 2.45,
+          "reportGain": 0.5,
+          "reserve": 8,
+          "rpm": 36,
+          "spinUpMs": 0,
+          "sustainedSpreadPerShot": 0,
+          "switchSeconds": 0.58
+        },
+        {
+          "adsRecoilMultiplier": 0.9,
+          "adsSpreadMultiplier": 0.72,
+          "automatic": true,
+          "color": 16719636,
+          "crouchRecoilMultiplier": 0.9,
+          "crouchSpreadMultiplier": 0.9,
+          "damage": 56.7,
+          "falloffEnd": 18,
+          "falloffStart": 8,
+          "fireKind": "hitscan",
+          "flashlight": null,
+          "headMultiplier": 1,
+          "hipSpread": 0.038,
+          "id": "crimson-flamethrower",
+          "limbMultiplier": 1,
+          "mag": 100,
+          "maximumSpread": 0.055,
+          "minimumDamage": 0,
+          "movementMultiplier": 0.82,
+          "movementSpreadMultiplier": 1.4,
+          "muzzleFlashScale": 1.8,
+          "name": "Crimson Flamethrower",
+          "optic": null,
+          "pellets": 1,
+          "penetration": {
+            "caliber": "ignited fuel stream",
+            "energyFalloffEnd": 18,
+            "energyFalloffStart": 0,
+            "fmjMultiplier": 1,
+            "maxPenetratedSurfaces": 0,
+            "minimumEnergyRetention": 0,
+            "minimumWallDamageMultiplier": 0,
+            "penetrationPower": 0,
+            "wallPenetrationMultiplier": 1
+          },
+          "projectileId": null,
+          "proneRecoilMultiplier": 0.82,
+          "recoilPitch": 0.004,
+          "recoilRecovery": 18,
+          "recoilYaw": 0.003,
+          "reload": 3.8,
+          "reportGain": 0.92,
+          "reserve": 0,
+          "rpm": 600,
+          "spinUpMs": 180,
+          "sustainedSpreadPerShot": 0.0008,
+          "switchSeconds": 0.85
+        }
+      ]
+    },
+    "inventory": {
+      "deathDrops": {
+        "interactionRange": 2.35,
+        "lifetimeMs": 30000,
+        "maximumActive": 12,
+        "scavengeHorizontalRange": 1.05,
+        "scavengeVerticalRange": 2.4
+      },
+      "fieldKits": [
+        {
+          "grenade": "frag",
+          "id": "balanced",
+          "role": "CONTROL / MID RANGE",
+          "sidearm": "pistol",
+          "summary": "Stable automatic pressure with the cleanest sight picture.",
+          "title": "Linekeeper",
+          "traits": [
+            "Range 4",
+            "Control 4",
+            "Mobility 3"
+          ],
+          "weapon": "carbine"
+        },
+        {
+          "grenade": "flash",
+          "id": "runner",
+          "role": "MOBILITY / CLOSE RANGE",
+          "sidearm": "pistol",
+          "summary": "Fast handling and dense close-range fire for side routes.",
+          "title": "Circuit Runner",
+          "traits": [
+            "Range 2",
+            "Control 3",
+            "Mobility 5"
+          ],
+          "weapon": "smg"
+        },
+        {
+          "grenade": "frag",
+          "id": "breacher",
+          "role": "BURST / VERY CLOSE",
+          "sidearm": "pistol",
+          "summary": "Heavy short-range impact with a deliberate pump cycle.",
+          "title": "Doorbreaker",
+          "traits": [
+            "Range 1",
+            "Control 2",
+            "Mobility 3"
+          ],
+          "weapon": "scattergun"
+        },
+        {
+          "grenade": "smoke",
+          "id": "marksman",
+          "role": "PRECISION / LONG RANGE",
+          "sidearm": "machine-pistol",
+          "summary": "One-headshot M40A5 precision backed by a compact full-auto Glock 18 sidearm.",
+          "title": "M40A5 Marksman",
+          "traits": [
+            "Range 5",
+            "Control 2",
+            "Mobility 2"
+          ],
+          "weapon": "sniper"
+        }
+      ],
+      "fieldSupport": {
+        "hunterSwarm": {
+          "blastRadius": 4,
+          "count": 5,
+          "directDamage": 200,
+          "directRadius": 0.85,
+          "proneMultiplier": 0.09,
+          "splashDamage": 100
+        },
+        "nuke": {
+          "damage": 1000,
+          "hostileOnly": true,
+          "warningMs": 5000
+        },
+        "rewards": [
+          {
+            "eliminations": 3,
+            "id": "scout-sweep",
+            "name": "Scout Sweep",
+            "repeatable": false
+          },
+          {
+            "eliminations": 3,
+            "id": "adrenaline",
+            "name": "Adrenaline Boost",
+            "repeatable": false
+          },
+          {
+            "eliminations": 4,
+            "id": "care-package",
+            "name": "Care Package",
+            "repeatable": false
+          },
+          {
+            "eliminations": 5,
+            "id": "yardhawk",
+            "name": "Yardhawk",
+            "repeatable": false
+          },
+          {
+            "eliminations": 5,
+            "id": "piloted-drone",
+            "name": "Piloted Drone",
+            "repeatable": false
+          },
+          {
+            "eliminations": 7,
+            "id": "tri-pass",
+            "name": "Tri-Pass Strike",
+            "repeatable": false
+          },
+          {
+            "eliminations": 7,
+            "id": "carpet-bomber",
+            "name": "Carpet Bomber",
+            "repeatable": false
+          },
+          {
+            "eliminations": 8,
+            "id": "hunter-swarm",
+            "name": "Hunter Swarm",
+            "repeatable": false
+          },
+          {
+            "eliminations": 8,
+            "id": "chopper",
+            "name": "Chopper Gunner",
+            "repeatable": false
+          },
+          {
+            "eliminations": 15,
+            "id": "drone-swarm",
+            "name": "Drone Swarm",
+            "repeatable": false
+          },
+          {
+            "eliminations": 15,
+            "id": "nuke",
+            "name": "Nuke",
+            "repeatable": false
+          }
+        ],
+        "triPass": {
+          "blastRadius": 15,
+          "maximumDamage": 450
+        }
+      }
+    },
+    "movement": {
+      "ads": {
+        "acceleration": 40,
+        "deceleration": 62,
+        "eyeHeight": 1.7,
+        "friction": 0,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 4.05
+      },
+      "airborne": {
+        "acceleration": 10.5,
+        "deceleration": 2.4,
+        "eyeHeight": 1.7,
+        "friction": 0.25,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 6.15
+      },
+      "crouch": {
+        "acceleration": 36,
+        "deceleration": 42,
+        "eyeHeight": 1.16,
+        "friction": 0,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 3.15
+      },
+      "prone": {
+        "acceleration": 17,
+        "deceleration": 25,
+        "eyeHeight": 0.61,
+        "friction": 0,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 1.55
+      },
+      "sprint": {
+        "acceleration": 54,
+        "deceleration": 62,
+        "eyeHeight": 1.7,
+        "friction": 0,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 8.7
+      },
+      "walk": {
+        "acceleration": 48,
+        "deceleration": 62,
+        "eyeHeight": 1.7,
+        "friction": 0,
+        "jumpVelocity": 6.35,
+        "maxSpeed": 6.15
+      }
+    },
+    "networking": {
+      "remoteInterpolationRate": 24,
+      "stateBroadcastIntervalMs": 50
+    },
+    "physics": {
+      "controller": {
+        "autostepHeight": 0.42,
+        "autostepMinimumWidth": 0.22,
+        "controllerOffset": 0.025,
+        "gravity": -22,
+        "maximumSlopeClimbDegrees": 50,
+        "minimumSlopeSlideDegrees": 55,
+        "playerHalfHeight": 0.53,
+        "playerRadius": 0.38,
+        "snapToGround": 0.24
+      },
+      "stances": {
+        "crouch": {
+          "eyeFromCenter": 0.58,
+          "halfHeight": 0.22,
+          "radius": 0.36
+        },
+        "prone": {
+          "eyeFromCenter": 0.23,
+          "halfHeight": 0.02,
+          "radius": 0.36
+        },
+        "stand": {
+          "eyeFromCenter": 0.79,
+          "halfHeight": 0.53,
+          "radius": 0.38
+        }
+      }
+    },
+    "rendering": {
+      "defaultProfile": "blender",
+      "profiles": {
+        "blender": {
+          "config": {
+            "antialias": true,
+            "pixelRatioCap": 1,
+            "profile": "blender",
+            "reducedPresentationDetail": false,
+            "reducedRepresentation": false,
+            "reducedWorldDetail": false,
+            "representation": "blender",
+            "shadowMapSize": 2048,
+            "shadowMode": "static",
+            "shadows": true,
+            "staticMaterialMode": "preserve"
+          },
+          "lighting": {
+            "ambientColor": 14672860,
+            "ambientIntensity": 0.18,
+            "exposure": 1.02,
+            "fillColor": 14212607,
+            "fillIntensity": 0.22,
+            "fillPosition": [
+              54,
+              20,
+              -42
+            ],
+            "fogColor": 11576757,
+            "fogFar": 128,
+            "fogNear": 50,
+            "godRayLobes": 4,
+            "godRayStrength": 0.12,
+            "hemisphereGround": 10721924,
+            "hemisphereIntensity": 0.7,
+            "hemisphereSky": 13350090,
+            "interiorLightCount": 4,
+            "interiorLightIntensity": 15,
+            "routeLightCount": 3,
+            "routeLightIntensity": 5,
+            "shadowBias": -0.00012,
+            "shadowNormalBias": 0.04,
+            "skyBottom": 15769951,
+            "skyCloud": 14259072,
+            "skyCloudLight": 16746303,
+            "skyCloudShadow": 3678537,
+            "skyHorizon": 13601404,
+            "skySun": 16763015,
+            "skyTop": 4601951,
+            "softShadows": true,
+            "streetLightCount": 4,
+            "streetLightIntensity": 6,
+            "sunColor": 16763285,
+            "sunIntensity": 3.15,
+            "sunPosition": [
+              -62,
+              25,
+              38
+            ]
+          }
+        },
+        "compat": {
+          "config": {
+            "antialias": false,
+            "pixelRatioCap": 0.2,
+            "profile": "compat",
+            "reducedPresentationDetail": true,
+            "reducedRepresentation": true,
+            "reducedWorldDetail": true,
+            "representation": "compat",
+            "shadowMapSize": 0,
+            "shadowMode": "off",
+            "shadows": false,
+            "staticMaterialMode": "palette-basic"
+          },
+          "lighting": {
+            "ambientColor": 14476253,
+            "ambientIntensity": 0.86,
+            "exposure": 1.16,
+            "fillColor": 14212607,
+            "fillIntensity": 0.66,
+            "fillPosition": [
+              54,
+              20,
+              -42
+            ],
+            "fogColor": 12103096,
+            "fogFar": 140,
+            "fogNear": 56,
+            "godRayLobes": 0,
+            "godRayStrength": 0,
+            "hemisphereGround": 10327679,
+            "hemisphereIntensity": 1.9,
+            "hemisphereSky": 13351627,
+            "interiorLightCount": 0,
+            "interiorLightIntensity": 0,
+            "routeLightCount": 0,
+            "routeLightIntensity": 0,
+            "shadowBias": -0.00028,
+            "shadowNormalBias": 0.025,
+            "skyBottom": 15377255,
+            "skyCloud": 14064262,
+            "skyCloudLight": 16748876,
+            "skyCloudShadow": 4467027,
+            "skyHorizon": 13275014,
+            "skySun": 16764819,
+            "skyTop": 5785198,
+            "softShadows": false,
+            "streetLightCount": 0,
+            "streetLightIntensity": 0,
+            "sunColor": 16765602,
+            "sunIntensity": 2.5,
+            "sunPosition": [
+              -62,
+              25,
+              38
+            ]
+          }
+        },
+        "performance": {
+          "config": {
+            "antialias": false,
+            "pixelRatioCap": 0.75,
+            "profile": "performance",
+            "reducedPresentationDetail": true,
+            "reducedRepresentation": true,
+            "reducedWorldDetail": true,
+            "representation": "responsive",
+            "shadowMapSize": 0,
+            "shadowMode": "off",
+            "shadows": false,
+            "staticMaterialMode": "vertex-lit"
+          },
+          "lighting": {
+            "ambientColor": 14476253,
+            "ambientIntensity": 0.34,
+            "exposure": 1.06,
+            "fillColor": 14212607,
+            "fillIntensity": 0.32,
+            "fillPosition": [
+              54,
+              20,
+              -42
+            ],
+            "fogColor": 12103096,
+            "fogFar": 140,
+            "fogNear": 56,
+            "godRayLobes": 2,
+            "godRayStrength": 0.08,
+            "hemisphereGround": 10327679,
+            "hemisphereIntensity": 1.05,
+            "hemisphereSky": 13351627,
+            "interiorLightCount": 2,
+            "interiorLightIntensity": 11,
+            "routeLightCount": 3,
+            "routeLightIntensity": 3,
+            "shadowBias": -0.00028,
+            "shadowNormalBias": 0.025,
+            "skyBottom": 15377255,
+            "skyCloud": 14064262,
+            "skyCloudLight": 16748876,
+            "skyCloudShadow": 4467027,
+            "skyHorizon": 13275014,
+            "skySun": 16764819,
+            "skyTop": 5785198,
+            "softShadows": false,
+            "streetLightCount": 4,
+            "streetLightIntensity": 4,
+            "sunColor": 16765602,
+            "sunIntensity": 2.7,
+            "sunPosition": [
+              -62,
+              25,
+              38
+            ]
+          }
+        }
+      }
+    },
+    "schemaVersion": 3,
+    "simulation": {
+      "hz": 120,
+      "maximumCatchupSteps": 6,
+      "maximumFrameDtSeconds": 0.05
+    }
+  },
+  "metadata": {
+    "baseSourceRevision": "5075a52d80c6db69a97ed53acc2df5368728371a",
+    "baseline": "Pass 65 pre-HITL arsenal candidate compared against the frozen Pass 25A oracle",
+    "candidateStatus": "pre-hitl-not-approved",
+    "dependencies": {
+      "@dimforge/rapier3d-compat": "0.19.3",
+      "peerjs": "1.5.5",
+      "three": "0.185.1",
+      "typescript": "6.0.3",
+      "vite": "8.1.3"
+    },
+    "generatedBy": "scripts/qa/generate-pass25a-baselines.ts",
+    "schemaVersion": 3,
+    "specifiedDeltas": [
+      "scattergun-strength",
+      "tri-pass-strength",
+      "spawn-safety",
+      "streak-cycle",
+      "owner-defect-fixes",
+      "pass30-double-tri-pass-radius-and-damage",
+      "pass30-hunter-swarm-eight-streak",
+      "pass30-nuke-fifteen-streak",
+      "pass30-stormfront-lighting",
+      "pass54-wall-penetration",
+      "pass55-range-armory-lmg",
+      "pass60-sniper-headshot-three-times",
+      "pass60-overdrive-two-times-thirty-seconds",
+      "pass60-atomic-acres-collision-completion",
+      "pass62-open-house-interior-routes",
+      "pass65-protocol-v7-arsenal-and-real-weapon-names",
+      "pass65-curated-and-three-custom-loadouts",
+      "pass65-single-selected-grenade-and-corpse-refill",
+      "pass65-coherent-pellet-shotgun-rebalance",
+      "pass65-hitl-minigun-no-crit-and-25-percent-damage-reduction",
+      "pass65-hitl-crossbow-compact-1.5x-optic",
+      "pass65-canonical-bot-weapon-and-grenade-cycles",
+      "pass65-atomic-ten-defeat-reinforcements",
+      "pass66-hitl-m14-half-fire-rate-and-through-wall-thermal",
+      "pass66-hitl-drone-swarm-thirty-second-lifetime",
+      "pass66-hitl-carpet-bomber-friendly-fire",
+      "pass66-hitl-balance-m14-62-damage-compensation",
+      "pass66-hitl-balance-scattergun-95rpm-13-damage",
+      "pass68-m14-ebr-75-percent-wallbang-reduction-half-fire-rate",
+      "pass68-flamethrower-triple-damage-and-five-second-ground-fire",
+      "pass68-flare-gun-five-second-burn",
+      "pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second",
+      "pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction"
+    ]
+  }
+}

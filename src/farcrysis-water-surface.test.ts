@@ -26,6 +26,8 @@ import {
   createFarcrysisSeaSurfaceMaterial,
   FARCRYSIS_WATER_DEPTH_ATTRIBUTE,
   SEA_REFLECTION_STRENGTH,
+  SKY_REFLECTION_HORIZON,
+  SKY_REFLECTION_ZENITH,
 } from './farcrysis-water-surface';
 
 const PARAMS = {
@@ -61,6 +63,28 @@ describe('farcrysis sea surface material', () => {
   it('keeps the sky-reflection contribution bounded for the bloom contract', () => {
     expect(SEA_REFLECTION_STRENGTH).toBeGreaterThan(0);
     expect(SEA_REFLECTION_STRENGTH).toBeLessThanOrEqual(1);
+  });
+
+  // HF-394 visual audit (real-WebGPU captures 2026-08-26): the retired
+  // sunset palette (warm 0xffb469 at high reflected rays) rendered grazing
+  // water as yellow mud against the arena's bright DAY sky. The reflection
+  // must agree with the sky a player can actually see (threejs-webgpu-water
+  // skill: "sky color, fog, horizon and water palette must agree"). Pinned as
+  // physical properties, not hex echoes:
+  //   - zenith: BLUE-dominant day sky (b > g > r);
+  //   - horizon: pale haze, LIGHTER than the zenith (fog agreement);
+  //   - the retired warm zenith hex must never return.
+  it('reflects the LIVE day sky, not the retired sunset palette', () => {
+    const zenith = new THREE.Color(SKY_REFLECTION_ZENITH);
+    const horizon = new THREE.Color(SKY_REFLECTION_HORIZON);
+    expect(zenith.b).toBeGreaterThan(zenith.g);
+    expect(zenith.g).toBeGreaterThan(zenith.r);
+    expect(0.2126 * horizon.r + 0.7152 * horizon.g + 0.0722 * horizon.b)
+      .toBeGreaterThan(0.2126 * zenith.r + 0.7152 * zenith.g + 0.0722 * zenith.b);
+    // Retired golden-hour water zenith — reintroducing it regresses the
+    // yellow-mud grazing look the 2026-08-26 captures recorded.
+    expect(SKY_REFLECTION_ZENITH).not.toBe(0xffb469);
+    expect(SKY_REFLECTION_HORIZON).not.toBe(0xffb469);
   });
 
   it.each([undefined, 'webgl2'] as const)(
@@ -121,5 +145,19 @@ describe('HF-394 wiring guard', () => {
     expect(artSource).toContain("from './farcrysis-water-surface'");
     expect(artSource).toMatch(/deepGeom[\s\S]{0,120}bakeFarcrysisWaterDepth\(deepGeom, true\)/);
     expect(artSource).toContain('createFarcrysisSeaSurfaceMaterial({');
+  });
+  // HF-394 visual audit (real-WebGPU captures, 2026-08-26): the flat mud and
+  // sand BACKSTOP plates under the sculpted terrain still spanned the full
+  // 120 m (half 60), but the HF-393 waterline sits at Chebyshev ~55.18
+  // (island half 55.5). From 55.2 to 60 the opaque sand plate floated ABOVE
+  // the lagoon surface (-0.18 vs water -0.25), rendering a hard-edged yellow
+  // floor over the open water. The plates must end at the shore-descent
+  // start (edge distance 10 m -> half 54), where the sculpted terrain is
+  // still above water and hides them.
+  it('ends the flat backstop plates before the waterline', () => {
+    expect(farcrysisSource).toContain('new THREE.PlaneGeometry(108, 108), mudMat');
+    expect(farcrysisSource).toContain('new THREE.PlaneGeometry(108, 108), sandMat');
+    // No flat backstop may span past the authored waterline.
+    expect(farcrysisSource).not.toContain('new THREE.PlaneGeometry(120, 120)');
   });
 });

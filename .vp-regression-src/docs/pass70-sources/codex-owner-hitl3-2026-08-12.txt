@@ -1,0 +1,17 @@
+First-person guns still clip through nearby environment geometry when standing close or going prone; the prior correction has regressed and must be restored across the weapon catalog.
+
+Carpet Bomber napalm must damage enemies, friendlies and the owner, and its existing authoritative flame damage must be doubled; apply the same all-relationship double-damage rule to Flare Gun fire and the Flamethrower.
+
+An intermittent strange white-noise sound appears behind gameplay; identify its actual source and remove it without muting intended weapon, ambience or accessibility audio.
+
+For any weapon that can reveal an operator through a wall, show the operator's normal exact animated model with an additional orange glow around the body instead of substituting a small orange pawn.
+
+Remove the small freeze that occurs when combat begins by locating the cold first-combat work and making the path robust without hiding frame errors.
+
+First-person arms must continue below the bottom of the screen, align like a natural human view and grip, and use thicker strong muscular proportions rather than skinny or detached joints.
+
+Stop the blue and orange practical lights beside the Gun Range killstreak-room door from flickering, and reset the shared clock to exactly two minutes on canonical room entry and exit for solo, host and guests.
+
+When Semtex or an explosive-crossbow bolt sticks a living player, flash a loud red centre-screen HUD warning for exactly 0.5 seconds in addition to the smaller persistent status.
+
+Correct Carpet Bomber collision against the Gun Range killstreak room so presentation, movement, support routing and authority geometry do not disagree.

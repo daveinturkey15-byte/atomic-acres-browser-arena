@@ -1,0 +1,14 @@
+{
+  "fixtureOnly": true,
+  "metadata": {
+    "schemaVersion": 3,
+    "kind": "viewmodel-lod",
+    "presentationId": "a4-vanguard-view",
+    "weaponId": "a4-vanguard",
+    "collection": "world",
+    "level": 1,
+    "triangles": 18000,
+    "draws": 5,
+    "decodedTextureBytes": 16777216
+  }
+}

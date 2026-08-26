@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "arena-audio-evidence",
+  "arenaId": "gun-range",
+  "ambienceEventId": "ambience.arena-bed",
+  "variantId": "gun-range.ventilation",
+  "sourceBudget": 4,
+  "settledSourceCount": 0,
+  "artifactPath": "fixture-payloads/audio/arenas/gun-range.json"
+}

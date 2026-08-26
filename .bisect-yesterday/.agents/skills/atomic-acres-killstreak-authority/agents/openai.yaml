@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atomic Acres Killstreak Authority"
+  short_description: "Build host-authoritative support systems"
+  default_prompt: "Use $atomic-acres-killstreak-authority to add or verify an Atomic Acres killstreak."

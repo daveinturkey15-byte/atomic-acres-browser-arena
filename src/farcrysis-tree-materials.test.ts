@@ -200,4 +200,21 @@ describe('farcrysis tree material fidelity (12 species)', () => {
     // buildFarcrysis it must count materials that actually carry maps.
     expect(FARCRYSIS_VEGE_STATS().textureCount).toBeGreaterThan(0);
   });
+  it('gives the enhanced-palm crowns the frond texture treatment (not skipped as UV-less)', () => {
+    // createPalmCrownGeometry used to be positions-only; applyFarcrysisTextures
+    // skips meshes without UV attributes, so the most visible beach-tree canopy
+    // silently kept its flat solid colour while every other species got PBR.
+    let fronds: THREE.Mesh | null = null;
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.name === 'farcrysis-vege-palm-fronds') fronds = obj;
+    });
+    expect(fronds, 'palm-fronds mesh missing from the built scene').not.toBeNull();
+    const mesh = fronds as unknown as THREE.Mesh;
+    expect(mesh.geometry.getAttribute('uv'), 'crown geometry must carry UVs or the texture pass skips it').toBeTruthy();
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    expect(mat.alphaMap, `palm-fronds must carry the frond alpha map`).not.toBeNull();
+    expect(mat.transparent, 'palm-fronds must be transparent for the alpha cut').toBe(true);
+    expect(mat.alphaTest, 'palm-fronds must use an alpha test threshold').toBeGreaterThan(0);
+  });
 });
+

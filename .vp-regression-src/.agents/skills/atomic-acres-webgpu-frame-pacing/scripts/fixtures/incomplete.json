@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "policyId": "atomic-acres-webgpu-frame-pacing-v1",
+  "activeGameplay": {
+    "nativeWebgpuCanvasReadback": "forbidden",
+    "nativeWebgpuCanvasTo2dCopy": "allowed-for-pause",
+    "periodicCanvasCapture": "forbidden"
+  },
+  "pauseBackdrop": {
+    "nativeWebgpu": "canvas-snapshot",
+    "webgl2Compatibility": "periodic-copy",
+    "maximumCopiesPerPauseOpen": 99,
+    "noCompositorFallback": "stale-source-pixels"
+  },
+  "evidence": {
+    "sourceIdentity": "branch-name",
+    "browser": "bundled-chromium",
+    "backend": "renderer-fallback-allowed",
+    "viewport": {
+      "width": 1280,
+      "height": 720,
+      "deviceScaleFactor": 1
+    },
+    "graphics": "Performance",
+    "arenas": [
+      "atomic-acres"
+    ],
+    "comparison": "single-lucky-run",
+    "minimumWindowMs": 1000,
+    "metrics": [
+      "averageFps"
+    ],
+    "longTasks": "ignored",
+    "runtimeSignals": [],
+    "ownerHitl": "optional",
+    "commands": []
+  }
+}

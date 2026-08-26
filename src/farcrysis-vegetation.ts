@@ -23,7 +23,13 @@
 import * as THREE from 'three';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL, FARCRYSIS_SHORE } from './farcrysis-terrain-authority';
+import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
+import {
+  FARCRYSIS_ARENA_HALF,
+  FARCRYSIS_INLAND_DEPTH,
+  FARCRYSIS_WATERLINE_EDGE,
+  farcrysisEdgeDistance,
+} from './farcrysis-shore-bands';
 import { buildPalmStandInstances, type PalmPlacement } from './farcrysis-palms-enhanced';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
@@ -117,36 +123,23 @@ const MARGIN = 1.8;
 // again. No layer carries a hand-scaled legacy radius.
 // ---------------------------------------------------------------------------
 
-const ARENA_HALF = BOUNDS.maxX;
-
-/** Metres inward from the square boundary face at (x, z) — the terrain
- *  authority's own shore-distance convention. >= 0 on the island. */
-function edgeDistance(x: number, z: number): number {
-  return ARENA_HALF - Math.max(Math.abs(x), Math.abs(z));
-}
-
-/** Edge distance of the waterline all around the island: where the HF-393
- *  descending shelf envelope crosses the gameplay water level. Derived from
- *  the authority constants, never a magic number:
- *  joinHeight - shelfSlope * (descentStartDist - d) = WATER_LEVEL. */
-const WATERLINE_EDGE: number = FARCRYSIS_SHORE.descentStartDist
-  - (FARCRYSIS_SHORE.joinHeight - FARCRYSIS_WATER_LEVEL) / FARCRYSIS_SHORE.shelfSlope;
-
-/** Dry-land depth from the waterline to the bound wall. */
-const INLAND_DEPTH = ARENA_HALF - WATERLINE_EDGE;
+// Shore arithmetic — arena half-extent, waterline edge distance, dry-land
+// depth, Chebyshev edge distance — is imported from farcrysis-shore-bands:
+// the ONE square-shore convention shared with the palms module, derived from
+// the terrain authority's HF-393 profile.
 
 /** Placement zones as [innerEdge, outerEdge] shore-edge intervals. */
 const ZONE = {
   /** Golden sand rim: just above the waterline to the top of the beach shelf. */
-  beach: Object.freeze([WATERLINE_EDGE + 0.6, WATERLINE_EDGE + INLAND_DEPTH * 0.16]),
+  beach: Object.freeze([FARCRYSIS_WATERLINE_EDGE + 0.6, FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.16]),
   /** Beach-to-jungle transition (the flattened approach band). */
-  transition: Object.freeze([WATERLINE_EDGE + INLAND_DEPTH * 0.1, WATERLINE_EDGE + INLAND_DEPTH * 0.34]),
+  transition: Object.freeze([FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.1, FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.34]),
   /** Jungle interior, out to near the bound wall. */
-  jungle: Object.freeze([WATERLINE_EDGE + INLAND_DEPTH * 0.3, ARENA_HALF - MARGIN - 1]),
+  jungle: Object.freeze([FARCRYSIS_WATERLINE_EDGE + FARCRYSIS_INLAND_DEPTH * 0.3, FARCRYSIS_ARENA_HALF - MARGIN - 1]),
   /** Shallow-waterline straddle for mangroves. */
-  mangrove: Object.freeze([WATERLINE_EDGE - 3.5, WATERLINE_EDGE + 3.5]),
+  mangrove: Object.freeze([FARCRYSIS_WATERLINE_EDGE - 3.5, FARCRYSIS_WATERLINE_EDGE + 3.5]),
   /** Wave-washed strand line for driftwood. */
-  strand: Object.freeze([WATERLINE_EDGE + 0.5, WATERLINE_EDGE + 6]),
+  strand: Object.freeze([FARCRYSIS_WATERLINE_EDGE + 0.5, FARCRYSIS_WATERLINE_EDGE + 6]),
 } as const;
 
 /** Mid-jungle depth: halfway between the jungle zone's inner and outer
@@ -172,12 +165,12 @@ function edgeBandPositions(
   const result: Array<[number, number, number, number]> = [];
   let attempts = 0;
   const maxAttempts = count * 60;
-  const span = ARENA_HALF - MARGIN;
+  const span = FARCRYSIS_ARENA_HALF - MARGIN;
   while (result.length < count && attempts < maxAttempts) {
     attempts += 1;
     const x = (rng() * 2 - 1) * span;
     const z = (rng() * 2 - 1) * span;
-    const edge = edgeDistance(x, z);
+    const edge = farcrysisEdgeDistance(x, z);
     if (edge < innerEdge || edge > outerEdge) continue;
     if (!clearOfGameplay(x, z, clearanceMargin)) continue;
     result.push([x, z, terrainHeightAt(x, z), rng() * Math.PI * 2]);
@@ -198,12 +191,12 @@ function poissonEdgeBandPositions(
   const result: Array<[number, number, number, number]> = [];
   let attempts = 0;
   const maxAttempts = count * 90;
-  const span = ARENA_HALF - MARGIN;
+  const span = FARCRYSIS_ARENA_HALF - MARGIN;
   while (result.length < count && attempts < maxAttempts) {
     attempts += 1;
     const x = (rng() * 2 - 1) * span;
     const z = (rng() * 2 - 1) * span;
-    const edge = edgeDistance(x, z);
+    const edge = farcrysisEdgeDistance(x, z);
     if (edge < innerEdge || edge > outerEdge) continue;
     if (!clearOfGameplay(x, z, clearanceMargin)) continue;
     let tooClose = false;
@@ -507,88 +500,6 @@ function mergeTransformed(geomParts: Array<{ geom: THREE.BufferGeometry; matrix:
     merged.computeVertexNormals();
   }
   return merged;
-}
-
-/**
- * Poisson-disc-based layer positions (seeded dart-throwing rejection).
- * Same signature as layerPositions but enforces minimum separation between
- * placed points for a more natural, non-overlapping scatter.
- */
-function poissonLayerPositions(
-  count: number,
-  minRadius: number,
-  maxRadius: number,
-  clearanceMargin: number,
-  seed: number,
-  minSeparation: number,
-): Array<[number, number, number, number]> {
-  const rng = mulberry32(seed);
-  const result: Array<[number, number, number, number]> = [];
-  let attempts = 0;
-  const maxAttempts = count * 60;
-
-  while (result.length < count && attempts < maxAttempts) {
-    const radius = minRadius + rng() * (maxRadius - minRadius);
-    const angle = rng() * Math.PI * 2;
-    let x = Math.cos(angle) * radius;
-    let z = Math.sin(angle) * radius;
-    x = Math.max(BOUNDS.minX + MARGIN, Math.min(BOUNDS.maxX - MARGIN, x));
-    z = Math.max(BOUNDS.minZ + MARGIN, Math.min(BOUNDS.maxZ - MARGIN, z));
-
-    if (clearOfGameplay(x, z, clearanceMargin)) {
-      let tooClose = false;
-      for (let j = 0; j < result.length; j++) {
-        if (Math.hypot(x - result[j][0], z - result[j][1]) < minSeparation) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        const groundY = terrainHeightAt(x, z);
-        result.push([x, z, groundY, angle]);
-      }
-    }
-
-    attempts += 1;
-  }
-
-  return result;
-}
-
-/**
- * Generate grove-like clustered positions: pick N grove centres, then scatter
- * `splay` stems around each centre with a small in-grove radius.
- */
-// PENDING WIRING (farcrysis-world lane, fw-vegetation-radii). This helper was written in
-// round 1 and never called - the comment above claiming the edge band uses it is not yet
-// true. Exported rather than deleted so the round's work survives and the debt stays
-// VISIBLE; wire it or delete it, but do not leave it exported and unused.
-export function grovePositions(
-  groves: number,
-  stemsPerGrove: number,
-  splay: number,
-  minRadius: number,
-  maxRadius: number,
-  clearanceMargin: number,
-  seed: number,
-): Array<[number, number, number, number, number, number]> {
-  const rng = mulberry32(seed);
-  const result: Array<[number, number, number, number, number, number]> = [];
-  const centres = poissonLayerPositions(groves, minRadius, maxRadius, clearanceMargin, seed, splay * 3);
-
-  for (let g = 0; g < centres.length; g++) {
-    const [cx, cz, _groundC, _angleC] = centres[g];
-    for (let s = 0; s < stemsPerGrove; s++) {
-      const sa = rng() * Math.PI * 2;
-      const sr = rng() * splay;
-      const sx = cx + Math.cos(sa) * sr;
-      const sz = cz + Math.sin(sa) * sr;
-      const sy = terrainHeightAt(sx, sz);
-      result.push([sx, sz, sy, sa, sr, g + s * 0.01]);
-    }
-  }
-
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -2810,7 +2721,7 @@ function constrainedScatter(
   // the rest. Sparse strict-fit layers pass a higher multiplier so enough
   // candidates survive to reach `count`.
   const oversample = opts.oversample ?? 2.5;
-  const span = ARENA_HALF - MARGIN;
+  const span = FARCRYSIS_ARENA_HALF - MARGIN;
   const step = Math.sqrt(((2 * span) ** 2) / (count * oversample));
   for (let gx = -span; gx <= span && out.length < count; gx += step) {
     for (let gz = -span; gz <= span && out.length < count; gz += step) {

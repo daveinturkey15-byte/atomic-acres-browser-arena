@@ -1,0 +1,122 @@
+{
+  "schema": "atomic-acres/pass25a-reference-environment@2",
+  "baselineSource": "3a1ead06bfdede4b3d6c96f9ecde228520c04ccf",
+  "packageLockSha256": "24fb171b0a933df6c93232d7bc7af3e0a954ceb391bb34388948d95a2f85a900",
+  "playwrightBrowserVersion": "149.0.7827.55",
+  "os": "linux",
+  "architecture": "x64",
+  "node": "v22.22.2",
+  "measurementMode": "headed Chromium under Xvfb",
+  "viewport": [
+    1280,
+    720
+  ],
+  "devicePixelRatio": 1,
+  "webgl": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+    "vendor": "WebKit",
+    "renderer": "WebKit WebGL"
+  },
+  "render": {
+    "profile": "performance",
+    "representation": "responsive",
+    "pixelRatio": 0.75,
+    "drawingBuffer": [
+      960,
+      540
+    ],
+    "antialias": false,
+    "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "calls": 136,
+    "triangles": 116172,
+    "points": 0,
+    "lines": 0,
+    "sceneObjects": 14,
+    "reducedMode": true,
+    "shadows": false,
+    "shadowAutoUpdate": false,
+    "shadowNeedsUpdate": false,
+    "staticShadowDynamicRefreshes": 0,
+    "contextLifecycle": {
+      "lost": false,
+      "losses": 1,
+      "restorations": 1
+    },
+    "authoredShadows": false,
+    "shadowMode": "off",
+    "framePacing": {
+      "ready": false,
+      "sampleCount": 29,
+      "cadenceHz": 5.455537370430982,
+      "medianMs": 183.30000000000018,
+      "p95Ms": 200.09999999999945,
+      "maxMs": 233.30000000000018,
+      "displayLimited": false
+    },
+    "adaptive": {
+      "enabled": true,
+      "profile": "performance",
+      "tier": 2,
+      "levels": [
+        0.55,
+        0.65,
+        0.75
+      ],
+      "pixelRatioCap": 0.75,
+      "targetFrameMs": 16.666666666666668,
+      "p50Ms": 183.30000000000018,
+      "p95Ms": 233.29999999999927,
+      "samples": 29,
+      "downshifts": 0,
+      "upshifts": 0,
+      "lastReason": "initial profile tier",
+      "cooldownFrames": 0
+    },
+    "lighting": {
+      "exposure": 1.14,
+      "hemisphereIntensity": 1.48,
+      "ambientIntensity": 0.38,
+      "sunIntensity": 2.8,
+      "shadowBias": -0.00028,
+      "shadowNormalBias": 0.025,
+      "softShadows": false
+    },
+    "blenderEnvironment": {
+      "status": "idle",
+      "asset": "./assets/original/models/atomic-acres-blender-arena.glb",
+      "meshCount": 0,
+      "materialCount": 0,
+      "texturedMaterials": 0,
+      "textureCount": 0,
+      "triangleCount": 0,
+      "semanticWindows": 0,
+      "boundWindows": 0,
+      "proceduralWorldHidden": false,
+      "error": null
+    },
+    "staticBatchPalette": [
+      "789d55",
+      "4b5557",
+      "a6a49a",
+      "d9a43b",
+      "f0e4c9",
+      "4eaaa7",
+      "dcd2bb",
+      "78513b",
+      "5f6d72",
+      "595e63",
+      "c66d5a",
+      "4b555a",
+      "ffd68d"
+    ]
+  },
+  "frameCount": 32,
+  "matchPhase": "active",
+  "random": {
+    "seed": "pass25a-environment",
+    "gameplayState": 1191456873,
+    "presentationState": 3043685244,
+    "protocolState": 3753341794
+  }
+}

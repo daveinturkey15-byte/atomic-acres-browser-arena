@@ -1,0 +1,1388 @@
+@layer pass65.hud {
+  /*
+   * Pass 65 HUD sizing is anchored to a small token set rather than inherited
+   * pass-by-pass pixel overrides. The map and support rail share one right
+   * edge; the weapon console is offset by the support width, so those critical
+   * surfaces cannot collide as the viewport grows or narrows.
+   */
+  #hud {
+    --hud-edge: clamp(14px, 1.2vw, 28px);
+    --hud-gap: clamp(10px, 0.8vw, 18px);
+    --hud-mission-width: clamp(470px, 28vw, 620px);
+    --hud-map-width: clamp(220px, 14vw, 300px);
+    --hud-operator-width: clamp(310px, 20vw, 420px);
+    --hud-weapon-width: clamp(300px, 19vw, 400px);
+    --hud-support-width: clamp(246px, 14vw, 360px);
+    --hud-panel-strong: rgba(2, 10, 15, 0.92);
+    --hud-panel-soft: rgba(25, 12, 4, 0.76);
+    --hud-panel-quiet: rgba(19, 9, 3, 0.64);
+    --hud-text: #fdf8f5;
+    --hud-muted: #c5beb7;
+    --hud-dim: #9b9186;
+    --hud-cyan: #66ebe1;
+    --hud-amber: #f2b74f;
+    --hud-coral: #ff776d;
+    --hud-green: #70e8b0;
+    color: var(--hud-text);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.88);
+  }
+
+  #hud::before {
+    inset: var(--hud-edge);
+    border-color: rgba(102, 235, 225, 0.08);
+  }
+
+  #sticky-warning {
+    position: absolute;
+    z-index: 86;
+    left: 50%;
+    top: 50%;
+    display: grid;
+    min-width: min(360px, calc(100vw - max(32px, env(safe-area-inset-left)) - max(32px, env(safe-area-inset-right))));
+    padding: 11px 24px 13px;
+    border: 2px solid #ff3a32;
+    border-inline-width: 5px;
+    background: rgba(43, 1, 1, 0.92);
+    box-shadow: 0 0 28px rgba(255, 31, 22, 0.68), inset 0 0 22px rgba(255, 45, 32, 0.18);
+    color: #fff;
+    text-align: center;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: sticky-warning-flash var(--sticky-warning-duration, 500ms) ease-out both;
+  }
+
+  #sticky-warning[hidden] { display: none; }
+  #sticky-warning small { font: 850 9px/1 var(--ui-copy); letter-spacing: 0.24em; color: #ffaaa5; }
+  #sticky-warning strong { margin-top: 4px; font: 950 clamp(42px, 6.5vw, 74px)/0.8 var(--ui-display); letter-spacing: 0.08em; color: #ff443c; }
+
+  @keyframes sticky-warning-flash {
+    0% { opacity: 0; filter: brightness(1.9); }
+    10% { opacity: 1; filter: brightness(1.35); }
+    32% { opacity: 1; filter: brightness(1); }
+    48% { opacity: 0.72; filter: brightness(1.4); }
+    64%, 100% { opacity: 1; filter: brightness(1); }
+  }
+
+  @media (max-width: 760px), (max-height: 520px) {
+    #sticky-warning {
+      top: 50%;
+      min-width: min(280px, calc(100vw - max(20px, env(safe-area-inset-left)) - max(20px, env(safe-area-inset-right))));
+      padding: 8px 16px 10px;
+    }
+    #sticky-warning strong { font-size: clamp(34px, 10vw, 54px); }
+  }
+
+  html[data-reduced-sensory='true'] #sticky-warning {
+    animation: none;
+    box-shadow: none;
+    background: rgba(43, 1, 1, 0.96);
+  }
+
+  .hud-mission-console {
+    left: var(--hud-edge);
+    top: var(--hud-edge);
+    width: var(--hud-mission-width);
+  }
+
+  #matchbar {
+    min-height: 72px;
+    padding: 12px 15px 11px;
+    grid-template-columns: minmax(112px, 0.9fr) minmax(210px, 1.45fr) auto;
+    gap: 10px;
+    border: 0;
+    border-left: 3px solid var(--hud-cyan);
+    background:
+      linear-gradient(90deg, rgba(102, 235, 225, 0.07), transparent 34%),
+      linear-gradient(112deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+    clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%);
+  }
+
+  #matchbar::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    right: 15px;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--hud-cyan), transparent 72%);
+    opacity: 0.45;
+  }
+
+  .tiny {
+    color: var(--hud-muted);
+    font: 800 9px/1.05 var(--ui-copy);
+    letter-spacing: 0.14em;
+  }
+
+  #timer {
+    margin-top: 5px;
+    color: var(--hud-text);
+    font: 900 clamp(30px, 2vw, 38px)/0.78 var(--ui-display);
+    letter-spacing: 0.015em;
+  }
+
+  #scoreline {
+    gap: clamp(7px, 0.7vw, 13px);
+    color: var(--hud-text);
+    font: 900 clamp(14px, 1vw, 18px)/1 var(--ui-display);
+  }
+
+  #scoreline b {
+    font-size: clamp(29px, 1.75vw, 38px);
+  }
+
+  #scoreline i {
+    padding: 5px 7px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--hud-muted);
+    font: 800 9px/1 var(--ui-copy);
+  }
+
+  #connection-pill {
+    min-width: 72px;
+    padding: 7px 9px;
+    border: 0;
+    border-bottom: 2px solid var(--hud-green);
+    background: rgba(2, 9, 13, 0.72);
+    color: var(--hud-text);
+    font: 800 9px/1 var(--ui-copy);
+    letter-spacing: 0.09em;
+    text-align: center;
+  }
+
+  #objective {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border: 0;
+    border-left: 2px solid var(--hud-amber);
+    background: linear-gradient(90deg, var(--hud-panel-strong), rgba(19, 9, 3, 0.46));
+    color: var(--hud-muted);
+    font: 800 10px/1.2 var(--ui-copy);
+    letter-spacing: 0.13em;
+  }
+
+  .hud-performance-row {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  #fps-counter {
+    min-width: 82px;
+    padding: 6px 9px;
+    border: 0;
+    border-left: 2px solid var(--hud-cyan);
+    background: var(--hud-panel-quiet);
+  }
+
+  #fps-counter b {
+    color: var(--hud-text);
+    font-size: 23px;
+  }
+
+  #fps-counter span {
+    color: var(--hud-muted);
+    font-size: 9px;
+  }
+
+  #network-strip {
+    gap: 4px;
+    font: 800 9px/1 var(--ui-copy);
+  }
+
+  #network-strip span {
+    min-height: 28px;
+    padding: 7px 8px;
+    border: 0;
+    border-bottom: 1px solid rgba(102, 235, 225, 0.26);
+    background: var(--hud-panel-quiet);
+    color: var(--hud-muted);
+  }
+
+  .hud-map-console {
+    right: var(--hud-edge);
+    top: var(--hud-edge);
+    width: var(--hud-map-width);
+    padding: 10px;
+    border: 0;
+    border-top: 2px solid rgba(102, 235, 225, 0.78);
+    background: linear-gradient(150deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  #minimap {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  #map-heading,
+  #location-label {
+    min-height: 27px;
+    padding: 7px 8px;
+    border: 0;
+    background: rgba(1, 8, 11, 0.58);
+    color: var(--hud-text);
+    font: 800 10px/1.15 var(--ui-copy);
+    letter-spacing: 0.11em;
+  }
+
+  #map-heading {
+    border-right: 2px solid var(--hud-cyan);
+  }
+
+  #location-label {
+    border-left: 2px solid var(--hud-amber);
+  }
+
+  .hud-operator-console {
+    left: var(--hud-edge);
+    bottom: var(--hud-edge);
+    width: var(--hud-operator-width);
+    padding: 13px 14px;
+    gap: 10px;
+    border: 0;
+    border-left: 3px solid var(--hud-cyan);
+    background: linear-gradient(105deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  #health-block span,
+  #equipment-block span,
+  #equipment-block small,
+  #room-hud {
+    color: var(--hud-muted);
+    font: 800 9px/1 var(--ui-copy);
+  }
+
+  #health-block b {
+    color: var(--hud-text);
+    font: 900 clamp(44px, 2.8vw, 58px)/0.72 var(--ui-display);
+  }
+
+  .health-track {
+    height: 8px;
+    border: 0;
+    background: rgba(0, 0, 0, 0.58);
+  }
+
+  .health-track i {
+    background: linear-gradient(90deg, var(--hud-cyan), #f5ebdd);
+    box-shadow: 0 0 12px rgba(102, 235, 225, 0.28);
+  }
+
+  #combat-stats {
+    gap: 9px;
+    padding: 8px 9px;
+    border: 0;
+    border-left: 2px solid var(--hud-amber);
+    background: rgba(1, 8, 11, 0.5);
+    color: var(--hud-muted);
+    font: 800 9px/1 var(--ui-copy);
+  }
+
+  #combat-stats b {
+    color: var(--hud-text);
+    font-size: 12px;
+  }
+
+  #equipment-block {
+    gap: 3px;
+  }
+
+  #equipment-block b {
+    color: var(--hud-amber);
+    font: 900 15px/1 var(--ui-display);
+  }
+
+  #room-hud {
+    color: var(--hud-green);
+    letter-spacing: 0.11em;
+  }
+
+  .hud-weapon-console {
+    right: calc(var(--hud-edge) + var(--hud-support-width) + var(--hud-gap));
+    bottom: var(--hud-edge);
+    width: var(--hud-weapon-width);
+  }
+
+  #weapon-block {
+    padding: 14px 16px 13px;
+    border: 0;
+    border-bottom: 3px solid var(--hud-cyan);
+    background: linear-gradient(135deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+  }
+
+  #weapon-name {
+    color: var(--hud-text);
+    font: 900 12px/1 var(--ui-copy);
+    letter-spacing: 0.14em;
+  }
+
+  #weapon-block #ammo {
+    color: var(--hud-text);
+    font: 900 clamp(66px, 4.2vw, 84px)/0.72 var(--ui-display);
+  }
+
+  .reserve-stack > small,
+  #reload-state {
+    color: var(--hud-muted);
+    font-size: 9px;
+  }
+
+  .reserve-stack em {
+    color: var(--hud-text);
+    font-size: clamp(27px, 1.8vw, 36px);
+  }
+
+  #support-block {
+    inset: auto var(--hud-edge) var(--hud-edge) auto;
+    width: var(--hud-support-width);
+    padding: 11px;
+    border: 0;
+    border-right: 3px solid var(--hud-amber);
+    background:
+      linear-gradient(90deg, transparent 68%, rgba(242, 183, 79, 0.055)),
+      linear-gradient(145deg, var(--hud-panel-strong), var(--hud-panel-soft));
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+  }
+
+  .support-heading {
+    min-height: 29px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .support-heading span {
+    color: var(--hud-muted);
+    font: 800 10px/1 var(--ui-copy);
+    letter-spacing: 0.13em;
+  }
+
+  .support-heading strong {
+    color: var(--hud-amber);
+    font: 900 15px/1 var(--ui-display);
+    letter-spacing: 0.06em;
+  }
+
+  .support-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .support-list b {
+    min-height: 46px;
+    padding: 5px 7px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-rows: 1fr 1fr;
+    align-items: center;
+    gap: 2px 7px;
+    overflow: hidden;
+    border: 0;
+    border-left: 2px solid rgba(197, 190, 183, 0.22);
+    background: rgba(1, 8, 11, 0.5);
+  }
+
+  .support-meta {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+  }
+
+  .support-list kbd {
+    width: 26px;
+    height: 24px;
+    border: 0;
+    border-bottom: 2px solid rgba(197, 190, 183, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--hud-text);
+    font: 900 13px/1 var(--ui-display);
+  }
+
+  .support-meta small {
+    display: block;
+    color: var(--hud-dim);
+    font: 800 9px/1 var(--ui-copy);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .support-name {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    color: var(--hud-text);
+    font: 900 13px/0.98 var(--ui-display);
+    letter-spacing: 0.025em;
+    white-space: normal;
+    overflow-wrap: normal;
+  }
+
+  .support-state {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    justify-self: end;
+    color: var(--hud-muted);
+    font: 800 9px/1 var(--ui-copy);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .support-list b.ready {
+    border-left-color: var(--hud-amber);
+    background: linear-gradient(90deg, rgba(242, 183, 79, 0.2), rgba(2, 11, 15, 0.58));
+    box-shadow: inset 9px 0 20px rgba(242, 183, 79, 0.06);
+  }
+
+  .support-list b.ready .support-state,
+  .support-list b.ready kbd {
+    color: var(--hud-amber);
+  }
+
+  .support-help {
+    display: block;
+    margin-top: 8px;
+    color: var(--hud-muted);
+    font: 800 9px/1.25 var(--ui-copy);
+    letter-spacing: 0.07em;
+    text-align: right;
+  }
+
+  #killfeed {
+    right: calc(var(--hud-edge) + var(--hud-map-width) + var(--hud-gap));
+    top: var(--hud-edge);
+    width: min(330px, 32vw);
+  }
+
+  #damage-feeds {
+    right: calc(var(--hud-edge) + var(--hud-support-width) + var(--hud-gap));
+    top: clamp(185px, 22vh, 260px);
+    width: min(330px, 32vw);
+  }
+
+  #text-chat {
+    left: clamp(14px, 1.2vw, 28px);
+    right: auto;
+    bottom: clamp(184px, 13vh, 280px);
+    width: min(420px, calc(100vw - 32px));
+    border-left: 3px solid var(--ui-signal, #b4531c);
+  }
+
+  /* Keep an unobtrusive keyboard affordance after live-match messages fade. */
+  #text-chat[data-context='game'][data-visible='false'][data-open='false'] {
+    width: min(250px, calc(100vw - 32px));
+    padding: 8px 10px;
+    opacity: 0.88;
+    pointer-events: none;
+  }
+
+  #text-chat[data-context='game'][data-visible='false'][data-open='false'] header {
+    margin-bottom: 0;
+  }
+
+  #text-chat[data-context='game'][data-visible='false'][data-open='false'] #text-chat-log {
+    display: none;
+  }
+
+  /* Lobby chat is part of the lobby flow, not a viewport overlay. */
+  #private-lobby:has(> #text-chat[data-context='lobby']) {
+    grid-template-rows: auto auto minmax(130px, 1fr) auto auto auto;
+  }
+
+  #text-chat[data-context='lobby'] {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    width: 100%;
+    max-width: none;
+    align-self: start;
+    padding: 10px 12px;
+    transform: none;
+    border: 1px solid var(--ui-line-strong);
+    border-left: 3px solid var(--ui-signal);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: none;
+    color: var(--ui-text);
+    text-shadow: none;
+  }
+
+  #text-chat[data-context='lobby'] header strong {
+    color: var(--ui-signal);
+  }
+
+  #text-chat[data-context='lobby'] header small,
+  #text-chat[data-context='lobby'] #text-chat-log p strong {
+    color: var(--ui-amber);
+  }
+
+  #text-chat[data-context='lobby'] #text-chat-log p {
+    background: rgba(0, 109, 116, 0.06);
+  }
+
+  #text-chat[data-context='lobby'] #text-chat-form input {
+    border-color: var(--ui-line-strong);
+    background: #fff;
+    color: var(--ui-text);
+  }
+
+  #pause-hint {
+    left: var(--hud-edge);
+    top: auto;
+    bottom: calc(var(--hud-edge) + 142px);
+    padding: 7px 10px;
+    border: 0;
+    border-left: 2px solid var(--hud-amber);
+    background: var(--hud-panel-quiet);
+    color: var(--hud-muted);
+    font-size: 9px;
+  }
+
+  #countdown {
+    top: 37%;
+    min-width: min(580px, calc(100vw - 32px));
+    padding: 16px 30px 25px;
+    color: #fff3c8;
+    font: 900 clamp(112px, 13vw, 190px)/0.72 var(--ui-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.035em;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(242, 183, 79, 0.72), 0 9px 30px rgba(0, 0, 0, 0.86);
+  }
+
+  #countdown[data-cue='engage'] {
+    font-size: clamp(68px, 8vw, 112px);
+    letter-spacing: 0.1em;
+  }
+
+  #countdown::before {
+    inset: 50% auto auto 50%;
+    width: 1.22em;
+    border: 2px solid rgba(102, 235, 225, 0.72);
+    background:
+      linear-gradient(45deg, transparent 49%, rgba(102, 235, 225, 0.17) 50%, transparent 51%),
+      radial-gradient(circle, rgba(242, 183, 79, 0.1), transparent 64%);
+    box-shadow: 0 0 0 8px rgba(102, 235, 225, 0.055), 0 0 34px rgba(102, 235, 225, 0.16);
+  }
+
+  #countdown::after {
+    content: 'DEPLOYMENT SYNC';
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    color: var(--hud-cyan);
+    font: 900 11px/1 var(--ui-copy);
+    letter-spacing: 0.28em;
+    text-shadow: 0 2px 7px #000;
+    white-space: nowrap;
+  }
+
+  #countdown[data-cue='engage']::after {
+    content: 'OBJECTIVE LIVE';
+    color: var(--hud-amber);
+  }
+
+  #countdown.countdown-cue-active::before {
+    animation: pass65HudCountdownRing 680ms ease-out;
+  }
+
+  @keyframes pass65HudCountdownRing {
+    0% { opacity: 0; transform: translate(-50%, -50%) rotate(33deg) scale(0.72); }
+    40% { opacity: 1; }
+    100% { opacity: 0.72; transform: translate(-50%, -50%) rotate(45deg) scale(1); }
+  }
+
+  @media (max-width: 700px) {
+    #hud {
+      --hud-edge: 8px;
+      --hud-gap: 8px;
+      --hud-mission-width: calc(100vw - 16px);
+      --hud-map-width: 160px;
+      --hud-operator-width: min(164px, calc(44vw - 8px));
+      --hud-weapon-width: min(198px, calc(56vw - 16px));
+      --hud-support-width: calc(100vw - 16px);
+    }
+
+    .hud-mission-console {
+      right: var(--hud-edge);
+      width: auto;
+    }
+
+    #matchbar {
+      min-height: 64px;
+      padding: 9px 10px;
+      grid-template-columns: 78px minmax(128px, 1fr) auto;
+      gap: 5px;
+    }
+
+    .tiny { font-size: 9px; }
+    #timer { font-size: 29px; }
+    #scoreline { gap: 4px; font-size: 12px; }
+    #scoreline b { font-size: 23px; }
+    #scoreline em { display: none; }
+    #connection-pill { min-width: 74px; padding-inline: 5px; font-size: 9px; }
+    #objective { padding: 7px 10px; font-size: 9px; }
+    #network-strip span { font-size: 9px; }
+
+    .hud-map-console {
+      top: 128px;
+      width: var(--hud-map-width);
+      padding: 7px;
+    }
+
+    #map-heading,
+    #location-label {
+      min-height: 25px;
+      padding: 6px;
+      font-size: 9px;
+    }
+
+    .hud-operator-console {
+      width: var(--hud-operator-width);
+      padding: 9px 10px;
+    }
+
+    #health-block b { font-size: 42px; }
+    #combat-stats { display: none; }
+    #equipment-block b { font-size: 13px; }
+
+    .hud-weapon-console {
+      right: var(--hud-edge);
+      width: var(--hud-weapon-width);
+    }
+
+    #weapon-block { padding: 11px 12px 10px; }
+    #weapon-name { font-size: 10px; }
+    #weapon-block #ammo { font-size: 54px; }
+    .reserve-stack em { font-size: 27px; }
+
+    #support-block {
+      left: var(--hud-edge);
+      right: var(--hud-edge);
+      bottom: 126px;
+      width: auto;
+      padding: 8px;
+    }
+
+    .support-heading {
+      min-height: 22px;
+      margin-bottom: 5px;
+    }
+
+    .support-heading span { font-size: 9px; }
+    .support-heading strong { font-size: 13px; }
+
+    .support-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .support-list b {
+      min-height: 40px;
+      grid-template-columns: 30px minmax(0, 1fr) auto;
+      padding: 4px 5px;
+      gap: 1px 5px;
+    }
+
+    .support-list kbd {
+      width: 24px;
+      height: 22px;
+      font-size: 12px;
+    }
+
+    .support-meta small { display: none; }
+    .support-name { font-size: 10px; }
+    .support-state { font-size: 9px; letter-spacing: 0.04em; }
+    .support-help { display: none; }
+
+    #killfeed {
+      right: var(--hud-edge);
+      top: 315px;
+      width: 184px;
+    }
+
+    #damage-feeds {
+      right: var(--hud-edge);
+      top: 344px;
+      width: min(230px, 58vw);
+    }
+
+    #text-chat {
+      left: 8px;
+      right: 8px;
+      bottom: 300px;
+      width: auto;
+    }
+
+    #pause-hint {
+      left: var(--hud-edge);
+      bottom: 112px;
+    }
+
+    #countdown {
+      top: 41%;
+      min-width: calc(100vw - 20px);
+      padding-inline: 10px;
+      font-size: clamp(94px, 30vw, 132px);
+    }
+
+    #countdown[data-cue='engage'] {
+      font-size: clamp(52px, 16vw, 76px);
+      letter-spacing: 0.06em;
+    }
+
+    #countdown::after {
+      font-size: 9px;
+      letter-spacing: 0.19em;
+    }
+
+  }
+
+  @media (max-width: 430px) {
+    #hud { --hud-map-width: 150px; }
+    #support-block { bottom: 136px; }
+    .support-list b { grid-template-columns: 28px minmax(0, 1fr) auto; }
+    .support-name { font-size: 9px; }
+    .support-state { font-size: 9px; }
+  }
+
+  @media (max-height: 640px) and (min-width: 701px) {
+    #hud {
+      --hud-edge: 10px;
+      --hud-map-width: 206px;
+      --hud-support-width: 238px;
+      --hud-operator-width: 296px;
+      --hud-weapon-width: 288px;
+    }
+
+    #support-block { padding: 7px; }
+    .support-heading { min-height: 22px; margin-bottom: 4px; }
+    .support-list { gap: 3px; }
+    .support-list b { min-height: 38px; }
+    .support-help { margin-top: 5px; font-size: 9px; }
+  }
+
+  @media (min-width: 2400px) and (min-height: 1000px) {
+    .tiny,
+    #scoreline i,
+    #connection-pill,
+    #fps-counter span,
+    #network-strip,
+    .hud-operator-console,
+    #health-block span,
+    #equipment-block span,
+    #equipment-block small,
+    #room-hud,
+    #combat-stats,
+    .reserve-stack > small,
+    #reload-state,
+    .support-meta small,
+    .support-state,
+    .support-help,
+    #pause-hint {
+      font-size: 10px;
+    }
+
+    #objective,
+    #map-heading,
+    #location-label,
+    .support-heading span {
+      font-size: 11px;
+    }
+
+    .support-name { font-size: 14px; }
+    #pause-hint { bottom: calc(var(--hud-edge) + 154px); }
+    #text-chat[data-context='game'] { width: min(480px, calc(100vw - 56px)); }
+    #text-chat-log p { font-size: 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #countdown.countdown-cue-active,
+    #countdown.countdown-cue-active::before {
+      animation: none;
+      filter: none;
+    }
+
+    #countdown::before {
+      opacity: 0.72;
+    }
+  }
+
+  /*
+   * Death/respawn presentation: a slow compositor-only black wash while the
+   * respawn timer runs, then one brief white flash as the new life begins.
+   * Pure CSS opacity on a DOM overlay; zero canvas readback, zero GPU work.
+   */
+  #death-fade {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.55s ease-in;
+  }
+  #death-fade.death-wash {
+    opacity: 0.94;
+  }
+
+  /* The operate instruction belongs to the existing top support panel. Keep
+     one readable surface at every target resolution; never add a second bold
+     centre-screen banner for Chopper or Piloted Drone. */
+  #support-control-action {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid rgba(101, 255, 168, 0.28);
+    border-left: 3px solid rgba(101, 255, 168, 0.72);
+    background: rgba(29, 14, 4, 0.72);
+    font: 800 clamp(10px, 0.56vw, 13px)/1.2 Inter, system-ui, sans-serif;
+    letter-spacing: clamp(0.04em, 0.08vw, 0.1em);
+    text-align: center;
+    text-transform: uppercase;
+    text-wrap: balance;
+    overflow-wrap: normal;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  }
+
+  #support-combat-feedback[data-awaiting-operation="true"] #support-control-action {
+    border-color: rgba(255, 157, 36, 0.5);
+    border-left-color: var(--p66-amber-bright, #ff9d24);
+    background: linear-gradient(90deg, rgba(255, 135, 24, 0.18), rgba(29, 14, 5, 0.78) 28%, rgba(29, 14, 5, 0.78));
+    color: #ffe6bd;
+    box-shadow: inset 0 0 16px rgba(255, 157, 36, 0.06);
+  }
+
+  /* At short/narrow desktop viewports the three original top consoles have no
+     collision-free horizontal lane. Move the support telemetry just below the
+     mission strip, left of the minimap/damage rail, and compact its six cells. */
+  @media (max-width: 1280px), (max-height: 720px) {
+    #support-combat-feedback {
+      left: max(10px, env(safe-area-inset-left));
+      top: max(162px, calc(env(safe-area-inset-top) + 154px));
+      width: min(620px, calc(100vw - 260px));
+      transform: none;
+      grid-template-columns: 1fr auto;
+      gap: 5px 10px;
+      padding: 8px 10px;
+    }
+
+    #support-combat-feedback .support-platform-readout {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    #support-combat-feedback .support-platform-readout > span {
+      min-width: 0;
+      padding: 5px 6px;
+    }
+  }
+
+  @media (max-width: 1000px) {
+    #support-combat-feedback {
+      width: min(360px, calc(100vw - 206px));
+    }
+  }
+
+  /* Non-fatal runtime error capture, shown bottom-left so a gameplay throw can
+     be diagnosed in a live session without opening devtools. */
+  #runtime-error-log {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 60;
+    max-width: 46vw;
+    max-height: 30vh;
+    overflow: hidden;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 90, 90, 0.6);
+    border-radius: 4px;
+    background: rgba(20, 4, 4, 0.86);
+    color: #ff9b9b;
+    font: 600 11px/1.4 ui-monospace, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    pointer-events: none;
+  }
+
+  #runtime-error-log[hidden] {
+    display: none;
+  }
+
+  /* Pass 70 authored support cockpit overlay. The centre remains optically
+     clear: four disconnected aim arms frame the authoritative camera ray. */
+  html[data-killstreak-possession="chopper-gunner"] .hud-mission-console,
+  html[data-killstreak-possession="chopper-gunner"] .hud-map-console,
+  html[data-killstreak-possession="chopper-gunner"] .hud-operator-console,
+  html[data-killstreak-possession="chopper-gunner"] .hud-weapon-console,
+  html[data-killstreak-possession="chopper-gunner"] #support-block,
+  html[data-killstreak-possession="chopper-gunner"] #support-combat-feedback,
+  html[data-killstreak-possession="chopper-gunner"] #crosshair {
+    display: none !important;
+  }
+
+  #gunner-cockpit-hud {
+    position: absolute;
+    inset: 0;
+    z-index: 13;
+    pointer-events: none;
+  }
+
+  #gunner-cockpit-hud[hidden] {
+    display: none;
+  }
+
+  #gunner-cockpit-hud .gunner-reticle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: clamp(126px, min(20vh, 16vw), 188px);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    color: rgba(124, 255, 173, 0.96);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.95));
+  }
+
+  #gunner-cockpit-hud .gunner-reticle > span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: currentColor;
+    box-shadow: 0 0 5px rgba(75, 255, 143, 0.52);
+  }
+
+  #gunner-cockpit-hud .gunner-reticle .north,
+  #gunner-cockpit-hud .gunner-reticle .south { width: 2px; height: 22%; transform: translateX(-50%); }
+  #gunner-cockpit-hud .gunner-reticle .north { bottom: 58%; top: auto; }
+  #gunner-cockpit-hud .gunner-reticle .south { top: 58%; }
+  #gunner-cockpit-hud .gunner-reticle .east,
+  #gunner-cockpit-hud .gunner-reticle .west { width: 22%; height: 2px; transform: translateY(-50%); }
+  #gunner-cockpit-hud .gunner-reticle .east { left: 58%; }
+  #gunner-cockpit-hud .gunner-reticle .west { left: auto; right: 58%; }
+
+  #gunner-cockpit-hud .gunner-reticle > i {
+    position: absolute;
+    width: 16%;
+    height: 16%;
+    border: 0 solid currentColor;
+  }
+
+  #gunner-cockpit-hud .gunner-reticle .tl { left: 4%; top: 4%; border-left-width: 2px; border-top-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .tr { right: 4%; top: 4%; border-right-width: 2px; border-top-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .bl { left: 4%; bottom: 4%; border-left-width: 2px; border-bottom-width: 2px; }
+  #gunner-cockpit-hud .gunner-reticle .br { right: 4%; bottom: 4%; border-right-width: 2px; border-bottom-width: 2px; }
+
+  #gunner-cockpit-hud .gunner-status {
+    position: absolute;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    display: grid;
+    min-width: min(480px, calc(100vw - 32px));
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 14px;
+    border-block: 1px solid rgba(120, 255, 170, 0.42);
+    color: #f6ede2;
+    background: linear-gradient(90deg, transparent, rgba(2, 16, 10, 0.72) 18%, rgba(2, 16, 10, 0.72) 82%, transparent);
+    transform: translateX(-50%);
+    text-shadow: 0 1px 5px #000;
+  }
+
+  #gunner-cockpit-hud .gunner-status small,
+  #gunner-cockpit-hud .gunner-status span { font: 800 10px/1 Inter, system-ui, sans-serif; letter-spacing: 0.16em; color: #7effad; }
+  #gunner-cockpit-hud .gunner-status strong { font: 900 14px/1 Inter, system-ui, sans-serif; letter-spacing: 0.11em; text-align: center; }
+
+  #gunner-cockpit-hud .gunner-instruments {
+    position: absolute;
+    left: 50%;
+    bottom: max(26px, calc(env(safe-area-inset-bottom) + 12px));
+    display: grid;
+    width: min(760px, calc(100vw - 40px));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border-block: 1px solid rgba(120, 255, 170, 0.38);
+    background: linear-gradient(90deg, transparent, rgba(3, 18, 12, 0.78) 8%, rgba(3, 18, 12, 0.78) 92%, transparent);
+    transform: translateX(-50%);
+  }
+
+  #gunner-cockpit-hud .gunner-readout {
+    min-width: 0;
+    padding: 8px 10px 9px;
+    border-inline-end: 1px solid rgba(120, 255, 170, 0.20);
+    color: #b8ffd6;
+    text-align: center;
+  }
+
+  #gunner-cockpit-hud .gunner-readout small {
+    display: block;
+    font: 800 9px/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.16em;
+    color: rgba(120, 255, 170, 0.8);
+  }
+
+  #gunner-cockpit-hud .gunner-readout strong {
+    display: block;
+    margin-top: 5px;
+    overflow: hidden;
+    font: 900 clamp(18px, 2.6vw, 28px)/1 Inter, system-ui, sans-serif;
+    text-overflow: ellipsis;
+    color: #f8f0e6;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  #gunner-cockpit-hud #chopper-thermal {
+    position: absolute;
+    left: 50%;
+    top: max(66px, calc(env(safe-area-inset-top) + 54px));
+    transform: translateX(-50%);
+    padding: 7px 16px;
+    border: 1px solid rgba(255, 120, 140, 0.55);
+    border-radius: 4px;
+    background: rgba(18, 4, 8, 0.62);
+    box-shadow: 0 0 18px rgba(255, 80, 100, 0.35);
+    color: #ffc9d2;
+  }
+
+  #gunner-cockpit-hud #chopper-thermal[hidden] {
+    display: none;
+  }
+
+  #gunner-cockpit-hud #chopper-thermal span {
+    font: 800 12px/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.24em;
+    color: #ffb3c0;
+    text-shadow: 0 0 8px rgba(255, 80, 100, 0.6);
+  }
+
+  /* Chopper gunner uses the authored lower cockpit plus one exact centre ray.
+     Keep telemetry at the perimeter; no opaque MFD-like DOM panel may occupy
+     the forward sight corridor. Piloted Drone retains its separate layout. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before,
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: clamp(38px, 8vw, 118px);
+    /* HF-335: the Pass 71 candidate lane raised the canopy frame to this
+       height (1e043fb2) and it never reached main, which is the taller cockpit
+       the owner remembers. The wedge clip keeps the sight corridor clear. */
+    height: clamp(280px, 58vh, 620px);
+    border-top: 1px solid rgba(126, 255, 173, 0.38);
+    background: linear-gradient(to top, rgba(2, 12, 9, 0.74), rgba(2, 12, 9, 0.2) 58%, transparent);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before {
+    left: 0;
+    border-right: 2px solid rgba(126, 255, 173, 0.48);
+    clip-path: polygon(0 0, 18% 0, 100% 100%, 0 100%);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::after {
+    right: 0;
+    border-left: 2px solid rgba(126, 255, 173, 0.48);
+    clip-path: polygon(82% 0, 100% 0, 100% 100%, 0 100%);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status {
+    left: max(18px, env(safe-area-inset-left));
+    top: max(18px, env(safe-area-inset-top));
+    min-width: 0;
+    grid-template-columns: auto auto;
+    gap: 5px 10px;
+    padding: 5px 9px;
+    border: 0;
+    border-left: 2px solid rgba(126, 255, 173, 0.82);
+    background: rgba(2, 14, 10, 0.24);
+    transform: none;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status span {
+    grid-column: 1 / -1;
+    font-size: 9px;
+    opacity: 0.78;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status strong {
+    font-size: 12px;
+    text-align: left;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-instruments {
+    left: max(18px, env(safe-area-inset-left));
+    bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+    width: min(430px, calc(100vw - 36px));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 0;
+    border-left: 2px solid rgba(126, 255, 173, 0.62);
+    background: rgba(2, 14, 10, 0.22);
+    transform: none;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout {
+    padding: 5px 8px 6px;
+    border-color: rgba(120, 255, 170, 0.12);
+    text-align: left;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout small {
+    font-size: 9px;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout strong {
+    margin-top: 3px;
+    font-size: clamp(14px, 1.5vw, 19px);
+  }
+
+  /* HF-335: one control strip on the bottom-right rail - LMB GUN | RMB
+     MISSILES xN. It sits opposite the instruments rail, never crosses the
+     centre sight corridor, and every size is clamp()ed against the viewport so
+     the same strip stays legible from 1280x720 up through ultrawide and
+     high-DPI displays. z-index lifts it clear of the cockpit-frame pillars,
+     which are ::after generated content and would otherwise tint it. */
+  #gunner-control-strip {
+    position: absolute;
+    z-index: 1;
+    right: max(18px, env(safe-area-inset-right));
+    bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+    /* Not a chopper gunner (or no possession at all): the strip is inert. The
+       HUD root's existing data-support-kind lifecycle is the only gate, so no
+       extra show/hide plumbing can drift out of sync with the cockpit. */
+    display: none;
+    align-items: stretch;
+    gap: clamp(6px, 0.5vw, 12px);
+    max-width: min(46vw, 560px);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #gunner-control-strip { display: flex; }
+  #gunner-cockpit-hud[data-support-kind] #gunner-control-strip[hidden] { display: none; }
+
+  #gunner-control-strip .gunner-control {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: clamp(3px, 0.2vw, 6px) clamp(8px, 0.62vw, 14px);
+    min-width: clamp(122px, 9.6vw, 208px);
+    padding: clamp(7px, 0.55vw, 13px) clamp(9px, 0.68vw, 16px);
+    border-right: 2px solid rgba(126, 255, 173, 0.82);
+    background: rgba(2, 14, 10, 0.46);
+    color: #f8f0e6;
+    text-align: right;
+  }
+
+  #gunner-control-strip .gunner-control[hidden] { display: none; }
+  #gunner-control-strip .gunner-control kbd {
+    grid-row: 1 / 3;
+    align-self: center;
+    padding: clamp(4px, 0.34vw, 8px) clamp(6px, 0.46vw, 11px);
+    border: 1px solid rgba(126, 255, 173, 0.75);
+    border-radius: 3px;
+    font: 900 clamp(11px, 0.86vw, 18px)/1 Inter, system-ui, sans-serif;
+    color: #f8f0e6;
+    background: rgba(2, 24, 15, 0.72);
+  }
+  #gunner-control-strip .gunner-control span {
+    font: 900 clamp(9px, 0.62vw, 14px)/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.16em;
+    color: #7effad;
+  }
+  #gunner-control-strip .gunner-control-value {
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 0.06em;
+    font: 950 clamp(17px, 1.3vw, 27px)/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.06em;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.92);
+  }
+  /* The UA stylesheet resolves b/strong to `bolder`, which would quietly drop
+     the value ramp below the weight the strip is designed around. */
+  #gunner-control-strip .gunner-control-value b { font: inherit; }
+  #gunner-control-strip .gunner-control-value i { font: inherit; font-style: normal; opacity: 0.72; }
+  #gunner-control-strip .gunner-control em {
+    grid-column: 1 / -1;
+    font: 850 clamp(9px, 0.6vw, 13px)/1 Inter, system-ui, sans-serif;
+    letter-spacing: 0.14em;
+    color: #ff9b58;
+  }
+
+  #gunner-control-strip #gunner-missile-status { border-right-color: rgba(255, 180, 84, 0.82); background: rgba(18, 10, 2, 0.46); color: #ffe4bd; }
+  #gunner-control-strip #gunner-missile-status[hidden] { display: none; }
+  #gunner-control-strip #gunner-missile-status kbd { border-color: rgba(255, 190, 104, 0.75); color: #fff0d6; background: rgba(31, 17, 3, 0.72); }
+  #gunner-control-strip #gunner-missile-status span { color: #ffbc67; letter-spacing: 0.18em; }
+  #gunner-control-strip #gunner-missile-status[data-ready="true"] em { color: #83ffb1; }
+
+  /* The cockpit-frame pillars are painted after the HUD children, so the two
+     telemetry rails claim their own layer to stay fully legible (HF-335). */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status,
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-instruments { z-index: 1; }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #chopper-thermal {
+    left: auto;
+    right: max(18px, env(safe-area-inset-right));
+    top: max(18px, env(safe-area-inset-top));
+    max-width: min(360px, calc(100vw - 36px));
+    padding: 5px 9px;
+    border: 0;
+    border-right: 2px solid rgba(255, 145, 160, 0.72);
+    background: rgba(18, 4, 8, 0.2);
+    box-shadow: none;
+    transform: none;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #chopper-thermal span {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+  }
+
+  #gunner-target-confirm {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    min-width: 54px;
+    min-height: 42px;
+    border: 2px solid #ffb454;
+    color: #fff2d8;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.95));
+    animation: gunner-target-confirm 650ms ease-out both;
+  }
+
+  #gunner-target-confirm[hidden] { display: none; }
+  #gunner-target-confirm span { font: 900 9px/1 Inter, system-ui, sans-serif; letter-spacing: 0.18em; color: #ffc36e; }
+  #gunner-target-confirm strong { font: 950 18px/1 Inter, system-ui, sans-serif; }
+
+  @keyframes gunner-target-confirm {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+    28% { opacity: 1; }
+    to { opacity: 0.88; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @media (max-width: 760px), (max-height: 520px) {
+    #gunner-cockpit-hud .gunner-status { top: max(8px, env(safe-area-inset-top)); min-width: calc(100vw - 20px); gap: 7px; padding: 6px 8px; }
+    #gunner-cockpit-hud .gunner-status span { display: none; }
+    #gunner-cockpit-hud .gunner-status { grid-template-columns: auto 1fr; }
+    #gunner-cockpit-hud #chopper-thermal { top: max(42px, calc(env(safe-area-inset-top) + 40px)); max-width: calc(100vw - 24px); padding: 5px 9px; text-align: center; }
+    #gunner-cockpit-hud #chopper-thermal span { font-size: 9px; letter-spacing: 0.12em; }
+    #gunner-cockpit-hud .gunner-reticle { width: clamp(104px, 28vw, 142px); }
+    #gunner-cockpit-hud .gunner-instruments { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 18px); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #gunner-cockpit-hud .gunner-readout { padding: 5px 6px; }
+    #gunner-cockpit-hud .gunner-readout strong { margin-top: 3px; font-size: clamp(15px, 4vw, 20px); }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status {
+      left: max(8px, env(safe-area-inset-left));
+      min-width: 0;
+      width: auto;
+      grid-template-columns: auto auto;
+    }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-instruments {
+      left: max(8px, env(safe-area-inset-left));
+      width: min(360px, calc(100vw - 16px));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      transform: none;
+    }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #chopper-thermal {
+      left: auto;
+      right: max(8px, env(safe-area-inset-right));
+      top: max(54px, calc(env(safe-area-inset-top) + 52px));
+      transform: none;
+    }
+    /* HF-335: on a phone the instruments claim the full bottom rail, so the
+       control strip stacks directly above it instead of colliding with it. */
+    #gunner-control-strip {
+      right: max(8px, env(safe-area-inset-right));
+      left: max(8px, env(safe-area-inset-left));
+      bottom: max(104px, calc(env(safe-area-inset-bottom) + 94px));
+      max-width: none;
+      justify-content: flex-end;
+    }
+    #gunner-control-strip .gunner-control {
+      min-width: 0;
+      flex: 1 1 0;
+      padding: 6px 8px;
+    }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before,
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::after {
+      width: clamp(24px, 7vw, 54px);
+      height: clamp(210px, 48vh, 390px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #gunner-target-confirm { animation: none; }
+  }
+
+  /* Each firearm projects its own canonical sight signature. The marker stays
+     on the authoritative centre ray; scoped weapons suppress it in favour of
+     their dedicated magnified/thermal overlays. */
+  #crosshair.ads::after {
+    width: var(--ads-dot-size, 4px);
+    height: var(--ads-dot-size, 4px);
+    background: var(--ads-color, #ff5f56);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.95), 0 0 7px var(--ads-color, #ff5f56);
+  }
+
+  #crosshair.ads::before {
+    width: var(--ads-ring-size, 24px);
+    height: var(--ads-ring-size, 24px);
+    border-color: color-mix(in srgb, var(--ads-color, #ff5f56) 78%, transparent);
+    border-radius: 50%;
+    background: transparent;
+    transform: translate(-50%, -50%) rotate(var(--ads-rotation, 0deg));
+  }
+
+  #crosshair.ads[data-ads-marker='aperture']::before { border-style: dashed; border-width: 1px; }
+  #crosshair.ads[data-ads-marker='posts']::before {
+    border: 0;
+    border-top: 2px solid var(--ads-color);
+    border-bottom: 2px solid var(--ads-color);
+    border-radius: 0;
+  }
+  #crosshair.ads[data-ads-marker='bead']::before {
+    border-width: 0 0 2px;
+    border-radius: 0;
+    height: calc(var(--ads-ring-size) / 2);
+  }
+  #crosshair.ads[data-ads-marker='diamond']::before { border-radius: 2px; }
+  #crosshair.ads[data-ads-marker='chevron']::before {
+    width: calc(var(--ads-ring-size) * 0.72);
+    height: calc(var(--ads-ring-size) * 0.72);
+    border-width: 2px 0 0 2px;
+    border-radius: 0;
+    transform: translate(-50%, -30%) rotate(45deg);
+  }
+  #crosshair.ads[data-ads-marker='cross']::before {
+    border: 0;
+    border-radius: 0;
+    background:
+      linear-gradient(var(--ads-color), var(--ads-color)) center / 2px 100% no-repeat,
+      linear-gradient(90deg, var(--ads-color), var(--ads-color)) center / 100% 2px no-repeat;
+  }
+  #crosshair.ads[data-ads-marker='scope'] { opacity: 0; }
+
+  #death-fade.respawn-flash {
+    background: #fff;
+    transition: none;
+    animation: pass66-respawn-flash 0.42s ease-out forwards;
+  }
+
+  @keyframes pass66-respawn-flash {
+    0% { opacity: 0.85; }
+    100% { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #death-fade { transition: opacity 0.2s linear; }
+    #death-fade.respawn-flash { animation: none; opacity: 0; }
+  }
+}

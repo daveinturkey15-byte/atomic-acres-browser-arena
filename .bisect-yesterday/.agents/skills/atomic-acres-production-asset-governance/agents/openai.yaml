@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atomic Acres Production Assets"
+  short_description: "Forge and gate release-grade game assets"
+  default_prompt: "Use $atomic-acres-production-asset-governance to forge and verify a release-grade Atomic Acres asset tranche."

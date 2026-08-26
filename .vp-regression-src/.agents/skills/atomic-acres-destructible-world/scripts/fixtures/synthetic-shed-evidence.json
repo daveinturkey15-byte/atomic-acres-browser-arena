@@ -1,0 +1,18 @@
+{
+  "evidenceVersion": 1,
+  "syntheticFixtureOnly": true,
+  "sourceSha": "9fecada75693c528d0ff2667ddad1f415d71ffe4",
+  "buildId": "pass65-synthetic-world-v1",
+  "verifierId": "interactive-world-fixture-verifier",
+  "verifierVersion": "fixture-v1",
+  "requirementIds": ["R400", "R401", "R402", "R403", "R404", "R405", "R406", "R407", "R408", "R409", "R410", "R411", "R412", "R413"],
+  "evidenceIds": ["shed-aperture-parity", "shed-consumer-parity", "shed-late-join-reset", "shed-resource-budget", "shed-vertical-slice"],
+  "artifactPath": ".agents/skills/atomic-acres-destructible-world/scripts/fixtures/synthetic-shed-artifact.json",
+  "artifactSha256": "308bf2fc7339c0d38aa8533822665f0d0153a5498e1512f454a165ccd06a737f",
+  "result": "passed",
+  "attestation": {
+    "reviewerId": "synthetic-independent-reviewer",
+    "reviewedAt": "2026-07-26T00:00:00Z",
+    "statement": "Synthetic fixture attestation only; no runtime implementation or owner approval is claimed."
+  }
+}

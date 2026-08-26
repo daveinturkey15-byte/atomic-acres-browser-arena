@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 63",
+  "feedbackReceivedAt": "2026-07-25T00:00:00Z",
+  "status": "accepted",
+  "preview": {
+    "kind": "github-actions-artifact",
+    "ref": "pr-preview-31-ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+    "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+    "createdAt": "2026-07-25T01:55:29Z"
+  },
+  "humanAcceptance": {
+    "state": "approved",
+    "approvedBy": "Dave",
+    "approvedAt": "2026-07-25T01:55:52Z",
+    "evidence": "After the exact immutable preview existed, Codex applied Dave's standing instruction in the active task: Pass 63 will be the next Live release; get it published. This records release authorization and does not claim a separate visual inspection of the newly generated artifact."
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Atomic Acres opaque-surface integrity and traversable house apertures",
+      "expected": "Opaque house walls block selected practical-light and effect contribution, while entrances and upstairs apertures stay visibly open and collision-authoritative in both rendering profiles.",
+      "falsifier": "A representative opaque wall exposes the audited light contribution, a black slab returns in an opening, or presentation and collision disagree.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass63-atomic-visuals.spec.ts",
+          "command": "npx playwright test tests/e2e/pass63-atomic-visuals.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served Quality and Performance routes exercise the repaired apertures and representative light-occlusion contract."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-31-ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+          "note": "The immutable Pass 63 preview contains the final Atomic presentation at the accepted source SHA."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Skyline Terminal opening and collider parity",
+      "expected": "Boarding routes, aircraft cabin openings, cockpit access, true glass, signs, and displays render consistently with movement and projectile authority in both profiles.",
+      "falsifier": "An audited opening looks like a wall, an open route is blocked, glass becomes opaque, or a sign/display is made transparent.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass63-skyline-terminal-openings.spec.ts",
+          "command": "npx playwright test tests/e2e/pass63-skyline-terminal-openings.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The served matrix traverses and probes the audited Terminal openings in Performance and Quality."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-31-ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+          "note": "The immutable preview is the final Pass 63 Terminal visual artifact."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Shared authoritative private-room text chat",
+      "expected": "Lobby and match chat is host-validated, bounded, sanitized, ordered identically for peers, keyboard-safe, ephemeral, and excluded from diagnostics and external persistence.",
+      "falsifier": "A guest can spoof identity or order, malformed text reaches peers, gameplay hotkeys fire while typing, or message text is persisted into diagnostics.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/text-chat.test.ts",
+          "command": "npx vitest run src/text-chat.test.ts src/text-chat-ui.test.ts src/protocol.test.ts src/network-lifecycle.test.ts",
+          "note": "Covers host validation, wire bounds, sanitization, ordering, UI keyboard ownership, and lifecycle cleanup."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass63-text-chat.spec.ts",
+          "command": "npx playwright test tests/e2e/pass63-text-chat.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "A real served peer session proves common chat delivery and lobby/match composer behavior."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Accessible Project Map with canonical current-first exports",
+      "expected": "The Project Map dialog exposes Overview, Structure, Changes, and Archive from one typed source and downloads safe Markdown and JSON with current architecture before complete history.",
+      "falsifier": "A documented source path is missing, UI and exports diverge, history precedes current state, unsafe text is injected, or a tab/download is inaccessible.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/project-map.test.ts",
+          "command": "npx vitest run src/project-map.test.ts src/ui/project-map-dialog.test.ts src/changelog.test.ts",
+          "note": "Validates stable IDs, real repository paths, archive completeness, current-first ordering, and safe serialization."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/pass63-project-map.spec.ts",
+          "command": "npx playwright test tests/e2e/pass63-project-map.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "Exercises all dialog tabs and both downloads in the served application."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-31-ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+          "note": "The immutable preview contains the accessible Project Map presentation."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Bounded recurring cleanup without gameplay-authority drift",
+      "expected": "Menu documentation-dialog ownership is extracted, replaced wiring and proven unused symbols are removed, and remaining hotspots are measured without a broad tree move.",
+      "falsifier": "Duplicate dialog lifecycle code remains active, TypeScript finds unused code, or the cleanup changes gameplay authority.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "docs/PASS63_CLEANUP_PROJECT_MAP_CHAT_SPEC_2026-07-24.md",
+          "command": "npm run lint",
+          "note": "Strict TypeScript and the bounded specification keep the extraction scoped to real ownership boundaries."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Pass 62 gameplay and accepted Rustworks contracts remain intact",
+      "expected": "Host-authoritative shot timing, DHV, 2x Damage, corpse, redeploy, profile/collision behavior, and the accepted Rustworks layout remain unchanged.",
+      "falsifier": "A core deterministic contract changes, Rustworks browser coverage regresses, or Quality and Performance disagree on gameplay authority.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/gameplay-contract.test.ts",
+          "command": "npm run verify:pass25a:core",
+          "note": "The complete static, deterministic gameplay, provenance, unit, leaderboard, build, release-tree, and production dependency gates passed on the immutable source SHA."
+        },
+        {
+          "kind": "browser",
+          "ref": "tests/e2e/rustworks-refinement.spec.ts",
+          "command": "npx playwright test tests/e2e/rustworks-refinement.spec.ts --project=chromium --workers=1 --retries=0",
+          "note": "The accepted one-ramp and 8/4/4 Rustworks composition remains in the Pass 63 browser gate."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Pass 63 Live and byte-exact Pass 62 Stable release topology",
+      "expected": "The root chooser exposes Pass 63 as Live and a pinned Pass 62 Stable subtree whose 118 runtime files retain the protected production digest and original provenance; legacy and room aliases enter Pass 63.",
+      "falsifier": "Pass 62 is rebuilt from current source, any pinned byte differs, the protected digest changes, an extra channel appears, or a current alias enters anything except Pass 63.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "baselines/pass62/best-netcode-benchmark.json",
+          "command": "npm run stage:release-topology && npm run verify:release-topology",
+          "note": "Stages and byte-compares the protected nested Pass 62 Pages subtree while preserving its original provenance and adding pinned-channel provenance."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-release-topology-browser.mjs",
+          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The chooser and latest, normal, and room aliases were exercised against the staged two-channel tree."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Exact immutable Pass 63 candidate is authorized for publication",
+      "expected": "The published runtime derives from the exact source SHA that produced the immutable preview and differs afterward only by this acceptance record and allowed process metadata.",
+      "falsifier": "Runtime or release content changes after preview creation, the artifact source differs, or publication lacks Dave's direct authorization.",
+      "acceptance": "mixed",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-release-topology-browser.mjs",
+          "command": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-release-topology-browser.mjs",
+          "note": "The exact candidate's staged chooser and all compatibility aliases were exercised before publication authorization was recorded."
+        },
+        {
+          "kind": "visual",
+          "ref": "artifact://pr-preview-31-ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
+          "note": "Immutable GitHub Actions preview artifact 8613961967 was created from the exact accepted source SHA before authorization was recorded."
+        },
+        {
+          "kind": "contract",
+          "ref": "acceptance/pass-63.json",
+          "command": "node scripts/release/acceptance-gate.mjs --phase ci --impact full --base 249a7ee77dce761eb237f3eb0e0d0ea1d0356317 --head HEAD",
+          "note": "The gate enforces exact preview identity, post-preview approval ordering, requirement coverage, and preview-to-head parity."
+        }
+      ]
+    }
+  ]
+}

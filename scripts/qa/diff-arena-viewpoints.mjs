@@ -7,8 +7,17 @@
 // dynamic actors (the solo bot, animated containers) moving inside an
 // otherwise identical frame?
 //
-// Metric design (per viewpoint, both sides downscaled to ANALYSIS_W x
-// ANALYSIS_H grayscale):
+// PERSISTENCE RULE: the candidate side may carry multiple samples per
+// viewpoint (capture-arena-viewpoints.mjs --samples). Verdicts are computed
+// on the pixel-wise MINIMUM |base-candidate| delta across those samples.
+// Dynamic content (solo bot, sliding containers, animated water, flickering
+// work lights) moves BETWEEN samples while geometry does not, so a pixel
+// that matches base in ANY sample counts as unchanged; a real regression
+// differs in EVERY sample and survives the min. This removes transient
+// noise WITHOUT loosening any threshold - the same calibrated strictness
+// applies to the persistence-min map.
+// Metric design (per viewpoint, computed on that persistence-min map with
+// both sides downscaled to ANALYSIS_W x ANALYSIS_H grayscale):
 //   meanAbsDelta      - global luminance shift; catches grade/exposure washes.
 //   ratioOver8        - fraction of pixels moved > 8/255; broad soft changes.
 //   ratioOver32       - fraction moved > 32/255; hard geometry/light changes.
@@ -88,45 +97,41 @@ function largestRegion(over) {
   return best;
 }
 
-async function comparePair(basePng, candPng) {
-  const [a, b] = await Promise.all([grayscale(basePng), grayscale(candPng)]);
+export async function comparePair(basePng, candPngs) {
+  const [a, ...rest] = await Promise.all([grayscale(basePng), ...candPngs.map(grayscale)]);
   const n = a.length;
   const over32 = new Uint8Array(n);
+  // persistenceMin: pixel-wise minimum |base-candidate| across samples.
+  const persistenceMin = new Uint8Array(n);
   let sum = 0; let hard = 0; let soft = 0;
   for (let i = 0; i < n; i += 1) {
-    const d = Math.abs(a[i] - b[i]);
+    let d = 255;
+    for (const cand of rest) d = Math.min(d, Math.abs(a[i] - cand[i]));
+    persistenceMin[i] = d;
     sum += d;
     if (d > THRESHOLDS.deltaHard) { over32[i] = 1; hard += 1; }
     if (d > THRESHOLDS.deltaSoft) soft += 1;
   }
   const region = largestRegion(over32);
   return {
-    meanAbsDelta: Number((sum / n).toFixed(3)),
-    ratioOver8: Number((soft / n).toFixed(5)),
-    ratioOver32: Number((hard / n).toFixed(5)),
-    largestRegionFraction: Number((region.count / n).toFixed(5)),
-    largestRegionBox: region.count > 0
-      ? { x: region.minX, y: region.minY, w: region.maxX - region.minX + 1, h: region.maxY - region.minY + 1 }
-      : null,
+    metrics: {
+      meanAbsDelta: Number((sum / n).toFixed(3)),
+      ratioOver8: Number((soft / n).toFixed(5)),
+      ratioOver32: Number((hard / n).toFixed(5)),
+      largestRegionFraction: Number((region.count / n).toFixed(5)),
+      largestRegionBox: region.count > 0
+        ? { x: region.minX, y: region.minY, w: region.maxX - region.minX + 1, h: region.maxY - region.minY + 1 }
+        : null,
+    },
+    persistenceMin,
   };
 }
 
-function verdictFor(metrics) {
-  if (metrics.meanAbsDelta <= THRESHOLDS.meanQuiet && metrics.ratioOver32 <= THRESHOLDS.regionMin * 0.4) return 'MATCH';
-  if (metrics.ratioOver32 >= THRESHOLDS.regionGlobal || metrics.meanAbsDelta >= 6) return 'GLOBAL_CHANGED';
-  if (metrics.ratioOver32 >= THRESHOLDS.regionMin) return 'REGION_CHANGED';
-  return 'DYNAMIC_ONLY';
-}
-
-async function writeComposite(basePng, candPng, outPath) {
-  // Base | candidate | amplified delta heat map, stacked vertically.
-  const [aBuf, bBuf] = await Promise.all([
-    sharp(basePng).resize(ANALYSIS_W, ANALYSIS_H, { fit: 'fill' }).greyscale().raw().toBuffer(),
-    sharp(candPng).resize(ANALYSIS_W, ANALYSIS_H, { fit: 'fill' }).greyscale().raw().toBuffer(),
-  ]);
+async function writeComposite(basePng, candPng, outPath, persistenceMin) {
+  // Base | candidate | amplified PERSISTENCE-MIN delta heat map, stacked.
   const heat = Buffer.alloc(ANALYSIS_W * ANALYSIS_H * 3);
   for (let i = 0; i < ANALYSIS_W * ANALYSIS_H; i += 1) {
-    const d = Math.abs(aBuf[i] - bBuf[i]);
+    const d = persistenceMin[i];
     heat[i * 3] = Math.min(255, d * 4);
     heat[(i * 3) + 1] = Math.min(255, d * 2);
     heat[(i * 3) + 2] = d > 4 ? 40 : 0;
@@ -187,23 +192,41 @@ async function main() {
   }
 
   mkdirSync(OUT_DIR, { recursive: true });
+  const candSampleCount = Math.max(1, Number(candManifest.samples ?? 1));
+  const candidatePaths = (arena, cameraId) => {
+    const paths = [];
+    for (let s = 0; s < candSampleCount; s += 1) {
+      const p = resolve(CAND_DIR, arena,
+        s === 0 ? `${cameraId}.png` : `${cameraId}.s${s}.png`);
+      if (existsSync(p)) paths.push(p);
+    }
+    return paths;
+  };
   const comparisons = [];
   for (const arena of Object.keys(VIEWPOINT_CATALOG)) {
     for (const cameraId of VIEWPOINT_CATALOG[arena]) {
       const rel = resolve(BASE_DIR, arena, `${cameraId}.png`);
-      const cPath = resolve(CAND_DIR, arena, `${cameraId}.png`);
       const entry = { arena, cameraId };
-      if (!existsSync(rel) || !existsSync(cPath)) {
+      if (!existsSync(rel)) {
         entry.verdict = 'MISSING';
-        entry.missingSide = existsSync(rel) ? 'candidate' : 'base';
+        entry.missingSide = 'base';
         comparisons.push(entry);
         continue;
       }
-      entry.metrics = await comparePair(rel, cPath);
-      entry.verdict = verdictFor(entry.metrics);
+      const cPaths = candidatePaths(arena, cameraId);
+      if (cPaths.length === 0) {
+        entry.verdict = 'MISSING';
+        entry.missingSide = 'candidate';
+        comparisons.push(entry);
+        continue;
+      }
+      const { metrics, persistenceMin } = await comparePair(rel, cPaths);
+      entry.metrics = metrics;
+      entry.samplesUsed = cPaths.length;
+      entry.verdict = verdictFor(metrics);
       if (entry.verdict === 'REGION_CHANGED' || entry.verdict === 'GLOBAL_CHANGED') {
         entry.composite = resolve(OUT_DIR, `${arena}__${cameraId}.png`);
-        await writeComposite(rel, cPath, entry.composite);
+        await writeComposite(rel, cPaths[0], entry.composite, persistenceMin);
       }
       comparisons.push(entry);
     }
@@ -219,6 +242,7 @@ async function main() {
     thresholds: THRESHOLDS,
     analysis: { width: ANALYSIS_W, height: ANALYSIS_H },
     base: { dir: BASE_DIR, sha: baseManifest.sha, bundleAtStart: baseManifest.bundleAtStart, capturedAt: baseManifest.capturedAt },
+    persistence: { rule: 'pixel-wise min |base-candidate| across candidate samples', candidateSamples: candManifest.samples ?? 1 },
     candidate: { dir: CAND_DIR, sha: candManifest.sha, bundleAtStart: candManifest.bundleAtStart, capturedAt: candManifest.capturedAt },
     counts,
     comparisons,

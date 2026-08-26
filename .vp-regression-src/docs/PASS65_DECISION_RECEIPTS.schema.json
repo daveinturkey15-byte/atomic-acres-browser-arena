@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "PASS65_DECISION_RECEIPTS.schema.json",
+  "title": "Pass 65 decision receipt registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "releasePass", "updatedAt", "receipts"],
+  "properties": {
+    "$schema": { "const": "PASS65_DECISION_RECEIPTS.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "releasePass": { "const": "PASS 65" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "receipts": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptVersion",
+          "id",
+          "status",
+          "proposedDefault",
+          "value",
+          "rationale",
+          "owner",
+          "recordedAt",
+          "resolvedAt",
+          "freezeNoLaterThan",
+          "supersedesReceiptSha256"
+        ],
+        "properties": {
+          "receiptVersion": { "const": 1 },
+          "id": {
+            "enum": [
+              "DEC-01", "DEC-02", "DEC-03", "DEC-04", "DEC-05",
+              "DEC-06", "DEC-07", "DEC-08", "DEC-09", "DEC-10",
+              "DEC-11", "DEC-12", "DEC-13", "DEC-14", "DEC-15", "DEC-16"
+            ]
+          },
+          "status": { "enum": ["OPEN", "FROZEN", "SUPERSEDED"] },
+          "proposedDefault": { "type": ["string", "number", "boolean", "object", "array"] },
+          "value": {},
+          "rationale": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "recordedAt": { "type": "string", "format": "date-time" },
+          "resolvedAt": { "type": ["string", "null"], "format": "date-time" },
+          "freezeNoLaterThan": { "type": "string", "minLength": 1 },
+          "supersedesReceiptSha256": {
+            "anyOf": [
+              { "type": "null" },
+              { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "OPEN" } }, "required": ["status"] },
+            "then": { "properties": { "value": { "type": "null" }, "resolvedAt": { "type": "null" } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "FROZEN" } }, "required": ["status"] },
+            "then": {
+              "properties": {
+                "value": { "not": { "type": "null" } },
+                "resolvedAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "status": { "const": "SUPERSEDED" } }, "required": ["status"] },
+            "then": { "properties": { "resolvedAt": { "type": "string", "format": "date-time" } } }
+          }
+        ]
+      },
+      "allOf": [
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-01" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-02" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-03" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-04" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-05" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-06" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-07" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-08" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-09" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-10" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-11" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-12" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-13" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-14" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-15" } } }, "minContains": 1, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["id"], "properties": { "id": { "const": "DEC-16" } } }, "minContains": 1, "maxContains": 1 }
+      ]
+    }
+  }
+}

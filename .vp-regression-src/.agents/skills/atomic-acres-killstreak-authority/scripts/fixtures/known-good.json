@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "9fecada75693c528d0ff2667ddad1f415d71ffe4",
+  "buildId": "pass65-synthetic-support-v1",
+  "decisionBinding": {
+    "id": "DEC-13",
+    "scope": "synthetic-fixture-only",
+    "receiptSha256": "66a7a96a4342bfcca7eb619d433be4e36a6860dc96f79cf98be6ac11debdf30d"
+  },
+  "catalog": [
+    {"id": "scout-sweep", "displayName": "Scout Sweep", "cost": 3, "tier": "low", "availability": "selectable", "carePackageBaseWeightUnits": 24, "carePackageWeightUnits": 2376, "relationship": "retained-slot-1", "activation": "instant", "supportDefinitionIds": [], "durationMs": 12000, "repeatable": false, "authorityPolicy": "host", "presentationId": "scout-sweep-view", "audioProfileId": "scout-sweep-audio", "evidenceIds": ["killstreak-catalog-exactness", "care-pool-completeness"]},
+    {"id": "adrenaline", "displayName": "Adrenaline Boost", "cost": 3, "tier": "low", "availability": "selectable", "carePackageBaseWeightUnits": 24, "carePackageWeightUnits": 2376, "relationship": "scout-sweep-slot-alternative", "activation": "instant", "supportDefinitionIds": [], "durationMs": 15000, "repeatable": false, "authorityPolicy": "host", "presentationId": "adrenaline-view", "audioProfileId": "adrenaline-audio", "evidenceIds": ["killstreak-catalog-exactness", "care-pool-completeness"]},
+    {"id": "care-package", "displayName": "Care Package", "cost": 4, "tier": "low", "availability": "selectable", "carePackageBaseWeightUnits": 0, "carePackageWeightUnits": 0, "relationship": "nonrecursive-slot-1", "activation": "instant", "supportDefinitionIds": ["care-package-aircraft", "care-package-crate"], "durationMs": 60000, "repeatable": false, "authorityPolicy": "host", "presentationId": "care-package-view", "audioProfileId": "care-package-audio", "evidenceIds": ["care-pool-completeness", "privacy-reveal-boundary", "support-lifecycle"]},
+    {"id": "yardhawk", "displayName": "Yardhawk", "cost": 5, "tier": "mid", "availability": "selectable", "carePackageBaseWeightUnits": 16, "carePackageWeightUnits": 1584, "relationship": "retained-slot-2", "activation": "instant", "supportDefinitionIds": ["yardhawk-entity"], "durationMs": 15000, "repeatable": false, "authorityPolicy": "host", "presentationId": "yardhawk-view", "audioProfileId": "yardhawk-audio", "evidenceIds": ["support-authority", "support-budget", "care-pool-completeness"]},
+    {"id": "piloted-drone", "displayName": "Piloted Drone", "cost": 5, "tier": "mid", "availability": "selectable", "carePackageBaseWeightUnits": 16, "carePackageWeightUnits": 1584, "relationship": "yardhawk-slot-alternative", "activation": "possession", "supportDefinitionIds": ["piloted-drone-entity"], "durationMs": 30000, "repeatable": false, "authorityPolicy": "host", "presentationId": "piloted-drone-view", "audioProfileId": "piloted-drone-audio", "evidenceIds": ["support-authority", "support-lifecycle", "care-pool-completeness"]},
+    {"id": "tri-pass", "displayName": "Tri-Pass Strike", "cost": 7, "tier": "high", "availability": "selectable", "carePackageBaseWeightUnits": 12, "carePackageWeightUnits": 1188, "relationship": "retained-slot-3-or-4", "activation": "target-line", "supportDefinitionIds": ["tri-pass-entity"], "durationMs": 12000, "repeatable": false, "authorityPolicy": "host", "presentationId": "tri-pass-view", "audioProfileId": "tri-pass-audio", "evidenceIds": ["support-authority", "care-pool-completeness"]},
+    {"id": "carpet-bomber", "displayName": "Carpet Bomber", "cost": 7, "tier": "high", "availability": "selectable", "carePackageBaseWeightUnits": 12, "carePackageWeightUnits": 1188, "relationship": "slot-3-or-4-alternative", "activation": "target-point", "supportDefinitionIds": ["carpet-bomber-entity"], "durationMs": 12000, "repeatable": false, "authorityPolicy": "host", "presentationId": "carpet-bomber-view", "audioProfileId": "carpet-bomber-audio", "evidenceIds": ["support-authority", "support-budget", "care-pool-completeness"]},
+    {"id": "hunter-swarm", "displayName": "Hunter Swarm", "cost": 8, "tier": "high", "availability": "selectable", "carePackageBaseWeightUnits": 9, "carePackageWeightUnits": 891, "relationship": "retained-slot-3-or-4", "activation": "instant", "supportDefinitionIds": ["hunter-swarm-entity"], "durationMs": 20000, "repeatable": false, "authorityPolicy": "host", "presentationId": "hunter-swarm-view", "audioProfileId": "hunter-swarm-audio", "evidenceIds": ["support-authority", "care-pool-completeness"]},
+    {"id": "chopper", "displayName": "Chopper Gunner", "cost": 8, "tier": "high", "availability": "selectable", "carePackageBaseWeightUnits": 9, "carePackageWeightUnits": 891, "relationship": "slot-3-or-4-alternative", "activation": "instant", "supportDefinitionIds": ["chopper-entity"], "durationMs": 30000, "repeatable": false, "authorityPolicy": "host", "presentationId": "chopper-view", "audioProfileId": "chopper-audio", "evidenceIds": ["support-authority", "support-budget", "care-pool-completeness"]},
+    {"id": "drone-swarm", "displayName": "Drone Swarm", "cost": 15, "tier": "top", "availability": "selectable", "carePackageBaseWeightUnits": 1, "carePackageWeightUnits": 99, "relationship": "nuke-slot-alternative", "activation": "instant", "supportDefinitionIds": ["drone-swarm-entity"], "durationMs": 60000, "repeatable": false, "authorityPolicy": "host", "presentationId": "drone-swarm-view", "audioProfileId": "drone-swarm-audio", "evidenceIds": ["support-authority", "support-budget", "support-lifecycle", "care-pool-completeness"]},
+    {"id": "nuke", "displayName": "Nuke", "cost": 15, "tier": "top", "availability": "selectable", "carePackageBaseWeightUnits": 0, "carePackageWeightUnits": 123, "relationship": "drone-swarm-slot-alternative-and-one-percent-care-reward", "activation": "instant", "supportDefinitionIds": [], "durationMs": 0, "repeatable": false, "authorityPolicy": "host", "presentationId": "nuke-view", "audioProfileId": "nuke-audio", "evidenceIds": ["care-pool-completeness", "support-authority"]}
+  ],
+  "loadout": ["scout-sweep", "yardhawk", "tri-pass", "chopper", "nuke"],
+  "selectionPolicy": {"slotCount": 5, "duplicatesAllowed": false, "freezeAt": "match-start", "keyBindings": [3, 4, 5, 6, 7], "slots": [{"slot": 1, "allowedIds": ["scout-sweep", "adrenaline", "care-package"]}, {"slot": 2, "allowedIds": ["yardhawk", "piloted-drone"]}, {"slot": 3, "allowedIds": ["tri-pass", "carpet-bomber", "hunter-swarm", "chopper"]}, {"slot": 4, "allowedIds": ["tri-pass", "carpet-bomber", "hunter-swarm", "chopper"]}, {"slot": 5, "allowedIds": ["nuke", "drone-swarm"]}], "mutuallyExclusiveGroups": [["nuke", "drone-swarm"]]},
+  "earningPolicy": {"progressScope": "per-life", "advancingKillSources": ["weapon", "ordnance"], "excludedKillSources": ["killstreak"], "eachRewardEarnsOncePerCycle": true, "cycleRepeatsAfterFinalThresholdWhileLifeActive": true, "nextCycleProgressStartsAtZero": true, "deathClearsProgress": true, "deathClearsUnconsumedRewards": false, "unconsumedRewardLifetime": "until-consumed-or-match-epoch-ends", "respawnStartsFreshLife": true, "rematchStartsFreshEpoch": true},
+  "activationPolicy": {"hostOwnsActivation": true, "consumesExactlyOnce": true, "duplicateOwnerTypePolicy": "forbid-unless-definition-allows"},
+  "privacyPolicy": {"rewardSeedRollHostOnly": true, "acquisitionStateHostOnly": true, "rewardRevealPolicy": "claimant-after-exclusive-claim", "recipientSnapshotOmitsSeedAndRoll": true},
+  "gunProfiles": [
+    {"id": "drone-gun-standard-v1", "definition": {"damage": 10, "rpm": 600, "falloffStartM": 10, "falloffEndM": 45, "penetration": 10, "magazineSize": 20, "reloadMs": 2000}, "sha256": "e1ab6c3d563caf939c66308ec89d7b72ea7df6ab1b0c695e52b543da2fd6e114"},
+    {"id": "chopper-gun-v1", "definition": {"damage": 20, "rpm": 450, "falloffStartM": 30, "falloffEndM": 150, "penetration": 20, "magazineSize": 64, "reloadMs": 3000}, "sha256": "b4fd974f6501fbc26fac74d9c5cc9108dd862fe88f0b80e9c9db1196e1ff999a"}
+  ],
+  "supportDefinitions": [
+    {
+      "id": "care-package-aircraft", "kind": "aircraft", "authority": "host", "targetable": false, "health": null, "hitboxProfileId": null, "presentationId": "care-aircraft-view", "audioProfileId": "care-aircraft-audio", "maximumEntities": 1, "maximumActiveVoices": 8, "maximumProjectiles": 0, "pooled": true, "prewarmed": true, "provenanceId": "care-aircraft-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "care-drop-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-drop-route", "hostOwned": true, "livingOnly": false, "opposingOnly": false, "allowedTargetKinds": [], "lineOfSightRequired": false, "semanticSmokeBlocks": false, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": null, "sensor": null,
+      "detail": {"role": "care-drop", "bombCount": 0, "ingressPolicy": "not-applicable", "pathPolicy": "not-applicable", "activationAnchorPolicy": "not-applicable", "lifetimeMs": 20000}
+    },
+    {
+      "id": "care-package-crate", "kind": "parachute-crate", "authority": "host", "targetable": false, "health": null, "hitboxProfileId": null, "presentationId": "care-crate-view", "audioProfileId": "care-crate-audio", "maximumEntities": 1, "maximumActiveVoices": 4, "maximumProjectiles": 0, "pooled": true, "prewarmed": true, "provenanceId": "care-crate-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": false, "policyId": null, "recoveryPolicy": "not-applicable"},
+      "targeting": null, "weapon": null, "sensor": null,
+      "detail": {"descentPolicyId": "care-descent-v1", "capturePolicyId": "host-range-los-exclusive-v1", "exclusiveConsume": true, "expiryPolicyId": "care-expiry-v1", "aircraftDefinitionId": "care-package-aircraft"}
+    },
+    {
+      "id": "yardhawk-entity", "kind": "aircraft", "authority": "host", "targetable": true, "health": 100, "hitboxProfileId": "yardhawk-hitbox", "presentationId": "yardhawk-view", "audioProfileId": "yardhawk-audio", "maximumEntities": 1, "maximumActiveVoices": 8, "maximumProjectiles": 4, "pooled": true, "prewarmed": true, "provenanceId": "yardhawk-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "yardhawk-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-living-opponents-los-smoke-cover", "hostOwned": true, "livingOnly": true, "opposingOnly": true, "allowedTargetKinds": ["player", "bot"], "lineOfSightRequired": true, "semanticSmokeBlocks": true, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": null, "sensor": null,
+      "detail": {"role": "yardhawk", "bombCount": 0, "ingressPolicy": "not-applicable", "pathPolicy": "not-applicable", "activationAnchorPolicy": "not-applicable", "lifetimeMs": 15000}
+    },
+    {
+      "id": "piloted-drone-entity", "kind": "drone", "authority": "host", "targetable": true, "health": 50, "hitboxProfileId": "drone-hitbox-v1", "presentationId": "piloted-drone-view", "audioProfileId": "piloted-drone-audio", "maximumEntities": 1, "maximumActiveVoices": 8, "maximumProjectiles": 40, "pooled": true, "prewarmed": true, "provenanceId": "piloted-drone-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "piloted-drone-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-living-opponents-los-smoke-cover", "hostOwned": true, "livingOnly": true, "opposingOnly": true, "allowedTargetKinds": ["player", "bot"], "lineOfSightRequired": true, "semanticSmokeBlocks": true, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": {"gunProfileId": "drone-gun-standard-v1", "magazineSize": 20, "reservePolicy": "two-magazines-total", "reloadMs": 2000},
+      "sensor": {"presentationOnly": true, "revealPolicy": "living-hostiles-only", "rangeM": 50, "forwardConeDeg": 90, "refreshMs": 250, "wallReveal": true, "ballisticAuthority": false},
+      "detail": {"count": 1, "durationMs": 30000, "fuelMs": 30000, "ownerBodyVulnerable": true, "controlRestoreConditions": ["body-death", "disconnect", "drone-death", "exit", "fuel-expiry"], "targetKinds": ["player", "bot"], "relationshipPolicy": "owner-controlled-or-opposing-living-ai", "pressureSevereByMs": null, "escapeWindowMinMs": null, "escapeWindowMaxMs": null, "spawnOrigin": "deterministic-valid-centre-map-volume", "minimumSpawnSeparationM": 1.15, "inputConvention": "non-inverted-screen-space-keyboard-mouse-gamepad", "manualHorizontalSpeedMps": 10, "autonomousStandaloneSpeedMultiplier": 2, "autonomousStandaloneSpeedMps": 20, "ingressPolicy": "not-applicable", "formationPolicy": "not-applicable", "routePolicy": "owner-controlled-or-host-ai-twice-manual-speed"}
+    },
+    {
+      "id": "tri-pass-entity", "kind": "aircraft", "authority": "host", "targetable": false, "health": null, "hitboxProfileId": null, "presentationId": "tri-pass-view", "audioProfileId": "tri-pass-audio", "maximumEntities": 3, "maximumActiveVoices": 12, "maximumProjectiles": 3, "pooled": true, "prewarmed": true, "provenanceId": "tri-pass-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "tri-pass-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-bounded-target-line", "hostOwned": true, "livingOnly": false, "opposingOnly": false, "allowedTargetKinds": [], "lineOfSightRequired": true, "semanticSmokeBlocks": false, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": null, "sensor": null,
+      "detail": {"role": "tri-pass", "bombCount": 0, "ingressPolicy": "not-applicable", "pathPolicy": "not-applicable", "activationAnchorPolicy": "not-applicable", "lifetimeMs": 12000}
+    },
+    {
+      "id": "carpet-bomber-entity", "kind": "aircraft", "authority": "host", "targetable": false, "health": null, "hitboxProfileId": null, "presentationId": "carpet-bomber-view", "audioProfileId": "carpet-bomber-audio", "maximumEntities": 1, "maximumActiveVoices": 12, "maximumProjectiles": 20, "pooled": true, "prewarmed": true, "provenanceId": "carpet-bomber-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "carpet-bomber-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-seeded-bounded-strip", "hostOwned": true, "livingOnly": false, "opposingOnly": false, "allowedTargetKinds": [], "lineOfSightRequired": false, "semanticSmokeBlocks": false, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": null, "sensor": null,
+      "detail": {"role": "carpet-bomber", "bombCount": 20, "ingressPolicy": "host-seeded-random-valid", "pathPolicy": "bounded-zigzag-strip", "activationAnchorPolicy": "crosshair-ground-anchor-no-overview-map", "lifetimeMs": 12000, "targetingLifecycle": "care-package-style-crosshair-preview-commit-aircraft-resolve", "sharedGroundMarker": "large-red-x-at-admitted-anchor", "callerFlightPathPreview": "red-map-bounded-payload-corridor"}
+    },
+    {
+      "id": "hunter-swarm-entity", "kind": "aircraft", "authority": "host", "targetable": true, "health": 100, "hitboxProfileId": "hunter-swarm-hitbox", "presentationId": "hunter-swarm-view", "audioProfileId": "hunter-swarm-audio", "maximumEntities": 8, "maximumActiveVoices": 16, "maximumProjectiles": 8, "pooled": true, "prewarmed": true, "provenanceId": "hunter-swarm-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "hunter-swarm-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-living-opponents-los-smoke-cover", "hostOwned": true, "livingOnly": true, "opposingOnly": true, "allowedTargetKinds": ["player", "bot"], "lineOfSightRequired": true, "semanticSmokeBlocks": true, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": null, "sensor": null,
+      "detail": {"role": "hunter-swarm", "bombCount": 0, "ingressPolicy": "not-applicable", "pathPolicy": "not-applicable", "activationAnchorPolicy": "not-applicable", "lifetimeMs": 20000}
+    },
+    {
+      "id": "chopper-entity", "kind": "chopper", "authority": "host", "targetable": true, "health": 800, "hitboxProfileId": "chopper-hitbox-v1", "presentationId": "chopper-view", "audioProfileId": "chopper-audio", "maximumEntities": 1, "maximumActiveVoices": 12, "maximumProjectiles": 64, "pooled": true, "prewarmed": true, "provenanceId": "chopper-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "chopper-arena-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-living-opponents-los-smoke-cover", "hostOwned": true, "livingOnly": true, "opposingOnly": true, "allowedTargetKinds": ["player", "bot"], "lineOfSightRequired": true, "semanticSmokeBlocks": true, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": {"gunProfileId": "chopper-gun-v1", "magazineSize": 64, "reservePolicy": "bounded-support-feed", "reloadMs": 3000},
+      "sensor": null,
+      "detail": {"durationMs": 30000, "motionPolicyId": "host-seeded-band-limited-chopper-v1", "losRequired": true, "semanticSmokeBlocks": true, "pressureSevereByMs": 4000, "escapeWindowMinMs": 4000, "escapeWindowMaxMs": 5000}
+    },
+    {
+      "id": "drone-swarm-entity", "kind": "drone", "authority": "host", "targetable": true, "health": 50, "hitboxProfileId": "drone-hitbox-v1", "presentationId": "drone-swarm-view", "audioProfileId": "drone-swarm-audio", "maximumEntities": 24, "maximumActiveVoices": 48, "maximumProjectiles": 480, "pooled": true, "prewarmed": true, "provenanceId": "drone-swarm-assets",
+      "lifecycle": {"spawnAuthority": "host-fixed-step", "reliableEvents": true, "lossyPoseSnapshots": true, "expiresAndDisposes": true, "resetOnRematch": true, "generationAware": true},
+      "navigation": {"required": true, "policyId": "drone-swarm-arena-flight-nav", "recoveryPolicy": "bounded-host-recovery"},
+      "targeting": {"policyId": "host-living-opponents-los-smoke-cover", "hostOwned": true, "livingOnly": true, "opposingOnly": true, "allowedTargetKinds": ["player", "bot"], "lineOfSightRequired": true, "semanticSmokeBlocks": true, "hardCoverBlocks": true, "hiddenUntilReveal": true},
+      "weapon": {"gunProfileId": "drone-gun-standard-v1", "magazineSize": 20, "reservePolicy": "unlimited-reloads-until-expiry", "reloadMs": 2000},
+      "sensor": null,
+      "detail": {"count": 24, "durationMs": 60000, "fuelMs": null, "ownerBodyVulnerable": false, "controlRestoreConditions": [], "targetKinds": ["player", "bot"], "relationshipPolicy": "opposing-living-only", "pressureSevereByMs": 4000, "escapeWindowMinMs": 4000, "escapeWindowMaxMs": 5000, "spawnOrigin": "deterministic-valid-centre-map-volume", "minimumSpawnSeparationM": 1.15, "inputConvention": "not-applicable", "manualHorizontalSpeedMps": null, "autonomousStandaloneSpeedMultiplier": null, "autonomousStandaloneSpeedMps": null, "ingressPolicy": "fast-then-smooth-normal-speed", "formationPolicy": "distributed-individual-or-small-groups", "routePolicy": "host-seeded-divergent-valid-map-directions"}
+    }
+  ],
+  "provenance": [
+    {"id": "care-aircraft-assets", "source": "authored/care-aircraft.blend", "license": "project-owned", "derivativeNotes": "Original fixture aircraft.", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"id": "care-crate-assets", "source": "authored/care-crate.blend", "license": "project-owned", "derivativeNotes": "Original fixture crate.", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+    {"id": "yardhawk-assets", "source": "authored/yardhawk.blend", "license": "project-owned", "derivativeNotes": "Original fixture aircraft.", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+    {"id": "piloted-drone-assets", "source": "authored/piloted-drone.blend", "license": "project-owned", "derivativeNotes": "Original fixture drone.", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+    {"id": "tri-pass-assets", "source": "authored/tri-pass.blend", "license": "project-owned", "derivativeNotes": "Original fixture aircraft.", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+    {"id": "carpet-bomber-assets", "source": "authored/carpet-bomber.blend", "license": "project-owned", "derivativeNotes": "Original fixture aircraft.", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+    {"id": "hunter-swarm-assets", "source": "authored/hunter-swarm.blend", "license": "project-owned", "derivativeNotes": "Original fixture swarm.", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    {"id": "chopper-assets", "source": "authored/chopper.blend", "license": "project-owned", "derivativeNotes": "Original fixture chopper.", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    {"id": "drone-swarm-assets", "source": "authored/drone-swarm.blend", "license": "project-owned", "derivativeNotes": "Original fixture swarm drone.", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"}
+  ],
+  "evidenceBinding": {
+    "scope": "synthetic-fixture-only",
+    "path": ".agents/skills/atomic-acres-killstreak-authority/scripts/fixtures/synthetic-support-evidence.json",
+    "receiptSha256": "10b417d63a544b65dd91dfd2f880d765e235e88e6d41c8d5b9b02afb1b8dbea5"
+  }
+}

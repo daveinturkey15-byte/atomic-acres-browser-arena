@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "spatial-audio-evidence",
+  "eventId": "world.projectile-impact",
+  "sourceAzimuthDeg": 40,
+  "observedPan": 0.6,
+  "openGain": 0.7,
+  "occludedGain": 0.3,
+  "openLowPassHz": 17000,
+  "occludedLowPassHz": 2200,
+  "artifactPath": "fixture-payloads/audio/spatial/world-projectile-impact.json"
+}

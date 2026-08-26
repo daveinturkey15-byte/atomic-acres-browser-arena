@@ -145,11 +145,13 @@ function varyPalmInstanceColors(mesh: THREE.InstancedMesh, seed: number): void {
 export function createPalmCrownGeometry(): THREE.BufferGeometry {
   const bladeCount = 8;
   const positions: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
 
   // Hub center vertex (crown origin)
   const hubIndex = 0;
   positions.push(0, 0.03, 0);
+  uvs.push(0.5, 0.5);
 
   // Per-blade hub rim vertex indices for the closing cap triangles
   const hubRim: number[] = [];
@@ -184,6 +186,10 @@ export function createPalmCrownGeometry(): THREE.BufferGeometry {
       ux * 1.0 - vx * w1, -0.16, uz * 1.0 - vz * w1,
       ux * len, -droop, uz * len,
     );
+    // u across the blade, v base->tip so the frond albedo/alpha reads along
+    // the blade. Without this attribute applyFarcrysisTextures skips the
+    // crown entirely and the beach palms render as flat solid colour.
+    uvs.push(0, 0, 1, 0, 0, 0.55, 1, 0.55, 0.5, 1);
     hubRim.push(bl, br);
 
     // Leaf triangles (tapered blade: base -> mid -> tip)
@@ -201,6 +207,8 @@ export function createPalmCrownGeometry(): THREE.BufferGeometry {
       ux * len * 0.92 + vx * sr * 0.6, -droop * 0.92, uz * len * 0.92 + vz * sr * 0.6,
       ux * len * 0.92 - vx * sr * 0.6, -droop * 0.92, uz * len * 0.92 - vz * sr * 0.6,
     );
+    // Spine ridge shares the blade's UV space (a narrow band up the centre).
+    uvs.push(0.4, 0.05, 0.6, 0.05, 0.4, 0.55, 0.6, 0.55, 0.45, 0.92, 0.55, 0.92);
     const s0 = bl + 5;
     indices.push(s0, s0 + 2, s0 + 3);
     indices.push(s0, s0 + 3, s0 + 1);
@@ -215,6 +223,7 @@ export function createPalmCrownGeometry(): THREE.BufferGeometry {
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;

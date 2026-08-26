@@ -1,0 +1,304 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { isAbsolute, dirname } from 'node:path';
+import { chromium } from '@playwright/test';
+
+const baseUrl = process.env.QA_BASE_URL ?? '';
+const peerPort = Number(process.env.QA_PEER_PORT ?? Number.NaN);
+const peerPath = process.env.QA_PEER_PATH ?? '';
+const expectedGate = process.env.PASS66_OWNED_GATE ?? '';
+const expectedSourceSha = process.env.PASS66_OWNED_SOURCE_SHA ?? '';
+const expectedTreeSha256 = process.env.PASS66_OWNED_TREE_SHA256 ?? '';
+const expectedFileCount = Number(process.env.PASS66_OWNED_FILE_COUNT ?? Number.NaN);
+const receiptPath = process.env.PASS66_OWNED_RECEIPT_PATH ?? '';
+
+if (expectedGate !== 'private-lobby' || !/^https?:\/\/127\.0\.0\.1:\d+\/channels\/the-big-one\/$/u.test(baseUrl)
+  || !/^[a-f0-9]{40}$/u.test(expectedSourceSha) || !/^[a-f0-9]{64}$/u.test(expectedTreeSha256)
+  || !Number.isSafeInteger(expectedFileCount) || expectedFileCount < 2 || !isAbsolute(receiptPath)
+  || !Number.isInteger(peerPort) || peerPort < 1_024 || peerPort > 65_535
+  || !/^\/peerjs-[a-f0-9]{24}$/u.test(peerPath)) {
+  throw new Error('Private-lobby QA must run through the clean-SHA owned Pass 66 verifier wrapper');
+}
+
+const provenanceResponse = await fetch(new URL('channel-provenance.json', baseUrl), {
+  signal: AbortSignal.timeout(10_000),
+  cache: 'no-store',
+});
+if (!provenanceResponse.ok) throw new Error(`Candidate provenance returned HTTP ${provenanceResponse.status}`);
+const servedCandidate = await provenanceResponse.json();
+if (servedCandidate?.schemaVersion !== 4 || servedCandidate.channel !== 'the-big-one'
+  || servedCandidate.releasePass !== 'PASS 66' || servedCandidate.path !== 'channels/the-big-one'
+  || servedCandidate.sourceSha !== expectedSourceSha || servedCandidate.treeSha256 !== expectedTreeSha256
+  || servedCandidate.exactRootFileCount !== expectedFileCount) {
+  throw new Error(`Served candidate provenance mismatch: ${JSON.stringify(servedCandidate)}`);
+}
+const browser = await chromium.launch({
+  headless: process.env.QA_HEADED !== '1',
+  args: [
+    '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows', '--allow-loopback-in-peer-connection',
+    '--disable-features=WebRtcHideLocalIpsWithMdns',
+  ],
+});
+const errors = [];
+const pages = [];
+const pageContexts = new Map();
+
+async function openPlayer(label) {
+  const context = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  const page = await context.newPage();
+  pageContexts.set(page, context);
+  page.on('pageerror', (error) => errors.push(`${label}: ${error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(`${label}: ${message.text()}`);
+  });
+  const url = new URL(baseUrl);
+  url.searchParams.set('render', 'compat');
+  url.searchParams.set('multiplayerQa', '1');
+  url.searchParams.set('seed', `pass38-private-${label}`);
+  url.searchParams.set('peerQaPort', String(peerPort));
+  url.searchParams.set('peerQaPath', peerPath);
+  await page.goto(url.toString());
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('.map-card[data-arena-id]')].some((button) => !button.disabled),
+    undefined,
+    { timeout: 60_000 },
+  );
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+  await page.fill('#player-name', label);
+  pages.push(page);
+  return page;
+}
+
+async function closePlayer(page) {
+  await pageContexts.get(page)?.close();
+  pageContexts.delete(page);
+  const index = pages.indexOf(page);
+  if (index >= 0) pages.splice(index, 1);
+}
+
+async function verifySoloHostStart(label, hostedBotCount) {
+  const host = await openPlayer(label);
+  await host.click('#host');
+  await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 1, undefined, { timeout: 45_000 });
+  const startActsAsReadyCommit = !(await host.locator('#lobby-start').isDisabled());
+  if (hostedBotCount > 0) {
+    await host.selectOption('#lobby-bots', String(hostedBotCount));
+    await host.waitForFunction((count) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.hostedBotCount === count, hostedBotCount, { timeout: 15_000 });
+  }
+  // A solo host's START action is the host ready commit; exercise that direct
+  // path instead of claiming it after separately clicking READY.
+  await host.click('#lobby-start');
+  await host.waitForFunction((count) => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state.bots.length === count;
+  }, hostedBotCount, { timeout: 45_000 });
+  const state = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  const result = {
+    startActsAsReadyCommit,
+    active: state.matchPhase === 'active',
+    humans: state.privateMatch.members.filter((member) => member.connected).length,
+    bots: state.bots.length,
+  };
+  await closePlayer(host);
+  return result;
+}
+
+try {
+  const soloHostNoBots = await verifySoloHostStart('Solo Host', 0);
+  const soloHostWithBots = await verifySoloHostStart('Solo Bot Host', 4);
+  const host = await openPlayer('Host Four');
+  const guests = [await openPlayer('Guest One'), await openPlayer('Guest Two'), await openPlayer('Guest Three')];
+  await host.selectOption('#team', '1');
+  await host.click('#host');
+  await host.waitForFunction(() => document.querySelector('#room-code')?.textContent?.trim(), undefined, { timeout: 45_000 });
+  const roomCode = (await host.textContent('#room-code')).trim();
+  for (const guest of guests) {
+    await guest.fill('#room-input', roomCode);
+    await guest.click('#join');
+  }
+  await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 4, undefined, { timeout: 45_000 });
+  await Promise.all(guests.map((guest) => guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 4, undefined, { timeout: 45_000 })));
+
+  const balancedTeams = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.reduce((counts, member) => {
+    counts[member.team] += 1;
+    return counts;
+  }, [0, 0]));
+  const hostTeamSynchronized = await host.evaluate(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const hostMember = state.privateMatch.members.find((member) => member.name === 'Host Four');
+    return hostMember?.team === state.player.team && document.querySelector('#team')?.value === String(state.player.team);
+  });
+  const startBlockedBeforeReady = await host.locator('#lobby-start').isDisabled();
+
+  await host.selectOption('[data-lobby-dhv]', 'X');
+  await guests[0].selectOption('[data-lobby-dhv]', '8');
+  await guests[1].selectOption('[data-lobby-dhv]', '6');
+  await guests[2].selectOption('[data-lobby-dhv]', '2');
+  await host.waitForFunction(() => {
+    const members = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [];
+    const values = Object.fromEntries(members.map((member) => [member.name, member.dhv]));
+    return values['Host Four'] === 'X' && values['Guest One'] === 8 && values['Guest Two'] === 6 && values['Guest Three'] === 2;
+  }, undefined, { timeout: 30_000 });
+  const dhvReplicated = await host.evaluate(() => Object.fromEntries(
+    window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member) => [member.name, member.dhv]),
+  ));
+
+  const overflow = await openPlayer('Overflow Five');
+  await overflow.fill('#room-input', roomCode);
+  await overflow.click('#join');
+  await overflow.waitForFunction(() => {
+    const status = document.querySelector('#network-status')?.textContent ?? '';
+    return status.includes('Room is full') || window.__ATOMIC_ACRES_DEBUG__?.snapshot().networkLifecycle.role === 'offline';
+  }, undefined, { timeout: 30_000 });
+  const overflowState = await overflow.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  const overflowRejected = overflowState.networkLifecycle.role === 'offline'
+    && overflowState.gameStarted === false
+    && (await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.length)) === 4;
+  await closePlayer(overflow);
+
+  await mkdir('artifacts/pass38', { recursive: true });
+  await host.screenshot({ path: 'artifacts/pass38/private-lobby-host-four-player.png', fullPage: true });
+
+  await host.selectOption('#lobby-capacity', '6');
+  await Promise.all(guests.map((guest) => guest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.capacity === 6, undefined, { timeout: 30_000 })));
+  const extraGuests = [await openPlayer('Guest Four'), await openPlayer('Guest Five')];
+  for (const guest of extraGuests) {
+    await guest.fill('#room-input', roomCode);
+    await guest.click('#join');
+  }
+  guests.push(...extraGuests);
+  await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members.length === 6, undefined, { timeout: 45_000 });
+  await Promise.all(guests.map((guest) => guest.waitForFunction(() => {
+    const match = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch;
+    return match?.capacity === 6 && match.members.length === 6;
+  }, undefined, { timeout: 45_000 })));
+  const sixCapacityReplicated = true;
+  const sixPlayersAdmitted = true;
+  await host.selectOption('#lobby-mode', 'ffa');
+  await Promise.all(guests.map((guest) => guest.waitForFunction(() => {
+    const match = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch;
+    return match?.capacity === 6 && match.mode === 'ffa';
+  }, undefined, { timeout: 30_000 })));
+  const ffaTeamControlsDisabled = await Promise.all([host, ...guests].map((page) => page.locator('#team').isDisabled()));
+
+  await host.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members
+    .filter((member) => member.id !== window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members[0].id)
+    .every((member) => member.pingMs !== null), undefined, { timeout: 15_000 });
+  const pingSamples = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.map((member) => member.pingMs));
+
+  for (const page of [host, ...guests]) await page.click('#lobby-ready');
+  await host.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 30_000 });
+  const allReady = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.every((member) => member.ready));
+  await host.screenshot({ path: 'artifacts/pass38/private-lobby-host-six-player.png', fullPage: true });
+  await guests[0].screenshot({ path: 'artifacts/pass38/private-lobby-guest-six-player.png', fullPage: true });
+  await host.click('#lobby-start');
+  await Promise.all([host, ...guests].map((page) => page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 45_000 })));
+  await Promise.all([host, ...guests].map((page) => page.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state.remotes === 5;
+  }, undefined, { timeout: 45_000 })));
+
+  const states = await Promise.all([host, ...guests].map((page) => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot())));
+  const timers = await Promise.all([host, ...guests].map((page) => page.textContent('#timer')));
+  const activeAtHostValues = states.map((state) => state.privateMatch.activeAtHostTimeMs);
+  const activeAtValues = states.map((state) => state.privateMatch.activeAtEpochMs);
+
+  const rejoinGuest = guests[0];
+  const rejoinIdBefore = await host.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.find((member) => member.name === 'Guest One')?.id);
+  await rejoinGuest.reload({ waitUntil: 'load' });
+  await host.waitForFunction((id) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch.members
+    .some((member) => member.id === id && member.connected === false), rejoinIdBefore, { timeout: 30_000 });
+  const rejoinGraceVisible = await host.evaluate((id) => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members
+    .some((member) => member.id === id && member.connected === false), rejoinIdBefore);
+  await rejoinGuest.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: 60_000 });
+  await rejoinGuest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
+  await rejoinGuest.fill('#player-name', 'Guest One');
+  await rejoinGuest.fill('#room-input', roomCode);
+  await rejoinGuest.click('#join');
+  await rejoinGuest.waitForFunction(() => {
+    const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.gameStarted === true && state.matchPhase === 'active' && state.remotes === 5;
+  }, undefined, { timeout: 45_000 });
+  await host.waitForFunction((id) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch.members
+    .some((member) => member.id === id && member.connected === true), rejoinIdBefore, { timeout: 30_000 });
+  const rejoinIdAfter = await rejoinGuest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().privateMatch.members.find((member) => member.name === 'Guest One')?.id);
+  const rejoinState = await rejoinGuest.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+  const rejoinIdentityPreserved = rejoinIdBefore === rejoinIdAfter;
+  const rejoinRecovered = rejoinState.gameStarted === true && rejoinState.remotes === 5
+    && rejoinState.networkLifecycle.eventChannels === 1 && rejoinState.networkLifecycle.stateChannels === 1;
+
+  const report = {
+    schemaVersion: 1,
+    status: 'PASS',
+    gate: 'private-lobby',
+    sourceSha: expectedSourceSha,
+    servedCandidate,
+    schema: 'atomic-acres/pass66-private-lobby@2',
+    ownedPeer: { host: '127.0.0.1', port: peerPort, path: peerPath, localOnly: true },
+    errors,
+    soloHostNoBots,
+    soloHostWithBots,
+    roomCodeLength: roomCode.length,
+    balancedTeams,
+    hostTeamSynchronized,
+    startBlockedBeforeReady,
+    dhvReplicated,
+    overflowRejected,
+    sixCapacityReplicated,
+    sixPlayersAdmitted,
+    sharedConfig: states.map((state) => ({ mode: state.privateMatch.mode, capacity: state.privateMatch.capacity })),
+    ffaTeamControlsDisabled,
+    allReady,
+    pingSamples,
+    timers,
+    activeAtHostValues,
+    activeAtValues,
+    modes: states.map((state) => state.gameMode),
+    dhvLoadouts: states.map((state) => ({ dhv: state.player.dhv, equippedWeapons: state.player.equippedWeapons })),
+    remotes: states.map((state) => state.remotes),
+    bots: states.map((state) => state.bots.length),
+    eventChannels: states.map((state) => state.networkLifecycle.eventChannels),
+    stateChannels: states.map((state) => state.networkLifecycle.stateChannels),
+    stateReliable: states.map((state) => state.networkLifecycle.stateChannelReliable),
+    stateOrdered: states.map((state) => state.networkLifecycle.stateChannelOrdered),
+    stateMaxRetransmits: states.map((state) => state.networkLifecycle.stateChannelMaxRetransmits),
+    hostSelfEchoesSuppressed: states[0].networkLifecycle.selfStateEchoesSuppressed,
+    rejoinGraceVisible,
+    rejoinIdentityPreserved,
+    rejoinRecovered,
+  };
+  const pass = errors.length === 0
+    && soloHostNoBots.startActsAsReadyCommit
+    && soloHostNoBots.active && soloHostNoBots.humans === 1 && soloHostNoBots.bots === 0
+    && soloHostWithBots.startActsAsReadyCommit
+    && soloHostWithBots.active && soloHostWithBots.humans === 1 && soloHostWithBots.bots === 4
+    && roomCode.length === 36
+    && balancedTeams[0] === 2 && balancedTeams[1] === 2
+    && hostTeamSynchronized
+    && startBlockedBeforeReady
+    && dhvReplicated['Host Four'] === 'X' && dhvReplicated['Guest One'] === 8
+    && dhvReplicated['Guest Two'] === 6 && dhvReplicated['Guest Three'] === 2
+    && overflowRejected && sixCapacityReplicated && sixPlayersAdmitted && allReady
+    && ffaTeamControlsDisabled.every(Boolean)
+    && pingSamples.slice(1).every((ping) => Number.isFinite(ping))
+    && new Set(activeAtHostValues).size === 1 && activeAtHostValues.every(Number.isFinite)
+    && new Set(activeAtValues).size === 1
+    && states[0].player.dhv === 'X' && states[0].player.equippedWeapons.includes('magnum')
+    && states[1].player.dhv === 8 && !states[1].player.equippedWeapons.includes('magnum')
+    && states.every((state, index) => state.privateMatch.mode === 'ffa' && state.privateMatch.capacity === 6
+      && state.matchPhase === 'active' && state.remotes === 5 && state.bots.length === 0
+      && state.networkLifecycle.eventChannels === (index === 0 ? 5 : 1)
+      && state.networkLifecycle.stateChannels === (index === 0 ? 5 : 1)
+      && state.networkLifecycle.stateChannelReliable === false
+      && state.networkLifecycle.stateChannelOrdered === false
+      && state.networkLifecycle.stateChannelMaxRetransmits === 0)
+    && states[0].networkLifecycle.selfStateEchoesSuppressed > 0
+    && rejoinGraceVisible && rejoinIdentityPreserved && rejoinRecovered;
+  if (!pass) throw new Error(`Private-lobby convergence contract failed: ${JSON.stringify(report)}`);
+  await mkdir(dirname(receiptPath), { recursive: true });
+  await writeFile(receiptPath, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(JSON.stringify(report, null, 2));
+} finally {
+  await browser.close();
+}

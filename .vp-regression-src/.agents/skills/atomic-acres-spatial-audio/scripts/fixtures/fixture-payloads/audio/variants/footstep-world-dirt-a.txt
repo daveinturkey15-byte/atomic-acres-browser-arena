@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "audio-variant-evidence",
+  "eventId": "movement.footstep.world",
+  "family": "movement",
+  "bus": "movement",
+  "delivery": "world-spatial",
+  "spatialProfileId": "footstep-world",
+  "maxConcurrent": 12,
+  "priority": 110,
+  "cooldownMs": 80,
+  "owner": "player-life",
+  "evidenceId": "audio-remote-footstep",
+  "variantId": "footstep-world-dirt-a",
+  "source": "fixture-payloads/audio/variants/footstep-world-dirt-a.txt",
+  "license": "cc0",
+  "derivativeNotes": "Deterministic project-owned staging fixture; no third-party derivative content."
+}

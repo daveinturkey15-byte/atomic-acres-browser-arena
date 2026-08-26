@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atomic Acres Viewmodel Forge"
+  short_description: "Forge and verify first-person weapon assets"
+  default_prompt: "Use $atomic-acres-weapon-viewmodel-forging to build or audit an Atomic Acres weapon viewmodel."

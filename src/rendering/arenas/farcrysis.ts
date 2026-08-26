@@ -43,6 +43,12 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion', 1.08),
     camera('farcrysis-core-interior', [0, 2.6, 0], [0, 1.7, 4], 'geometry', 1.08),
     camera('farcrysis-seaplane-throwback', [48, 2.4, -48], [40, 1.2, -40], 'overview', 1.08),
+    // Shore-band audit cameras (HF-395/396 round 4): the top-down frame proves
+    // every vegetation band hugs the square shoreline instead of a legacy
+    // circular radius, and the west-shoreline frame proves it at eye level
+    // where beach grass meets the actual waterline.
+    camera('farcrysis-island-topdown', [0, 95, 2], [0, 0, 0], 'overview', 1.08),
+    camera('farcrysis-west-shoreline', [-62, 5, -6], [-50, 1.2, 12], 'overview', 1.08),
   ],
   collisionIdentity: { authoritativeArenaId: 'farcrysis', evidence: 'ArenaMap farcrysis collider, cover and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['beach/jungle foliage may remain presentation-only while authoritative cover and shot surfaces remain unchanged'],

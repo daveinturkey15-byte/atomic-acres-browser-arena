@@ -119,12 +119,12 @@ await page.evaluate(() => {
       minX = Math.min(minX, v.x); minY = Math.min(minY, v.y); minZ = Math.min(minZ, v.z);
       maxX = Math.max(maxX, v.x); maxY = Math.max(maxY, v.y); maxZ = Math.max(maxZ, v.z);
     }
-    const sizeX = maxX - minX, sizeY = maxY - minY;
+    // Track EVERY visible mesh: Quality-profile authored assets do not carry
+    // the procedural box names, so a name/size filter silently dropped the
+    // very walls under test. The expanded-AABB gate in hfEyeDistance is the
+    // real filter.
     const name = String(node.name ?? '');
-    const wallLike = name.toLowerCase().includes('rail')
-      || /-(torso|head)$/.test(name)
-      || (sizeY >= 0.9 && Math.min(sizeX, maxZ - minZ) <= 5.7);
-    if (!wallLike) return;
+    void name;
     entries.push({ name, mesh: node, min: [minX, minY, minZ], max: [maxX, maxY, maxZ] });
   });
   window.__hf387WallMeshes = entries;
@@ -135,9 +135,9 @@ await page.evaluate(() => {
     const tmpA = new V3(), tmpB = new V3(), tmpC = new V3();
     const ab = new V3(), ac = new V3(), ap = new V3(), bp = new V3(), cp = new V3(), q = new V3();
     for (const entry of window.__hf387WallMeshes) {
-      if (p.x < entry.min[0] || p.x > entry.max[0]
-        || p.y < entry.min[1] || p.y > entry.max[1]
-        || p.z < entry.min[2] || p.z > entry.max[2]) continue;
+      if (p.x < entry.min[0] - 0.6 || p.x > entry.max[0] + 0.6
+        || p.y < entry.min[1] - 0.6 || p.y > entry.max[1] + 0.6
+        || p.z < entry.min[2] - 0.6 || p.z > entry.max[2] + 0.6) continue;
       const mesh = entry.mesh;
       mesh.updateMatrixWorld(true);
       const pos = mesh.geometry.getAttribute('position');
