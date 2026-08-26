@@ -317,7 +317,7 @@ describe('Nuke Town traversal (HF-383)', () => {
     const busRoof = CENTRAL_BUS.size[1];
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
-      // Stand beside the east kerb-side van and jump toward its centre twice.
+      // Stand beside the east mid-street van and jump toward its centre twice.
       const van = PARKED_VAN_LAYOUT.find((v) => v.x > 0)!;
       physics.teleportEye({ x: van.x + PARKED_VAN_SIZE[0] / 2 + 0.8, y: 1.7, z: van.z });
       let verticalVelocity = sprintProfile.jumpVelocity;
@@ -370,8 +370,8 @@ describe('Nuke Town traversal (HF-383)', () => {
       expect(cover?.blocksMovement).toBe(true);
     }
     // Cover you cannot reach is not cover: a standable cell must exist on
-    // each van's street-facing long face (the face looking away from the
-    // kerb), clear of the planter fins and the bus.
+    // each van's street-facing outer long face (the face looking away from
+    // the road centre), clear of the planter fins and the bus.
     for (const van of PARKED_VAN_LAYOUT) {
       const streetFaceZ = van.z - Math.sign(van.z) * (PARKED_VAN_SIZE[2] / 2);
       const standZ = streetFaceZ - Math.sign(van.z) * (MOVEMENT_RADIUS + 0.1);
