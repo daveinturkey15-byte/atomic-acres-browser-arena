@@ -4820,7 +4820,12 @@ export class WeaponPresentation {
     const bobWeight = pose.moving ? (pose.sprinting ? 1.22 : pose.ads ? 0.12 : pose.prone ? 0.12 : pose.crouched ? 0.32 : 0.56) : 0.05;
     const bobX = Math.cos(pose.phase * 0.5) * 0.017 * bobWeight;
     const bobY = Math.sin(pose.phase) * 0.019 * bobWeight;
-    const breath = Math.sin(performance.now() * 0.0017) * (pose.ads ? 0.0015 : 0.0045);
+    // HF-388 exactness repair: breath rides the HF-365 arm-motion clock
+    // (accumulated, stalled-tab-clamped dt) instead of wall-clock
+    // performance.now(). A loaded tab or test runner must not jump the pose -
+    // the same invariant the armDt clamp above states - and exact rest-pose
+    // presentation contracts sample root Y at one deterministic phase.
+    const breath = Math.sin(this.armMotionSeconds * 1.7) * (pose.ads ? 0.0015 : 0.0045);
     const adsX = this.adsBlend * profile.adsX;
     // Each original weapon family declares its physical sight axis. The 0.6
     // view scale is included in the profile so no HUD approximation is used.

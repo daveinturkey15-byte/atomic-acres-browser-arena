@@ -813,6 +813,23 @@ describe('HF-388: the hip trigger-hand lift is applied by the live update loop',
     expect(firstPersonHipTriggerHandLift('lmg', 0, 0))
       .toBeCloseTo(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy, 8);
   });
+
+  it('is immune to the wall clock: settling across half a breath period drifts nothing', () => {
+    // The lift delta above is only an exact number while every vertical term
+    // at REST_POSE is shared or zero. Breath used to read performance.now(),
+    // so two settles sampled different phases and the measured delta moved
+    // with machine load (measured drift: 8.995 mm across a half period -
+    // 45x this bound - which is what intermittently failed the assertion
+    // above in loaded full-suite runs). Breath now rides the accumulated
+    // arm-motion clock, so wall-clock time between settles must move root Y
+    // by exactly nothing.
+    const first = settle('lmg', false);
+    const halfBreathPeriodMs = Math.PI / 1.7 * 1000;
+    const until = performance.now() + halfBreathPeriodMs;
+    while (performance.now() < until) { /* spin: force maximal phase divergence */ }
+    const second = settle('lmg', false);
+    expect(second - first).toBe(0);
+  });
 });
 
 /**
