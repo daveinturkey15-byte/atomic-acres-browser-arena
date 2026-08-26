@@ -7,15 +7,16 @@
 // dynamic actors (the solo bot, animated containers) moving inside an
 // otherwise identical frame?
 //
-// PERSISTENCE RULE: the candidate side may carry multiple samples per
-// viewpoint (capture-arena-viewpoints.mjs --samples). Verdicts are computed
-// on the pixel-wise MINIMUM |base-candidate| delta across those samples.
-// Dynamic content (solo bot, sliding containers, animated water, flickering
-// work lights) moves BETWEEN samples while geometry does not, so a pixel
-// that matches base in ANY sample counts as unchanged; a real regression
-// differs in EVERY sample and survives the min. This removes transient
-// noise WITHOUT loosening any threshold - the same calibrated strictness
-// applies to the persistence-min map.
+// PERSISTENCE RULE (SYMMETRIC since 2026-08-26): both sides may carry
+// multiple samples per viewpoint (capture-arena-viewpoints.mjs --samples).
+// Verdicts are computed on the pixel-wise MINIMUM |base-candidate| delta
+// across ALL base x candidate sample PAIRS (never base x base: two agreeing
+// base samples would produce a 0 diff that absorbs a candidate matching
+// neither). Dynamic content (rail targets, sliding containers, animated
+// water, flickering work lights) sits at a different script phase in every
+// session while geometry does not, so a pixel matching ANY base sample in
+// ANY candidate sample counts as unchanged; a real regression differs from
+// EVERY base sample and survives the min - at unchanged per-pixel thresholds.
 // Metric design (per viewpoint, computed on that persistence-min map with
 // both sides downscaled to ANALYSIS_W x ANALYSIS_H grayscale):
 //   meanAbsDelta      - global luminance shift; catches grade/exposure washes.
@@ -97,16 +98,46 @@ function largestRegion(over) {
   return best;
 }
 
-export async function comparePair(basePng, candPngs) {
-  const [a, ...rest] = await Promise.all([grayscale(basePng), ...candPngs.map(grayscale)]);
-  const n = a.length;
+// Verdict tiers documented in the header comment above. Restored 2026-08-26:
+// d4585388 (r9) deleted this function while keeping its caller, so every
+// real diff run crashed with ReferenceError until a live end-to-end round
+// executed it - the source-contract tests never call main(). Tier order
+// matters: blocking gates run first so concentrated change cannot be
+// diluted by a quiet global mean, and a whole-frame exposure/grade wash
+// (meanAbsDelta >= 6, the r2-calibrated floor) blocks even without one.
+export function verdictFor(metrics) {
+  if (metrics.largestRegionFraction >= THRESHOLDS.regionGlobal) return 'GLOBAL_CHANGED';
+  if (metrics.meanAbsDelta >= 6) return 'GLOBAL_CHANGED';
+  if (metrics.largestRegionFraction >= THRESHOLDS.regionMin) return 'REGION_CHANGED';
+  if (metrics.meanAbsDelta <= THRESHOLDS.meanQuiet
+    && metrics.ratioOver32 < THRESHOLDS.regionMin * 0.4) return 'MATCH';
+  return 'DYNAMIC_ONLY';
+}
+
+export async function comparePair(basePngs, candPngs) {
+  // SYMMETRIC persistence-min: a pixel counts as changed only if it differs
+  // from EVERY base sample in EVERY candidate sample. Scripted arena motion
+  // (lateral targets, sliding containers, water phase) sits at a different
+  // phase in each capture session; min over all base x candidate pairs
+  // absorbs that phase noise on either side. A real regression differs from
+  // every base sample, so it survives at UNCHANGED per-pixel thresholds.
+  const bases = Array.isArray(basePngs) ? basePngs : [basePngs];
+  const cands = Array.isArray(candPngs) ? candPngs : [candPngs];
+  const [firstBase, ...otherBases] = await Promise.all(bases.map(grayscale));
+  const candFrames = await Promise.all(cands.map(grayscale));
+  const n = firstBase.length;
   const over32 = new Uint8Array(n);
-  // persistenceMin: pixel-wise minimum |base-candidate| across samples.
   const persistenceMin = new Uint8Array(n);
   let sum = 0; let hard = 0; let soft = 0;
   for (let i = 0; i < n; i += 1) {
+    // Base x candidate pairs ONLY. Base x base pairs must never enter this
+    // min: two agreeing base samples would produce a 0 diff that absorbs a
+    // candidate matching neither - a silent real-regression hole.
     let d = 255;
-    for (const cand of rest) d = Math.min(d, Math.abs(a[i] - cand[i]));
+    for (const cand of candFrames) {
+      d = Math.min(d, Math.abs(firstBase[i] - cand[i]));
+      for (const base of otherBases) d = Math.min(d, Math.abs(base[i] - cand[i]));
+    }
     persistenceMin[i] = d;
     sum += d;
     if (d > THRESHOLDS.deltaHard) { over32[i] = 1; hard += 1; }
@@ -193,15 +224,18 @@ async function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
   const candSampleCount = Math.max(1, Number(candManifest.samples ?? 1));
-  const candidatePaths = (arena, cameraId) => {
+  const baseSampleCount = Math.max(1, Number(baseManifest.samples ?? 1));
+  const samplePaths = (dir, arena, cameraId, count) => {
     const paths = [];
-    for (let s = 0; s < candSampleCount; s += 1) {
-      const p = resolve(CAND_DIR, arena,
+    for (let s = 0; s < count; s += 1) {
+      const p = resolve(dir, arena,
         s === 0 ? `${cameraId}.png` : `${cameraId}.s${s}.png`);
       if (existsSync(p)) paths.push(p);
     }
     return paths;
   };
+  const candidatePaths = (arena, cameraId) => samplePaths(CAND_DIR, arena, cameraId, candSampleCount);
+  const basePaths = (arena, cameraId) => samplePaths(BASE_DIR, arena, cameraId, baseSampleCount);
   const comparisons = [];
   for (const arena of Object.keys(VIEWPOINT_CATALOG)) {
     for (const cameraId of VIEWPOINT_CATALOG[arena]) {
@@ -220,13 +254,14 @@ async function main() {
         comparisons.push(entry);
         continue;
       }
-      const { metrics, persistenceMin } = await comparePair(rel, cPaths);
+      const bPaths = basePaths(arena, cameraId);
+      const { metrics, persistenceMin } = await comparePair(bPaths, cPaths);
       entry.metrics = metrics;
-      entry.samplesUsed = cPaths.length;
+      entry.samplesUsed = { base: bPaths.length, candidate: cPaths.length };
       entry.verdict = verdictFor(metrics);
       if (entry.verdict === 'REGION_CHANGED' || entry.verdict === 'GLOBAL_CHANGED') {
         entry.composite = resolve(OUT_DIR, `${arena}__${cameraId}.png`);
-        await writeComposite(rel, cPaths[0], entry.composite, persistenceMin);
+        await writeComposite(bPaths[0], cPaths[0], entry.composite, persistenceMin);
       }
       comparisons.push(entry);
     }
@@ -242,7 +277,7 @@ async function main() {
     thresholds: THRESHOLDS,
     analysis: { width: ANALYSIS_W, height: ANALYSIS_H },
     base: { dir: BASE_DIR, sha: baseManifest.sha, bundleAtStart: baseManifest.bundleAtStart, capturedAt: baseManifest.capturedAt },
-    persistence: { rule: 'pixel-wise min |base-candidate| across candidate samples', candidateSamples: candManifest.samples ?? 1 },
+    persistence: { rule: 'pixel-wise min |base-candidate| across ALL base x candidate sample pairs', baseSamples: baseManifest.samples ?? 1, candidateSamples: candManifest.samples ?? 1 },
     candidate: { dir: CAND_DIR, sha: candManifest.sha, bundleAtStart: candManifest.bundleAtStart, capturedAt: candManifest.capturedAt },
     counts,
     comparisons,

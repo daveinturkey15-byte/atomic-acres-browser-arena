@@ -23,6 +23,11 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'farcrysis-jungle-dapple',
     'farcrysis-core-interior',
     'farcrysis-seaplane-throwback',
+    // HF-395/396 round 4 shore-band audit cameras (authored farcrysis.ts):
+    // top-down proves vegetation bands hug the square shoreline; west-shoreline
+    // proves it at eye level where beach grass meets the waterline.
+    'farcrysis-island-topdown',
+    'farcrysis-west-shoreline',
   ]),
   'gun-range': Object.freeze([
     'gun-range-overview',

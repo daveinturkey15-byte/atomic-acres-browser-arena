@@ -3,11 +3,16 @@
 //
 // All audit logic lives in ./collider-visual-parity-core.ts so the same code
 // also gates the full vitest suite via src/collider-visual-parity-gate.test.ts.
-// This wrapper only parses argv, prints findings, and maps them to exit codes:
+// This wrapper only parses argv, prints findings, maps them to exit codes, and
+// (--json) persists the full per-arena result — including the deterministic
+// colliderSamples the live CDP leg (verify-collider-parity-live-cdp.mjs)
+// probes through the game's own collision authority:
 //   0 = within gate
 //   1 = unexplained collider(s) found
 //   2 = the audit itself failed for an arena (construction threw)
 //   3 = --gate-walkthrough and walk-through mesh(es) found
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ALL_ARENA_IDS, runColliderVisualParityAudit } from './collider-visual-parity-core';
 
 const argv = process.argv.slice(2);
@@ -17,6 +22,9 @@ const arg = (name: string, fallback: string) => {
 };
 const REPORT_ONLY = argv.includes('--report-only');
 const GATE_WALKTHROUGH = argv.includes('--gate-walkthrough');
+const JSON_OUT = argv.includes('--json')
+  ? resolve('artifacts/qa/collider-parity-audit.json')
+  : null;
 const ARENAS = arg('--arenas', ALL_ARENA_IDS.join(','))
   .split(',').map((value) => value.trim()).filter(Boolean);
 
@@ -50,6 +58,12 @@ async function main(): Promise<void> {
     : GATE_WALKTHROUGH
       ? '\nGate: unexplained colliders exit 1; walk-through meshes exit 3.'
       : '\nGate: any unexplained collider fails the run (exit 1). Walk-through meshes are reported for triage (--gate-walkthrough hardens this); src/collider-visual-parity-gate.test.ts hardens both directions in vitest.');
+
+if (JSON_OUT) {
+  mkdirSync(resolve('artifacts/qa'), { recursive: true });
+  writeFileSync(JSON_OUT, `${JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2)}\n`);
+  console.log(`[collider-parity] full audit JSON written to ${JSON_OUT}`);
+}
   process.exitCode = exitCode;
 }
 

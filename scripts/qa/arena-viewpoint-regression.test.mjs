@@ -136,6 +136,83 @@ test('diff gates verdicts on cross-sample persistence at unchanged strictness', 
   });
 });
 
+test('diff verdicts come from an exported verdictFor pinned to the documented tiers', async () => {
+  // Regression guard: d4585388 (r9) rewrote the diff around persistence-min
+  // and deleted verdictFor while keeping its caller - the diff stage then
+  // crashed ReferenceError on every real run until a live end-to-end round
+  // executed it. Pin both existence and tier boundaries here.
+  const { verdictFor, THRESHOLDS } = await import('./diff-arena-viewpoints.mjs');
+  const quiet = { meanAbsDelta: 0.1, ratioOver8: 0, ratioOver32: 0, largestRegionFraction: 0 };
+  assert.equal(verdictFor(quiet), 'MATCH', 'a quiet frame must read MATCH');
+  // Below the region floor: transient actor noise, never blocking.
+  assert.equal(
+    verdictFor({ ...quiet, meanAbsDelta: 1.2, ratioOver32: THRESHOLDS.regionMin * 0.4 }),
+    'DYNAMIC_ONLY',
+    'sub-floor scattered change reads DYNAMIC_ONLY',
+  );
+  // One solid region >= floor blocks.
+  assert.equal(
+    verdictFor({ ...quiet, largestRegionFraction: THRESHOLDS.regionMin }),
+    'REGION_CHANGED',
+    'a region at the floor must block',
+  );
+  // Whole-frame shifts block hardest: large region OR global luminance wash.
+  assert.equal(
+    verdictFor({ ...quiet, largestRegionFraction: THRESHOLDS.regionGlobal }),
+    'GLOBAL_CHANGED',
+  );
+  assert.equal(verdictFor({ ...quiet, meanAbsDelta: 6 }), 'GLOBAL_CHANGED',
+    'a whole-frame exposure/grade wash must read GLOBAL_CHANGED');
+});
+
+test('persistence is symmetric: transient change on EITHER side is absorbed', async () => {
+  // Measured 2026-08-26: a same-build self-diff flagged 7/37 viewpoints
+  // because rail targets and sliding containers sit at a different script
+  // phase in EVERY candidate sample relative to ONE base frame. The baseline
+  // already stores 3 samples per viewpoint; the min must run over ALL
+  // base x candidate pairs. A real regression differs from every base sample
+  // and still survives; per-pixel thresholds are unchanged.
+  const sharp = (await import('sharp')).default;
+  const { comparePair } = await import('./diff-arena-viewpoints.mjs');
+  const W = 640; const H = 360;
+  const frame = (rects) => sharp({
+    create: { width: W, height: H, channels: 3, background: { r: 128, g: 128, b: 128 } },
+  }).composite(rects.map((r) => ({
+    input: { create: { width: r.w, height: r.h, channels: 3, background: { r: r.v, g: r.v, b: r.v } } },
+    left: r.x, top: r.y,
+  }))).png().toBuffer();
+  const dir = import.meta.dirname;
+  const paths = [];
+  const images = [
+    frame([{ x: 20, y: 20, w: 40, h: 40, v: 255 }]),   // base main: "target" left
+    frame([{ x: 300, y: 20, w: 40, h: 40, v: 255 }]),  // base s1: "target" middle
+    frame([{ x: 20, y: 20, w: 40, h: 40, v: 255 }]),   // candidate main: left again
+  ];
+  for (let i = 0; i < images.length; i += 1) {
+    const p = resolve(dir, `.tmp-symmetric-${i}.png`);
+    await sharp(await images[i]).toFile(p);
+    paths.push(p);
+  }
+  try {
+    // Candidate main matches base MAIN exactly; only base s1 is offset.
+    // One-sided persistence against base-main-only cannot know that; the
+    // symmetric min over base samples must read this pair as quiet.
+    const { metrics } = await comparePair([paths[0], paths[1]], [paths[2]]);
+    assert.equal(metrics.ratioOver32, 0, 'phase offset in one base sample must not alarm');
+    // A persistent change still blocks: candidate carries a dark rectangle
+    // no base sample has.
+    const persistent = resolve(dir, '.tmp-symmetric-3.png');
+    await sharp(await frame([
+      { x: 20, y: 20, w: 40, h: 40, v: 255 },
+      { x: 300, y: 150, w: 80, h: 60, v: 0 },
+    ])).toFile(persistent);
+    const blocked = await comparePair([paths[0], paths[1]], [persistent]);
+    assert.ok(blocked.metrics.ratioOver32 > 0.015, 'a change no base sample has must survive the symmetric min');
+  } finally {
+    for (const p of [...paths, resolve(dir, '.tmp-symmetric-3.png')]) rmSync(p, { force: true });
+  }
+});
+
 test('round runner wires build, capture and diff end to end', () => {
   const source = readFileSync(resolve(ROOT, 'scripts/qa/run-arena-viewpoint-regression.mjs'), 'utf8');
   assert.match(source, /capture-arena-viewpoints\.mjs/);

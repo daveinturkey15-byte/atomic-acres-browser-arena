@@ -100,6 +100,14 @@ export type MeshEntry = {
   vertices: number;
 };
 
+export type ColliderSample = {
+  /** World-space centre of the collider AABB (mid-height of its Y range). */
+  centre: [number, number, number];
+  size: [number, number, number];
+  sources: string[];
+  yRangeDefaulted: boolean;
+};
+
 export type ArenaAuditResult = {
   id: string;
   error?: string;
@@ -111,6 +119,15 @@ export type ArenaAuditResult = {
   invisibleColliders?: Array<Record<string, unknown>>;
   walkThroughMeshes?: Array<Record<string, unknown>>;
   excludedByRuleCounts?: Record<string, number>;
+  /**
+   * Deterministic sample of LIVE-authoritative movement colliders (boundary
+   * containment and runtime-replaced statics excluded). The CDP live leg
+   * probes these through the game's own collision authority: each one MUST
+   * block, or the audited scene has drifted from what players experience.
+   */
+  colliderSamples?: ColliderSample[];
+  /** How many eligible colliders the sample was drawn from. */
+  colliderSamplePopulation?: number;
 };
 
 type ArenaBuild = (scene: THREE.Scene) => Omit<ArenaMap, 'id'> & { id?: string };
@@ -356,6 +373,28 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
   }
   walkThroughMeshes.sort((a, b) => Number(b.vertices) - Number(a.vertices));
 
+  // Deterministic live-probe sample: evenly spaced over the eligible
+  // (non-boundary, non-runtime-replaced) movement colliders, index-strided so
+  // the same tree always yields the same coordinates for a given build.
+  const eligible = movementColliders.filter((entry) => !runtimeReplaced.has(entry.box));
+  const MAX_SAMPLES = 12;
+  const stride = Math.max(1, Math.ceil(eligible.length / MAX_SAMPLES));
+  const colliderSamples: ColliderSample[] = [];
+  for (let index = 0; index < eligible.length; index += stride) {
+    const entry = eligible[index];
+    const y = colliderYRange(entry.box);
+    colliderSamples.push({
+      centre: [
+        round((entry.box.minX + entry.box.maxX) / 2),
+        round((y.min + y.max) / 2),
+        round((entry.box.minZ + entry.box.maxZ) / 2),
+      ],
+      size: [round(entry.box.maxX - entry.box.minX), round(y.max - y.min), round(entry.box.maxZ - entry.box.minZ)],
+      sources: entry.sources,
+      yRangeDefaulted: y.defaulted,
+    });
+  }
+
   return {
     id,
     colliderCount: colliders.length,
@@ -366,6 +405,8 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     invisibleColliders,
     walkThroughMeshes,
     excludedByRuleCounts,
+    colliderSamples,
+    colliderSamplePopulation: eligible.length,
   };
 }
 
