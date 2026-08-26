@@ -39,7 +39,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { RainPresentation } from './weather/rain-presentation';
-import { applyHudSway, createHudSwayState, type HudSwayState } from './ui/pass77-hud-sway';
+import { applyHudSway, createHudSwayState, releaseHudSway, type HudSwayState } from './ui/pass77-hud-sway';
 import {
   advanceHudImpact,
   createHudImpactState,
@@ -1654,6 +1654,8 @@ const hudRoot = element<HTMLElement>('#hud');
 // screen". Clusters lag the camera slightly; crosshair and hitmarker never
 // move, because those are combat surfaces.
 let hudSway: HudSwayState = createHudSwayState();
+/** Latch so the neutral-pose write happens once per stop, not every frame. */
+let hudSwayReleased = false;
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
 const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
@@ -28337,12 +28339,35 @@ function frame(now: number, scheduleNext = true): void {
     updateHud(now);
   // Must live in frame(), not updateHud: updateHud self-throttles to 10 Hz and
   // sway needs every frame or it reads as a stutter rather than a lag.
-  hudSway = applyHudSway(hudRoot, hudSway, {
-    yaw: player.yaw,
-    pitch: player.pitch,
-    speed: Math.hypot(player.velocity.x, player.velocity.z),
-    deltaMs: rawFrameMs,
-  });
+  //
+  // Sway is first-person player motion. The four states below are the ones
+  // pass77-hud-sway's own contract names as "motion must stop dead": reduced
+  // motion, a menu/pause surface on screen, death, and a killstreak
+  // possession handover (the HUD is then reporting the drone or chopper, not
+  // the body). `releaseHudSway` existed for exactly this and had no caller at
+  // all, so the last live frame's offset stayed frozen on the HUD through all
+  // four — most visibly on death, where the whole HUD held a stale lean until
+  // the next respawn frame overwrote it.
+  const hudSwayLive = !accessibilityRuntime.reducedMotion
+    && gameStarted
+    && menuLifecycle.surface === 'hidden'
+    && player.hp > 0
+    && !localKillstreakActorSnapshot()?.possession;
+  if (hudSwayLive) {
+    hudSway = applyHudSway(hudRoot, hudSway, {
+      yaw: player.yaw,
+      pitch: player.pitch,
+      speed: Math.hypot(player.velocity.x, player.velocity.z),
+      deltaMs: rawFrameMs,
+    });
+    hudSwayReleased = false;
+  } else if (!hudSwayReleased) {
+    // Latched: write the neutral pose once, then leave the properties alone
+    // so a paused HUD is not re-writing four custom properties every frame.
+    releaseHudSway(hudRoot);
+    hudSway = createHudSwayState(player.yaw, player.pitch);
+    hudSwayReleased = true;
+  }
   hudRoot.style.setProperty('--hud-health', (Math.max(0, player.hp) / 100).toFixed(3));
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);

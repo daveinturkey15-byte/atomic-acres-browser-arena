@@ -60,6 +60,29 @@ interface ReedEntry {
 
 const _reeds: ReedEntry[] = [];
 
+/**
+ * Drop every registered vine and reed.
+ *
+ * `_vines` and `_reeds` are module-level so `animateDetail` can sway them
+ * each frame without traversing the scene, but a second `buildDetail`
+ * (arena reload, rematch, map switch back to farcrysis) used to APPEND to
+ * the previous arena's entries. Each stale vine owns its own TubeGeometry
+ * and each stale reed its own CylinderGeometry, so the registries pinned
+ * disposed GPU geometry alive AND grew the per-frame sway loop linearly
+ * with the number of rebuilds — writing transforms to detached objects.
+ * `buildDetail` resets first so the registries only ever describe the arena
+ * that is actually mounted.
+ */
+function resetDetailAnimationRegistries(): void {
+  _vines.length = 0;
+  _reeds.length = 0;
+}
+
+/** Diagnostic: how many animated detail entries the live arena registered. */
+export function farcrysisDetailAnimationCounts(): { vines: number; reeds: number } {
+  return { vines: _vines.length, reeds: _reeds.length };
+}
+
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
@@ -436,6 +459,8 @@ function buildReedClusters(root: THREE.Object3D, rng: () => number): void {
 // ---------------------------------------------------------------------------
 
 export function buildDetail(scene: THREE.Scene): void {
+  resetDetailAnimationRegistries();
+
   // Use a fresh seeded-RNG per subsystem for deterministic, repeatable placement.
   // Each builder gets its own rng chain so seed order is stable.
   const rngVines = seededRandom(0xf4c4d);

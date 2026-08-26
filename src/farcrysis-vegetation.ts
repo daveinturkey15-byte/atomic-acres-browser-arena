@@ -78,6 +78,27 @@ function registerLODPair(near: THREE.InstancedMesh[], far: THREE.InstancedMesh[]
 }
 
 /**
+ * Drop every registered LOD pair.
+ *
+ * The registry is module-level so `setVegetationLOD` can toggle impostors
+ * without re-traversing the scene graph, but that also means a second
+ * `buildVegetation` (arena reload, rematch, map switch back to farcrysis)
+ * used to APPEND to the pairs from the torn-down arena. The stale entries
+ * pinned disposed InstancedMeshes — and their geometries — alive, and every
+ * `setVegetationLOD` call then wrote `.visible` to detached objects.
+ * `buildVegetation` resets first so the registry only ever describes the
+ * arena that is actually mounted.
+ */
+function resetLODPairs(): void {
+  _lodPairs.length = 0;
+}
+
+/** Diagnostic: how many LOD pairs the live arena registered. */
+export function farcrysisVegetationLodPairCount(): number {
+  return _lodPairs.length;
+}
+
+/**
  * Call when camera distance changes to toggle near/far LOD impostors.
  * Threshold: dist < 80m → near (full detail); dist >= 80m → far (impostor).
  *
@@ -2987,6 +3008,7 @@ function addUndergrowthCarpet(root: THREE.Group): void {
 
 export function buildVegetation(scene: THREE.Group): void {
   resetStats();
+  resetLODPairs();
 
   // Trees — 6 distinct types (existing)
   addPalms(scene);              // LOD pair registered + fronds wind-enabled inside

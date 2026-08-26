@@ -169,14 +169,14 @@
         "limbThicknessMultiplier": 0.95
       },
       "silhouetteProfile": {
-        "intent": "Compact, low-profile waterline raider: slightly shorter and narrower, slim limbs, minimal radial bulk.",
+        "intent": "Compact, low-profile waterline raider: slightly shorter and narrower, slim limbs, minimal radial bulk. legRadiusTarget was authored at 0.80 and measured out at thighMeanRadius 0.9247 against this archetype's own 0.90 distinctness gate: the slim factor is applied per vertex weight, so the delivered radius change is about a third of the authored target. Retargeted to 0.66, which measures inside the gate while staying well within contract bounds and squarely on this archetype's slim-limb intent. The gate itself is unchanged.",
         "params": {
           "heightScale": 0.955,
           "shoulderScale": -0.09,
           "waistPinch": 0.1,
           "hipFlare": 0.03,
           "armRadiusTarget": 0.82,
-          "legRadiusTarget": 0.8,
+          "legRadiusTarget": 0.66,
           "chestForm": 0.0
         },
         "distinctnessGates": [

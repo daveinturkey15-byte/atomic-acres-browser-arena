@@ -27,6 +27,18 @@ let _foamRing: THREE.Mesh | null = null;
 let _waveMesh: THREE.Mesh | null = null;
 let _waveBasePositions: Float32Array | null = null;
 let _waveGeom: THREE.PlaneGeometry | null = null;
+/**
+ * Per-vertex swell energy, resolved once at build time.
+ *
+ * `swellDepthFactor` samples the terrain authority and depends only on the
+ * vertex's base XZ, which never moves — but the frame loop used to call it
+ * TWICE per vertex per frame (once inside `waveSurfaceDisplacement`, once
+ * for the vertex colour) across all 625 vertices, then re-uploaded a colour
+ * buffer whose contents were identical to the previous frame. Both are
+ * hoisted here: the colours are written once at build, and the loop reads
+ * the cached factor instead of re-sampling the terrain.
+ */
+let _waveDepthFactors: Float32Array | null = null;
 let _causticPlane: THREE.Mesh | null = null;
 let _rippleGroup: THREE.Group | null = null;
 const _rippleMeshes: THREE.Mesh[] = [];
@@ -41,6 +53,12 @@ type FoamWashRing = Readonly<{
   washSpeed: number;
   /** Per-ring phase so the three rings do not pulse in lockstep. */
   washOffset: number;
+  /**
+   * Per-vertex `atan2(z, x)` around the ring, resolved once at build time.
+   * The ring vertices never move, so the frame loop was paying an atan2 per
+   * vertex per ring per frame to recompute a constant.
+   */
+  angles: Float32Array;
 }>;
 const _foamWashRings: FoamWashRing[] = [];
 let _crestBasePositions: Float32Array | null = null;
@@ -200,10 +218,15 @@ function buildShorelineFoamRing(scene: THREE.Scene): void {
   // energy, instead of the whole ring fading in and out uniformly.
   const attachFoamWash = (mesh: THREE.Mesh, lobes: number, washSpeed: number, washOffset: number): void => {
     const geom = mesh.geometry as THREE.BufferGeometry;
-    const count = (geom.attributes.position as THREE.BufferAttribute).count;
+    const posAttr = geom.attributes.position as THREE.BufferAttribute;
+    const count = posAttr.count;
     geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3).fill(1), 3));
     (mesh.material as THREE.MeshBasicMaterial).vertexColors = true;
-    _foamWashRings.push(Object.freeze({ mesh, lobes, washSpeed, washOffset }));
+    const angles = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      angles[i] = Math.atan2(posAttr.getZ(i), posAttr.getX(i));
+    }
+    _foamWashRings.push(Object.freeze({ mesh, lobes, washSpeed, washOffset, angles }));
   };
 
   // Square-shore foam path. The island's waterline is a SQUARE (constant
@@ -362,7 +385,19 @@ function buildWaveSurface(scene: THREE.Scene): void {
     side: THREE.DoubleSide,
     vertexColors: true,
   });
-  geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(posAttr.count * 3), 3));
+  // Swell energy is a pure function of the base XZ, so both the per-vertex
+  // factor and the vertex colours it drives are resolved here, once, instead
+  // of being recomputed and re-uploaded on every frame.
+  const depthFactors = new Float32Array(posAttr.count);
+  const colors = new Float32Array(posAttr.count * 3);
+  for (let i = 0; i < posAttr.count; i++) {
+    const energy = swellDepthFactor(base[i * 3 + 0], base[i * 3 + 2]);
+    depthFactors[i] = energy;
+    colors[i * 3 + 0] = energy;
+    colors[i * 3 + 1] = energy;
+    colors[i * 3 + 2] = energy;
+  }
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const mesh = new THREE.Mesh(geom, waveMat);
   mesh.name = 'farcrysis-water-fx-wave-surface';
@@ -375,6 +410,7 @@ function buildWaveSurface(scene: THREE.Scene): void {
   _waveMesh = mesh;
   _waveBasePositions = base;
   _waveGeom = geom;
+  _waveDepthFactors = depthFactors;
 }
 // ---------------------------------------------------------------------------
 // 2b. Directional swell field (HF-394)
@@ -428,15 +464,26 @@ export function swellDepthFactor(x: number, z: number): number {
   return swellSmoothstep((column - SWELL_DEPTH_CALM_M) / (SWELL_DEPTH_FULL_M - SWELL_DEPTH_CALM_M));
 }
 
-/** Presentation swell height (metres) at world (x, z) and time t seconds. */
-export function waveSurfaceDisplacement(x: number, z: number, tSeconds: number): number {
-  const depth = swellDepthFactor(x, z);
+/**
+ * Swell height for a vertex whose depth factor is already known.
+ *
+ * The frame loop caches `swellDepthFactor` per vertex at build time (it is
+ * time-invariant), so this variant skips the terrain sample. Identical
+ * arithmetic to `waveSurfaceDisplacement` — that function is this one with
+ * the depth resolved on the spot.
+ */
+function swellDisplacementAtDepth(x: number, z: number, tSeconds: number, depth: number): number {
   if (depth === 0) return 0; // exact zero ashore — no sign-carrying -0
   let y = 0;
   for (const band of SWELL_BANDS) {
     y += band.amp * Math.sin((x * band.dx + z * band.dz) * band.k - tSeconds * band.w);
   }
   return depth * y;
+}
+
+/** Presentation swell height (metres) at world (x, z) and time t seconds. */
+export function waveSurfaceDisplacement(x: number, z: number, tSeconds: number): number {
+  return swellDisplacementAtDepth(x, z, tSeconds, swellDepthFactor(x, z));
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +501,40 @@ export function waveSurfaceDisplacement(x: number, z: number, tSeconds: number):
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Drop every module-level water-FX registry and singleton reference.
+ *
+ * These are module-level so `animateWaterFX` can drive them without
+ * traversing the scene, but a second `buildWaterFX` (arena reload, rematch,
+ * map switch back to farcrysis) used to APPEND to the torn-down arena's
+ * entries — pinning disposed geometry alive and growing the per-frame loop
+ * linearly with the number of rebuilds.
+ */
+function resetWaterFXRegistries(): void {
+  _foamWashRings.length = 0;
+  _rippleMeshes.length = 0;
+  _ripplePhases.length = 0;
+  _foamRing = null;
+  _waveMesh = null;
+  _waveBasePositions = null;
+  _waveGeom = null;
+  _waveDepthFactors = null;
+  _causticPlane = null;
+  _rippleGroup = null;
+  _crestMesh = null;
+  _crestBasePositions = null;
+  _crestGeom = null;
+  _sandGradient = null;
+}
+
+/** Diagnostic: how many animated foam-wash rings the live arena registered. */
+export function farcrysisWaterFxFoamRingCount(): number {
+  return _foamWashRings.length;
+}
+
 export function buildWaterFX(scene: THREE.Scene): void {
+  resetWaterFXRegistries();
+
   // HF-374. SIX stacked full-screen additive transparent layers here, on top of
   // the inline water's own deep plane and shallow lens and the sparkle points,
   // pushed farcrysis past the first-presentation fence on the WebGPU route:
@@ -506,34 +586,31 @@ export function animateWaterFX(time: number): void {
 
   // --- 1b. HF-394 travelling foam wash — brightness lobes circle each ring ---
   for (const ring of _foamWashRings) {
-    const posAttr = ring.mesh.geometry.attributes.position as THREE.BufferAttribute;
     const colAttr = ring.mesh.geometry.attributes.color as THREE.BufferAttribute;
-    for (let i = 0; i < posAttr.count; i++) {
-      const angle = Math.atan2(posAttr.getZ(i), posAttr.getX(i));
-      const wash = 0.72 + 0.28 * Math.sin(ring.lobes * angle - time * ring.washSpeed + ring.washOffset);
+    const angles = ring.angles;
+    for (let i = 0; i < angles.length; i++) {
+      const wash = 0.72 + 0.28 * Math.sin(ring.lobes * angles[i] - time * ring.washSpeed + ring.washOffset);
       colAttr.setXYZ(i, wash, wash, wash);
     }
     colAttr.needsUpdate = true;
   }
 
   // --- 2. Animated wave surface — directional multi-band swell (HF-394) ---
-  if (_waveMesh && _waveBasePositions && _waveGeom) {
+  if (_waveMesh && _waveBasePositions && _waveGeom && _waveDepthFactors) {
     const posAttr = _waveGeom.attributes.position as THREE.BufferAttribute;
-    const colAttr = _waveGeom.attributes.color as THREE.BufferAttribute;
     const base = _waveBasePositions;
+    const depths = _waveDepthFactors;
 
     for (let i = 0; i < posAttr.count; i++) {
-      const bx = base[i * 3 + 0];
-      const bz = base[i * 3 + 2];
-      posAttr.setY(i, waveSurfaceDisplacement(bx, bz, time));
-      // Same depth factor drives the additive brightness, so the chop layer
-      // visually dissolves into the calm shoreline water (HF-394 blend).
-      const energy = swellDepthFactor(bx, bz);
-      colAttr.setXYZ(i, energy, energy, energy);
+      posAttr.setY(i, swellDisplacementAtDepth(base[i * 3 + 0], base[i * 3 + 2], time, depths[i]));
     }
 
     posAttr.needsUpdate = true;
-    colAttr.needsUpdate = true;
+
+    // The vertex colours carry the SAME depth factor, which is time-invariant
+    // (HF-394 shore blend). They are written once in buildWaveSurface; the old
+    // loop recomputed and re-uploaded a byte-identical colour buffer every
+    // frame on top of a second terrain sample per vertex.
 
     // No computeVertexNormals: MeshBasicMaterial is unlit, so the old
     // per-frame normal recompute was ~600 wasted vertex normals per frame.

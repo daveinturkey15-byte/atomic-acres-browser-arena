@@ -757,17 +757,25 @@ def apply_silhouette_profile(
     """
     height_scale = params["heightScale"]
 
-    # Limb segments are rescaled vertically with the body so anchors keep
-    # matching the (already height-scaled) vertices they act on.
+    # Limb segments are taken from the canonical skeleton UNSCALED, because the
+    # limb-radius pass below now runs FIRST, against the untouched bind pose.
+    #
+    # It used to run last, after the frame edits, anchored on bones that the
+    # frame edits never move. Slimming shrinks a vertex toward its bone axis,
+    # so every vertex the shoulder/waist/flare pass had displaced was dragged
+    # back toward the canonical skeleton — explorer's -0.18 shoulder narrowing
+    # measured out at only 0.9575x shoulder-over-hip instead of the authored
+    # <=0.95, and the whole point of the archetype (a lighter, narrower frame)
+    # was silently cancelled by its own arm slimming. Radius first, in the one
+    # space where bones and geometry agree; frame edits are pure scalings on
+    # top of the result.
     segments: dict[str, tuple[Vector, Vector, Vector, float]] = {}
     for joint in PROFILE_LIMB_JOINTS:
         head, tail, _length = _bone_segment(armature, joint)
-        scaled_head = Vector((head.x, head.y, head.z * height_scale))
-        scaled_tail = Vector((tail.x, tail.y, tail.z * height_scale))
-        vector = scaled_tail - scaled_head
+        vector = tail - head
         length = vector.length
         direction = vector.normalized() if length > 1e-6 else Vector((0.0, 0.0, 1.0))
-        segments[joint] = (scaled_head, scaled_tail, direction, length)
+        segments[joint] = (head.copy(), tail.copy(), direction, length)
 
     def closest_on_segment(segment: tuple[Vector, Vector, Vector, float], point: Vector) -> Vector:
         head, _tail, direction, length = segment
@@ -806,21 +814,10 @@ def apply_silhouette_profile(
             region = regions.get(mesh.name, vertex.index)
             co = world @ vertex.co
 
-            # 1. stature: scale about the ground plane
-            co.z *= height_scale
-
-            # 2. frame widening/narrowing: shoulders and upper arms
-            shoulder_influence = min(1.0, region["shoulder"] + 0.35 * region["armUpper"])
-            co.x *= 1.0 + params["shoulderScale"] * shoulder_influence
-
-            # 3. torso shaping: waist pinch (+) or bulk (-) plus hip flare
-            waist = params["waistPinch"] * region["abdomen"]
-            flare = flare_influence(co.z, region)
-            co.x *= (1.0 - waist) * (1.0 + flare)
-            co.y *= (1.0 - 0.85 * waist) * (1.0 + 0.55 * flare)
-
-            # 4. limb slimming/thickening: shrink ONLY the perpendicular component
-            #    so limb length along the bone is preserved exactly.
+            # 1. limb slimming/thickening: shrink ONLY the perpendicular component
+            #    so limb length along the bone is preserved exactly. Runs first,
+            #    on the untouched bind pose, so the anchor bone axis still
+            #    matches the geometry it is shrinking.
             best_joint = None
             best_weight = 0.0
             for element in vertex.groups:
@@ -837,6 +834,19 @@ def apply_silhouette_profile(
                 perpendicular = offset - parallel_component
                 slim_factor = 1.0 - (1.0 - target) * best_weight
                 co = anchor + parallel_component + perpendicular * slim_factor
+
+            # 2. stature: scale about the ground plane
+            co.z *= height_scale
+
+            # 3. frame widening/narrowing: shoulders and upper arms
+            shoulder_influence = min(1.0, region["shoulder"] + 0.35 * region["armUpper"])
+            co.x *= 1.0 + params["shoulderScale"] * shoulder_influence
+
+            # 4. torso shaping: waist pinch (+) or bulk (-) plus hip flare
+            waist = params["waistPinch"] * region["abdomen"]
+            flare = flare_influence(co.z, region)
+            co.x *= (1.0 - waist) * (1.0 + flare)
+            co.y *= (1.0 - 0.85 * waist) * (1.0 + 0.55 * flare)
 
             # 5. bust: push front-facing chest vertices along the detected forward axis
             chest_w = region["chest"]
@@ -1532,6 +1542,7 @@ def apply_body_shaping(
     armature: bpy.types.Object,
     body_meshes: list[bpy.types.Object],
     proportions: dict[str, float] | None = None,
+    accessories: list[bpy.types.Object] | None = None,
 ) -> None:
     """Full HF-380 body shaping: spec proportion edits + silhouette profile.
 
@@ -1540,10 +1551,19 @@ def apply_body_shaping(
     profile shaping can never bypass (or be wiped by) the hit-proxy clamp.
     `proportions` overrides the spec values only inside the envelope solver's
     relaxation loop; the silhouette profile itself is never relaxed.
+
+    `accessories` are shaped in the SAME pass as the body. Every accessory
+    builder places its geometry off canonical BONE positions, which the body
+    shaping never moves, so once the shaping actually started changing the
+    body the straps, pouches and plates stayed behind on the canonical frame:
+    the explorer's shoulder bands hung in the air beside its narrowed arms and
+    its thigh case floated off a body that is now 14 cm shorter. They must
+    ride the same transform as the surface they sit on.
     """
-    apply_proportion_edits(armature, body_meshes, proportions or context["proportions"])
+    shaped = body_meshes if not accessories else [*body_meshes, *accessories]
+    apply_proportion_edits(armature, shaped, proportions or context["proportions"])
     ensure_region_data(context, armature, body_meshes)
-    apply_silhouette_profile(armature, body_meshes, context["profile_params"], context["_forward"])
+    apply_silhouette_profile(armature, shaped, context["profile_params"], context["_forward"])
 
 
 def enforce_silhouette_envelope(
@@ -1573,11 +1593,20 @@ def enforce_silhouette_envelope(
     # The capsule is what hit registration uses. A visual silhouette wider than it
     # means shots that look like hits miss, so this gate is a gameplay contract,
     # not a modelling nicety.
-    restore_bind_pose(body_meshes, pristine)
+    # `pristine` snapshots body AND accessories, so both rewind together; the
+    # canonical BASELINE is still measured over the body alone.
+    shaped = [*body_meshes, *accessories]
+    restore_bind_pose(shaped, pristine)
     bpy.context.view_layer.update()
     base_radius, base_height = silhouette_measure(body_meshes)
     effective = dict(context["proportions"])
-    apply_body_shaping(context, armature, body_meshes)
+    apply_body_shaping(context, armature, body_meshes, accessories=accessories)
+    # Restored: the HF-380 silhouette-profile edit replaced the
+    # apply_proportion_edits call above and dropped this initializer with it,
+    # so the very first trace entry raised UnboundLocalError and NO archetype
+    # could be exported at all. That is why the shipped GLBs still predate the
+    # profile work.
+    accessory_scale = 1.0
     measured_scale = float("inf")
     trace: list[dict] = []
     attribution: dict[str, dict[str, float]] = {}
@@ -1610,8 +1639,8 @@ def enforce_silhouette_envelope(
             key: 1.0 + (context["proportions"][key] - 1.0) / relaxation
             for key in context["proportions"]
         }
-        restore_bind_pose(body_meshes, pristine)
-        apply_body_shaping(context, armature, body_meshes, effective)
+        restore_bind_pose(shaped, pristine)
+        apply_body_shaping(context, armature, body_meshes, effective, accessories=accessories)
         accessory_scale *= shrink
         for accessory in accessories:
             accessory.scale = (accessory.scale[0] * shrink, accessory.scale[1] * shrink, accessory.scale[2] * shrink)
@@ -1912,7 +1941,13 @@ def build_archetype(archetype: dict) -> str:
     context = archetype_context(archetype)
     print(f"ARCHETYPE={context['id']} design={context['design_id']}")
     armature, body_meshes = import_and_prepare(context)
-    pristine = snapshot_bind_pose(body_meshes)
+
+    # Accessories are placed off canonical BONE positions, so they must be
+    # built against the canonical bind pose and then carried through the same
+    # shaping as the body. Building them after the shaping (as this used to)
+    # left them anchored to a skeleton the body no longer matched.
+    accessories = build_accessories(context, armature)
+    pristine = snapshot_bind_pose([*body_meshes, *accessories])
 
     # HF-380: measure the pristine canonical body, shape it, then fail closed
     # on the spec's distinctness gates AFTER the envelope clamp has had its say
@@ -1921,8 +1956,7 @@ def build_archetype(archetype: dict) -> str:
     ensure_region_data(context, armature, body_meshes)
     profile_before = measure_profile(armature, body_meshes, context["_regions"], 1.0)
 
-    apply_body_shaping(context, armature, body_meshes)
-    accessories = build_accessories(context, armature)
+    apply_body_shaping(context, armature, body_meshes, accessories=accessories)
     ground_lifts = enforce_ground_plane(armature, body_meshes, accessories)
     envelope = enforce_silhouette_envelope(context, armature, body_meshes, pristine, accessories)
     envelope["groundPlaneLifts"] = ground_lifts
@@ -1949,8 +1983,6 @@ def build_archetype(archetype: dict) -> str:
         context, envelope, glb_paths, review_paths, source_blend,
         profile_before, profile_after, gate_results,
     )
-
-    receipt_path = write_receipt(context, envelope, glb_paths, review_paths, source_blend)
     for path in glb_paths:
         print(f"GLB={path}")
     print(f"REVIEWS={review_paths[0].parent}")
