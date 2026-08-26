@@ -94,10 +94,27 @@ def toolchain_ok():
     return True, ""
 
 
+def heal_toolchain():
+    """Rebuild node_modules/.bin. Returns True if the toolchain works afterwards.
+
+    --ignore-scripts is REQUIRED: npm rebuild deadlocks because its own precompile step
+    needs rimraf, which is itself one of the missing shims.
+    """
+    _run("npm install --ignore-scripts --no-audit --no-fund --prefer-offline", 1800)
+    return toolchain_ok()[0]
+
+
 def measure():
     ok, why = toolchain_ok()
     if not ok:
-        return {"toolchain_broken": why}
+        # Try ONCE to repair before giving up. node_modules/.bin has vanished four times in
+        # two days - cause still unknown, but a transient break should not be allowed to
+        # block a publish when the repair takes four seconds and is verifiable.
+        print(f"[gate] toolchain broken ({why}) - attempting one self-repair", file=sys.stderr)
+        if heal_toolchain():
+            print("[gate] self-repair succeeded; measuring", file=sys.stderr)
+        else:
+            return {"toolchain_broken": why + " (self-repair did not fix it)"}
 
     rc, _ = _run("npx tsc --noEmit", 900)
     tsc_clean = rc == 0
