@@ -120,9 +120,21 @@ def publish():
     """Add Pass 80 as a THIRD channel. Nothing existing is touched."""
     sh(f'git worktree remove --force "{WORKTREE}"')
     shutil.rmtree(WORKTREE, ignore_errors=True)
-    rc, out = sh(f'git worktree add "{WORKTREE}" gh-pages')
+
+    # FETCH FIRST, and branch from ORIGIN - not the local ref.
+    #
+    # The local gh-pages was 23 commits behind origin and its config listed TWO channels
+    # while origin listed FIVE (PASS 73, 72, 70, 69, 63). Publishing from the stale ref
+    # would have written a config containing three, silently deleting four of the owner's
+    # retained builds - the exact thing he asked not to happen. The "abort if a channel key
+    # disappears" guard passed, because it compared against the stale baseline. A guard is
+    # only as good as what it measures against.
+    rc, out = sh("git fetch origin gh-pages")
     if rc != 0:
-        return False, f"could not check out gh-pages: {out[-300:]}"
+        return False, f"could not fetch gh-pages: {out[-300:]}"
+    rc, out = sh(f'git worktree add --detach "{WORKTREE}" FETCH_HEAD')
+    if rc != 0:
+        return False, f"could not check out origin/gh-pages: {out[-300:]}"
 
     target = os.path.join(WORKTREE, *CHANNEL.split("/"))
     # Replace only THIS channel's directory; the sibling channels are never touched.
@@ -160,7 +172,7 @@ def publish():
                   'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'], cwd=WORKTREE)
     if rc != 0 and "nothing to commit" not in out:
         return False, f"commit failed: {out[-300:]}"
-    rc, out = sh("git push origin gh-pages", cwd=WORKTREE, timeout=3600)
+    rc, out = sh("git push origin HEAD:gh-pages", cwd=WORKTREE, timeout=3600)
     if rc != 0:
         return False, f"push failed: {out[-400:]}"
     return True, ("https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/"
