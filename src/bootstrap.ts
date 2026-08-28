@@ -26,9 +26,14 @@ import {
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
 const stableFallback = releaseChannels.rollback ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
+// The pass name used to be hand-written into both of these strings, and had been stale for
+// ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
+// and told the owner publication was disabled while he was reading it on a published URL.
+// Every other field in this chooser already comes from release-channels.json; this one now
+// does too, so the description cannot drift from the build it describes.
 const latestDescription = newestBuildIsPublished
-  ? 'The approved Pass 70 gameplay and presentation build.'
-  : 'The local Pass 70 HITL candidate. Publication remains disabled until owner approval.';
+  ? releaseChannels.latest.description
+  : `${releaseChannels.latest.description} Local HITL candidate - not yet published.`;
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;

@@ -3,16 +3,16 @@
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
     "label": "PASS 80",
-    "description": "Pass 80 overnight refinement: invisible-geometry parity gate, farcrysis sea reflection and refraction, Hijacked deckhouse glazing, mid-street vehicles and crimson flamethrower parity."
+    "description": "Operator archetypes that read at distance (braid, thigh rigs, talons, cranial crest), locally generated Kimodo motion retargeted onto the 62-joint rig, per-instance grass tint across 87,280 blades, farcrysis frame-loop leaks closed, chopper gunner controls and killstreak selector, RAY TRACED reflective coverage gated."
   },
   "experimental": {
     "pass": "PASS 80",
     "label": "PASS 80",
-    "description": "Pass 80 overnight refinement: invisible-geometry parity gate, farcrysis sea reflection and refraction, Hijacked deckhouse glazing, mid-street vehicles and crimson flamethrower parity.",
+    "description": "Operator archetypes that read at distance (braid, thigh rigs, talons, cranial crest), locally generated Kimodo motion retargeted onto the 62-joint rig, per-instance grass tint across 87,280 blades, farcrysis frame-loop leaks closed, chopper gunner controls and killstreak selector, RAY TRACED reflective coverage gated.",
     "path": "channels/pass80"
   },
   "previous": {
-    "label": "PASS 72 · PREVIOUS LIVE",
+    "label": "PASS 72 \u00b7 PREVIOUS LIVE",
     "description": "The exact previously live Pass 72 Pages runtime, retained byte-for-byte for comparison and immediate rollback testing.",
     "pass": "PASS 72",
     "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
@@ -23,7 +23,7 @@
     "path": "channels/pass72-retained"
   },
   "retained": {
-    "label": "PASS 70 · RETAINED LIVE",
+    "label": "PASS 70 \u00b7 RETAINED LIVE",
     "description": "The exact Pass 70 Pages runtime, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 70",
     "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
@@ -34,7 +34,7 @@
     "path": "channels/pass70-retained"
   },
   "historical": {
-    "label": "PASS 69 · RETAINED STABLE",
+    "label": "PASS 69 \u00b7 RETAINED STABLE",
     "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 69",
     "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",
@@ -56,7 +56,7 @@
     "path": "channels/recent-stable"
   },
   "rollback": {
-    "label": "PASS 63 · STABLE WEBGL",
+    "label": "PASS 63 \u00b7 STABLE WEBGL",
     "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
@@ -68,7 +68,7 @@
     "rebuiltFromSource": true
   },
   "pass73Retained": {
-    "label": "PASS 73 · RETAINED LIVE",
+    "label": "PASS 73 \u00b7 RETAINED LIVE",
     "description": "The exact Pass 73 Pages runtime, retained byte-for-byte at its original path for comparison and fallback testing.",
     "pass": "PASS 73",
     "path": "channels/the-big-one"
