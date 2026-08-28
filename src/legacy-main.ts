@@ -1014,6 +1014,7 @@ import {
   LobbyJoinMessage,
   LobbyHandicapMessage,
   LobbySkinMessage,
+  LobbyStanceMessage,
   LobbySquadMessage,
   LobbyReadyMessage,
   LobbyStateMessage,
@@ -7959,6 +7960,7 @@ function sendLobbyJoin(): void {
     squadName: localSquadName,
     squadColor: localSquadColor,
     skinId: localOperatorSkinId, // HF-360
+    stanceId: localOperatorStanceId, // HF-382
     resumeToken: localResumeToken,
     nonce: randomNonce(),
   };
@@ -8622,6 +8624,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
         squadName: squad.name,
         squadColor: squad.color,
         ...(joinSkinId ? { skinId: joinSkinId } : {}),
+        ...(isOperatorStanceId(message.stanceId) ? { stanceId: message.stanceId } : {}),
       });
       authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
     }
@@ -8755,6 +8758,34 @@ function updateHostSkin(message: LobbySkinMessage): void {
 
 /** HF-360: the replicated skin for a peer's third-person presentation. Falls
  * back to the retained default operator for anything absent or off-catalog. */
+function updateHostStance(message: LobbyStanceMessage): void {
+  if (network.role !== 'host') return;
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' && phase !== 'countdown' && phase !== 'active') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected || !isOperatorStanceId(message.stanceId)) return;
+  hostLobbyMembers.set(message.by, { ...member, stanceId: message.stanceId });
+  broadcastHostLobby(phase);
+  syncRemoteOperatorStances();
+}
+
+/** HF-382: the replicated idle stance for a peer's third-person rig. Falls back
+ * to the catalog default for anything absent or off-catalog, mirroring skinId. */
+function memberOperatorStanceId(id: string): string {
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id)
+    ?? (network.role === 'host' ? hostLobbyMembers.get(id) : undefined);
+  const stance = member && 'stanceId' in member ? member.stanceId : undefined;
+  return isOperatorStanceId(stance) ? stance : DEFAULT_OPERATOR_STANCE;
+}
+
+/** Write every remote rig's replicated stance onto the root updateRiggedOperator
+ * reads. Idempotent and cheap; called whenever the lobby membership changes. */
+function syncRemoteOperatorStances(): void {
+  for (const [id, remote] of remotes) {
+    remote.root.userData.operatorStanceId = memberOperatorStanceId(id);
+  }
+}
+
 function memberOperatorSkinId(id: string): string {
   const member = privateLobbySnapshot?.members.find((entry) => entry.id === id)
     ?? hostLobbyMembers.get(id);
@@ -9368,6 +9399,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     && previousSnapshot?.phase !== 'waiting';
   const endingFromHost = message.snapshot.phase === 'ended' && gameStarted && matchState.phase !== 'ended';
   privateLobbySnapshot = message.snapshot;
+  syncRemoteOperatorStances(); // HF-382: stance changes land on live rigs mid-match
   if (message.snapshot.phase === 'waiting') {
     // HF-322: A join into a WAITING lobby must clear awaitingCanonicalGuestAuthority rather than leaving it armed
     awaitingCanonicalGuestAuthority = false;
@@ -9526,6 +9558,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-skin') {
     updateHostSkin(message);
+    return true;
+  }
+  if (message.type === 'lobby-stance') {
+    updateHostStance(message);
     return true;
   }
   if (message.type === 'redeploy-request') {
@@ -10420,6 +10456,9 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.name = 'remote-player-world';
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
+  // HF-382: seed the replicated idle stance; updateRiggedOperator reads this
+  // root channel every frame and cross-fades when it changes.
+  root.userData.operatorStanceId = memberOperatorStanceId(snapshot.id);
   // A remote seeded from retained (possibly dead) authority must not stand
   // visible at its old position until the first admitted state corrects it.
   root.visible = snapshot.hp > 0;
@@ -27734,6 +27773,12 @@ document.addEventListener('click', (event) => {
     // the previous stance until a reload. Publish to the live store here,
     // mirroring what ui/operator-preview.ts already does for its turntable.
     setActiveOperatorStance(stance);
+    // HF-382: and replicate it, exactly like the skin branch above - the panel
+    // says "Your squad sees every choice here" and until now stance was the one
+    // choice they never saw.
+    const stanceMessage: LobbyStanceMessage = { type: 'lobby-stance', by: player.id, stanceId: stance, nonce: randomNonce() };
+    if (network.role === 'host') updateHostStance(stanceMessage);
+    else if (network.role === 'client') network.send(stanceMessage);
   } else if (emote !== undefined && isOperatorEmoteId(emote)) {
     localOperatorEmoteId = emote;
     persistOperatorPreference(OPERATOR_EMOTE_STORAGE_KEY, emote);

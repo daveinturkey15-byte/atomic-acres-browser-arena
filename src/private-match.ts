@@ -10,6 +10,7 @@ import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -48,6 +49,10 @@ export type LobbyMember = Readonly<{
   squadColor?: SquadColor;
   /** HF-360: host-validated operator-skin selection; absent means default. */
   skinId?: string;
+  /** HF-382: replicated idle stance for the peer's third-person presentation.
+   * Optional and tolerant exactly like skinId, so pre-Pass-81 checkpoints and
+   * lobbies still validate; renderers fall back to the catalog default. */
+  stanceId?: string;
 }>;
 
 export type PlayerScore = Readonly<{
@@ -172,6 +177,7 @@ export function isLobbyMember(value: unknown): value is LobbyMember {
     && (member.squadName === undefined || isSquadName(member.squadName))
     && (member.squadColor === undefined || isSquadColor(member.squadColor))
     && (member.skinId === undefined || isSelectableOperatorSkinId(member.skinId))
+    && (member.stanceId === undefined || isOperatorStanceId(member.stanceId))
     && (member.pingMs === null || Number.isFinite(member.pingMs) && Number(member.pingMs) >= 0 && Number(member.pingMs) <= MAX_CLOCK_RTT_MS);
 }
 

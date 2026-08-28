@@ -251,4 +251,37 @@ describe('the match shell publishes stance selections to the live arms store (HF
     const handlerWindow = source.slice(persistIndex, persistIndex + 600);
     expect(handlerWindow).toContain('setActiveOperatorStance(stance)');
   });
+
+  // ---------------------------------------------------------------------------
+  // HF-382 replication. The panel says "Your squad sees every choice here"; the
+  // stance was the one choice they never saw. These pin the full path: publish
+  // on click, host-validate, carry at join, land on remote roots, refresh live.
+  it('replicates the stance choice through the lobby exactly like the skin', () => {
+    const legacyMain = readFileSync('src/legacy-main.ts', 'utf8');
+    // Publish from the click branch, both roles, beside the local store update.
+    const clickBranch = legacyMain.slice(legacyMain.indexOf('setActiveOperatorStance(stance);'));
+    expect(clickBranch).toContain("{ type: 'lobby-stance', by: player.id, stanceId: stance, nonce: randomNonce() }");
+    expect(clickBranch).toContain("if (network.role === 'host') updateHostStance(stanceMessage);");
+    expect(clickBranch).toContain("else if (network.role === 'client') network.send(stanceMessage);");
+    // Host validates and rebroadcasts, then refreshes every live rig.
+    expect(legacyMain).toContain('function updateHostStance(message: LobbyStanceMessage): void');
+    expect(legacyMain).toContain("hostLobbyMembers.set(message.by, { ...member, stanceId: message.stanceId });");
+    expect(legacyMain).toContain('syncRemoteOperatorStances();');
+    // Join carries it; the host only accepts a catalog stance.
+    expect(legacyMain).toContain('stanceId: localOperatorStanceId, // HF-382');
+    expect(legacyMain).toContain('...(isOperatorStanceId(message.stanceId) ? { stanceId: message.stanceId } : {}),');
+    // Remote rigs read it on the SAME root channel updateRiggedOperator consumes.
+    expect(legacyMain).toContain('root.userData.operatorStanceId = memberOperatorStanceId(snapshot.id);');
+    expect(legacyMain).toContain("remote.root.userData.operatorStanceId = memberOperatorStanceId(id);");
+  });
+
+  it('validates the lobby-stance message and member field against the catalog', () => {
+    const protocol = readFileSync('src/protocol.ts', 'utf8');
+    expect(protocol).toContain("export type LobbyStanceMessage = { type: 'lobby-stance'; by: string; stanceId: string; nonce: number };");
+    expect(protocol).toContain("case 'lobby-stance':");
+    expect(protocol).toContain('isOperatorStanceId(msg.stanceId) && Number.isFinite(msg.nonce)');
+    const privateMatch = readFileSync('src/private-match.ts', 'utf8');
+    expect(privateMatch).toContain('(member.stanceId === undefined || isOperatorStanceId(member.stanceId))');
+  });
 });
+

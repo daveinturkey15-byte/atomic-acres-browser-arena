@@ -5,6 +5,7 @@ import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
 import type { KillCause } from './kill-provenance';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
@@ -457,6 +458,8 @@ export type LobbyJoinMessage = {
   squadColor?: SquadColor;
   /** HF-360: the joiner's preferred operator skin; host-validated. */
   skinId?: string;
+  /** HF-382: the joiner's idle stance; host-validated, optional-tolerant. */
+  stanceId?: string;
   resumeToken: string;
   nonce: number;
 };
@@ -525,6 +528,8 @@ export type LobbySquadMessage = { type: 'lobby-squad'; by: string; squadName: st
 /** HF-360: a member's operator-skin selection. Host-validated against the
  * canonical selectable catalog; replicated via the lobby snapshot. */
 export type LobbySkinMessage = { type: 'lobby-skin'; by: string; skinId: string; nonce: number };
+/** HF-382: idle-stance twin of lobby-skin, same host-validated lifecycle. */
+export type LobbyStanceMessage = { type: 'lobby-stance'; by: string; stanceId: string; nonce: number };
 export type RedeployRequestMessage = {
   type: 'redeploy-request'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId; nonce: number;
@@ -608,7 +613,7 @@ export type ChatHistoryMessage = {
 };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
@@ -1103,6 +1108,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.squadName === undefined || isSquadName(msg.squadName))
         && (msg.squadColor === undefined || isSquadColor(msg.squadColor))
         && (msg.skinId === undefined || isSelectableOperatorSkinId(msg.skinId))
+        && (msg.stanceId === undefined || isOperatorStanceId(msg.stanceId))
         && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
         && /^[a-zA-Z0-9_-]+$/.test(msg.resumeToken)
         && Number.isFinite(msg.nonce);
@@ -1121,6 +1127,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-skin':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isSelectableOperatorSkinId(msg.skinId) && Number.isFinite(msg.nonce);
+    case 'lobby-stance':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isOperatorStanceId(msg.stanceId) && Number.isFinite(msg.nonce);
     case 'redeploy-request':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -1298,6 +1307,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-handicap':
     case 'lobby-squad':
     case 'lobby-skin':
+    case 'lobby-stance':
     case 'redeploy-request':
     case 'redeploy-commit':
     case 'reload-intent':
