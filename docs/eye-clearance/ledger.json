@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-08-28",
+  "probeM": 0.15,
+  "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality = static + interactive-world runtime colliders) then sweep-eye-clearance-live.mjs (traceBallistics probes vs canonical shot surfaces)",
+  "ceilings": {
+    "atomic-acres": 0,
+    "rustworks-1v1": 0,
+    "skyline-terminal": 3,
+    "gun-range": 2,
+    "high-seas": 2
+  },
+  "accepted": [
+    {
+      "arena": "gun-range",
+      "rows": "wallbang-panel glass (0.052 m) and brick (0.000 m), crouch",
+      "reason": "The panels are authored solid:false, shots:true - deliberately walk-through range fixtures you shoot targets through. A player standing inside one clips by design; making them movement-solid would change what the range IS. Accepted, not deferred."
+    },
+    {
+      "arena": "skyline-terminal",
+      "rows": "skyline-airstair x3, stand, 0.069 m at (18.40, 1.3-2.7)",
+      "reason": "Escalator flank fringe: eye 11 mm inside the near-plane+bob margin beside the sloped belly. Real but sub-centimetre-class; fixing means reshaping the rotated stair collider. Deferred with numbers, revisit on any player report."
+    },
+    {
+      "arena": "high-seas",
+      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (\u00b10.90, 22.15)",
+      "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
+    }
+  ],
+  "farcrysis": "excluded - parked by the owner 2026-08-28"
+}

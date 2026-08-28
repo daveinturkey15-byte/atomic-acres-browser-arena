@@ -198,7 +198,11 @@ describe('Quality Graphics environment asset', () => {
     // AUTHORED_LARGE_COVER_ANCHORS and the generator branches on the anchor id, so both
     // props are back (+164 triangles) and all four ids are present in the shipped bytes.
     // Still an exact equality: a re-pin to correct behaviour, not a loosening.
-    expect(provenance.runtimeAudit.triangles).toBe(42_044);
+    // Third Pass 81 bake: 42_044 -> 42_132. +88 for the two storage lockers that are
+    // now real authored solids in the spec (HF-387 - they were shot surfaces with no
+    // movement or visual authority), minus the slimmer HF-383b planter fins. Exact
+    // equality, as ever.
+    expect(provenance.runtimeAudit.triangles).toBe(42_132);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

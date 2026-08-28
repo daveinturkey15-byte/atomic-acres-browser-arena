@@ -108,7 +108,15 @@ export const FRONT_HEDGE_FIN_LAYOUT = Object.freeze([
 /** [width along the street, height, depth across the canyon]. Each pillar
  * spans the FULL flank from hedge line to bus face plane so both the street
  * channel and the kerb-side verge lane die against it. */
-export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.4, 2.05, 5.4] as const);
+// HF-383b declutter (owner, 2026-08-28): the pillars read as bulk. Their HEIGHT is
+// load-bearing - 2.05 m is what stops the 1.65 m standing eye-line, and lowering it
+// reopens the measured 58-60 m lanes - so decluttering slims the FOOTPRINT instead:
+// width 1.4 -> 1.0 along the street, depth 5.4 -> 4.8 across the canyon. The island
+// contract (1.8 m verge gap, x-gaps to vans and bus) grows, never shrinks, and the
+// sightline suite is the arbiter. Measured: depth 4.8 REOPENED a 54 m lane through the
+// 0.6 m verge slit ([-26,-3.5]->[28,-2.5]), so depth stays at its full 5.4 m span -
+// hedge line to bus face - and only the street-facing width slims.
+export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.0, 2.05, 5.4] as const);
 
 /**
  * Rear-boundary hedge runs splitting the back-yard strips behind each house.

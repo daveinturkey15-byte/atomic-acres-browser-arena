@@ -314,6 +314,15 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - DOOR_FRAME_OUTSET),
     ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster', 0, true),
     solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - 0.2, 0.12, DEPTH - 0.2], 'concrete', false, 'floor'),
+    // HF-387. The storage locker always existed as a SHOT surface and a rendered mesh
+    // (house-destruction.ts furniture fragment) but never as a movement solid, so its
+    // fragment sourceId ':authored-storage-locker' dangled and a player could stand -
+    // and prone - INSIDE a solid-looking cabinet, camera and all. Found by the eye-
+    // clearance sweep: 4 of Nuketown's 8 violations were legal capsule positions whose
+    // eye sat 0.000-0.045 m from this locker's faces. The fragment now reads THIS solid
+    // (same pattern as the wall fragments), so movement, ballistics and presentation
+    // finally agree on one box.
+    solid('authored-storage-locker', [indoorRampSide * 6.75, 0.82, -5.65], [1.24, 1.64, 0.72], 'metal', true, 'wall'),
 
     ...westUpperWall,
     ...eastUpperWall,

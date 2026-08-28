@@ -764,6 +764,21 @@
             },
             {
               "collidable": true,
+              "id": "aqua-irrigation-workshop:authored-storage-locker",
+              "kind": "wall",
+              "position": [
+                10.75,
+                0.82,
+                -23.049999999999997
+              ],
+              "size": [
+                1.24,
+                1.64,
+                0.72
+              ]
+            },
+            {
+              "collidable": true,
               "id": "aqua-irrigation-workshop:upper-ramp-side-wall-rear",
               "kind": "wall",
               "position": [
@@ -1955,6 +1970,21 @@
                 20,
                 0.12,
                 16.2
+              ]
+            },
+            {
+              "collidable": true,
+              "id": "coral-orchard-conservatory:authored-storage-locker",
+              "kind": "wall",
+              "position": [
+                -10.75,
+                0.82,
+                23.049999999999997
+              ],
+              "size": [
+                1.24,
+                1.64,
+                0.72
               ]
             },
             {

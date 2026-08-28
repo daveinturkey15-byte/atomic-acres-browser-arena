@@ -538,6 +538,24 @@
           "breakable": false
         },
         {
+          "id": "aqua-irrigation-workshop:authored-storage-locker",
+          "name": "authored-storage-locker",
+          "position": [
+            10.75,
+            0.82,
+            -23.049999999999997
+          ],
+          "size": [
+            1.24,
+            1.64,
+            0.72
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
           "id": "aqua-irrigation-workshop:upper-ramp-side-wall-rear",
           "name": "upper-ramp-side-wall-rear",
           "position": [
@@ -1959,6 +1977,24 @@
           "breakable": false
         },
         {
+          "id": "coral-orchard-conservatory:authored-storage-locker",
+          "name": "authored-storage-locker",
+          "position": [
+            -10.75,
+            0.82,
+            23.049999999999997
+          ],
+          "size": [
+            1.24,
+            1.64,
+            0.72
+          ],
+          "surface": "metal",
+          "collidable": true,
+          "kind": "wall",
+          "breakable": false
+        },
+        {
           "id": "coral-orchard-conservatory:upper-west-wall",
           "name": "upper-west-wall",
           "position": [
@@ -2995,7 +3031,7 @@
           -5.5
         ],
         "size": [
-          1.4,
+          1,
           2.05,
           5.4
         ]
@@ -3007,7 +3043,7 @@
           -5.5
         ],
         "size": [
-          1.4,
+          1,
           2.05,
           5.4
         ]
@@ -3019,7 +3055,7 @@
           5.5
         ],
         "size": [
-          1.4,
+          1,
           2.05,
           5.4
         ]
@@ -3031,7 +3067,7 @@
           5.5
         ],
         "size": [
-          1.4,
+          1,
           2.05,
           5.4
         ]

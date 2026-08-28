@@ -184,7 +184,8 @@
     "verify:benchmark": "node scripts/release/verify-benchmark-record.mjs",
     "qa:release-topology": "node scripts/qa/verify-release-topology-browser.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
-    "deploy:ci": "gh-pages -d dist"
+    "deploy:ci": "gh-pages -d dist",
+    "qa:eye-clearance": "npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/sweep-eye-clearance-live.mjs --check"
   },
   "overrides": {
     "postcss": "8.5.23",
