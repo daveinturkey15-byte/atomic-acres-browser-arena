@@ -67,9 +67,57 @@ def sh(cmd, cwd=SRC, check=True, timeout=3600):
     return p.stdout + p.stderr
 
 
+def assert_farcrysis_not_selectable(dist_dir):
+    """Owner, 2026-08-28: farcrysis stays unselectable in ANY live published version.
+
+    Checked against the BYTES the minifier actually emits, not the bytes one imagines.
+    The first version of this guard searched for data-arena-id="farcrysis" and passed
+    green on every bundle - including ones with farcrysis selectable - because the menu
+    interpolates arena ids at runtime and that byte sequence never exists. A guard is
+    only as good as its red test; this one has one below in main().
+
+    Real shape (verified in dist bytes): the arena registry serializes as
+    routeId:`farcrysis`,selectable:!1 (template quotes survive esbuild; !1 is false).
+    The rule: every farcrysis registry entry in every chunk must carry selectable:!1
+    within its entry window; an entry without it means the menu will offer the arena.
+    No farcrysis entry at all is also acceptable (arena fully removed).
+    """
+    import glob
+    import re
+    entry_rx = re.compile(rb"routeId:[`'\"]farcrysis[`'\"]")
+    ok_rx = re.compile(rb"selectable:(?:!1|false)")
+    entries_seen = 0
+    for path in glob.glob(os.path.join(dist_dir, "assets", "*.js")):
+        with open(path, "rb") as fh:
+            data = fh.read()
+        for match in entry_rx.finditer(data):
+            entries_seen += 1
+            window = data[max(0, match.start() - 100):match.end() + 200]
+            if not ok_rx.search(window):
+                sys.exit("REFUSING TO PUBLISH: a farcrysis registry entry in "
+                         f"{os.path.basename(path)} does not carry selectable:false - "
+                         "the menu would offer the parked arena. Fix src/map-selection.ts.")
+    print(f"  farcrysis-unselectable guard: OK ({entries_seen} registry entr"
+          f"{'y' if entries_seen == 1 else 'ies'} checked, all selectable:false)")
+
+
 def main():
     if not os.path.isdir(DIST):
         sys.exit(f"no build at {DIST}")
+    # Prove the guard can fire before trusting its pass (it shipped vacuous once).
+    import tempfile
+    with tempfile.TemporaryDirectory() as red_dir:
+        os.makedirs(os.path.join(red_dir, "assets"))
+        with open(os.path.join(red_dir, "assets", "red.js"), "wb") as fh:
+            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,legacyAliases:[]")
+        fired = False
+        try:
+            assert_farcrysis_not_selectable(red_dir)
+        except SystemExit:
+            fired = True
+        if not fired:
+            sys.exit("REFUSING: the farcrysis guard failed its own red test - it cannot fire")
+    assert_farcrysis_not_selectable(DIST)
 
     sh(f'git worktree remove --force "{WORKTREE}"', check=False)
     shutil.rmtree(WORKTREE, ignore_errors=True)
