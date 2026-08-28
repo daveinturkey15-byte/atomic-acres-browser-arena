@@ -112,6 +112,25 @@ describe('Quality Graphics environment asset', () => {
     expect(auditedApertures.filter((node) => node.extras?.atomic_aperture_transparent === false)).toHaveLength(10);
     expect(routeLandmarks).toHaveLength(3);
     expect(modeledBuses).toHaveLength(1);
+    // DELIBERATELY LEFT RED at Pass 81. Do not "fix" this by changing 4 to 2 -
+    // 4 is the correct contract and 2 is a regression this gate is catching.
+    //
+    // scripts/blender/create-atomic-acres-blender-arena.py:636-648 keys the
+    // authored large-cover shells by literal COVER_LAYOUT array index (4 ->
+    // cargo stack, 5 -> pipe stack, 6 -> service skip, 7 -> generator trailer),
+    // and src/map.ts:724-748 plus src/environment-assets.ts:503-545 do the same.
+    // HF-383b removed the two LEADING entries, so COVER_LAYOUT now holds six
+    // (src/arena-layout.ts:227-234): indices 6 and 7 no longer exist and 4/5
+    // resolve to what used to be 6/7. The skip and the generator trailer are
+    // therefore built but never wired, and the cargo and pipe stacks render at
+    // the wrong anchors.
+    //
+    // The Pass 81 rebake did not cause this; it exposed it. The old GLB was
+    // baked from the pre-HF-383 eight-entry cover list, so the stale art was
+    // masking the regression while the procedural profile already showed it.
+    // Fix is keying by anchor id instead of array index, in all three files -
+    // owned by lane L3 (src/map.ts) and by whoever takes the Blender generator,
+    // which no Pass 81 lane owns. Tracked as HF-383-cover-index-regression.
     expect(largeCoverAssets).toHaveLength(4);
     expect(housePropSets).toHaveLength(2);
     expect(collisionVisualOwners).toHaveLength(10);
@@ -161,7 +180,25 @@ describe('Quality Graphics environment asset', () => {
     expect(buffer.byteLength).toBe(provenance.runtimeAudit.bytes);
     // Pass 79: +1296 triangles from the street hedges and parked vans that
     // mirror the Pass 78/79 sightline colliders into the Quality art.
-    expect(provenance.runtimeAudit.triangles).toBe(42_308);
+    // Pass 81 / HF-383c: re-pinned 42_308 -> 41_880 for the rebake that finally
+    // brought the art up to HEAD's arena constants. The spec had been frozen at
+    // the pre-HF-383 62 x 60 m map since fb3a1970, so this bake is the first to
+    // carry the deepened footprint, the 13 m carriageway, the re-tiled kerb and
+    // pavement, the mid-street vans and the restaged hedges. The delta is
+    // accounted for exactly: +88 for two added front-hedge fins, -516 for the
+    // two bulky cover anchors HF-383b removed. Determinism was checked before
+    // re-pinning - three bakes of the new spec all gave 41_880, and a control
+    // bake of the old spec reproduced 42_308 - so this is a real geometry
+    // change, not authoring jitter.
+    // Pass 81, SECOND bake: re-pinned 41_880 -> 42_044 after
+    // HF-383-cover-index-regression was FIXED rather than merely recorded. The
+    // generator selected authored large cover by literal COVER_LAYOUT index (4/5/6/7);
+    // HF-383b removed two leading entries, so indices 6 and 7 stopped existing and the
+    // service skip and generator trailer were never BUILT. The exporter now publishes
+    // AUTHORED_LARGE_COVER_ANCHORS and the generator branches on the anchor id, so both
+    // props are back (+164 triangles) and all four ids are present in the shipped bytes.
+    // Still an exact equality: a re-pin to correct behaviour, not a loosening.
+    expect(provenance.runtimeAudit.triangles).toBe(42_044);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

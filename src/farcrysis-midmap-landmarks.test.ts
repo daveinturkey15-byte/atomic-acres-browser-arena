@@ -21,9 +21,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { buildFarcrysis } from './farcrysis';
 import {
+  allLandmarkInteractableSpecs,
   FARCRYSIS_LANDMARKS,
+  LANDMARK_KEEPOUT_RADIUS_M,
+  landmarkAuthoredPositions,
+  landmarkBoulderPosition,
   landmarkByTag,
   landmarkCratePlacements,
+  landmarkInteractableSpecs,
   landmarkFernPositions,
   landmarkHedgePositions,
   landmarkRubblePositions,
@@ -215,6 +220,120 @@ describe('farcrysis mid-map landmarks (HF-395)', () => {
       expect(landmarkCratePlacements(frame)).toHaveLength(3);
       expect(landmarkHedgePositions(frame)).toHaveLength(4);
       expect(landmarkFernPositions(frame)).toHaveLength(6);
+    }
+  });
+});
+
+describe('farcrysis landmark coordination (HF-395 round 2)', () => {
+  beforeEach(() => stubCanvasDocument());
+  afterEach(() => vi.unstubAllGlobals());
+
+  /**
+   * THE GATE THE OLD SUITE DID NOT HAVE.
+   *
+   * The pre-existing "never intersects a landmark collider" case (above)
+   * selects its subjects with an id REGEX, so it can only reason about props
+   * that were NAMED after a landmark, and non-overlap is not coordination: a
+   * crate 2.00 m from a grove centre, dropped there by an unrelated absolute
+   * table, passes it comfortably.
+   *
+   * This case works the other way round and by POSITION: anything whose
+   * collider centre lands inside a landmark's footprint radius must be a prop
+   * the landmark module actually authored. That is what "coordinated" means —
+   * one placement authority per composition.
+   *
+   * Red against HEAD before the reroute: farcrysis-crate-17 sat at (-28,-26),
+   * 2.00 m from the NW grove centre, authored by nothing.
+   */
+  it('admits no unauthored prop inside a landmark footprint', () => {
+    const scene = new THREE.Scene();
+    const arena = buildFarcrysis(scene);
+    const audit = arena.root.userData.farcrysisColliderAudit as ReadonlyArray<{ id: string; bounds: Box2ish }>;
+
+    const strays: string[] = [];
+    for (const frame of FARCRYSIS_LANDMARKS) {
+      const authored = landmarkAuthoredPositions(frame);
+      for (const entry of audit) {
+        const cx = (entry.bounds.minX + entry.bounds.maxX) / 2;
+        const cz = (entry.bounds.minZ + entry.bounds.maxZ) / 2;
+        const radial = Math.hypot(cx - frame.center[0], cz - frame.center[1]);
+        if (radial > LANDMARK_KEEPOUT_RADIUS_M) continue;
+        const matched = authored.some(([ax, az]) => Math.hypot(cx - ax, cz - az) <= 0.06);
+        if (!matched) {
+          strays.push(`${entry.id} at (${cx.toFixed(2)}, ${cz.toFixed(2)}) is ${radial.toFixed(2)} m inside landmark ${frame.tag} but no landmark placement authored it`);
+        }
+      }
+    }
+    expect(strays, strays.join('\n')).toEqual([]);
+  });
+
+  /**
+   * The approach kit is the family that used to be the absolute table. Pin
+   * that it is (a) present in the built arena under the SAME ids, (b) seated
+   * on the terrain authority, and (c) actually derived from the frames rather
+   * than re-listed — proven by comparing the built collider centre against the
+   * module's arithmetic to 4 decimal places.
+   */
+  it('routes every mid-ring interactable through the shared landmark frames', () => {
+    const scene = new THREE.Scene();
+    const arena = buildFarcrysis(scene);
+    const audit = arena.root.userData.farcrysisColliderAudit as ReadonlyArray<{
+      id: string; bounds: Box2ish & { minY?: number; maxY?: number };
+    }>;
+    const byId = new Map(audit.map((entry) => [entry.id, entry]));
+
+    const specs = allLandmarkInteractableSpecs();
+    expect(specs).toHaveLength(FARCRYSIS_LANDMARKS.length * 3);
+
+    for (const spec of specs) {
+      const entry = byId.get(spec.id);
+      expect(entry, `${spec.id} (${spec.tag}/${spec.slot}) missing from the built arena`).toBeTruthy();
+      const cx = (entry!.bounds.minX + entry!.bounds.maxX) / 2;
+      const cz = (entry!.bounds.minZ + entry!.bounds.maxZ) / 2;
+      expect(cx, `${spec.id} x`).toBeCloseTo(spec.pos[0], 4);
+      expect(cz, `${spec.id} z`).toBeCloseTo(spec.pos[1], 4);
+      // Seated on the single terrain authority, like every other landmark prop.
+      expect(Math.abs((entry!.bounds.minY ?? Number.NaN) - farcrysisTerrainHeight(cx, cz)), `${spec.id} seating`)
+        .toBeLessThanOrEqual(0.06);
+    }
+
+    // The kit must NOT be four copies of one arrangement: the Pass 80 audit
+    // recorded "all four quadrants are the identical arrangement" as the
+    // surviving cosmetic residual. Flank side x picket kind gives four
+    // distinct quadrant signatures.
+    const signatures = new Set(
+      FARCRYSIS_LANDMARKS.map((frame) => {
+        const kit = landmarkInteractableSpecs(frame);
+        const picket = kit.find((s) => s.slot === 'picket')!;
+        // Sign of the tangential offset of crate-a in the local frame.
+        const crateA = kit.find((s) => s.slot === 'crate-a')!;
+        const dv = (crateA.pos[0] - frame.center[0]) * frame.tangent[0]
+          + (crateA.pos[1] - frame.center[1]) * frame.tangent[1];
+        return `${picket.kind}:${Math.sign(dv)}`;
+      }),
+    );
+    expect(signatures.size, 'four quadrants must not share one arrangement').toBe(4);
+  });
+
+  /**
+   * The two lone absolute boulders (farcrysis-rock-nw/-se at (-28,-40) and
+   * (28,40)) existed in two of four quadrants and were placed by hand. There
+   * must now be one per landmark, each on its frame.
+   */
+  it('gives every quadrant one frame-derived boulder', () => {
+    const scene = new THREE.Scene();
+    const arena = buildFarcrysis(scene);
+    const audit = arena.root.userData.farcrysisColliderAudit as ReadonlyArray<{ id: string; bounds: Box2ish }>;
+
+    const rocks = audit.filter((entry) => /^farcrysis-rock-(nw|ne|sw|se)$/.test(entry.id));
+    expect(rocks.map((r) => r.id).sort()).toEqual([
+      'farcrysis-rock-ne', 'farcrysis-rock-nw', 'farcrysis-rock-se', 'farcrysis-rock-sw',
+    ]);
+    for (const frame of FARCRYSIS_LANDMARKS) {
+      const entry = audit.find((e) => e.id === `farcrysis-rock-${frame.tag}`)!;
+      const [bx, bz] = landmarkBoulderPosition(frame);
+      expect((entry.bounds.minX + entry.bounds.maxX) / 2, `rock-${frame.tag} x`).toBeCloseTo(bx, 4);
+      expect((entry.bounds.minZ + entry.bounds.maxZ) / 2, `rock-${frame.tag} z`).toBeCloseTo(bz, 4);
     }
   });
 });

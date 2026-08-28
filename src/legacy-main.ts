@@ -27,6 +27,13 @@ import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBu
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
+// L7 handoff (PASS 81). This file used to define its OWN screenSpaceTopologyKey, and the
+// private copy is the one the pending-changes check calls. `rayTracing` is a declared
+// 'pipeline-rebuild' topology owner, but it was absent from the private key - so toggling
+// ray tracing mid-session scheduled no rebuild and applyTuning no-opped against a graph
+// that was never rebuilt. Importing the shared key is the fix; two copies of a key was
+// always going to end with one of them being wrong.
+import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
@@ -444,7 +451,6 @@ import {
   resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   type GraphicsPreset,
-  type GraphicsRuntime,
   type Pass65Settings,
 } from './pass65-settings';
 import { PlayerProfileStore, type PlayerControlPreferencesV1 } from './player-profile';
@@ -1753,16 +1759,6 @@ let liveGraphicsAppliedAt = 0;
  * counts — a tier change inside an already-built pass is a live uniform, while
  * adding or removing one changes MRT attachments and render targets.
  */
-function screenSpaceTopologyKey(screenSpace: GraphicsRuntime['screenSpace']): string {
-  return [
-    screenSpace.godrays.enabled ? 'shafts' : '-',
-    screenSpace.reflections.enabled ? 'ssr' : '-',
-    screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
-    screenSpace.depthOfField.enabled ? 'dof' : '-',
-    screenSpace.motionBlur.enabled ? 'motion' : '-',
-    screenSpace.upscaling.enabled ? `fsr${screenSpace.upscaling.sceneResolutionScale}` : '-',
-  ].join('|');
-}
 const rendererConstructionGraphics = Object.freeze({
   profile: renderProfile,
   antialiasSamples: graphicsRuntime.antialiasSamples,

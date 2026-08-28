@@ -48,7 +48,20 @@ SOURCE_GLTF = ROOT / "public/assets/third-party/quaternius/ultimate-modular-male
 BLEND_DIR = ROOT / "source-assets/blender"
 RAW_DIR = ROOT / "artifacts/blender-operator-skins/raw"
 REVIEW_ROOT = ROOT / "artifacts/blender-operator-skins/reviews"
-TEXTURE_ROOT = ROOT / "public/assets/original/textures/operators/pass74-operator-skins"
+# Generator intermediates, NOT deploy payload. `make_texture` paints these
+# procedurally, writes them here so a bake can be inspected by eye, then calls
+# `image.pack()` - so the shipped GLBs embed their own copies and have zero
+# external URIs. Nothing loads the PNGs back: not the runtime, not a test, not
+# assets.manifest.json, and not this script on a re-bake, which repaints every
+# texel from the spec every time.
+#
+# They used to be written under `public/`, which Vite copies wholesale into
+# `dist`, so 48 PNGs / 11.3 MB were downloaded by every player and read by
+# nothing. They now sit beside this target's other raw output in `artifacts/`
+# (gitignored), matching RAW_DIR and REVIEW_ROOT above. `source-assets/` was the
+# other candidate, but it is tracked, and committing 12 MB of regenerable
+# procedural noise trades a deploy-size problem for a repo-size one.
+TEXTURE_ROOT = ROOT / "artifacts/blender-operator-skins/textures"
 ASSET_FAMILY_ID = "pass74-project-original-operator-skin-corpus-v1"
 TEXTURE_SIZE = 512
 REVIEW_SIZE = 640
@@ -1411,10 +1424,14 @@ def build_ankle_tether_straps(context: dict, armature: bpy.types.Object) -> list
 # the crest never cleared the skull. Head features below are expressed in SKULL
 # WIDTHS via `_skull_span` instead.
 #
-# NOTE: the pre-existing head-wear builders (`build_head_wear`) have the same
-# bone-length sizing and produce a visor lens 4.8 cm wide on a 23.7 cm head.
-# That is a real finding but NOT corrected here - it would change three already
-# approved assets - see the sprint log.
+# The head-wear builders were carried across too. `build_head_wear` now sizes
+# both the band and the lens through `_skull_span`, and commit 24f702ad rebuilt
+# all six operator GLBs on it. Measured from the shipped lod0 POSITION
+# accessors: the band is 20.59 cm across on all three archetypes and the lens is
+# 12.17 / 14.51 / 13.57 cm (explorer / symbiote / navalops), i.e. exactly the
+# 0.52 / 0.62 / 0.58 `lens_size` factors of a 23.39 cm skull span. The 4.8 cm
+# letterbox this note used to describe as uncorrected is gone; the shipped
+# dimensions are pinned by src/operator-skin-silhouette.test.ts.
 SKULL_WIDTH_PER_HEAD_BONE = 3.05
 
 

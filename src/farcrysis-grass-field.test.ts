@@ -15,11 +15,14 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
+import { buildFarcrysis } from './farcrysis';
 import {
   animateGrassField,
   buildFarcrysisGrassField,
   createGrassBladeGeometry,
+  FARCRYSIS_GRASS_CHUNK_GRID,
   FARCRYSIS_GRASS_DRAW_DISTANCE_M,
+  FARCRYSIS_GRASS_PLACEMENT_HALF_M,
   FARCRYSIS_GRASS_MAX_HEIGHT_M,
   FARCRYSIS_GRASS_MIN_SPACING_M,
   grassPlacementAllowed,
@@ -229,5 +232,112 @@ describe('farcrysis grass field (HF-396)', () => {
 
     animateGrassField(null); // defensive: show everything
     root.children.forEach((c) => expect(c.visible).toBe(true));
+  });
+});
+
+/**
+ * HF-396 residual: grass coverage from the corner spawns.
+ *
+ * The field is built across the whole island, but the LOD used to cull whole
+ * 27 m chunks on their CENTRE distance. Measured from the real spawn at
+ * (-52,-52): only 4 of 16 chunks survived, so three quarters of the island's
+ * grass was absent from the frame the player starts in, and the nearest culled
+ * chunk carried grass 52 m from the camera — well inside the arena's fog near
+ * plane at 78 m (src/rendering/arenas/farcrysis.ts fog: near 78, far 200), so
+ * the boundary was a hard visible edge rather than a haze-out.
+ *
+ * These cases pin the two halves of the fix, mirroring the vegetation suite's
+ * corner-spawn case at src/farcrysis-visual-dressing.test.ts:184-205 (the
+ * existing LOD case only asserted "some visible, some hidden", which 4 of 16
+ * satisfies perfectly).
+ */
+describe('farcrysis grass corner-spawn coverage (HF-396)', () => {
+  beforeEach(() => {
+    stubCanvasDocument();
+    tslResetWindUniforms();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Half-extent of one LOD chunk on each axis. */
+  const chunkHalf = FARCRYSIS_GRASS_PLACEMENT_HALF_M / FARCRYSIS_GRASS_CHUNK_GRID;
+
+  /** Chunk index -> [min, max] on one axis, from the module's own grid. */
+  function chunkSpan(index: number): [number, number] {
+    const min = -FARCRYSIS_GRASS_PLACEMENT_HALF_M + index * chunkHalf * 2;
+    return [min, min + chunkHalf * 2];
+  }
+
+  function chunkIndices(mesh: THREE.Object3D): [number, number] {
+    const match = /farcrysis-grass-chunk-(\d+)-(\d+)$/.exec(mesh.name);
+    if (!match) throw new Error(`not a grass chunk: ${mesh.name}`);
+    return [Number(match[1]), Number(match[2])];
+  }
+
+  /** Shortest XZ distance from a camera to a chunk's footprint. */
+  function distanceToChunk(mesh: THREE.Object3D, camX: number, camZ: number): number {
+    const [ix, iz] = chunkIndices(mesh);
+    const [minX, maxX] = chunkSpan(ix);
+    const [minZ, maxZ] = chunkSpan(iz);
+    const dx = Math.max(minX - camX, 0, camX - maxX);
+    const dz = Math.max(minZ - camZ, 0, camZ - maxZ);
+    return Math.hypot(dx, dz);
+  }
+
+  it('keeps most of the field drawn from every authored spawn', () => {
+    const scene = new THREE.Scene();
+    const arena = buildFarcrysis(scene);
+
+    const chunks: THREE.Object3D[] = [];
+    arena.root.traverse((node) => {
+      if (node.name.startsWith('farcrysis-grass-chunk-')) chunks.push(node);
+    });
+    expect(chunks.length).toBe(16);
+
+    const camera = new THREE.Object3D();
+    const spawns = [...arena.spawns[0], ...arena.spawns[1]];
+    expect(spawns.length).toBeGreaterThanOrEqual(8);
+
+    for (const spawn of spawns) {
+      camera.position.set(spawn.x, spawn.y, spawn.z);
+      animateGrassField(camera);
+      const visible = chunks.filter((c) => c.visible).length;
+      // Centre-distance culling scored 4/16 here. Bounds culling at the fog
+      // near plane scores 9/16 at the worst spawn (-52,-52) and 13/16 at the
+      // inboard spawns; anything under 9 is a regression of this fix.
+      expect(
+        visible,
+        `only ${visible}/16 grass chunks drawn from spawn (${spawn.x}, ${spawn.z})`,
+      ).toBeGreaterThanOrEqual(9);
+    }
+  });
+
+  it('culls on chunk BOUNDS, not chunk centre', () => {
+    const root = new THREE.Group();
+    buildFarcrysisGrassField(root);
+    const camera = new THREE.Object3D();
+
+    // The corner spawn. The chunk covering the arena centre has its CENTRE
+    // 92.6 m away (culled by a centre test at any sane draw distance) but its
+    // nearest edge only 73.5 m away — grass the player can plainly see.
+    camera.position.set(-52, 1.7, -52);
+    animateGrassField(camera);
+
+    for (const chunk of root.children) {
+      const near = distanceToChunk(chunk, -52, -52);
+      if (near <= FARCRYSIS_GRASS_DRAW_DISTANCE_M) {
+        expect(chunk.visible, `${chunk.name} is ${near.toFixed(1)} m away and must draw`).toBe(true);
+      } else {
+        expect(chunk.visible, `${chunk.name} is ${near.toFixed(1)} m away and must cull`).toBe(false);
+      }
+    }
+  });
+
+  it('cuts the field no closer than the arena fog begins', () => {
+    // src/rendering/arenas/farcrysis.ts authors fog { near: 78, far: 200 }.
+    // With bounds culling, the nearest grass a cull can remove is exactly
+    // FARCRYSIS_GRASS_DRAW_DISTANCE_M away, so the boundary only ever falls
+    // where the fog has already started to hide it. Dropping the draw
+    // distance below the fog near plane re-opens the visible edge.
+    expect(FARCRYSIS_GRASS_DRAW_DISTANCE_M).toBeGreaterThanOrEqual(78);
   });
 });

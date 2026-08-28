@@ -36,6 +36,16 @@ import { createBallisticSurface, type BallisticMaterialId } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+// HF-395 round 2: the mid-ring crates, barrels and sandbags below used to be
+// an absolute coordinate table living in this file, independent of the
+// relational mid-map composition. They now derive from the SAME landmark
+// frames the ruin walls, groves and crate caches use.
+import {
+  allLandmarkInteractableSpecs,
+  LANDMARK_PICKET_SANDBAG_DEPTH_M,
+  LANDMARK_PICKET_SANDBAG_HEIGHT_M,
+  LANDMARK_PICKET_SANDBAG_WIDTH_M,
+} from './farcrysis-midmap-landmarks';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1012,12 @@ function placeStackedSandbagWall(
  * platforms (8 more crates).  Every position is seed-deterministic (mulberry32 — no Math.random)
  * and verified ≥3 m from every spawn and patrol waypoint.
  *
+ * HF-395 round 2: twelve of those props (8 crates, 2 barrels, 2 sandbag
+ * walls) are the mid-map landmarks' approach kits and no longer carry
+ * coordinates here at all — they derive from the shared frames in
+ * farcrysis-midmap-landmarks.ts, the same authority that places the ruin
+ * walls, groves and crate caches.  Their ids are unchanged.
+ *
  * @param builder  The ArenaMap Builder object from farcrysis.ts — a
  *                 plain object with { root, colliders, physicsColliders,
  *                 raycastMeshes, shotSurfaces, physicalCover }.
@@ -1016,18 +1032,48 @@ export function addInteractables(builder: any): void {
     pz >= bMinZ + margin && pz <= bMaxZ - margin;
 
   // =====================================================================
-  // 1. WOODEN CRATES (16 + 4 from cover stacks) — 0.8–1.2 m
+  // 1. WOODEN CRATES (12 here + 8 in the landmark approach kits below,
+  //    plus 4 from cover stacks) — 0.8–1.2 m
   // =====================================================================
   //
-  // Crates cluster around the research-station core approaches and the
-  // mid-ring jungle paths.  Every crate is registered as 'wood' so
-  // bullets penetrate with the wood resistance profile.
+  // Crates cluster around the research-station core approaches, the beach
+  // ring, and the four mid-map landmark approaches.  Every crate is
+  // registered as 'wood' so bullets penetrate with the wood resistance
+  // profile.
 
-  // -- Mid-ring jungle, rotated square around the core ------------------
-  placeCrate(builder, 'farcrysis-crate-01', -34, -34, 1.0);
-  placeCrate(builder, 'farcrysis-crate-02',  34,  34, 1.0);
-  placeCrate(builder, 'farcrysis-crate-03', -34,  34, 1.0);
-  placeCrate(builder, 'farcrysis-crate-04',  34, -34, 1.0);
+  // -- Mid-ring landmark approach kits (HF-395 round 2) ------------------
+  //
+  // Twelve props — two supply crates and one picket piece per quadrant —
+  // whose positions come from farcrysis-midmap-landmarks.ts, the same module
+  // that places the ruin walls, groves and crate caches. This replaces four
+  // separate absolute blocks that used to live here:
+  //   crates 01-04  "Mid-ring jungle, rotated square around the core" at
+  //                 (+/-34, +/-34); each hung 3.7 m outboard of its
+  //                 landmark's fringe row on the same diagonal.
+  //   crates 17-20  "Jungle mid-ring diagonals (radius ~19 m)" at
+  //                 (+/-28, +/-26); their real radial was 38.2 m, and each
+  //                 landed 2.00 m from a grove centre — inside the grove.
+  //   barrels 09/10 "Mid-field jungle paths".
+  //   sandbags 03/04 "Path toward ruined wall N / S" — there has been no
+  //                 N/S wall since the walls were renamed nw/ne/sw/se.
+  //
+  // The ids are deliberately unchanged so cover, ballistic-surface and
+  // raycast identity stay stable; only the placement authority moved.
+  for (const spec of allLandmarkInteractableSpecs()) {
+    const [px, pz] = spec.pos;
+    if (spec.kind === 'crate') {
+      placeCrate(builder, spec.id, px, pz, spec.footprint);
+    } else if (spec.kind === 'barrel') {
+      placeBarrel(builder, spec.id, px, pz);
+    } else {
+      placeSandbagWall(
+        builder, spec.id, px, pz,
+        LANDMARK_PICKET_SANDBAG_WIDTH_M,
+        LANDMARK_PICKET_SANDBAG_HEIGHT_M,
+        LANDMARK_PICKET_SANDBAG_DEPTH_M,
+      );
+    }
+  }
 
   // -- Core approaches (N/S/E/W) — stacked near the entrances -----------
   placeCrate(builder, 'farcrysis-crate-05',  -4, -10, 0.9);
@@ -1050,7 +1096,7 @@ export function addInteractables(builder: any): void {
   placeCrate(builder, 'farcrysis-crate-16',  20,  44, 1.0);
 
   // =====================================================================
-  // 2. RUSTY STEEL BARRELS (10) — 0.6 m radius × 1.0 m height
+  // 2. RUSTY STEEL BARRELS (8 here + 2 landmark pickets) — fuel-drum sized
   // =====================================================================
   //
   // Barrels are scattered along path edges and near the skiff / beacon /
@@ -1076,12 +1122,11 @@ export function addInteractables(builder: any): void {
   placeBarrel(builder, 'farcrysis-barrel-07',  -3, -3.5);
   placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5);
 
-  // -- Mid-field jungle paths --------------------------------------------
-  placeBarrel(builder, 'farcrysis-barrel-09', -24,  32);
-  placeBarrel(builder, 'farcrysis-barrel-10',  24, -32);
+  // -- barrels 09/10 are now landmark picket pieces (SW and NE approach
+  //    kits, placed in section 1 from the shared landmark frames).
 
   // =====================================================================
-  // 3. SANDBAG WALLS (4) — low cover near existing hard-cover positions
+  // 3. SANDBAG WALLS (2 here + 2 landmark pickets) — low cover
   // =====================================================================
   //
   // Each sandbag wall is ~2.2 m wide × 0.6 m tall × 0.45 m deep —
@@ -1089,17 +1134,17 @@ export function addInteractables(builder: any): void {
   // (but not overlapping) the existing hard-cover pieces (skiffs, rocks,
   // ruined walls) so players can chain cover-to-cover movement.
 
-  // -- Beach approach, near skiff NW and rock NW -------------------------
+  // -- NW beach approach, on the skiff-to-jungle line (quadrant naming
+  //    matches the landmark tags: nw = -x/-z) -----------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-01', -28, -36, 2.2, 0.6, 0.45);
 
-  // -- Beach approach, near skiff SE and rock SE -------------------------
+  // -- SE beach approach, mirror of sandbag-01 ---------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-02',  28,  36, 2.2, 0.6, 0.45);
 
-  // -- Path toward ruined wall N, mid-ring approach to core --------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-03', -12, -34, 2.2, 0.6, 0.45);
-
-  // -- Path toward ruined wall S, mid-ring approach to core --------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-04',  12,  34, 2.2, 0.6, 0.45);
+  // -- sandbags 03/04 are now landmark picket pieces (NW and SE approach
+  //    kits, placed in section 1 from the shared landmark frames). They
+  //    used to be captioned "path toward ruined wall N / S"; the ruin walls
+  //    have been named nw/ne/sw/se since the HF-395 recomposition.
 
   // =====================================================================
   // 4. COVER POSITIONS (4) — crate stacks & fallen trunks along paths
@@ -1123,20 +1168,19 @@ export function addInteractables(builder: any): void {
   placeCrateCover(builder, 'farcrysis-cover-jungle-04', -40, 28);
 
   // =====================================================================
-  // 5. ADDITIONAL CRATES (6) — jungle mid-ring and beach fringe
+  // 5. ADDITIONAL CRATES (2) — beach / jungle transition
   // =====================================================================
   //
-  // Six more breakable wooden crates placed in the jungle mid-ring and
-  // along the beach approach.  Every position avoids spawn points, core
-  // entrances, mid-ring cardinal corridor, and patrol waypoints.
+  // Two more breakable wooden crates on the beach approach.  Every position
+  // avoids spawn points, core entrances, the mid-ring cardinal corridor,
+  // and patrol waypoints.
 
-  // -- Jungle mid-ring diagonals (radius ~19 m) --------------------------
-  placeCrate(builder, 'farcrysis-crate-17', -28, -26, 0.95);
-  placeCrate(builder, 'farcrysis-crate-18',  28,  26, 0.95);
-  placeCrate(builder, 'farcrysis-crate-19', -26,  28, 0.9);
-  placeCrate(builder, 'farcrysis-crate-20',  26, -28, 0.9);
+  // -- crates 17-20 are now the landmark approach kits' crate-b slot
+  //    (placed in section 1 from the shared landmark frames). Their old
+  //    caption read "radius ~19 m"; the actual radial was 38.2 m, a
+  //    pre-rescale comment that survived the HF-396 island expansion.
 
-  // -- Beach / jungle transition (radius ~24 m) --------------------------
+  // -- Beach / jungle transition (radial 48.8 m from the arena centre) ---
   placeCrate(builder, 'farcrysis-crate-21', -28, -40, 0.95);
   placeCrate(builder, 'farcrysis-crate-22',  28,  40, 0.95);
 
@@ -1221,7 +1265,8 @@ export function addInteractables(builder: any): void {
   placeCrate(builder, 'farcrysis-crate-25',  -6,  4.0, 0.9);
   placeCrate(builder, 'farcrysis-crate-26',   6,  4.0, 0.9);
 
-  // -- Mid-jungle SW + NE pockets (radius ~17 m) --------------------------
+  // -- Mid-jungle NW + SE pockets, 8.49 m outboard of the nearest grove
+  //    centre on the pure tangential bearing (radial 37.7 m) --------------
   placeCrate(builder, 'farcrysis-crate-27', -32, -20, 0.95);
   placeCrate(builder, 'farcrysis-crate-28',  32,  20, 0.95);
 
@@ -1233,7 +1278,7 @@ export function addInteractables(builder: any): void {
   // placed in arena corner pockets away from spawns and patrol paths.
   // Each carries a small emissive band for visibility at range.
 
-  // -- NW / SE diagonal corner pockets ------------------------------------
+  // -- SW / NE diagonal corner pockets (nw = -x/-z, matching landmark tags)
   placeBarrel(builder, 'farcrysis-barrel-15', -32,  32);
   placeBarrel(builder, 'farcrysis-barrel-16',  32, -32);
 

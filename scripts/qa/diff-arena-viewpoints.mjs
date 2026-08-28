@@ -181,6 +181,26 @@ async function writeComposite(basePng, candPng, outPath, persistenceMin) {
     .toFile(outPath);
 }
 
+export function validateManifests(baseManifest, candManifest) {
+  const problems = [];
+  if (baseManifest.backend !== candManifest.backend) {
+    problems.push(`backend mismatch: ${baseManifest.backend} vs ${candManifest.backend} - comparing WebGPU against WebGL2 proves nothing`);
+  }
+  for (const m of [baseManifest, candManifest]) {
+    if (m.environmentInvalid) problems.push(`${m.label ?? m.url}: captured under invalid environment (${m.environmentInvalid})`);
+  }
+  if (baseManifest.verdict !== 'PASS') {
+    problems.push(`base capture did not pass (verdict='${baseManifest.verdict}')`);
+  }
+  if (candManifest.verdict !== 'PASS') {
+    problems.push(`candidate capture did not pass (verdict='${candManifest.verdict}')`);
+  }
+  if (baseManifest.bundleAtStart === candManifest.bundleAtStart) {
+    problems.push(`both runs served the same bundle '${baseManifest.bundleAtStart}' - harness mistake, not a code regression`);
+  }
+  return problems;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const arg = (name, fallback) => {
@@ -209,15 +229,9 @@ async function main() {
   }
   // Comparing WebGPU against WebGL2 proves nothing about either route; a
   // capture taken under an invalidated environment proves even less.
-  const envProblems = [];
-  if (baseManifest.backend !== candManifest.backend) {
-    envProblems.push(`backend mismatch: ${baseManifest.backend} vs ${candManifest.backend} - comparing WebGPU against WebGL2 proves nothing`);
-  }
-  for (const m of [baseManifest, candManifest]) {
-    if (m.environmentInvalid) envProblems.push(`${m.label ?? m.url}: captured under invalid environment (${m.environmentInvalid})`);
-  }
+  const envProblems = validateManifests(baseManifest, candManifest);
   if (envProblems.length > 0) {
-    console.error('[viewpoint-diff] INVALID environment comparison:');
+    console.error('[viewpoint-diff] INVALID comparison:');
     for (const problem of envProblems) console.error(`  - ${problem}`);
     process.exit(2);
   }

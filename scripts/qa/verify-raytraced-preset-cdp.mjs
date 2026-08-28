@@ -9,19 +9,30 @@
 //     browser measures one cold arena and five warm ones, and a warm number is
 //     evidence about the second run, not about admission.
 //
-//  2. THE PRESET IS SEEDED INTO localStorage BEFORE BOOT. The GRAPHICS MODE
-//     <select> lives in src/ui/pass64-shell.ts and this lane may not edit it,
-//     so the fourth option is not in the menu yet. Seeding the persisted
-//     settings drives the identical code path the menu would
+//  2. THE PRESET IS SEEDED INTO localStorage BEFORE BOOT. Seeding the persisted
+//     settings drives the identical code path the menu does
 //     (parsePass65Settings -> presetGraphics -> resolveGraphicsRuntime), and
 //     the run asserts the preset the RUNTIME resolved rather than the one the
-//     harness asked for.
+//     harness asked for. (The header used to say the fourth option "is not in
+//     the menu yet". It has been in the menu since src/ui/pass64-shell.ts:229
+//     shipped `<option value="raytraced">RAY TRACED</option>`; the seeding is
+//     kept because it survives a cold profile with no click.)
 //
 //  3. IT READS THE LINEAR STAGE RECEIPT. Green boot is not evidence a player
 //     sees anything; this project has shipped three fully-tested systems with
 //     no runtime caller. The receipt is published from the graph that was
 //     actually constructed, so "raytraced-reflection-refraction-add" appearing
 //     in it is proof the trace compiled into the live chain.
+//
+//  4. PASS 81 - IT NOW FAILS ON AN EMPTY PROXY SET. The receipt has two halves,
+//     `shapes/candidates:reflectiveMeshes`, and only the first was ever
+//     checked. The 2026-08-25 capture (artifacts/qa/rt-final/final-summary.json)
+//     therefore recorded verdict PASS with rayTracedProxy 24/260:3 on
+//     atomic-acres and :0 on all five other arenas - a correctly compiled
+//     tracer with nothing in the world smooth enough to spawn a ray, reported
+//     as a healthy preset. A trace that reflects nothing is the defect this
+//     harness exists to catch, so `reflectiveMeshes > 0` is now part of `ok`
+//     for the raytraced preset.
 //
 // Usage:
 //   node scripts/qa/verify-raytraced-preset-cdp.mjs --url http://127.0.0.1:41917 \
@@ -178,6 +189,27 @@ async function runOne(preset, arena) {
     }
     record.errors = [...new Set(errors)].slice(0, 6);
     record.admissionFenceBreach = record.errors.some((line) => /queue completion exceeded/i.test(line));
+    // `shapes/candidates:reflectiveMeshes`. Zero reflective meshes means the
+    // arena has no surface at or under the mirror-roughness ceiling with a
+    // footprint above the extractor's floor, so the trace draws nothing however
+    // well it compiled. src/rendering/raytracing/arena-proxy-coverage.test.ts
+    // is the offline ratchet for the same number; this is the live one.
+    const proxy = /^(\d+)\/(\d+):(\d+)$/.exec(record.telemetry?.rayTracedProxy ?? '');
+    record.proxyShapes = proxy ? Number(proxy[1]) : null;
+    record.proxyCandidates = proxy ? Number(proxy[2]) : null;
+    record.reflectiveMeshes = proxy ? Number(proxy[3]) : null;
+    if (preset === 'raytraced' && record.ok) {
+      if (!proxy) {
+        record.ok = false;
+        record.error = 'no rayTracedProxy receipt: the trace never extracted a proxy scene';
+      } else if (record.reflectiveMeshes === 0) {
+        record.ok = false;
+        record.error = `rayTracedProxy ${record.telemetry.rayTracedProxy}: zero reflective meshes, so the trace renders nothing on this arena`;
+      } else if (record.proxyShapes === 0) {
+        record.ok = false;
+        record.error = `rayTracedProxy ${record.telemetry.rayTracedProxy}: proxy scene is empty`;
+      }
+    }
   } finally {
     await browser.close().catch(() => {});
   }
@@ -192,7 +224,8 @@ for (const preset of PRESETS) {
     console.error(
       `[rt-preset] ${preset.padEnd(10)} ${arena.padEnd(18)} ${record.ok ? 'OK  ' : 'FAIL'} `
       + `${String(record.admissionMs).padStart(6)} ms  resolved=${record.resolvedPreset} `
-      + `layer=${record.telemetry?.rayTracedLayer ?? 'ABSENT'} proxy=${record.telemetry?.rayTracedProxy ?? '-'}`
+      + `layer=${record.telemetry?.rayTracedLayer ?? 'ABSENT'} proxy=${record.telemetry?.rayTracedProxy ?? '-'} `
+      + `reflective=${record.reflectiveMeshes ?? '-'}`
       + (record.admissionFenceBreach ? '  ADMISSION-FENCE-BREACH' : ''),
     );
     for (const line of record.errors) console.error(`             ${line}`);

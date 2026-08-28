@@ -57,6 +57,26 @@
  * Fixes: SATURATION_RAD restored toward its original sensitivity, plus an
  * output stage below that bounds per-frame motion and smooths reversals.
  *
+ * PASS 81 (HF-391 continued). Pass 79 fixed only the look-lag channel, and
+ * only its per-frame step. Three things were still true and the owner was
+ * still reporting the same defect:
+ *
+ *   1. GAIT WAS THE ONE GENUINE PER-MAP SIGNAL PATH. `speed` is raw world
+ *      units per second and was divided by a fixed 5.5, so every scale the
+ *      game applies to the player's own top speed - wading and swimming, a
+ *      killstreak movement modifier, a weapon's movement multiplier - came
+ *      out as a different amount of vertical bob for identical input. The
+ *      sample now carries `maxSpeed`, the player's OWN achievable top speed
+ *      for the stance they are in, and gait is the ratio of the two.
+ *   2. `breathe` and `gait` were returned RAW. They are two of the three
+ *      terms in the sheet's vertical offset, i.e. most of what the owner
+ *      means by "bounce", and they were the two with no output bound at all.
+ *      They now go through the same stage as `swayX`/`swayY`.
+ *   3. The deflection MAGNITUDE was frame-pacing-dependent - the same head
+ *      movement produced a 25% larger HUD offset at 20 fps than at 144 fps,
+ *      which is the "inconsistent between maps" half of the report. See
+ *      `pacingGain` below.
+ *
  * Everything here is pure. It reads no globals, touches no DOM except through
  * the tiny structural type `HudSwayTarget`, and has no side effects other than
  * the property writes in `applyHudSway`.
@@ -80,6 +100,19 @@ export type HudSwayState = Readonly<{
   outX: number | null;
   /** HF-391 smoothed vertical look-lag output, -1..1. Null until sampled. */
   outY: number | null;
+  /**
+   * Pass 81 smoothed respiration output, -1..1. Null until sampled.
+   *
+   * `breathe` and `gait` are the two VERTICAL terms the CSS adds on top of
+   * `--hud-sway-y` (`pass77-instrument-hud.css`: `... + --hud-breathe * 2.6px
+   * + --hud-gait * 1.8px`), i.e. they are most of what the owner reads as the
+   * HUD "bouncing". They were returned raw while only the horizontal/vertical
+   * look-lag went through the output stage, so nothing bounded a step in
+   * either of them. They now share the same stage.
+   */
+  outBreathe: number | null;
+  /** Pass 81 smoothed gait output, 0..1. Null until sampled. */
+  outGait: number | null;
 }>;
 
 /** Per-frame camera and movement sample. */
@@ -90,6 +123,24 @@ export type HudSwaySample = Readonly<{
   pitch: number;
   /** Horizontal speed in world units per second. */
   speed: number;
+  /**
+   * The player's OWN maximum ground speed, in world units per second, for the
+   * stance they are in this frame (`movementProfile(...).maxSpeed` after the
+   * swim/wade/killstreak scales the frame loop applies to it).
+   *
+   * HF-391, the owner's report: the HUD "bounces inconsistently across maps".
+   * `speed` is a raw world-units-per-second value; normalising it against a
+   * fixed constant meant every scale the game applies to the player's top
+   * speed - wading and swimming (High Seas, the map he named), a killstreak
+   * movement modifier, an equipped weapon's movement multiplier - leaked
+   * straight into the vertical bob. Dividing by the speed the player could
+   * actually reach makes gait "how hard am I moving, for me, right now", so
+   * identical movement input produces identical bob on every map.
+   *
+   * Optional only so the module stays callable without it; when it is absent
+   * or non-finite the legacy fixed reference below is used unchanged.
+   */
+  maxSpeed?: number;
   /** Frame delta in milliseconds. */
   deltaMs: number;
 }>;
@@ -154,8 +205,12 @@ const TAU_OUT_RELEASE_MS = 60;
 const SLEW_RATE_PER_S = 30;
 const SLEW_MAX_PER_FRAME = 0.3;
 
-/** Speed, in world units per second, that maps to full gait intensity. */
-const BREATHE_SPEED = 5.5;
+/**
+ * Fallback gait reference, in world units per second, used only when the
+ * caller does not supply `maxSpeed`. Prefer the sample's own `maxSpeed`: see
+ * the field's documentation for why a fixed constant is a per-map signal path.
+ */
+const GAIT_FALLBACK_SPEED = 5.5;
 
 /** Gait follows the body, not the head, so it settles more slowly. */
 const BREATHE_TAU_MS = 260;
@@ -214,7 +269,16 @@ export function shortestAngleDelta(a: number, b: number): number {
 
 /** Start the filter already settled on a pose, so the first frame never jumps. */
 export function createHudSwayState(yaw = 0, pitch = 0): HudSwayState {
-  return { yaw: finite(yaw), pitch: finite(pitch), breathe: 0, phase: 0, outX: null, outY: null };
+  return {
+    yaw: finite(yaw),
+    pitch: finite(pitch),
+    breathe: 0,
+    phase: 0,
+    outX: null,
+    outY: null,
+    outBreathe: null,
+    outGait: null,
+  };
 }
 
 /**
@@ -228,6 +292,14 @@ export function sampleHudSway(state: HudSwayState, sample: HudSwaySample): HudSw
   const yaw = finite(sample.yaw, state.yaw);
   const pitch = finite(sample.pitch, state.pitch);
   const speed = Math.max(0, finite(sample.speed));
+  // The player's own achievable top speed for this stance. An absent or
+  // degenerate reference falls back to the fixed constant rather than being
+  // clamped into something arbitrary, and a positive one still gets a floor:
+  // dividing by a near-zero reference would turn a shuffle into a
+  // full-amplitude bob, which is the failure this normalisation exists to
+  // remove, not to introduce.
+  const suppliedMaxSpeed = finite(sample.maxSpeed ?? 0, 0);
+  const gaitReference = suppliedMaxSpeed > 0 ? Math.max(1, suppliedMaxSpeed) : GAIT_FALLBACK_SPEED;
   const deltaMs = Math.min(MAX_DELTA_MS, Math.max(0, finite(sample.deltaMs)));
 
   // Exponential smoothing with a frame-rate-independent coefficient, so the
@@ -240,7 +312,7 @@ export function sampleHudSway(state: HudSwayState, sample: HudSwaySample): HudSw
 
   const nextYaw = state.yaw + yawResidual * follow;
   const nextPitch = state.pitch + pitchResidual * follow;
-  const targetGait = Math.min(1, speed / BREATHE_SPEED);
+  const targetGait = Math.min(1, speed / gaitReference);
   const nextGait = state.breathe + (targetGait - state.breathe) * breatheFollow;
 
   // Respiration is advanced by the CLOCK, never by speed. That is the whole
@@ -255,16 +327,43 @@ export function sampleHudSway(state: HudSwayState, sample: HudSwaySample): HudSw
 
   // HF-391: the raw residuals are what the HUD chases; the sheet consumes the
   // SMOOTHED stage below, which bounds how fast the visible position can move.
-  const outX = advanceOutputStage(state.outX, clampUnit(yawResidual / SATURATION_RAD), deltaMs);
-  const outY = advanceOutputStage(state.outY, clampUnit(pitchResidual / SATURATION_RAD), deltaMs);
+  const pacing = pacingGain(deltaMs, follow);
+  const outX = advanceOutputStage(state.outX, clampUnit((yawResidual * pacing) / SATURATION_RAD), deltaMs);
+  const outY = advanceOutputStage(state.outY, clampUnit((pitchResidual * pacing) / SATURATION_RAD), deltaMs);
+  // Pass 81: the two VERTICAL terms get the same treatment. They are the ones
+  // the owner reads as "bounce" and neither had any output bound at all.
+  const outBreathe = advanceOutputStage(state.outBreathe, clampUnit(Math.sin(phase) * breathAmplitude), deltaMs);
+  const outGait = advanceOutputStage(state.outGait, clampUnit(nextGait), deltaMs);
 
   return {
-    state: { yaw: nextYaw, pitch: nextPitch, breathe: nextGait, phase, outX, outY },
+    state: { yaw: nextYaw, pitch: nextPitch, breathe: nextGait, phase, outX, outY, outBreathe, outGait },
     swayX: outX,
     swayY: outY,
-    breathe: clampUnit(Math.sin(phase) * breathAmplitude),
-    gait: clampUnit(nextGait),
+    breathe: outBreathe,
+    gait: Math.max(0, outGait),
   };
+}
+
+/**
+ * HF-391 (3), the half the per-frame slew bound did NOT fix: the deflection
+ * MAGNITUDE was frame-pacing-dependent, so the same head movement produced a
+ * bigger HUD offset on a map that runs slower - exactly the "inconsistent
+ * between maps" the owner reported, and independent of the per-frame slam.
+ *
+ * The residual of a first-order lag driven at a constant angular rate settles
+ * at `omega * deltaMs / follow`, not at `omega * TAU_MS`: `deltaMs / follow`
+ * is TAU_MS only in the limit and grows with the frame time (90 ms at 144 fps
+ * -> 117 ms at 20 fps, a 25% larger deflection for identical input, measured).
+ * Scaling the residual by `TAU_MS * follow / deltaMs` cancels that term
+ * exactly, so a steady turn now deflects the same amount at 144, 60, 40 and
+ * 20 fps (measured: 0.523 at all four, against 0.544..0.682 before).
+ *
+ * It also shrinks - it cannot amplify - so it can never make the HUD move
+ * further than it does today, and it leaves a flick saturating as before.
+ */
+function pacingGain(deltaMs: number, follow: number): number {
+  if (deltaMs <= 0 || follow <= 0) return 1;
+  return Math.min(1, (TAU_MS * follow) / deltaMs);
 }
 
 /**

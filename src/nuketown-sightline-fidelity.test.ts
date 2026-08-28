@@ -13,7 +13,21 @@ import { buildArena } from './map';
 // before the rear-hedge cross-runs landed.
 
 const EYE_HEIGHT = 1.65;
-/** Worst allowed clear standing eye-line, in metres. */
+/** Worst allowed clear standing eye-line, in metres.
+ *
+ * Pass 81 / HF-383d: re-measured with THIS test's own estimator (the 1 m
+ * interior lattice below) against HEAD's built colliders: 41.7732 m, on the
+ * lane [-29, -21.5] -> [12, -29.5]. Left at 42 ON PURPOSE. Unlike its sibling
+ * ceiling in src/nuketown-fidelity.test.ts - which was ratcheted 40 -> 26
+ * because it sat 16 m above its own measurement - this one already has only
+ * 0.23 m of headroom, so it catches any creep above half a percent. Tightening
+ * it further would not buy coverage, it would only make the gate flake on
+ * sub-decimetre layout nudges.
+ *
+ * Note for whoever grows this arena next: 0.23 m is all the room there is. The
+ * HF-383 Z deepening spent most of the original margin, and the next change
+ * that lengthens a back-fence lane will trip this gate rather than slip past
+ * it. That is the intended behaviour - re-measure and justify, do not raise. */
 const MAXIMUM_CLEAR_EYE_LINE = 42;
 
 function blocksSight(collider: Box2): boolean {

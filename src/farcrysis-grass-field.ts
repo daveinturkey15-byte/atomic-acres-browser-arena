@@ -43,7 +43,12 @@ import {
 // frames the builder's colliders use — never a second hand-maintained list.
 import {
   FARCRYSIS_LANDMARKS,
+  LANDMARK_BOULDER_SIZE_M,
+  LANDMARK_PICKET_SANDBAG_DEPTH_M,
+  LANDMARK_PICKET_SANDBAG_WIDTH_M,
+  landmarkBoulderPosition,
   landmarkCratePlacements,
+  landmarkInteractableSpecs,
   landmarkTreePositions,
   landmarkWallSpecs,
 } from './farcrysis-midmap-landmarks';
@@ -76,8 +81,32 @@ const BLADE_BEND_M = 0.09;
 const PLACEMENT_HALF_M = FARCRYSIS_BOUNDS.maxX - FARCRYSIS_SHORE.descentStartDist;
 /** Chunk grid: 4x4 = 16 InstancedMeshes maximum, one draw each. */
 const CHUNK_GRID = 4;
-/** Chunk centre beyond this camera distance hides its draw (distance LOD). */
-export const FARCRYSIS_GRASS_DRAW_DISTANCE_M = 62;
+// Exposed so the LOD gates reason about the real grid instead of re-deriving
+// it from copied constants (the failure mode that let the old +/-26 m extent
+// survive the HF-396 rescale unnoticed).
+export const FARCRYSIS_GRASS_PLACEMENT_HALF_M = PLACEMENT_HALF_M;
+export const FARCRYSIS_GRASS_CHUNK_GRID = CHUNK_GRID;
+/**
+ * A chunk whose nearest FOOTPRINT edge is beyond this camera distance stops
+ * drawing (distance LOD).
+ *
+ * HF-396 round 2: this was 62 m tested against the chunk CENTRE, which from
+ * the authored spawn at (-52,-52) drew only 4 of 16 chunks and put a hard
+ * grass edge 52 m from the player. It is now the arena's fog near plane
+ * (src/rendering/arenas/farcrysis.ts authors fog { near: 78, far: 200 }), so
+ * with bounds culling the cut can never fall closer than the distance at
+ * which the fog has already begun hiding it.
+ *
+ * COST: this does NOT raise the worst case. All 16 chunks were already drawn
+ * simultaneously from the arena centre under the old rule (every centre lies
+ * within 62 m of the origin), so the 16-draw / 436,400-triangle ceiling the
+ * arena budget is sized for is unchanged; only mid-field and corner cameras
+ * draw more than they used to. Boot cost is unaffected too: every chunk mesh,
+ * the one shared geometry and the one shared material are constructed at
+ * build time regardless of LOD, so no geometry, material or pipeline is added
+ * to the cold-admission path.
+ */
+export const FARCRYSIS_GRASS_DRAW_DISTANCE_M = 78;
 /**
  * Blades must sit this far above the lagoon waterline (metres). Measured
  * against the terrain authority: half the placement disc sits below -0.05 m
@@ -139,6 +168,22 @@ const LANDMARK_EXCLUSION_RECTS: readonly (readonly [number, number, number, numb
     for (const [tx, tz] of landmarkTreePositions(frame)) {
       rects.push([tx - 0.9, tx + 0.9, tz - 0.9, tz + 0.9]);
     }
+    // HF-395 round 2: the approach kit (the crates/barrels/sandbags that used
+    // to be an absolute table in farcrysis-physics.ts) and the ruin boulder
+    // now derive from the same frames, so their keep-outs derive with them.
+    // These props are axis-aligned boxes, so the footprint is the authored
+    // width/depth plus the same 0.18 m margin the wall segments use.
+    for (const spec of landmarkInteractableSpecs(frame)) {
+      const halfX = (spec.kind === 'sandbag' ? LANDMARK_PICKET_SANDBAG_WIDTH_M : spec.footprint) / 2 + 0.18;
+      const halfZ = (spec.kind === 'sandbag' ? LANDMARK_PICKET_SANDBAG_DEPTH_M : spec.footprint) / 2 + 0.18;
+      rects.push([
+        spec.pos[0] - halfX, spec.pos[0] + halfX,
+        spec.pos[1] - halfZ, spec.pos[1] + halfZ,
+      ]);
+    }
+    const [bx, bz] = landmarkBoulderPosition(frame);
+    const boulderHalf = LANDMARK_BOULDER_SIZE_M / 2 + 0.18;
+    rects.push([bx - boulderHalf, bx + boulderHalf, bz - boulderHalf, bz + boulderHalf]);
   }
   return rects;
 })();
@@ -289,8 +334,13 @@ function webgl2CompatRoute(): boolean {
 }
 
 const _chunkMeshes: THREE.InstancedMesh[] = [];
-const _chunkCentersX = new Float32Array(CHUNK_GRID * CHUNK_GRID);
-const _chunkCentersZ = new Float32Array(CHUNK_GRID * CHUNK_GRID);
+// HF-396 round 2: the LOD tests the camera against each chunk's FOOTPRINT,
+// not its centre, so these are per-chunk XZ bounds rather than centres. All
+// four arrays are preallocated to the full grid; the animator never allocates.
+const _chunkMinX = new Float32Array(CHUNK_GRID * CHUNK_GRID);
+const _chunkMaxX = new Float32Array(CHUNK_GRID * CHUNK_GRID);
+const _chunkMinZ = new Float32Array(CHUNK_GRID * CHUNK_GRID);
+const _chunkMaxZ = new Float32Array(CHUNK_GRID * CHUNK_GRID);
 
 /**
  * Build the grass field under `root`. Deterministic; safe to call once per
@@ -420,8 +470,10 @@ export function buildFarcrysisGrassField(root: THREE.Object3D): Readonly<GrassFi
     mesh.receiveShadow = true;
     root.add(mesh);
     _chunkMeshes.push(mesh);
-    _chunkCentersX[chunks] = chunkCenter(cxi);
-    _chunkCentersZ[chunks] = chunkCenter(czi);
+    _chunkMinX[chunks] = chunkMin(cxi);
+    _chunkMaxX[chunks] = chunkMin(cxi) + CHUNK_EDGE_M;
+    _chunkMinZ[chunks] = chunkMin(czi);
+    _chunkMaxZ[chunks] = chunkMin(czi) + CHUNK_EDGE_M;
     chunks += 1;
   }
 
@@ -439,8 +491,12 @@ function terrainSeat(x: number, z: number): number {
   return farcrysisTerrainHeight(x, z) - ROOT_SINK_M;
 }
 
-function chunkCenter(chunkIndex: number): number {
-  return -PLACEMENT_HALF_M + (chunkIndex + 0.5) * ((PLACEMENT_HALF_M * 2) / CHUNK_GRID);
+/** Edge length of one LOD chunk on each axis (metres). */
+const CHUNK_EDGE_M = (PLACEMENT_HALF_M * 2) / CHUNK_GRID;
+
+/** Low edge of a chunk on one axis. */
+function chunkMin(chunkIndex: number): number {
+  return -PLACEMENT_HALF_M + chunkIndex * CHUNK_EDGE_M;
 }
 
 // ---------------------------------------------------------------------------
@@ -460,9 +516,15 @@ export function animateGrassField(camera?: THREE.Object3D | null): void {
     return;
   }
   const maxSquared = FARCRYSIS_GRASS_DRAW_DISTANCE_M * FARCRYSIS_GRASS_DRAW_DISTANCE_M;
+  const camX = camera.position.x;
+  const camZ = camera.position.z;
   for (let i = 0; i < _chunkMeshes.length; i++) {
-    const dx = camera.position.x - _chunkCentersX[i];
-    const dz = camera.position.z - _chunkCentersZ[i];
+    // Distance to the chunk's FOOTPRINT: zero inside, else the gap to the
+    // nearest edge. A centre test hid a 27 m chunk whose near edge was still
+    // 13.5 m closer than its centre, which from the corner spawn meant grass
+    // vanishing 52 m from the player.
+    const dx = camX < _chunkMinX[i] ? _chunkMinX[i] - camX : (camX > _chunkMaxX[i] ? camX - _chunkMaxX[i] : 0);
+    const dz = camZ < _chunkMinZ[i] ? _chunkMinZ[i] - camZ : (camZ > _chunkMaxZ[i] ? camZ - _chunkMaxZ[i] : 0);
     _chunkMeshes[i].visible = dx * dx + dz * dz <= maxSquared;
   }
 }

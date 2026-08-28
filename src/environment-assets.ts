@@ -14,6 +14,7 @@ import {
   texturedMaterial,
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
+import { ATOMIC_MANNEQUIN_LAYOUT, authoredLargeCoverIdAt } from './map';
 
 export { NEIGHBOURHOOD_BIN_POSITIONS } from './arena-layout';
 
@@ -262,8 +263,86 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
   }
 
+  // Yard mannequins (D4 of the Nuke Town measurement): the reference map's most
+  // identifiable prop class, and until now entirely absent from the arena. They
+  // live in the street-life layer rather than in map.ts on purpose - the default
+  // 'blender' render profile hides the whole procedural arena root behind the
+  // Quality GLB, so a mannequin authored there would never reach the frame the
+  // owner actually plays. Authority for each one is the invisible
+  // street-mannequin-collider-N proxy that map.ts builds from the same layout.
+  const mannequinShell = new THREE.MeshStandardMaterial({ color: 0xd9cfc0, roughness: 0.44, metalness: 0.04 });
+  const mannequinBase = new THREE.MeshStandardMaterial({ color: 0x3a4147, roughness: 0.46, metalness: 0.58 });
+  const limb = (name: string, top: number, bottom: number, length: number, material: THREE.Material): THREE.Mesh => {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(top, bottom, length, reduced ? 6 : 10), material);
+    mesh.name = name;
+    return mesh;
+  };
+  for (const [index, [x, z, facing]] of ATOMIC_MANNEQUIN_LAYOUT.entries()) {
+    const dummy = new THREE.Group();
+    dummy.name = 'street-mannequin';
+    dummy.position.set(x, 0, z);
+    dummy.rotation.y = facing;
+    // Base radius is capped by the authority envelope, not by taste: a
+    // cylinder's bounding box is square, so a disc of radius r occupies r of
+    // the envelope half-width at an axis-aligned facing and r * sqrt(2) at 45
+    // degrees. Every authored facing is axis-aligned, and the envelope gate in
+    // atomic-authored-cover.test.ts is what keeps it that way.
+    const plinth = limb('mannequin-plinth', 0.22, 0.25, 0.05, mannequinBase);
+    plinth.position.y = 0.025;
+    dummy.add(plinth);
+    for (const side of [-1, 1]) {
+      const leg = limb('mannequin-leg', 0.075, 0.055, 0.86, mannequinShell);
+      leg.position.set(side * 0.09, 0.48, 0);
+      dummy.add(leg);
+    }
+    const hips = new THREE.Mesh(new THREE.SphereGeometry(0.2, reduced ? 8 : 12, reduced ? 6 : 8), mannequinShell);
+    hips.name = 'mannequin-hips';
+    hips.position.y = 0.95;
+    hips.scale.set(0.88, 0.72, 0.62);
+    dummy.add(hips);
+    const torso = limb('mannequin-torso', 0.19, 0.145, 0.5, mannequinShell);
+    torso.position.y = 1.2;
+    torso.scale.z = 0.68;
+    dummy.add(torso);
+    const shoulders = limb('mannequin-shoulders', 0.075, 0.075, 0.42, mannequinShell);
+    shoulders.rotation.z = Math.PI / 2;
+    shoulders.position.y = 1.45;
+    dummy.add(shoulders);
+    // Two arm poses, alternating by PAIR rather than by index, so a mannequin
+    // and its 180-degree twin are the same dummy seen from the other side
+    // instead of two different ones.
+    const posed = Math.floor(index / 2) % 2 === 1;
+    for (const side of [-1, 1]) {
+      const arm = limb('mannequin-arm', 0.05, 0.04, 0.62, mannequinShell);
+      arm.position.set(side * 0.2, 1.13, posed ? 0.08 : side * 0.05);
+      arm.rotation.z = side * 0.1;
+      arm.rotation.x = posed ? -0.35 : 0;
+      dummy.add(arm);
+    }
+    const neck = limb('mannequin-neck', 0.045, 0.045, 0.1, mannequinShell);
+    neck.position.y = 1.56;
+    dummy.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, reduced ? 8 : 12, reduced ? 6 : 8), mannequinShell);
+    head.name = 'mannequin-head';
+    head.position.y = 1.66;
+    head.scale.set(1, 1.14, 0.94);
+    dummy.add(head);
+    decorative(dummy);
+    group.add(dummy);
+  }
+
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
-  group.userData.neighbourhoodLife = { flowers: flowerCount, flowerBeds: flowerBeds.length, benches: 4, bins: 6, bicycles: 0, markers: 0, butterflies: 0, birds: 0 };
+  group.userData.neighbourhoodLife = {
+    flowers: flowerCount,
+    flowerBeds: flowerBeds.length,
+    benches: 4,
+    bins: 6,
+    mannequins: ATOMIC_MANNEQUIN_LAYOUT.length,
+    bicycles: 0,
+    markers: 0,
+    butterflies: 0,
+    birds: 0,
+  };
   root.add(group);
   return group;
 }
@@ -500,8 +579,13 @@ function addRouteArchitecture(root: THREE.Group): void {
   }
 
   // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
+  // Keyed by ANCHOR COORDINATE, never by COVER_LAYOUT array index: HF-383 removed
+  // the two leading entries, which shifted every index and silently deleted the
+  // skip and generator shells here while re-pointing the cargo and pipe shells at
+  // anchors they are not modelled for. See AUTHORED_LARGE_COVER_ANCHORS in map.ts.
   COVER_LAYOUT.forEach(([x, z, width, depth], index) => {
-    if (index === 4) {
+    const authoredId = authoredLargeCoverIdAt(x, z);
+    if (authoredId === 'north-cargo-stack') {
       const cargo = new THREE.Group(); cargo.name = 'north-authored-cargo-stack';
       for (const [cx, cy, cz, sx, sy, sz] of [
         [-0.95, 0.62, 0, 1.72, 1.18, 1.78], [0.95, 0.62, 0, 1.72, 1.18, 1.78], [0, 1.65, 0, 1.72, 0.86, 1.78],
@@ -514,7 +598,7 @@ function addRouteArchitecture(root: THREE.Group): void {
         }
       }
       cargo.position.set(x, 0, z); decorative(cargo); root.add(cargo);
-    } else if (index === 5) {
+    } else if (authoredId === 'south-pipe-stack') {
       const pipes = new THREE.Group(); pipes.name = 'south-authored-pipe-stack';
       for (const [offsetX, y] of [[-0.9, 0.62], [0, 0.62], [0.9, 0.62], [-0.45, 1.48], [0.45, 1.48]] as Array<[number, number]>) {
         const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, Math.max(1.2, width - 0.3), 16, 1, true), concrete);
@@ -522,7 +606,7 @@ function addRouteArchitecture(root: THREE.Group): void {
         pipe.position.set(offsetX, y, 0); pipe.rotation.z = Math.PI / 2; pipes.add(pipe);
       }
       pipes.position.set(x, 0, z); decorative(pipes); root.add(pipes);
-    } else if (index === 6) {
+    } else if (authoredId === 'west-service-skip') {
       const skip = new THREE.Group(); skip.name = 'west-authored-service-skip'; skip.position.set(x, 0, z);
       const body = routeBox('service-skip-body', [width - 0.12, 1.72, depth - 0.18], concrete, 0.16);
       body.position.y = 0.91; skip.add(body);
@@ -532,7 +616,7 @@ function addRouteArchitecture(root: THREE.Group): void {
       }
       const label = routeBox('service-skip-warning-panel', [width - 0.45, 0.5, 0.06], trim, 0.03);
       label.position.set(0, 1.05, depth / 2); skip.add(label); decorative(skip); root.add(skip);
-    } else if (index === 7) {
+    } else if (authoredId === 'east-generator-trailer') {
       const generator = new THREE.Group(); generator.name = 'east-authored-generator-trailer'; generator.position.set(x, 0, z);
       const shell = routeBox('generator-shell', [width - 0.18, 1.72, depth - 0.42], frame, 0.14);
       shell.position.y = 1.1; generator.add(shell);

@@ -67,10 +67,16 @@ head and neck features off BONE length. The Head bone is 0.0774 m; the skull is
 nape and the crest never cleared the skull. Rewrote all three head features in
 SKULL WIDTHS via a documented `_skull_span` calibration.
 
-**Pre-existing finding, NOT corrected here.** `build_head_wear` has the same
-bone-length sizing, so every archetype's visor lens is 4.8 cm wide on a 23.7 cm
-head. Correcting it would change three already-approved assets, so it is
-recorded rather than silently fixed. Owner decision.
+**Pre-existing finding, since corrected.** `build_head_wear` had the same
+bone-length sizing, so every archetype's visor lens was 4.8 cm wide on a 23.7 cm
+head. It was recorded here rather than silently fixed, then corrected in commit
+24f702ad, which moved the band and lens onto `_skull_span` and rebuilt all six
+operator GLBs. Measured from the shipped lod0 POSITION accessors on 2026-08-28:
+band 20.59 cm on all three, lens 12.17 / 14.51 / 13.57 cm for explorer /
+symbiote / navalops - the authored 0.52 / 0.62 / 0.58 fractions of a 23.39 cm
+skull span. Pass 81 pinned those dimensions in
+`src/operator-skin-silhouette.test.ts`; this paragraph is superseded and is kept
+only so the earlier entry is not read as current.
 
 **Verified.** 487 files / 4366 tests green, tsc 0, provenance 151/151, every
 distinctness gate byte-identical to before the accessories, envelope unclamped

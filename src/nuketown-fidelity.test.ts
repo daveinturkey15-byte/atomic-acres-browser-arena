@@ -24,8 +24,24 @@ const walkSpeed = movementProfile({ crouched: false, prone: false, ads: false, s
 
 const width = ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX;
 const depth = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ;
-/** The reference map's longest legal standing sightline; measured on built colliders. */
-const MAX_STANDING_EYE_LINE_METRES = 40;
+/** The reference map's longest legal standing sightline; measured on built colliders.
+ *
+ * Pass 81 / HF-383d: ratcheted 40 -> 26. Re-measured with THIS test's own
+ * estimator (longestClearEyeLine below, perimeter rings at 1.65 m eye height)
+ * against HEAD's built colliders: 24.00 m, on the east perimeter run from
+ * [30, -16.5] to [30, 7.5]. The old 40 left 16 m of unused slack, so sightlines
+ * could grow by two thirds before anything noticed - and they did grow, twice:
+ * the 45.5 m and 45.3 m lanes recorded at src/arena-layout.ts:148-153 and
+ * :174-186 reopened after the Z deepening. 26 keeps a 2 m margin for the
+ * estimator's 2 m sample step while still catching that class of creep.
+ *
+ * Deliberately NOT set to the 24.19 m figure in
+ * artifacts/NUKETOWN-MEASUREMENT-2026-08-24.md: that came from a 3 m walkable
+ * grid, and the sibling gate in src/nuketown-sightline-fidelity.test.ts uses a
+ * 1 m interior lattice that measures 41.77 m on the same arena. The three
+ * estimators sample different populations and their numbers are not
+ * interchangeable, so each ceiling is pinned only against its own estimator. */
+const MAX_STANDING_EYE_LINE_METRES = 26;
 
 /** Longest unobstructed straight eye-line between perimeter sample points on the built arena. */
 function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {

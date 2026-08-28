@@ -633,14 +633,22 @@ for index, van in enumerate(spec["parkedVans"]):
 # Lane cover becomes authored modular military/agricultural barriers. The four
 # outer anchors are recognisable large utility objects aligned to their taller
 # TypeScript collision bodies rather than another row of anonymous cubes.
+# Authored art is selected by ANCHOR COORDINATE. Branching on the array index
+# meant HF-383b removing two leading entries silently deleted two authored props.
+_AUTHORED_COVER_BY_ANCHOR = {
+    (round(float(ax), 3), round(float(az), 3)): cover_id
+    for ax, az, cover_id in spec.get("authoredLargeCover", [])
+}
+
 for index, (x, z, width, depth) in enumerate(spec["cover"]):
+    authored_id = _AUTHORED_COVER_BY_ANCHOR.get((round(float(x), 3), round(float(z), 3)))
     accent = M["aqua"] if index % 2 == 0 else M["coral"]
-    if index == 4:
+    if authored_id == "north-cargo-stack":
         for crate_index, (ox, oy, sy) in enumerate(((-0.95, 0.62, 1.18), (0.95, 0.62, 1.18), (0, 1.65, 0.86))):
             add_box(f"P32_LARGE_COVER_cargo_crate_{crate_index}", [x + ox, oy, z], [1.72, sy, 1.78], M["timber"], 0.1)
             for band in (-0.42, 0.42):
                 add_box(f"P32_LARGE_COVER_cargo_strap_{crate_index}_{band}", [x + ox + band, oy, z], [0.1, sy + 0.04, 1.82], M["yellow"], 0.02)
-    elif index == 5:
+    elif authored_id == "south-pipe-stack":
         # Ground the stack exactly and leave both pipe ends open. The previous
         # capped cylinders floated 19 cm above grade and looked like boulders.
         pipe_length = width - 0.3
@@ -660,12 +668,12 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
                     f"P32_LARGE_COVER_concrete_pipe_{pipe_index}_rim_{end_index}",
                     [end_x, oy, z + oz], 0.36, 0.07, M["concrete"], rotation=(0, math.pi / 2, 0),
                 )
-    elif index == 6:
+    elif authored_id == "west-service-skip":
         add_box("P32_LARGE_COVER_service_skip_body", [x, 0.98, z], [width - 0.12, 1.86, depth - 0.18], M["coral"], 0.16)
         for side in (-1, 1):
             add_box(f"P32_LARGE_COVER_service_skip_rim_{side}", [x, 1.98, z + side * (depth / 2 - 0.12)], [width + 0.08, 0.14, 0.18], M["yellow"], 0.035)
         add_box("P32_LARGE_COVER_service_skip_label", [x, 1.08, z + depth / 2], [width - 0.45, 0.5, 0.06], M["trim"], 0.03)
-    elif index == 7:
+    elif authored_id == "east-generator-trailer":
         add_box("P32_LARGE_COVER_generator_shell", [x, 1.1, z], [width - 0.18, 1.72, depth - 0.42], M["metal"], 0.14)
         add_box("P32_LARGE_COVER_generator_roof", [x, 2.02, z], [width, 0.18, depth - 0.18], M["yellow"], 0.06)
         for vent_index, vent_y in enumerate((0.54, 0.82, 1.1)):
@@ -676,11 +684,11 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
         add_box(f"BLD_COVER_{index}_core", [x, 0.8, z], [width, 1.6, depth], M["concrete_dark"], 0.15)
         add_box(f"BLD_COVER_{index}_plate", [x, 1.32, z], [max(0.5, width - 0.25), 0.22, depth + 0.08], accent, 0.04)
         for side in (-1, 1): add_box(f"BLD_COVER_{index}_foot_{side}", [x + side * (width / 2 - 0.18), 0.18, z], [0.28, 0.36, depth + 0.35], M["metal"], 0.04)
-    if index >= 4:
-        cover_marker = bpy.data.objects.new(f"P32_LARGE_COVER_ASSET_{index}", None)
+    if authored_id is not None:
+        cover_marker = bpy.data.objects.new(f"P32_LARGE_COVER_ASSET_{authored_id}", None)
         cover_marker.location = game_location((x, 1.1, z))
         cover_marker["atomic_asset_class"] = "authored-large-physical-cover"
-        cover_marker["atomic_cover_id"] = ("north-cargo-stack", "south-pipe-stack", "west-service-skip", "east-generator-trailer")[index - 4]
+        cover_marker["atomic_cover_id"] = authored_id
         cover_marker["atomic_collision_authority"] = "typescript-cover-box"
         env.objects.link(cover_marker)
 

@@ -29,11 +29,19 @@ import {
   FARCRYSIS_WATER_LEVEL,
   FARCRYSIS_SAFETY_FLOOR_Y,
   farcrysisWadeSpeedScale,
+  FARCRYSIS_WADE_TUNING,
   PLATE_FIT_TOLERANCE_M,
 } from './farcrysis-terrain-authority';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { STANCE_SHAPES, CHARACTER_PHYSICS_CONFIG } from './physics';
-import { SWIM_TUNING } from './water/swim-state';
+import {
+  EYE_ABOVE_FEET_M,
+  SWIM_TUNING,
+  createSwimState,
+  stepSwimState,
+  swimMovementModifiers,
+} from './water/swim-state';
+import { PLAYER_JUMP_GRAVITY } from './gameplay';
 import { FARCRYSIS_WATER } from './water/water-authoring';
 import { buildFarcrysis } from './farcrysis';
 import { enhancedPalmPlacements } from './farcrysis-palms-enhanced';
@@ -74,10 +82,26 @@ function stubCanvasDocument(): void {
   });
 }
 
-/** Standing feet-to-eye distance, derived from the real capsule constants. */
+/**
+ * Standing feet-to-eye distance, derived from the real capsule constants.
+ * swim-state.test.ts pins EYE_ABOVE_FEET_M against this same derivation, so
+ * the water thresholds and the capsule cannot drift apart.
+ */
 const EYE_ABOVE_FEET = STANCE_SHAPES.stand.eyeFromCenter
   + CHARACTER_PHYSICS_CONFIG.playerHalfHeight
   + CHARACTER_PHYSICS_CONFIG.playerRadius;
+
+/**
+ * Water column standing over the player's FEET at (x, z) — the depth
+ * SWIM_TUNING and FARCRYSIS_WADE_TUNING are keyed to (Pass 81 HF-393
+ * body-reference correction). Before Pass 81 these probes compared
+ * `FARCRYSIS_WATER_LEVEL - (feetY + EYE_ABOVE_FEET)`, i.e. depth over the
+ * EYE, against the same constants — which is what let a green test coexist
+ * with a swim state no player could ever reach.
+ */
+function waterDepthOverFeet(x: number, z: number): number {
+  return FARCRYSIS_WATER_LEVEL - farcrysisTerrainHeight(x, z);
+}
 
 /**
  * Height of a plate's TOP surface at (x, z), reconstructed from the Box2
@@ -260,18 +284,21 @@ describe('farcrysis terrain authority', () => {
     // survives island resizes; the wall inner face is HALF - 0.05.
     const half = FARCRYSIS_BOUNDS.maxX;
     const wallFace = half - 0.05;
-    const drySandZ = half - 8; // still on the beach shelf, before the shore band
+    // PASS 81: this was `half - 8` (z = 56), which the comment called dry
+    // sand but which the HF-393 shelf envelope already puts 0.31 m UNDER
+    // water - the envelope crosses the waterline at z = 55.18. Starting the
+    // probe below the waterline shortened the measured wade span by 0.8 m and
+    // skipped the whole approach flatten. half - 12 is genuinely dry.
+    const drySandZ = half - 12;
     expect(FARCRYSIS_SAFETY_FLOOR_Y).toBeLessThan(farcrysisTerrainHeight(0, wallFace));
 
     // Probe the beach centreline from dry sand to the boundary wall's inner
-    // face. Swim engages when the mean surface stands at least
-    // SWIM_TUNING.enterDepth above the standing EYE (see legacy-main's
-    // stepSwimState wiring: depth = surfaceY - player.position.y).
+    // face. Swim engages when the water column standing over the player's
+    // FEET reaches SWIM_TUNING.enterDepth (chin-deep against the 1.70 m eye
+    // height); the reducer converts the eye depth legacy-main measures.
     let entryZ: number | null = null;
     for (let z = drySandZ; z <= wallFace; z += 0.05) {
-      const feetY = farcrysisTerrainHeight(0, z);
-      const depthOverEye = FARCRYSIS_WATER_LEVEL - (feetY + EYE_ABOVE_FEET);
-      if (depthOverEye >= SWIM_TUNING.enterDepth) {
+      if (waterDepthOverFeet(0, z) >= SWIM_TUNING.enterDepth) {
         entryZ = z;
         break;
       }
@@ -341,8 +368,7 @@ describe('farcrysis terrain authority', () => {
       let entryDist: number | null = null;
       for (let d = 16; d >= 0.05; d -= 0.25) {
         const [x, z] = at(d);
-        const depthOverEye = FARCRYSIS_WATER_LEVEL - (farcrysisTerrainHeight(x, z) + EYE_ABOVE_FEET);
-        if (depthOverEye >= SWIM_TUNING.enterDepth) {
+        if (waterDepthOverFeet(x, z) >= SWIM_TUNING.enterDepth) {
           entryDist = d;
           break;
         }
@@ -376,26 +402,163 @@ describe('farcrysis terrain authority', () => {
 
   // HF-393: progressive wade slowdown. Pure helper, farcrysis-scoped, that
   // the movement loop multiplies into player speed while wading. It must be
-  // CONTINUOUS with the swim state's speed scale at enter depth — a
+  // CONTINUOUS with the swim state's speed scale at enter depth - a
   // discontinuity there is exactly the "speed snap" the owner feels when
   // swimming engages.
+  //
+  // PASS 81 RE-PIN (deliberate contract change, not a weakened gate). The
+  // previous version of this test asserted `farcrysisWadeSpeedScale(0) === 1`
+  // and labelled it "dry sand". The argument is depth over the EYE, so 0 is
+  // water standing level with the player's eye - total submersion - and the
+  // assertion was pinning "run at full dry-land speed while underwater" as
+  // correct. The tuning is now keyed to the column over the FEET and the same
+  // curve is probed at real body landmarks.
   it('eases player speed from dry land to swim scale across the wade band', () => {
     const { enterDepth } = SWIM_TUNING;
-    // Dry sand: no water resistance at all.
-    expect(farcrysisWadeSpeedScale(-1)).toBe(1);
-    expect(farcrysisWadeSpeedScale(0)).toBe(1);
+    /** The helper takes eye depth; these probes are stated in feet depth. */
+    const atFeetDepth = (depthOverFeet: number): number =>
+      farcrysisWadeSpeedScale(depthOverFeet - EYE_ABOVE_FEET_M);
+
+    // Dry sand, and the waterline itself: no water resistance at all.
+    expect(atFeetDepth(-1)).toBe(1);
+    expect(atFeetDepth(0)).toBe(1);
+    expect(atFeetDepth(FARCRYSIS_WADE_TUNING.startDepth)).toBe(1);
+
+    // The band the owner actually walks. Each landmark must resist MORE than
+    // the last: this is the whole feel of a wade, and every one of these
+    // measured exactly 1.000 before the re-key.
+    const knee = atFeetDepth(0.5);
+    const waist = atFeetDepth(1.0);
+    const chest = atFeetDepth(1.35);
+    expect(knee).toBeLessThan(1);
+    expect(waist).toBeLessThan(knee);
+    expect(chest).toBeLessThan(waist);
+    // ...and by a margin a player can feel, not a rounding difference.
+    expect(1 - waist).toBeGreaterThan(0.15);
+
     // Monotonic non-increasing across the whole wade band.
     let previous = Number.POSITIVE_INFINITY;
-    for (let d = 0; d <= enterDepth + 0.5; d += 0.01) {
-      const scale = farcrysisWadeSpeedScale(d);
+    for (let d = -EYE_ABOVE_FEET_M; d <= enterDepth + 0.5; d += 0.01) {
+      const scale = atFeetDepth(d);
       expect(scale).toBeLessThanOrEqual(previous + 1e-12);
       expect(scale).toBeGreaterThan(0);
       previous = scale;
     }
+
     // Continuity: at swim-enter depth the wade scale IS the swim scale, so
     // engaging the swim state cannot step the player's speed.
-    expect(farcrysisWadeSpeedScale(enterDepth)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
-    expect(farcrysisWadeSpeedScale(enterDepth + 5)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
+    expect(atFeetDepth(enterDepth)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
+    expect(atFeetDepth(enterDepth + 5)).toBeCloseTo(SWIM_TUNING.swimSpeedScale, 12);
+  });
+
+  // HF-393 (Pass 81) - THE test the old suite did not have. The retired
+  // swim-entry probe was geometry only: it read the terrain height, added the
+  // eye offset and declared the water deep enough. That models a player
+  // planted on the seabed with no vertical dynamics at all, which is why it
+  // stayed green for two passes while the live game could not enter the swim
+  // state on any azimuth (browser probes: artifacts/hf393-wade-r2/verdict.json
+  // records "reachedSwim": false).
+  //
+  // This steps the ACTUAL vertical sequence of legacy-main's updatePhysics -
+  // gravity, the swim block's gravity cancel and rest-depth drive, the
+  // float-zone buoyancy/drag branch, then the ground clamp the character
+  // controller applies - walking seaward down the beach centreline.
+  //
+  // It is run BOTH with and without the float-zone buoyancy branch, so the
+  // contract holds whether or not the one-line `!waterSystem.swimmable` gate
+  // at legacy-main.ts:24474-24480 (handed to the legacy-main lane) is applied.
+  it('engages the swim state when a player actually walks into the sea', () => {
+    const DT = 1 / 120;
+    const REST_EYE_BELOW_SURFACE = 0.45; // legacy-main: restY = surfaceY - 0.45
+    const surfaceY = FARCRYSIS_WATER_LEVEL; // mean surface; waves ride on top
+    const wallFace = FARCRYSIS_BOUNDS.maxX - 0.05;
+    const outsideThreshold = (FARCRYSIS_WATER.island.halfX + 0.8) * 0.98;
+
+    function walkIntoTheSea(floatZoneBuoyancy: boolean) {
+      let z = FARCRYSIS_BOUNDS.maxX - 20; // dry sand, well inland of the shelf
+      let feetY = farcrysisTerrainHeight(0, z);
+      let velocityY = 0;
+      let grounded = true;
+      let swim = createSwimState();
+      let swamAtZ: number | null = null;
+      let maxFeetDepth = Number.NEGATIVE_INFINITY;
+
+      for (let frame = 0; frame < 120 * 40; frame += 1) {
+        const eyeY = feetY + EYE_ABOVE_FEET;
+        const depthOverEye = surfaceY - eyeY;
+        maxFeetDepth = Math.max(maxFeetDepth, surfaceY - feetY);
+
+        swim = stepSwimState(swim, { depth: depthOverEye, swimmable: true, dtSeconds: DT });
+        if (swim.swimming && swamAtZ === null) swamAtZ = z;
+        const modifiers = swimMovementModifiers(swim);
+
+        velocityY += PLAYER_JUMP_GRAVITY * DT;
+        if (grounded) velocityY = Math.max(0, velocityY);
+
+        if (swim.swimming) {
+          velocityY -= PLAYER_JUMP_GRAVITY * DT; // swimmers are neutrally buoyant
+          const restY = surfaceY - REST_EYE_BELOW_SURFACE;
+          const target = Math.max(
+            -modifiers.verticalSpeed,
+            Math.min(modifiers.verticalSpeed, (restY - eyeY) * 1.6),
+          );
+          velocityY += (target - velocityY) * Math.min(1, 7 * DT);
+        }
+
+        const outside = Math.abs(z) >= outsideThreshold;
+        const inWater = outside && depthOverEye > -1.2;
+        if (floatZoneBuoyancy && inWater && !swim.swimming) {
+          const submerged = Math.max(0, Math.min(4, depthOverEye + 1.4));
+          velocityY += submerged * 18 * DT;
+          velocityY += (0 - velocityY) * Math.min(1, 1.8 * DT);
+          velocityY *= Math.max(0.25, 1 - (0.7 + submerged * 0.15) * 0.65 * DT);
+        }
+
+        // Horizontal: walk seaward, slowed by the wade curve then the swim scale.
+        const wadeScale = swim.swimming ? 1 : farcrysisWadeSpeedScale(depthOverEye);
+        const nextZ = Math.min(wallFace, z + 4.5 * modifiers.speedScale * wadeScale * DT);
+
+        // Vertical integrate + the controller's ground clamp.
+        let nextFeetY = feetY + velocityY * DT;
+        const ground = farcrysisTerrainHeight(0, nextZ);
+        grounded = false;
+        if (nextFeetY <= ground) {
+          nextFeetY = ground;
+          grounded = true;
+          if (velocityY < 0) velocityY = 0;
+        }
+        feetY = nextFeetY;
+        z = nextZ;
+      }
+      return { swimming: swim.swimming, swamAtZ, maxFeetDepth };
+    }
+
+    for (const floatZoneBuoyancy of [true, false]) {
+      const run = walkIntoTheSea(floatZoneBuoyancy);
+      const label = floatZoneBuoyancy ? 'on' : 'off';
+      expect(
+        run.swamAtZ,
+        'walking seaward never engaged the swim state (float-zone buoyancy '
+          + label + '); deepest water over the feet was '
+          + run.maxFeetDepth.toFixed(3) + ' m',
+      ).not.toBeNull();
+      // ...and it must STAY engaged, not flicker on and immediately release.
+      expect(run.swimming, 'swim state did not hold (buoyancy ' + label + ')').toBe(true);
+      // Entry must happen in open water, not by clipping the boundary wall.
+      expect(run.swamAtZ as number).toBeLessThan(wallFace);
+    }
+  });
+
+  // The vertical loop above is a MODEL of legacy-main's updatePhysics. Pin the
+  // handful of lines it models, so a change there is caught as a stale model
+  // rather than passing silently against fiction.
+  it('models the live updatePhysics vertical sequence', () => {
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(main).toContain('player.velocity.y += PLAYER_JUMP_GRAVITY * dt;');
+    expect(main).toContain('player.velocity.y -= PLAYER_JUMP_GRAVITY * dt;');
+    expect(main).toContain('const restY = swimSample.surfaceY - 0.45;');
+    expect(main).toContain('player.velocity.y += preWater.buoyancy * dt;');
+    expect(PLAYER_JUMP_GRAVITY).toBe(-24.5);
   });
 
   // HF-393 wiring guard (failure mode #1: green module imported by nothing).

@@ -531,6 +531,42 @@ export function resolveScreenSpacePostRuntime(
   return runtime;
 }
 
+/**
+ * THE screen-space graph topology, as one comparable key.
+ *
+ * Only PRESENCE counts. Changing a tier inside a pass that is already built is
+ * a live uniform write; adding or removing one changes MRT attachments and
+ * whole render targets, and that cannot be applied to a graph that has already
+ * been assembled. The renderer compares this key against the one captured at
+ * construction and stages a rebuild when they differ.
+ *
+ * WHY IT LIVES HERE. It was a private function in `legacy-main`, and
+ * `rayTracing` — declared a `pipeline-rebuild` topology owner in
+ * `graphics-settings-registry.ts` — was simply missing from it. The
+ * consequence was silent and exactly backwards: toggling ray tracing live
+ * scheduled no rebuild, `applyTuning` wrote its uniforms into a graph that was
+ * never built with a trace in it, and the pending badge reported APPLIED LIVE.
+ * Every field of this runtime that gates a pass is now enumerated in one place,
+ * beside the resolver that produces them, with a test that walks the control
+ * registry and fails when a declared topology owner is missing from the key.
+ */
+export function screenSpaceTopologyKey(screenSpace: ScreenSpacePostRuntime): string {
+  return [
+    screenSpace.godrays.enabled ? 'shafts' : '-',
+    screenSpace.reflections.enabled ? 'ssr' : '-',
+    screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
+    screenSpace.depthOfField.enabled ? 'dof' : '-',
+    screenSpace.motionBlur.enabled ? 'motion' : '-',
+    screenSpace.upscaling.enabled ? `fsr${screenSpace.upscaling.sceneResolutionScale}` : '-',
+    // HF-398 / PASS 81. The trace allocates the normal and material MRT
+    // attachments it reads (`screenSpaceMrtRequirement`) and composites its own
+    // stage into the additive reflection term, so it is as much a topology
+    // change as SSR is. `refractions` adds no attachment over `reflections`,
+    // hence presence rather than tier here, same rule as every row above.
+    screenSpace.rayTracing.enabled ? 'rt' : '-',
+  ].join('|');
+}
+
 /** Every effect off. The compatibility route and the disabled state share it. */
 export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze({
   godrays: GODRAYS_OFF,

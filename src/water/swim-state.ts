@@ -15,6 +15,9 @@
  *    weapon-restriction flag) for swimmable bodies (water-authoring.ts
  *    swimmable: true). Host-authoritative like every movement state; the
  *    reducer is pure so hosts and replays step it deterministically.
+ *    Its depth thresholds are keyed to the water column over the player's
+ *    FEET (Pass 81 HF-393 correction); the eye-relative depth call sites
+ *    measure is converted once, inside the reducer.
  *
  * No THREE dependency: this is gameplay authority, kept renderer-free.
  */
@@ -88,15 +91,66 @@ export function sampleFloatZonePhysics(input: FloatZoneInput): WaterPhysicsSampl
 }
 
 /**
+ * Standing feet-to-eye distance of the player capsule, in metres.
+ *
+ * Derived from physics.ts: STANCE_SHAPES.stand.eyeFromCenter (0.79)
+ * + CHARACTER_PHYSICS_CONFIG.playerHalfHeight (0.53)
+ * + CHARACTER_PHYSICS_CONFIG.playerRadius (0.38) = 1.70 m.
+ *
+ * Duplicated here deliberately rather than imported, so this module stays
+ * outside the physics/rapier import graph (it is renderer-free and
+ * dependency-free gameplay authority by design). swim-state.test.ts pins the
+ * literal against the live physics constants, so the two cannot drift.
+ */
+export const EYE_ABOVE_FEET_M = 1.7;
+
+/**
+ * HF-393 BODY-REFERENCE CORRECTION (Pass 81).
+ *
+ * Every call site measures water depth against the player's EYE, because
+ * `player.position` IS the eye (legacy-main teleportEye / camera.position
+ * copy). Depth over the eye is a terrible thing to key body-scale gameplay
+ * thresholds to: an eye depth of 0 already means the water is at eye level,
+ * i.e. the player is submerged to the forehead.
+ *
+ * The tuning below is therefore keyed to the water column over the player's
+ * FEET, which is the depth a human reads ("ankle / knee / waist / chest"),
+ * and `stepSwimState` converts the eye depth it is fed with
+ * `feetDepthFromEyeDepth` at the single point of entry. Call sites are
+ * unchanged; only the meaning of the CONSTANTS moved.
+ *
+ * Before this correction, enterDepth 0.9 was 0.9 m over the EYE = 2.60 m over
+ * the feet — deeper than the float zone can ever hold a player (buoyancy
+ * equilibrium sits at 1.661 m over the feet), so the swim state was
+ * mathematically unreachable and the arena's only swimmable body could never
+ * be swum. Measured, both with and without the legacy float-zone buoyancy
+ * branch, by the vertical-loop test in farcrysis-terrain-authority.test.ts.
+ */
+export function feetDepthFromEyeDepth(depthOverEye: number): number {
+  return depthOverEye + EYE_ABOVE_FEET_M;
+}
+
+/**
  * Swim movement tuning for swimmable bodies. New HF-358 scope — these numbers
  * only ever apply where WaterBodyDefinition.swimmable is true, so the
  * rustworks float zone is untouched by construction.
+ *
+ * DEPTHS ARE FEET-RELATIVE (see feetDepthFromEyeDepth above): the water column
+ * standing over the player's feet, NOT over the eye.
  */
 export const SWIM_TUNING = Object.freeze({
-  /** Depth (surfaceY - eyeY, metres) that begins the enter timer. */
-  enterDepth: 0.9,
-  /** Depth at or below which the exit timer runs (hysteresis band). */
-  exitDepth: 0.35,
+  /**
+   * Water column over the FEET (metres) that begins the enter timer. 1.55 m
+   * against a 1.70 m eye height is chin-deep — the depth at which a standing
+   * player stops walking and starts swimming.
+   */
+  enterDepth: 1.55,
+  /**
+   * Column over the FEET at or below which the exit timer runs (hysteresis
+   * band). 1.05 m is waist-deep: a swimmer who paddles back up the shelf
+   * stands up again well before they are stranded on dry sand.
+   */
+  exitDepth: 1.05,
   /** Sustained submersion required before the swim state engages (s). */
   enterDelaySeconds: 0.1,
   /** Sustained shallow water required before the swim state releases (s). */
@@ -124,7 +178,13 @@ export function createSwimState(): SwimState {
 }
 
 export type SwimInput = Readonly<{
-  /** Water depth over the player reference point: surfaceY - y (metres). */
+  /**
+   * Water depth over the player's EYE: `surfaceY - player.position.y`
+   * (metres), the one convention every call site can measure, because
+   * `player.position` is the eye. Converted to the feet-relative depth
+   * SWIM_TUNING is keyed to by `feetDepthFromEyeDepth` inside the reducer —
+   * do NOT pre-convert at the call site or the offset is applied twice.
+   */
   depth: number;
   /** WaterBodyDefinition.swimmable for the active body (false = no body). */
   swimmable: boolean;
@@ -142,8 +202,10 @@ export function stepSwimState(previous: SwimState, input: SwimInput): SwimState 
       : previous;
   }
   const dt = Math.max(0, input.dtSeconds);
+  // Single conversion point: eye-relative in, feet-relative thresholds.
+  const depth = feetDepthFromEyeDepth(input.depth);
   if (!previous.swimming) {
-    const wetSeconds = input.depth >= SWIM_TUNING.enterDepth ? previous.wetSeconds + dt : 0;
+    const wetSeconds = depth >= SWIM_TUNING.enterDepth ? previous.wetSeconds + dt : 0;
     const swimming = wetSeconds >= SWIM_TUNING.enterDelaySeconds;
     return Object.freeze({
       swimming,
@@ -152,7 +214,7 @@ export function stepSwimState(previous: SwimState, input: SwimInput): SwimState 
       weaponRestricted: swimming,
     });
   }
-  const drySeconds = input.depth <= SWIM_TUNING.exitDepth ? previous.drySeconds + dt : 0;
+  const drySeconds = depth <= SWIM_TUNING.exitDepth ? previous.drySeconds + dt : 0;
   const swimming = drySeconds < SWIM_TUNING.exitDelaySeconds;
   return Object.freeze({
     swimming,

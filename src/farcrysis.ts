@@ -29,6 +29,8 @@ import { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE } from '
 // position from one of four quadrant landmark frames (see the module header).
 import {
   FARCRYSIS_LANDMARKS,
+  LANDMARK_BOULDER_SIZE_M,
+  landmarkBoulderPosition,
   landmarkCratePlacements,
   landmarkFernPositions,
   landmarkHedgePositions,
@@ -429,8 +431,23 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     boat.rotation.set(skiff.pitch, skiff.yaw, skiff.roll);
     root.add(boat);
   }
-  cover(builder, 'farcrysis-rock-nw', [-28, groundY(-28, -40) + 0.5, -40], [2.2, 1.0, 2.2], rockMat);
-  cover(builder, 'farcrysis-rock-se', [28, groundY(28, 40) + 0.5, 40], [2.2, 1.0, 2.2], rockMat);
+  // Weathered limestone boulders framing each ruin's outer flank.
+  //
+  // HF-395 round 2: these were two LONE ABSOLUTE rocks — farcrysis-rock-nw at
+  // (-28,-40) and farcrysis-rock-se at (28,40). Two of four quadrants had one
+  // and two did not, so they broke the four-fold composition on sight, and
+  // neither position was derived from anything. There is now one per
+  // landmark, placed on the frame like every other prop in the composition.
+  for (const frame of FARCRYSIS_LANDMARKS) {
+    const [rx, rz] = landmarkBoulderPosition(frame);
+    cover(
+      builder,
+      `farcrysis-rock-${frame.tag}`,
+      [rx, groundY(rx, rz) + 0.5, rz],
+      [LANDMARK_BOULDER_SIZE_M, 1.0, LANDMARK_BOULDER_SIZE_M],
+      rockMat,
+    );
+  }
 
   // ---- Mid-map landmarks (HF-395 relational composition) --------------------
   //

@@ -102,6 +102,94 @@ export type ArenaMap = {
 const material = (color: number, roughness = 0.78, metalness = 0.03) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
+export type AuthoredLargeCoverId =
+  | 'north-cargo-stack'
+  | 'south-pipe-stack'
+  | 'west-service-skip'
+  | 'east-generator-trailer';
+
+/**
+ * The four lane anchors that carry authored art instead of a blockout box, keyed
+ * by ANCHOR COORDINATE rather than by COVER_LAYOUT array index.
+ *
+ * HF-383 removed the two leading COVER_LAYOUT entries. Both production
+ * consumers - this file and the fallback/Performance art in
+ * environment-assets.ts - keyed their authored art by literal index, so the
+ * removal silently retired `west-service-skip` and `east-generator-trailer`
+ * (indices 6 and 7 stopped existing) and re-pointed the cargo and pipe stacks
+ * at the former 6/7 anchors, against a 2.8 x 4.4 collider they are not modelled
+ * for. Nothing failed loudly: two minimap landmarks disappeared, two moved, and
+ * the orphaned (-8,-22)/(8,22) anchors went back to rendering as plain
+ * aqua/coral blockout cubes. Anchors are what the art is actually modelled
+ * against, so keying on them means a future layout edit either keeps the anchor
+ * (art follows it automatically) or deletes it, which fails
+ * src/atomic-authored-cover.test.ts instead of passing quietly.
+ */
+export const AUTHORED_LARGE_COVER_ANCHORS: ReadonlyArray<
+  readonly [x: number, z: number, id: AuthoredLargeCoverId]
+> = Object.freeze([
+  Object.freeze([-8, -22, 'north-cargo-stack'] as const),
+  Object.freeze([8, 22, 'south-pipe-stack'] as const),
+  Object.freeze([24, -13, 'west-service-skip'] as const),
+  Object.freeze([-24, 13, 'east-generator-trailer'] as const),
+]);
+
+/** Authored large cover is the tall lane-breaking class; ordinary cover is 1.6 m. */
+export const AUTHORED_LARGE_COVER_HEIGHT = 2.2;
+
+/**
+ * Yard mannequins - the reference map's single most identifiable prop class,
+ * and (row D4 of artifacts/NUKETOWN-MEASUREMENT-2026-08-24.md) the largest
+ * remaining identity gap: a repo-wide grep for "mannequin" previously found
+ * exactly one HUD string and nothing in the arena.
+ *
+ * Placement rules this set satisfies, all measured against the BUILT collider
+ * set rather than the authored constants:
+ *  - exact 180-degree rotational pairing, so neither team owns a better half
+ *    (the symmetry gates in nuketown-traversal/nuketown-fidelity compare
+ *    rotated partners over every built collider);
+ *  - >= 3.4 m clear of every other collider, so a 0.58 m prop cannot narrow a
+ *    route, wedge a body or seal a pocket;
+ *  - clear of both terrain mounds (-24,-29.5)/(24,29.5), so every base seats
+ *    flat on the y = 0 ground authority instead of floating over a slope;
+ *  - out of the street canyon, so the bus/van/pillar sightline staging that
+ *    HF-383 tuned is untouched.
+ *
+ * Layout is [x, z, facing]; the art in environment-assets.ts reads the same
+ * constant, so the visible dummy and its authority can never drift apart.
+ */
+export const ATOMIC_MANNEQUIN_LAYOUT: ReadonlyArray<readonly [x: number, z: number, facing: number]> = Object.freeze([
+  // Deep in the west back-yard strip, facing back toward its own house.
+  Object.freeze([-15, -25, Math.PI / 2] as const),
+  Object.freeze([15, 25, -Math.PI / 2] as const),
+  // West side yard beside the house's outboard wall, turned toward the street.
+  // Facings are axis-aligned on purpose: a mannequin's authority box is square
+  // in plan, so a diagonal facing spends sqrt(2) of the envelope on the same
+  // silhouette and the envelope gate rejects it.
+  Object.freeze([-15, -14, 0] as const),
+  Object.freeze([15, 14, Math.PI] as const),
+  // East back-yard strip behind the garage, facing back down the yard.
+  Object.freeze([18, -20, -Math.PI / 2] as const),
+  Object.freeze([-18, 20, Math.PI / 2] as const),
+]);
+
+/**
+ * [width, height, depth] of the mannequin's movement/shot authority. Square in
+ * plan so the box is identical at every facing - a mannequin is small enough
+ * that a facing-dependent AABB would be the only thing making a rotated pair
+ * asymmetric. Height clears the crouched eye-line and stops just under the
+ * standing one, matching the visible dummy's 1.79 m crown.
+ */
+export const ATOMIC_MANNEQUIN_COLLIDER_SIZE = Object.freeze([0.58, 1.82, 0.58] as const);
+
+/** Resolve the authored asset seated on a cover anchor, or null for plain cover. */
+export function authoredLargeCoverIdAt(x: number, z: number): AuthoredLargeCoverId | null {
+  const anchor = AUTHORED_LARGE_COVER_ANCHORS.find(
+    (entry) => Math.abs(entry[0] - x) < 1e-6 && Math.abs(entry[1] - z) < 1e-6,
+  );
+  return anchor ? anchor[2] : null;
+}
+
 export function buildArena(scene: THREE.Scene): ArenaMap {
   const colliders: Box2[] = [];
   const physicsColliders: Box2[] = [];
@@ -295,7 +383,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   }
 
   function addPerformanceLargeCover(
-    id: 'north-cargo-stack' | 'south-pipe-stack' | 'west-service-skip' | 'east-generator-trailer',
+    id: AuthoredLargeCoverId,
     x: number,
     z: number,
   ): { kind: NonNullable<ArenaMap['physicalCover'][number]['performanceVisualKind']>; meshes: number } {
@@ -312,11 +400,15 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     if (id === 'north-cargo-stack') {
       // HF-387 player-body half: the lower crates used to span x +/- 1.925
       // while the frozen COVER_LAYOUT authority for this anchor is only
-      // +/- 1.4 wide, so a player hugging the stack put the camera eye up to
-      // 5 cm inside visible crate mass that nothing blocked. The silhouette
-      // now sits INSIDE the frozen authority envelope (visible mass matches
-      // movement/shot authority) instead of widening the frozen gameplay
-      // layout, which world-identity pins forbid.
+      // +/- 1.5 wide (3 x 2.2 at [-8,-22]), so a player hugging the stack put
+      // the camera eye inside visible crate mass that nothing blocked. The
+      // silhouette now sits INSIDE the frozen authority envelope (visible mass
+      // matches movement/shot authority) instead of widening the frozen
+      // gameplay layout, which world-identity pins forbid. NOTE: HF-387 was
+      // authored while the index-keying bug had this builder mis-seated on the
+      // 2.8 x 4.4 anchor, so its comment quoted +/- 1.4; the geometry it landed
+      // (+/- 1.4 wide, +/- 0.91 deep) fits both, and fits the correct anchor
+      // with 0.1 m to spare.
       for (const offset of [-0.7, 0.7]) addBox('performance-cargo-lower', [x + offset, 0.52, z], [1.4, 1.04, 1.82], offset < 0 ? palette.aqua : palette.mustard);
       addBox('performance-cargo-upper', [x, 1.62, z], [2.15, 1.04, 1.82], palette.aqua);
       for (const offset of [-0.62, 0.62]) addBox('performance-cargo-lock-rail', [x + offset, 1.62, z - 0.93], [0.12, 0.9, 0.08], palette.dark);
@@ -332,19 +424,24 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
 
     if (id === 'west-service-skip') {
-      addBox('performance-skip-floor', [x, 0.18, z], [2.8, 0.28, 4.75], palette.dark);
-      for (const offset of [-1.35, 1.35]) addBox('performance-skip-side', [x + offset, 1.02, z], [0.22, 1.72, 4.65], palette.aqua);
-      addBox('performance-skip-rear', [x, 1.02, z + 2.3], [2.7, 1.72, 0.22], palette.aqua);
-      addBox('performance-skip-front', [x, 0.62, z - 2.3], [2.7, 0.92, 0.22], palette.mustard);
-      for (const offset of [-1.35, 1.35]) addBox('performance-skip-top-rail', [x + offset, 1.92, z], [0.28, 0.16, 4.72], palette.mustard);
+      // HF-387 authority-wrap rule, applied to the two builders that were
+      // unreachable while the index-keying bug hid them: every visible face
+      // stays inside the frozen 2.8 x 4.4 anchor (x +/- 1.4, z +/- 2.2), so no
+      // eye that the capsule can press against ends up inside skip mass.
+      addBox('performance-skip-floor', [x, 0.18, z], [2.72, 0.28, 4.3], palette.dark);
+      for (const offset of [-1.25, 1.25]) addBox('performance-skip-side', [x + offset, 1.02, z], [0.22, 1.72, 4.3], palette.aqua);
+      addBox('performance-skip-rear', [x, 1.02, z + 2.04], [2.6, 1.72, 0.22], palette.aqua);
+      addBox('performance-skip-front', [x, 0.62, z - 2.04], [2.6, 0.92, 0.22], palette.mustard);
+      for (const offset of [-1.25, 1.25]) addBox('performance-skip-top-rail', [x + offset, 1.92, z], [0.28, 0.16, 4.3], palette.mustard);
       return { kind: 'service-skip', meshes };
     }
 
-    addBox('performance-generator-chassis', [x, 0.48, z], [2.8, 0.22, 4.65], palette.dark);
+    // Generator trailer: same authority-wrap envelope as the skip above.
+    addBox('performance-generator-chassis', [x, 0.48, z], [2.72, 0.22, 4.3], palette.dark);
     addBox('performance-generator-body', [x, 1.28, z + 0.28], [2.42, 1.5, 3.05], palette.mustard);
     addBox('performance-generator-panel', [x - 1.23, 1.3, z + 0.28], [0.08, 0.92, 1.75], palette.dark);
-    addBox('performance-generator-drawbar', [x, 0.48, z - 2.02], [0.18, 0.18, 1.0], palette.chrome);
-    for (const wheelX of [-1.34, 1.34]) for (const wheelZ of [-1.08, 1.08]) {
+    addBox('performance-generator-drawbar', [x, 0.48, z - 1.68], [0.18, 0.18, 0.9], palette.chrome);
+    for (const wheelX of [-1.22, 1.22]) for (const wheelZ of [-1.08, 1.08]) {
       addCylinder('performance-generator-wheel', [x + wheelX, 0.48, z + wheelZ], 0.38, 0.24, palette.dark, [0, 0, Math.PI / 2]);
     }
     addCylinder('performance-generator-exhaust', [x + 0.83, 1.75, z + 0.82], 0.1, 0.82, palette.dark, [0, 0, 0]);
@@ -567,6 +664,27 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     proxy.visible = false;
     proxy.userData.collisionProxy = true;
   }
+  // Mannequins follow the same contract as the benches and bins: authority
+  // here, art in the street-life layer. That split is what makes them visible
+  // on the DEFAULT 'blender' profile at all - blender-environment.ts hides the
+  // whole 'Atomic Acres arena' root once the Quality GLB loads, so anything
+  // rendered from this file is invisible to a Quality player, while the
+  // pass31-neighbourhood-life root is a sibling of the arena and survives.
+  for (const [index, [x, z]] of ATOMIC_MANNEQUIN_LAYOUT.entries()) {
+    const [width, height, depth] = ATOMIC_MANNEQUIN_COLLIDER_SIZE;
+    const proxy = box(
+      `street-mannequin-collider-${index}`,
+      [x, height / 2, z],
+      [width, height, depth],
+      palette.white,
+      true,
+      false,
+      true,
+      'wood',
+    );
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  }
 
   // One transit anchor, parked broadside across the middle of the street. This
   // is the map's single unmistakable piece of central hard cover: it splits the
@@ -721,22 +839,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
   // outer anchors receive taller collision aligned to recognisable authored
   // cargo/utility assets in the Blender and fallback art layers.
-  const authoredLargeCoverIds = new Map<number, string>([
-    [4, 'north-cargo-stack'],
-    [5, 'south-pipe-stack'],
-    [6, 'west-service-skip'],
-    [7, 'east-generator-trailer'],
-  ]);
   COVER_LAYOUT.forEach(([x, z, w, d], index) => {
-    const height = authoredLargeCoverIds.has(index) ? 2.2 : 1.6;
+    // Keyed by anchor coordinate, never by array index - see
+    // AUTHORED_LARGE_COVER_ANCHORS for why an index broke this silently.
+    const id = authoredLargeCoverIdAt(x, z);
+    const height = id ? AUTHORED_LARGE_COVER_HEIGHT : 1.6;
     const authoritativeCover = box(`cover ${index}`, [x, height / 2, z], [w, height, d], index % 2 ? palette.coral : palette.aqua);
-    const id = authoredLargeCoverIds.get(index);
     if (id) {
       // Keep one simple AABB for movement/projectile authority, but render a
       // recognisable low-cost semantic silhouette on the representative
       // Performance profile instead of a generic coloured block.
       authoritativeCover.visible = false;
-      const visual = addPerformanceLargeCover(id as Parameters<typeof addPerformanceLargeCover>[0], x, z);
+      const visual = addPerformanceLargeCover(id, x, z);
       physicalCover.push({
         id,
         bounds: { ...colliders[colliders.length - 1] },

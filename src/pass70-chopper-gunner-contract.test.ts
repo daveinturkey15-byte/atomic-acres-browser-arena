@@ -36,16 +36,34 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     // layered sheet. A contract test that cannot see the sheet that wins is
     // not a contract. This test therefore parses EVERY stylesheet bootstrap
     // imports and enforces the same ownership rule on all of them.
+    // PASS 81: the scanned set was `src/ui/*.css` only, and the comment above
+    // claimed it parsed EVERY stylesheet bootstrap imports. It did not:
+    // `src/bootstrap.ts:3` imports `./style.css`, which lives OUTSIDE src/ui,
+    // is itself unlayered, and is what pulls pass65-hud.css onto the page at
+    // all (`@import url('./ui/pass65-hud.css')`). A rail override placed there
+    // would have won the cascade on exactly the same layer precedence this
+    // test exists to police, and passed the guard. It is scanned now.
     const uiDir = new URL('./ui/', import.meta.url);
-    const sheets = readdirSync(uiDir, 'utf8').filter((name) => name.endsWith('.css'));
-    expect(sheets.length).toBeGreaterThan(0);
+    const sheets = readdirSync(uiDir, 'utf8')
+      .filter((name) => name.endsWith('.css'))
+      .map((name) => ({ name, url: new URL(`./ui/${name}`, import.meta.url) }));
+    sheets.push({ name: 'style.css', url: new URL('./style.css', import.meta.url) });
+    expect(sheets.length).toBeGreaterThan(1);
+    const sheetNames = sheets.map((sheet) => sheet.name);
 
     // Every css import in bootstrap.ts must be inside the scanned set, so a
-    // future sheet cannot silently join (or leave) the cockpit's cascade.
-    const bootImports = [...bootstrap.matchAll(/import '(\.\/ui\/[a-z0-9-]+\.css)';/gu)]
-      .map((match) => match[1]!.replace('./ui/', ''));
+    // future sheet cannot silently join (or leave) the cockpit's cascade -
+    // and so must every sheet those sheets @import in turn.
+    const bootImports = [...bootstrap.matchAll(/import '\.\/((?:ui\/)?[a-z0-9-]+\.css)';/gu)]
+      .map((match) => match[1]!.replace('ui/', ''));
     expect(bootImports.length).toBeGreaterThan(0);
-    for (const name of bootImports) expect(sheets, `${name} must exist under src/ui`).toContain(name);
+    expect(bootImports, 'src/style.css is imported by bootstrap and must be scanned').toContain('style.css');
+    for (const name of bootImports) expect(sheetNames, `${name} must be in the scanned set`).toContain(name);
+    const styleCss = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
+    const nested = [...styleCss.matchAll(/@import url\('\.\/((?:ui\/)?[a-z0-9-]+\.css)'\)/gu)]
+      .map((match) => match[1]!.replace('ui/', ''));
+    expect(nested, 'style.css must still be what pulls the cockpit sheet onto the page').toContain('pass65-hud.css');
+    for (const name of nested) expect(sheetNames, `${name} must be in the scanned set`).toContain(name);
 
     interface Rule { readonly sheet: string; readonly selector: string; readonly body: string; }
     const parseRules = (sheet: string, css: string, acc: Rule[]): void => {
@@ -73,7 +91,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     };
 
     const rules: Rule[] = [];
-    for (const sheet of sheets) parseRules(sheet, readFileSync(new URL(`./ui/${sheet}`, import.meta.url), 'utf8'), rules);
+    for (const sheet of sheets) parseRules(sheet.name, readFileSync(sheet.url, 'utf8'), rules);
     // pass65 owns these axes on the rails: the border-block-only green hairline
     // and the edge-fading gradient are what make them read as part of the
     // canopy rather than floating cards. No other sheet may set them.
@@ -114,6 +132,41 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(pass65Rules.some((rule) => isRailSelector(rule.selector) && rule.body.includes('linear-gradient(90deg, transparent, rgba(3, 18, 12, 0.78)'))).toBe(true);
   });
 
+  it('HF-389: the missile readout carries EXACTLY ONE multiplication glyph, in exactly one place', () => {
+    // THE REGRESSION THIS TEST MISSED THE FIRST TIME. Two independent sources
+    // each supplied the glyph and both gates blessed it:
+    //   - the shell markup carried `<i aria-hidden="true">&times;</i>` beside
+    //     the `<b>` (added by 821eb8e0),
+    //   - and aecd8b6f then merged an unmerged branch's JS, which writes
+    //     `×${ammo} / 6` INTO that same `<b>` (legacy-main.ts).
+    // The old pin asserted the `<i>` existed, and the e2e read only the `<b>`'s
+    // own textContent, so "× ×3 / 6" shipped green for six days in the
+    // exact readout the owner named when he said the chopper HUD had regressed.
+    //
+    // The `<b>`'s content is REPLACED at runtime, so the glyph budget is not a
+    // sum over the whole file: it is (glyphs outside the `<b>`) + (glyphs in
+    // whatever currently occupies it), evaluated once for the static markup
+    // and once for every runtime write. Each of those must be exactly one.
+    const start = shell.indexOf('id="gunner-missile-status"');
+    expect(start).toBeGreaterThan(-1);
+    const missilePanel = shell.slice(start, shell.indexOf('</div>', start));
+    const readout = /<b id="gunner-missile-ammo">([^<]*)<\/b>/u.exec(missilePanel);
+    expect(readout, 'the missile readout must still be a single <b> the runtime writes into').not.toBeNull();
+    const glyphs = (text: string): number => (text.match(/&times;|×/gu) ?? []).length;
+    const outsideTheReadout = glyphs(missilePanel.replace(readout![0], ''));
+    expect(outsideTheReadout + glyphs(readout![1]!), 'static markup renders one glyph').toBe(1);
+
+    const runtimeWrites = [...legacy.matchAll(/#gunner-missile-ammo'\)\.textContent = `([^`]*)`/gu)]
+      .map((match) => match[1]!);
+    expect(runtimeWrites.length, 'legacy-main must still be the only writer of the readout').toBeGreaterThanOrEqual(2);
+    for (const write of runtimeWrites) {
+      expect(
+        outsideTheReadout + glyphs(write),
+        `"${write}" plus ${outsideTheReadout} glyph(s) of surrounding markup must render exactly one ×`,
+      ).toBe(1);
+    }
+  });
+
   it('keeps the centre reticle clear and all instruments bounded on desktop and mobile', () => {
     for (const id of [
       'gunner-hull', 'gunner-ammo', 'gunner-altitude', 'gunner-speed', 'gunner-time', 'gunner-damage',
@@ -143,7 +196,7 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     // The owner asked for `LMB GUN | RMB MISSILES xN`, not a tutorial panel.
     expect(shell).toContain('<kbd>LMB</kbd><span>GUN</span>');
     expect(shell).toContain('<kbd>RMB</kbd><span>MISSILES</span>');
-    expect(shell).toContain('<i aria-hidden="true">&times;</i><b id="gunner-missile-ammo">');
+    expect(shell).toContain('<b id="gunner-missile-ammo">');
     // The missile readout keeps its own id/hidden/data-ready contract so the
     // existing typed HUD lifecycle in legacy-main stays the only writer.
     expect(shell).toMatch(/id="gunner-missile-status"[^>]*hidden[^>]*data-ready="false"/u);

@@ -42,7 +42,7 @@
 import type { Box2 } from './collision';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_WATER } from './water/water-authoring';
-import { SWIM_TUNING } from './water/swim-state';
+import { SWIM_TUNING, feetDepthFromEyeDepth } from './water/swim-state';
 
 /** The one gameplay water level (registry-authoritative, see water-authoring). */
 export const FARCRYSIS_WATER_LEVEL = FARCRYSIS_WATER.level;
@@ -101,24 +101,42 @@ export const FARCRYSIS_SHORE = Object.freeze({
  * ankle-deep water, and exactly `SWIM_TUNING.swimSpeedScale` at the swim
  * state's enter depth — so engaging swim cannot step the player's speed.
  *
- * Pure and host-authoritative like every movement modifier; depth over eye
- * uses the same convention as legacy-main's stepSwimState feed
- * (surfaceY - player.position.y). WIRED: legacy-main.ts updatePhysics
- * multiplies this into BOTH horizontal speed channels while the water is
- * swimmable and the swim state has not engaged (import at legacy-main.ts:63,
- * call site in the swim block of updatePhysics); pinned by the wiring guard
- * in farcrysis-terrain-authority.test.ts.
+ * Pure and host-authoritative like every movement modifier. The ARGUMENT is
+ * depth over the EYE, the same convention as legacy-main's stepSwimState feed
+ * (surfaceY - player.position.y), because player.position IS the eye; the
+ * TUNING is keyed to the water column over the FEET, and the conversion
+ * happens once, here.
+ *
+ * PASS 81 BODY-REFERENCE CORRECTION (HF-393). These constants shipped
+ * documented as "ankle-deep" while being compared against depth over the eye,
+ * and EYE_ABOVE_FEET_M is 1.70 m — so resistance did not begin until the
+ * player's head was 0.25 m UNDER water. Measured on the x=0 centreline before
+ * the fix: the scale was still exactly 1.000 at knee (z=56.51), waist
+ * (z=57.82) and chest (z=58.74) depth, and 5.13 m of the 6.84 m walk-in
+ * happened at full dry-land speed. Keying to feet depth is what makes the
+ * wade something the player feels rather than something the constants claim.
+ *
+ * WIRED: legacy-main.ts updatePhysics multiplies this into BOTH horizontal
+ * speed channels while the water is swimmable and the swim state has not
+ * engaged (import at legacy-main.ts:63, call site in the swim block of
+ * updatePhysics); pinned by the wiring guard in
+ * farcrysis-terrain-authority.test.ts.
  */
 export const FARCRYSIS_WADE_TUNING = Object.freeze({
-  /** Eye depth where wading resistance begins (about ankle-deep). */
+  /** Water column over the FEET where wading resistance begins (ankle-deep). */
   startDepth: 0.25,
-  /** Eye depth where wading has slowed all the way to swim speed. */
+  /** Column over the FEET where wading has slowed all the way to swim speed. */
   fullDepth: SWIM_TUNING.enterDepth,
 } as const);
 
+/**
+ * @param depthOverEye `surfaceY - player.position.y` — what the movement loop
+ * measures. Converted to feet depth internally; do NOT pre-convert.
+ */
 export function farcrysisWadeSpeedScale(depthOverEye: number): number {
+  const depthOverFeet = feetDepthFromEyeDepth(depthOverEye);
   const span = FARCRYSIS_WADE_TUNING.fullDepth - FARCRYSIS_WADE_TUNING.startDepth;
-  const t = Math.min(1, Math.max(0, (depthOverEye - FARCRYSIS_WADE_TUNING.startDepth) / span));
+  const t = Math.min(1, Math.max(0, (depthOverFeet - FARCRYSIS_WADE_TUNING.startDepth) / span));
   return 1 - t * (1 - SWIM_TUNING.swimSpeedScale);
 }
 

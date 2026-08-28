@@ -14,8 +14,8 @@
   "bounds": {
     "minX": -31,
     "maxX": 31,
-    "minZ": -30,
-    "maxZ": 30
+    "minZ": -31.5,
+    "maxZ": 31.5
   },
   "houses": [
     {
@@ -389,7 +389,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -407,7 +407,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -425,7 +425,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -443,7 +443,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -461,7 +461,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -479,7 +479,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -749,7 +749,7 @@
             0.18
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -767,7 +767,7 @@
             0.18
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -785,7 +785,7 @@
             2.96
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1810,7 +1810,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1828,7 +1828,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1846,7 +1846,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1864,7 +1864,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1882,7 +1882,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -1900,7 +1900,7 @@
             0.16
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -2170,7 +2170,7 @@
             0.18
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -2188,7 +2188,7 @@
             0.18
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -2206,7 +2206,7 @@
             2.96
           ],
           "surface": "trim",
-          "collidable": false,
+          "collidable": true,
           "kind": "frame",
           "breakable": false
         },
@@ -2878,18 +2878,6 @@
   ],
   "cover": [
     [
-      -12,
-      -6.5,
-      3.6,
-      2
-    ],
-    [
-      12,
-      6.5,
-      3.6,
-      2
-    ],
-    [
       -20,
       -2,
       2.4,
@@ -2924,6 +2912,28 @@
       13,
       2.8,
       4.4
+    ]
+  ],
+  "authoredLargeCover": [
+    [
+      -8,
+      -22,
+      "north-cargo-stack"
+    ],
+    [
+      8,
+      22,
+      "south-pipe-stack"
+    ],
+    [
+      24,
+      -13,
+      "west-service-skip"
+    ],
+    [
+      -24,
+      13,
+      "east-generator-trailer"
     ]
   ],
   "streetHedges": {
@@ -2980,26 +2990,50 @@
     "fins": [
       {
         "position": [
-          11,
+          4,
           1.025,
-          -5.2
+          -5.5
         ],
         "size": [
           1.4,
           2.05,
-          7.4
+          5.4
         ]
       },
       {
         "position": [
-          -11,
+          13,
           1.025,
-          5.2
+          -5.5
         ],
         "size": [
           1.4,
           2.05,
-          7.4
+          5.4
+        ]
+      },
+      {
+        "position": [
+          -4,
+          1.025,
+          5.5
+        ],
+        "size": [
+          1.4,
+          2.05,
+          5.4
+        ]
+      },
+      {
+        "position": [
+          -13,
+          1.025,
+          5.5
+        ],
+        "size": [
+          1.4,
+          2.05,
+          5.4
         ]
       }
     ],
@@ -3008,7 +3042,7 @@
         "position": [
           -3,
           1.025,
-          -29.1
+          -30.6
         ],
         "size": [
           46,
@@ -3020,7 +3054,7 @@
         "position": [
           3,
           1.025,
-          29.1
+          30.6
         ],
         "size": [
           46,
@@ -3034,57 +3068,57 @@
         "position": [
           -21.5,
           1.025,
-          -25.7
+          -27.2
         ],
         "size": [
           5,
           2.05,
-          5.2
+          7
         ]
       },
       {
         "position": [
           21.5,
           1.025,
-          -25.7
+          -27.2
         ],
         "size": [
           5,
           2.05,
-          5.2
+          7
         ]
       },
       {
         "position": [
           21.5,
           1.025,
-          25.7
+          27.2
         ],
         "size": [
           5,
           2.05,
-          5.2
+          7
         ]
       },
       {
         "position": [
           -21.5,
           1.025,
-          25.7
+          27.2
         ],
         "size": [
           5,
           2.05,
-          5.2
+          7
         ]
       }
     ],
     "sideVerges": [
       {
         "position": [
-          -28.5,
+          -27.9,
           1.025,
-          -17
+          -17.75
         ],
         "size": [
           5.6,
@@ -3094,9 +3128,9 @@
       },
       {
         "position": [
-          -28.5,
+          -27.9,
           1.025,
-          17
+          17.75
         ],
         "size": [
           5.6,
@@ -3106,9 +3140,9 @@
       },
       {
         "position": [
-          28.5,
+          27.9,
           1.025,
-          17
+          17.75
         ],
         "size": [
           5.6,
@@ -3118,9 +3152,9 @@
       },
       {
         "position": [
-          28.5,
+          27.9,
           1.025,
-          -17
+          -17.75
         ],
         "size": [
           5.6,
@@ -3134,9 +3168,9 @@
     {
       "id": "east-parked-van",
       "position": [
-        16,
+        8.6,
         1.15,
-        0
+        -1.5
       ],
       "size": [
         4.6,
@@ -3147,9 +3181,9 @@
     {
       "id": "west-parked-van",
       "position": [
-        -16,
+        -8.6,
         1.15,
-        0
+        1.5
       ],
       "size": [
         4.6,
@@ -3180,7 +3214,7 @@
       "size": [
         64,
         0.03,
-        10
+        13
       ]
     },
     "curbs": [
@@ -3188,7 +3222,7 @@
         "position": [
           0,
           0.12,
-          -5.6
+          -7.1
         ],
         "size": [
           64,
@@ -3200,7 +3234,7 @@
         "position": [
           0,
           0.12,
-          5.6
+          7.1
         ],
         "size": [
           64,
@@ -3214,24 +3248,24 @@
         "position": [
           0,
           0.07,
-          -7.5
+          -8.25
         ],
         "size": [
           64,
           0.14,
-          2.6
+          1.1
         ]
       },
       {
         "position": [
           0,
           0.07,
-          7.5
+          8.25
         ],
         "size": [
           64,
           0.14,
-          2.6
+          1.1
         ]
       }
     ],
@@ -3587,7 +3621,7 @@
       "size": [
         0.6,
         3,
-        61.6
+        64.6
       ]
     },
     {
@@ -3600,7 +3634,7 @@
       "size": [
         0.6,
         3,
-        61.6
+        64.6
       ]
     },
     {
@@ -3608,7 +3642,7 @@
       "position": [
         0,
         1.5,
-        -30.3
+        -31.8
       ],
       "size": [
         63,
@@ -3621,7 +3655,7 @@
       "position": [
         0,
         1.5,
-        30.3
+        31.8
       ],
       "size": [
         63,

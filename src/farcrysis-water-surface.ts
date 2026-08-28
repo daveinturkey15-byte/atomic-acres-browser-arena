@@ -55,9 +55,11 @@ import {
   pow,
   reflect,
   saturate,
+  normalLocal,
+  normalWorld,
   smoothstep,
   texture as tslTexture,
-  transformedNormalWorld,
+  transformNormalToView,
   vec2,
   vec3,
 } from 'three/tsl';
@@ -177,7 +179,12 @@ export function createFarcrysisSeaSurfaceMaterial(
 
   // Ripple-perturbed world normal drives both the Fresnel curve and the
   // reflection ray, so sky picks up the same shimmer as the specular sun.
-  const surfaceNormal = transformedNormalWorld.normalize();
+  // `normalWorld` resolves through the material's own setupNormal() outside
+  // the NORMAL sub-build, so this IS the shaded normal, ripple included, in
+  // WORLD space — the space `positionWorld` and `cameraPosition` below are
+  // already in. `transformedNormalWorld` was the r178-deprecated alias for the
+  // same node and warned on every graph build (HF-394, Pass 81).
+  const surfaceNormal = normalWorld.normalize();
   const incident = positionWorld.sub(cameraPosition).normalize();
   const cosTheta = saturate(incident.negate().dot(surfaceNormal));
   const fresnel = float(FRESNEL_F0).add(
@@ -220,7 +227,25 @@ export function createFarcrysisSeaSurfaceMaterial(
     // evaluates to a vec3 - so mix() rejects it on types alone. Narrow, documented cast at
     // the one call site, rather than loosening a signature the rest of the file relies on.
     const rippleVec = ripple as unknown as ReturnType<typeof vec3>;
-    mat.normalNode = mix(rippleVec, surfaceNormal, flatten);
+    // HF-394 COORDINATE-SPACE FIX (Pass 81). The shipped line mixed two
+    // different bases and handed the result to a consumer that reads VIEW
+    // space:
+    //   - tslNormalMap defaults to TangentSpaceNormalMap and returns
+    //     TBNViewMatrix * normalMap, i.e. VIEW space;
+    //   - the flat term was `transformedNormalWorld`, i.e. WORLD space, while
+    //     NodeMaterial.setupNormal() consumes normalNode as view with no
+    //     transform. Past RIPPLE_NORMAL_FADE_FAR_M the far sea's shading
+    //     normal was therefore world (0,1,0) reinterpreted as view, which
+    //     tumbles as the player pitches - in the exact far field this block
+    //     was written to calm. Worse, `transformedNormalWorld` resolves
+    //     through the material's OWN setupNormal(), so feeding it back into
+    //     normalNode closed a cycle through the node builder.
+    // Both terms are now VIEW space, built the way the repo's own working
+    // precedent builds it (src/water/ocean-tsl.ts:157
+    // `transformNormalToView(oceanNormalLocal)`), and the mix of two unit
+    // vectors is renormalized so lighting never sees a short normal.
+    const flatNormalView = transformNormalToView(normalLocal);
+    mat.normalNode = mix(rippleVec, flatNormalView, flatten).normalize();
   }
 
   return mat;

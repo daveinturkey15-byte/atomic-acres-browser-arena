@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, beforeAll } from 'vitest';
 import { extractProxyScene, REFLECTIVE_ROUGHNESS_CEILING } from './analytic-proxy-scene';
-import { ARENA_PROXY_EXTRACTION } from './arena-proxy-registration';
+import { ARENA_PROXY_EXTRACTION, ARENA_WATER_SURFACES } from './arena-proxy-registration';
 import { RAY_TRACED_MAXIMUM_SHAPES } from './raytracing-profile';
 import { ALL_ARENA_IDS } from '../../../scripts/qa/collider-visual-parity-core';
 
@@ -27,26 +27,57 @@ import { ALL_ARENA_IDS } from '../../../scripts/qa/collider-visual-parity-core';
  * `chrome` palette entry - the ramp rails, both garage doors, the irrigation
  * vessel, the entrance canopies - was authored at roughness 0.230 against the
  * 0.22 mirror ceiling. One hundredth outside. The ceiling is combat-tuned and
- * did NOT move; the material was polished to 0.18 instead, which is what a
- * material named `chrome` at metalness 0.76 should have been. Coverage went
- * 2 meshes / 14 m2 -> 7 meshes / 68 m2, and the floors below were re-measured
- * against the polished value.
+ * did NOT move; the material was polished to 0.18 instead.
+ *
+ * PASS 81 - THE GATE WAS MEASURING A SCENE THE PLAYER NEVER SEES. Three ways,
+ * all of which made the floors below smaller than the truth and left the parts
+ * most likely to break uncovered:
+ *
+ *   1. It extracted from `arena.root`. Production extracts from the camera's
+ *      TOPMOST ANCESTOR (`raytraced-light-node.ts` sceneRoot()), i.e. the whole
+ *      THREE.Scene, so everything a builder parents to the scene rather than to
+ *      its own root - the atomic-acres street dressing and arena art this file
+ *      already went to the trouble of loading - contributed nothing.
+ *   2. It never called `updateMatrixWorld`. Every proxy was therefore fitted to
+ *      LOCAL bounds: a mesh authored at the origin and moved into place by its
+ *      parent measured its own size at the wrong scale and rotation. Turning
+ *      world matrices on moved atomic-acres 7 -> 11 reflective meshes and
+ *      farcrysis 3 -> 4 before a single other change.
+ *   3. It built arena geometry only. On the WebGPU route - the ONLY route the
+ *      RAY TRACED preset exists on - `createPass64TslSceneSystems` adds the
+ *      shared sky, grass and perimeter ocean to the same scene. That ocean,
+ *      `Pass 64 TSL perimeter water`, is the single surface class
+ *      `arena-proxy-registration.ts` was written for, and it was never once
+ *      exercised here. It is worth 921,600 m2 on rustworks-1v1 and high-seas.
+ *
+ * A fourth defect fell out of fixing the third: every registered sea plane is
+ * zero-thickness by construction, and only survived the extractor's degeneracy
+ * guard because cos(-PI/2) is 6.12e-17. See `analytic-proxy-scene.test.ts`.
  */
 
 const EXTRACTION = ARENA_PROXY_EXTRACTION;
 
 /**
- * Measured floors, captured 2026-08-26 on the six shipped arena builders.
- * Raise them when art genuinely adds reflective surface; never lower one to
- * make a build pass.
+ * Measured floors, RE-MEASURED 2026-08-28 against the production traversal
+ * (whole scene, world matrices updated, Pass 64 TSL presentation systems
+ * present). Every one of them rose. Raise them when art genuinely adds
+ * reflective surface; never lower one to make a build pass.
+ *
+ *                    2026-08-26 (arena.root)   2026-08-28 (production root)
+ *   atomic-acres        7 /        68 m2         13 /       200.6 m2
+ *   rustworks-1v1       1 /         6 m2          2 /   921,606.4 m2
+ *   gun-range           6 /     4,300 m2          6 /     4,307.2 m2
+ *   skyline-terminal   10 /       440 m2         10 /       447.4 m2
+ *   farcrysis           3 /   300,000 m2          4 /   326,176.0 m2
+ *   high-seas          16 /       150 m2         17 /   921,753.4 m2
  */
 const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = {
-  'atomic-acres': { meshes: 7, footprintM2: 68 },
-  'rustworks-1v1': { meshes: 1, footprintM2: 6 },
+  'atomic-acres': { meshes: 13, footprintM2: 200 },
+  'rustworks-1v1': { meshes: 2, footprintM2: 921_600 },
   'gun-range': { meshes: 6, footprintM2: 4_300 },
-  'skyline-terminal': { meshes: 10, footprintM2: 440 },
-  farcrysis: { meshes: 3, footprintM2: 300_000 },
-  'high-seas': { meshes: 16, footprintM2: 150 },
+  'skyline-terminal': { meshes: 10, footprintM2: 447 },
+  farcrysis: { meshes: 4, footprintM2: 326_000 },
+  'high-seas': { meshes: 17, footprintM2: 921_700 },
 };
 
 type Coverage = {
@@ -54,6 +85,9 @@ type Coverage = {
   reflectiveFootprintM2: number;
   shapes: number;
   candidatesConsidered: number;
+  /** Names of the shapes that actually reached the packed set. */
+  shapeNames: readonly string[];
+  planeNames: readonly string[];
 };
 
 const coverage = new Map<string, Coverage>();
@@ -103,12 +137,16 @@ beforeAll(async () => {
     { buildFarcrysis },
     { buildHighSeas },
     { addNeighbourhoodLife, loadArenaArt },
+    { ARENA_VISUAL_REGISTRY },
+    { createPass64TslSceneSystems },
   ] = await Promise.all([
     import('../../map'),
     import('../../additional-maps'),
     import('../../farcrysis'),
     import('../../high-seas'),
     import('../../environment-assets'),
+    import('../arena-visual-stream'),
+    import('../pass64-tsl-scene'),
   ]);
 
   const factories: Record<string, (scene: THREE.Scene) => unknown> = {
@@ -122,19 +160,38 @@ beforeAll(async () => {
 
   for (const id of ALL_ARENA_IDS) {
     const scene = new THREE.Scene();
-    const arena = factories[id](scene) as { root?: THREE.Object3D };
+    factories[id](scene);
     // atomic-acres' street dressing and arena art are separate passes; the
     // reflective surfaces they add are part of what the preset sees live.
     if (id === 'atomic-acres') {
       addNeighbourhoodLife(scene, false);
       await loadArenaArt(scene, undefined, false);
     }
-    const proxy = extractProxyScene(arena.root ?? scene, THREE, EXTRACTION);
+    // The preset exists only on the WebGPU route, and on that route the shared
+    // TSL presentation systems - sky, grass and the perimeter ocean the water
+    // registration is written for - are added to this same scene before the
+    // first frame (legacy-main -> createPass64TslSceneSystems). A gate that
+    // omits them is not measuring the preset's scene.
+    const camera = new THREE.PerspectiveCamera();
+    scene.add(camera);
+    const definition = (await ARENA_VISUAL_REGISTRY[id as keyof typeof ARENA_VISUAL_REGISTRY]()).definition;
+    createPass64TslSceneSystems(scene, camera, { outputNode: null } as never, definition);
+    // Production fits proxies to WORLD bounds during the frame loop, after the
+    // renderer has updated matrices. Fitting them to stale local matrices
+    // measures a different arena.
+    scene.updateMatrixWorld(true);
+    // Exactly `raytraced-light-node.ts` sceneRoot(): walk up from the camera.
+    let root: THREE.Object3D = camera;
+    while (root.parent) root = root.parent;
+    expect(root, `${id} scene root`).toBe(scene);
+    const proxy = extractProxyScene(root, THREE, EXTRACTION);
     coverage.set(id, {
       reflectiveMeshCount: proxy.reflectiveMeshCount,
       reflectiveFootprintM2: proxy.reflectiveFootprintM2,
       shapes: proxy.shapes.length,
       candidatesConsidered: proxy.candidatesConsidered,
+      shapeNames: proxy.shapes.map(({ name }) => name),
+      planeNames: proxy.shapes.filter(({ kind }) => kind === 'plane').map(({ name }) => name),
     });
   }
 }, 600_000);
@@ -170,6 +227,29 @@ describe('RAY TRACED arena proxy coverage', () => {
       // end, or writes out of bounds.
       expect(measured.shapes, `${id} packed proxy shapes`).toBeLessThanOrEqual(RAY_TRACED_MAXIMUM_SHAPES);
       expect(measured.shapes, `${id} packed proxy shapes`).toBeGreaterThan(0);
+    }
+  });
+
+  it('actually traces the registered water on the arenas that have it', () => {
+    // The aggregate floors above can be held by architecture alone, so the one
+    // surface class `arena-proxy-registration.ts` exists for gets its own gate,
+    // by NAME. Before Pass 81 this registration had never contributed a proxy
+    // on any arena: the coverage gate built no TSL presentation systems, so the
+    // shared ocean was not in the scene it measured.
+    const seaArenas = ['rustworks-1v1', 'high-seas'] as const;
+    for (const id of seaArenas) {
+      const measured = coverage.get(id)!;
+      expect(
+        measured.planeNames,
+        `${id} traced planes (packed shapes: ${measured.shapeNames.join(', ')})`,
+      ).toContain('Pass 64 TSL perimeter water');
+    }
+    // farcrysis authors its own waterline in the arena builder rather than
+    // taking the shared ocean, and registers four planes for it.
+    const farcrysisPlanes = coverage.get('farcrysis')!.planeNames;
+    expect(farcrysisPlanes.length, `farcrysis traced planes: ${farcrysisPlanes.join(', ')}`).toBeGreaterThan(0);
+    for (const name of farcrysisPlanes) {
+      expect(ARENA_WATER_SURFACES.some(({ namePattern }) => namePattern.test(name)), name).toBe(true);
     }
   });
 

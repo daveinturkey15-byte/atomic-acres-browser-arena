@@ -9,12 +9,30 @@ export const OVERDRIVE_PICKUP_RADIUS = 1.65;
  * since the Pass 78 rebuild (src/arena-layout.ts CENTRAL_BUS, built solid at
  * src/map.ts) - leaving the nearest standable point 3.25 m away against a
  * 1.65 m pickup radius and the 2x icon depth-occluded inside the bus body.
- * The core now sits on the street centre line 3.3 m past the bus's east end:
- * >= 2.7 m clear of every layout solid (bus face, both planter fins, the east
- * van, bins and benches) at street level, so it is claimable and its icon
- * renders in the open. src/nuketown-overdrive-core.test.ts DERIVES this from
- * the live buildArena collider set - if the map moves again, the guard fails
- * instead of rotting like the origin seat did.
+ * The core now sits on the street centre line 3.3 m past the bus's east end,
+ * so it is claimable and its icon renders in the open.
+ *
+ * CORRECTED Pass 81. This block used to claim the seat was ">= 2.7 m clear of
+ * every layout solid (bus face, both planter fins, the east van, bins and
+ * benches) at street level". That was true when written and is false now.
+ * Clearances from (9.6, 0) to each layout solid, computed from
+ * src/arena-layout.ts at HEAD: east parked van 0.55 m, central bus 3.30 m,
+ * nearest planter fin 3.89 m. HF-383a restaged both vans off the kerb and into
+ * the middle of the street - east-parked-van moved from (16, 0) to
+ * (8.6, -1.5) - which brought the van's near face to within 0.55 m of the core
+ * without anyone revisiting this comment.
+ *
+ * The seat itself is still sound: src/nuketown-overdrive-core.test.ts checks
+ * the two properties that actually matter - that a standable point exists well
+ * inside OVERDRIVE_PICKUP_RADIUS, and that neither the core nor its world icon
+ * sits inside a solid - and both still hold at 0.55 m, because the van sits
+ * beside the seat rather than over it. So only the prose rotted.
+ *
+ * But note the second false claim it made: "if the map moves again, the guard
+ * fails instead of rotting like the origin seat did". The map DID move and the
+ * guard did NOT fail, because no gate ever asserted a blanket 2.7 m clearance.
+ * Do not read a clearance contract into this constant that no test enforces.
+ * Tuning is deliberately untouched pending the owner's answer on HF-385.
  *
  * TRADE: an off-origin seat breaks the layout's exact 180-degree rotational
  * symmetry. Accepted because team spawns split north/south across the full

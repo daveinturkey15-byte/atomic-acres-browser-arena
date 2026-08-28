@@ -3,7 +3,7 @@
   "title": "Atomic Acres-owned Quality Graphics Arena Aesthetic Overhaul",
   "creator": "Atomic Acres project / Jigglyclaw",
   "created": "2026-07-22",
-  "updated": "2026-08-23",
+  "updated": "2026-08-28",
   "license": "Project-original; no third-party assets",
   "inspirationBoundary": "Original early-2010s near-future military-suburb atmosphere only. No copied commercial map geometry, meshes, textures, logos, UI, names, or audio.",
   "blenderVersion": "5.1.2",
@@ -14,14 +14,14 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "1e50b81ba5483df11e73821e11fbc9e0d66dde655b56a79eb3da91de3fde1b67",
-  "sourceBlendSha256": "6c11ebef3a9bfbdf19a5d25c10a2c74e337ba20ff87e3063060639af9cfd60de",
-  "sourceSpecSha256": "d204a2ec84a62c33e55de41261ce4fd642d0d9254ac5a073f9dc1f5d8387c4ba",
+  "runtimeGlbSha256": "4babd004893a00026bbc555cf35f25be617c9c7da59577c7cadb04076982a8cf",
+  "sourceBlendSha256": "53641b7e6d9247b09a5fea215d7bdaf1f75530197a8e00bf4fb23a7ec1957263",
+  "sourceSpecSha256": "b543e602e8847740ae936a94410f5982a7c87fa39bcae1693dc546f9a6be1e98",
   "runtimeAudit": {
-    "bytes": 3484564,
+    "bytes": 3478076,
     "meshNodes": 45,
     "materials": 29,
-    "triangles": 42308,
+    "triangles": 42044,
     "semanticBreakableWindows": 6,
     "auditedHouseApertures": 16,
     "apertureAuditSamples": 144,
@@ -41,15 +41,15 @@
     "command": "npm run assets:compress:quality",
     "geometry": "EXT_meshopt_compression plus KHR_mesh_quantization",
     "textures": "lossless EXT_texture_webp",
-    "uncompressedBytes": 7002776,
-    "compressedBytes": 3484564,
-    "reductionPercent": 50.2
+    "uncompressedBytes": 6972084,
+    "compressedBytes": 3478076,
+    "reductionPercent": 50.1
   },
   "determinism": {
     "command": "npm run author:blender-arena && npm run assets:compress:quality",
     "cleanFactoryStartup": true,
     "pythonHashSeed": 0,
     "twoConsecutiveGlbBuildsByteIdentical": false,
-    "note": "The committed Blender 5.1.2 artifact includes a deterministic 144-ray audit over all 16 declared house apertures and ten separately named collision-visual owners. The runtime GLB, editable .blend and deterministic JSON specification are checksum-tracked exactly; reproducibility is semantic rather than byte-identical across Blender authoring runs."
+    "note": "Rebaked at Pass 81 from the re-derived spec (HF-383c), then rebaked again after HF-383-cover-index-regression was FIXED rather than merely recorded. The generator used to select authored large cover by literal COVER_LAYOUT array index (4/5/6/7); HF-383b removed two leading entries, so indices 6 and 7 stopped existing and the service skip and generator trailer were never BUILT - not merely unlabelled. The exporter now publishes AUTHORED_LARGE_COVER_ANCHORS and the generator branches on the anchor's id, matching how src/map.ts and src/environment-assets.ts already key it, so authoredLargePhysicalCoverAssets is back to 4 and all four ids are present in the shipped bytes. Reproducibility is semantic rather than byte-identical across Blender authoring runs; triangle count is reproducible for a given spec."
   }
 }

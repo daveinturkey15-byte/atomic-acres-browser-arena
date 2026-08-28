@@ -505,7 +505,7 @@ function hudMarkup(): string {
           <kbd>LMB</kbd><span>GUN</span><strong class="gunner-control-value"><b id="gunner-control-gun-ammo">&infin;</b></strong>
         </div>
         <div id="gunner-missile-status" class="gunner-control" hidden aria-hidden="true" aria-live="polite" data-ready="false">
-          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><i aria-hidden="true">&times;</i><b id="gunner-missile-ammo">0 / 6</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
+          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><b id="gunner-missile-ammo">&times;0 / 6</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
         </div>
       </div>
       <div class="gunner-instruments" aria-hidden="true">

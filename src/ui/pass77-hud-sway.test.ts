@@ -316,20 +316,42 @@ describe('Pass 77 HUD sway - amplitude a human can see', () => {
  * of the deflection under identical look input at different frame pacing.
  */
 describe('Pass 77 HUD sway - HF-391 smoothness and cross-map consistency', () => {
-  /** swayX trace of a moderate 25 deg/s tracking turn with the given pacing. */
+  /**
+   * swayX trace of a moderate 25 deg/s tracking turn with the given pacing.
+   *
+   * PASS 81: this used to advance yaw by `0.436 * (Math.min(deltaMs, 33) / 1000)`.
+   * That cap made the test lie in the direction that hid the defect: it fed
+   * the SLOW run less look travel per frame than the fast one, so the two runs
+   * were not "identical look input" at all and the pacing dependence of the
+   * deflection could not show up. Real input does not work that way - yaw is
+   * advanced per mousemove event (`player.yaw -= event.movementX * ...`,
+   * legacy-main.ts), so a long frame accumulates a full frame's worth of mouse
+   * delta. The cap is gone; the same 25 deg/s turn is now delivered to every
+   * pacing.
+   */
   function trackingRun(deltaMsFor: (frame: number) => number, frames = 600) {
     let state = createHudSwayState(0, 0);
     const xs: number[] = [];
     let yaw = 0;
     for (let frame = 0; frame < frames; frame += 1) {
       const deltaMs = Math.min(100, Math.max(0, deltaMsFor(frame)));
-      yaw += 0.436 * (Math.min(deltaMs, 33) / 1000); // identical look path either way
+      yaw += 0.436 * (deltaMs / 1000); // one turn rate, whatever the pacing
       const out = sampleHudSway(state, { yaw, pitch: 0, speed: 0, deltaMs });
       state = out.state;
       xs.push(out.swayX);
     }
     return xs;
   }
+
+  /** Settled peak |swayX| of a pacing, ignoring the initial ramp. */
+  function settledPeak(deltaMsFor: (frame: number) => number): number {
+    return Math.max(...trackingRun(deltaMsFor).slice(240).map(Math.abs));
+  }
+
+  /** The steady frame rates a player actually sees across this game's maps. */
+  const STEADY_PACINGS: ReadonlyArray<readonly [string, number]> = [
+    ['144 fps', 6.9], ['60 fps', 16.7], ['40 fps', 25], ['30 fps', 33.3], ['20 fps', 50],
+  ];
 
   it('never moves the output more than 0.3 of travel in a single frame', () => {
     // A direction reversal while fully deflected used to jump the FULL range
@@ -360,10 +382,137 @@ describe('Pass 77 HUD sway - HF-391 smoothness and cross-map consistency', () =>
     const hitched = trackingRun((frame) => (frame % 48 === 0 ? 100 : 25));
     const smoothMean = smooth.slice(240).reduce((a, b) => a + Math.abs(b), 0) / (smooth.length - 240);
     const hitchedMean = hitched.slice(240).reduce((a, b) => a + Math.abs(b), 0) / (hitched.length - 240);
-    expect(Math.abs(smoothMean - hitchedMean)).toBeLessThan(0.15);
+    // Tightened in Pass 81 (was 0.15) now that the cross-pacing gain is
+    // cancelled outright: measured 0.019 between these two runs.
+    expect(Math.abs(smoothMean - hitchedMean)).toBeLessThan(0.05);
     // The paced run must also obey the same per-frame bound - no slam frames.
     for (let i = 1; i < hitched.length; i += 1) {
       expect(Math.abs(hitched[i] - hitched[i - 1])).toBeLessThanOrEqual(0.301);
+    }
+  });
+
+  it('deflects the SAME PEAK amount at every steady frame pacing, not just the same mean', () => {
+    // HF-391 (4). The two bounds that existed were a per-frame step bound and
+    // a MEAN bound. Neither can see the defect the owner actually described:
+    // the same head movement produced a LARGER HUD offset on a map that runs
+    // slower. Measured against the unfixed filter, an identical 25 deg/s turn
+    // settled at 0.544 of travel at 144 fps and 0.682 at 20 fps - a 25% bigger
+    // HUD swing for the same input, purely because the map was heavier.
+    //
+    // The residual of a first-order lag settles at omega * deltaMs / follow,
+    // and deltaMs / follow grows with the frame time; `pacingGain` cancels it.
+    const peaks = STEADY_PACINGS.map(([, deltaMs]) => settledPeak(() => deltaMs));
+    const spread = Math.max(...peaks) - Math.min(...peaks);
+    const labelled = STEADY_PACINGS.map(([name], index) => `${name} ${peaks[index]!.toFixed(4)}`).join(', ');
+    expect(spread, `peak deflection must not depend on frame pacing: ${labelled}`).toBeLessThanOrEqual(0.01);
+    // And it must still be a visible effect at every one of them, not equal-
+    // because-flattened-to-nothing.
+    for (const peak of peaks) expect(peak).toBeGreaterThan(0.35);
+  });
+
+  it('bounds the PEAK deflection through a hitch, not only the per-frame step', () => {
+    // A hitch is the one case the pacing cancellation cannot fully remove: the
+    // filter is clamped to MAX_DELTA_MS while the player's mouse kept moving
+    // for the whole 100 ms, so the residual genuinely overshoots. What must
+    // never come back is the SLAM: measured 0.786 peak / 0.212 per-frame step
+    // before the fix, 0.667 / 0.144 after.
+    const steady = settledPeak(() => 16.7);
+    for (const [name, hitch] of [['40 fps + 100 ms hitch/s', (frame: number) => (frame % 48 === 0 ? 100 : 25)],
+      ['144 fps + 100 ms hitch/s', (frame: number) => (frame % 145 === 0 ? 100 : 6.9)]] as const) {
+      const peak = settledPeak(hitch as (frame: number) => number);
+      expect(peak, `${name} peak ${peak.toFixed(4)}`).toBeLessThanOrEqual(0.7);
+      expect(peak - steady, `${name} overshoot over steady ${steady.toFixed(4)}`).toBeLessThanOrEqual(0.15);
+    }
+  });
+});
+
+/**
+ * PASS 81 / HF-391 (1) and (2). The owner's report was two things: the HUD
+ * bounces about twice as fast as it should, AND it bounces INCONSISTENTLY
+ * across maps. The look-lag channel was addressed in Pass 79; these pin the
+ * two VERTICAL terms, which are most of what "bounce" means on screen
+ * (`pass77-instrument-hud.css`: the vertical offset is the sway-y lag term
+ * PLUS `--hud-breathe * 2.6px` PLUS `--hud-gait * 1.8px`).
+ */
+describe('Pass 77 HUD sway - the vertical bounce terms', () => {
+  /** Settled gait after a second of holding one speed. */
+  function settledGait(speed: number, maxSpeed?: number): number {
+    let state = createHudSwayState(0, 0);
+    let gait = 0;
+    for (let frame = 0; frame < 200; frame += 1) {
+      const out = sampleHudSway(state, { yaw: 0, pitch: 0, speed, maxSpeed, deltaMs: 16.7 });
+      state = out.state;
+      gait = out.gait;
+    }
+    return gait;
+  }
+
+  it('HF-391: normalises gait against the top speed THIS PLAYER can reach, so identical input bobs identically on every map', () => {
+    // The one genuine per-map signal path the HF-391 measurement found. `speed`
+    // is a raw world-units-per-second value and it was divided by a FIXED 5.5,
+    // so every scale the game applies to the player's own top speed - wading
+    // and swimming (High Seas, the map the owner named as worst), a killstreak
+    // movement modifier, a heavy weapon's movement multiplier - came straight
+    // out as a different amount of vertical bob for the same stick/key input.
+    //
+    // Against the fixed reference these four cases read 1.000 / 0.727 and
+    // 0.559 / 0.364: walking at half your available speed produced 54% more
+    // bob on dry land than in water. Normalised, they are equal by construction.
+    const dryLandTop = 6.15; // movementProfile({}).maxSpeed, standing, no modifiers
+    const wadingTop = 4.0; // the same stance with a wade/swim speed scale applied
+    expect(settledGait(dryLandTop, dryLandTop)).toBeCloseTo(settledGait(wadingTop, wadingTop), 6);
+    expect(settledGait(dryLandTop / 2, dryLandTop)).toBeCloseTo(settledGait(wadingTop / 2, wadingTop), 6);
+    expect(settledGait(dryLandTop / 2, dryLandTop)).toBeCloseTo(0.5, 3);
+
+    // A degenerate reference falls back to the fixed constant rather than
+    // dividing a shuffle by ~nothing and reporting a full-amplitude bob.
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(settledGait(1, bad), `maxSpeed ${String(bad)}`).toBeCloseTo(settledGait(1), 6);
+    }
+    expect(settledGait(1)).toBeCloseTo(1 / 5.5, 3);
+    // And omitting it keeps the previous fixed reference, so the module stays
+    // callable (and honest) from anywhere that has no movement profile to hand.
+    expect(settledGait(5.5)).toBeCloseTo(1, 3);
+    expect(settledGait(2.75)).toBeCloseTo(0.5, 3);
+  });
+
+  it('HF-391: bounds a single frame of BREATHE and GAIT, which had no output bound at all', () => {
+    // Only `swayX`/`swayY` went through the Pass 79 output stage; `breathe`
+    // and `gait` were returned raw, so the two terms the owner actually reads
+    // as bounce were the two with nothing bounding them. Worst single-frame
+    // step under a pathological pacing (every frame a 100 ms hitch) with the
+    // player slamming between a standstill and a full walk: measured 0.0948
+    // breathe / 0.1749 gait unbounded, 0.0677 / 0.1145 through the stage.
+    let state = createHudSwayState(0, 0);
+    let previousBreathe = 0;
+    let previousGait = 0;
+    let worstBreathe = 0;
+    let worstGait = 0;
+    for (let frame = 0; frame < 900; frame += 1) {
+      const speed = Math.floor(frame / 4) % 2 ? 6.15 : 0;
+      const out = sampleHudSway(state, { yaw: 0, pitch: 0, speed, maxSpeed: 6.15, deltaMs: 100 });
+      state = out.state;
+      if (frame > 0) {
+        worstBreathe = Math.max(worstBreathe, Math.abs(out.breathe - previousBreathe));
+        worstGait = Math.max(worstGait, Math.abs(out.gait - previousGait));
+      }
+      previousBreathe = out.breathe;
+      previousGait = out.gait;
+    }
+    expect(worstBreathe, `breathe step ${worstBreathe.toFixed(4)}`).toBeLessThanOrEqual(0.08);
+    expect(worstGait, `gait step ${worstGait.toFixed(4)}`).toBeLessThanOrEqual(0.13);
+  });
+
+  it('keeps gait inside 0..1 through the new output stage', () => {
+    let state = createHudSwayState(0, 0);
+    for (let frame = 0; frame < 400; frame += 1) {
+      const out = sampleHudSway(state, {
+        yaw: 0, pitch: 0, speed: frame % 3 === 0 ? 40 : 0, maxSpeed: 6.15, deltaMs: 100,
+      });
+      state = out.state;
+      expect(out.gait).toBeGreaterThanOrEqual(0);
+      expect(out.gait).toBeLessThanOrEqual(1);
+      expect(Math.abs(out.breathe)).toBeLessThanOrEqual(1);
     }
   });
 });

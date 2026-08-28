@@ -121,15 +121,15 @@
     },
     "sourceScript": {
       "path": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
-      "sha256": "04239b76c587cb8e1b6cb8619c81e07be84081d907ec77a79a385cde7183a5d3"
+      "sha256": "6b7a7a383bfd3af9ece2596137324d434104a10d4fa6fdcec2d00b623a64a7a8"
     },
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod0.glb",
-        "sha256": "c17b3fb653a161fe3fecad81235e3c1c70c7fc5037b83cfd5078d02533359574",
+        "sha256": "962b8658b7f350e750bf92ee9c81a38af602fadbbd8d54115191b4d2a3d3aac3",
         "lod": 0,
         "triangles": 9744,
-        "bytes": 343688,
+        "bytes": 427020,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
@@ -141,10 +141,10 @@
       },
       {
         "path": "public/assets/original/models/operators/pass65-first-person-arms-lod1.glb",
-        "sha256": "552fb405b761b7e8fd899370f4c8bf8993fcad3f627a6ec41ceb00fc8a08f0f0",
+        "sha256": "dd4cadc1ed9826b62b537b2b29c3aa86f742780977c3856cc33f7e22582e6b39",
         "lod": 1,
         "triangles": 7703,
-        "bytes": 327720,
+        "bytes": 411052,
         "skinnedMeshNodes": 4,
         "renderPrimitives": 4,
         "skins": 4,
@@ -183,7 +183,7 @@
     },
     "provenance": {
       "path": "source-assets/blender/pass69-3-first-person-operator-arms.provenance.json",
-      "sha256": "0b9acc1d8b657eb90c424b9f4fcb718563e446868958e83bb4d3522411512089"
+      "sha256": "bc52950d32a09283dae892e3bc5b55f2eaf90f389d730db1fe3a11bb1bcac794"
     },
     "bones": [
       "Root",
@@ -293,14 +293,14 @@
         },
         {
           "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-reload-cuff-flex.png",
-          "sha256": "d9b391cb34c19bcdf7d696de6e9d096314dada69357af4e94ea6efe60f47e765",
+          "sha256": "f617486eea4472e8d79ec31a32ba8eb0671d74de40109920fb89ad22afda9f7d",
           "width": 800,
           "height": 800,
           "cameraId": "reload-cuff-flex"
         },
         {
           "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-firing-digit-separation.png",
-          "sha256": "8e29c26c3ad10f5458c2a9ab1808dd616c9824859386730cf81566310c1565a6",
+          "sha256": "7bcf7bae64de46f39dd76608dcd8e9b1ad39e0e101fb2acdad4f27d606ad22a2",
           "width": 800,
           "height": 800,
           "cameraId": "firing-digit-separation"
@@ -308,13 +308,13 @@
       ],
       "contactSheet": {
         "path": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
-        "sha256": "cf13c04bde929b5726980d7ae08eaa92641a0d4e5064e5122ff00918da92df17",
+        "sha256": "5946a1bd741fcba672ba56b28d2b8f64e1819fd924d4c4f2f1bad6b7bdbd048e",
         "width": 2400,
         "height": 1708
       },
       "contactReceipt": {
         "path": "source-assets/blender/pass69-3-first-person-operator-arms-contact-receipt.json",
-        "sha256": "651db7d32c5506f2f1f8f85e3f6acc2b4bce82b005e2204a26b4238df3961314"
+        "sha256": "4cfa4f3996603fe9bdc698c3d63bef354ad7fc67cc7690a06261abeaa2cd61ab"
       }
     },
     "technicalAudit": {
@@ -322,7 +322,7 @@
         {
           "lod": 0,
           "triangles": 9744,
-          "bytes": 343688,
+          "bytes": 427020,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,
@@ -436,7 +436,7 @@
         {
           "lod": 1,
           "triangles": 7703,
-          "bytes": 327720,
+          "bytes": 411052,
           "meshNodes": 4,
           "skinnedMeshNodes": 4,
           "renderPrimitives": 4,

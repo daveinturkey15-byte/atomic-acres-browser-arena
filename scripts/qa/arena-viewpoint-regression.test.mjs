@@ -11,7 +11,8 @@
 //      requires editing THIS file with evidence - that is the point.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS, CATALOG_VIEWPOINT_COUNT } from './viewpoint-catalog.mjs';
 
@@ -260,3 +261,109 @@ test('persistence-min separates transient actor noise from persistent change', a
     for (const p of [tmpA, tmpB, tmpBase]) rmSync(p, { force: true });
   }
 });
+
+test('diff manifest validation refuses non-PASS verdicts and identical bundleAtStart', async () => {
+  const { validateManifests } = await import('./diff-arena-viewpoints.mjs');
+  const validBase = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-base.js' };
+  const validCand = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-cand.js' };
+  assert.deepEqual(validateManifests(validBase, validCand), []);
+
+  // Base verdict !== 'PASS'
+  const failBase = { ...validBase, verdict: 'FAIL' };
+  const problemsFailBase = validateManifests(failBase, validCand);
+  assert.equal(problemsFailBase.length, 1);
+  assert.match(problemsFailBase[0], /base capture did not pass \(verdict='FAIL'\)/);
+
+  // Candidate verdict !== 'PASS'
+  const failCand = { ...validCand, verdict: 'INVALID' };
+  const problemsFailCand = validateManifests(validBase, failCand);
+  assert.equal(problemsFailCand.length, 1);
+  assert.match(problemsFailCand[0], /candidate capture did not pass \(verdict='INVALID'\)/);
+
+  // Identical bundleAtStart
+  const sameBundle = { ...validCand, bundleAtStart: '/bundle-base.js' };
+  const problemsSameBundle = validateManifests(validBase, sameBundle);
+  assert.equal(problemsSameBundle.length, 1);
+  assert.match(problemsSameBundle[0], /both runs served the same bundle '\/bundle-base\.js' - harness mistake, not a code regression/);
+});
+
+test('diff CLI refuses real invalid fixture pair on disk (both FAIL and identical bundle)', () => {
+  const baseDir = resolve(ROOT, 'artifacts/viewpoint-regression/base-c736d48c');
+  const headDir = resolve(ROOT, 'artifacts/viewpoint-regression/head-55833a07');
+  const res = spawnSync(process.execPath, [
+    resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'),
+    '--base', baseDir,
+    '--candidate', headDir,
+  ], { encoding: 'utf8' });
+
+  assert.equal(res.status, 2, 'diff CLI must exit 2 when given invalid captures');
+  assert.match(res.stderr, /base capture did not pass \(verdict='FAIL'\)/);
+  assert.match(res.stderr, /candidate capture did not pass \(verdict='FAIL'\)/);
+  assert.match(res.stderr, /both runs served the same bundle '\/legacy-main-C7nXu8gj\.js' - harness mistake, not a code regression/);
+});
+
+test('diff CLI refuses when a capture manifest has non-PASS verdict', () => {
+  const tmpBase = resolve(import.meta.dirname, '.tmp-test-verdict-base');
+  const tmpCand = resolve(import.meta.dirname, '.tmp-test-verdict-cand');
+  mkdirSync(tmpBase, { recursive: true });
+  mkdirSync(tmpCand, { recursive: true });
+  try {
+    writeFileSync(resolve(tmpBase, 'capture-manifest.json'), JSON.stringify({
+      contract: 'arena-viewpoint-regression-capture-v1',
+      verdict: 'PASS',
+      backend: 'webgpu',
+      bundleAtStart: '/bundle-a.js',
+    }));
+    writeFileSync(resolve(tmpCand, 'capture-manifest.json'), JSON.stringify({
+      contract: 'arena-viewpoint-regression-capture-v1',
+      verdict: 'FAIL',
+      backend: 'webgpu',
+      bundleAtStart: '/bundle-b.js',
+    }));
+    const res = spawnSync(process.execPath, [
+      resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'),
+      '--base', tmpBase,
+      '--candidate', tmpCand,
+    ], { encoding: 'utf8' });
+    assert.equal(res.status, 2);
+    assert.match(res.stderr, /candidate capture did not pass \(verdict='FAIL'\)/);
+    assert.doesNotMatch(res.stderr, /base capture did not pass/);
+    assert.doesNotMatch(res.stderr, /same bundle/);
+  } finally {
+    rmSync(tmpBase, { recursive: true, force: true });
+    rmSync(tmpCand, { recursive: true, force: true });
+  }
+});
+
+test('diff CLI refuses when both captures served the same bundle', () => {
+  const tmpBase = resolve(import.meta.dirname, '.tmp-test-bundle-base');
+  const tmpCand = resolve(import.meta.dirname, '.tmp-test-bundle-cand');
+  mkdirSync(tmpBase, { recursive: true });
+  mkdirSync(tmpCand, { recursive: true });
+  try {
+    writeFileSync(resolve(tmpBase, 'capture-manifest.json'), JSON.stringify({
+      contract: 'arena-viewpoint-regression-capture-v1',
+      verdict: 'PASS',
+      backend: 'webgpu',
+      bundleAtStart: '/identical-bundle.js',
+    }));
+    writeFileSync(resolve(tmpCand, 'capture-manifest.json'), JSON.stringify({
+      contract: 'arena-viewpoint-regression-capture-v1',
+      verdict: 'PASS',
+      backend: 'webgpu',
+      bundleAtStart: '/identical-bundle.js',
+    }));
+    const res = spawnSync(process.execPath, [
+      resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'),
+      '--base', tmpBase,
+      '--candidate', tmpCand,
+    ], { encoding: 'utf8' });
+    assert.equal(res.status, 2);
+    assert.match(res.stderr, /both runs served the same bundle '\/identical-bundle\.js' - harness mistake, not a code regression/);
+    assert.doesNotMatch(res.stderr, /capture did not pass/);
+  } finally {
+    rmSync(tmpBase, { recursive: true, force: true });
+    rmSync(tmpCand, { recursive: true, force: true });
+  }
+});
+

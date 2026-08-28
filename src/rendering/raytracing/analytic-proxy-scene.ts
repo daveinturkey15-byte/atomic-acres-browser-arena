@@ -339,14 +339,6 @@ export function extractProxyScene(
     const sizeX = box.max.x - box.min.x;
     const sizeY = box.max.y - box.min.y;
     const sizeZ = box.max.z - box.min.z;
-    if (!(sizeX > 0) || !(sizeY > 0) || !(sizeZ > 0)) return;
-    // Footprint, not volume: a tall thin lamp post and a wide low crate have
-    // similar volumes and completely different presence in a reflection.
-    const area = Math.max(sizeX * sizeZ, sizeX * sizeY, sizeZ * sizeY);
-    if (area < options.minimumFootprintM2) return;
-    const sample = materialSample(mesh.material);
-    const centre = vec3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2);
-    const halfExtents = vec3(sizeX / 2, sizeY / 2, sizeZ / 2);
     const name = mesh.name || '(unnamed)';
     // Registered water becomes an analytic PLANE proxy, counted as reflective
     // whatever its authored raster roughness says — see the option's contract.
@@ -354,7 +346,31 @@ export function extractProxyScene(
     // reconstructs planes as +Y horizontal (unpackProxyShape), so anything
     // else keeps the ordinary box fit rather than lying about its orientation.
     const registeredWater = options.waterSurfaces?.some(({ namePattern }) => namePattern.test(name)) ?? false;
-    if (registeredWater && sizeY <= sizeX && sizeY <= sizeZ) {
+    // Degeneracy guard. A proxy needs a surface for a slab test to describe, so
+    // two positive axes is the real floor and the third is required only for
+    // the box path.
+    //
+    // PASS 81: a sea plane is EXACTLY that third case. Every water surface this
+    // project registers is a PlaneGeometry laid flat, i.e. zero-thickness by
+    // construction, and it reached the water branch at all only because
+    // `cos(-PI/2)` is 6.12e-17 rather than 0 and a rotated plane therefore
+    // measures 8.6e-15 m thick. Bake the same surface with an exact zero extent
+    // — a merged buffer, a pre-rotated geometry, a GLB — and the whole water
+    // registration would have gone silently dead. Flatness is admitted for
+    // registered water only: an unregistered flat card (foam ring, decal, sand
+    // gradient) has no volume to trace and its large area would take slots in
+    // the 24-shape budget away from the walls a reflection is made of.
+    const flatWater = registeredWater && sizeY <= sizeX && sizeY <= sizeZ;
+    if (!(sizeX > 0) || !(sizeZ > 0)) return;
+    if (!(sizeY > 0) && !flatWater) return;
+    // Footprint, not volume: a tall thin lamp post and a wide low crate have
+    // similar volumes and completely different presence in a reflection.
+    const area = Math.max(sizeX * sizeZ, sizeX * sizeY, sizeZ * sizeY);
+    if (area < options.minimumFootprintM2) return;
+    const sample = materialSample(mesh.material);
+    const centre = vec3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2);
+    const halfExtents = vec3(sizeX / 2, sizeY / 2, sizeZ / 2);
+    if (flatWater) {
       reflectiveMeshCount += 1;
       reflectiveFootprintM2 += area;
       candidates.push({

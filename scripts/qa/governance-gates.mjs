@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * governance-gates.mjs — consolidated CI gate for the five orphaned governance
+ * governance-gates.mjs — consolidated CI gate for the six orphaned governance
  * and audit layers that were previously enforced only inside their own vitest
  * files. Runs every audit directly against the shipped modules so a silent
  * drift fails a runnable command (`npm run qa:governance`), not just a test
@@ -12,6 +12,7 @@
  *   3. src/particles/particle-catalog.ts  — arena coverage, impact projection, opacity ceilings
  *   4. src/sound-event-inventory.ts       — inventory verification + canonical digest pin
  *   5. src/surface-impact-registry.ts     — ballistic material impact coverage
+ *   6. scripts/qa/find-unreachable-modules.mjs — dead module detector & test-only allowlist ratchet
  *
  * Output contract: one stable machine-readable summary line per check,
  *   [GOVERNANCE-GATE] check=<id> result=pass|fail key=value...
@@ -44,6 +45,7 @@ const {
   verifySoundEventInventory,
 } = await import('../../src/sound-event-inventory.ts');
 const { auditSurfaceImpactCoverage } = await import('../../src/surface-impact-registry.ts');
+const { auditUnreachableModules } = await import('./find-unreachable-modules.mjs');
 
 /** @returns {{ id: string, pass: boolean, fields: Record<string, string|number>, failures: string[] }} */
 function checkWeaponSchema() {
@@ -185,12 +187,42 @@ function checkSurfaceImpactRegistry() {
   };
 }
 
+function checkUnreachableModules() {
+  const failures = [];
+  const audit = auditUnreachableModules();
+  if (audit.dead.length > 0) {
+    failures.push(
+      `found ${audit.dead.length} unreachable module(s) (not even reachable from tests): `
+      + audit.dead.map((row) => row.file).join(', '),
+    );
+  }
+  if (audit.unallowlistedTestOnly.length > 0) {
+    failures.push(
+      `test-only reachability set grew beyond allowlist (${audit.unallowlistedTestOnly.length} unallowlisted): `
+      + audit.unallowlistedTestOnly.map((row) => row.file).join(', '),
+    );
+  }
+  return {
+    id: 'unreachable-modules',
+    pass: failures.length === 0,
+    fields: {
+      totalModules: audit.summary.totalModules,
+      unreachable: audit.summary.unreachableFromProduction,
+      dead: audit.dead.length,
+      testOnly: audit.testOnly.length,
+      unallowlisted: audit.unallowlistedTestOnly.length,
+    },
+    failures,
+  };
+}
+
 const CHECKS = [
   checkWeaponSchema,
   checkWeaponRoleDistance,
   checkParticleCatalog,
   checkSoundEventInventory,
   checkSurfaceImpactRegistry,
+  checkUnreachableModules,
 ];
 
 const results = [];
@@ -225,5 +257,5 @@ if (results.some((result) => !result.pass)) {
   }
   process.exitCode = 1;
 } else {
-  console.log('governance gate PASSED: all five governance layers hold on the current tree.');
+  console.log('governance gate PASSED: all six governance layers hold on the current tree.');
 }

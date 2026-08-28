@@ -19,6 +19,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
+import { normalWorld, transformedNormalWorld } from 'three/tsl';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -87,6 +88,94 @@ describe('farcrysis sea surface material', () => {
     // silently inverts and the ripple would appear only in the distance.
     expect(RIPPLE_NORMAL_FADE_NEAR_M).toBeGreaterThan(0);
     expect(RIPPLE_NORMAL_FADE_FAR_M).toBeGreaterThan(RIPPLE_NORMAL_FADE_NEAR_M);
+  });
+
+  // -----------------------------------------------------------------------
+  // HF-394 COORDINATE-SPACE GATE (Pass 81).
+  //
+  // The shipped fix assigned `mix(rippleVec, transformedNormalWorld, flatten)`
+  // to normalNode: a VIEW-space tangent-map normal mixed with a WORLD-space
+  // vertex normal, handed to NodeMaterial.setupNormal() which consumes
+  // normalNode as VIEW space with no transform. Past the fade distance the far
+  // sea's shading normal was world (0,1,0) reinterpreted as view, so it
+  // tumbled as the player pitched - in the exact far field the block was
+  // written to calm. `transformedNormalWorld` also resolves through the
+  // material's OWN setupNormal(), closing a cycle through the node builder,
+  // and warned as deprecated on every graph build.
+  //
+  // The old test could not catch any of that: it asserted normalNode was
+  // non-null. This asserts the SPACE.
+  // -----------------------------------------------------------------------
+  it('mixes the ripple and flat normals in ONE space (view), never world', () => {
+    stubDocument('webgpu');
+    const material = createFarcrysisSeaSurfaceMaterial({
+      ...PARAMS,
+      normalMap: new THREE.Texture(),
+    }) as unknown as Record<string, unknown>;
+
+    const root = material.normalNode as object | null | undefined;
+    expect(root).toBeTruthy();
+
+    // Collect every node reachable from the normal graph.
+    const seen = new Set<object>();
+    const walk = (value: unknown, depth: number): void => {
+      if (depth > 24 || value === null || typeof value !== 'object') return;
+      if (seen.has(value as object)) return;
+      seen.add(value as object);
+      if (Array.isArray(value)) {
+        for (const entry of value) walk(entry, depth + 1);
+        return;
+      }
+      for (const key of Object.keys(value as Record<string, unknown>)) {
+        walk((value as Record<string, unknown>)[key], depth + 1);
+      }
+    };
+    walk(root, 0);
+
+    // World-space normal accessors must not appear in the normal graph: they
+    // are the wrong basis for normalNode AND they route back through this
+    // material's own setupNormal().
+    expect(seen.has(normalWorld as unknown as object)).toBe(false);
+    expect(seen.has(transformedNormalWorld as unknown as object)).toBe(false);
+
+    // The colour graph is world space by construction (positionWorld /
+    // cameraPosition), and IS allowed to use the world normal - the two
+    // graphs must not be confused for each other.
+    const colorSeen = new Set<object>();
+    const walkColor = (value: unknown, depth: number): void => {
+      if (depth > 24 || value === null || typeof value !== 'object') return;
+      if (colorSeen.has(value as object)) return;
+      colorSeen.add(value as object);
+      if (Array.isArray(value)) {
+        for (const entry of value) walkColor(entry, depth + 1);
+        return;
+      }
+      for (const key of Object.keys(value as Record<string, unknown>)) {
+        walkColor((value as Record<string, unknown>)[key], depth + 1);
+      }
+    };
+    walkColor(material.colorNode, 0);
+    expect(colorSeen.has(normalWorld as unknown as object)).toBe(true);
+  });
+
+  // Source-level half of the same gate: the flat term must be built with the
+  // repo's own working precedent, and the deprecated alias (one warn() per
+  // graph build) must be gone from the module entirely.
+  it('builds the flat normal with transformNormalToView, as ocean-tsl does', () => {
+    const surfaceSource = readFileSync(
+      fileURLToPath(new URL('./farcrysis-water-surface.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(surfaceSource).toContain('const flatNormalView = transformNormalToView(normalLocal);');
+    expect(surfaceSource).toContain('mat.normalNode = mix(rippleVec, flatNormalView, flatten)');
+    expect(surfaceSource).not.toContain('transformedNormalWorld,');
+    // The precedent this follows must itself still exist and still be in view
+    // space, or the "repo's own correct pattern" claim above goes stale.
+    const oceanSource = readFileSync(
+      fileURLToPath(new URL('./water/ocean-tsl.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(oceanSource).toContain('material.normalNode = transformNormalToView(');
   });
 
   it('keeps the sky-reflection contribution bounded for the bloom contract', () => {

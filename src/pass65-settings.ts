@@ -303,6 +303,34 @@ export function writePass65Settings(
 }
 
 /**
+ * What the RENDERER ROUTE can actually do. Only the caller that owns the
+ * renderer knows this, so it is passed in rather than sniffed: `navigator.gpu`
+ * existing is not the same statement as "this session adopted the WebGPU
+ * backend", and the fallback to WebGL2 happens after adapter request.
+ */
+export type GraphicsRouteCapability = Readonly<{
+  /**
+   * True when the classic ray tracer can be built at all. The tracer composites
+   * inside the TSL/HDR graph, and `legacy-main` constructs that graph only when
+   * `renderRuntime.backend === 'webgpu'`, so on every other route the trace is
+   * structurally absent rather than merely expensive.
+   *
+   * Defaults to TRUE. Every existing caller resolves settings without a
+   * renderer in hand (storage round-trips, the feature inventory, the whole
+   * unit suite) and must keep the behaviour it had; the one caller that owns a
+   * renderer passes the real backend.
+   */
+  rayTracingCapable?: boolean;
+}>;
+
+/**
+ * Why RAY TRACED was demoted. Printed by the EFFECTIVE badge next to the preset
+ * the player actually got, in the same slot the compatibility route uses.
+ */
+export const RAY_TRACED_REQUIRES_WEBGPU_REASON =
+  'Ray tracing needs the WebGPU renderer; this device fell back to WebGL2.';
+
+/**
  * Resolves the runtime AND publishes the weather half of it.
  *
  * THE ONE SIDE EFFECT IN THIS FILE, AND WHY IT IS HERE. The weather systems are
@@ -322,7 +350,33 @@ export function writePass65Settings(
  * This runs at boot and again on every Options apply — exactly the cadence a
  * presentation clamp needs.
  */
-export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatibility = false): GraphicsRuntime {
+export function resolveGraphicsRuntime(
+  requestedGraphics: GraphicsSettings,
+  forceCompatibility = false,
+  capability: GraphicsRouteCapability = {},
+): GraphicsRuntime {
+  // PASS 81 — the capability gate for the classic ray tracer.
+  //
+  // The trace is built inside the TSL/HDR graph and that graph exists only on
+  // the WebGPU route, so on a WebGL2 fallback RAY TRACED was QUALITY minus MSAA
+  // 4x minus screen-space reflections, with nothing traced in exchange: the one
+  // preset in the ladder that was strictly worse than the preset below it, and
+  // the EFFECTIVE badge still read RAY TRACED.
+  //
+  // The demotion is a real substitution of values, not a relabel. A relabel
+  // would have left the player paying RAY TRACED's costs for QUALITY's picture,
+  // which is the defect rather than the fix. A CUSTOM set is treated
+  // differently on purpose: that player did not ask for QUALITY, they asked for
+  // their own values, exactly one of which this machine cannot draw.
+  const traceUnavailable = capability.rayTracingCapable === false && requestedGraphics.rayTracing !== 'off';
+  const demotedFromRayTraced = traceUnavailable && requestedGraphics.preset === 'raytraced';
+  const settings: GraphicsSettings = !traceUnavailable
+    ? requestedGraphics
+    : demotedFromRayTraced
+      // `preset` deliberately stays `raytraced` here so `requestedPreset` still
+      // reports what the player chose; only `effectivePreset` moves.
+      ? Object.freeze({ ...requestedGraphics, ...GRAPHICS_PRESET_VALUES.high })
+      : Object.freeze({ ...requestedGraphics, rayTracing: 'off' as const });
   const weather = resolveWeatherPresentation(settings);
   publishWeatherPresentation(weather);
   // Second latch, same contract, same cadence: a pure function of `settings`,
@@ -348,7 +402,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
         : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62, denoise: true });
   if (forceCompatibility) {
     return Object.freeze({
-      requestedPreset: settings.preset,
+      requestedPreset: requestedGraphics.preset,
       effectivePreset: 'performance',
       renderProfile: 'compat',
       renderScale: 0.2,
@@ -391,8 +445,8 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     });
   }
   return Object.freeze({
-    requestedPreset: settings.preset,
-    effectivePreset: settings.preset,
+    requestedPreset: requestedGraphics.preset,
+    effectivePreset: demotedFromRayTraced ? 'high' : settings.preset,
     renderProfile: settings.geometryDetail === 'reduced' ? 'performance' : 'blender',
     renderScale: Math.min(1.25, settings.renderScale),
     adaptive: settings.adaptiveResolution,
@@ -444,7 +498,7 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     gradeProfile: settings.filmicProfile,
     weather,
     ambientLife,
-    reason: null,
+    reason: traceUnavailable ? RAY_TRACED_REQUIRES_WEBGPU_REASON : null,
   });
 }
 
@@ -479,13 +533,25 @@ export function resolveActiveGraphicsConfig(
   });
 }
 
-/** Public preset label after an explicit renderer review route is applied. */
+/**
+ * Public preset label after an explicit renderer review route AND the renderer
+ * route's own capability are applied.
+ *
+ * The capability demotion is LAST because an explicit review route is a
+ * stronger statement: `?render=performance` already forced the whole budget
+ * down, and reporting a preset the route does not run would be the same lie
+ * from the other direction. It mirrors `resolveGraphicsRuntime`'s
+ * `effectivePreset` exactly; the reason string that belongs beside it is
+ * `RAY_TRACED_REQUIRES_WEBGPU_REASON`, published through `GraphicsRuntime.reason`.
+ */
 export function resolveDisplayedGraphicsPreset(
   requestedPreset: GraphicsPreset,
   queryRenderProfile: RenderProfile | null = null,
+  capability: GraphicsRouteCapability = {},
 ): GraphicsPreset {
   if (queryRenderProfile === 'performance' || queryRenderProfile === 'compat') return 'performance';
   if (queryRenderProfile === 'blender') return 'high';
+  if (capability.rayTracingCapable === false && requestedPreset === 'raytraced') return 'high';
   return requestedPreset;
 }
 

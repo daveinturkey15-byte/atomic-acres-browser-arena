@@ -1208,7 +1208,6 @@
   /* The UA stylesheet resolves b/strong to `bolder`, which would quietly drop
      the value ramp below the weight the strip is designed around. */
   #gunner-control-strip .gunner-control-value b { font: inherit; }
-  #gunner-control-strip .gunner-control-value i { font: inherit; font-style: normal; opacity: 0.72; }
   #gunner-control-strip .gunner-control em {
     grid-column: 1 / -1;
     font: 850 clamp(9px, 0.6vw, 13px)/1 Inter, system-ui, sans-serif;

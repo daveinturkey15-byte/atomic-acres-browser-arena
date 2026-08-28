@@ -248,3 +248,164 @@ export function landmarkWordmarkAnchor(frame: LandmarkFrame): WordmarkAnchor {
   const gy = farcrysisTerrainHeight(stack.pos[0], stack.pos[1]) + 0.95;
   return { tag: frame.tag, position: [gx, gy, gz], yaw: outwardYaw };
 }
+
+// ---------------------------------------------------------------------------
+// Approach kit — the breakable interactables that belong to each landmark
+// ---------------------------------------------------------------------------
+//
+// HF-395 round 2. The relational spine above landed in Pass 80, but the most
+// visible mid-map props never joined it: addInteractables() in
+// farcrysis-physics.ts still hand-listed the mid-ring crates, barrels and
+// sandbags in ABSOLUTE coordinates, under comments describing a layout that
+// no longer exists ("radius ~19 m" on props whose real radial is 38.2 m,
+// "ruined wall N / S" when the walls are named nw/ne/sw/se). Measured
+// consequences before this table existed:
+//   - farcrysis-crate-17 at (-28,-26) sat 2.00 m from the NW grove centre and
+//     2.12 m from the nearest grove trunk — a stray crate INSIDE the grove.
+//   - farcrysis-crate-01 at (-34,-34) hung 3.7 m outboard of the NW fringe
+//     row on the same diagonal — a lone extra crate off every landmark.
+//
+// The ids are unchanged (existing gates key off them); only the positions now
+// derive from the shared frames. Each landmark carries the same SKELETON — a
+// two-crate supply pair on the inward approach plus one picket piece further
+// along the same flank — but the flank side and the picket KIND vary per
+// quadrant, so the four quadrants stop reading as one arrangement stamped
+// four times (the other residual the Pass 80 audit recorded).
+//
+// Local frame reminder: u = outward from the arena centre, v = tangent.
+// Occupied bands are u >= 4.1 (crate cache, ruin wall, hedgerow, art fringe)
+// and the grove trunks at (0,+3.0), (-2.85,-0.93), (+1.50,-2.60); the kit
+// below sits on the INWARD approach with |v| >= 3.4, clear of all of them.
+
+/** Inward-approach supply pair, crate A (nearest the grove). */
+const LANDMARK_APPROACH_CRATE_A: Vec2 = [-2.6, 4.9];
+/** Inward-approach supply pair, crate B (set back behind A). */
+const LANDMARK_APPROACH_CRATE_B: Vec2 = [-4.7, 3.4];
+/** Picket piece on the same flank, further along the tangent. */
+const LANDMARK_APPROACH_PICKET: Vec2 = [-1.0, 6.2];
+/** Weathered boulder framing the ruin outer flank (opposite the approach). */
+const LANDMARK_BOULDER: Vec2 = [6.8, -8.4];
+
+/**
+ * Nothing that is not part of a landmark may sit this close to its centre.
+ * Pinned by farcrysis-midmap-landmarks.test.ts. Measured headroom: the
+ * nearest surviving unrelated props (farcrysis-crate-27/-28 and
+ * farcrysis-barrel-15/-16, the mid-jungle pocket family) sit 8.49 m out on
+ * the pure tangential bearing, so the radius has 0.49 m of margin.
+ */
+export const LANDMARK_KEEPOUT_RADIUS_M = 8.0;
+
+export type LandmarkInteractableKind = 'crate' | 'barrel' | 'sandbag';
+
+export type LandmarkInteractableSpec = Readonly<{
+  tag: LandmarkTag;
+  /** Slot within the kit — stable across quadrants. */
+  slot: 'crate-a' | 'crate-b' | 'picket';
+  /** The prop id addInteractables() registers. Unchanged from the old table. */
+  id: string;
+  kind: LandmarkInteractableKind;
+  pos: Vec2;
+  /** Crate cube side, sandbag wall width, or drum diameter (metres). */
+  footprint: number;
+}>;
+
+/** Which tangential flank the approach kit occupies, per quadrant. */
+function approachSide(tag: LandmarkTag): 1 | -1 {
+  return tag === 'nw' || tag === 'sw' ? 1 : -1;
+}
+
+/** Which picket piece this quadrant carries, so the four are not identical. */
+function picketKind(tag: LandmarkTag): LandmarkInteractableKind {
+  return tag === 'nw' || tag === 'se' ? 'sandbag' : 'barrel';
+}
+
+/**
+ * Prop ids per quadrant, preserving the ids the old absolute table used so no
+ * existing gate, ballistic surface or cover id changes.
+ *   crate-a  <- the old "mid-ring rotated square" crates 01-04
+ *   crate-b  <- the old "jungle mid-ring diagonals" crates 17-20
+ *   picket   <- the old mid-field barrels 09/10 and path sandbags 03/04
+ */
+const APPROACH_IDS: Readonly<Record<LandmarkTag, Readonly<{ crateA: string; crateB: string; picket: string }>>> = {
+  nw: { crateA: 'farcrysis-crate-01', crateB: 'farcrysis-crate-17', picket: 'farcrysis-sandbag-03' },
+  ne: { crateA: 'farcrysis-crate-04', crateB: 'farcrysis-crate-20', picket: 'farcrysis-barrel-10' },
+  sw: { crateA: 'farcrysis-crate-03', crateB: 'farcrysis-crate-19', picket: 'farcrysis-barrel-09' },
+  se: { crateA: 'farcrysis-crate-02', crateB: 'farcrysis-crate-18', picket: 'farcrysis-sandbag-04' },
+};
+
+/** Crate sizes carried over from the old table so silhouettes do not change. */
+const APPROACH_CRATE_SIZES: Readonly<Record<LandmarkTag, readonly [number, number]>> = {
+  nw: [1.0, 0.95],
+  ne: [1.0, 0.9],
+  sw: [1.0, 0.9],
+  se: [1.0, 0.95],
+};
+
+/** Sandbag picket footprint (width) — matches the old placeSandbagWall call. */
+export const LANDMARK_PICKET_SANDBAG_WIDTH_M = 2.2;
+/** Sandbag picket depth and height — matches the old placeSandbagWall call. */
+export const LANDMARK_PICKET_SANDBAG_HEIGHT_M = 0.6;
+export const LANDMARK_PICKET_SANDBAG_DEPTH_M = 0.45;
+/** Barrel picket footprint (drum diameter). */
+export const LANDMARK_PICKET_BARREL_DIAMETER_M = 0.6;
+
+/** The breakable interactables that belong to one landmark. */
+export function landmarkInteractableSpecs(frame: LandmarkFrame): readonly LandmarkInteractableSpec[] {
+  const side = approachSide(frame.tag);
+  const ids = APPROACH_IDS[frame.tag];
+  const [sizeA, sizeB] = APPROACH_CRATE_SIZES[frame.tag];
+  const kind = picketKind(frame.tag);
+  const at = (local: Vec2): Vec2 => localToWorld(frame, local[0], local[1] * side);
+  return [
+    { tag: frame.tag, slot: 'crate-a', id: ids.crateA, kind: 'crate', pos: at(LANDMARK_APPROACH_CRATE_A), footprint: sizeA },
+    { tag: frame.tag, slot: 'crate-b', id: ids.crateB, kind: 'crate', pos: at(LANDMARK_APPROACH_CRATE_B), footprint: sizeB },
+    {
+      tag: frame.tag,
+      slot: 'picket',
+      id: ids.picket,
+      kind,
+      pos: at(LANDMARK_APPROACH_PICKET),
+      footprint: kind === 'sandbag' ? LANDMARK_PICKET_SANDBAG_WIDTH_M : LANDMARK_PICKET_BARREL_DIAMETER_M,
+    },
+  ];
+}
+
+/** Every landmark approach kit, flattened (build-loop convenience). */
+export function allLandmarkInteractableSpecs(): readonly LandmarkInteractableSpec[] {
+  return FARCRYSIS_LANDMARKS.flatMap((frame) => landmarkInteractableSpecs(frame));
+}
+
+/**
+ * The limestone boulder framing each ruin outer flank.
+ *
+ * Replaces farcrysis-rock-nw/-se, which were two lone ABSOLUTE boulders at
+ * (-28,-40) and (28,40) — present in two of the four quadrants, so they broke
+ * the four-fold composition outright. There are now four, one per landmark,
+ * derived from the frames like everything else.
+ */
+export function landmarkBoulderPosition(frame: LandmarkFrame): Vec2 {
+  const side = approachSide(frame.tag);
+  return localToWorld(frame, LANDMARK_BOULDER[0], LANDMARK_BOULDER[1] * side);
+}
+
+/** Boulder footprint (width/depth) — carried over from the old rock covers. */
+export const LANDMARK_BOULDER_SIZE_M = 2.2;
+
+/**
+ * Every world position this module authors for a landmark, in one list.
+ * The coordination gate uses it to answer "is this prop part of a landmark?"
+ * by POSITION rather than by an id regex — an id pattern can only prove a
+ * prop was named after a landmark, never that it was placed by one.
+ */
+export function landmarkAuthoredPositions(frame: LandmarkFrame): Vec2[] {
+  return [
+    ...landmarkTreePositions(frame),
+    ...landmarkWallSpecs(frame).map((w) => w.pos),
+    ...landmarkCratePlacements(frame).map((c) => c.pos),
+    ...landmarkHedgePositions(frame),
+    ...landmarkFernPositions(frame),
+    ...landmarkRubblePositions(frame),
+    ...landmarkInteractableSpecs(frame).map((s) => s.pos),
+    landmarkBoulderPosition(frame),
+  ];
+}
