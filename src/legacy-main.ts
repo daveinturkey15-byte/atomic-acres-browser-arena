@@ -9850,6 +9850,7 @@ function renderPrivateLobby(): void {
   squadLabel.dataset.connected = localMember?.connected ? 'true' : 'false';
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
+  trackLobbyArenaSyncDeadline(lobbyArenaSynchronized, snapshot?.config.arenaId ?? null);
   localLobbyReady = localMember?.ready ?? localLobbyReady;
   const ready = element<HTMLButtonElement>('#lobby-ready');
   ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
@@ -9900,7 +9901,9 @@ function renderPrivateLobby(): void {
   roster.innerHTML = (renderedMembers + pendingRow) || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
   const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
   element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
-    ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
+    ? lobbyArenaSyncFailed
+      ? `Arena sync failed twice for ${arenaSelection(snapshot!.config.arenaId).displayName}. LEAVE the lobby and rejoin - the room stays open.`
+      : `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
     : snapshot?.phase === 'active'
     ? 'Match active · disconnected players have a 90 second rejoin slot.'
     : snapshot?.phase === 'countdown'
@@ -9913,6 +9916,61 @@ function renderPrivateLobby(): void {
           ? 'Ready up. The host controls match start.'
           : 'Choose your squad and ready up. The host controls match start.';
 }
+
+/**
+ * HF-347 bounded deadline. `lobbyArenaSynchronized` false disables READY under a
+ * "Synchronizing..." line with NO time bound: a stalled arena transition wedged the
+ * lobby forever, reading as "cant move" the moment the match started without the
+ * player. 75 s comfortably exceeds the slowest measured legitimate sync (cold
+ * Quality-art streaming ~50 s); one automatic fresh re-selection follows (the
+ * admission path documents a fresh selection as the recovery), and a second breach
+ * stops pretending: the guidance line names the stall and points at LEAVE, which
+ * always works. Runs on its own interval because a stalled transition also stalls
+ * the event-driven lobby re-renders - a watchdog that only runs when the patient
+ * is healthy diagnoses nothing.
+ */
+const LOBBY_ARENA_SYNC_DEADLINE_MS = 75_000;
+let lobbyArenaSyncPendingSince: number | null = null;
+let lobbyArenaSyncPendingArenaId: string | null = null;
+let lobbyArenaSyncRetryUsed = false;
+let lobbyArenaSyncFailed = false;
+
+function trackLobbyArenaSyncDeadline(synchronized: boolean, targetArenaId: string | null): void {
+  if (synchronized || !targetArenaId) {
+    lobbyArenaSyncPendingSince = null;
+    lobbyArenaSyncPendingArenaId = null;
+    lobbyArenaSyncRetryUsed = false;
+    lobbyArenaSyncFailed = false;
+    return;
+  }
+  if (lobbyArenaSyncPendingArenaId !== targetArenaId) {
+    lobbyArenaSyncPendingArenaId = targetArenaId;
+    lobbyArenaSyncPendingSince = performance.now();
+    lobbyArenaSyncRetryUsed = false;
+    lobbyArenaSyncFailed = false;
+  }
+}
+
+window.setInterval(() => {
+  if (lobbyArenaSyncPendingSince === null || lobbyArenaSyncFailed) return;
+  if (!privateLobbySnapshot || gameStarted) return;
+  if (performance.now() - lobbyArenaSyncPendingSince < LOBBY_ARENA_SYNC_DEADLINE_MS) return;
+  const arenaId = lobbyArenaSyncPendingArenaId;
+  if (!arenaId) return;
+  if (!lobbyArenaSyncRetryUsed) {
+    lobbyArenaSyncRetryUsed = true;
+    lobbyArenaSyncPendingSince = performance.now();
+    addFeed('ARENA SYNC STALLED - RETRYING', 'gold');
+    void activateArenaSelection(arenaId as ArenaId, true);
+    return;
+  }
+  lobbyArenaSyncFailed = true;
+  const guidance = document.querySelector<HTMLElement>('#lobby-guidance');
+  if (guidance) {
+    guidance.textContent = `Arena sync failed twice for ${arenaSelection(arenaId as ArenaId).displayName}. LEAVE the lobby and rejoin - the room stays open.`;
+  }
+  addFeed('ARENA SYNC FAILED - LEAVE AND REJOIN', 'gold');
+}, 5_000);
 
 renderHighScores();
 void refreshGlobalLeaderboard();
