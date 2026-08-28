@@ -70,6 +70,12 @@
   if (requested === 'pass70') return route('retained');
   if (requested === 'pass69') return route('historical');
   if (requested === 'experimental') return route('experimental');
+  // Any channel the config knows is addressable by its own key, so a newly published pass
+  // is linkable the moment it exists. This sits AFTER the legacy remaps above so they keep
+  // winning - notably ?release=stable, which has always meant PASS 72, not the stable key.
+  if (requested && Object.prototype.hasOwnProperty.call(config, requested) && config[requested]?.path) {
+    return route(requested);
+  }
 
   const options = document.querySelector('#release-channel-options');
   const hardRefreshButton = document.querySelector('#release-hard-refresh');
@@ -95,23 +101,51 @@
     const version = String(channel.label || '').match(/v\d+(?:\.\d+)+/);
     return version ? `PASS ${version[0].slice(1)}` : channel.pass;
   };
-  for (const key of ['experimental', 'previous', 'retained', 'historical']) {
+  // Every channel the config carries gets a card, newest pass first.
+  //
+  // This deliberately has no hardcoded key list any more. The previous one named exactly
+  // four keys, so PASS 80 and PASS 63 were published, sat in this very config, and were
+  // never drawn - the owner could deploy a build, open the site, be offered PASS 73 and
+  // reasonably conclude nothing had changed. A list of keys is something a person has to
+  // remember to update on every release; the config is the thing that already knows.
+  const passNumber = (channel) => {
+    const match = String(channel?.pass ?? '').match(/\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : Number.NEGATIVE_INFINITY;
+  };
+  const RETAINED_BADGES = {
+    previous: 'PREVIOUS LIVE',
+    retained: 'RETAINED LIVE',
+    historical: 'RETAINED STABLE',
+    stable: 'STABLE WEBGL',
+    rollback: 'STABLE WEBGL',
+  };
+  // Sort by pass number so a new channel lands in the right place without being told
+  // where. Ties fall back to the key so the order is stable rather than hash-dependent.
+  const orderedKeys = Object.keys(config)
+    .filter((key) => config[key]?.path)
+    .sort((a, b) => passNumber(config[b]) - passNumber(config[a]) || a.localeCompare(b));
+
+  for (const key of orderedKeys) {
     const channel = config[key];
-    if (!channel) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `release-channel-option ${key}`;
     button.dataset.releaseChoice = key;
-    const badge = key === 'stable'
-      ? 'STABLE WEBGL'
-      : key === 'previous'
-        ? 'PREVIOUS LIVE'
-        : key === 'retained'
-          ? 'RETAINED LIVE'
-          : key === 'historical'
-            ? 'RETAINED STABLE'
-            : channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE';
-    button.innerHTML = `<small>${displayPass(key, channel)} · ${badge}</small><strong>${channel.label}</strong><span>${channel.description}</span>`;
+    // Badge vocabulary is unchanged: a retained channel names what it is retained as, and
+    // anything else is LIVE or RELEASE CANDIDATE off its own deploymentState. A newly
+    // published pass has no deploymentState, so it reads RELEASE CANDIDATE - which is
+    // exactly what it is until the owner has played it.
+    const badge = RETAINED_BADGES[key]
+      ?? (channel.deploymentState === 'live' ? 'LIVE' : 'RELEASE CANDIDATE');
+    // Built as text nodes rather than innerHTML: these three fields are the only place a
+    // channel's authored strings reach the page, and a card is not worth an HTML sink.
+    const eyebrow = document.createElement('small');
+    eyebrow.textContent = `${displayPass(key, channel)} · ${badge}`;
+    const title = document.createElement('strong');
+    title.textContent = String(channel.label ?? '');
+    const blurb = document.createElement('span');
+    blurb.textContent = String(channel.description ?? '');
+    button.append(eyebrow, title, blurb);
     button.addEventListener('click', () => route(key));
     options.append(button);
   }

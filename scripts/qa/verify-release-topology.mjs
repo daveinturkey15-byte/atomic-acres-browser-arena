@@ -20,11 +20,23 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
 const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
-const expectedChannelKeys = rollbackStaged
+const requiredChannelKeys = rollbackStaged
   ? ['experimental', 'previous', 'retained', 'historical', 'stable']
   : ['experimental', 'previous', 'retained', 'historical'];
-if (JSON.stringify(Object.keys(publicConfig)) !== JSON.stringify(expectedChannelKeys)) {
-  throw new Error(`Root chooser must expose exactly ${expectedChannelKeys.join(', ')}: ${Object.keys(publicConfig).join(', ')}`);
+const missingChannelKeys = requiredChannelKeys.filter((key) => !publicConfig[key]);
+if (missingChannelKeys.length) {
+  throw new Error(`Root chooser must expose ${requiredChannelKeys.join(', ')}; missing ${missingChannelKeys.join(', ')}`);
+}
+// Additional channels are ALLOWED, and are the point: the owner keeps every published pass
+// selectable, so this set grows with each release. The exact-equality check this replaces is
+// what let a published PASS 80 sit in the live config while the chooser refused to draw it.
+// What is still forbidden - and was never checked before - is a channel the chooser would
+// offer that the deploy never staged. A card that 404s is worse than no card.
+for (const [key, channel] of Object.entries(publicConfig)) {
+  if (!channel?.path) throw new Error(`Root chooser channel ${key} has no path`);
+  if (!existsSync(join(dist, channel.path))) {
+    throw new Error(`Root chooser channel ${key} points at ${channel.path}, which is not staged`);
+  }
 }
 if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
   || publicConfig.experimental.path !== 'channels/the-big-one') {

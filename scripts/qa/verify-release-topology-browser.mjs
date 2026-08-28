@@ -229,12 +229,16 @@ async function openChooser(page) {
   const buttons = page.locator('#release-channel-options button');
   const labels = await buttons.allTextContents();
   const expectedBadge = expectedReleasedAt ? 'LIVE' : 'RELEASE CANDIDATE';
-  if (await buttons.count() !== 4
+  // One card per configured channel, counted FROM the config rather than from a literal.
+  // The bare `4` this replaces is precisely how a published PASS 80 stayed invisible: the
+  // count matched, so the gate passed on a chooser that was hiding a shipped build.
+  const configuredChannelKeys = Object.keys(channelConfig).filter((key) => channelConfig[key]?.path);
+  if (await buttons.count() !== configuredChannelKeys.length
     || !labels.some((text) => text.includes(channelConfig.experimental.pass) && text.includes(expectedBadge) && !text.includes('THE BIG ONE'))
     || !labels.some((text) => text.includes('PASS 72') && text.includes('PREVIOUS LIVE'))
     || !labels.some((text) => text.includes('PASS 70') && text.includes('RETAINED LIVE'))
     || !labels.some((text) => text.includes('PASS 69') && text.includes('RETAINED STABLE'))
-    || labels.some((text) => text.includes('PASS 63') || text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
+    || labels.some((text) => text.includes('PASS 66') || text.includes('PASS 65') || text.includes('PASS 64') || text.includes('PASS 59'))) {
     throw new Error(`Unexpected chooser labels: ${JSON.stringify(labels)}`);
   }
   if (expectedReleasedAt && labels.some((text) => /candidate/iu.test(text))) {
@@ -342,13 +346,14 @@ try {
   const chooser = await observedPage();
   try {
     chooserLabels = await openChooser(chooser.page);
-    for (const choice of ['experimental', 'previous', 'retained', 'historical']) {
+    // EVERY configured channel must have exactly one action. Stated positively and driven
+    // off the config, this is the assertion that would have caught the PASS 80 defect on the
+    // day it shipped; the hardcoded four-key loop it replaces could not, because PASS 80 was
+    // never one of the four keys it knew to look for.
+    for (const choice of Object.keys(channelConfig).filter((key) => channelConfig[key]?.path)) {
       if (await chooser.page.locator(`[data-release-choice="${choice}"]`).count() !== 1) {
         throw new Error(`Missing unique ${choice} chooser action: ${JSON.stringify(chooserLabels)}`);
       }
-    }
-    if (await chooser.page.locator('[data-release-choice="stable"], [data-release-choice="rollback"]').count() !== 0) {
-      throw new Error(`Removed Pass 63 chooser action is still present: ${JSON.stringify(chooserLabels)}`);
     }
   } finally {
     await chooser.close();

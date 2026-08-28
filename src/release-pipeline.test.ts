@@ -56,14 +56,23 @@ describe('production release workflow', () => {
     expect(readFileSync('package.json', 'utf8')).not.toContain('"deploy:ci": "gh-pages -d dist --add"');
   });
 
-  it('verifies four public choices while retaining unlinked stable provenance', () => {
+  it('requires the core channels, allows published extras, and counts cards from the config', () => {
+    // The core four (five with a staged rollback) are still REQUIRED to be present. What
+    // changed is that the check is a superset, not an equality: the owner keeps every
+    // published pass selectable, so the channel set grows, and an equality check meant a
+    // correctly published PASS 80 made the config illegal.
     expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical', 'stable']");
     expect(staticTopologyVerifier).toContain("['experimental', 'previous', 'retained', 'historical']");
+    expect(staticTopologyVerifier).toContain('const missingChannelKeys = requiredChannelKeys.filter((key) => !publicConfig[key]);');
+    expect(staticTopologyVerifier).not.toContain('Root chooser must expose exactly');
+    // Newly enforced, and never enforced before: an offered channel must actually be staged.
+    expect(staticTopologyVerifier).toContain('which is not staged');
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.historical.pass !== config.historical.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');
-    expect(liveTopologyVerifier).toContain('await buttons.count() !== 4');
-    expect(liveTopologyVerifier).toContain("for (const choice of ['experimental', 'previous', 'retained', 'historical'])");
+    expect(liveTopologyVerifier).toContain('await buttons.count() !== configuredChannelKeys.length');
+    expect(liveTopologyVerifier).not.toContain('await buttons.count() !== 4');
+    expect(liveTopologyVerifier).toContain("for (const choice of Object.keys(channelConfig).filter((key) => channelConfig[key]?.path))");
     expect(liveTopologyVerifier).toContain("await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');");
     expect(liveTopologyVerifier).toContain("await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');");
     expect(liveTopologyVerifier).toContain("await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');");
