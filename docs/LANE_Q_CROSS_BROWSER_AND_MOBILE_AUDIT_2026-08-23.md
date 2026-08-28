@@ -25,10 +25,21 @@ Build: integration worktree `atomic-acres-highseas`, dev server on `127.0.0.1:41
 4. **Safari cannot be tested on this machine at all**, and the WebKit lane that
    stands in for it lies about being macOS on Apple hardware. **Opera is not
    installed.** Both are reported as coverage holes, never as passes.
-5. **The standing gate exists**: `npm run qa:cross-browser` — ceiling, then
+5. **Mobile is genuinely playable with touch** at 390x844 and 768x1024 — move,
+   look, fire and jump all verified by driving the real overlay with real touch
+   events and reading the game's own camera and ammo back. 16 controls, none under
+   44 px, none off-screen, none overlapping, no horizontal overflow.
+6. **The standing gate exists**: `npm run qa:cross-browser` — ceiling, then
    browser x arena, then mobile touch playability; one exit code; SKIPPED and
    BLOCKED can never read as PASS, and that rule is unit-tested without launching
-   a browser.
+   a browser. Verified failing closed: with `--require opera` on a machine with no
+   Opera, the gate exits **1**.
+7. **Three product faults fell out of the sweep**, none of them previously
+   visible: `farcrysis` will not deploy in **Chrome** on WebGPU (a queue-completion
+   stall — it boots in Edge and Firefox); `gun-range` throws a godrays TSL null in
+   **every** WebGPU browser; and `high-seas` fails **WebGL2 shader validation** in
+   every browser that takes the fallback path — which is the path phones and
+   Safari take.
 
 ---
 
@@ -73,8 +84,14 @@ Bisect receipt: `artifacts/qa/lane-q/firefox-focus-variants.json`
 | `-no-remote -profile <dir> -new-window <url>` (what every harness did) | **false** | 0.000 | 0 |
 | `-no-remote -profile <dir> -private-window <url>` | **false** | 0.000 | 0 |
 | `-profile <dir> -private-window <url>` | **false** | 0.000 | 0 |
-| `-profile <dir>` warmed and re-launched twice more | **false** | 0.000 | 0 |
 | **`-private-window <url>` (default profile)** | **true** | 0.36–0.57 | 7–9 |
+
+The first four rows are in that receipt. A separate probe
+(`scripts/qa/tmp-lane-q-firefox-warm-profile.mjs`) additionally launched the SAME
+`-profile` directory three times in a row — cold, then warmed, then warmed again —
+and scored `everFocused: false, focusedFraction: 0.000` on all three. So it is not
+a first-run effect that a warmed profile grows out of; it is the `-profile` flag
+itself.
 
 The fix is in `scripts/qa/installed-browser-lanes.mjs`: the Firefox lane now
 drives the **default profile** with `-private-window`, is identified by process
@@ -415,6 +432,8 @@ scripts/qa/verify-mobile-touch-playability.mjs stage 3: phone + tablet, and does
 scripts/qa/cross-browser-probe.html        the one instrument every lane loads
 scripts/qa/installed-browser-lanes.mjs     launch/foreground/teardown discipline, shared
 scripts/qa/win-foreground.ps1              takes the Windows foreground and PROVES it
+scripts/qa/cross-browser-gate-contract.mjs      the verdict rule, as a pure function
+scripts/qa/cross-browser-gate-contract.test.mjs its unit tests - no browser needed
 ```
 
 Also wired: `qa:cross-browser:matrix`, `qa:cross-browser:ceiling`,
@@ -619,3 +638,18 @@ focus/visibility fraction next to it should not be believed.
 | Opera | Not installed on this machine. | Install Opera, then `--require opera`. |
 | Real handset performance | The mobile lanes are Chromium device emulation on a desktop GPU. Layout, touch and reachability are real; the frame rate is an upper bound no phone will reach. | A physical Android device. |
 | Multiplayer across browsers | This lane measures solo boot and frame rate only. | A two-browser session matrix (HF-325's row). |
+| Whether Firefox and Chrome do equal GPU work per frame | The matrix compares requestAnimationFrame cadence, which is a callback rate. Firefox coming out ahead of Chrome deserves confirmation before anyone acts on it. | GPU timestamp queries, or a pixel diff of the two outputs on one arena. |
+| A quiet machine | Other lanes were driving browsers throughout. The gate now detects and records this, but it still costs measurement precision, and it blocked the Edge lane outright once. | Run the gate when nothing else on this PC is driving a browser. |
+
+### Receipts
+
+```
+artifacts/qa/lane-q/cross-browser-matrix-merged.json   the table in section 2
+artifacts/qa/lane-q/cross-browser-matrix-full.json     the full sweep as run
+artifacts/qa/lane-q/matrix-edge-rerun.json             Edge, re-run in isolation
+artifacts/qa/lane-q/mobile-touch-playability.json      section 5
+artifacts/qa/lane-q/firefox-focus-variants.json        the HF-331 root-cause bisect
+artifacts/qa/lane-q/ceiling-vsync.json                 presentation ceilings
+artifacts/qa/lane-q/ceiling-uncapped.json              the same with vsync off
+artifacts/qa/lane-q/gate-failclosed-demo/              the gate exiting 1 on a required, uninstalled browser
+```
