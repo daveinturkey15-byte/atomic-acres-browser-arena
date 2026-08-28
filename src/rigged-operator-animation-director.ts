@@ -79,7 +79,7 @@ export const OPERATOR_ANIMATION_TRANSITIONS: BlendGraphDefinition = Object.freez
   }),
 });
 
-export type OperatorOneShotKind = 'fire' | 'melee';
+export type OperatorOneShotKind = 'fire' | 'melee' | 'emote-wave' | 'emote-punch' | 'emote-boot';
 
 /**
  * Bounded one-shot envelopes. Peaks stay well below 1 so the layer reads as an
@@ -89,6 +89,12 @@ export type OperatorOneShotKind = 'fire' | 'melee';
 export const OPERATOR_ONE_SHOT_SHAPES: Readonly<Record<OperatorOneShotKind, HitReactionShape>> = Object.freeze({
   fire: Object.freeze({ riseSeconds: 0.025, decaySeconds: 0.13, peak: 0.5 }),
   melee: Object.freeze({ riseSeconds: 0.07, decaySeconds: 0.38, peak: 0.9 }),
+  // Emotes are deliberate gestures, not combat accents: near-full weight so the
+  // clip reads across the map, slower decay so the gesture completes, and the
+  // same hard end as every other one-shot - nothing clamps forever.
+  'emote-wave': Object.freeze({ riseSeconds: 0.08, decaySeconds: 1.05, peak: 0.95 }),
+  'emote-punch': Object.freeze({ riseSeconds: 0.06, decaySeconds: 0.6, peak: 0.95 }),
+  'emote-boot': Object.freeze({ riseSeconds: 0.06, decaySeconds: 0.7, peak: 0.95 }),
 });
 
 export type OperatorAnimationInput = Readonly<{
@@ -259,6 +265,9 @@ function advanceOneShots(
 const ONE_SHOT_CLIPS: Readonly<Record<OperatorOneShotKind, readonly string[]>> = Object.freeze({
   fire: Object.freeze(['Gun_Shoot', 'Idle_Gun_Shoot']),
   melee: Object.freeze(['Punch_Right', 'Kick_Right']),
+  'emote-wave': Object.freeze(['Wave']),
+  'emote-punch': Object.freeze(['Punch_Right']),
+  'emote-boot': Object.freeze(['Kick_Right']),
 });
 
 const HIT_CLIPS = Object.freeze(['HitRecieve', 'HitRecieve_2'] as const);

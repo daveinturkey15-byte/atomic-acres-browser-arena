@@ -78,7 +78,8 @@ import {
   prewarmPass65RuntimeWeaponCorpus,
 } from './weapon-model';
 import { createGpuRetirementScheduler } from './gpu-retirement-scheduler';
-import { applyBotEmissiveBrightness } from './operator-model';
+import {
+  emoteRiggedOperator, applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import {
   classifyRiggedHandSelfOcclusionHit,
@@ -1015,6 +1016,7 @@ import {
   LobbyHandicapMessage,
   LobbySkinMessage,
   LobbyStanceMessage,
+  EmoteMessage,
   LobbySquadMessage,
   LobbyReadyMessage,
   LobbyStateMessage,
@@ -8769,6 +8771,43 @@ function updateHostStance(message: LobbyStanceMessage): void {
   syncRemoteOperatorStances();
 }
 
+const EMOTE_LOCAL_COOLDOWN_MS = 1_500;
+let lastEmoteSentAt = 0;
+
+/** The EMOTE key. The selector chose a gesture since Pass 75; this makes the key
+ * exist. Local player is first-person, so the payoff is entirely on OTHER
+ * screens: the message relays host-authoritatively and every peer plays the
+ * one-shot on this player's remote rig. Locally you get the feed line. */
+function performEmote(): void {
+  if (!gameStarted || !player.alive) return;
+  const emoteId = localOperatorEmoteId;
+  if (!isOperatorEmoteId(emoteId) || emoteId === 'none') {
+    addFeed('NO EMOTE BOUND - PICK ONE IN OPERATOR', 'gold');
+    return;
+  }
+  const now = performance.now();
+  if (now - lastEmoteSentAt < EMOTE_LOCAL_COOLDOWN_MS) return;
+  lastEmoteSentAt = now;
+  const message: EmoteMessage = { type: 'emote', by: player.id, emoteId, nonce: randomNonce() };
+  if (network.role === 'host') relayEmote(message);
+  else if (network.role === 'client') network.send(message);
+  addFeed(`EMOTE: ${emoteId.toUpperCase()}`, 'gold');
+}
+
+/** Host: validate against the live lobby, play on this screen, forward to guests. */
+function relayEmote(message: EmoteMessage): void {
+  if (network.role !== 'host') return;
+  if (message.by !== player.id && !hostLobbyMembers.get(message.by)?.connected) return;
+  applyRemoteEmote(message);
+  network.send(message);
+}
+
+/** Every screen: the sender's rig is a remote everywhere but their own machine. */
+function applyRemoteEmote(message: EmoteMessage): void {
+  const remote = remotes.get(message.by);
+  if (remote) emoteRiggedOperator(remote.root, message.emoteId);
+}
+
 /** HF-382: the replicated idle stance for a peer's third-person rig. Falls back
  * to the catalog default for anything absent or off-catalog, mirroring skinId. */
 function memberOperatorStanceId(id: string): string {
@@ -9562,6 +9601,11 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-stance') {
     updateHostStance(message);
+    return true;
+  }
+  if (message.type === 'emote') {
+    if (network.role === 'host') relayEmote(message);
+    else if (message.by !== player.id) applyRemoteEmote(message);
     return true;
   }
   if (message.type === 'redeploy-request') {
@@ -26695,6 +26739,7 @@ window.addEventListener('keydown', (event) => {
     if (actionMatchesCode('weapon-2', event.code, keyProfile)) switchWeapon(1);
     if (actionMatchesCode('reload', event.code, keyProfile)) reload();
     if (actionMatchesCode('melee', event.code, keyProfile) && !event.repeat) melee();
+    if (actionMatchesCode('emote', event.code, keyProfile) && !event.repeat) performEmote();
     if (actionMatchesCode('grenade', event.code, keyProfile) && !event.repeat) throwGrenade();
   }
   let supportSlot = -1;

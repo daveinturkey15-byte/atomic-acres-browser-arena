@@ -5,7 +5,7 @@ import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
 import type { KillCause } from './kill-provenance';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
-import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
+import { isOperatorEmoteId, isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
@@ -530,6 +530,8 @@ export type LobbySquadMessage = { type: 'lobby-squad'; by: string; squadName: st
 export type LobbySkinMessage = { type: 'lobby-skin'; by: string; skinId: string; nonce: number };
 /** HF-382: idle-stance twin of lobby-skin, same host-validated lifecycle. */
 export type LobbyStanceMessage = { type: 'lobby-stance'; by: string; stanceId: string; nonce: number };
+/** Transient gesture event; relayed, never stored in lobby state. */
+export type EmoteMessage = { type: 'emote'; by: string; emoteId: string; nonce: number };
 export type RedeployRequestMessage = {
   type: 'redeploy-request'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId; nonce: number;
@@ -613,7 +615,7 @@ export type ChatHistoryMessage = {
 };
 
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | EmoteMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
@@ -1130,6 +1132,9 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-stance':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isOperatorStanceId(msg.stanceId) && Number.isFinite(msg.nonce);
+    case 'emote':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isOperatorEmoteId(msg.emoteId) && msg.emoteId !== 'none' && Number.isFinite(msg.nonce);
     case 'redeploy-request':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -1308,6 +1313,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-squad':
     case 'lobby-skin':
     case 'lobby-stance':
+    case 'emote':
     case 'redeploy-request':
     case 'redeploy-commit':
     case 'reload-intent':

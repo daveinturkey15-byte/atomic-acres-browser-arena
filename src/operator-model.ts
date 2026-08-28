@@ -14,6 +14,7 @@ import {
   createOperatorAnimationDirector,
   pushOperatorHitImpulse,
   pushOperatorOneShot,
+  type OperatorOneShotKind,
   type OperatorAnimationDirector,
   type OperatorAnimationOutput,
 } from './rigged-operator-animation-director';
@@ -2577,6 +2578,29 @@ export function fireRiggedOperator(root: THREE.Object3D): boolean {
   if (!runtimeState) return false;
   ensureAnimationRuntime(runtimeState, root);
   pushOperatorOneShot(runtimeState.director, 'fire');
+  return true;
+}
+
+/** Catalog emote id -> director one-shot kind. 'none' maps to nothing on purpose. */
+const EMOTE_ONE_SHOT_KINDS: Readonly<Record<string, OperatorOneShotKind>> = Object.freeze({
+  wave: 'emote-wave',
+  'salute-punch': 'emote-punch',
+  boot: 'emote-boot',
+});
+
+/**
+ * Play a replicated emote on a third-person rig as a bounded one-shot. Same
+ * contract as fireRiggedOperator: the director owns the envelope, so nothing has
+ * to remember to switch it off, and an off-catalog id is a no-op rather than a
+ * throw - the message was already host-validated, this is defence in depth.
+ */
+export function emoteRiggedOperator(root: THREE.Object3D, emoteId: string): boolean {
+  const kind = EMOTE_ONE_SHOT_KINDS[emoteId];
+  if (!kind) return false;
+  const runtimeState = runtime(root);
+  if (!runtimeState) return false;
+  ensureAnimationRuntime(runtimeState, root);
+  pushOperatorOneShot(runtimeState.director, kind);
   return true;
 }
 
