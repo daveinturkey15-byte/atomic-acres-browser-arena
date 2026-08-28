@@ -2713,14 +2713,14 @@
       },
       "overdrive": {
         "damageMultiplier": 2,
-        "durationMs": 30000,
+        "durationMs": 20000,
         "pickupRadius": 1.65,
         "position": [
           9.6,
           0.82,
           0
         ],
-        "spawnIntervalMs": 120000
+        "spawnIntervalMs": 90000
       },
       "soloBotCount": 1,
       "weapons": [

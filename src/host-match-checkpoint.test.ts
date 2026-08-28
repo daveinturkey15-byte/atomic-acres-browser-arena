@@ -286,10 +286,15 @@ describe('host active-match checkpoint', () => {
 
   it('preserves scheduled, available, held and depleted railgun authority across a host crash', () => {
     const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 12);
+    // HF-384 re-pin: the spawn delay is jittered (railgunSpawnDelayMs) so the remaining
+    // time is derived from the state's own spawn moment, not from a fixed 180 s literal.
+    // The checkpoint contract itself - remaining = spawnAt - now, restore = now + drift +
+    // remaining - is pinned exactly as before.
+    const scheduledRemainingMs = scheduled.spawnAtHostTimeMs! - 2_000;
     const scheduledCheckpoint = checkpointRailgunAuthority(scheduled, 2_000)!;
-    expect(scheduledCheckpoint).toMatchObject({ status: 'scheduled', spawnRemainingMs: 179_000, roundsRemaining: 8 });
+    expect(scheduledCheckpoint).toMatchObject({ status: 'scheduled', spawnRemainingMs: scheduledRemainingMs, roundsRemaining: 8 });
     expect(restoreRailgunAuthority({ savedAtEpochMs: 1_000_000, railgun: scheduledCheckpoint }, 1_004_000, 50))
-      .toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 175_050, roundsRemaining: 8 });
+      .toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 50 + scheduledRemainingMs - 4_000, roundsRemaining: 8 });
 
     const available = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs!).state;
     const availableCheckpoint = checkpointRailgunAuthority(available, 181_000)!;
