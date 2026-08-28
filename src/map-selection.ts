@@ -24,6 +24,15 @@ export type ArenaSelection = Readonly<{
   fieldSupport: boolean;
   overdrive: boolean;
   matchRules: MatchRules;
+  /**
+   * Whether the arena is offered in the menu. Absent means yes.
+   *
+   * This is deliberately NOT the same thing as existing. A hidden arena keeps its stable
+   * id, so old room links, saved loadouts, replays and network payloads naming it still
+   * decode - the id is the network and storage boundary and must never move for a
+   * presentation decision.
+   */
+  selectable?: boolean;
 }>;
 
 /**
@@ -113,6 +122,12 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'farcrysis' as const,
     routeId: 'farcrysis' as const,
+    // HIDDEN 2026-08-28, owner request: "remove farcrysis for now its not ready".
+    // Measured against the LIVE build through the real player path the same day: the only
+    // arena of six that never reaches an active match - 279 s, then the tab crashes. The
+    // other five reach playable in 49-69 s. Restore by deleting this one line once the
+    // farcrysis lanes land and verify-player-path-cdp.mjs passes it.
+    selectable: false,
     legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
     selectorLabel: 'FARCrySIS',
     displayName: 'Farcrysis',
@@ -147,6 +162,15 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);
+
+/**
+ * The arenas the menu offers. Every other consumer - audio, spawn safety, replay,
+ * the compatibility decoder below - keeps using ARENA_SELECTIONS, because a hidden
+ * arena is still a real arena that a saved match or an old link can name.
+ */
+export const SELECTABLE_ARENAS: readonly ArenaSelection[] = Object.freeze(
+  ARENA_SELECTIONS.filter((entry) => entry.selectable !== false),
+);
 
 const ARENA_COMPATIBILITY_DECODER = new Map<string, ArenaId>(ARENA_SELECTIONS.flatMap((entry) => [
   [entry.id, entry.id] as const,

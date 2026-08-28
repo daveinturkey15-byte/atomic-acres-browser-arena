@@ -2,7 +2,7 @@ import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
-import { ARENA_SELECTIONS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
+import { ARENA_SELECTIONS, SELECTABLE_ARENAS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
 import { DEFAULT_PRIVATE_MATCH_CONFIG, LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
@@ -52,7 +52,7 @@ export function createPass64ShellViewModel(playerName: string): Pass64ShellViewM
 }
 
 function mapCardsMarkup(): string {
-  return ARENA_SELECTIONS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
+  return SELECTABLE_ARENAS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
     <i class="map-index">0${index + 1}</i>
     <span>${entry.selectorLabel}</span>
     <strong>${entry.summary}</strong>
@@ -119,7 +119,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
-        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${ARENA_SELECTIONS.length} deployable spaces · choose before launch</small></div>
+        <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${SELECTABLE_ARENAS.length} deployable spaces · choose before launch</small></div>
         <div class="map-card-grid">${mapCardsMarkup()}</div>
       </section>
     </section>
@@ -146,7 +146,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <section id="private-lobby" hidden aria-labelledby="private-lobby-title">
         <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
         <div class="lobby-settings">
-          <label>MAP<select id="lobby-arena">${ARENA_SELECTIONS.map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
+          <label>MAP<select id="lobby-arena">${SELECTABLE_ARENAS.map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
           <label>MODE<select id="lobby-mode"><option value="ffa" selected>FREE FOR ALL</option><option value="tdm">TEAM DEATHMATCH</option></select></label>
           <!-- HF-328: squad identity is prescribed (AQUA/CORAL colour names); the free name input and colour picker were removed. Swap-after stays available via the host-checked SWAP SIDES request. -->
           <div class="lobby-squad-identity" id="lobby-squad-identity"><small>SQUAD</small><strong id="lobby-squad-label" style="--lobby-squad-color:#55e6ff">AQUA</strong></div>

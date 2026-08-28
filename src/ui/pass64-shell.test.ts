@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SELECTABLE_ARENAS } from '../map-selection';
 import { createPass64ShellViewModel, renderPass64Shell } from './pass64-shell';
 
 describe('Pass 66 command shell', () => {
@@ -22,15 +23,20 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('class="hud-map-console"');
     expect(markup).toContain('class="hud-operator-console"');
     expect(markup).toContain('class="hud-weapon-console"');
+    expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual(
+      SELECTABLE_ARENAS.map((entry) => entry.routeId),
+    );
+    // Order is still load-bearing, so pin the offered sequence explicitly too.
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
       'nuke-town',
       'terminal',
       'rustrig',
       'gun-range',
-      'farcrysis',
       'high-seas',
     ]);
-    expect(markup).toContain('6 deployable spaces · choose before launch');
+    // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
+    expect(markup).not.toContain('data-arena-route="farcrysis"');
+    expect(markup).toContain(`${SELECTABLE_ARENAS.length} deployable spaces · choose before launch`);
   });
 
   it('keeps deployment controls inert until the gameplay module binds their handlers', () => {
@@ -39,7 +45,7 @@ describe('Pass 66 command shell', () => {
     expect(markup).toContain('id="host" disabled');
     expect(markup).toContain('id="room-input" placeholder="Paste room code" autocomplete="off" disabled');
     expect(markup).toContain('id="join" disabled');
-    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(6);
+    expect(markup.match(/class="map-card[^>]+disabled/g)).toHaveLength(SELECTABLE_ARENAS.length);
   });
 
   it('renders four curated kits, exactly three custom slots with nested EDIT, and one manager', () => {
