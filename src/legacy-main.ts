@@ -9102,8 +9102,23 @@ function handleMatchAdmissionFailure(
       // all. ?renderer=webgl2 is the repo's own hard compat contract. One deploy click
       // after the reload and the player is in the match.
       setStatus('Renderer failed repeatedly in this browser - switching to the compatibility renderer. Deploy again after the reload.', 'warn');
+      // Leave a sticky record so the NEXT session skips the failed attempts entirely
+      // and boots straight onto the compat route (read in bootstrap.ts). Keyed to the
+      // full user agent: a Chrome update invalidates it and WebGPU gets tried again.
+      try {
+        localStorage.setItem('atomic-acres:renderer-fallback:v1', JSON.stringify({
+          userAgent: navigator.userAgent,
+          at: new Date().toISOString(),
+          reason: error.message.slice(0, 200),
+        }));
+      } catch { /* Storage-less contexts just retry per session. */ }
       const fallbackUrl = new URL(window.location.href);
       fallbackUrl.searchParams.set('renderer', 'webgl2');
+      // Carry the arena and finish the deploy on the other side. Without this the
+      // player lands back on the menu mid-recovery needing one more click, and the
+      // owner's live report shows what that reads as: "I couldnt even load into
+      // nuke town" - he had bailed inside the retry window, reasonably.
+      fallbackUrl.searchParams.set('redeploy', selectedArena.id);
       window.setTimeout(() => { window.location.assign(fallbackUrl.toString()); }, 1_200);
     } else {
       setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
@@ -25734,6 +25749,26 @@ else {
 }
 refreshGuestMatchRecoveryAffordance();
 element<HTMLInputElement>('#room-input').addEventListener('input', refreshGuestMatchRecoveryAffordance);
+// Finish a renderer-fallback deploy without another human click. The reload that
+// switched this session to ?renderer=webgl2 names the arena that was being deployed;
+// stage it and press the REAL solo button once the gameplay module has enabled it -
+// the same code path a player's click takes, so every guard (callsign, admission,
+// preparing) still applies. One-shot: the interval disarms after the first press.
+const redeployArenaParam = launchParams.get('redeploy');
+if (redeployArenaParam && ARENA_SELECTIONS.some((entry) => entry.id === redeployArenaParam)) {
+  stageMenuArenaSelection(redeployArenaParam as ArenaId);
+  const redeployTimer = window.setInterval(() => {
+    if (gameStarted || matchStartPreparing) { window.clearInterval(redeployTimer); return; }
+    const soloButton = document.querySelector<HTMLButtonElement>('#solo');
+    if (soloButton && !soloButton.disabled) {
+      window.clearInterval(redeployTimer);
+      stageMenuArenaSelection(redeployArenaParam as ArenaId);
+      soloButton.click();
+    }
+  }, 400);
+  window.setTimeout(() => window.clearInterval(redeployTimer), 90_000);
+}
+
 const invitedName = launchParams.get('name');
 const normalizedInvitedName = normalizeRequiredPlayerName(invitedName ?? '');
 if (normalizedInvitedName) element<HTMLInputElement>('#player-name').value = normalizedInvitedName;

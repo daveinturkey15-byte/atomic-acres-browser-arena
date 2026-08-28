@@ -39,6 +39,24 @@ describe('solo renderer auto-retry', () => {
     expect(legacyMain).toContain("fallbackUrl.searchParams.set('renderer', 'webgl2')");
   });
 
+  it('remembers the fallback per browser version so the next session skips the pain', () => {
+    // Measured: Chrome 153 fails 9/9 plain WebGPU deploys, on Pass 73 and HEAD alike.
+    // Re-litigating that verdict every session costs ~90 s of visible failure each time.
+    expect(legacyMain).toContain("localStorage.setItem('atomic-acres:renderer-fallback:v1'");
+    expect(legacyMain).toContain('userAgent: navigator.userAgent');
+    const bootstrap = readFileSync('src/bootstrap.ts', 'utf8');
+    expect(bootstrap).toContain("localStorage.getItem('atomic-acres:renderer-fallback:v1')");
+    // A browser update must clear the record and try WebGPU again.
+    expect(bootstrap).toContain('record.userAgent !== navigator.userAgent');
+    // An explicit ?renderer= param always wins over the sticky record.
+    expect(bootstrap).toContain("url.searchParams.has('renderer')");
+    // And it must steer BEFORE the game module loads, or the renderer is already chosen.
+    const steer = bootstrap.indexOf('applyStickyRendererFallback();');
+    const load = bootstrap.indexOf("await import('./main')");
+    expect(steer).toBeGreaterThan(-1);
+    expect(steer).toBeLessThan(load);
+  });
+
   it('keeps the honest failure message when the error is not renderer-class', () => {
     expect(legacyMain).toContain(
       'setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`',

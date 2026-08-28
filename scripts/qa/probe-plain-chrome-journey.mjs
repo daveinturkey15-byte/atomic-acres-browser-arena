@@ -35,20 +35,29 @@ await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catc
 const errors = [];
 const fullErrors = [];
 page.on('pageerror', (e) => { errors.push('PAGE: ' + String(e).slice(0, 220)); fullErrors.push('PAGE: ' + String(e)); });
-page.on('console', (m) => { if (m.type() === 'error') { errors.push('CONSOLE: ' + m.text().slice(0, 220)); fullErrors.push('CONSOLE: ' + m.text()); } });
+const CAPTURE_ALL = argv.includes('--capture-all-console');
+page.on('console', (m) => {
+  if (m.type() === 'error') { errors.push('CONSOLE: ' + m.text().slice(0, 220)); fullErrors.push('CONSOLE: ' + m.text()); }
+  // Dawn's dump_shaders toggle emits the translated WGSL as PLAIN console messages, not
+  // errors - without this they are exactly the evidence a failing run throws away.
+  else if (CAPTURE_ALL) fullErrors.push(`CONSOLE[${m.type()}]: ` + m.text());
+});
 
 // 1. The root chooser, like a person following the link - or --direct to skip it and
 // load the channel URL exactly as the chooser would land it, isolating the journey.
 const CHANNEL_URL = arg('--channel-url', null);
+const EXTRA_PARAMS = arg('--extra-params', '');
 if (CHANNEL_URL) {
-  await page.goto(`${CHANNEL_URL}/?release=latest`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${CHANNEL_URL}/?release=latest${EXTRA_PARAMS}`, { waitUntil: 'domcontentloaded' });
 } else if (argv.includes('--direct')) {
-  await page.goto(`${ROOT}/channels/${CARD}/?release=latest`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${ROOT}/channels/${CARD}/?release=latest${EXTRA_PARAMS}`, { waitUntil: 'domcontentloaded' });
 } else {
   await page.goto(`${ROOT}/?probe=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector(`[data-release-choice="${CARD}"]`, { timeout: 60_000 });
   await page.locator(`[data-release-choice="${CARD}"]`).click();
-  await page.waitForURL(`**/channels/${CARD}/**`, { timeout: 60_000 });
+  // The card KEY is not the channel PATH (experimental routes to the-big-one), so wait
+  // for any channel landing rather than assuming key === path.
+  await page.waitForURL('**/channels/**', { timeout: 60_000 });
 }
 
 // 2. In-game identity: what does the build SAY it is?
@@ -101,10 +110,10 @@ console.log(JSON.stringify({
   finalState,
   errors: errors.slice(0, 10),
 }, null, 2));
-if (!launched && fullErrors.length) {
+if ((!launched || CAPTURE_ALL) && fullErrors.length) {
   const { mkdirSync, writeFileSync } = await import('node:fs');
   mkdirSync('artifacts/qa/tint-swizzle', { recursive: true });
-  writeFileSync('artifacts/qa/tint-swizzle/full-console-errors.txt', fullErrors.slice(0, 6).join(String.fromCharCode(10) + '=====' + String.fromCharCode(10)));
+  writeFileSync('artifacts/qa/tint-swizzle/full-console-errors.txt', fullErrors.slice(0, CAPTURE_ALL ? 400 : 6).join(String.fromCharCode(10) + '=====' + String.fromCharCode(10)));
   console.log('full errors -> artifacts/qa/tint-swizzle/full-console-errors.txt');
 }
 await browser.close();

@@ -38,8 +38,35 @@ const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
 
+/**
+ * Steer a browser with a KNOWN-broken WebGPU compiler straight onto the compat route.
+ *
+ * The record is written by the in-game fallback after two failed deploys (measured:
+ * Chrome 153 fails 9/9 un-instrumented WebGPU deploys with an internal Tint error, on
+ * old builds and new alike). Without this, every session replays ~90 seconds of failed
+ * attempts before recovering - which reads as "the game doesn't work", because for a
+ * minute and a half it doesn't. Keyed to the FULL user agent so any browser update
+ * clears it and WebGPU is tried again; an explicit ?renderer= always wins.
+ */
+function applyStickyRendererFallback(): void {
+  try {
+    const raw = localStorage.getItem('atomic-acres:renderer-fallback:v1');
+    if (!raw) return;
+    const record = JSON.parse(raw) as { userAgent?: string };
+    if (record.userAgent !== navigator.userAgent) {
+      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('renderer')) return;
+    url.searchParams.set('renderer', 'webgl2');
+    window.history.replaceState(null, '', url);
+  } catch { /* Storage-less contexts keep the per-session recovery. */ }
+}
+
 async function loadLatestBuild(): Promise<void> {
   document.title = 'Nuke Town — Browser Arena FPS';
+  applyStickyRendererFallback();
   app.replaceChildren();
   await import('./main');
 }
