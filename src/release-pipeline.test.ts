@@ -67,6 +67,13 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).not.toContain('Root chooser must expose exactly');
     // Newly enforced, and never enforced before: an offered channel must actually be staged.
     expect(staticTopologyVerifier).toContain('which is not staged');
+    // And a release must never REMOVE a pass the owner can currently select. The staging
+    // script still rebuilds the config from a closed set, so without this a production
+    // release would silently drop pass80 from the chooser.
+    expect(staticTopologyVerifier).toContain("execFileSync('git', ['show', 'origin/gh-pages:release-channel-config.js']");
+    expect(staticTopologyVerifier).toContain('would remove live channel(s)');
+    // A verifier that could not run must never read as one that passed.
+    expect(staticTopologyVerifier).toContain('NOT a pass - fetch gh-pages to enable this check.');
     expect(staticTopologyVerifier).toContain('publicConfig.retained.pass !== config.retained.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.historical.pass !== config.historical.pass');
     expect(staticTopologyVerifier).toContain('publicConfig.stable.pass !== config.rollback.pass');

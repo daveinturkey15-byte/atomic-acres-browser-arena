@@ -180,6 +180,20 @@ def publish():
     shutil.rmtree(target, ignore_errors=True)
     shutil.copytree(DIST, target)
 
+    # Refresh the ROOT chooser shell from the repo, every publish.
+    #
+    # The root shell is written by the release workflow's staging step and nothing else ever
+    # touched it, so a fix in `release-shell/` could sit unpublished indefinitely while the
+    # live root kept serving the old file. That is exactly how a chooser that iterated a
+    # hardcoded four keys survived two Pass 80 publishes and hid the build it had just
+    # deployed. These three files are the chooser and nothing else - no channel bytes, no
+    # release-channel-config.js, which is edited separately below.
+    for name in ("index.html", "release-shell.js", "release-shell.css"):
+        source = os.path.join(REPO, "release-shell", name)
+        if not os.path.isfile(source):
+            return False, f"release-shell/{name} is missing from the repo"
+        shutil.copyfile(source, os.path.join(WORKTREE, name))
+
     cfg_path = os.path.join(WORKTREE, "release-channel-config.js")
     cfg = open(cfg_path, encoding="utf-8").read()
     m = re.search(r"=\s*(\{.*\})\s*;?\s*$", cfg.strip(), re.S)
@@ -196,6 +210,16 @@ def publish():
     lost = before - set(channels)
     if lost:
         return False, f"REFUSING: this would have dropped existing channels {sorted(lost)}"
+    # Every channel the chooser will now DRAW must exist on disk. This mattered less when the
+    # chooser only ever drew four hardcoded keys; now that it renders whatever the config
+    # carries, a stale key here becomes a card that 404s in front of the owner.
+    for key, channel in channels.items():
+        path = channel.get("path")
+        if not path:
+            return False, f"REFUSING: channel {key} has no path"
+        if not os.path.isdir(os.path.join(WORKTREE, *path.split("/"))):
+            return False, f"REFUSING: channel {key} points at {path}, which is not on gh-pages"
+
     open(cfg_path, "w", encoding="utf-8", newline="\n").write(
         "window.__ATOMIC_ACRES_RELEASE_CHANNELS__=" + json.dumps(channels, separators=(",", ":")) + ";\n")
 

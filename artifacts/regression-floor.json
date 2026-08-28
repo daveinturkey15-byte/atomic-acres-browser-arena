@@ -1,11 +1,8 @@
 {
   "tsc_clean": true,
-  "tests_passed": 4095,
-  "tests_failed": 20,
-  "test_files_passed": 457,
-  "failing_files": [
-    "src/rendering/filmic-grade-chain.test.ts",
-    "src/timed-map-weapon-main-integration.test.ts"
-  ],
+  "tests_passed": 4384,
+  "tests_failed": 0,
+  "test_files_passed": 489,
+  "failing_files": [],
   "discounted_flaky": []
 }

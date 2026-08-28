@@ -38,6 +38,42 @@ for (const [key, channel] of Object.entries(publicConfig)) {
     throw new Error(`Root chooser channel ${key} points at ${channel.path}, which is not staged`);
   }
 }
+
+// A release must never REMOVE a pass the owner can currently select.
+//
+// `stage-release-topology.mjs` rebuilds this config from a closed set of keys, so a
+// production release would drop `pass80` - and every future extra pass - from the chooser
+// without a word. The owner's standing instruction is the opposite: "keeping historical
+// selectable passes on that available".
+//
+// Compared against what is ACTUALLY LIVE rather than against a list in this file, because a
+// list in this file is the same mistake one layer up: the four-key expectation that agreed
+// with a chooser hiding a shipped build was itself a hardcoded list.
+//
+// Skipped, not failed, when origin/gh-pages is unreachable - a first deploy and a local dry
+// run both legitimately have no live config, and a verifier that cannot run must not be
+// mistaken for one that passed. It says which case it is.
+let liveChannelKeys = null;
+try {
+  const liveConfigSource = execFileSync('git', ['show', 'origin/gh-pages:release-channel-config.js'], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 8 * 1024 * 1024,
+  });
+  liveChannelKeys = Object.keys(JSON.parse(
+    liveConfigSource.slice(liveConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''),
+  ));
+} catch {
+  console.warn('[release-topology] origin/gh-pages has no readable release-channel-config.js; '
+    + 'cannot check for dropped channels. NOT a pass - fetch gh-pages to enable this check.');
+}
+if (liveChannelKeys) {
+  const droppedChannelKeys = liveChannelKeys.filter((key) => !publicConfig[key]);
+  if (droppedChannelKeys.length) {
+    throw new Error(`This release would remove live channel(s) ${droppedChannelKeys.join(', ')} `
+      + `from the chooser. Currently live: ${liveChannelKeys.join(', ')}; staged: `
+      + `${Object.keys(publicConfig).join(', ')}. Carry them forward in `
+      + 'scripts/release/stage-release-topology.mjs, or drop them deliberately with the owner.');
+  }
+}
 if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
   || publicConfig.experimental.path !== 'channels/the-big-one') {
   throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
