@@ -15147,6 +15147,17 @@ function spawnPoint(): THREE.Vector3 {
 
 function syncMenuLifecyclePresentation(): void {
   const pausedMatch = menuLifecycle.surface === 'paused-match';
+  // L1/Pass 81: the frame loop's own sway latch cannot run on INELIGIBLE frames -
+  // the loop bails before it when a menu/loading surface owns the compositor, so a
+  // HUD frozen mid-lean stayed mid-lean through the whole pause. This is the
+  // event-driven twin: every lifecycle transition onto a visible surface writes the
+  // neutral pose once, outside the frame loop, respecting the ineligible-frame
+  // contract (no per-frame HUD writes; one latched write per transition).
+  if (menuLifecycle.surface !== 'hidden' && !hudSwayReleased) {
+    releaseHudSway(hudRoot);
+    hudSway = createHudSwayState(player.yaw, player.pitch);
+    hudSwayReleased = true;
+  }
   const deploying = menuLifecycle.surface === 'deploying';
   // Deployment owns a dedicated full-screen prerecorded-video surface which
   // sits outside #menu. Keeping the menu in layout while merely inert/aria-
