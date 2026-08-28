@@ -16,7 +16,7 @@ const ARENA = arg('--arena', 'atomic-acres');
 
 const browser = await chromium.launch({
   headless: false,
-  channel: 'chrome',
+  channel: arg('--browser-channel', 'chrome'),
   // Anti-throttling only by default. --extra-flag adds one Chrome flag per use, so the
   // masking flag can be bisected: the harness set ran green while default Chrome failed.
   args: [
@@ -62,6 +62,17 @@ if (CHANNEL_URL) {
 
 // 2. In-game identity: what does the build SAY it is?
 await page.waitForSelector('#solo:not([disabled])', { timeout: 120_000 });
+// --observe-only: never click anything - used to prove the redeploy carry-through
+// presses the solo button by itself after a renderer fallback.
+if (argv.includes('--observe-only')) {
+  const launched = await page.waitForFunction(() => {
+    const snap = window.__ATOMIC_ACRES_DEBUG__?.snapshot?.();
+    return Boolean(snap && snap.matchPhase === 'active' && snap.gameStarted === true);
+  }, undefined, { timeout: 240_000 }).then(() => true).catch(() => false);
+  console.log(JSON.stringify({ verdict: launched ? 'AUTO-DEPLOYED with zero input' : 'DID NOT AUTO-DEPLOY' }));
+  await browser.close();
+  process.exit(launched ? 0 : 1);
+}
 const identity = await page.evaluate(() => {
   const badge = [...document.querySelectorAll('header *,[class*=badge],[id*=session]')]
     .map((e) => (e.textContent || '').trim()).find((t) => /PASS \d+/.test(t)) ?? null;
@@ -88,10 +99,16 @@ let launched = await waitActive(240_000);
 // card and deploy once more.
 if (!launched && page.url().includes('renderer=webgl2')) {
   console.log('followed fallback: page reloaded onto the WebGL2 compat route');
-  await page.waitForSelector('#solo:not([disabled])', { timeout: 120_000 });
-  await page.locator(`.map-card[data-arena-id="${ARENA}"]`).click();
-  await page.locator('#solo').click();
-  launched = await waitActive(240_000);
+  if (argv.includes('--hands-off')) {
+    // The build now carries redeploy=<arena> through the fallback and presses the real
+    // solo button itself. Hands-off mode proves that: no further probe input at all.
+    launched = await waitActive(240_000);
+  } else {
+    await page.waitForSelector('#solo:not([disabled])', { timeout: 120_000 });
+    await page.locator(`.map-card[data-arena-id="${ARENA}"]`).click();
+    await page.locator('#solo').click();
+    launched = await waitActive(240_000);
+  }
 }
 
 const finalState = await page.evaluate(() => {
