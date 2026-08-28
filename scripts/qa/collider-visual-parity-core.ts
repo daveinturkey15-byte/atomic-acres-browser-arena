@@ -86,6 +86,71 @@ export const WALKTHROUGH_NAME_RULES: Array<{ pattern: RegExp; reason: string }> 
   { pattern: /particle|sprite|spark|smoke|dust|mist|rain/i, reason: 'particle/volumetric effect' },
 ];
 
+// ---------------------------------------------------------------------------
+// Direction C - BALLISTIC parity (HF-390 / Pass 81 lane aa-lane-ballistics).
+//
+// castShot's penetration path (src/legacy-main.ts) traces
+// activeBallisticSurfaces() ONLY: a visible mesh with no BallisticSurface is
+// GHOST cover - bullets cross it with no attenuation, no impact mark and no
+// sound. Direction C therefore asks the mirror question of Direction B:
+// every substantial visible mesh must be rated for gunfire - registered
+// directly (userData.ballisticSurfaceId), covered by an overlapping
+// shot-surface footprint (authored collision proxies ARE the shot authority
+// for Blender art), a dynamic raycast target, or excluded by a stated
+// shoot-through rule. Anything left is reported for triage: rate it or put it
+// in the ACCEPTED_SHOOT_THROUGH ledger with a written reason
+// (scripts/qa/ballistic-parity-ledger.ts).
+// ---------------------------------------------------------------------------
+
+/** A mesh this tall can hide part of a crouched body: it needs a rating. */
+export const BALLISTIC_MIN_HEIGHT_M = WALKTHROUGH_MIN_HEIGHT_M;
+/**
+ * WIDEST XZ dimension floor (movement uses the narrowest): a 0.12 m thick
+ * window pane can never block a body but absolutely takes a bullet, so thin
+ * wide sheets stay in the ballistic census while true slivers (posts thinner
+ * than a barrel, decals) drop out.
+ */
+export const BALLISTIC_MIN_WIDE_DIMENSION_M = 0.35;
+/** Shot-surface footprint must cover this share OF THE MESH footprint. */
+export const BALLISTIC_OVERLAP_SHARE = 0.25;
+/**
+ * The explaining surface must also cover this share of the mesh's
+ * COMBAT-HEIGHT range (0 .. BALLISTIC_ABOVE_COMBAT_MIN_Y_M): a knee-high
+ * garden bed must never "explain" the 3 m greenhouse wall standing on it -
+ * binary Y-overlap did exactly that in the first measured sweep.
+ */
+export const BALLISTIC_Y_COVERAGE_SHARE = 0.6;
+/**
+ * Flush-dressing tolerance: a thin authored skin or recessed panel sitting
+ * within this distance of a registered surface is explained by it - a bullet
+ * crossing the 3 cm skin impacts the authority a few centimetres later, so
+ * the felt result is the authority's material, not ghost cover. Only thin
+ * sheets are materially affected: for chunky meshes the expanded strip can
+ * never reach the footprint-share threshold on its own.
+ */
+export const BALLISTIC_FLUSH_EPSILON_M = 0.05;
+/**
+ * Meshes whose BOTTOM sits above the standing combat volume (bodies, bots and
+ * traversal all live below): canopy/ceiling dressing. Shots CAN reach them,
+ * but no body is ever behind them, so a missing rating there cannot move
+ * time-to-kill; counted as an exclusion, never silently dropped.
+ */
+export const BALLISTIC_ABOVE_COMBAT_MIN_Y_M = ABOVE_REACH_MIN_Y_M;
+/** BallisticSurface bounds without authored Y default to the nav volume. */
+export const DEFAULT_SURFACE_MIN_Y = 0;
+export const DEFAULT_SURFACE_MAX_Y = 8;
+
+/**
+ * Name rules for meshes a bullet legitimately crosses without a rating.
+ * Movement's exclusions carry over (water, terrain, sky, foliage, decals,
+ * particles) plus cloth: all are soft presentation a round should never stop
+ * on. Every exclusion is counted in the result, never silently dropped.
+ */
+export const BALLISTIC_SHOOT_THROUGH_NAME_RULES: Array<{ pattern: RegExp; reason: string }> = [
+  ...WALKTHROUGH_NAME_RULES,
+  { pattern: /flag|cloth|banner|awning|curtain|tarp|drape/i, reason: 'cloth/soft presentation' },
+];
+
 export type ColliderEntry = {
   box: Box2;
   sources: string[];
@@ -98,6 +163,10 @@ export type MeshEntry = {
   presentationOnly: boolean;
   instanced: boolean;
   vertices: number;
+  /** Direction C: the mesh's own registration stamp, when the arena builder rated it. */
+  ballisticSurfaceId: string | null;
+  /** Direction C: dynamic raycast target (practice target / test dummy limb). */
+  dynamicTarget: boolean;
 };
 
 export type ColliderSample = {
@@ -119,6 +188,31 @@ export type ArenaAuditResult = {
   invisibleColliders?: Array<Record<string, unknown>>;
   walkThroughMeshes?: Array<Record<string, unknown>>;
   excludedByRuleCounts?: Record<string, number>;
+  /** Direction C: authored shot-surface roster stats (material / classification). */
+  shotSurfaceStats?: {
+    total: number;
+    byMaterial: Record<string, number>;
+    byClassification: Record<string, number>;
+  };
+  /** Direction C: full authored roster, one row per shot surface. */
+  shotSurfaceRoster?: Array<{ id: string; name: string; material: string; classification: string }>;
+  /**
+   * Direction C: meshes explained ONLY by an overlapping surface footprint -
+   * listed with the explaining surface so a reviewer can falsify the
+   * explanation instead of trusting the count (fake coverage guard).
+   */
+  ballisticFootprintExplained?: Array<{ name: string; centre: [number, number, number]; surfaceId: string; surfaceMaterial: string; share: number }>;
+  /** Direction C: substantial visible meshes with NO gunfire rating at all. */
+  ballisticGhostMeshes?: Array<Record<string, unknown>>;
+  ballisticExcludedByRuleCounts?: Record<string, number>;
+  ballisticCensus?: {
+    total: number;
+    ratedDirect: number;
+    ratedByFootprint: number;
+    dynamicTargets: number;
+    excludedByRule: number;
+    unrated: number;
+  };
   /**
    * Deterministic sample of LIVE-authoritative movement colliders (boundary
    * containment and runtime-replaced statics excluded). The CDP live leg
@@ -171,6 +265,8 @@ export function collectMeshes(scene: THREE.Scene): MeshEntry[] {
       presentationOnly: object.userData.presentationOnly === true,
       instanced: object instanceof THREE.InstancedMesh,
       vertices: object.geometry.attributes?.position?.count ?? 0,
+      ballisticSurfaceId: typeof object.userData.ballisticSurfaceId === 'string' ? object.userData.ballisticSurfaceId : null,
+      dynamicTarget: typeof object.userData.targetId === 'string' || typeof object.userData.hitZone === 'string',
     });
   });
   return meshes;
@@ -251,6 +347,37 @@ function nearestVisibleMesh(entry: ColliderEntry, meshes: MeshEntry[]): string |
     }
   }
   return bestName;
+}
+
+/**
+ * World-space XZ AABB + Y range of a BallisticSurface's bounds. Authored
+ * rotations (yaw-staged props, the high-seas hull) rotate the box about its
+ * centre exactly as ballistics.surfaceInterval does, so the parity test sees
+ * the same footprint gunfire does.
+ */
+export function surfaceWorldFootprint(bounds: Box2): {
+  minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number;
+} {
+  const minY = bounds.minY ?? DEFAULT_SURFACE_MIN_Y;
+  const maxY = bounds.maxY ?? DEFAULT_SURFACE_MAX_Y;
+  if (!bounds.rotation) {
+    return { minX: bounds.minX, maxX: bounds.maxX, minZ: bounds.minZ, maxZ: bounds.maxZ, minY, maxY };
+  }
+  const centre = new THREE.Vector3((bounds.minX + bounds.maxX) / 2, (minY + maxY) / 2, (bounds.minZ + bounds.maxZ) / 2);
+  const half = new THREE.Vector3((bounds.maxX - bounds.minX) / 2, (maxY - minY) / 2, (bounds.maxZ - bounds.minZ) / 2);
+  const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...bounds.rotation));
+  const footprint = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity, minY: Infinity, maxY: -Infinity };
+  const corner = new THREE.Vector3();
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    corner.set(half.x * sx, half.y * sy, half.z * sz).applyQuaternion(rotation).add(centre);
+    footprint.minX = Math.min(footprint.minX, corner.x);
+    footprint.maxX = Math.max(footprint.maxX, corner.x);
+    footprint.minZ = Math.min(footprint.minZ, corner.z);
+    footprint.maxZ = Math.max(footprint.maxZ, corner.z);
+    footprint.minY = Math.min(footprint.minY, corner.y);
+    footprint.maxY = Math.max(footprint.maxY, corner.y);
+  }
+  return footprint;
 }
 
 export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEnrich): Promise<ArenaAuditResult> {
@@ -373,6 +500,105 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
   }
   walkThroughMeshes.sort((a, b) => Number(b.vertices) - Number(a.vertices));
 
+  // Direction C - ballistic census (see header block by the constants).
+  const shotSurfaces = (map as ArenaMap).shotSurfaces ?? [];
+  const byMaterial: Record<string, number> = {};
+  const byClassification: Record<string, number> = {};
+  for (const surface of shotSurfaces) {
+    byMaterial[surface.material] = (byMaterial[surface.material] ?? 0) + 1;
+    byClassification[surface.classification] = (byClassification[surface.classification] ?? 0) + 1;
+  }
+  const surfaceFootprints = shotSurfaces.map((surface) => ({
+    surface,
+    footprint: surfaceWorldFootprint(surface.bounds),
+  }));
+  const ballisticFootprintExplained: NonNullable<ArenaAuditResult['ballisticFootprintExplained']> = [];
+  const ballisticExcludedByRuleCounts: Record<string, number> = {};
+  const ballisticGhostMeshes: Array<Record<string, unknown>> = [];
+  let ballisticCensusTotal = 0;
+  let ratedDirect = 0;
+  let ratedByFootprint = 0;
+  let dynamicTargets = 0;
+  let ballisticExcluded = 0;
+  const excludeBallistic = (reason: string) => {
+    ballisticExcluded += 1;
+    ballisticExcludedByRuleCounts[reason] = (ballisticExcludedByRuleCounts[reason] ?? 0) + 1;
+  };
+  for (const entry of meshes) {
+    const height = entry.box.max.y - entry.box.min.y;
+    const footW = entry.box.max.x - entry.box.min.x;
+    const footD = entry.box.max.z - entry.box.min.z;
+    if (height < BALLISTIC_MIN_HEIGHT_M) continue;
+    if (Math.max(footW, footD) < BALLISTIC_MIN_WIDE_DIMENSION_M) continue;
+    const footprint = rectArea(entry.box.min.x, entry.box.max.x, entry.box.min.z, entry.box.max.z);
+    if (footprint > TERRAIN_FOOTPRINT_SHARE * arenaFootprintArea) continue;
+    const centreX = (entry.box.min.x + entry.box.max.x) / 2;
+    const centreZ = (entry.box.min.z + entry.box.max.z) / 2;
+    if (centreX < bounds.minX - 1 || centreX > bounds.maxX + 1 || centreZ < bounds.minZ - 1 || centreZ > bounds.maxZ + 1) continue;
+    ballisticCensusTotal += 1;
+    if (entry.ballisticSurfaceId) { ratedDirect += 1; continue; }
+    if (entry.dynamicTarget || /practice-target|test-dummy|mannequin/i.test(entry.path)) { dynamicTargets += 1; continue; }
+    const rule = BALLISTIC_SHOOT_THROUGH_NAME_RULES.find(({ pattern }) => pattern.test(entry.name) || pattern.test(entry.path));
+    if (rule) { excludeBallistic(rule.reason); continue; }
+    const shellScale = Math.max(footW, footD) > SHELL_MESH_WIDTH_M;
+    let bestShare = 0;
+    const combatMinY = Math.max(entry.box.min.y, 0);
+    const combatMaxY = Math.min(entry.box.max.y, BALLISTIC_ABOVE_COMBAT_MIN_Y_M);
+    const combatRange = Math.max(combatMaxY - combatMinY, 1e-6);
+    const meshMinX = entry.box.min.x - BALLISTIC_FLUSH_EPSILON_M;
+    const meshMaxX = entry.box.max.x + BALLISTIC_FLUSH_EPSILON_M;
+    const meshMinZ = entry.box.min.z - BALLISTIC_FLUSH_EPSILON_M;
+    const meshMaxZ = entry.box.max.z + BALLISTIC_FLUSH_EPSILON_M;
+    const flushFootprint = rectArea(meshMinX, meshMaxX, meshMinZ, meshMaxZ);
+    const explainedBy = surfaceFootprints.find(({ footprint: surface }) => {
+      if (entry.box.max.y <= surface.minY || entry.box.min.y >= surface.maxY) return false;
+      const yCovered = Math.min(surface.maxY, combatMaxY) - Math.max(surface.minY, combatMinY);
+      if (yCovered / combatRange < BALLISTIC_Y_COVERAGE_SHARE) return false;
+      const ix = Math.min(surface.maxX, meshMaxX) - Math.max(surface.minX, meshMinX);
+      const iz = Math.min(surface.maxZ, meshMaxZ) - Math.max(surface.minZ, meshMinZ);
+      const share = flushFootprint <= 1e-9 ? 0 : (Math.max(0, ix) * Math.max(0, iz)) / flushFootprint;
+      if (share > bestShare) bestShare = share;
+      if (shellScale) {
+        const contained = surface.minX >= entry.box.min.x - CONTAINMENT_EPSILON_M
+          && surface.maxX <= entry.box.max.x + CONTAINMENT_EPSILON_M
+          && surface.minZ >= entry.box.min.z - CONTAINMENT_EPSILON_M
+          && surface.maxZ <= entry.box.max.z + CONTAINMENT_EPSILON_M;
+        return contained || share >= SHELL_OVERLAP_SHARE_FLOOR;
+      }
+      return share >= BALLISTIC_OVERLAP_SHARE;
+    });
+    if (explainedBy) {
+      ratedByFootprint += 1;
+      ballisticFootprintExplained.push({
+        name: entry.name,
+        centre: [round(centreX), round((entry.box.min.y + entry.box.max.y) / 2), round(centreZ)],
+        surfaceId: explainedBy.surface.id,
+        surfaceMaterial: explainedBy.surface.material,
+        share: round(bestShare),
+      });
+      continue;
+    }
+    // Only exclude above-volume dressing AFTER the footprint attempt, so an
+    // upper-storey skin whose authority IS a registered fragment counts as
+    // rated, and only true canopy/eaves dressing lands here.
+    if (entry.box.min.y >= BALLISTIC_ABOVE_COMBAT_MIN_Y_M) {
+      excludeBallistic('above the standing combat volume (canopy/eaves/overhead dressing)');
+      continue;
+    }
+    ballisticGhostMeshes.push({
+      name: entry.name,
+      path: entry.path,
+      centre: [round(centreX), round((entry.box.min.y + entry.box.max.y) / 2), round(centreZ)],
+      size: [round(footW), round(height), round(footD)],
+      vertices: entry.vertices,
+      instanced: entry.instanced,
+      bestSurfaceShare: round(bestShare),
+    });
+  }
+  ballisticGhostMeshes.sort((a, b) => String(a.name).localeCompare(String(b.name))
+    || Number((a.centre as number[])[0]) - Number((b.centre as number[])[0])
+    || Number((a.centre as number[])[2]) - Number((b.centre as number[])[2]));
+
   // Deterministic live-probe sample: evenly spaced over the eligible
   // (non-boundary, non-runtime-replaced) movement colliders, index-strided so
   // the same tree always yields the same coordinates for a given build.
@@ -405,6 +631,28 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     invisibleColliders,
     walkThroughMeshes,
     excludedByRuleCounts,
+    shotSurfaceStats: {
+      total: shotSurfaces.length,
+      byMaterial,
+      byClassification,
+    },
+    shotSurfaceRoster: shotSurfaces.map((surface) => ({
+      id: surface.id,
+      name: surface.name,
+      material: surface.material,
+      classification: surface.classification,
+    })),
+    ballisticFootprintExplained,
+    ballisticGhostMeshes,
+    ballisticExcludedByRuleCounts,
+    ballisticCensus: {
+      total: ballisticCensusTotal,
+      ratedDirect,
+      ratedByFootprint,
+      dynamicTargets,
+      excludedByRule: ballisticExcluded,
+      unrated: ballisticGhostMeshes.length,
+    },
     colliderSamples,
     colliderSamplePopulation: eligible.length,
   };
