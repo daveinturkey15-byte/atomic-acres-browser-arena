@@ -982,7 +982,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   box(builder, 'rustworks-service-trench-floor', [trenchX, 0.045, 0], [3.4, 0.05, 34], grate, { solid: false, cast: false, shots: false });
   for (const x of trenchWallXs) {
     for (const z of trenchSegments) {
-      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark);
+      // HF-390 lane (2026-08-28): authored in concreteDark and read as poured
+      // concrete trench cover, but the 'wall' name rule rated it interior-wall
+      // (0.42 entry - drywall) so the 1v1 trench lane was casually wallbanged
+      // through what looks like concrete. Authored to the family it visually is.
+      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark, { ballisticMaterial: 'concrete' });
       wall.userData.rustworksRouteRole = 'west-service-trench-cover';
       box(builder, 'rustworks-service-trench-coping', [x, 1.34, z], [0.46, 0.08, 7.05], hazard, {
         solid: false,
@@ -2241,7 +2245,10 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   root.userData.gunRangeNeonLights = neonLights;
 
   box(builder, 'gun-range-control-room', [-16.5, 2.1, 15.5], [6.2, 4.2, 6.2], wall, { ballisticMaterial: 'interior-wall' });
-  box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: false });
+  // HF-390 lane (2026-08-28): the control-room glazing was shots:false - a
+  // ghost pane bullets crossed silently. It is glass for gunfire (impact
+  // material + 0.1 toll); movement stays non-solid exactly as before.
+  box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: true, ballisticMaterial: 'glass' });
   box(builder, 'gun-range-ready-bench', [16.2, 0.62, 15.4], [6.4, 1.05, 2.1], timber);
   box(builder, 'gun-range-ready-lockers', [18.5, 2.35, 8.4], [2.8, 4.6, 5.8], acoustic, { ballisticMaterial: 'structural-metal' });
 
