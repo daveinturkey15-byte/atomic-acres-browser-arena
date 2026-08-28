@@ -1,4 +1,0 @@
-interface:
-  display_name: "Atomic Acres Spatial Audio"
-  short_description: "Build bounded spatial audio and ambience"
-  default_prompt: "Use $atomic-acres-spatial-audio to add or verify spatial audio, footsteps, or ambience."

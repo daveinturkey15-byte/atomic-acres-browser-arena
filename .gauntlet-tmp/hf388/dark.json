@@ -1,9 +1,0 @@
-[
- {"id":"d0-shipped","fill":17.5,"emissive":null},
- {"id":"d1-arena-only","fill":0,"emissive":0},
- {"id":"d2-fill4p5-cap","fill":4.5,"emissive":0.18},
- {"id":"d3-fill4p5-bypass","fill":4.5,"emissive":null},
- {"id":"d4-fill3-cap","fill":3,"emissive":0.18},
- {"id":"d5-fill4p5-cap-normal4","fill":4.5,"emissive":0.18,"normalScale":4},
- {"id":"d6-paint","fill":4.5,"emissive":0.18,"paint":{"arms_sleeve":"#ff00ff","arms_glove":"#00ff00","arms_fingerglove":"#0000ff","arms_wristaccent":"#ffff00"}}
-]

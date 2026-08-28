@@ -1,3 +1,0 @@
-build 0: 1017 ms; midstorey instances=173
-build 1: 452 ms; midstorey instances=348
-build2 meshes=675 instancedMeshes=103 uniqueMaterials=192 shadowCasters=325

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Atomic Acres Feedback Gate"
-  short_description: "Bind every owner request to executable evidence"
-  default_prompt: "Use $atomic-acres-owner-feedback-gate to reconcile this Atomic Acres feedback into owned code, tests, and exact evidence."

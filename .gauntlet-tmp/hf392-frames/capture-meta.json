@@ -1,8 +1,0 @@
-{
-  "backend": "webgpu",
-  "adapterInfo": {
-    "vendor": "nvidia",
-    "architecture": "blackwell"
-  },
-  "errors": []
-}

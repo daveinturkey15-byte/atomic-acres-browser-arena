@@ -1,4 +1,0 @@
-interface:
-  display_name: "Atomic Acres Combat Verification"
-  short_description: "Red-team multiplayer combat authority"
-  default_prompt: "Use $atomic-acres-multiplayer-combat-verification to run a fail-closed multiplayer combat audit."

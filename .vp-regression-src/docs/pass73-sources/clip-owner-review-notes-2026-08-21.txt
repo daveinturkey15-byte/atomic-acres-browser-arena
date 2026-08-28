@@ -1,9 +1,0 @@
-00:03-00:11 - The first grenade throw looks improved in this recording, but this clip alone cannot falsify the owner's written report of a remaining cold first-throw hitch.
-
-01:09-01:28 - The owner discusses one-click directional Carpet Bomber targeting while the capture presents a red world-space line/arrow; the selected support identity is not legible enough here to prove an activation mismatch.
-
-01:28-01:41 - The supplied capture shows the first-person arms terminating inside the viewport and shows collision against geometry that is not visibly present on the intended route.
-
-01:51-02:16 - The owner describes the knife/arms as too thin, held presentation penetrates nearby wall/floor/underside geometry, the player falls through a visibly solid canopy/platform, and a large freeze is audible but its triggering system is not isolated by the recording.
-
-02:33-02:45 - The overlay explicitly reads TRI-PASS and SELECT THREE TARGETS, so its three-target map is not proof of a Carpet Bomber defect; the owner repeats the Carpet direction request and encounters another invisible geometry obstruction.

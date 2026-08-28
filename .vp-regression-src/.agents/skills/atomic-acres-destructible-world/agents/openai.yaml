@@ -1,4 +1,0 @@
-interface:
-  display_name: "Atomic Acres Destructible World"
-  short_description: "Forge authoritative interactive destruction"
-  default_prompt: "Use $atomic-acres-destructible-world to implement or audit an interactive destructible object."

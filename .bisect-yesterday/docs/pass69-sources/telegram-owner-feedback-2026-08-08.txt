@@ -1,7 +1,0 @@
-Ok I will test more properly later. The mobile controls are improved but a bit clunky. Make the sticks work where I click on them not just around the edges. Put the fire button closer to right thumb stick. Research how other games do mobile controls emulating a gamepad and ensure our gamepad controls work the same. I rotated mid match and it crashed   Fix that
-
-Bring the dps stat back to the gun field kit. Remove the note about static backed image
-
-All of this should be easy to quickly add and publish as 69.1. Also remove the note about farcrysis
-
-Also ensure the note about control shift r is on the front when you select your version of the game. And the hard reset button in options the game refresh should be there on the front too.

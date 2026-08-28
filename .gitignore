@@ -31,3 +31,15 @@ dist-*/
 # Transient publish worktree created by scripts/orchestration/publish_pass80.py.
 # It was committed as a stray gitlink by a round `git add -A`; it is not a submodule.
 .gh-pages-publish/
+
+# Full duplicate repo checkouts left by a viewpoint-regression run and a bisect. Nothing
+# references either; they were committed by a round `git add -A`. Tracking them made every
+# repo-wide search return three copies of every source file.
+.vp-regression-src/
+.bisect-yesterday/
+
+# Agent scratch: critic frame captures, a GLB before/after comparison, and a backup copy
+# of three farcrysis sources whose originals live in src/. Committed by a round `git add -A`.
+.critic-iw/
+.tower-cmp-tmp/
+.tmp-tree-mat-backup/

@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 3,
-  "identity": {"sourceSha": "not-a-git-sha", "buildId": "moving-latest", "environmentHash": "bad", "worktreeState": "dirty", "buildState": "moving"},
-  "acceptance": {"state": "draft", "artifact": {"path": "../moving.json", "sha256": "bad"}, "requirementIds": [], "falsifierIds": []},
-  "impairmentManifest": {"version": "draft", "sha256": "bad", "profiles": []},
-  "results": [],
-  "hardwareEvidence": []
-}
