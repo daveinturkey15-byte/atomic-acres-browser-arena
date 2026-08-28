@@ -15,6 +15,8 @@ import {
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
 import { ATOMIC_MANNEQUIN_LAYOUT, authoredLargeCoverIdAt } from './map';
+import { buildNuketownLawnField } from './nuketown-lawn-field';
+import { buildNuketownMountainBackdrop } from './nuketown-mountain-backdrop';
 
 export { NEIGHBOURHOOD_BIN_POSITIONS } from './arena-layout';
 
@@ -332,6 +334,23 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   }
 
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
+
+  // Pass 82 "better grass and surrounding mountains in nuketown". Both layers
+  // live HERE, in the street-life group, for the same reason the mannequins
+  // do: the default 'blender' render profile hides the whole procedural arena
+  // root behind the Quality GLB, while this group is a sibling of the arena
+  // and renders on EVERY profile. Added after the batch pass on purpose - the
+  // lawn is InstancedMesh (the batcher skips those) and the backdrop must
+  // keep its vertex-coloured ridge materials instead of being collapsed into
+  // a palette batch.
+  const lawn = buildNuketownLawnField(group, reduced);
+  const backdrop = buildNuketownMountainBackdrop(group);
+  group.userData.nuketownLawnStats = lawn.stats;
+  group.userData.nuketownBackdropStats = backdrop.stats;
+  // updateArenaArt drives the lawn's GPU wind clock through this hook (the
+  // per-frame caller in legacy-main already passes this group + now-ms).
+  group.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
+
   group.userData.neighbourhoodLife = {
     flowers: flowerCount,
     flowerBeds: flowerBeds.length,
@@ -850,6 +869,10 @@ const arenaFlightScale = new THREE.Vector3();
 
 /** Updates only explicitly presentation-only arena nodes without per-instance frame allocations. */
 export function updateArenaArt(root: THREE.Group, now: number): void {
+  // Pass 82 lawn wind: one uniform write per frame; the sway itself is fully
+  // GPU-side in the field's TSL graph (no-op on the WebGL2 compat route).
+  const lawnWind = root.userData.nuketownLawnWind as ((seconds: number) => void) | undefined;
+  if (lawnWind) lawnWind(now * 0.001);
   const state = arenaAnimationAt(now);
   const rings = (root.userData.animationRings as THREE.Mesh[] | undefined) ?? [];
   for (let index = 0; index < rings.length; index += 1) {

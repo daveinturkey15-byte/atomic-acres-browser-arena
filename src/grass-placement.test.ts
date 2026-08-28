@@ -4,47 +4,70 @@ import {
   evaluateGrassBend,
   grassPlacementAllowed,
   GRASS_MAX_HEIGHT,
+  HARD_SURFACE_HALF_DEPTH_M,
   isGrassGround,
 } from './grass-placement';
 
 describe('Atomic Acres deterministic manicured-verge placement', () => {
-  it('admits only the split green verges and rejects road, bounds, structures and expanded colliders', () => {
-    expect(isGrassGround(-20, 0)).toBe(true);
-    expect(isGrassGround(20, 0)).toBe(true);
-    expect(isGrassGround(0, 0)).toBe(false);
-    expect(isGrassGround(-35, 0)).toBe(false);
-    expect(grassPlacementAllowed(-9, -28, [])).toBe(false);
-    expect(grassPlacementAllowed(-20, 0, [{ minX: -20.2, maxX: -19.8, minZ: -0.2, maxZ: 0.2 }])).toBe(false);
-    expect(grassPlacementAllowed(-20, 2, [])).toBe(true);
+  // manicured-verges-v4 (Pass 82): the v3 regions pre-dated the Pass 78 axis
+  // flip - the street now runs ALONG X with asphalt at |z| <= 6.5, kerbs to
+  // 7.7 and pavements to 8.8, but the v3 west/east bands at |x| > 14.2 spanned
+  // the whole Z range, so (+/-20, 0) - the MIDDLE OF THE ROAD near each street
+  // end - counted as grass ground and both grass consumers grew blades on the
+  // asphalt while the back yards stayed bald. v4 re-derives the two lawn
+  // bands from the layout authority (everything between the pavement edge and
+  // the boundary fence). The old (+/-20, 0) probes are kept, inverted, as the
+  // regression pin for exactly that defect.
+  it('admits only the yard/verge lawn bands and rejects road, kerb, pavement, bounds, structures and expanded colliders', () => {
+    expect(isGrassGround(-20, -20)).toBe(true); // west back yard
+    expect(isGrassGround(20, 20)).toBe(true); // east back yard
+    expect(isGrassGround(0, -10)).toBe(true); // verge strip behind the north hedge line
+    expect(isGrassGround(-20, 0)).toBe(false); // asphalt (v3 grew grass here)
+    expect(isGrassGround(20, 0)).toBe(false); // asphalt (v3 grew grass here)
+    expect(isGrassGround(0, 0)).toBe(false); // asphalt, street centre
+    expect(isGrassGround(-20, -7.1)).toBe(false); // kerbstone band
+    expect(isGrassGround(-20, 8.25)).toBe(false); // pavement band
+    expect(isGrassGround(-35, 0)).toBe(false); // out of bounds
+    expect(isGrassGround(0, -32)).toBe(false); // beyond the boundary fence
+    expect(grassPlacementAllowed(4, -17.4, [])).toBe(false); // aqua house footprint
+    expect(grassPlacementAllowed(-17.7, 12.5, [])).toBe(false); // garage footprint
+    expect(grassPlacementAllowed(-20, -20, [{ minX: -20.2, maxX: -19.8, minZ: -20.2, maxZ: -19.8 }])).toBe(false);
+    expect(grassPlacementAllowed(-20, -20, [])).toBe(true);
   });
 
-  // RED-FIRST PROOF: this pin failed at '2766df53' before this edit (received
-  // '788f9625'). The sole cause is ARENA_BOUNDS minZ/maxZ +/-30 -> +/-31.5
-  // (commit 9a9bbd7b), the owner-sanctioned HF-383 remainder "maybe make it a
-  // tad bigger because it feels a little bit clustered", under which hedge
-  // runs, fences and mounds deliberately follow the fence line out. The verge
-  // regions are clipped by ARENA_BOUNDS in isGrassGround, so the manicured
-  // verges follow the same fence line; the deeper candidate pool changes which
-  // shuffled cells fill the fixed 720 slots. Causation isolated via a probe
-  // that reproduces '2766df53' exactly under the old bounds - no other input
-  // moved. Re-pinned at EQUAL OR GREATER strictness: every original assertion
-  // is kept verbatim and a new assertion below pins that placements now cover
-  // the deepened |z| in (30, 31.5] strips.
+  // RED-FIRST PROOF (v4, Pass 82): this pin failed at '788f9625' before this
+  // edit (received 'e034370e'), with every other assertion in this file and
+  // the grass-system suite green. The sole cause is GRASS_GROUND_REGIONS
+  // moving to the manicured-verges-v4 lawn bands (see grass-placement.ts):
+  // same candidate lattice, same 720-slot fill, same hashes - only the
+  // region rectangles the candidates map into changed, which is the entire
+  // point of the pass ("grass must NOT grow on asphalt, kerb or pavement").
+  // Re-pinned at GREATER strictness: every original assertion is kept and the
+  // new hard-surface exclusion pin below is one the v3 layout could never
+  // pass.
+  // (v3 proof retained: '2766df53' -> '788f9625' was the HF-383 bounds
+  // deepening, isolated the same way.)
   it('produces a stable private placement checksum without consuming runtime RNG', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('788f9625');
+    expect(first.checksum).toBe('e034370e');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);
-    // NEW behaviour pin (HF-383 Z-deepening): grass must cover the extended
-    // back-yard depth behind each spawn, on BOTH verges, or the map shows a
-    // bald 1.5 m strip between the old and new fence lines.
+    // Behaviour pin kept from HF-383: grass must cover the extended back-yard
+    // depth behind each spawn, on BOTH sides of the street.
     const deepened = first.placements.filter((placement) => Math.abs(placement.z) > 30 && Math.abs(placement.z) <= 31.5);
     expect(deepened.length).toBeGreaterThan(0);
     expect(new Set(deepened.map((placement) => Math.sign(placement.z))).size).toBe(2);
+    // NEW hard-surface pin (Pass 82): no placement may sit on the asphalt,
+    // kerbstone or pavement band. |z| < 8.8 is the full hard-surface half
+    // depth (STREET_HALF_WIDTH 6.5 + kerb 1.2 + sidewalk 1.1); v3 placed
+    // dozens of blades inside it at both street ends.
+    expect(first.placements.every((placement) => Math.abs(placement.z) >= HARD_SURFACE_HALF_DEPTH_M)).toBe(true);
+    // And both lawn bands must actually be populated.
+    expect(new Set(first.placements.map((placement) => Math.sign(placement.z))).size).toBe(2);
   });
 
   it('keeps wind deterministic and adds only bounded local player reaction', () => {
