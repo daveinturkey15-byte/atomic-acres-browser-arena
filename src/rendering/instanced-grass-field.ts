@@ -99,6 +99,10 @@ export type GrassFieldMaterialOptions = Readonly<{
   sssColor?: number;
   /** Backlit translucency strength 0..1 (default 0 = off). */
   sssStrength?: number;
+  /** Root-shade multiplier RGB (fraction of base colour at the blade root).
+   * The tropical donor's dark humus [0.42, 0.5, 0.38] reads as burnt stubble
+   * on a bright kept lawn; suburban presets pass a lighter shade. */
+  rootShade?: readonly [number, number, number];
 }>;
 
 export interface InstancedGrassFieldOptions {
@@ -263,7 +267,8 @@ function makeFieldMaterial(
 
   // ---- root-to-tip gradient + optional backlit translucency ----
   const baseV = vec3(materialColor as unknown as Node<'vec3'>);
-  const rootShade = baseV.mul(vec3(0.42, 0.5, 0.38));
+  const [shadeR, shadeG, shadeB] = opts.rootShade ?? [0.42, 0.5, 0.38];
+  const rootShade = baseV.mul(vec3(shadeR, shadeG, shadeB));
   const grad = smoothstep(0, 0.55, hN);
   let col = mix(rootShade, baseV, grad);
   col = mix(col, baseV.mul(vec3(1.14, 1.08, 0.8)), hN.mul(0.7)) as unknown as Node<'vec3'>;

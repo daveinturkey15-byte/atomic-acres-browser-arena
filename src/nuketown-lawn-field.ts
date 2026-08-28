@@ -153,10 +153,10 @@ export function nuketownLawnPlacementAllowed(x: number, z: number): boolean {
 
 /** Kept-lawn tint: cool suburban greens with mild sun-bleached clumping. */
 export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
-  rBase: 0.62, rWarm: 0.16,
-  gBase: 0.86, gWarm: 0.08,
-  bBase: 0.55, bWarm: -0.12,
-  valueBase: 0.86, valuePatch: 0.09, valueJitter: 0.05,
+  rBase: 0.7, rWarm: 0.2,
+  gBase: 0.9, gWarm: 0.1,
+  bBase: 0.52, bWarm: -0.1,
+  valueBase: 0.9, valuePatch: 0.07, valueJitter: 0.04,
 });
 
 /**
@@ -171,18 +171,21 @@ export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean)
     regions: GRASS_GROUND_REGIONS,
     cellSizeM: reduced ? 0.52 : 0.34,
     bladeHeightM: NUKETOWN_LAWN_BLADE_HEIGHT_M,
-    bladeWidthM: 0.045,
+    bladeWidthM: 0.05,
     bladeBendM: 0.05,
     scaleRange: [0.68, 1.0],
     placementAllowed: nuketownLawnPlacementAllowed,
     material: {
-      color: 0x527d36,
+      color: 0x61a244,
       roughness: 0.88,
       metalness: 0.02,
       swayAmount: 0.045,
       windSpeed: 0.8,
-      sssColor: 0x9cc44e,
+      sssColor: 0xa8cf56,
       sssStrength: 0.3,
+      // Kept lawn, not jungle floor: light root shade so blades stay green
+      // against the bright Quality lawn plates instead of reading as stubble.
+      rootShade: [0.62, 0.7, 0.55],
     },
     tint: NUKETOWN_LAWN_TINT,
   });
