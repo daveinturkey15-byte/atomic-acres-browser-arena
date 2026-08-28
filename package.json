@@ -32,6 +32,7 @@
     "qa:playwright-topology": "node scripts/qa/run-playwright-with-topology.mjs",
     "test:e2e:bounded": "node scripts/qa/run-bounded-e2e.mjs",
     "qa:governance": "node scripts/qa/governance-gates.mjs",
+    "qa:ballistic-parity": "tsx scripts/qa/audit-ballistic-parity.ts",
     "qa:unreachable": "node scripts/qa/find-unreachable-modules.mjs",
     "qa:release": "node scripts/qa/capture-release.mjs",
     "qa:multiplayer": "node scripts/qa/verify-multiplayer.mjs",

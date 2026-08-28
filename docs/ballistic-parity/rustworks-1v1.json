@@ -21,13 +21,12 @@
   "total": 64,
   "byMaterial": {
    "structural-metal": 21,
-   "concrete": 1,
-   "interior-wall": 6,
+   "concrete": 7,
    "container": 36
   },
   "byClassification": {
-   "explicit": 40,
-   "rule": 24
+   "explicit": 46,
+   "rule": 18
   }
  },
  "excludedByRule": {
@@ -174,38 +173,38 @@
   {
    "id": "Rustworks arena:22:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:23:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:24:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:25:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:26:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:27:rustworks-service-trench-wall",
    "name": "rustworks-service-trench-wall",
-   "material": "interior-wall",
-   "classification": "rule"
+   "material": "concrete",
+   "classification": "explicit"
   },
   {
    "id": "Rustworks arena:28:rustworks-open-container-wall-a",

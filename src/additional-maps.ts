@@ -982,7 +982,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   box(builder, 'rustworks-service-trench-floor', [trenchX, 0.045, 0], [3.4, 0.05, 34], grate, { solid: false, cast: false, shots: false });
   for (const x of trenchWallXs) {
     for (const z of trenchSegments) {
-      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark);
+      // HF-390 lane (2026-08-28): authored in concreteDark and read as poured
+      // concrete trench cover, but the 'wall' name rule rated it interior-wall
+      // (0.42 entry - drywall) so the 1v1 trench lane was casually wallbanged
+      // through what looks like concrete. Authored to the family it visually is.
+      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark, { ballisticMaterial: 'concrete' });
       wall.userData.rustworksRouteRole = 'west-service-trench-cover';
       box(builder, 'rustworks-service-trench-coping', [x, 1.34, z], [0.46, 0.08, 7.05], hazard, {
         solid: false,
