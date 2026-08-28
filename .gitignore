@@ -27,3 +27,7 @@ docs/assets/pass65-weapons/firearms/pass65-weapon-family-preview-contact-sheet.p
 # separate, deliberate cleanup.
 dist-*/
 .gauntlet-tmp/
+
+# Transient publish worktree created by scripts/orchestration/publish_pass80.py.
+# It was committed as a stray gitlink by a round `git add -A`; it is not a submodule.
+.gh-pages-publish/
