@@ -262,6 +262,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     blocksShots = solid,
     ballisticMaterial?: BallisticMaterialId,
     breakableWindowId?: string,
+    rotation?: [number, number, number],
   ): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
     mesh.name = name;
@@ -270,16 +271,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       metalness: mat instanceof THREE.MeshStandardMaterial ? mat.metalness : undefined,
     });
     mesh.position.set(...position);
+    if (rotation) mesh.rotation.set(...rotation);
     mesh.castShadow = cast;
     mesh.receiveShadow = true;
     world.add(mesh);
-    const bounds = {
+    const bounds: Box2 = {
       minX: position[0] - size[0] / 2,
       maxX: position[0] + size[0] / 2,
       minZ: position[2] - size[2] / 2,
       maxZ: position[2] + size[2] / 2,
       minY: position[1] - size[1] / 2,
       maxY: position[1] + size[1] / 2,
+      ...(rotation ? { rotation } : {}),
     };
     if (blocksShots) {
       raycastMeshes.push(mesh);
@@ -305,8 +308,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     return mesh;
   }
 
-  function collisionProxy(name: string, position: [number, number, number], size: [number, number, number]): void {
-    const proxy = box(name, position, size, palette.dark, true, false);
+  function collisionProxy(name: string, position: [number, number, number], size: [number, number, number], ballisticMaterial?: BallisticMaterialId): void {
+    const proxy = box(name, position, size, palette.dark, true, false, true, ballisticMaterial);
     // This simple shell is intentionally visible in Performance so every
     // authoritative route collider has a readable visual counterpart. Quality
     // replaces it with the rounded authored route art in environment-assets.
@@ -318,7 +321,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     name: string,
     position: [number, number, number],
     size: [number, number, number],
-    ballisticMaterial: BallisticMaterialId = 'structural-metal',
+    // HF-390 lane: REQUIRED. The old 'structural-metal' default made a silent
+    // guess look exactly like an authored rating ('explicit' classification),
+    // so the fallback gate could never catch it - the house media consoles
+    // shipped rated near-concrete that way.
+    ballisticMaterial: BallisticMaterialId,
   ): THREE.Mesh {
     const proxy = box(name, position, size, palette.dark, true, false, true, ballisticMaterial);
     proxy.visible = false;
@@ -582,8 +589,14 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     for (const solid of architecture.solids) {
       const solidMaterial = wallMaterial(solid);
       if (solid.kind === 'ramp') {
-        const rendered = box(solid.name, solid.position, solid.size, solidMaterial, false, true, false);
-        if (solid.rotation) rendered.rotation.set(...solid.rotation);
+        // HF-390 lane (2026-08-28): ramps were movement-only - a timber ramp
+        // was GHOST cover for gunfire (no impact, no attenuation, free
+        // under-ramp wallbangs). Register the slope for shots with its real
+        // rotation so bullets pay the authored family (timber -> wood).
+        const rendered = box(
+          solid.name, solid.position, solid.size, solidMaterial,
+          false, true, true, wallBallistics[solid.surface], undefined, solid.rotation,
+        );
         bindPass73CollisionVisualOwner(rendered, architecture, solid);
         physicsColliders.push(solidBounds(solid));
         continue;
@@ -694,8 +707,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   physicalCover.push({ id: 'central-transit-bus', bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
   box('coach roof', [CENTRAL_BUS.x, busHeight - 0.18, CENTRAL_BUS.z], [busLength - 0.45, 0.25, busWidth - 0.5], palette.white, false);
   for (const x of [-4.6, -1.6, 1.6, 4.6]) {
-    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z - busWidth / 2 - 0.03], [2.3, 1.1, 0.12], palette.glass, false, false);
-    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z + busWidth / 2 + 0.03], [2.3, 1.1, 0.12], palette.glass, false, false);
+    // HF-390 lane: the panes are glass for gunfire (impact/audio material and a
+    // negligible 0.11 energy toll); the bus BODY box behind them remains the
+    // cover authority, so central-cover balance does not move. Whether the
+    // window band should ever become a real shot aperture through the bus is
+    // an open owner balance decision recorded in docs/ballistic-parity/.
+    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z - busWidth / 2 - 0.03], [2.3, 1.1, 0.12], palette.glass, false, false, true, 'glass');
+    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z + busWidth / 2 + 0.03], [2.3, 1.1, 0.12], palette.glass, false, false, true, 'glass');
   }
   for (const x of [-4.4, 4.4]) {
     for (const z of [-1.2, 1.2]) {
@@ -704,6 +722,26 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       wheel.position.set(CENTRAL_BUS.x + x, 0.7, CENTRAL_BUS.z + z);
       world.add(wheel);
     }
+  }
+
+  // HF-390 lane: the Quality art coach (environment-assets buildRetroCoach at
+  // CENTRAL_BUS, yaw PI/2 + 0.02) has raked end glazing OUTSIDE the bus body
+  // box (half-length 6.3), so its windshield and rear glass were ghost
+  // surfaces - bullets crossed with no impact. Shot-only glass panes sized to
+  // the art's measured world AABBs (docs/ballistic-parity sweep) give them
+  // real glass impacts; the parity gate re-flags them if the art ever moves.
+  // One shared envelope for both ends (covering the larger, windshield AABB):
+  // the art's windshield and rear glass differ by centimetres, but the
+  // nuketown fidelity contract requires 180-degree symmetric authority, and a
+  // glass toll over a superset envelope is felt identically at both ends.
+  for (const [name, endX, endZ] of [
+    ['coach windshield', -6.82, 0.14],
+    ['coach rear glass', 6.82, -0.14],
+  ] as Array<[string, number, number]>) {
+    const pane = box(name, [CENTRAL_BUS.x + endX, 2.64, CENTRAL_BUS.z + endZ], [0.27, 1.36, 4.28], palette.glass, false, false, true, 'glass');
+    pane.visible = false;
+    pane.userData.collisionProxy = true;
+    pane.userData.authoredCollisionAuthority = true;
   }
 
   // Two delivery vans parked in the road, one beyond each end of the bus.
@@ -733,7 +771,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     box(`garage ${index}`, [garage.x, garageHeight / 2, garage.z], [garageWidth, garageHeight, garageDepth], palette.cream);
     // These read as closed, opaque doors, so movement and projectile authority
     // must match the facade instead of relying on the slightly recessed shell.
-    box('garage door', [garage.x, 1.35, garage.z + facing * (garageDepth / 2)], [garageWidth - 1.8, 2.5, 0.18], palette.chrome, true, false, true);
+    // HF-390 lane: the chrome door previously fell to the 'garage' name rule
+    // (interior-wall, 0.42/1.05) - a metal door that wallbanged like
+    // plasterboard. Authored thin-metal to match what it visibly is.
+    box('garage door', [garage.x, 1.35, garage.z + facing * (garageDepth / 2)], [garageWidth - 1.8, 2.5, 0.18], palette.chrome, true, false, true, 'thin-metal');
   }
 
   // Waist-high yard fencing divides the two properties without sealing a route.
@@ -863,7 +904,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   });
 
   // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
-  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55]);
+  // HF-390 lane: the trellis art (environment-assets) is timber ribs, slats
+  // and vines; the 'column' name rule was rating these four wooden posts as
+  // structural-metal (2.15 entry - steel-girder bullets-sponge). Wood.
+  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55], 'wood');
   // The Blender hydroponics landmark is an open frame with beds rather than a full-height perimeter.
   // Older west/east/north/south proxy walls created an unseen enclosure; keep those routes open.
   collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
@@ -882,27 +926,46 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // decorative; walk-through here is the accepted cosmetic mismatch and the
   // traversal suite pins zero 'greenhouse frame wall' colliders.
 
+  // HF-390 lane (2026-08-28): the movement deferral above is about ROUTES and
+  // stays exactly as pinned (zero greenhouse colliders). Gunfire is separate
+  // authority: a greenhouse wall is glazing in a thin frame, and bullets were
+  // crossing it with no impact and no cost. These shot-only glass panes mirror
+  // the six environment-assets 'greenhouse-frame-wall' segments byte-for-byte
+  // (both doorways stay true holes), cost a negligible 0.08-entry glass toll,
+  // and leave every traversal contract untouched.
+  for (const [index, [x, z, sx, sz]] of ([
+    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8],
+    [-28.025, 24.8, 4.45, 0.45], [-22.975, 24.8, 2.45, 0.45],
+    [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
+  ] as Array<[number, number, number, number]>).entries()) {
+    const pane = box(`greenhouse-shot-pane-${index}`, [x, 1.5, z], [sx, 3, sz], palette.glass, false, false, true, 'glass');
+    pane.visible = false;
+    pane.userData.collisionProxy = true;
+    pane.userData.authoredCollisionAuthority = true;
+  }
+
   // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
   box('atomic landmark plinth', [27, 0.38, -20], [4.4, 0.76, 4.4], palette.concrete);
 
   // Player-sized authored objects need one shared authority contract even when
   // Quality replaces the procedural presentation with its Blender scene.
   const substantialPropColliders: string[] = [];
-  const substantial = (name: string, position: [number, number, number], size: [number, number, number], material?: BallisticMaterialId) => {
+  const substantial = (name: string, position: [number, number, number], size: [number, number, number], material: BallisticMaterialId) => {
     substantialPropColliders.push(authoredCollisionProxy(name, position, size, material).name);
   };
   for (const [index, [x, z, scale]] of [
     [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
   ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
   for (const [index, [x, z]] of [[-24, -8], [24, 8], [-9, -27], [9, 27]].entries()) {
-    substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8]);
+    // Sheet-metal service kiosks, not girders: thin-metal by what they look like.
+    substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8], 'thin-metal');
   }
   for (const [index, [x, z]] of [[-30, -8], [30, 8]].entries()) {
-    substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3]);
+    substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3], 'structural-metal');
   }
   for (const [index, x] of [-29, -26, -23].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 21], [1.1, 0.7, 6.2], 'concrete');
-  substantial('authored-reclamation-tank-collider', [-29.5, 3.05, -14], [2.7, 5.6, 2.7]);
-  for (const [index, z] of [-6.5, 6.5].entries()) substantial(`authored-civic-post-collider-${index}`, [0, 3.25, z], [0.32, 6.5, 0.32]);
+  substantial('authored-reclamation-tank-collider', [-29.5, 3.05, -14], [2.7, 5.6, 2.7], 'structural-metal');
+  for (const [index, z] of [-6.5, 6.5].entries()) substantial(`authored-civic-post-collider-${index}`, [0, 3.25, z], [0.32, 6.5, 0.32], 'structural-metal');
   for (const [houseIndex, house] of HOUSE_LAYOUT.entries()) {
     const { x, z, facing } = house;
     const tableX = x - 3;
@@ -916,7 +979,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     substantial(`authored-house-${houseIndex}-sofa-collider`, [sofaX, 0.85, sofaZ], [3.25, 1.7, 1.3], 'wood');
     substantial(`authored-house-${houseIndex}-kitchen-collider`, [x - 3.75, 1.15, z - facing * 5.25], [6.5, 2.3, 0.85], 'wood');
     substantial(`authored-house-${houseIndex}-coffee-table-collider`, [sofaX - 0.3, 0.36, sofaZ - facing * 1.5], [1.9, 0.72, 0.9], 'wood');
-    substantial(`authored-house-${houseIndex}-media-collider`, [x + 3.7, 1.1, z - facing * 3.1], [2.6, 2.2, 0.82]);
+    // A mid-century TV cabinet is furniture-grade timber, not a steel bulkhead:
+    // it was silently rated structural-metal (2.15/6.4, near-concrete) by the
+    // old default while sitting in the main indoor firefight.
+    substantial(`authored-house-${houseIndex}-media-collider`, [x + 3.7, 1.1, z - facing * 3.1], [2.6, 2.2, 0.82], 'wood');
     // Keep the bed out of the upper partition sightline. Its old x + 3.6
     // placement made the dark headboard fill the opening and read as a sealed
     // black door even though the route was physically open.
