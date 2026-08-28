@@ -1323,8 +1323,21 @@ function createPlayerId(): string {
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
+// A first-time visitor used to land on an EMPTY callsign field, and the deploy button
+// stayed fully enabled and inviting. Clicking it did nothing except set a small status
+// line - so the game read as broken, which is exactly how the owner reported it.
+//
+// The requirement itself is fine; blocking the primary action on it was not. The field is
+// now prefilled with a default the player can overwrite, so deploy works on the first
+// click and the callsign becomes a thing you CHANGE rather than a gate you must discover.
+//
+// Note the debug harnesses at the bottom of this file each set their own name ('Boot
+// Probe', 'FPS Probe', 'QA Operator'). That is precisely why every automated gate sailed
+// past this: each one filled in the very field a real visitor arrives without.
+const DEFAULT_PLAYER_NAME = 'OPERATOR';
 let storedPlayerName = '';
 try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
+if (!storedPlayerName) storedPlayerName = DEFAULT_PLAYER_NAME;
 app.innerHTML = renderPass64Shell(createPass64ShellViewModel(storedPlayerName));
 let killstreakMenuBinding: KillstreakMenuBinding;
 
