@@ -42,6 +42,45 @@ CHANNEL = "channels/pass80"
 PORT = 41930
 ARENAS = "atomic-acres,skyline-terminal,rustworks-1v1,gun-range,high-seas,farcrysis"
 
+# Owner, 2026-08-28: "overwriting any old pass 80 and keeping historical selectable passes
+# on that available". Both halves are already how this script works - `channels/pass80` is
+# rmtree'd and rewritten while every sibling channel directory is untouched, and the config
+# is edited by REPLACING one key with a hard refusal if any existing key would vanish.
+#
+# What was stale was the PROSE. The live channel card still advertised the 2026-08-26 11:03
+# build - thirteen commits ago - so a player reading the chooser was told about work that
+# had been superseded. The card is data about a specific build, so it lives up here next to
+# the other build constants rather than buried inline at the point of use.
+DESCRIPTION = (
+    "Operator archetypes that read at distance (braid, thigh rigs, talons, cranial crest), "
+    "locally generated Kimodo motion retargeted onto the 62-joint rig, per-instance grass "
+    "tint across 87,280 blades, farcrysis frame-loop leaks closed, chopper gunner controls "
+    "and killstreak selector, RAY TRACED reflective coverage gated. Earlier passes remain "
+    "live and selectable."
+)
+
+COMMIT_MESSAGE = """publish: PASS 80 refreshed - thirteen commits the live channel never had
+
+Replaces channels/pass80 in place. Every sibling channel (the-big-one, pass72/70/69
+-retained, recent-stable, pass63-rollback) is left byte-untouched on disk, and the
+config edit refuses to run if any existing channel key would disappear - so the
+owner's historical passes stay selectable.
+
+The live pass80 channel was built at 2026-08-26 11:03 and never moved. Landed since:
+operator silhouette accessories that carry the archetype read at distance, the Kimodo
+text-to-motion lane end to end (licence cleared, built on MSVC with no installs,
+retargeted and measured on our own rig rather than on the tool's demo body), farcrysis
+animation-registry leaks that doubled the frame loop on every arena rebuild,
+releaseHudSway wired to the four states its own contract names, per-instance grass tint
+across 87,280 blades that were one flat green, chopper gunner controls, killstreak
+selector readability, low-health audio muted per owner request, and a RAY TRACED
+per-arena reflective-coverage gate with a hard never-zero floor.
+
+Verified before publishing, not after: regression gate OK, production bundle builds, and
+all six arenas boot on a real WebGPU device from that exact bundle.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"""
+
 
 def log(m):
     line = f"[publish] {time.strftime('%H:%M:%S')} {m}"
@@ -150,8 +189,7 @@ def publish():
     before = set(channels)
     channels["pass80"] = {
         "label": "PASS 80",
-        "description": "Overnight refinement pass: invisible-geometry sweep, arena work and "
-                       "the full owner-request backlog. Earlier passes remain live.",
+        "description": DESCRIPTION,
         "pass": "PASS 80",
         "path": CHANNEL,
     }
@@ -162,14 +200,7 @@ def publish():
         "window.__ATOMIC_ACRES_RELEASE_CHANNELS__=" + json.dumps(channels, separators=(",", ":")) + ";\n")
 
     sh("git add -A", cwd=WORKTREE)
-    rc, out = sh(['git', 'commit', '-m',
-                  'publish: PASS 80 overnight refinement build as a third channel\n\n'
-                  'Verified before publishing, not after: regression gate OK, production\n'
-                  'bundle builds, and all six arenas boot on a real WebGPU device from that\n'
-                  'bundle. Added as a NEW channel - recent-stable and the-big-one are\n'
-                  'untouched, and the script refuses to run if any existing channel key\n'
-                  'would disappear.\n\n'
-                  'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'], cwd=WORKTREE)
+    rc, out = sh(['git', 'commit', '-m', COMMIT_MESSAGE], cwd=WORKTREE)
     if rc != 0 and "nothing to commit" not in out:
         return False, f"commit failed: {out[-300:]}"
     rc, out = sh("git push origin HEAD:gh-pages", cwd=WORKTREE, timeout=3600)
