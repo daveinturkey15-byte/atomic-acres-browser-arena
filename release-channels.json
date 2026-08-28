@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 80",
-    "description": "Operator archetypes that read at distance (braid, thigh rigs, talons, cranial crest), locally generated Kimodo motion retargeted onto the 62-joint rig, per-instance grass tint across 87,280 blades, farcrysis frame-loop leaks closed, chopper gunner controls and killstreak selector, RAY TRACED reflective coverage gated."
+    "label": "PASS 81",
+    "description": "Pass 81 wave 1: Nuke Town rebaked so the Quality art matches its colliders, the two authored props an index bug deleted are back, HUD bob normalised per map, ray-tracing toggle actually rebuilds the pipeline, first-person arms carry real authored motion, cold visitors deploy on the first click. Farcrysis hidden until ready."
   },
   "experimental": {
-    "pass": "PASS 80",
-    "label": "PASS 80",
-    "description": "Operator archetypes that read at distance (braid, thigh rigs, talons, cranial crest), locally generated Kimodo motion retargeted onto the 62-joint rig, per-instance grass tint across 87,280 blades, farcrysis frame-loop leaks closed, chopper gunner controls and killstreak selector, RAY TRACED reflective coverage gated.",
-    "path": "channels/pass80"
+    "pass": "PASS 81",
+    "label": "PASS 81",
+    "description": "Pass 81 wave 1: Nuke Town rebaked so the Quality art matches its colliders, the two authored props an index bug deleted are back, HUD bob normalised per map, ray-tracing toggle actually rebuilds the pipeline, first-person arms carry real authored motion, cold visitors deploy on the first click. Farcrysis hidden until ready.",
+    "path": "channels/pass81"
   },
   "previous": {
     "label": "PASS 72 \u00b7 PREVIOUS LIVE",

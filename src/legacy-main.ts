@@ -9042,6 +9042,10 @@ function settleMatchAdmissionRun(token: MatchAdmissionToken): void {
   syncArenaSelectionUi();
 }
 
+// Automatic solo redeploy budget for intermittent renderer pipeline failures. Restored
+// to 2 by every explicit Solo click; spent only on WebGPU/pipeline-class errors.
+let soloRendererAutoRetriesRemaining = 2;
+
 function handleMatchAdmissionFailure(
   token: MatchAdmissionToken,
   mode: 'solo' | 'host' | 'client',
@@ -9073,7 +9077,37 @@ function handleMatchAdmissionFailure(
     setArenaMenuCamera();
     matchAdmissionCoordinator.complete(token);
     matchStartPreparing = false;
-    setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
+    // Chrome 153's Tint can fail pipeline creation INTERMITTENTLY in default Chrome
+    // ("swizzle view instruction still has usages after lowering" - measured live,
+    // 2026-08-28; the same deploy retried clean). This branch already documents the
+    // failed generation as evicted and a fresh Solo click as the recovery, so perform
+    // that click for the player - at most twice per explicit attempt, and only for
+    // renderer-class errors. Everything else keeps the honest failure message.
+    const rendererClassFailure = /webgpu|pipeline|commandbuffer|queue completion|device lost|tint/i.test(error.message);
+    if (soloRendererAutoRetriesRemaining > 0 && rendererClassFailure) {
+      soloRendererAutoRetriesRemaining -= 1;
+      const attempt = 2 - soloRendererAutoRetriesRemaining;
+      setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 2)...`, 'warn');
+      window.setTimeout(() => {
+        if (matchStartPreparing || gameStarted) return;
+        network.close();
+        resetForMode();
+        resetPrivateLobbyState();
+        void startGame('solo');
+      }, 1_500);
+    } else if (rendererClassFailure) {
+      // Both automatic WebGPU attempts failed the same way. Chrome 153's Tint bug is
+      // environmental, so a third identical attempt is not a plan - route this session
+      // onto the WebGL2 compatibility renderer instead, which does not involve Tint at
+      // all. ?renderer=webgl2 is the repo's own hard compat contract. One deploy click
+      // after the reload and the player is in the match.
+      setStatus('Renderer failed repeatedly in this browser - switching to the compatibility renderer. Deploy again after the reload.', 'warn');
+      const fallbackUrl = new URL(window.location.href);
+      fallbackUrl.searchParams.set('renderer', 'webgl2');
+      window.setTimeout(() => { window.location.assign(fallbackUrl.toString()); }, 1_200);
+    } else {
+      setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
+    }
   } else {
     clientWorldRepairAdmission = null;
     pendingClientReconnectWorldRepairConnectionEpoch = null;
@@ -27477,6 +27511,9 @@ bindProjectMapDialog();
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (matchStartPreparing) return;
   if (!requirePlayerName()) return;
+  // A fresh explicit click restores the automatic retry budget (see
+  // handleMatchAdmissionFailure): retries belong to an attempt, not to the session.
+  soloRendererAutoRetriesRemaining = 2;
   network.close();
   resetForMode();
   resetPrivateLobbyState();

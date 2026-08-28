@@ -2,19 +2,20 @@
  * What the running build calls ITSELF - the header badge, the session block and the
  * blocked-renderer notice all read this.
  *
- * Stamped to PASS 80 on 2026-08-26 when that build was published to
- * channels/pass80. It had been left at PASS 73 through the whole publish, so the owner
- * opened the new URL and was told he was looking at Pass 73. The bundle was correct; only
- * this was stale. Stamping the identity is part of CUTTING a release, not an afterthought.
+ * Stamped to PASS 81 on 2026-08-28. The previous stamp (PASS 80) survived into the
+ * first channels/pass81 publish, so the owner clicked PASS 81 in the chooser and the game
+ * introduced itself as PASS 80 - the third time this exact class of failure has shipped
+ * (PASS 73 before that). Stamping the identity is part of CUTTING a release, not an
+ * afterthought, and the identity must always name the channel this source will publish to.
  *
  * PASS 73 remains live at channels/the-big-one and is untouched.
  */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 80',
-  label: 'PASS 80',
+  pass: 'PASS 81',
+  label: 'PASS 81',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/pass80',
-  runtimeLabel: 'PASS 80',
+  route: 'channels/pass81',
+  runtimeLabel: 'PASS 81',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

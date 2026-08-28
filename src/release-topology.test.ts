@@ -18,13 +18,13 @@ describe('Pass 80 release topology', () => {
   // every field still exact - and the protected fallback pins below are untouched.
   it('identifies this source as Pass 80 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 80',
-      label: 'PASS 80',
+      pass: 'PASS 81',
+      label: 'PASS 81',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/pass80',
-      runtimeLabel: 'PASS 80',
+      route: 'channels/pass81',
+      runtimeLabel: 'PASS 81',
     });
-    expect(config.latest.label).toBe('PASS 80');
+    expect(config.latest.label).toBe('PASS 81');
     // The identity's route must be the channel the config actually stages, or the shell
     // links players at a 404 - which is exactly how a correct bundle came to announce
     // itself as the wrong pass. This assertion did not exist before.
