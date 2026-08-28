@@ -1,5 +1,10 @@
-export const OVERDRIVE_SPAWN_INTERVAL_MS = 120_000;
-export const OVERDRIVE_DURATION_MS = 30_000;
+// HF-385 (owner, 2026-08-28): "the 2x damage needs adjusting". Retuned 120 s/30 s ->
+// 90 s/20 s: the core contests half again as often and a holder's reign is a third
+// shorter, so losing the flip costs a squad 20 seconds of double-damage exposure
+// rather than 30. The multiplier itself stays 2 - the owner asked for adjustment,
+// not removal, and 2x is the identity of the pickup.
+export const OVERDRIVE_SPAWN_INTERVAL_MS = 90_000;
+export const OVERDRIVE_DURATION_MS = 20_000;
 export const OVERDRIVE_DAMAGE_MULTIPLIER = 2;
 export const OVERDRIVE_PICKUP_RADIUS = 1.65;
 /**

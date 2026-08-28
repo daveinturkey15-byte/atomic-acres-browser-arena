@@ -33150,7 +33150,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
     const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
     const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
-    const advanced = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS);
+    const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
     return railgunState;

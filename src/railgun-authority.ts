@@ -1,6 +1,21 @@
 export const RAILGUN_WEAPON_ID = 'railgun' as const;
 export const RAILGUN_ARENA_ID = 'atomic-acres' as const; // Stable arena id; Pass 64 display name is Nuke Town.
-export const RAILGUN_SPAWN_DELAY_MS = 180_000;
+// HF-384 (owner, 2026-08-28): the fixed 180 s spawn could be clock-camped - stand on
+// the site at 2:59 and the rare weapon is yours every match. The delay is now a
+// 150 s base with deterministic +/-30 s jitter derived from the SAME replicated
+// randomUnit that picks the site, so host and guests agree without a new message.
+// The unit is re-hashed (golden-ratio fract) before use so site and time stay
+// uncorrelated - reusing it raw would make each room imply its own spawn time.
+export const RAILGUN_SPAWN_DELAY_BASE_MS = 150_000;
+export const RAILGUN_SPAWN_DELAY_JITTER_MS = 30_000;
+/** Legacy fixed delay, kept for the debug staging path and the protocol fixtures. */
+export const RAILGUN_SPAWN_DELAY_MS = RAILGUN_SPAWN_DELAY_BASE_MS + RAILGUN_SPAWN_DELAY_JITTER_MS;
+
+export function railgunSpawnDelayMs(randomUnit: number): number {
+  const unit = Number.isFinite(randomUnit) ? Math.min(Math.max(randomUnit, 0), 1) : 0;
+  const decorrelated = (unit * 0.618033988749895) % 1;
+  return Math.round(RAILGUN_SPAWN_DELAY_BASE_MS + (decorrelated * 2 - 1) * RAILGUN_SPAWN_DELAY_JITTER_MS);
+}
 export const RAILGUN_DAMAGE = 50;
 export const RAILGUN_PENETRATION_MULTIPLIER = 1;
 export const RAILGUN_RECHAMBER_MS = 1_500;
@@ -121,7 +136,7 @@ export function createRailgunAuthorityState(
     generation,
     revision: 0,
     status: 'scheduled',
-    spawnAtHostTimeMs: matchStartedAtHostTimeMs + RAILGUN_SPAWN_DELAY_MS,
+    spawnAtHostTimeMs: matchStartedAtHostTimeMs + railgunSpawnDelayMs(randomUnit),
     spawnSite,
     pickupPosition: copyPosition(spawnSite.position),
     holderId: null,

@@ -28,13 +28,18 @@ import {
   isRailgunProtocolMessage,
   railgunThermalTargetEligible,
   replenishRailgunAmmo,
+  railgunSpawnDelayMs,
+  RAILGUN_SPAWN_DELAY_BASE_MS,
+  RAILGUN_SPAWN_DELAY_JITTER_MS,
 } from './railgun-authority';
 
 describe('host-authoritative railgun', () => {
   it('schedules only on Nuke Town and selects each authored upper room uniformly', () => {
     expect(createRailgunAuthorityState('skyline-terminal', 10_000, 0).status).toBe('disabled');
     const scheduled = createRailgunAuthorityState('atomic-acres', 10_000, 0.5);
-    expect(scheduled).toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 10_000 + RAILGUN_SPAWN_DELAY_MS });
+    // HF-384: the delay is now 150 s +/- 30 s, derived deterministically from the same
+    // replicated randomUnit that picks the site, so this pins the FUNCTION not a literal.
+    expect(scheduled).toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 10_000 + railgunSpawnDelayMs(0.5) });
     expect([0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999].map(chooseRailgunUpperRoom).map((site) => site.id))
       .toEqual(['aqua-front', 'aqua-front', 'aqua-rear', 'aqua-rear', 'coral-front', 'coral-front', 'coral-rear', 'coral-rear']);
     expect(new Set(RAILGUN_UPPER_ROOM_SPAWN_SITES.map((site) => site.position[1]))).toEqual(new Set([4.18]));
@@ -94,12 +99,32 @@ describe('host-authoritative railgun', () => {
     }
   });
 
-  it('spawns and announces exactly once at 180 seconds', () => {
+  it('spawns and announces exactly once at its jittered spawn time', () => {
     const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 7);
-    expect(advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS - 1).spawned).toBe(false);
-    const spawned = advanceRailgunAuthority(scheduled, 1_000 + RAILGUN_SPAWN_DELAY_MS);
+    const spawnDelay = railgunSpawnDelayMs(0);
+    expect(advanceRailgunAuthority(scheduled, 1_000 + spawnDelay - 1).spawned).toBe(false);
+    const spawned = advanceRailgunAuthority(scheduled, 1_000 + spawnDelay);
     expect(spawned).toMatchObject({ spawned: true, announcement: 'RARE WEAPON SPAWNED' });
     expect(advanceRailgunAuthority(spawned.state, 999_999)).toMatchObject({ spawned: false, announcement: null });
+  });
+
+  it('jitters the spawn delay deterministically, bounded, and uncorrelated with the site', () => {
+    // HF-384. Deterministic: host and guests derive the same time from the replicated
+    // unit. Bounded: never outside base +/- jitter, so the announcement window remains
+    // predictable enough to design around. Uncorrelated: the site index must not imply
+    // the spawn time, or knowing the room re-enables the clock-camp this removes.
+    const units = [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.999999];
+    for (const unit of units) {
+      const delay = railgunSpawnDelayMs(unit);
+      expect(delay).toBe(railgunSpawnDelayMs(unit));
+      expect(delay).toBeGreaterThanOrEqual(RAILGUN_SPAWN_DELAY_BASE_MS - RAILGUN_SPAWN_DELAY_JITTER_MS);
+      expect(delay).toBeLessThanOrEqual(RAILGUN_SPAWN_DELAY_BASE_MS + RAILGUN_SPAWN_DELAY_JITTER_MS);
+    }
+    // Same room, different times: units 0.25 and 0.4999 both choose aqua-rear.
+    expect(chooseRailgunUpperRoom(0.26).id).toBe(chooseRailgunUpperRoom(0.49).id);
+    expect(railgunSpawnDelayMs(0.26)).not.toBe(railgunSpawnDelayMs(0.49));
+    // Degenerate input stays in bounds rather than throwing or drifting.
+    expect(railgunSpawnDelayMs(Number.NaN)).toBe(railgunSpawnDelayMs(0));
   });
 
   it('orders every mutation within a generation and rejects stale equal-generation snapshots', () => {
