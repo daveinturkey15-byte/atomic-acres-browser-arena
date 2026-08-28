@@ -128,7 +128,11 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await ready(page);
     await page.locator('#menu-tab-options').click();
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
+    // PASS 81: re-pinned to the SHIPPED five-option list. The RAY TRACED
+    // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
+    // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
+    // still named the old four, so the change shipped with its own e2e red.
+    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
     await expect(page.locator('#graphics-target-fps')).toBeHidden();
     await page.locator('#advanced-graphics summary').click();
