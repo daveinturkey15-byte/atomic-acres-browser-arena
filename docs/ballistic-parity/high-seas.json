@@ -1,0 +1,1321 @@
+{
+ "arena": "high-seas",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 126,
+  "ratedDirect": 116,
+  "ratedByFootprint": 0,
+  "dynamicTargets": 0,
+  "excludedByRule": 10,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 213,
+  "byMaterial": {
+   "structural-metal": 85,
+   "interior-wall": 68,
+   "wood": 4,
+   "glass": 28,
+   "reinforced": 16,
+   "thin-metal": 12
+  },
+  "byClassification": {
+   "explicit": 213
+  }
+ },
+ "excludedByRule": {
+  "water volume presentation": 10
+ },
+ "footprintExplained": [],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "high-seas:0:high-seas-platform-bow-tip",
+   "name": "high-seas-platform-bow-tip",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:1:high-seas-platform-bow-shoulder",
+   "name": "high-seas-platform-bow-shoulder",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:2:high-seas-platform-bow-spawn",
+   "name": "high-seas-platform-bow-spawn",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:3:high-seas-platform-bow-cabin-forward",
+   "name": "high-seas-platform-bow-cabin-forward",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:4:high-seas-platform-bow-hatch-port",
+   "name": "high-seas-platform-bow-hatch-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:5:high-seas-platform-bow-hatch-starboard",
+   "name": "high-seas-platform-bow-hatch-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:6:high-seas-platform-bow-cabin-aft",
+   "name": "high-seas-platform-bow-cabin-aft",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:7:high-seas-platform-center",
+   "name": "high-seas-platform-center",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:8:high-seas-platform-stern-cabin-forward",
+   "name": "high-seas-platform-stern-cabin-forward",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:9:high-seas-platform-stern-hatch-port",
+   "name": "high-seas-platform-stern-hatch-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:10:high-seas-platform-stern-hatch-starboard",
+   "name": "high-seas-platform-stern-hatch-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:11:high-seas-platform-stern-cabin-aft",
+   "name": "high-seas-platform-stern-cabin-aft",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:12:high-seas-platform-stern-spawn",
+   "name": "high-seas-platform-stern-spawn",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:13:high-seas-platform-port-viewing-catwalk",
+   "name": "high-seas-platform-port-viewing-catwalk",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:14:high-seas-platform-engine-floor",
+   "name": "high-seas-platform-engine-floor",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:15:high-seas-engine-room-wall-port",
+   "name": "high-seas-engine-room-wall-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:16:high-seas-engine-corridor-wall-bow-port",
+   "name": "high-seas-engine-corridor-wall-bow-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:17:high-seas-engine-vestibule-wall-bow-port",
+   "name": "high-seas-engine-vestibule-wall-bow-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:18:high-seas-engine-room-shoulder-bow-port",
+   "name": "high-seas-engine-room-shoulder-bow-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:19:high-seas-engine-vestibule-shoulder-bow-port",
+   "name": "high-seas-engine-vestibule-shoulder-bow-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:20:high-seas-engine-end-bulkhead-bow-port",
+   "name": "high-seas-engine-end-bulkhead-bow-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:21:high-seas-engine-corridor-wall-stern-port",
+   "name": "high-seas-engine-corridor-wall-stern-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:22:high-seas-engine-vestibule-wall-stern-port",
+   "name": "high-seas-engine-vestibule-wall-stern-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:23:high-seas-engine-room-shoulder-stern-port",
+   "name": "high-seas-engine-room-shoulder-stern-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:24:high-seas-engine-vestibule-shoulder-stern-port",
+   "name": "high-seas-engine-vestibule-shoulder-stern-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:25:high-seas-engine-end-bulkhead-stern-port",
+   "name": "high-seas-engine-end-bulkhead-stern-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:26:high-seas-engine-room-wall-starboard",
+   "name": "high-seas-engine-room-wall-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:27:high-seas-engine-corridor-wall-bow-starboard",
+   "name": "high-seas-engine-corridor-wall-bow-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:28:high-seas-engine-vestibule-wall-bow-starboard",
+   "name": "high-seas-engine-vestibule-wall-bow-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:29:high-seas-engine-room-shoulder-bow-starboard",
+   "name": "high-seas-engine-room-shoulder-bow-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:30:high-seas-engine-vestibule-shoulder-bow-starboard",
+   "name": "high-seas-engine-vestibule-shoulder-bow-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:31:high-seas-engine-end-bulkhead-bow-starboard",
+   "name": "high-seas-engine-end-bulkhead-bow-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:32:high-seas-engine-corridor-wall-stern-starboard",
+   "name": "high-seas-engine-corridor-wall-stern-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:33:high-seas-engine-vestibule-wall-stern-starboard",
+   "name": "high-seas-engine-vestibule-wall-stern-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:34:high-seas-engine-room-shoulder-stern-starboard",
+   "name": "high-seas-engine-room-shoulder-stern-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:35:high-seas-engine-vestibule-shoulder-stern-starboard",
+   "name": "high-seas-engine-vestibule-shoulder-stern-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:36:high-seas-engine-end-bulkhead-stern-starboard",
+   "name": "high-seas-engine-end-bulkhead-stern-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:37:high-seas-ramp-bow-engine-access",
+   "name": "high-seas-ramp-bow-engine-access",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:38:high-seas-ramp-stern-engine-access",
+   "name": "high-seas-ramp-stern-engine-access",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:39:high-seas-bow-hatch-guard--1.52",
+   "name": "high-seas-bow-hatch-guard--1.52",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:40:high-seas-bow-hatch-guard-1.52",
+   "name": "high-seas-bow-hatch-guard-1.52",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:41:high-seas-bow-hatch-end-guard",
+   "name": "high-seas-bow-hatch-end-guard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:42:high-seas-stern-hatch-guard--1.52",
+   "name": "high-seas-stern-hatch-guard--1.52",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:43:high-seas-stern-hatch-guard-1.52",
+   "name": "high-seas-stern-hatch-guard-1.52",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:44:high-seas-stern-hatch-end-guard",
+   "name": "high-seas-stern-hatch-end-guard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:45:high-seas-bow-hatch-shaft-wall-port",
+   "name": "high-seas-bow-hatch-shaft-wall-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:46:high-seas-bow-hatch-shaft-wall-starboard",
+   "name": "high-seas-bow-hatch-shaft-wall-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:47:high-seas-stern-hatch-shaft-wall-port",
+   "name": "high-seas-stern-hatch-shaft-wall-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:48:high-seas-stern-hatch-shaft-wall-starboard",
+   "name": "high-seas-stern-hatch-shaft-wall-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:49:high-seas-bow-hatch-rim-port",
+   "name": "high-seas-bow-hatch-rim-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:50:high-seas-bow-hatch-rim-starboard",
+   "name": "high-seas-bow-hatch-rim-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:51:high-seas-bow-hatch-rim-end",
+   "name": "high-seas-bow-hatch-rim-end",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:52:high-seas-stern-hatch-rim-port",
+   "name": "high-seas-stern-hatch-rim-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:53:high-seas-stern-hatch-rim-starboard",
+   "name": "high-seas-stern-hatch-rim-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:54:high-seas-stern-hatch-rim-end",
+   "name": "high-seas-stern-hatch-rim-end",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:55:high-seas-engine-machinery-0",
+   "name": "high-seas-engine-machinery-0",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:56:high-seas-engine-machinery-1",
+   "name": "high-seas-engine-machinery-1",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:57:high-seas-engine-machinery-2",
+   "name": "high-seas-engine-machinery-2",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:58:high-seas-engine-machinery-3",
+   "name": "high-seas-engine-machinery-3",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:59:high-seas-engine-machinery-4",
+   "name": "high-seas-engine-machinery-4",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:60:high-seas-engine-exhaust-trunk",
+   "name": "high-seas-engine-exhaust-trunk",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:61:high-seas-bow-ground-inner-wall-port",
+   "name": "high-seas-bow-ground-inner-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:62:high-seas-bow-ground-inner-wall-starboard",
+   "name": "high-seas-bow-ground-inner-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:63:high-seas-bow-ground-outer-wall-port",
+   "name": "high-seas-bow-ground-outer-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:64:high-seas-bow-ground-outer-wall-starboard",
+   "name": "high-seas-bow-ground-outer-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:65:high-seas-bow-ground-port-wall-forward",
+   "name": "high-seas-bow-ground-port-wall-forward",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:66:high-seas-bow-ground-port-wall-aft",
+   "name": "high-seas-bow-ground-port-wall-aft",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:67:high-seas-bow-ground-starboard-wall-forward",
+   "name": "high-seas-bow-ground-starboard-wall-forward",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:68:high-seas-bow-ground-starboard-wall-aft",
+   "name": "high-seas-bow-ground-starboard-wall-aft",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:69:high-seas-platform-bow-upper-port",
+   "name": "high-seas-platform-bow-upper-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:70:high-seas-platform-bow-upper-starboard",
+   "name": "high-seas-platform-bow-upper-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:71:high-seas-platform-bow-upper-stair-forward",
+   "name": "high-seas-platform-bow-upper-stair-forward",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:72:high-seas-platform-bow-upper-stair-aft",
+   "name": "high-seas-platform-bow-upper-stair-aft",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:73:high-seas-ramp-bow-internal-stair",
+   "name": "high-seas-ramp-bow-internal-stair",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:74:high-seas-ramp-bow-external-stair",
+   "name": "high-seas-ramp-bow-external-stair",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:75:high-seas-bow-upper-inner-wall-port",
+   "name": "high-seas-bow-upper-inner-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:76:high-seas-bow-upper-inner-wall-starboard",
+   "name": "high-seas-bow-upper-inner-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:77:high-seas-bow-upper-window-sill",
+   "name": "high-seas-bow-upper-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:78:high-seas-bow-upper-window-header",
+   "name": "high-seas-bow-upper-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:79:high-seas-bow-upper-inner-mullion",
+   "name": "high-seas-bow-upper-inner-mullion",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:80:high-seas-bow-upper-inner-glazing-port",
+   "name": "high-seas-bow-upper-inner-glazing-port",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:81:high-seas-bow-upper-inner-glazing-starboard",
+   "name": "high-seas-bow-upper-inner-glazing-starboard",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:82:high-seas-bow-upper-windscreen-port-spandrel",
+   "name": "high-seas-bow-upper-windscreen-port-spandrel",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:83:high-seas-bow-upper-windscreen-port-header",
+   "name": "high-seas-bow-upper-windscreen-port-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:84:high-seas-bow-upper-windscreen-port-glass",
+   "name": "high-seas-bow-upper-windscreen-port-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:85:high-seas-bow-upper-windscreen-starboard-spandrel",
+   "name": "high-seas-bow-upper-windscreen-starboard-spandrel",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:86:high-seas-bow-upper-windscreen-starboard-header",
+   "name": "high-seas-bow-upper-windscreen-starboard-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:87:high-seas-bow-upper-windscreen-starboard-glass",
+   "name": "high-seas-bow-upper-windscreen-starboard-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:88:high-seas-bow-upper-windscreen-starboard-mullion",
+   "name": "high-seas-bow-upper-windscreen-starboard-mullion",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:89:high-seas-bow-upper-port-window-sill",
+   "name": "high-seas-bow-upper-port-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:90:high-seas-bow-upper-port-window-header",
+   "name": "high-seas-bow-upper-port-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:91:high-seas-bow-upper-port-glazing-0",
+   "name": "high-seas-bow-upper-port-glazing-0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:92:high-seas-bow-upper-port-glazing-1",
+   "name": "high-seas-bow-upper-port-glazing-1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:93:high-seas-bow-upper-port-glazing-2",
+   "name": "high-seas-bow-upper-port-glazing-2",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:94:high-seas-bow-upper-port-glazing-3",
+   "name": "high-seas-bow-upper-port-glazing-3",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:95:high-seas-bow-upper-port-glazing-4",
+   "name": "high-seas-bow-upper-port-glazing-4",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:96:high-seas-bow-upper-port-mullion--27.4",
+   "name": "high-seas-bow-upper-port-mullion--27.4",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:97:high-seas-bow-upper-port-mullion--23.25",
+   "name": "high-seas-bow-upper-port-mullion--23.25",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:98:high-seas-bow-upper-port-mullion--18.75",
+   "name": "high-seas-bow-upper-port-mullion--18.75",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:99:high-seas-bow-upper-port-mullion--14.6",
+   "name": "high-seas-bow-upper-port-mullion--14.6",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:100:high-seas-bow-upper-starboard-window-sill",
+   "name": "high-seas-bow-upper-starboard-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:101:high-seas-bow-upper-starboard-window-header",
+   "name": "high-seas-bow-upper-starboard-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:102:high-seas-bow-upper-starboard-glazing-0",
+   "name": "high-seas-bow-upper-starboard-glazing-0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:103:high-seas-bow-upper-starboard-glazing-1",
+   "name": "high-seas-bow-upper-starboard-glazing-1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:104:high-seas-bow-upper-starboard-glazing-2",
+   "name": "high-seas-bow-upper-starboard-glazing-2",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:105:high-seas-bow-upper-starboard-glazing-3",
+   "name": "high-seas-bow-upper-starboard-glazing-3",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:106:high-seas-bow-upper-starboard-glazing-4",
+   "name": "high-seas-bow-upper-starboard-glazing-4",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:107:high-seas-bow-upper-starboard-mullion--27.4",
+   "name": "high-seas-bow-upper-starboard-mullion--27.4",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:108:high-seas-bow-upper-starboard-mullion--23.25",
+   "name": "high-seas-bow-upper-starboard-mullion--23.25",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:109:high-seas-bow-upper-starboard-mullion--18.75",
+   "name": "high-seas-bow-upper-starboard-mullion--18.75",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:110:high-seas-bow-upper-starboard-mullion--14.6",
+   "name": "high-seas-bow-upper-starboard-mullion--14.6",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:111:high-seas-bow-cabin-roof",
+   "name": "high-seas-bow-cabin-roof",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:112:high-seas-bow-galley-island",
+   "name": "high-seas-bow-galley-island",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:113:high-seas-bow-side-locker-port",
+   "name": "high-seas-bow-side-locker-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:114:high-seas-bow-side-locker-starboard",
+   "name": "high-seas-bow-side-locker-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:115:high-seas-stern-ground-inner-wall-port",
+   "name": "high-seas-stern-ground-inner-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:116:high-seas-stern-ground-inner-wall-starboard",
+   "name": "high-seas-stern-ground-inner-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:117:high-seas-stern-ground-outer-wall-port",
+   "name": "high-seas-stern-ground-outer-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:118:high-seas-stern-ground-outer-wall-starboard",
+   "name": "high-seas-stern-ground-outer-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:119:high-seas-stern-ground-port-wall-forward",
+   "name": "high-seas-stern-ground-port-wall-forward",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:120:high-seas-stern-ground-port-wall-aft",
+   "name": "high-seas-stern-ground-port-wall-aft",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:121:high-seas-stern-ground-starboard-wall-forward",
+   "name": "high-seas-stern-ground-starboard-wall-forward",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:122:high-seas-stern-ground-starboard-wall-aft",
+   "name": "high-seas-stern-ground-starboard-wall-aft",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:123:high-seas-platform-stern-upper-port",
+   "name": "high-seas-platform-stern-upper-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:124:high-seas-platform-stern-upper-starboard",
+   "name": "high-seas-platform-stern-upper-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:125:high-seas-platform-stern-upper-stair-forward",
+   "name": "high-seas-platform-stern-upper-stair-forward",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:126:high-seas-platform-stern-upper-stair-aft",
+   "name": "high-seas-platform-stern-upper-stair-aft",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:127:high-seas-ramp-stern-internal-stair",
+   "name": "high-seas-ramp-stern-internal-stair",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:128:high-seas-ramp-stern-external-stair",
+   "name": "high-seas-ramp-stern-external-stair",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:129:high-seas-stern-upper-inner-wall-port",
+   "name": "high-seas-stern-upper-inner-wall-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:130:high-seas-stern-upper-inner-wall-starboard",
+   "name": "high-seas-stern-upper-inner-wall-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:131:high-seas-stern-upper-window-sill",
+   "name": "high-seas-stern-upper-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:132:high-seas-stern-upper-window-header",
+   "name": "high-seas-stern-upper-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:133:high-seas-stern-upper-inner-mullion",
+   "name": "high-seas-stern-upper-inner-mullion",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:134:high-seas-stern-upper-inner-glazing-port",
+   "name": "high-seas-stern-upper-inner-glazing-port",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:135:high-seas-stern-upper-inner-glazing-starboard",
+   "name": "high-seas-stern-upper-inner-glazing-starboard",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:136:high-seas-stern-upper-windscreen-port-spandrel",
+   "name": "high-seas-stern-upper-windscreen-port-spandrel",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:137:high-seas-stern-upper-windscreen-port-header",
+   "name": "high-seas-stern-upper-windscreen-port-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:138:high-seas-stern-upper-windscreen-port-glass",
+   "name": "high-seas-stern-upper-windscreen-port-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:139:high-seas-stern-upper-windscreen-port-mullion",
+   "name": "high-seas-stern-upper-windscreen-port-mullion",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:140:high-seas-stern-upper-windscreen-starboard-spandrel",
+   "name": "high-seas-stern-upper-windscreen-starboard-spandrel",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:141:high-seas-stern-upper-windscreen-starboard-header",
+   "name": "high-seas-stern-upper-windscreen-starboard-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:142:high-seas-stern-upper-windscreen-starboard-glass",
+   "name": "high-seas-stern-upper-windscreen-starboard-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:143:high-seas-stern-upper-port-window-sill",
+   "name": "high-seas-stern-upper-port-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:144:high-seas-stern-upper-port-window-header",
+   "name": "high-seas-stern-upper-port-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:145:high-seas-stern-upper-port-glazing-0",
+   "name": "high-seas-stern-upper-port-glazing-0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:146:high-seas-stern-upper-port-glazing-1",
+   "name": "high-seas-stern-upper-port-glazing-1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:147:high-seas-stern-upper-port-glazing-2",
+   "name": "high-seas-stern-upper-port-glazing-2",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:148:high-seas-stern-upper-port-glazing-3",
+   "name": "high-seas-stern-upper-port-glazing-3",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:149:high-seas-stern-upper-port-glazing-4",
+   "name": "high-seas-stern-upper-port-glazing-4",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:150:high-seas-stern-upper-port-mullion-14.6",
+   "name": "high-seas-stern-upper-port-mullion-14.6",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:151:high-seas-stern-upper-port-mullion-18.75",
+   "name": "high-seas-stern-upper-port-mullion-18.75",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:152:high-seas-stern-upper-port-mullion-23.25",
+   "name": "high-seas-stern-upper-port-mullion-23.25",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:153:high-seas-stern-upper-port-mullion-27.4",
+   "name": "high-seas-stern-upper-port-mullion-27.4",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:154:high-seas-stern-upper-starboard-window-sill",
+   "name": "high-seas-stern-upper-starboard-window-sill",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:155:high-seas-stern-upper-starboard-window-header",
+   "name": "high-seas-stern-upper-starboard-window-header",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:156:high-seas-stern-upper-starboard-glazing-0",
+   "name": "high-seas-stern-upper-starboard-glazing-0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:157:high-seas-stern-upper-starboard-glazing-1",
+   "name": "high-seas-stern-upper-starboard-glazing-1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:158:high-seas-stern-upper-starboard-glazing-2",
+   "name": "high-seas-stern-upper-starboard-glazing-2",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:159:high-seas-stern-upper-starboard-glazing-3",
+   "name": "high-seas-stern-upper-starboard-glazing-3",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:160:high-seas-stern-upper-starboard-glazing-4",
+   "name": "high-seas-stern-upper-starboard-glazing-4",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:161:high-seas-stern-upper-starboard-mullion-14.6",
+   "name": "high-seas-stern-upper-starboard-mullion-14.6",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:162:high-seas-stern-upper-starboard-mullion-18.75",
+   "name": "high-seas-stern-upper-starboard-mullion-18.75",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:163:high-seas-stern-upper-starboard-mullion-23.25",
+   "name": "high-seas-stern-upper-starboard-mullion-23.25",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:164:high-seas-stern-upper-starboard-mullion-27.4",
+   "name": "high-seas-stern-upper-starboard-mullion-27.4",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:165:high-seas-stern-cabin-roof",
+   "name": "high-seas-stern-cabin-roof",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:166:high-seas-stern-galley-island",
+   "name": "high-seas-stern-galley-island",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:167:high-seas-stern-side-locker-port",
+   "name": "high-seas-stern-side-locker-port",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:168:high-seas-stern-side-locker-starboard",
+   "name": "high-seas-stern-side-locker-starboard",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:169:high-seas-hot-tub-rim-1",
+   "name": "high-seas-hot-tub-rim-1",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:170:high-seas-hot-tub-rim-2",
+   "name": "high-seas-hot-tub-rim-2",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:171:high-seas-hot-tub-rim-3",
+   "name": "high-seas-hot-tub-rim-3",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:172:high-seas-hot-tub-rim-4",
+   "name": "high-seas-hot-tub-rim-4",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:173:high-seas-hot-tub-rim-5",
+   "name": "high-seas-hot-tub-rim-5",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:174:high-seas-hot-tub-rim-7",
+   "name": "high-seas-hot-tub-rim-7",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:175:high-seas-hot-tub-rim-8",
+   "name": "high-seas-hot-tub-rim-8",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:176:high-seas-hot-tub-rim-9",
+   "name": "high-seas-hot-tub-rim-9",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:177:high-seas-hot-tub-rim-10",
+   "name": "high-seas-hot-tub-rim-10",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:178:high-seas-hot-tub-rim-11",
+   "name": "high-seas-hot-tub-rim-11",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:179:high-seas-shower-port-partition",
+   "name": "high-seas-shower-port-partition",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:180:high-seas-shower-starboard-partition",
+   "name": "high-seas-shower-starboard-partition",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:181:high-seas-cabana-roof",
+   "name": "high-seas-cabana-roof",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:182:high-seas-cabana-post-3.75--3.65",
+   "name": "high-seas-cabana-post-3.75--3.65",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:183:high-seas-cabana-post-3.75-3.65",
+   "name": "high-seas-cabana-post-3.75-3.65",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:184:high-seas-cabana-post-9.35--3.65",
+   "name": "high-seas-cabana-post-9.35--3.65",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:185:high-seas-cabana-post-9.35-3.65",
+   "name": "high-seas-cabana-post-9.35-3.65",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:186:high-seas-cabana-bench-forward",
+   "name": "high-seas-cabana-bench-forward",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:187:high-seas-cabana-bench-aft",
+   "name": "high-seas-cabana-bench-aft",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:188:high-seas-bow-canopy",
+   "name": "high-seas-bow-canopy",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:189:high-seas-bow-canopy-post--3.25",
+   "name": "high-seas-bow-canopy-post--3.25",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:190:high-seas-bow-canopy-post-3.25",
+   "name": "high-seas-bow-canopy-post-3.25",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:191:high-seas-stern-pool-rim-port",
+   "name": "high-seas-stern-pool-rim-port",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:192:high-seas-stern-pool-rim-starboard",
+   "name": "high-seas-stern-pool-rim-starboard",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:193:high-seas-stern-pool-rim-forward-port",
+   "name": "high-seas-stern-pool-rim-forward-port",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:194:high-seas-stern-pool-rim-aft-port",
+   "name": "high-seas-stern-pool-rim-aft-port",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:195:high-seas-stern-pool-rim-forward-starboard",
+   "name": "high-seas-stern-pool-rim-forward-starboard",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:196:high-seas-stern-pool-rim-aft-starboard",
+   "name": "high-seas-stern-pool-rim-aft-starboard",
+   "material": "reinforced",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:197:high-seas-bow-rescue-locker-port",
+   "name": "high-seas-bow-rescue-locker-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:198:high-seas-bow-rescue-locker-starboard",
+   "name": "high-seas-bow-rescue-locker-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:199:high-seas-stern-rescue-locker-port",
+   "name": "high-seas-stern-rescue-locker-port",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:200:high-seas-stern-rescue-locker-starboard",
+   "name": "high-seas-stern-rescue-locker-starboard",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:201:high-seas-perimeter-rail-starboard",
+   "name": "high-seas-perimeter-rail-starboard",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:202:high-seas-perimeter-rail-port-bow",
+   "name": "high-seas-perimeter-rail-port-bow",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:203:high-seas-perimeter-rail-port-center-outer",
+   "name": "high-seas-perimeter-rail-port-center-outer",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:204:high-seas-perimeter-rail-port-stern",
+   "name": "high-seas-perimeter-rail-port-stern",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:205:high-seas-perimeter-rail-bow-tip-port",
+   "name": "high-seas-perimeter-rail-bow-tip-port",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:206:high-seas-perimeter-rail-bow-tip-starboard",
+   "name": "high-seas-perimeter-rail-bow-tip-starboard",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:207:high-seas-perimeter-rail-bow-shoulder-port",
+   "name": "high-seas-perimeter-rail-bow-shoulder-port",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:208:high-seas-perimeter-rail-bow-shoulder-starboard",
+   "name": "high-seas-perimeter-rail-bow-shoulder-starboard",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:209:high-seas-perimeter-rail-bow-tip",
+   "name": "high-seas-perimeter-rail-bow-tip",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:210:high-seas-perimeter-rail-stern",
+   "name": "high-seas-perimeter-rail-stern",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:211:high-seas-catwalk-threshold--10.8",
+   "name": "high-seas-catwalk-threshold--10.8",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "high-seas:212:high-seas-catwalk-threshold-10.8",
+   "name": "high-seas-catwalk-threshold-10.8",
+   "material": "thin-metal",
+   "classification": "explicit"
+  }
+ ]
+}

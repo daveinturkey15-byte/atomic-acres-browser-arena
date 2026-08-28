@@ -4,6 +4,11 @@ import {
   runColliderVisualParityAudit,
   type ArenaAuditResult,
 } from '../scripts/qa/collider-visual-parity-core';
+import {
+  ACCEPTED_SHOOT_THROUGH,
+  BALLISTIC_UNRATED_CEILINGS,
+  matchAcceptedShootThrough,
+} from '../scripts/qa/ballistic-parity-ledger';
 
 /**
  * PERMANENT GATE for the mechanical collider/visual parity audit
@@ -92,6 +97,46 @@ describe('collider/visual parity gate (all six arenas)', () => {
       expect(unexpected, `${result.id}: new walk-through meshes need triage and a ledger row`).toEqual([]);
     }
   }, 120_000);
+
+  it('Direction C: rates every substantial visible mesh for gunfire beyond the accepted shoot-through ledger', async () => {
+    // HF-390 / Pass 81 lane aa-lane-ballistics. castShot's penetration path
+    // traces registered BallisticSurfaces ONLY, so a substantial visible mesh
+    // with no rating is GHOST cover: bullets cross it with no impact, no
+    // sound and no cost. Fix a red run by RATING the mesh (shots:true + the
+    // family it visually is) or - only for genuinely shoot-through
+    // presentation - a reasoned ACCEPTED_SHOOT_THROUGH row in
+    // scripts/qa/ballistic-parity-ledger.ts. Never raise a ceiling.
+    const results = await audit();
+    for (const result of results) {
+      const { unmatched, staleRows } = matchAcceptedShootThrough(result.id, result.ballisticGhostMeshes ?? []);
+      const ceiling = BALLISTIC_UNRATED_CEILINGS[result.id] ?? 0;
+      const summary = unmatched.map((ghost) => `${String(ghost.name)} @ ${JSON.stringify(ghost.centre)} size ${JSON.stringify(ghost.size)}`);
+      expect(
+        summary.length,
+        `${result.id}: ${summary.length} unrated ghost shot surface(s) over ceiling ${ceiling}: ${summary.join(' | ')}`,
+      ).toBeLessThanOrEqual(ceiling);
+      // A row that matches nothing is rot: the geometry it excused is gone.
+      // Delete the row so the ledger only ever shrinks truthfully.
+      expect(staleRows, `${result.id}: stale ACCEPTED_SHOOT_THROUGH rows`).toEqual([]);
+    }
+  }, 120_000);
+
+  it('Direction C: the ballistic ratchet ceilings stay at their triaged floor (they may only go DOWN)', () => {
+    // Triaged 2026-08-28: zero unrated in all six arenas. Raising any ceiling
+    // is weakening a gate; a genuine contract change must edit BOTH the
+    // ledger module and this pin, with evidence, in review.
+    expect(BALLISTIC_UNRATED_CEILINGS).toEqual({
+      'atomic-acres': 0,
+      'skyline-terminal': 0,
+      'rustworks-1v1': 0,
+      'high-seas': 0,
+      'gun-range': 0,
+      farcrysis: 0,
+    });
+    for (const arenaId of ALL_ARENA_IDS) {
+      expect(ACCEPTED_SHOOT_THROUGH[arenaId], `${arenaId} must have an explicit (possibly empty) ledger`).toBeDefined();
+    }
+  });
 
   it('atomic-acres replaces exactly 8 house statics at runtime and leaves none invisible', async () => {
     const results = await audit();
