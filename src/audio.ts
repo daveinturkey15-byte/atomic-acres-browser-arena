@@ -13,6 +13,7 @@ import {
   selectChiptuneTrack,
   type ChiptuneEvent,
   type ChiptuneTrackId,
+  GAME_MUSIC_BUS_GAIN,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 // Pass 75: the intermittent "sense of place" layer above the continuous bed.
@@ -867,7 +868,12 @@ export class ArenaAudio {
         this.announcements = this.createBus('announcements', 0.5);
         this.ambience = this.createBus('ambience', 0.12);
         this.createBus('menu-music', 0.18);
-        this.createBus('game-music', 0.16);
+        // 2026-08-29 (owner: the chiptunes were promised and never heard).
+        // The old staging multiplied out to ~0.009 amplitude at the default
+        // slider (-41 dBFS) - inaudible under any gunfire. 0.45 x restaged
+        // note gains x default 68% slider lands the bed near -26 dBFS: an
+        // audible background layer that still sits far under weapon SFX.
+        this.createBus('game-music', GAME_MUSIC_BUS_GAIN);
         this.noiseBuffer = this.createNoiseBuffer(1.2);
         this.noiseTextures.clear();
         this.noiseTextures.set('white', this.noiseBuffer);

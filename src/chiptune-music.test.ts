@@ -9,6 +9,7 @@ import {
   midiToFrequency,
   selectChiptuneTrack,
   type ChiptuneTrackId,
+  GAME_MUSIC_BUS_GAIN,
 } from './chiptune-music';
 import { AUDIO_RUNTIME_BUDGET } from './spatial-audio';
 
@@ -42,12 +43,19 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     }
   });
 
-  it('is quiet enough to sit under gameplay audio', () => {
-    // The owner asked for background music that does not overpower game sounds.
-    // These peaks are pre-bus: the game-music bus multiplies by 0.16 and the
-    // player's music volume by up to 1.0 on top of that.
+  it('is AUDIBLE at the default slider and still sits under gameplay audio', () => {
+    // 2026-08-29 re-pin, both directions. The old pin only capped the
+    // pre-bus peak, and the full chain (peak x bus 0.16 x default slider
+    // 0.68) multiplied out to ~0.009 - the owner was promised background
+    // music and NOBODY EVER HEARD IT. The contract now pins the EFFECTIVE
+    // peak through the real bus constant: loud enough to exist (>= 0.03,
+    // which the old staging fails), quiet enough to stay a bed (<= 0.09,
+    // far under weapon SFX amplitudes).
+    const DEFAULT_MUSIC_SLIDER = 0.68;
     for (const event of events) expect(event.gain).toBeGreaterThan(0);
-    expect(Math.max(...events.map((event) => event.gain))).toBeLessThan(0.12);
+    const effectivePeak = Math.max(...events.map((event) => event.gain)) * GAME_MUSIC_BUS_GAIN * DEFAULT_MUSIC_SLIDER;
+    expect(effectivePeak).toBeGreaterThanOrEqual(0.03);
+    expect(effectivePeak).toBeLessThanOrEqual(0.09);
   });
 
   it('never overruns its loop, so it can repeat seamlessly', () => {

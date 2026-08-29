@@ -25,6 +25,15 @@
 /** Semitone offsets from the tonic for the natural-minor scale both tracks use. */
 const NATURAL_MINOR_SEMITONES = Object.freeze([0, 2, 3, 5, 7, 8, 10]);
 
+/**
+ * The game-music bus coefficient audio.ts applies under these compositions.
+ * Lives HERE (the pure module) so the audibility contract test can pin the
+ * whole effective chain: note gain x bus x default slider. The 2026-08-29
+ * restage exists because the previous chain multiplied out to -41 dBFS -
+ * the owner was promised background music and nobody ever heard it.
+ */
+export const GAME_MUSIC_BUS_GAIN = 0.45;
+
 export type ChiptuneChannel = 'lead' | 'bass';
 export type ChiptuneTrackId = 'siren-groves' | 'fallout-drift';
 
@@ -96,8 +105,8 @@ const SIREN_GROVES: ChiptuneTrack = Object.freeze({
   bassOctave: Object.freeze([0, 0, 0, 12, 0, 0, 12, 0]),
   leadSustain: 0.92,
   bassSustain: 0.86,
-  leadGain: 0.085,
-  bassGain: 0.105,
+  leadGain: 0.16,
+  bassGain: 0.19,
 });
 
 /**
@@ -133,8 +142,8 @@ const FALLOUT_DRIFT: ChiptuneTrack = Object.freeze({
   bassOctave: Object.freeze([0, 0, 0, 0, 12, 0, 0, 0]),
   leadSustain: 2.6, // longer than a sixteenth: notes ring into the following rest
   bassSustain: 1.7,
-  leadGain: 0.078,
-  bassGain: 0.098,
+  leadGain: 0.15,
+  bassGain: 0.18,
 });
 
 export const CHIPTUNE_TRACKS: Readonly<Record<ChiptuneTrackId, ChiptuneTrack>> = Object.freeze({
