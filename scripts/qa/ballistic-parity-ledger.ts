@@ -36,6 +36,11 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     // outside every registered footprint.
     { name: 'yard-trunk-bole', count: 8, reason: 'tree bole over the authored wood trunk proxy; the proxy is the rated authority and a bole surface would double-charge it' },
     { name: 'yard-root-flare', count: 8, reason: 'ankle-height root flare beside the collided trunk; a flare surface would double-charge the trunk proxy' },
+    // v4 enterable bus (owner 2026-08-29): the coach art's glazing and
+    // under-chassis wheels stand beside the NEW rated authorities (the
+    // movement-solid glass window bands and the vehicle hull pieces); a
+    // second surface on each would double-charge the same pane or panel.
+    { name: 'coach-window', count: 8, reason: 'coach art glazing over the rated movement-glass window band; one pane, one charge' },
     // (2026-08-29: the two animated-atomic-ring rows are deleted per this
     // gate's own stale-row law - the census stopped flagging the rings after
     // the redesign re-census, so the rows had become rot.)

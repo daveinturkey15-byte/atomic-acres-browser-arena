@@ -52,11 +52,14 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     // peak through the real bus constant: loud enough to exist (>= 0.03,
     // which the old staging fails), quiet enough to stay a bed (<= 0.09,
     // far under weapon SFX amplitudes).
-    const DEFAULT_MUSIC_SLIDER = 0.68;
+    // Owner-tuned 2026-08-29: 35% of the first audible staging at a 50%
+    // default slider. The floor still fails RED against the original
+    // never-heard staging (0.105 x 0.16 x 0.68 = 0.011).
+    const DEFAULT_MUSIC_SLIDER = 0.5;
     for (const event of events) expect(event.gain).toBeGreaterThan(0);
     const effectivePeak = Math.max(...events.map((event) => event.gain)) * GAME_MUSIC_BUS_GAIN * DEFAULT_MUSIC_SLIDER;
-    expect(effectivePeak).toBeGreaterThanOrEqual(0.03);
-    expect(effectivePeak).toBeLessThanOrEqual(0.09);
+    expect(effectivePeak).toBeGreaterThanOrEqual(0.015);
+    expect(effectivePeak).toBeLessThanOrEqual(0.045);
   });
 
   it('schedules EVERY loop event across consecutive horizon windows (regression: one blip per loop)', () => {

@@ -56,7 +56,10 @@ const depth = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ;
 // two end houses). The ceiling re-pins to the measured open-map value; when
 // the owner brings yard furniture back this number must come back DOWN with
 // it, so the comment carries the measured lane to re-derive against.
-const MAX_STANDING_EYE_LINE_METRES = 85;
+// v4 same day: the owner lowered the street crates to jump-mountable height
+// (their eye-cover duty is deliberately gone), which frees one more verge
+// diagonal - measured 90.0 m. Same interim-open-map caveat as above.
+const MAX_STANDING_EYE_LINE_METRES = 93; // v4 estimator found the full corner diagonal (92.46) in the same open-map family
 
 /** Longest unobstructed straight eye-line between perimeter sample points on the built arena. */
 function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {

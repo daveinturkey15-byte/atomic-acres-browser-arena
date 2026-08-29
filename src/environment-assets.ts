@@ -521,21 +521,26 @@ function addRouteArchitecture(root: THREE.Group): void {
       }
       decorative(generator); root.add(generator);
     }
+    // Owner 2026-08-29: the +/-12 street pair is a 0.75 m jump-mountable
+    // platform - its dressing scales to the REAL crate height instead of
+    // floating at the old 1.6 m silhouette.
+    const crateHeight = authoredLargeCoverIdAt(x, z) ? 2.2 : Math.abs(x) === 12 ? 0.75 : 1.6;
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
-    cap.position.set(x, 1.58, z); decorative(cap); root.add(cap);
+    cap.position.set(x, crateHeight - 0.02, z); decorative(cap); root.add(cap);
+    const bodyHeight = Math.max(0.4, crateHeight - 0.42);
     for (const side of [-1, 1]) {
-      const rib = routeBox('barrier-rib', [0.12, 1.18, depth + 0.1], frame, 0.03);
-      rib.position.set(x + side * (width / 2 - 0.18), 0.78, z); decorative(rib); root.add(rib);
+      const rib = routeBox('barrier-rib', [0.12, bodyHeight, depth + 0.1], frame, 0.03);
+      rib.position.set(x + side * (width / 2 - 0.18), bodyHeight / 2 + 0.08, z); decorative(rib); root.add(rib);
       const foot = routePanel('barrier-foot', [0.48, 0.14, depth + 0.34], frame);
       foot.position.set(x + side * (width / 2 - 0.34), 0.08, z); decorative(foot); root.add(foot);
     }
     for (const face of [-1, 1]) {
       const faceZ = z + face * (depth / 2 + 0.035);
-      const panel = routePanel('barrier-recessed-panel', [Math.max(0.7, width - 0.48), 0.92, 0.07], frame);
-      panel.position.set(x, 0.78, faceZ); decorative(panel); root.add(panel);
+      const panel = routePanel('barrier-recessed-panel', [Math.max(0.7, width - 0.48), Math.min(0.92, bodyHeight), 0.07], frame);
+      panel.position.set(x, bodyHeight / 2 + 0.1, faceZ); decorative(panel); root.add(panel);
       for (const side of [-1, 1]) {
         const warning = routePanel('barrier-warning-stripe', [Math.max(0.42, width * 0.29), 0.13, 0.075], trim);
-        warning.position.set(x + side * width * 0.21, 0.8, faceZ + face * 0.006);
+        warning.position.set(x + side * width * 0.21, bodyHeight / 2 + 0.12, faceZ + face * 0.006);
         warning.rotation.z = side * 0.48;
         decorative(warning); root.add(warning);
       }

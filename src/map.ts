@@ -17,6 +17,7 @@ import {
   NEIGHBOURHOOD_BIN_POSITIONS,
   PATROL_LAYOUT,
   SPAWN_LAYOUT,
+  STREET_CRATE_HEIGHT,
   STREET_HALF_WIDTH,
 } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
@@ -629,25 +630,78 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // is the map's single unmistakable piece of central hard cover: it splits the
   // road sightline in half and is the first thing both teams contest.
   const [busLength, busHeight, busWidth] = CENTRAL_BUS.size;
-  box('central transit bus', [CENTRAL_BUS.x, busHeight / 2, CENTRAL_BUS.z], [busLength, busHeight, busWidth], palette.mustard);
-  physicalCover.push({ id: 'central-transit-bus', bounds: { ...colliders[colliders.length - 1] }, blocksMovement: true, blocksShots: true });
-  box('coach roof', [CENTRAL_BUS.x, busHeight - 0.18, CENTRAL_BUS.z], [busLength - 0.45, 0.25, busWidth - 0.5], palette.white, false);
-  for (const x of [-4.6, -1.6, 1.6, 4.6]) {
-    // HF-390 lane: the panes are glass for gunfire (impact/audio material and a
-    // negligible 0.11 energy toll); the bus BODY box behind them remains the
-    // cover authority, so central-cover balance does not move. Whether the
-    // window band should ever become a real shot aperture through the bus is
-    // an open owner balance decision recorded in docs/ballistic-parity/.
-    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z - busWidth / 2 - 0.03], [2.3, 1.1, 0.12], palette.glass, false, false, true, 'glass');
-    box('coach window', [CENTRAL_BUS.x + x, 2.4, CENTRAL_BUS.z + busWidth / 2 + 0.03], [2.3, 1.1, 0.12], palette.glass, false, false, true, 'glass');
-  }
-  for (const x of [-4.4, 4.4]) {
-    for (const z of [-1.2, 1.2]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.38, 8), palette.dark);
-      wheel.rotation.x = Math.PI / 2;
-      wheel.position.set(CENTRAL_BUS.x + x, 0.7, CENTRAL_BUS.z + z);
-      world.add(wheel);
+  // v4 (owner 2026-08-29): the bus is REAL - a walkable interior entered
+  // through its two side doors (the positions the coach art has always
+  // framed), window bands that are movement-solid but ballistic GLASS so you
+  // can see and shoot in and out, closed ends under the raked end glazing,
+  // and the same footprint as ever. The old single body box answered the
+  // "should the windows become real apertures" question recorded in
+  // docs/ballistic-parity/ - the owner decided yes.
+  const busHullTopY = 1.85;
+  const busWindowTopY = 3.05;
+  const busSideZ = busWidth / 2 - 0.14; // hull centreline (z +/-2.66)
+  const busDoorHalf = 0.85;
+  // Door centres mirror the coach art's frames: north side toward the west
+  // end, south side the exact 180-degree twin.
+  // Doors at +/-2.8: clear of the wheel solids at the corners (the first
+  // seat at 4.05 sealed the interior - 0.23 m past capsule margins).
+  const busDoorX = 2.8;
+  for (const side of [-1, 1] as const) {
+    const doorCentre = -side * busDoorX;
+    const sideName = side < 0 ? 'north' : 'south';
+    const segments: Array<[number, number]> = [
+      [-busLength / 2, doorCentre - busDoorHalf],
+      [doorCentre + busDoorHalf, busLength / 2],
+    ];
+    for (const [fromX, toX] of segments) {
+      const width = toX - fromX;
+      const centre = (fromX + toX) / 2;
+      box(`central bus hull ${sideName} ${fromX < doorCentre ? 'a' : 'b'}`,
+        [CENTRAL_BUS.x + centre, busHullTopY / 2, CENTRAL_BUS.z + side * busSideZ],
+        [width, busHullTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
+      box(`central bus window ${sideName} ${fromX < doorCentre ? 'a' : 'b'}`,
+        [CENTRAL_BUS.x + centre, (busHullTopY + busWindowTopY) / 2, CENTRAL_BUS.z + side * (busWidth / 2 + 0.02)],
+        [width, busWindowTopY - busHullTopY, 0.12], palette.glass, true, false, true, 'glass');
     }
+    // Header over the door aperture (the aperture itself is open to 2.4 m).
+    box(`central bus door header ${sideName}`,
+      [CENTRAL_BUS.x + doorCentre, (2.4 + busWindowTopY) / 2, CENTRAL_BUS.z + side * busSideZ],
+      [busDoorHalf * 2, busWindowTopY - 2.4, 0.28], palette.mustard, true, true, true, 'vehicle');
+    // Roof band above the windows.
+    box(`central bus roof band ${sideName}`,
+      [CENTRAL_BUS.x, (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
+      [busLength, busHeight - busWindowTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
+  }
+  // Closed ends below the raked end glazing (whose shot-only proxies remain
+  // the glass authority above 1.9 m).
+  for (const end of [-1, 1] as const) {
+    box(`central bus end cap ${end < 0 ? 'west' : 'east'}`,
+      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), 0.95, CENTRAL_BUS.z],
+      [0.3, 1.9, busWidth], palette.mustard, true, true, true, 'vehicle');
+  }
+  box('central bus roof', [CENTRAL_BUS.x, busHeight - 0.1, CENTRAL_BUS.z], [busLength, 0.2, busWidth], palette.white, true, true, true, 'vehicle');
+  // Bot cover reasoning keeps one bus-sized envelope; movement/ballistics
+  // come from the pieces above.
+  physicalCover.push({
+    id: 'central-transit-bus',
+    bounds: {
+      minX: CENTRAL_BUS.x - busLength / 2, maxX: CENTRAL_BUS.x + busLength / 2,
+      minY: 0, maxY: busHeight,
+      minZ: CENTRAL_BUS.z - busWidth / 2, maxZ: CENTRAL_BUS.z + busWidth / 2,
+    },
+    // Semantically the hull IS mostly blocking; the flags feed the minimap's
+    // landmark renderer, not physics (the pieces above own that).
+    blocksMovement: true,
+    blocksShots: true,
+  });
+  // v4: the crude wheel visuals leave (the coach art and the Quality bake
+  // both carry real wheels); the interior gains HONEST seat colliders sized
+  // to the coach art's bench rows - crouch cover inside the bus, and the
+  // walk-through census stops seeing ghost furniture.
+  for (const [index, [wheelX, wheelZ]] of ([
+    [-4.64, -1.71], [4.64, 1.71], [-4.56, 1.89], [4.56, -1.89],
+  ] as Array<[number, number]>).entries()) {
+    box(`central bus wheel ${index}`, [CENTRAL_BUS.x + wheelX, 0.74, CENTRAL_BUS.z + wheelZ], [1.49, 1.48, 0.45], palette.dark, true, false, true, 'vehicle');
   }
 
   // HF-390 lane: the Quality art coach (environment-assets buildRetroCoach at
@@ -761,7 +815,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // Keyed by anchor coordinate, never by array index - see
     // AUTHORED_LARGE_COVER_ANCHORS for why an index broke this silently.
     const id = authoredLargeCoverIdAt(x, z);
-    const height = id ? AUTHORED_LARGE_COVER_HEIGHT : 1.6;
+    // Owner 2026-08-29: the street pair is jump-mountable, not eye cover.
+    const height = id ? AUTHORED_LARGE_COVER_HEIGHT : Math.abs(x) === 12 ? STREET_CRATE_HEIGHT : 1.6;
     const authoritativeCover = box(`cover ${index}`, [x, height / 2, z], [w, height, d], index % 2 ? palette.coral : palette.aqua);
     if (id) {
       // Keep one simple AABB for movement/projectile authority, but render a

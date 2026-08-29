@@ -1077,6 +1077,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
 
 function wheel(root: THREE.Group, x: number, z: number, radius: number): void {
   const tyre = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.42, 24), MAT.rubber());
+  tyre.name = 'coach-wheel';
   tyre.rotation.z = Math.PI / 2;
   tyre.position.set(x, radius, z);
   tyre.castShadow = true;
@@ -1102,8 +1103,25 @@ function decal(textValue: string, width: number, height: number): THREE.Mesh {
 export function buildRetroCoach(): THREE.Group {
   const root = new THREE.Group(); root.name = 'original-atomic-coach';
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd09b32, roughness: 0.48, metalness: 0.25 });
-  part(root, roundedBox('coach-body', [5.3, 3.45, 13.6], bodyMat, 0.38, 5), [0, 2.02, 0]);
-  part(root, roundedBox('coach-lower', [5.42, 0.72, 13.2], MAT.tealMetal(), 0.2), [0, 0.78, 0]);
+  // v4 (owner 2026-08-29): the coach is ENTERABLE - the solid body becomes a
+  // hull with a door aperture per side (local z +/-2.8, mirroring the
+  // collision), an open interior, and the same silhouette.
+  for (const side of [-1, 1]) {
+    const doorLocalZ = side * 2.8;
+    const segments: Array<[number, number]> = [[-6.8, doorLocalZ - 0.85], [doorLocalZ + 0.85, 6.8]];
+    for (const [fromZ, toZ] of segments) {
+      const length = toZ - fromZ;
+      part(root, roundedBox('coach-body', [0.3, 1.5, length], bodyMat, 0.14, 3), [side * 2.5, 1.05, (fromZ + toZ) / 2]);
+      part(root, roundedBox('coach-roof-band', [0.3, 0.7, length], bodyMat, 0.1, 3), [side * 2.5, 3.4, (fromZ + toZ) / 2]);
+    }
+    part(root, roundedBox('coach-door-header', [0.3, 0.5, 1.7], bodyMat, 0.08), [side * 2.5, 3.0, doorLocalZ]);
+    part(root, roundedBox('coach-lower', [0.36, 0.72, 13.2], MAT.tealMetal(), 0.2), [side * 2.53, 0.78, 0]);
+  }
+  for (const end of [-1, 1]) {
+    part(root, roundedBox('coach-end-cap', [5.3, 1.9, 0.34], bodyMat, 0.16, 3), [0, 0.97, end * 6.63]);
+    part(root, roundedBox('coach-end-roofline', [5.3, 0.5, 0.34], bodyMat, 0.12, 3), [0, 3.5, end * 6.63]);
+  }
+  part(root, roundedBox('coach-floor', [4.9, 0.12, 13.2], MAT.dark(), 0.05), [0, 0.1, 0]);
   part(root, roundedBox('coach-roof', [5.08, 0.34, 12.8], MAT.cream(), 0.16), [0, 3.88, 0]);
   const glass = MAT.glass();
   for (const side of [-1, 1]) {

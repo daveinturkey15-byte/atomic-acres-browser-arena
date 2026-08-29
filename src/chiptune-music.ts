@@ -32,7 +32,11 @@ const NATURAL_MINOR_SEMITONES = Object.freeze([0, 2, 3, 5, 7, 8, 10]);
  * restage exists because the previous chain multiplied out to -41 dBFS -
  * the owner was promised background music and nobody ever heard it.
  */
-export const GAME_MUSIC_BUS_GAIN = 0.45;
+// Owner-tuned 2026-08-29 (after finally HEARING it): effective level set to
+// 35% of the first audible staging, with the mixer slider defaulting to 50%
+// so the player has full headroom in both directions.
+// 0.214 x 0.50 default = 0.107 effective (was 0.45 x 0.68 = 0.306).
+export const GAME_MUSIC_BUS_GAIN = 0.214;
 
 export type ChiptuneChannel = 'lead' | 'bass';
 export type ChiptuneTrackId = 'siren-groves' | 'fallout-drift';

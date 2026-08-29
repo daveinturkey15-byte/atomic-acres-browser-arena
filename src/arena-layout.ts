@@ -117,6 +117,11 @@ export const COVER_LAYOUT: ReadonlyArray<readonly [number, number, number, numbe
   [-9, -26, 3, 2.2], [9, 26, 3, 2.2], [27, -13, 2.8, 4.4], [-27, 13, 2.8, 4.4],
 ]);
 
+/** Owner 2026-08-29: the two street crates beside the bus are JUMP-MOUNTABLE
+ * platforms (jump apex measures 0.82 m at 6.35 m/s vs 24.5 gravity), not
+ * eye-height cover. Applies to the +/-12 street pair only. */
+export const STREET_CRATE_HEIGHT = 0.75;
+
 /**
  * REDESIGN D1: spawns live in the two END gardens, behind the spawn fences,
  * looking down the street - the reference's defining flow. Team 0 owns the

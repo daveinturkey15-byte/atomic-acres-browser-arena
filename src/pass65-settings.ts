@@ -189,7 +189,7 @@ export function createDefaultPass65Settings(capabilities: CapabilityHints = {}):
   const gains = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [id, 100])) as Record<AudioBusId, number>;
   const mutes = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [id, false])) as Record<AudioBusId, boolean>;
   gains['menu-music'] = 72;
-  gains['game-music'] = 68;
+  gains['game-music'] = 50; // owner-tuned 2026-08-29 with the 0.214 bus
   gains.ambience = 82;
   return Object.freeze({
     version: 1,

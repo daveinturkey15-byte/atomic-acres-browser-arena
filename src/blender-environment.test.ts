@@ -210,7 +210,7 @@ describe('Quality Graphics environment asset', () => {
     // REDESIGN 2026-08-29 wave 2: -88 = the two retired (+/-22) yard-fence
     // side runs (44 beveled tris each); the cultivation cluster re-seat is
     // pure translation and adds nothing.
-    expect(provenance.runtimeAudit.triangles).toBe(36_492); // v3.1: + the quality planter twins
+    expect(provenance.runtimeAudit.triangles).toBe(36_712); // v4: the enterable bus hull
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

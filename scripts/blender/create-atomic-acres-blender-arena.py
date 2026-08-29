@@ -288,8 +288,26 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     x, z = centre
     before = {obj.name for obj in env.objects}
     half = length / 2
-    add_box(f"{prefix}_body_lower", [x, 1.25, z], [5.2, 2.2, length], M["metal"], 0.24)
-    add_box(f"{prefix}_body_colour", [x, 2.15, z], [5.0, 2.25, length - 0.35], body_material, 0.3)
+    # v4 (owner 2026-08-29): the bus is ENTERABLE. The solid body becomes two
+    # segmented side hulls with a door aperture each (local z = side*2.8,
+    # mirroring the TypeScript colliders and the performance coach art), a
+    # floor, closed end caps, window pillars and roof bands.
+    door_half = 0.85
+    for hull_side in (-1, 1):
+        hull_door_z = z + hull_side * 2.8
+        for seg_index, (z0, z1) in enumerate((
+            (z - half + 0.35, hull_door_z - door_half),
+            (hull_door_z + door_half, z + half - 0.35),
+        )):
+            seg_len = z1 - z0
+            seg_mid = (z0 + z1) / 2
+            add_box(f"{prefix}_hull_low_{hull_side}_{seg_index}", [x + hull_side * 2.45, 0.925, seg_mid], [0.3, 1.85, seg_len], M["metal"], 0.1)
+            add_box(f"{prefix}_hull_roofband_{hull_side}_{seg_index}", [x + hull_side * 2.42, 3.3, seg_mid], [0.28, 0.7, seg_len], body_material, 0.08)
+        add_box(f"{prefix}_door_header_{hull_side}", [x + hull_side * 2.44, 3.05, hull_door_z], [0.28, 0.6, door_half * 2], body_material, 0.06)
+    for cap_end in (-1, 1):
+        add_box(f"{prefix}_end_cap_{cap_end}", [x, 0.95, z + cap_end * (half - 0.18)], [5.2, 1.9, 0.35], M["metal"], 0.12)
+        add_box(f"{prefix}_end_roofline_{cap_end}", [x, 3.35, z + cap_end * (half - 0.18)], [5.2, 0.6, 0.35], body_material, 0.1)
+    add_box(f"{prefix}_floor", [x, 0.08, z], [4.6, 0.16, length - 0.8], M["rubber"], 0.03)
     add_box(f"{prefix}_roof", [x, 3.52, z], [4.75, 0.34, length - 0.7], M["trim"], 0.14)
     # Original Atomic Acres civic-showcase trim, held inside the existing footprint.
     add_box(f"{prefix}_roof_visor", [x, 3.58, z - half - 0.18], [4.3, 0.18, 0.55], body_material, 0.08)
@@ -307,15 +325,14 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
             add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
         add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
         add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 1.86, z + 0.35], [0.05, 0.42, length - 2.2], body_material, 0.025)
-        door_z = z - half + (2.25 if side > 0 else length - 2.25)
+        # v4: frames trace the OPEN apertures at local z = side*2.8; the old
+        # glass leaves are gone - you walk through.
+        door_z = z + side * 2.8
         frame_x = x + side * 2.67
-        add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 2.975, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
-        add_box(f"{prefix}_door_frame_{side}_bottom", [frame_x, 1.125, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
-        for frame_z in (-0.8, 0, 0.8):
-            add_box(f"{prefix}_door_frame_{side}_upright_{frame_z}", [frame_x, 2.05, door_z + frame_z], [0.08, 1.75, 0.1], M["metal_light"], 0.02)
-        for leaf in (-1, 1):
-            add_box(f"{prefix}_door_glass_{side}_{leaf}", [x + side * 2.615, 2.05, door_z + leaf * 0.41], [0.055, 1.75, 0.68], M["glass"], 0.018)
-        add_box(f"{prefix}_step_{side}", [x + side * 2.72, 0.42, door_z], [0.42, 0.18, 1.45], M["metal_light"], 0.025)
+        add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 2.45, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
+        for frame_z in (-0.85, 0.85):
+            add_box(f"{prefix}_door_frame_{side}_upright_{frame_z}", [frame_x, 1.25, door_z + frame_z], [0.08, 2.4, 0.1], M["metal_light"], 0.02)
+        add_box(f"{prefix}_step_{side}", [x + side * 2.72, 0.12, door_z], [0.42, 0.18, 1.45], M["metal_light"], 0.025)
     for wheel_x in (x - 2.48, x + 2.48):
         for wheel_z in (z - half + 2.2, z + half - 2.2):
             add_cylinder(f"{prefix}_wheel_{wheel_x}_{wheel_z}", [wheel_x, 0.72, wheel_z], 0.72, 0.42, M["rubber"], 20, rotation=(0, math.pi / 2, 0))
