@@ -34,14 +34,14 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuke-town-street-axis', [-27, 1.7, 0], [34, 1.5, 0], 'overview', 1.08),
     // What a spawning defender actually sees: the west garden looking back
     // over the flower border and plank fence toward the street.
-    camera('nuke-town-west-garden', [-32.5, 1.7, -14], [-24, 1.2, 6], 'overview', 1.08),
-    camera('nuke-town-aqua-upper-roof', [-10, 6, -20.4], [4, 5, -17.4], 'geometry', 1.08),
+    camera('nuke-town-west-garden', [-35.5, 1.7, -8], [-20, 1.4, 8], 'overview', 1.08), // v3 spawn yard
+    camera('nuke-town-aqua-upper-roof', [-33, 6, -20.4], [-19, 5, -17.4], 'geometry', 1.08), // v3: house at its team end
     // Keep the occluded wall and open portal probes at one legal room position.
     // The retired wall probe sat inside a narrow wall cavity and measured two
     // sunlit backfaces, making its HDR result depend on geometry overlap rather
     // than whether light was actually retained through the doorway.
-    camera('nuke-town-aqua-wall-closed', [4, 2.2, -12.4], [-1, 2.2, -17.4], 'light-occlusion', 1.08),
-    camera('nuke-town-aqua-door-open', [4, 2.2, -12.4], [6, 2.2, -17.4], 'portal', 1.08),
+    camera('nuke-town-aqua-wall-closed', [-19, 2.2, -12.4], [-24, 2.2, -17.4], 'light-occlusion', 1.08),
+    camera('nuke-town-aqua-door-open', [-19, 2.2, -12.4], [-17, 2.2, -17.4], 'portal', 1.08),
   ],
   collisionIdentity: { authoritativeArenaId: 'atomic-acres', evidence: 'ArenaMap atomic-acres collider and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['grass, decals, particles and overhead dressing remain presentation-only'],

@@ -1,4 +1,4 @@
-import { ARENA_BOUNDS, SPAWN_END_FENCE_X, GARAGE_LAYOUT, HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
+import { ARENA_BOUNDS, STREET_END_X, GARAGE_LAYOUT, HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
 import type { Box2 } from './collision';
 
 export const GRASS_GROUND_LAYOUT_ID = 'manicured-verges-v4';
@@ -53,19 +53,18 @@ export const GRASS_GROUND_REGIONS: readonly GrassGroundRegion[] = Object.freeze(
     minZ: HARD_SURFACE_HALF_DEPTH_M,
     maxZ: ARENA_BOUNDS.maxZ,
   }),
-  // REDESIGN 2026-08-29: the street (and with it the hard-surface band) ends
-  // at the spawn fences now, so the two END GARDENS are lawn at street level
-  // too - without these strips the spawn yards were bare painted plates.
+  // v3: the asphalt ends at STREET_END_X; the end aprons beyond it are lawn
+  // at street level all the way to the boundary.
   Object.freeze({
     id: 'west-garden',
     minX: ARENA_BOUNDS.minX,
-    maxX: -SPAWN_END_FENCE_X,
+    maxX: -STREET_END_X,
     minZ: -HARD_SURFACE_HALF_DEPTH_M,
     maxZ: HARD_SURFACE_HALF_DEPTH_M,
   }),
   Object.freeze({
     id: 'east-garden',
-    minX: SPAWN_END_FENCE_X,
+    minX: STREET_END_X,
     maxX: ARENA_BOUNDS.maxX,
     minZ: -HARD_SURFACE_HALF_DEPTH_M,
     maxZ: HARD_SURFACE_HALF_DEPTH_M,

@@ -786,13 +786,22 @@ for index, (x, z) in enumerate(((-18, -16), (18, 16), (-26, -2), (26, 2), (-30, 
     add_cylinder(f"BLD_PROP_lamp_{index}", [x, 2.8, z], 0.11, 5.6, M["metal"], 10)
     add_box(f"BLD_PROP_lamp_arm_{index}", [x + (0.55 if x < 0 else -0.55), 5.45, z], [1.25, 0.12, 0.12], M["metal"], 0.025)
     add_uv_sphere(f"BLD_PROP_lamp_glow_{index}", [x + (1.05 if x < 0 else -1.05), 5.28, z], [0.22, 0.18, 0.22], M["emissive_amber"])
-for index, (x, z, scale) in enumerate(((-19, -28, 1.0), (19, 28, 1.0), (-27, -21, 0.9), (27, 21, 0.9), (-13, 28.5, 0.85), (13, -28.5, 0.85))):
+# v3 (owner HITL 2026-08-29): trees re-seated for the house-per-end anatomy;
+# mirrors the map.ts substantial list exactly.
+for index, (x, z, scale) in enumerate(((-9, -28.5, 1.0), (9, 28.5, 1.0), (-33.5, -26, 0.9), (33.5, 26, 0.9), (-13, 27.5, 0.85), (13, -27.5, 0.85), (-34.5, 10, 0.9), (34.5, -10, 0.9))):
     add_cylinder(f"BLD_PROP_tree_trunk_{index}", [x, 2.0 * scale, z], 0.34 * scale, 4.0 * scale, M["timber"], 10)
     for cluster, (ox, oy, oz) in enumerate(((0, 5.2, 0), (-0.9, 4.8, 0.4), (0.9, 4.9, -0.4), (0, 6.0, 0.25))):
         add_uv_sphere(f"BLD_PROP_tree_crown_{index}_{cluster}", [x + ox * scale, oy * scale, z + oz * scale], [1.45 * scale, 1.15 * scale, 1.3 * scale], M["foliage"])
-for index, (x, z) in enumerate(((-24, -8), (24, 8), (-9, -27), (9, 27))):
-    add_box(f"BLD_PROP_terminal_{index}", [x, 0.85, z], [1.25, 1.7, 0.8], M["metal"], 0.12)
-    add_box(f"BLD_PROP_terminal_screen_{index}", [x, 1.15, z + 0.43], [0.7, 0.42, 0.05], M["emissive_aqua"], 0.02)
+# v3: the irrigation terminals were deleted from the arena entirely
+# (DECLUTTER 2026-08-29); their quality twins go with them.
+# v3.1: the rear-strip concrete planters carry real colliders, so the Quality
+# scene must show them - the quality-composition parity gate found them
+# invisible on this profile (the performance art layer owned their only
+# visuals).
+for index, (x, z) in enumerate(((-16, -28.5), (16, 28.5))):
+    add_box(f"BLD_PROP_planter_{index}", [x, 0.35, z], [2.2, 0.7, 1.05], M["concrete"], 0.1)
+    for offset in (-0.6, 0.0, 0.6):
+        add_uv_sphere(f"BLD_PROP_planter_shrub_{index}_{offset}", [x + offset, 0.95, z], [0.42, 0.36, 0.4], M["foliage"])
 
 # Export one checked semantic marker per route as a named empty node. Keeping the
 # route contract on empties lets the visible meshes remain fully material-batched.

@@ -4,7 +4,6 @@ import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
   COVER_LAYOUT,
-  FRONT_HEDGE_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
   NEIGHBOURHOOD_BENCH_COLLIDER_SIZE,
@@ -14,11 +13,8 @@ import {
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
   PATROL_LAYOUT,
-  SPAWN_END_FENCE_SEGMENTS,
-  SPAWN_END_FENCE_X,
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
-  YARD_FENCE_LAYOUT,
 } from './arena-layout';
 import { movementProfile } from './gameplay';
 import { circleIntersectsBox, segmentIntersectsBox } from './collision';
@@ -36,20 +32,25 @@ const rotated = (points: ReadonlyArray<readonly [number, number]>) =>
 const sprint = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
 
 describe('compact original arena layout', () => {
-  it('measures 68 by 57 metres, crossed corner to corner in barely over ten seconds', () => {
+  it('measures 74 by 60 metres, crossed corner to corner in about eleven seconds', () => {
+    // v3 (owner HITL 2026-08-29): "you didn't make the playable map any
+    // bigger" - bounds grow to 74 x 60 by direct owner instruction, so the
+    // sprint bands re-derive from the measured geometry rather than the
+    // reference's own timings: 95.3 m diagonal, 10.95 s at 8.7 m/s.
+
     // REDESIGN 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md): length moves
     // onto the STREET axis where the reference keeps it; the across-street
     // depth gives back what the sideways design had borrowed. The diagonal
     // sprint band below holds UNCHANGED - 68 x 57 was sized to it: 88.73 m
     // diagonal, 10.20 s at 8.7 m/s, inside the same 10..10.5 s pin that
     // rejected a straight scale-up once already.
-    expect(ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX).toBe(68);
-    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(57);
+    expect(ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX).toBe(74);
+    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(60);
     const diagonal = Math.hypot(
       ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX,
       ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ,
     );
-    expect(diagonal).toBeLessThan(90);
+    expect(diagonal).toBeLessThan(96);
     // The reference map's whole character is that it is small. Sprinting a
     // straight diagonal must stay inside ten seconds, and a full lap of the
     // perimeter inside thirty. HF-383 note: an in-flight uniform 1.05 scale-up
@@ -59,10 +60,10 @@ describe('compact original arena layout', () => {
     // owner-requested growth (proven red at 10.16 s against the old <10 s),
     // below 10.5 s to keep the sprint-crossing character.
     expect(diagonal / sprint).toBeGreaterThan(10);
-    expect(diagonal / sprint).toBeLessThan(10.5);
+    expect(diagonal / sprint).toBeLessThan(11.2);
     const lapSeconds = (2 * ((ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX) + (ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ))) / sprint;
-    expect(lapSeconds).toBeGreaterThan(25);
-    expect(lapSeconds).toBeLessThan(30);
+    expect(lapSeconds).toBeGreaterThan(27);
+    expect(lapSeconds).toBeLessThan(32); // v3 74x60: measured 30.8 s
   });
 
   it('faces the two houses at each other across the central street', () => {
@@ -107,27 +108,12 @@ describe('compact original arena layout', () => {
     expect(rotated(PATROL_LAYOUT)).toBe(true);
     expect(rotated(NEIGHBOURHOOD_BIN_POSITIONS)).toBe(true);
     expect(rotated(NEIGHBOURHOOD_BENCH_LAYOUT.map(([x, z]) => [x, z] as const))).toBe(true);
-    expect(rotated(YARD_FENCE_LAYOUT.map(([x, z]) => [x, z] as const))).toBe(true);
     expect(rotated(GARAGE_LAYOUT.map((garage) => [garage.x, garage.z] as const))).toBe(true);
-    // HF-383 completion: the hedge/fin/van layers were previously only
-    // symmetric by collider audit (nuketown-traversal); they are pinned here
-    // at the authored-constant level too so a future edit cannot break one
-    // side silently. Strictness only increases: no prior assertion removed.
-    expect(rotated(FRONT_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
-    // REDESIGN 2026-08-29: fins/rear/corner/side hedge sets are deleted with the
-    // cross-flow maze (docs/NUKETOWN_REDESIGN_2026-08-29.md). Their symmetry duty
-    // passes to the spawn-end fences: expanding both signed fences must yield a
-    // 180-degree-symmetric point set, exactly like every other layer here.
-    const fencePoints = ([1, -1] as const).flatMap((sign) =>
-      SPAWN_END_FENCE_SEGMENTS.map(([zCentre]) => [sign * SPAWN_END_FENCE_X, sign * zCentre] as const));
-    expect(rotated(fencePoints)).toBe(true);
+    // v3 (owner HITL 2026-08-29): the hedge and fence layers are DELETED, so
+    // their symmetry rows go with them - the surviving layers above and the
+    // houses/vans below still pin every remaining gameplay set.
     expect(rotated(HOUSE_LAYOUT.map((house) => [house.x, house.z] as const))).toBe(true);
     expect(rotated(PARKED_VAN_LAYOUT.map((van) => [van.x, van.z] as const))).toBe(true);
-    // Segment lengths must pair too, not just centres: a longer north run vs
-    // a shorter south twin would be asymmetric cover even with matched keys.
-    expect(FRONT_HEDGE_LAYOUT.every((hedge) => FRONT_HEDGE_LAYOUT.some((twin) => (
-      Math.abs(twin.x + hedge.x) < 1e-6 && Math.abs(twin.z + hedge.z) < 1e-6 && twin.length === hedge.length
-    )))).toBe(true);
     // Neither team may inherit a better spawn set than the other.
     expect(SPAWN_LAYOUT[0].every(([x, z]) => (
       SPAWN_LAYOUT[1].some(([ox, oz]) => Math.abs(ox + x) < 1e-6 && Math.abs(oz + z) < 1e-6)
@@ -148,23 +134,27 @@ describe('compact original arena layout', () => {
     expect(PATROL_LAYOUT.every((point) => inside(point, 0.44))).toBe(true);
   });
 
-  it('keeps each team spawning in its own END garden behind the spawn fence', () => {
-    // REDESIGN D1: the reference's defining flow. Team 0 owns the west end
-    // garden, team 1 the east; every spawn sits BEHIND its fence line, so no
-    // spawn is in the street or the verges.
-    expect(SPAWN_LAYOUT[0].every(([x]) => x < -SPAWN_END_FENCE_X)).toBe(true);
-    expect(SPAWN_LAYOUT[1].every(([x]) => x > SPAWN_END_FENCE_X)).toBe(true);
+  it('keeps each team spawning in its own END yard behind its own house', () => {
+    // v3: the fences are gone (owner HITL); the HOUSE is the spawn shield
+    // now, so every spawn must sit strictly beyond its own team's house
+    // rear line - the reference's anatomy.
+    const houseRearX = Math.max(...HOUSE_LAYOUT.map((house) => Math.abs(house.x))) + 10.5;
+    expect(SPAWN_LAYOUT[0].every(([x]) => x < -33)).toBe(true);
+    expect(SPAWN_LAYOUT[1].every(([x]) => x > 33)).toBe(true);
+    expect(houseRearX).toBeLessThanOrEqual(33.5); // spawns clear the house envelope
   });
 
-  it('keeps the east patrol turn clear of the authored service wall', () => {
-    const serviceWall = { minX: 22.15, maxX: 22.85, minY: 0, maxY: 1.5, minZ: 4, maxZ: 14 };
+  it('keeps the east patrol turn clear of the coral garage plot', () => {
+    // v3: the service wall is long gone; the nearest authored plot to the
+    // east patrol turn is the coral garage. Same capsule-clearance pin.
+    const coralGarage = { minX: 1.5, maxX: 8.7, minY: 0, maxY: 3.3, minZ: 9.2, maxZ: 15.8 };
     const turn = PATROL_LAYOUT[5];
-    expect(circleIntersectsBox(turn[0], turn[1], 0.44, serviceWall)).toBe(false);
+    expect(circleIntersectsBox(turn[0], turn[1], 0.44, coralGarage)).toBe(false);
     const previous = PATROL_LAYOUT[4];
     expect(segmentIntersectsBox(
       { x: previous[0], y: 0.8, z: previous[1] },
       { x: turn[0], y: 0.8, z: turn[1] },
-      serviceWall,
+      coralGarage,
       0.44,
     )).toBe(false);
   });

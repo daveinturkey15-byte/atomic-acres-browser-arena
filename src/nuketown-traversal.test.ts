@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createHouseArchitecture, solidBounds } from './house-navigation';
 import {
   ARENA_BOUNDS,
+  HOUSE_LAYOUT,
   CENTRAL_BUS,
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
@@ -530,7 +531,11 @@ describe('Nuke Town traversal (HF-383)', () => {
       const cz = (b.minZ + b.maxZ) / 2;
       if (cz >= 0) continue;
       southFrames += 1;
-      const k = `${signature(b)}|${(((b.minX + b.maxX) / 2) - 8).toFixed(3)}|${(-cz).toFixed(3)}`;
+      // v3: the twin offset derives from the live house layout instead of the
+      // old hardcoded 8 m separation (both houses share one plan, so entry
+      // frames TRANSLATE between origins rather than rotating).
+      const twinDx = HOUSE_LAYOUT[1].x - HOUSE_LAYOUT[0].x;
+      const k = `${signature(b)}|${(((b.minX + b.maxX) / 2) + twinDx).toFixed(3)}|${(-cz).toFixed(3)}`;
       if ((frameAt.get(k) ?? 0) > 0) frameAt.set(k, frameAt.get(k)! - 1);
       else unpairedFrames.push(`${nameFor(b)} @(${((b.minX + b.maxX) / 2).toFixed(2)}, ${cz.toFixed(2)})`);
     }

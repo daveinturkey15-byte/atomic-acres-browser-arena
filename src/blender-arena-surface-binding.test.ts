@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ARENA_BOUNDS, STREET_HALF_WIDTH } from './arena-layout';
+import { ARENA_BOUNDS, STREET_END_X, STREET_HALF_WIDTH } from './arena-layout';
 import { classifyFootstepSurface } from './combat-feedback';
 
 /**
@@ -47,8 +47,11 @@ describe('Blender arena spec tracks the arena-layout constants', () => {
 
   it('draws the carriageway at exactly STREET_HALF_WIDTH', () => {
     expect(spec.roadway.road.size[2] / 2).toBeCloseTo(STREET_HALF_WIDTH, 6);
-    // The asphalt runs past both end fences so no seam shows at either mouth.
-    expect(spec.roadway.road.size[0] / 2).toBeGreaterThan(ARENA_BOUNDS.maxX);
+    // v3: the asphalt deliberately ENDS at STREET_END_X - the end aprons
+    // beyond it are lawn under the spawn yards, so the road must stop short
+    // of the bounds rather than run past them.
+    expect(spec.roadway.road.size[0] / 2).toBe(STREET_END_X);
+    expect(STREET_END_X).toBeLessThan(ARENA_BOUNDS.maxX);
   });
 
   it('tiles kerb and pavement across the concrete band with no gap or overlap', () => {

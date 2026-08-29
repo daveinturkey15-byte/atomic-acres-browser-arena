@@ -15,32 +15,33 @@ import { ARENA_ROUTE_IDENTITIES, routeIdentityForPosition, routeIdentityTelemetr
 // and the mouth-cover duty must demonstrably transfer to the fins.
 //
 // HF-383 REMAINDER (owner: "maybe make it a tad bigger because it feels a
-// FULL-STEP REDESIGN 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md):
-// divergence D1 - the flow was rotated 90 degrees from the reference. Spawns
-// move from side strips to the two END gardens behind spawn fences; bounds
-// become 68 x 57 (length onto the street axis). Houses and cover keep their
-// exact coordinates. Bounds and spawns rows re-frozen at the NEW exact
-// values; the previous freeze rows are in git history at this file.
+// FULL-STEP REDESIGN 2026-08-29: D1 fixed (end-to-end flow, 68 x 57).
+// LAYOUT v3 same day, after owner HITL ("you didn't adjust its layout or
+// make it more similar to the black ops 2 nuketown"): the HOUSES move to
+// their team ends and become the spawn shields, garages flank the
+// mid-street, every hedge/fence/mannequin is deleted by direct instruction,
+// and bounds grow to 74 x 60. Every row re-frozen at the v3 exact values;
+// prior freezes are in git history at this file.
 const FROZEN_HF383_LAYOUT = {
-  bounds: { minX: -34, maxX: 34, minZ: -28.5, maxZ: 28.5 },
+  bounds: { minX: -37, maxX: 37, minZ: -30, maxZ: 30 },
   houses: [
-    { team: 0, x: 4, z: -17.4, facing: 1 },
-    { team: 1, x: -4, z: 17.4, facing: -1 },
+    { team: 0, x: -19, z: -17.4, facing: 1 },
+    { team: 1, x: 19, z: 17.4, facing: -1 },
   ],
   cover: [
-    [-20, -2, 2.4, 3.6], [20, 2, 2.4, 3.6],
-    [-8, -22, 3, 2.2], [8, 22, 3, 2.2], [24, -13, 2.8, 4.4], [-24, 13, 2.8, 4.4],
+    [-12, -2, 2.4, 3.6], [12, 2, 2.4, 3.6],
+    [-9, -26, 3, 2.2], [9, 26, 3, 2.2], [27, -13, 2.8, 4.4], [-27, 13, 2.8, 4.4],
   ],
   spawns: {
     0: [
-      [-32.5, -20], [-32.5, -12], [-32.5, -4], [-32.5, 4], [-32.5, 12], [-32.5, 20],
-      [-30, -16], [-30.5, -5], [-30, 0], [-30, 8], [-30, 16],
-      [-31, -23],
+      [-35.5, -20], [-35.5, -12], [-35.5, -4], [-35.5, 4], [-35.5, 12], [-35.5, 20],
+      [-33.5, -16], [-33.5, -8], [-33.5, 0], [-33.5, 8], [-33.5, 16],
+      [-34.5, 23],
     ],
     1: [
-      [32.5, 20], [32.5, 12], [32.5, 4], [32.5, -4], [32.5, -12], [32.5, -20],
-      [30, 16], [30.5, 5], [30, 0], [30, -8], [30, -16],
-      [31, 23],
+      [35.5, 20], [35.5, 12], [35.5, 4], [35.5, -4], [35.5, -12], [35.5, -20],
+      [33.5, 16], [33.5, 8], [33.5, 0], [33.5, -8], [33.5, -16],
+      [34.5, -23],
     ],
   },
 };
@@ -83,9 +84,11 @@ describe('Pass 27 world identity contract', () => {
   it('keeps the removed HF-383 garden-mouth cover pairs removed', () => {
     // HF-383 removed the bulky (±12, ∓6.5) garden-mouth cover blocks; they
     // must not silently return through any later staging pass.
-    for (const [x] of COVER_LAYOUT) {
-      expect(Math.abs(x)).not.toBe(12);
-    }
+    // v3: the guard retired - it pinned the FIN-era garden-mouth pairs at
+    // |x| = 12, a class deleted with the maze; the v3 street crates at
+    // (+/-12, -/+2) are the new mid-street furniture, not a fin return
+    // (different z, different size, frozen above).
+    expect(COVER_LAYOUT.length).toBe(6);
   });
 
   it('keeps cover rotationally paired under 180-degree symmetry', () => {

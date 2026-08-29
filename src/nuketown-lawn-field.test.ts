@@ -18,7 +18,7 @@
  */
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
-import { ARENA_BOUNDS, SPAWN_END_FENCE_X } from './arena-layout';
+import { ARENA_BOUNDS, STREET_END_X } from './arena-layout';
 import { HARD_SURFACE_HALF_DEPTH_M } from './grass-placement';
 import { buildArena } from './map';
 import {
@@ -62,7 +62,7 @@ describe('Nuke Town lawn field (Pass 82)', () => {
       // REDESIGN 2026-08-29: the street (and its hard-surface band) ends at
       // the spawn fences, so the |z| exclusion applies only inside the street
       // span; the end gardens are lawn at street level by design.
-      if (Math.abs(origin.x) <= SPAWN_END_FENCE_X) {
+      if (Math.abs(origin.x) <= STREET_END_X) {
         expect(Math.abs(origin.z)).toBeGreaterThanOrEqual(HARD_SURFACE_HALF_DEPTH_M);
       }
       expect(origin.z).toBeGreaterThanOrEqual(ARENA_BOUNDS.minZ);
@@ -128,7 +128,9 @@ describe('Nuke Town lawn field (Pass 82)', () => {
       // The donor's measured gotcha: the bounding volume must wrap the
       // instance BOUNDS, not the geometry at the origin.
       expect(mesh.boundingSphere).not.toBeNull();
-      expect(mesh.boundingSphere!.radius).toBeGreaterThan(10);
+      // v3: the smallest region is the 2 m end apron strip (radius ~9.5);
+      // the pin still proves instance BOUNDS, not the 0.25 m geometry origin.
+      expect(mesh.boundingSphere!.radius).toBeGreaterThan(4);
     }
   });
 
@@ -157,13 +159,12 @@ describe('Nuke Town lawn field (Pass 82)', () => {
   it('rejects the yard props the arena authors on the lawns', () => {
     // DECLUTTER 2026-08-29: plinth/vessel/greenhouse left the map; the
     // surviving and new props take their keep-out rows.
-    expect(nuketownLawnPlacementAllowed(-33.2, -27.3)).toBe(false); // verge mound (redesign corner seat)
-    expect(nuketownLawnPlacementAllowed(9, 27)).toBe(false); // rear-yard planter
-    expect(nuketownLawnPlacementAllowed(-32, 13.5)).toBe(false); // garden divider fence
-    expect(nuketownLawnPlacementAllowed(-30.6, 11.5)).toBe(false); // spawn-garden tree
-    expect(nuketownLawnPlacementAllowed(-6.5, -27)).toBe(false); // rear yard hedge
-    expect(nuketownLawnPlacementAllowed(-15, -25)).toBe(false); // mannequin
-    expect(nuketownLawnPlacementAllowed(-16, -20)).toBe(true); // open west yard
-    expect(nuketownLawnPlacementAllowed(16, 20)).toBe(true); // open east yard
+    // v3: fences/hedges/dividers/mannequins deleted; survivors re-seated.
+    expect(nuketownLawnPlacementAllowed(-36.2, -28.8)).toBe(false); // verge mound (v3 corner)
+    expect(nuketownLawnPlacementAllowed(16, 28.5)).toBe(false); // rear-strip planter
+    expect(nuketownLawnPlacementAllowed(-34.5, 10)).toBe(false); // spawn-yard tree
+    expect(nuketownLawnPlacementAllowed(-9, -28.5)).toBe(false); // rear yard tree
+    expect(nuketownLawnPlacementAllowed(-30, -20)).toBe(true); // open west spawn yard
+    expect(nuketownLawnPlacementAllowed(30, 20)).toBe(true); // open east spawn yard
   });
 });

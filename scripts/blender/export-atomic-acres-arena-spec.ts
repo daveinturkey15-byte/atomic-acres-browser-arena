@@ -5,23 +5,14 @@ import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
   COVER_LAYOUT,
-  GARDEN_COVER_HEIGHT,
-  GARDEN_COVER_LAYOUT,
   KERB_CAR_LAYOUT,
   KERB_CAR_SIZE,
-  FRONT_HEDGE_LAYOUT,
-  FRONT_HEDGE_SIZE,
   GARAGE_LAYOUT,
   GARAGE_SIZE,
   HOUSE_LAYOUT,
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
-  SPAWN_END_FENCE_SEGMENTS,
-  SPAWN_END_FENCE_SIZE,
-  SPAWN_END_FENCE_X,
   STREET_HALF_WIDTH,
-  YARD_FENCE_HEIGHT,
-  YARD_FENCE_LAYOUT,
 } from '../../src/arena-layout';
 import { createHouseArchitecture } from '../../src/house-navigation';
 // Anchors live with the art authority in src/map.ts, not with the layout constants.
@@ -47,7 +38,8 @@ const ARENA_CENTRE_X = (ARENA_BOUNDS.minX + ARENA_BOUNDS.maxX) / 2;
 const ARENA_CENTRE_Z = (ARENA_BOUNDS.minZ + ARENA_BOUNDS.maxZ) / 2;
 
 /** Asphalt overruns the end fences by 1 m so no seam shows at either mouth. */
-const STREET_LENGTH = ARENA_WIDTH + 2;
+// v3: the asphalt ends at STREET_END_X (+/-35); the end aprons are lawn.
+const STREET_LENGTH = 70;
 /** Authored kerb section: fixed depth, sitting immediately outside the asphalt. */
 const CURB_DEPTH = 1.2;
 const CURB_Z = STREET_HALF_WIDTH + CURB_DEPTH / 2;
@@ -111,25 +103,12 @@ const spec = {
   // layout edit either keeps the anchor and the art follows it, or drops it and
   // src/blender-environment.test.ts fails loudly.
   authoredLargeCover: AUTHORED_LARGE_COVER_ANCHORS.map(([x, z, id]) => [x, z, id]),
-  streetHedges: {
-    front: FRONT_HEDGE_LAYOUT.map((hedge) => ({
-      position: [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z],
-      size: [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth],
-    })),
-  },
-  // REDESIGN 2026-08-29: fins/rear/corner/side families deleted with the
-  // cross-flow maze. The art mirrors the new authorities instead: the two
-  // spawn-end fences (with their door gaps), the tall garden cover, and the
-  // kerb-parked driveway cars - every collider visible, every visible solid.
-  spawnEndFences: ([1, -1] as const).flatMap((sign) =>
-    SPAWN_END_FENCE_SEGMENTS.map(([zCentre, zLength]) => ({
-      position: [sign * SPAWN_END_FENCE_X, SPAWN_END_FENCE_SIZE.height / 2, sign * zCentre],
-      size: [SPAWN_END_FENCE_SIZE.depth, SPAWN_END_FENCE_SIZE.height, zLength],
-    }))),
-  gardenCover: GARDEN_COVER_LAYOUT.map(([x, z, width, depth]) => ({
-    position: [x, GARDEN_COVER_HEIGHT / 2, z],
-    size: [width, GARDEN_COVER_HEIGHT, depth],
-  })),
+  // v3 (owner HITL 2026-08-29): hedges, spawn fences and garden cover are
+  // DELETED from the arena; the families stay in the schema as empty lists
+  // so the generator contract is explicit rather than absent.
+  streetHedges: { front: [] },
+  spawnEndFences: [],
+  gardenCover: [],
   kerbCars: KERB_CAR_LAYOUT.map((car) => ({
     id: car.id,
     position: [car.x, KERB_CAR_SIZE[1] / 2, car.z],
@@ -141,7 +120,7 @@ const spec = {
     size: [...PARKED_VAN_SIZE],
   })),
   roadway: {
-    ground: { position: [0, -0.09, 0], size: [70, 0.18, 68] },
+    ground: { position: [0, -0.09, 0], size: [ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX + 2, 0.18, ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ + 2] },
     road: {
       position: [ARENA_CENTRE_X, 0.015, ARENA_CENTRE_Z],
       size: [STREET_LENGTH, 0.03, STREET_HALF_WIDTH * 2],
@@ -154,7 +133,7 @@ const spec = {
     })),
     // Centre-line dashes run along the street; the two crosswalk bands sit
     // clear of them so nothing stacks a few millimetres under the white bars.
-    laneMarkers: [-28, -20, -12, 12, 20, 28]
+    laneMarkers: [-32, -24, -16, -8, 8, 16, 24, 32]
       .map((x) => ({ position: [x, 0.055, 0], size: [3.6, 0.03, 0.18] })),
     crosswalks: [-16, 16].flatMap((x) => [-4.5, -3, -1.5, 0, 1.5, 3, 4.5].map((z) => ({
       position: [x, 0.062, z], size: [3.2, 0.025, 1.4],
@@ -165,9 +144,7 @@ const spec = {
   vehicles: [
     { id: 'armored-transit', position: [CENTRAL_BUS.x, 0, CENTRAL_BUS.z], facing: 1, length: CENTRAL_BUS.assetLength },
   ],
-  yardFences: YARD_FENCE_LAYOUT.map(([x, z, width, depth]) => ({
-    position: [x, YARD_FENCE_HEIGHT / 2, z], size: [width, YARD_FENCE_HEIGHT, depth],
-  })),
+  yardFences: [],
   // DECLUTTER 2026-08-29: the campus routeStructures (hydroponics, service
   // channel, solar canopy, beacon) left the playable area entirely.
   routeStructures: [],

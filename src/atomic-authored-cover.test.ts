@@ -1,10 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { COVER_LAYOUT } from './arena-layout';
-import { addNeighbourhoodLife } from './environment-assets';
 import {
-  ATOMIC_MANNEQUIN_COLLIDER_SIZE,
-  ATOMIC_MANNEQUIN_LAYOUT,
   AUTHORED_LARGE_COVER_ANCHORS,
   AUTHORED_LARGE_COVER_HEIGHT,
   authoredLargeCoverIdAt,
@@ -29,10 +26,12 @@ import {
 
 /** id, x, z, width, depth - the footprint each authored asset is modelled to fill. */
 const ANCHORS: ReadonlyArray<readonly [string, number, number, number, number]> = [
-  ['north-cargo-stack', -8, -22, 3, 2.2],
-  ['south-pipe-stack', 8, 22, 3, 2.2],
-  ['west-service-skip', 24, -13, 2.8, 4.4],
-  ['east-generator-trailer', -24, 13, 2.8, 4.4],
+  // v3 (owner HITL 2026-08-29): anchors re-seated with COVER_LAYOUT for the
+  // house-per-end anatomy; ids and footprints unchanged.
+  ['north-cargo-stack', -9, -26, 3, 2.2],
+  ['south-pipe-stack', 9, 26, 3, 2.2],
+  ['west-service-skip', 27, -13, 2.8, 4.4],
+  ['east-generator-trailer', -27, 13, 2.8, 4.4],
 ];
 
 describe('atomic-acres authored large cover', () => {
@@ -129,96 +128,6 @@ describe('atomic-acres authored large cover', () => {
  * the owner; the pass31-neighbourhood-life root is a SIBLING of the arena root
  * (legacy-main.ts adds it straight to the scene) and survives that hide.
  */
-describe('atomic-acres yard mannequins', () => {
-  const scene = new THREE.Scene();
-  const arena = buildArena(scene);
-  const life = addNeighbourhoodLife(scene, false);
-  scene.updateMatrixWorld(true);
-
-  const dummies: THREE.Object3D[] = [];
-  life.traverse((node) => {
-    if (node.name === 'street-mannequin') dummies.push(node);
-  });
-
-  it('pairs every mannequin with its exact 180-degree twin', () => {
-    expect(ATOMIC_MANNEQUIN_LAYOUT.length % 2).toBe(0);
-    for (const [x, z, facing] of ATOMIC_MANNEQUIN_LAYOUT) {
-      const twin = ATOMIC_MANNEQUIN_LAYOUT.find((other) => (
-        Math.abs(other[0] + x) < 1e-6
-        && Math.abs(other[1] + z) < 1e-6
-        && Math.abs(Math.cos(other[2] - facing - Math.PI)) > 1 - 1e-9
-      ));
-      expect(twin, `mannequin (${x}, ${z}) has no rotated partner`).toBeDefined();
-    }
-  });
-
-  it('gives every mannequin movement and shot authority, seated on the ground', () => {
-    for (const [index, [x, z]] of ATOMIC_MANNEQUIN_LAYOUT.entries()) {
-      const proxy = arena.root.getObjectByName(`street-mannequin-collider-${index}`) as THREE.Mesh | undefined;
-      expect(proxy, `mannequin ${index} has no collider`).toBeDefined();
-      expect(proxy!.visible, 'the authority proxy must never render').toBe(false);
-      const collider = arena.physicsColliders.find((bounds) => (
-        Math.abs((bounds.minX + bounds.maxX) / 2 - x) < 1e-6
-        && Math.abs((bounds.minZ + bounds.maxZ) / 2 - z) < 1e-6
-        && Math.abs((bounds.maxY ?? 0) - ATOMIC_MANNEQUIN_COLLIDER_SIZE[1]) < 1e-6
-      ));
-      expect(collider, `mannequin ${index} is not in the physics set`).toBeDefined();
-      expect(collider!.minY, 'mannequin base must seat on the y=0 ground authority').toBeCloseTo(0, 6);
-    }
-  });
-
-  /** A prop this small must never narrow a route, wedge a body or seal a
-   * pocket. 3 m of clearance is nearly four capsule diameters. */
-  it('stands well clear of every other collider', () => {
-    const size = ATOMIC_MANNEQUIN_COLLIDER_SIZE;
-    for (const [x, z] of ATOMIC_MANNEQUIN_LAYOUT) {
-      let nearest = Infinity;
-      for (const bounds of arena.physicsColliders) {
-        const isSelf = Math.abs((bounds.minX + bounds.maxX) / 2 - x) < 1e-6
-          && Math.abs((bounds.minZ + bounds.maxZ) / 2 - z) < 1e-6;
-        if (isSelf || (bounds.minY ?? 0) > 1.6 || (bounds.maxY ?? 3) < 0.2) continue;
-        const dx = Math.max(bounds.minX - x, 0, x - bounds.maxX);
-        const dz = Math.max(bounds.minZ - z, 0, z - bounds.maxZ);
-        nearest = Math.min(nearest, Math.hypot(dx, dz));
-      }
-      expect(nearest, `mannequin (${x}, ${z}) clearance`).toBeGreaterThan(size[0] / 2 + 3);
-    }
-  });
-
-  it('renders one dummy per authored anchor, inside its own authority envelope', () => {
-    expect(dummies).toHaveLength(ATOMIC_MANNEQUIN_LAYOUT.length);
-    const [width, height] = ATOMIC_MANNEQUIN_COLLIDER_SIZE;
-    for (const [x, z] of ATOMIC_MANNEQUIN_LAYOUT) {
-      const dummy = dummies.find((node) => Math.abs(node.position.x - x) < 1e-6 && Math.abs(node.position.z - z) < 1e-6);
-      expect(dummy, `no mannequin art at (${x}, ${z})`).toBeDefined();
-      const silhouette = new THREE.Box3().setFromObject(dummy!);
-      expect(silhouette.min.y, 'mannequin floats above the ground').toBeCloseTo(0, 2);
-      expect(silhouette.max.y).toBeLessThanOrEqual(height + 1e-6);
-      expect(silhouette.min.x).toBeGreaterThanOrEqual(x - width / 2 - 1e-6);
-      expect(silhouette.max.x).toBeLessThanOrEqual(x + width / 2 + 1e-6);
-      expect(silhouette.min.z).toBeGreaterThanOrEqual(z - width / 2 - 1e-6);
-      expect(silhouette.max.z).toBeLessThanOrEqual(z + width / 2 + 1e-6);
-    }
-  });
-
-  it('publishes the mannequin count on the street-life contract', () => {
-    expect((life.userData.neighbourhoodLife as { mannequins: number }).mannequins)
-      .toBe(ATOMIC_MANNEQUIN_LAYOUT.length);
-  });
-
-  it('survives the Quality profile hiding the whole procedural arena root', () => {
-    // Exactly what src/blender-environment.ts does once the Quality GLB loads.
-    const proceduralWorld = scene.getObjectByName('Atomic Acres arena');
-    expect(proceduralWorld, 'the arena root must be findable by that name').toBeDefined();
-    expect(life.parent, 'street life must not hang under the arena root').toBe(scene);
-    proceduralWorld!.visible = false;
-    for (const dummy of dummies) {
-      let node: THREE.Object3D | null = dummy;
-      while (node && node !== scene) {
-        expect(node.visible, `${node.name || '<unnamed>'} hides the mannequins on Quality`).toBe(true);
-        node = node.parent;
-      }
-    }
-    proceduralWorld!.visible = true;
-  });
-});
+// v3 (owner HITL 2026-08-29): the mannequin prop class is DELETED with its
+// whole gate suite - "random manekins that look like bots standing around,
+// remove those".

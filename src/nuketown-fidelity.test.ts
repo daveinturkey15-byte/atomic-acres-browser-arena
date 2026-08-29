@@ -50,7 +50,13 @@ const depth = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ;
 // Derived with this test's own estimator per its convention; not loosened
 // past what the reference layout implies (the raw unfurnished verge would
 // measure 58 m - the furniture is doing its job).
-const MAX_STANDING_EYE_LINE_METRES = 32;
+// v3 (owner HITL 2026-08-29): "remove all hedges and fences for now" -
+// with the yard architecture deliberately stripped, cross-yard diagonals run
+// the open block (measured 84.4 m: [-36,29]->[36,-15], threading BETWEEN the
+// two end houses). The ceiling re-pins to the measured open-map value; when
+// the owner brings yard furniture back this number must come back DOWN with
+// it, so the comment carries the measured lane to re-derive against.
+const MAX_STANDING_EYE_LINE_METRES = 85;
 
 /** Longest unobstructed straight eye-line between perimeter sample points on the built arena. */
 function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {
@@ -99,15 +105,17 @@ describe('Nuke Town fidelity', () => {
     // crossing must stay above the old sub-10 s envelope (pinning the
     // owner-requested growth) and below 10.5 s (keeping the reference
     // map's sprint-crossing character).
-    expect(diagonal / sprintSpeed).toBeGreaterThan(10);
-    expect(diagonal / sprintSpeed).toBeLessThan(10.5);
-    expect(diagonal / walkSpeed).toBeLessThan(15);
+    // v3 (owner HITL): bounds 74 x 60 by direct instruction - measured
+    // 10.95 s diagonal; the band re-pins around it.
+    expect(diagonal / sprintSpeed).toBeGreaterThan(10.5);
+    expect(diagonal / sprintSpeed).toBeLessThan(11.4);
+    expect(diagonal / walkSpeed).toBeLessThan(16.5);
     // A full lap of the perimeter is the reference map's 25-30 second circuit.
     const lap = (2 * (width + depth)) / sprintSpeed;
-    expect(lap).toBeGreaterThan(25);
-    expect(lap).toBeLessThan(30);
+    expect(lap).toBeGreaterThan(27);
+    expect(lap).toBeLessThan(32); // v3 74x60: measured 30.8 s
     // Guard against the footprint creeping back out.
-    expect(width * depth).toBeLessThan(4000);
+    expect(width * depth).toBeLessThan(4500); // v3: 74x60 = 4440
   });
 
   it('keeps the longest straight sightline short by putting the bus in the road', () => {
@@ -308,7 +316,7 @@ describe('Nuke Town fidelity', () => {
     // at 4057 m^2 against the old <4000 pin after the fence line deepened to
     // +/-31.5; the new band is two-sided - above the old 4000 ceiling (the
     // growth is real and pinned) and below 4200 so creep stays capped.
-    expect(area).toBeGreaterThan(4000);
-    expect(area).toBeLessThan(4200);
+    expect(area).toBeGreaterThan(4400);
+    expect(area).toBeLessThan(4800); // v3: 74x60 fenced footprint measured 4602
   });
 });

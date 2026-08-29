@@ -109,7 +109,7 @@ describe('Pass 64 arena visual definitions', () => {
     expect(solid).toBeDefined();
     expect(portal).toBeDefined();
     expect(solid!.position).toEqual(portal!.position);
-    expect(solid!.position).toEqual([4, 2.2, -12.4]);
+    expect(solid!.position).toEqual([-19, 2.2, -12.4]); // v3: the aqua house at its team end
     expect(solid!.target).not.toEqual(portal!.target);
     expect(solid!.purpose).toBe('light-occlusion');
     expect(portal!.purpose).toBe('portal');

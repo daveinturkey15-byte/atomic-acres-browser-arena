@@ -14,10 +14,8 @@ import {
   texturedMaterial,
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
-import { ATOMIC_MANNEQUIN_LAYOUT, authoredLargeCoverIdAt } from './map';
+import { authoredLargeCoverIdAt } from './map';
 import { buildNuketownForestSurround } from './nuketown-forest-surround';
-import { buildNuketownGardenDressing } from './nuketown-garden-dressing';
-import { buildNuketownHedgeFoliage } from './nuketown-hedge-foliage';
 import { buildNuketownLawnField } from './nuketown-lawn-field';
 import { buildNuketownMountainBackdrop } from './nuketown-mountain-backdrop';
 
@@ -132,8 +130,8 @@ function addStreetProps(root: THREE.Group): void {
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hydrantRed); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
-  // DECLUTTER 2026-08-29: rear-yard pair only; the flank planters left.
-  for (const [x, z] of [[-9, -27], [9, 27]] as Array<[number, number]>) {
+  // v3: the planter pair follows the rear strips.
+  for (const [x, z] of [[-16, -28.5], [16, 28.5]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
       const shrub = new THREE.Mesh(shrubGeometry, shrubMaterial);
@@ -185,8 +183,8 @@ function addStreetProps(root: THREE.Group): void {
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
 
 export const NEIGHBOURHOOD_FLOWER_BEDS: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  [-21.2, -29], [-16.8, -12.2], [-27.8, 24],
-  [21.2, 29], [16.8, 12.2], [27.8, -24],
+  [-24, -29.2], [-6, -7.6], [-33, 20],
+  [24, 29.2], [6, 7.6], [33, -20],
 ]);
 
 export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): THREE.Group {
@@ -261,73 +259,8 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     bin.position.set(x, 0.54, z); decorative(bin); group.add(bin);
   }
 
-  // Yard mannequins (D4 of the Nuke Town measurement): the reference map's most
-  // identifiable prop class, and until now entirely absent from the arena. They
-  // live in the street-life layer rather than in map.ts on purpose - the default
-  // 'blender' render profile hides the whole procedural arena root behind the
-  // Quality GLB, so a mannequin authored there would never reach the frame the
-  // owner actually plays. Authority for each one is the invisible
-  // street-mannequin-collider-N proxy that map.ts builds from the same layout.
-  const mannequinShell = new THREE.MeshStandardMaterial({ color: 0xd9cfc0, roughness: 0.44, metalness: 0.04 });
-  const mannequinBase = new THREE.MeshStandardMaterial({ color: 0x3a4147, roughness: 0.46, metalness: 0.58 });
-  const limb = (name: string, top: number, bottom: number, length: number, material: THREE.Material): THREE.Mesh => {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(top, bottom, length, reduced ? 6 : 10), material);
-    mesh.name = name;
-    return mesh;
-  };
-  for (const [index, [x, z, facing]] of ATOMIC_MANNEQUIN_LAYOUT.entries()) {
-    const dummy = new THREE.Group();
-    dummy.name = 'street-mannequin';
-    dummy.position.set(x, 0, z);
-    dummy.rotation.y = facing;
-    // Base radius is capped by the authority envelope, not by taste: a
-    // cylinder's bounding box is square, so a disc of radius r occupies r of
-    // the envelope half-width at an axis-aligned facing and r * sqrt(2) at 45
-    // degrees. Every authored facing is axis-aligned, and the envelope gate in
-    // atomic-authored-cover.test.ts is what keeps it that way.
-    const plinth = limb('mannequin-plinth', 0.22, 0.25, 0.05, mannequinBase);
-    plinth.position.y = 0.025;
-    dummy.add(plinth);
-    for (const side of [-1, 1]) {
-      const leg = limb('mannequin-leg', 0.075, 0.055, 0.86, mannequinShell);
-      leg.position.set(side * 0.09, 0.48, 0);
-      dummy.add(leg);
-    }
-    const hips = new THREE.Mesh(new THREE.SphereGeometry(0.2, reduced ? 8 : 12, reduced ? 6 : 8), mannequinShell);
-    hips.name = 'mannequin-hips';
-    hips.position.y = 0.95;
-    hips.scale.set(0.88, 0.72, 0.62);
-    dummy.add(hips);
-    const torso = limb('mannequin-torso', 0.19, 0.145, 0.5, mannequinShell);
-    torso.position.y = 1.2;
-    torso.scale.z = 0.68;
-    dummy.add(torso);
-    const shoulders = limb('mannequin-shoulders', 0.075, 0.075, 0.42, mannequinShell);
-    shoulders.rotation.z = Math.PI / 2;
-    shoulders.position.y = 1.45;
-    dummy.add(shoulders);
-    // Two arm poses, alternating by PAIR rather than by index, so a mannequin
-    // and its 180-degree twin are the same dummy seen from the other side
-    // instead of two different ones.
-    const posed = Math.floor(index / 2) % 2 === 1;
-    for (const side of [-1, 1]) {
-      const arm = limb('mannequin-arm', 0.05, 0.04, 0.62, mannequinShell);
-      arm.position.set(side * 0.2, 1.13, posed ? 0.08 : side * 0.05);
-      arm.rotation.z = side * 0.1;
-      arm.rotation.x = posed ? -0.35 : 0;
-      dummy.add(arm);
-    }
-    const neck = limb('mannequin-neck', 0.045, 0.045, 0.1, mannequinShell);
-    neck.position.y = 1.56;
-    dummy.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, reduced ? 8 : 12, reduced ? 6 : 8), mannequinShell);
-    head.name = 'mannequin-head';
-    head.position.y = 1.66;
-    head.scale.set(1, 1.14, 0.94);
-    dummy.add(head);
-    decorative(dummy);
-    group.add(dummy);
-  }
+  // v3 (owner HITL 2026-08-29): the mannequin art is DELETED with its
+  // colliders - "random manekins that look like bots standing around".
 
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
 
@@ -341,19 +274,12 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // a palette batch.
   const lawn = buildNuketownLawnField(group, reduced);
   const backdrop = buildNuketownMountainBackdrop(group);
-  // 2026-08-29 redesign art: dress the two spawn end gardens (plank fences,
-  // flower borders, trail pavers, door shrubs) - instanced, seeded,
-  // presentation-only like its siblings above.
-  const gardens = buildNuketownGardenDressing(group);
-  const hedgeFoliage = buildNuketownHedgeFoliage(group);
   // DECLUTTER 2026-08-29: the corner earth banks became a real instanced
   // forest ring between the fence and the foothills.
   const forest = buildNuketownForestSurround(group);
   group.userData.nuketownForestStats = forest.stats;
   group.userData.nuketownLawnStats = lawn.stats;
-  group.userData.nuketownHedgeFoliageStats = hedgeFoliage.stats;
   group.userData.nuketownBackdropStats = backdrop.stats;
-  group.userData.nuketownGardenStats = gardens.stats;
   // updateArenaArt drives the lawn's GPU wind clock through this hook (the
   // per-frame caller in legacy-main already passes this group + now-ms).
   group.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
@@ -363,7 +289,7 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
     flowerBeds: flowerBeds.length,
     benches: 4,
     bins: 6,
-    mannequins: ATOMIC_MANNEQUIN_LAYOUT.length,
+    mannequins: 0,
     bicycles: 0,
     markers: 0,
     butterflies: 0,
@@ -885,15 +811,15 @@ export async function loadArenaArt(
   onProgress?.(2, 12);
 
   // Trunks are the visible half of map.ts's authored tree colliders.
-  addTree(root, -19, -28, 1); onProgress?.(3, 12);
-  addTree(root, 19, 28, 1);
-  addTree(root, -27, -21, 0.9); onProgress?.(4, 12);
-  addTree(root, 27, 21, 0.9);
-  addTree(root, -13, 28.5, 0.85); onProgress?.(5, 12);
-  addTree(root, 13, -28.5, 0.85); onProgress?.(6, 12);
-  // DECLUTTER 2026-08-29: one tree per spawn garden (see map.ts twin note).
-  addTree(root, -30.6, 11.5, 0.9);
-  addTree(root, 30.6, -11.5, 0.9);
+  addTree(root, -9, -28.5, 1); onProgress?.(3, 12);
+  addTree(root, 9, 28.5, 1);
+  addTree(root, -33.5, -26, 0.9); onProgress?.(4, 12);
+  addTree(root, 33.5, 26, 0.9);
+  addTree(root, -13, 27.5, 0.85); onProgress?.(5, 12);
+  addTree(root, 13, -27.5, 0.85); onProgress?.(6, 12);
+  // v3: one tree per spawn yard (see map.ts twin list).
+  addTree(root, -34.5, 10, 0.9);
+  addTree(root, 34.5, -10, 0.9);
   addStreetProps(root); onProgress?.(7, 12);
   addModernGroundDetails(root, reduced);
 

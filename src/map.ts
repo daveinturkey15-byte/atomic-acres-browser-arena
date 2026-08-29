@@ -4,19 +4,8 @@ import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
   PARKED_VAN_LAYOUT,
-  FRONT_HEDGE_LAYOUT,
-  GARDEN_COVER_HEIGHT,
-  GARDEN_COVER_LAYOUT,
   KERB_CAR_LAYOUT,
   KERB_CAR_SIZE,
-  REAR_YARD_CLOSURE_LAYOUT,
-  REAR_YARD_CLOSURE_SIZE,
-  SPAWN_END_FENCE_SEGMENTS,
-  SPAWN_GARDEN_DIVIDER_LAYOUT,
-  SPAWN_GARDEN_DIVIDER_SIZE,
-  SPAWN_END_FENCE_SIZE,
-  SPAWN_END_FENCE_X,
-  FRONT_HEDGE_SIZE,
   PARKED_VAN_SIZE,
   COVER_LAYOUT,
   GARAGE_LAYOUT,
@@ -29,8 +18,6 @@ import {
   PATROL_LAYOUT,
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
-  YARD_FENCE_HEIGHT,
-  YARD_FENCE_LAYOUT,
 } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
 import { Box2 } from './collision';
@@ -131,63 +118,20 @@ export type AuthoredLargeCoverId =
 export const AUTHORED_LARGE_COVER_ANCHORS: ReadonlyArray<
   readonly [x: number, z: number, id: AuthoredLargeCoverId]
 > = Object.freeze([
-  Object.freeze([-8, -22, 'north-cargo-stack'] as const),
-  Object.freeze([8, 22, 'south-pipe-stack'] as const),
-  Object.freeze([24, -13, 'west-service-skip'] as const),
-  Object.freeze([-24, 13, 'east-generator-trailer'] as const),
+  // v3: anchors follow the COVER_LAYOUT re-seat for the house-per-end
+  // anatomy - ids stable, coordinates the layout's.
+  Object.freeze([-9, -26, 'north-cargo-stack'] as const),
+  Object.freeze([9, 26, 'south-pipe-stack'] as const),
+  Object.freeze([27, -13, 'west-service-skip'] as const),
+  Object.freeze([-27, 13, 'east-generator-trailer'] as const),
 ]);
 
 /** Authored large cover is the tall lane-breaking class; ordinary cover is 1.6 m. */
 export const AUTHORED_LARGE_COVER_HEIGHT = 2.2;
 
-/**
- * Yard mannequins - the reference map's single most identifiable prop class,
- * and (row D4 of artifacts/NUKETOWN-MEASUREMENT-2026-08-24.md) the largest
- * remaining identity gap: a repo-wide grep for "mannequin" previously found
- * exactly one HUD string and nothing in the arena.
- *
- * Placement rules this set satisfies, all measured against the BUILT collider
- * set rather than the authored constants:
- *  - exact 180-degree rotational pairing, so neither team owns a better half
- *    (the symmetry gates in nuketown-traversal/nuketown-fidelity compare
- *    rotated partners over every built collider);
- *  - >= 3.4 m clear of every other collider, so a 0.58 m prop cannot narrow a
- *    route, wedge a body or seal a pocket;
- *  - clear of both terrain mounds (-24,-29.5)/(24,29.5), so every base seats
- *    flat on the y = 0 ground authority instead of floating over a slope;
- *  - out of the street canyon, so the bus/van/pillar sightline staging that
- *    HF-383 tuned is untouched.
- *
- * Layout is [x, z, facing]; the art in environment-assets.ts reads the same
- * constant, so the visible dummy and its authority can never drift apart.
- */
-export const ATOMIC_MANNEQUIN_LAYOUT: ReadonlyArray<readonly [x: number, z: number, facing: number]> = Object.freeze([
-  // Deep in the west back-yard strip, facing back toward its own house.
-  Object.freeze([-15, -25, Math.PI / 2] as const),
-  Object.freeze([15, 25, -Math.PI / 2] as const),
-  // West side yard beside the house's outboard wall, turned toward the street.
-  // Facings are axis-aligned on purpose: a mannequin's authority box is square
-  // in plan, so a diagonal facing spends sqrt(2) of the envelope on the same
-  // silhouette and the envelope gate rejects it.
-  Object.freeze([-15, -14, 0] as const),
-  Object.freeze([15, 14, Math.PI] as const),
-  // REDESIGN 2026-08-29: the third (rear-yard) pair at (+/-18, -/+20) is
-  // RETIRED. The re-seated greenhouse east wall stands 0.3 m from the west
-  // seat, and the redesign filled both rear yards with real structure (yard
-  // closures, hydro beds, trees) - measured: no rear-yard point still holds
-  // the 3.29 m clearance envelope the mannequin gate demands, which is the
-  // envelope working as intended: the placeholder cover's duty passed to
-  // real furniture.
-]);
+// v3 (owner HITL 2026-08-29): the mannequin prop class is DELETED -
+// "random manekins that look like bots standing around, remove those".
 
-/**
- * [width, height, depth] of the mannequin's movement/shot authority. Square in
- * plan so the box is identical at every facing - a mannequin is small enough
- * that a facing-dependent AABB would be the only thing making a rotated pair
- * asymmetric. Height clears the crouched eye-line and stops just under the
- * standing one, matching the visible dummy's 1.79 m crown.
- */
-export const ATOMIC_MANNEQUIN_COLLIDER_SIZE = Object.freeze([0.58, 1.82, 0.58] as const);
 
 /** Resolve the authored asset seated on a cover anchor, or null for plain cover. */
 export function authoredLargeCoverIdAt(x: number, z: number): AuthoredLargeCoverId | null {
@@ -476,7 +420,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
 
   // The street runs the long axis with a house on each kerb, so the road plane
   // is laid out along X and both houses face across it.
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(64, STREET_HALF_WIDTH * 2), palette.road);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(70, STREET_HALF_WIDTH * 2), palette.road);
   road.name = 'aged asphalt road';
   road.rotation.x = -Math.PI / 2;
   road.position.y = 0.025;
@@ -487,16 +431,16 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const roadSurface = createBallisticSurface(
     `atomic-acres:${ballisticSurfaceSequence}:road`,
     'atomic-acres-road',
-    { minX: -32, maxX: 32, minY: -0.25, maxY: 0.03, minZ: -STREET_HALF_WIDTH, maxZ: STREET_HALF_WIDTH },
+    { minX: -35, maxX: 35, minY: -0.25, maxY: 0.03, minZ: -STREET_HALF_WIDTH, maxZ: STREET_HALF_WIDTH },
     { impactSurface: 'concrete', material: 'concrete' },
   );
   ballisticSurfaceSequence += 1;
   shotSurfaces.push(roadSurface);
   road.userData.ballisticSurfaceId = roadSurface.id;
   road.userData.ballisticMaterial = roadSurface.material;
-  for (const z of [-5.6, 5.6]) box('curb', [0, 0.12, z], [64, 0.24, 1.2], palette.concrete, false, false);
-  for (const z of [-7.5, 7.5]) box('sidewalk', [0, 0.07, z], [64, 0.14, 2.6], palette.concrete, false, false);
-  for (const x of [-28, -20, -12, 12, 20, 28]) box('lane marker', [x, 0.055, 0], [3.6, 0.03, 0.18], palette.mustard, false, false);
+  for (const z of [-5.6, 5.6]) box('curb', [0, 0.12, z], [70, 0.24, 1.2], palette.concrete, false, false);
+  for (const z of [-7.5, 7.5]) box('sidewalk', [0, 0.07, z], [70, 0.14, 2.6], palette.concrete, false, false);
+  for (const x of [-32, -24, -16, -8, 8, 16, 24, 32]) box('lane marker', [x, 0.055, 0], [3.6, 0.03, 0.18], palette.mustard, false, false);
   for (const x of [-16, 16]) {
     for (let z = -4.5; z <= 4.5; z += 1.5) box('crosswalk stripe', [x, 0.062, z], [3.2, 0.025, 1.4], palette.white, false, false);
   }
@@ -678,27 +622,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     proxy.visible = false;
     proxy.userData.collisionProxy = true;
   }
-  // Mannequins follow the same contract as the benches and bins: authority
-  // here, art in the street-life layer. That split is what makes them visible
-  // on the DEFAULT 'blender' profile at all - blender-environment.ts hides the
-  // whole 'Atomic Acres arena' root once the Quality GLB loads, so anything
-  // rendered from this file is invisible to a Quality player, while the
-  // pass31-neighbourhood-life root is a sibling of the arena and survives.
-  for (const [index, [x, z]] of ATOMIC_MANNEQUIN_LAYOUT.entries()) {
-    const [width, height, depth] = ATOMIC_MANNEQUIN_COLLIDER_SIZE;
-    const proxy = box(
-      `street-mannequin-collider-${index}`,
-      [x, height / 2, z],
-      [width, height, depth],
-      palette.white,
-      true,
-      false,
-      true,
-      'wood',
-    );
-    proxy.visible = false;
-    proxy.userData.collisionProxy = true;
-  }
+  // v3 (owner HITL 2026-08-29): the mannequins are DELETED - "random
+  // manekins that look like bots standing around, remove those".
 
   // One transit anchor, parked broadside across the middle of the street. This
   // is the map's single unmistakable piece of central hard cover: it splits the
@@ -778,63 +703,17 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     box('garage door', [garage.x, 1.35, garage.z + facing * (garageDepth / 2)], [garageWidth - 1.8, 2.5, 0.18], palette.chrome, true, false, true, 'thin-metal');
   }
 
-  // Waist-high yard fencing divides the two properties without sealing a route.
-  for (const [index, [x, z, width, depth]] of YARD_FENCE_LAYOUT.entries()) {
-    box(`yard fence ${index}`, [x, YARD_FENCE_HEIGHT / 2, z], [width, YARD_FENCE_HEIGHT, depth], palette.timber, true, true, true, 'wood');
-  }
-
-  // Front-garden hedges: the sightline authority for the street flanks. The
-  // houses alone leave shallow corner-to-corner rays that thread the verges
-  // beside them (60 m+ measured); these close those lanes the way the
-  // reference map's garden hedges do. Visible mass matches each collider.
-  for (const [index, hedge] of FRONT_HEDGE_LAYOUT.entries()) {
-    box(`front hedge ${index}`, [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z], [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth], palette.grassDark);
-  }
-  // REDESIGN 2026-08-29 (D1/D3/D5): the canyon fins, rear hedges, corner
-  // blocks and side cross-runs are gone - they broke ACROSS-street lanes the
-  // end-to-end flow no longer has. In their place, the reference's own spawn
-  // boundary: one fence per street end, four solid runs each, leaving two
-  // door gaps and the central low trail mouth a defender must actually watch.
-  for (const [gardenIndex, [gx, gz, gWidth, gDepth]] of GARDEN_COVER_LAYOUT.entries()) {
-    box(`garden cover ${gardenIndex}`, [gx, GARDEN_COVER_HEIGHT / 2, gz], [gWidth, GARDEN_COVER_HEIGHT, gDepth], palette.timber, true, true, true, 'wood');
-  }
+  // v3 (owner HITL 2026-08-29): every yard fence, front hedge and garden-
+  // cover slab is DELETED - "remove all hedges and fences for now".
   for (const car of KERB_CAR_LAYOUT) {
     const [carLength, carHeight, carWidth] = KERB_CAR_SIZE;
     box(car.id, [car.x, carHeight / 2, car.z], [carLength, carHeight, carWidth], palette.coral, true, false, true, 'vehicle');
   }
-  for (const [closureIndex, [closureX, closureZ]] of REAR_YARD_CLOSURE_LAYOUT.entries()) {
-    const [closureWidth, closureHeight, closureDepth] = REAR_YARD_CLOSURE_SIZE;
-    box(`rear yard hedge ${closureIndex}`, [closureX, closureHeight / 2, closureZ], [closureWidth, closureHeight, closureDepth], palette.grassDark);
-  }
-  for (const [dividerIndex, [dx, dz, dLength]] of SPAWN_GARDEN_DIVIDER_LAYOUT.entries()) {
-    box(
-      `spawn garden divider ${dividerIndex}`,
-      [dx, SPAWN_GARDEN_DIVIDER_SIZE.height / 2, dz],
-      [dLength, SPAWN_GARDEN_DIVIDER_SIZE.height, SPAWN_GARDEN_DIVIDER_SIZE.depth],
-      palette.timber,
-      true,
-      true,
-      true,
-      'wood',
-    );
-  }
-  for (const [sideIndex, sign] of ([1, -1] as const).entries()) {
-    for (const [segmentIndex, [zCentre, zLength]] of SPAWN_END_FENCE_SEGMENTS.entries()) {
-      box(
-        `spawn end fence ${sideIndex}-${segmentIndex}`,
-        [sign * SPAWN_END_FENCE_X, SPAWN_END_FENCE_SIZE.height / 2, sign * zCentre],
-        [SPAWN_END_FENCE_SIZE.depth, SPAWN_END_FENCE_SIZE.height, zLength],
-        palette.timber,
-        true,
-        true,
-        true,
-        'wood', // 1 m planted plank run, not chain-link: the 'fence' name rule undercharges it
-      );
-    }
-  }
-
-  // Pass 59 collision audit objects: visible soft terrain keeps conservative AABB
-  // movement/ballistic authority, and the irrigation vessel has matching hard cover.
+  // v3: rear-yard hedges, garden dividers and spawn-end fences DELETED with
+  // the rest of the fence system. The dividers had shipped INVISIBLE on the
+  // Quality profile (procedural-only visuals hidden behind the GLB) - the
+  // exact geometry the owner walked into; see the quality-composition parity
+  // gate added this pass.
   const moundAudit: Array<{ id: string; collider: string; bottomY: number }> = [];
   for (const [id, x, z, sx, sz] of [
     // REDESIGN: the mounds move with the boundary - now soft shoulders in the
@@ -843,8 +722,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // (z beyond the fence span) keep >= 2.5 m of walkable width. The first
     // re-seat filled the corridor and sealed the whole rear strip - measured
     // as 4,608 grid cells by the traversal gate before this fix.
-    ['west-verge', -33.2, -27.3, 1.6, 2.2],
-    ['east-verge', 33.2, 27.3, 1.6, 2.2],
+    ['west-verge', -36.2, -28.8, 1.6, 2.2],
+    ['east-verge', 36.2, 28.8, 1.6, 2.2],
   ] as const) {
     const colliderName = `terrain-mound-${id}-collider`;
     const authority = box(colliderName, [x, 0.55, z], [sx, 1.1, sz], palette.grass, true, false, true, 'earth');
@@ -914,18 +793,17 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   const substantial = (name: string, position: [number, number, number], size: [number, number, number], material: BallisticMaterialId) => {
     substantialPropColliders.push(authoredCollisionProxy(name, position, size, material).name);
   };
+  // v3: eight yard trees re-seated for the house-per-end anatomy - rear
+  // yards, flank verges and one per spawn yard.
   for (const [index, [x, z, scale]] of [
-    [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
-    // DECLUTTER 2026-08-29: one tree per spawn garden - the reference's own
-    // yard furniture, and it breaks the 55 m intra-yard eye-line the deleted
-    // reclamation tank used to interrupt.
-    [-30.6, 11.5, 0.9], [30.6, -11.5, 0.9],
+    [-9, -28.5, 1], [9, 28.5, 1], [-33.5, -26, 0.9], [33.5, 26, 0.9],
+    [-13, 27.5, 0.85], [13, -27.5, 0.85], [-34.5, 10, 0.9], [34.5, -10, 0.9],
   ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
   // DECLUTTER 2026-08-29: the rear-yard concrete planters keep their visuals
   // (suburban, on-reference) and now carry HONEST authority sized to what a
   // player sees - the old 'terminal' colliders were the wrong story and the
   // wrong size. The flank pair at (+/-24,+/-8) is deleted with its visuals.
-  for (const [index, [x, z]] of [[-9, -27], [9, 27]].entries()) {
+  for (const [index, [x, z]] of [[-16, -28.5], [16, 28.5]].entries()) {
     substantial(`authored-planter-collider-${index}`, [x, 0.35, z], [2.2, 0.7, 1.05], 'concrete');
   }
   for (const [index, [x, z]] of [[-30, -8], [30, 8]].entries()) {

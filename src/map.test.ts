@@ -46,13 +46,13 @@ describe('Atomic Acres Pass 59 collision audit', () => {
       // penetration duties re-pin onto surviving authority: the rear-yard
       // planter, and the boundary fence that owns containment now the banks
       // no longer wall the outside corners.
-      physics.teleportEye({ x: 9, y: 1.7, z: 24 });
+      physics.teleportEye({ x: 16, y: 1.7, z: 25.5 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0, y: -0.002, z: 0.03 }, 1 / 120);
-      expect(physics.eyePosition().z).toBeLessThan(26.9);
+      expect(physics.eyePosition().z).toBeLessThan(28.4);
       // Walk outward from inside the arena into the east boundary fence.
       physics.teleportEye({ x: 31, y: 1.7, z: -22 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0.03, y: -0.002, z: 0 }, 1 / 120);
-      expect(physics.eyePosition().x).toBeLessThan(34.2);
+      expect(physics.eyePosition().x).toBeLessThan(37.2); // v3 bounds: fence face at 37
     } finally {
       physics.dispose();
     }

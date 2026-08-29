@@ -41,7 +41,10 @@ const EYE_HEIGHT = 1.65;
 // far-garden diagonal; measured 56.44 m. The reference's own down-street
 // lanes run the full block, so the ceiling re-pins just above the measured
 // lane - not loosened beyond what the layout implies.
-const MAXIMUM_CLEAR_EYE_LINE = 57;
+// v3 (owner HITL): fences and hedges deliberately removed - measured
+// longest clear eye-line 79.8 m ([34,-27]->[-35,13]). Re-pinned to the open
+// interim geometry; tighten when yard furniture returns.
+const MAXIMUM_CLEAR_EYE_LINE = 81;
 
 function blocksSight(collider: Box2): boolean {
   return collider.maxY === undefined || collider.maxY >= EYE_HEIGHT;

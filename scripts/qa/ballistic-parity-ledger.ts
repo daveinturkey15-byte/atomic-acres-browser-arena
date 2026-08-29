@@ -32,8 +32,10 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     // replaced by named rows at the measured counts - four boles (the other
     // four trees are footprint-covered by registered surfaces) and six
     // exposed flares. The 0.68 m wood trunk proxies stay the rated authority.
-    { name: 'yard-trunk-bole', count: 4, reason: 'tree bole over the authored wood trunk proxy; the proxy is the rated authority and a bole surface would double-charge it' },
-    { name: 'yard-root-flare', count: 6, reason: 'ankle-height root flare beside the collided trunk; a flare surface would double-charge the trunk proxy' },
+    // v3 re-measure at the re-seated trees: six boles and two flares stand
+    // outside every registered footprint.
+    { name: 'yard-trunk-bole', count: 8, reason: 'tree bole over the authored wood trunk proxy; the proxy is the rated authority and a bole surface would double-charge it' },
+    { name: 'yard-root-flare', count: 8, reason: 'ankle-height root flare beside the collided trunk; a flare surface would double-charge the trunk proxy' },
     // (2026-08-29: the two animated-atomic-ring rows are deleted per this
     // gate's own stale-row law - the census stopped flagging the rings after
     // the redesign re-census, so the rows had become rot.)

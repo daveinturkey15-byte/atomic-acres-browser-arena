@@ -37,14 +37,17 @@ const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [numbe
     // into the ground; the player collides with the trunk beside them. The
     // rear hedges that used to swallow two of the four flares died in the
     // 2026-08-29 redesign, so all four now stand in the open rear yards.
-    // 2026-08-29 declutter follow-up: the tree meshes are NAMED now, so the
-    // rows carry the real name instead of an opaque unnamed pool.
-    { name: 'yard-root-flare', centre: [-18.53, 0.22, -28], reason: 'decorative root flare around a collided trunk' },
-    { name: 'yard-root-flare', centre: [18.53, 0.22, 28], reason: 'decorative root flare around a collided trunk' },
-    { name: 'yard-root-flare', centre: [-19, 0.22, -27.53], reason: 'decorative root flare around a collided trunk' },
-    { name: 'yard-root-flare', centre: [-19.47, 0.22, -28], reason: 'decorative root flare around a collided trunk' },
-    { name: 'yard-root-flare', centre: [19.47, 0.22, 28], reason: 'decorative root flare around a collided trunk' },
-    { name: 'yard-root-flare', centre: [19, 0.22, 27.53], reason: 'decorative root flare around a collided trunk' },
+    // v3: the rear-yard trees re-seated to (+/-9, -/+28.5); all four flares
+    // of each stand in the open yards now. Same reason as ever: the trunk's
+    // wood proxy is the authority and a flare is ankle-height dressing.
+    { name: 'yard-root-flare', centre: [-9, 0.22, -28.03], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [-8.53, 0.22, -28.5], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [-9, 0.22, -28.97], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [-9.47, 0.22, -28.5], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [9, 0.22, 28.97], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [9.47, 0.22, 28.5], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [9, 0.22, 28.03], reason: 'decorative root flare around a collided trunk' },
+    { name: 'yard-root-flare', centre: [8.53, 0.22, 28.5], reason: 'decorative root flare around a collided trunk' },
   ],
   'gun-range': [
     // Merged static presentation batch (userData.presentationOnly): a batched

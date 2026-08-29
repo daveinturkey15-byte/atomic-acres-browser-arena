@@ -1,3 +1,4 @@
+import { HOUSE_LAYOUT } from './arena-layout';
 export const RAILGUN_WEAPON_ID = 'railgun' as const;
 export const RAILGUN_ARENA_ID = 'atomic-acres' as const; // Stable arena id; Pass 64 display name is Nuke Town.
 // HF-384 (owner, 2026-08-28): the fixed 180 s spawn could be clock-camped - stand on
@@ -53,11 +54,15 @@ export type RailgunSpawnSite = Readonly<{
  * layout moved; the guard derives the rooms from the same source the arena is built
  * from, so the next rebuild fails loudly instead of silently relocating the weapon.
  */
+// v3 (owner HITL 2026-08-29): the sites now DERIVE their x/z from
+// HOUSE_LAYOUT - the guard test fired exactly as designed when the houses
+// moved to their team ends, and deriving here retires the hand-written class
+// it existed to catch.
 export const RAILGUN_UPPER_ROOM_SPAWN_SITES: readonly RailgunSpawnSite[] = Object.freeze([
-  Object.freeze({ id: 'aqua-front', position: [4, 4.18, -13.4] as const }),
-  Object.freeze({ id: 'aqua-rear', position: [4, 4.18, -21.4] as const }),
-  Object.freeze({ id: 'coral-front', position: [-4, 4.18, 13.4] as const }),
-  Object.freeze({ id: 'coral-rear', position: [-4, 4.18, 21.4] as const }),
+  Object.freeze({ id: 'aqua-front', position: [HOUSE_LAYOUT[0].x, 4.18, HOUSE_LAYOUT[0].z + 4 * HOUSE_LAYOUT[0].facing] as const }),
+  Object.freeze({ id: 'aqua-rear', position: [HOUSE_LAYOUT[0].x, 4.18, HOUSE_LAYOUT[0].z - 4 * HOUSE_LAYOUT[0].facing] as const }),
+  Object.freeze({ id: 'coral-front', position: [HOUSE_LAYOUT[1].x, 4.18, HOUSE_LAYOUT[1].z + 4 * HOUSE_LAYOUT[1].facing] as const }),
+  Object.freeze({ id: 'coral-rear', position: [HOUSE_LAYOUT[1].x, 4.18, HOUSE_LAYOUT[1].z - 4 * HOUSE_LAYOUT[1].facing] as const }),
 ]);
 
 export type RailgunAuthorityState = Readonly<{

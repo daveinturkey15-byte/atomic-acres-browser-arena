@@ -7,7 +7,7 @@ import {
   HARD_SURFACE_HALF_DEPTH_M,
   isGrassGround,
 } from './grass-placement';
-import { SPAWN_END_FENCE_X } from './arena-layout';
+import { STREET_END_X } from './arena-layout';
 
 describe('Atomic Acres deterministic manicured-verge placement', () => {
   // manicured-verges-v4 (Pass 82): the v3 regions pre-dated the Pass 78 axis
@@ -28,12 +28,15 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
     expect(isGrassGround(0, 0)).toBe(false); // asphalt, street centre
     expect(isGrassGround(-20, -7.1)).toBe(false); // kerbstone band
     expect(isGrassGround(-20, 8.25)).toBe(false); // pavement band
-    expect(isGrassGround(-35, 0)).toBe(false); // out of bounds
-    expect(isGrassGround(0, -32)).toBe(false); // beyond the boundary fence
-    expect(grassPlacementAllowed(4, -17.4, [])).toBe(false); // aqua house footprint
-    expect(grassPlacementAllowed(-17.7, 12.5, [])).toBe(false); // garage footprint
-    expect(grassPlacementAllowed(-20, -20, [{ minX: -20.2, maxX: -19.8, minZ: -20.2, maxZ: -19.8 }])).toBe(false);
-    expect(grassPlacementAllowed(-20, -20, [])).toBe(true);
+    expect(isGrassGround(-38, 0)).toBe(false); // out of bounds
+    expect(isGrassGround(0, -33)).toBe(false); // beyond the boundary fence
+    expect(isGrassGround(36.2, 0)).toBe(true); // v3 east lawn apron past the asphalt
+    expect(grassPlacementAllowed(-19, -17.4, [])).toBe(false); // aqua house footprint (v3 end seat)
+    expect(grassPlacementAllowed(-5.1, -12.5, [])).toBe(false); // garage footprint (v3 inboard seat)
+    // v3: (-20,-20) is inside the moved aqua house; the open-yard probe sits
+    // in the mid north yard between the house and the garages.
+    expect(grassPlacementAllowed(0, -20, [{ minX: -0.2, maxX: 0.2, minZ: -20.2, maxZ: -19.8 }])).toBe(false);
+    expect(grassPlacementAllowed(0, -20, [])).toBe(true);
   });
 
   // RED-FIRST PROOF (v4, Pass 82): this pin failed at '788f9625' before this
@@ -57,12 +60,14 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
   // region set (the street ends at the spawn fences, so the garden ground at
   // street level is lawn), redistributing the same 720 slots; gardens fold
   // into the four existing distance-cull chunks by quadrant.
+  // v3 (owner HITL): '11437d01' -> '51bd5c03' - bounds 74x60 and the end
+  // aprons re-keyed to STREET_END_X; same lattice, same 720 slots.
   it('produces a stable private placement checksum without consuming runtime RNG', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('11437d01');
+    expect(first.checksum).toBe('51bd5c03');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);
@@ -81,7 +86,7 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
     // holds INSIDE the street span; the end-garden strips are lawn at street
     // level by design (and the fence x-band itself carries its own keep-out).
     expect(first.placements.every((placement) => (
-      Math.abs(placement.x) > SPAWN_END_FENCE_X || Math.abs(placement.z) >= HARD_SURFACE_HALF_DEPTH_M
+      Math.abs(placement.x) > STREET_END_X || Math.abs(placement.z) >= HARD_SURFACE_HALF_DEPTH_M
     ))).toBe(true);
     // And both lawn bands must actually be populated.
     expect(new Set(first.placements.map((placement) => Math.sign(placement.z))).size).toBe(2);

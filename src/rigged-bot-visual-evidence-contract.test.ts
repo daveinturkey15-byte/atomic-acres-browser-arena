@@ -5,7 +5,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isBlocked } from './collision';
-import { SPAWN_END_FENCE_X, SPAWN_LAYOUT } from './arena-layout';
+import { SPAWN_LAYOUT } from './arena-layout';
 import { SIMULATION_HZ } from './gameplay';
 import { buildArena } from './map';
 import { CharacterPhysics } from './physics';
@@ -97,10 +97,10 @@ describe('fixed rigged actor visual evidence fixtures', () => {
     // measured against this exact ground) and re-pinned as what it now is:
     // open rear-strip ground inside the north corridor between the two rear
     // yard hedges, still spawn-legal terrain by the unblocked checks below.
-    expect(SPAWN_LAYOUT[1].some(([x]) => x > SPAWN_END_FENCE_X)).toBe(true);
+    expect(SPAWN_LAYOUT[1].some(([x]) => x > 33)).toBe(true);
     expect(fixture.commandedPlayerPosition[2]).toBeGreaterThan(25.3);
     expect(Math.abs(fixture.commandedPlayerPosition[0])).toBeLessThan(6);
-    expect(isBlocked({ x: -6.1, y: 1.7, z: -17.4 }, map.physicsColliders, 0.42)).toBe(true);
+    expect(isBlocked({ x: -21, y: 1.7, z: -17.4 }, map.physicsColliders, 0.42)).toBe(true); // inside the v3 aqua house
     expect(isBlocked({
       x: fixture.commandedPlayerPosition[0],
       y: fixture.commandedPlayerPosition[1],
