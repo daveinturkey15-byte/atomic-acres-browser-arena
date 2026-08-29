@@ -37,9 +37,10 @@ export type ArenaLightingProfile = {
 };
 
 const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
+  // Owner 2026-08-29 shadow-side lift (see ATOMIC_BLENDER_LIGHTING).
   exposure: 1.02,
-  hemisphereIntensity: 1.05,
-  ambientIntensity: 0.32,
+  hemisphereIntensity: 1.3,
+  ambientIntensity: 0.42,
   sunIntensity: 2.65,
   shadowBias: -0.00028,
   shadowNormalBias: 0.025,
@@ -60,7 +61,7 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xffedc8,
   sunPosition: [-48, 42, 30],
   fillColor: 0xcce0ed,
-  fillIntensity: 0.28,
+  fillIntensity: 0.45,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 2.4,
   streetLightIntensity: 3.2,
@@ -73,9 +74,13 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
 };
 
 const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
-  exposure: 1,
-  hemisphereIntensity: 0.72,
-  ambientIntensity: 0.18,
+  // Owner 2026-08-29 ("the lighting was bad"): shadow sides crushed to
+  // featureless black - lit:shadow ratio measured ~4.6:1 with combined
+  // ambient+hemisphere at 0.9 vs sun 3.25. Fill light trio lifted so shadow
+  // sides read (~2.9:1) while the sun keeps golden-hour directionality.
+  exposure: 1.06,
+  hemisphereIntensity: 1.2,
+  ambientIntensity: 0.42,
   sunIntensity: 3.25,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
@@ -96,7 +101,7 @@ const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xfff0cb,
   sunPosition: [-48, 42, 30],
   fillColor: 0xc9dfef,
-  fillIntensity: 0.2,
+  fillIntensity: 0.52,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 3.8,

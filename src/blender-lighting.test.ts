@@ -72,7 +72,7 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
     const atomic = arenaLightingProfile('blender', 'atomic-acres');
     const otherMap = arenaLightingProfile('blender', 'rustworks-1v1');
     expect(atomic).toMatchObject({
-      exposure: 1,
+      exposure: 1.06,
       fogColor: 0xaebdbd,
       fogNear: 58,
       fogFar: 148,
@@ -83,8 +83,14 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
       interiorLightIntensity: 10,
       godRayStrength: 0.05,
     });
-    expect(atomic.sunIntensity / atomic.hemisphereIntensity).toBeGreaterThan(4);
-    expect(atomic.ambientIntensity).toBeLessThan(0.25);
+    // Owner 2026-08-29 re-pin: the old >4:1 sun:hemisphere pin ENCODED the
+    // dead-black shadow sides the owner reported. The daylight must stay
+    // strongly directional (ratio > 2.5) without crushing shadow detail
+    // (ambient in [0.3, 0.45]).
+    expect(atomic.sunIntensity / atomic.hemisphereIntensity).toBeGreaterThan(2.5);
+    expect(atomic.sunIntensity / atomic.hemisphereIntensity).toBeLessThan(4);
+    expect(atomic.ambientIntensity).toBeGreaterThan(0.3);
+    expect(atomic.ambientIntensity).toBeLessThan(0.45);
     // RustRig gets the owner-specced +25% brightness lift so its darkest
     // corridors read; it must not fall back to the plain blender profile.
     const plain = arenaLightingProfile('blender');
