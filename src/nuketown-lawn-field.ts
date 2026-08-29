@@ -30,19 +30,19 @@
  */
 import type * as THREE from 'three';
 import {
-  CORNER_HEDGE_LAYOUT,
-  CORNER_HEDGE_SIZE,
   COVER_LAYOUT,
-  FRONT_HEDGE_FIN_LAYOUT,
-  FRONT_HEDGE_FIN_SIZE,
+  GARDEN_COVER_LAYOUT,
+  REAR_YARD_CLOSURE_LAYOUT,
+  REAR_YARD_CLOSURE_SIZE,
+  KERB_CAR_LAYOUT,
+  KERB_CAR_SIZE,
   FRONT_HEDGE_LAYOUT,
   FRONT_HEDGE_SIZE,
   NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
   NEIGHBOURHOOD_BIN_POSITIONS,
-  REAR_HEDGE_LAYOUT,
-  REAR_HEDGE_SIZE,
-  SIDE_HEDGE_LAYOUT,
-  SIDE_HEDGE_SIZE,
+  SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_END_FENCE_SIZE,
+  SPAWN_END_FENCE_X,
   YARD_FENCE_LAYOUT,
 } from './arena-layout';
 import type { Box2 } from './collision';
@@ -78,12 +78,18 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
 
   // --- Derived from arena-layout (moves automatically with the layout) ---
   for (const hedge of FRONT_HEDGE_LAYOUT) boxes.push(rect(hedge.x, hedge.z, hedge.length, FRONT_HEDGE_SIZE.depth));
-  for (const fin of FRONT_HEDGE_FIN_LAYOUT) boxes.push(rect(fin.x, fin.z, FRONT_HEDGE_FIN_SIZE[0], FRONT_HEDGE_FIN_SIZE[2]));
-  for (const rear of REAR_HEDGE_LAYOUT) boxes.push(rect(rear.x, rear.z, REAR_HEDGE_SIZE[0], REAR_HEDGE_SIZE[2]));
-  for (const corner of CORNER_HEDGE_LAYOUT) boxes.push(rect(corner.x, corner.z, CORNER_HEDGE_SIZE[0], CORNER_HEDGE_SIZE[2]));
-  for (const side of SIDE_HEDGE_LAYOUT) boxes.push(rect(side.x, side.z, SIDE_HEDGE_SIZE[0], SIDE_HEDGE_SIZE[2]));
+  // REDESIGN 2026-08-29: fins/rear/corner/side hedges are gone; the spawn-end
+  // fences take their keep-out slot (grass grows in the gardens, not in fences).
+  for (const sign of [1, -1] as const) {
+    for (const [zCentre, zLength] of SPAWN_END_FENCE_SEGMENTS) {
+      boxes.push(rect(sign * SPAWN_END_FENCE_X, sign * zCentre, SPAWN_END_FENCE_SIZE.depth, zLength));
+    }
+  }
   for (const [x, z, sizeX, sizeZ] of YARD_FENCE_LAYOUT) boxes.push(rect(x, z, sizeX, sizeZ));
   for (const [x, z, width, depth] of COVER_LAYOUT) boxes.push(rect(x, z, width, depth));
+  for (const [x, z, width, depth] of GARDEN_COVER_LAYOUT) boxes.push(rect(x, z, width, depth));
+  for (const [x, z] of REAR_YARD_CLOSURE_LAYOUT) boxes.push(rect(x, z, REAR_YARD_CLOSURE_SIZE[0], REAR_YARD_CLOSURE_SIZE[2]));
+  for (const car of KERB_CAR_LAYOUT) boxes.push(rect(car.x, car.z, KERB_CAR_SIZE[0], KERB_CAR_SIZE[2]));
   for (const [x, z] of NEIGHBOURHOOD_BIN_POSITIONS) {
     boxes.push(rect(x, z, NEIGHBOURHOOD_BIN_COLLIDER_SIZE[0], NEIGHBOURHOOD_BIN_COLLIDER_SIZE[2]));
   }
@@ -99,13 +105,14 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
   // Irrigation terminals (authored-terminal-collider-N), yard pair + kerb pair.
   for (const [x, z] of [[-24, -8], [24, 8], [-9, -27], [9, 27]] as const) boxes.push(rect(x, z, 1.25, 0.8));
   // Hydroponics beds (authored-hydro-bed-collider-N) at z = 21.
-  for (const x of [-29, -26, -23]) boxes.push(rect(x, 21, 1.1, 6.2));
+  for (const x of [-24.5, -21.5, -18.5]) boxes.push(rect(x, 21, 1.1, 6.2));
   // Reclamation tank (authored-reclamation-tank-collider).
   boxes.push(rect(-29.5, -14, 2.7, 2.7));
   // Skyline trellis columns (collisionProxy 'skyline trellis column').
-  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as const) boxes.push(rect(x, z, 0.55, 0.55));
-  // Service channel walls (collisionProxy 'service wall west/east').
-  for (const x of [22.5, 28.5]) boxes.push(rect(x, 9, 0.7, 10));
+  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as const) boxes.push(rect(x, z, 0.55, 0.55));
+  // Service channel wall (collisionProxy 'service wall west'; the east twin
+  // died with the 2026-08-29 redesign).
+  boxes.push(rect(22.5, 6.5, 0.7, 5));
   // Solar canopy columns (collisionProxy 'solar canopy column').
   for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) boxes.push(rect(x, z, 0.6, 0.6));
   // Street lamp poles ('lamp pole'); the yard pair stands on the lawns.
@@ -118,8 +125,8 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
   boxes.push(rect(27, 24, 3.8, 3.8));
   // Verge terrain mounds ('terrain-mound-*-collider'): blades rooted at y=0
   // under the raised ellipsoids would render buried inside them.
-  boxes.push(rect(-24, -29.5, 4.6, 3.4));
-  boxes.push(rect(24, 29.5, 4.6, 3.4));
+  boxes.push(rect(-33.2, -27.3, 1.6, 2.2));
+  boxes.push(rect(33.2, 27.3, 1.6, 2.2));
   // Quality earth-bank tier colliders ('quality-earth-bank-*-collider-N'):
   // the corner banks deliberately overlap the playable side of the boundary,
   // so their tiered authority boxes reach into the lawn corners. Blades
@@ -136,7 +143,7 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
   // x -30/-22, z 17.2/24.8 + planters): the framed floor is planted beds, not
   // lawn, and the sills are decorative (no colliders) so no collider-derived
   // rect exists for them.
-  boxes.push({ minX: -30.5, maxX: -21.5, minZ: 16.7, maxZ: 25.3 });
+  boxes.push({ minX: -26, maxX: -17, minZ: 16.7, maxZ: 25.3 });
 
   return boxes.map((box) => Object.freeze(box));
 })());

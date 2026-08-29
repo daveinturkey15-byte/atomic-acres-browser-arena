@@ -28,13 +28,15 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     // 0.68 m 'authored-tree-trunk-collider-*' WOOD proxy beside each one is
     // the rated authority; a second surface over the tapered flare would bill
     // the same trunk twice. Positions: 4 trunk flares at (+/-27,+/-21) and
-    // (+/-13,+/-28.5), 2 ankle-height root flares at (+/-18.53,+/-28).
-    { name: '(unnamed Mesh)', count: 6, reason: 'addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it' },
-    // The landmark's animated open rings above the rated concrete plinth: a
-    // box surface would block the OPEN middle of a spinning ring - worse
-    // parity than free passage through decorative torus rim at head height.
-    { name: 'animated-atomic-ring-1', count: 1, reason: 'open animated ring sculpture; an AABB surface would block the ring opening; plinth below is rated cover' },
-    { name: 'animated-atomic-ring-2', count: 1, reason: 'open animated ring sculpture; an AABB surface would block the ring opening; plinth below is rated cover' },
+    // (+/-13,+/-28.5), root flares at (+/-18.53,+/-28). REDESIGN 2026-08-29:
+    // +2 - the rear hedges whose registered surfaces footprint-covered the
+    // two rear-yard trunk visuals at (+/-19,-/+28) are deleted, so those
+    // trunks (and one more exposed flare) now stand alone; their 0.68 m wood
+    // proxies stay the rated authority, same reason as ever.
+    { name: '(unnamed Mesh)', count: 8, reason: 'addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it' },
+    // (2026-08-29: the two animated-atomic-ring rows are deleted per this
+    // gate's own stale-row law - the census stopped flagging the rings after
+    // the redesign re-census, so the rows had become rot.)
     // house-navigation authors these as 0.08 x 0.08 m handrail BARS rotated
     // along the ramp slope; the census AABB inflates each to a 3.55 x 6.24
     // plane. A surface authored from that AABB would be a phantom wall over

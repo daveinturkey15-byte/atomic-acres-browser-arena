@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
-  CORNER_HEDGE_LAYOUT,
   COVER_LAYOUT,
-  FRONT_HEDGE_FIN_LAYOUT,
-  FRONT_HEDGE_FIN_SIZE,
   FRONT_HEDGE_LAYOUT,
   GARAGE_LAYOUT,
   HOUSE_LAYOUT,
@@ -17,8 +14,8 @@ import {
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
   PATROL_LAYOUT,
-  REAR_HEDGE_LAYOUT,
-  SIDE_HEDGE_LAYOUT,
+  SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_END_FENCE_X,
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
   YARD_FENCE_LAYOUT,
@@ -39,14 +36,15 @@ const rotated = (points: ReadonlyArray<readonly [number, number]>) =>
 const sprint = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
 
 describe('compact original arena layout', () => {
-  it('measures 62 by 63 metres, crossed corner to corner in barely over ten seconds', () => {
-    expect(ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX).toBe(62);
-    // HF-383 remainder ("maybe make it a tad bigger because it feels a
-    // little bit clustered"): the map deepened from 60 to 63 m across the
-    // street, giving each back yard 1.5 m more depth behind its spawns.
-    // The street canyon itself is untouched, so every exact seam pin below
-    // still measures the same geometry.
-    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(63);
+  it('measures 68 by 57 metres, crossed corner to corner in barely over ten seconds', () => {
+    // REDESIGN 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md): length moves
+    // onto the STREET axis where the reference keeps it; the across-street
+    // depth gives back what the sideways design had borrowed. The diagonal
+    // sprint band below holds UNCHANGED - 68 x 57 was sized to it: 88.73 m
+    // diagonal, 10.20 s at 8.7 m/s, inside the same 10..10.5 s pin that
+    // rejected a straight scale-up once already.
+    expect(ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX).toBe(68);
+    expect(ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ).toBe(57);
     const diagonal = Math.hypot(
       ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX,
       ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ,
@@ -116,10 +114,13 @@ describe('compact original arena layout', () => {
     // at the authored-constant level too so a future edit cannot break one
     // side silently. Strictness only increases: no prior assertion removed.
     expect(rotated(FRONT_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
-    expect(rotated(FRONT_HEDGE_FIN_LAYOUT.map((fin) => [fin.x, fin.z] as const))).toBe(true);
-    expect(rotated(REAR_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
-    expect(rotated(CORNER_HEDGE_LAYOUT.map((block) => [block.x, block.z] as const))).toBe(true);
-    expect(rotated(SIDE_HEDGE_LAYOUT.map((hedge) => [hedge.x, hedge.z] as const))).toBe(true);
+    // REDESIGN 2026-08-29: fins/rear/corner/side hedge sets are deleted with the
+    // cross-flow maze (docs/NUKETOWN_REDESIGN_2026-08-29.md). Their symmetry duty
+    // passes to the spawn-end fences: expanding both signed fences must yield a
+    // 180-degree-symmetric point set, exactly like every other layer here.
+    const fencePoints = ([1, -1] as const).flatMap((sign) =>
+      SPAWN_END_FENCE_SEGMENTS.map(([zCentre]) => [sign * SPAWN_END_FENCE_X, sign * zCentre] as const));
+    expect(rotated(fencePoints)).toBe(true);
     expect(rotated(HOUSE_LAYOUT.map((house) => [house.x, house.z] as const))).toBe(true);
     expect(rotated(PARKED_VAN_LAYOUT.map((van) => [van.x, van.z] as const))).toBe(true);
     // Segment lengths must pair too, not just centres: a longer north run vs
@@ -147,9 +148,12 @@ describe('compact original arena layout', () => {
     expect(PATROL_LAYOUT.every((point) => inside(point, 0.44))).toBe(true);
   });
 
-  it('keeps each team spawning on its own side of the street', () => {
-    expect(SPAWN_LAYOUT[0].every(([, z]) => z < -STREET_HALF_WIDTH)).toBe(true);
-    expect(SPAWN_LAYOUT[1].every(([, z]) => z > STREET_HALF_WIDTH)).toBe(true);
+  it('keeps each team spawning in its own END garden behind the spawn fence', () => {
+    // REDESIGN D1: the reference's defining flow. Team 0 owns the west end
+    // garden, team 1 the east; every spawn sits BEHIND its fence line, so no
+    // spawn is in the street or the verges.
+    expect(SPAWN_LAYOUT[0].every(([x]) => x < -SPAWN_END_FENCE_X)).toBe(true);
+    expect(SPAWN_LAYOUT[1].every(([x]) => x > SPAWN_END_FENCE_X)).toBe(true);
   });
 
   it('keeps the east patrol turn clear of the authored service wall', () => {
@@ -168,8 +172,12 @@ describe('compact original arena layout', () => {
   it('blocks the opposing primary-spawn ray with the central bus', () => {
     const [a] = SPAWN_LAYOUT[0];
     const [b] = SPAWN_LAYOUT[1];
-    // Short map: the two primary spawns are close, so the bus has to do the work.
-    expect(Math.hypot(b[0] - a[0], b[1] - a[1])).toBeLessThan(60);
+    // REDESIGN: the primary spawns face each other down the full street, so
+    // the separation GROWS (76.3 m measured) - the point of the end-to-end
+    // flow - and the bus still owns the block, since the primary ray crosses
+    // the origin by 180-degree symmetry. Bounded above by the map diagonal.
+    expect(Math.hypot(b[0] - a[0], b[1] - a[1])).toBeGreaterThan(60);
+    expect(Math.hypot(b[0] - a[0], b[1] - a[1])).toBeLessThan(90);
     const [length, height, width] = CENTRAL_BUS.size;
     expect(segmentIntersectsBox(
       { x: a[0], y: 1.7, z: a[1] },
@@ -226,23 +234,18 @@ describe('mid-street vehicle staging (HF-383)', () => {
   it('seats each mid-street vehicle without pocketing a player against the bus or a planter pillar', () => {
     const [busLength, busHeight, busWidth] = CENTRAL_BUS.size;
     const bus = { minX: -busLength / 2, maxX: busLength / 2, minY: 0, maxY: busHeight, minZ: -busWidth / 2, maxZ: busWidth / 2 };
-    const [, finHeight, finDepth] = FRONT_HEDGE_FIN_SIZE;
+    // REDESIGN 2026-08-29: the planter pillars are gone; a mid-street van's
+    // real neighbours are the bus and its own twin. Auditing the twin is new
+    // coverage the pillar era never had.
     const blockers = [
       { id: 'central-bus', ...bus },
-      ...FRONT_HEDGE_FIN_LAYOUT.map((fin, i) => ({
-        id: `planter-${i}`,
-        minX: fin.x - FRONT_HEDGE_FIN_SIZE[0] / 2,
-        maxX: fin.x + FRONT_HEDGE_FIN_SIZE[0] / 2,
-        minY: 0,
-        maxY: finHeight,
-        minZ: fin.z - finDepth / 2,
-        maxZ: fin.z + finDepth / 2,
-      })),
+      ...PARKED_VAN_LAYOUT.map((other) => ({ id: `${other.id}-twin`, ...vanBounds(other) })),
     ];
     for (const van of PARKED_VAN_LAYOUT) {
       const bounds = vanBounds(van);
       // No volume overlap with any street blocker.
       for (const blocker of blockers) {
+        if (blocker.id === `${van.id}-twin`) continue; // a van is not its own pocket
         const overlaps = bounds.minX < blocker.maxX && bounds.maxX > blocker.minX
           && bounds.minZ < blocker.maxZ && bounds.maxZ > blocker.minZ;
         expect(overlaps, `${van.id} must not overlap ${blocker.id}`).toBe(false);
@@ -356,7 +359,7 @@ describe('HF-387 prone/wall camera clearance', () => {
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
       for (const stance of ['stand', 'crouch', 'prone'] as const) {
-        const eye = await pressedEye(physics, stance, { x: 28.5, y: 1.7, z: -14.25 }, { x: 1, z: 0 });
+        const eye = await pressedEye(physics, stance, { x: ARENA_BOUNDS.maxX - 2.5, y: 1.7, z: -14.25 }, { x: 1, z: 0 });
         const clearance = distanceToNamedBoxes(eye, map.root, 'fence post');
         expect(clearance, `${stance} eye-to-post clearance`).toBeGreaterThanOrEqual(CAMERA_NEAR_PLANE);
       }

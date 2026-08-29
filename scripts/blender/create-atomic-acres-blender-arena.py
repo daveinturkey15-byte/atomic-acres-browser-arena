@@ -604,12 +604,26 @@ for fence_index, fence in enumerate(spec["yardFences"]):
 # verge cross-runs). They are the map's lane-breaking authority and must be
 # visible in this Quality art exactly where the collision lives.
 hedges = spec["streetHedges"]
-for family in ("front", "fins", "rear", "corners", "sideVerges"):
+for family in ("front",):
     for index, hedge in enumerate(hedges[family]):
         add_box(
             f"BLD_HEDGE_{family}_{index}",
             hedge["position"], hedge["size"], M["foliage"], 0.12,
         )
+
+# REDESIGN 2026-08-29: the spawn-end fences, tall garden cover and kerb cars
+# replace the deleted hedge families, mirroring their colliders one-for-one.
+for index, fence in enumerate(spec["spawnEndFences"]):
+    add_box(f"BLD_SPAWNFENCE_{index}", fence["position"], fence["size"], M["timber"], 0.04)
+for index, cover in enumerate(spec["gardenCover"]):
+    add_box(f"BLD_GARDENCOVER_{index}", cover["position"], cover["size"], M["timber"], 0.05)
+for index, car in enumerate(spec["kerbCars"]):
+    cx, cy, cz = car["position"]
+    length, height, width = car["size"]
+    add_box(f"P32_KERBCAR_{index}_body", [cx, cy * 0.82, cz], [length, height * 0.64, width], M["coral"], 0.07)
+    add_box(f"P32_KERBCAR_{index}_cab", [cx, height * 0.66, cz], [length * 0.55, height * 0.36, width * 0.9], M["glass"], 0.04)
+    for wheel_index, wheel_x in enumerate((cx - length * 0.32, cx + length * 0.32)):
+        add_cylinder(f"P32_KERBCAR_{index}_wheel_{wheel_index}", [wheel_x, 0.3, cz], 0.3, width + 0.06, M["rubber"], 14, rotation=(0, math.pi / 2, 0))
 
 # Two parked delivery vans flank the bus in the road. Presentation mirrors the
 # TypeScript PARKED_VAN colliders: one boxy body, cab window band, four wheels.

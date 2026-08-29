@@ -4,11 +4,11 @@ import { dirname, resolve } from 'node:path';
 import {
   ARENA_BOUNDS,
   CENTRAL_BUS,
-  CORNER_HEDGE_LAYOUT,
-  CORNER_HEDGE_SIZE,
   COVER_LAYOUT,
-  FRONT_HEDGE_FIN_LAYOUT,
-  FRONT_HEDGE_FIN_SIZE,
+  GARDEN_COVER_HEIGHT,
+  GARDEN_COVER_LAYOUT,
+  KERB_CAR_LAYOUT,
+  KERB_CAR_SIZE,
   FRONT_HEDGE_LAYOUT,
   FRONT_HEDGE_SIZE,
   GARAGE_LAYOUT,
@@ -16,10 +16,9 @@ import {
   HOUSE_LAYOUT,
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
-  REAR_HEDGE_LAYOUT,
-  REAR_HEDGE_SIZE,
-  SIDE_HEDGE_LAYOUT,
-  SIDE_HEDGE_SIZE,
+  SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_END_FENCE_SIZE,
+  SPAWN_END_FENCE_X,
   STREET_HALF_WIDTH,
   YARD_FENCE_HEIGHT,
   YARD_FENCE_LAYOUT,
@@ -117,23 +116,25 @@ const spec = {
       position: [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z],
       size: [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth],
     })),
-    fins: FRONT_HEDGE_FIN_LAYOUT.map((fin) => ({
-      position: [fin.x, FRONT_HEDGE_FIN_SIZE[1] / 2, fin.z],
-      size: [...FRONT_HEDGE_FIN_SIZE],
-    })),
-    rear: REAR_HEDGE_LAYOUT.map((rear) => ({
-      position: [rear.x, REAR_HEDGE_SIZE[1] / 2, rear.z],
-      size: [...REAR_HEDGE_SIZE],
-    })),
-    corners: CORNER_HEDGE_LAYOUT.map((corner) => ({
-      position: [corner.x, CORNER_HEDGE_SIZE[1] / 2, corner.z],
-      size: [...CORNER_HEDGE_SIZE],
-    })),
-    sideVerges: SIDE_HEDGE_LAYOUT.map((side) => ({
-      position: [side.x, SIDE_HEDGE_SIZE[1] / 2, side.z],
-      size: [...SIDE_HEDGE_SIZE],
-    })),
   },
+  // REDESIGN 2026-08-29: fins/rear/corner/side families deleted with the
+  // cross-flow maze. The art mirrors the new authorities instead: the two
+  // spawn-end fences (with their door gaps), the tall garden cover, and the
+  // kerb-parked driveway cars - every collider visible, every visible solid.
+  spawnEndFences: ([1, -1] as const).flatMap((sign) =>
+    SPAWN_END_FENCE_SEGMENTS.map(([zCentre, zLength]) => ({
+      position: [sign * SPAWN_END_FENCE_X, SPAWN_END_FENCE_SIZE.height / 2, sign * zCentre],
+      size: [SPAWN_END_FENCE_SIZE.depth, SPAWN_END_FENCE_SIZE.height, zLength],
+    }))),
+  gardenCover: GARDEN_COVER_LAYOUT.map(([x, z, width, depth]) => ({
+    position: [x, GARDEN_COVER_HEIGHT / 2, z],
+    size: [width, GARDEN_COVER_HEIGHT, depth],
+  })),
+  kerbCars: KERB_CAR_LAYOUT.map((car) => ({
+    id: car.id,
+    position: [car.x, KERB_CAR_SIZE[1] / 2, car.z],
+    size: [...KERB_CAR_SIZE],
+  })),
   parkedVans: PARKED_VAN_LAYOUT.map((van) => ({
     id: van.id,
     position: [van.x, PARKED_VAN_SIZE[1] / 2, van.z],
@@ -168,8 +169,10 @@ const spec = {
     position: [x, YARD_FENCE_HEIGHT / 2, z], size: [width, YARD_FENCE_HEIGHT, depth],
   })),
   routeStructures: [
-    { id: 'west-hydroponics', position: [-26, 0, 21] },
-    { id: 'east-service-channel', position: [25.5, 0, 9] },
+    // REDESIGN 2026-08-29: hydroponics cluster re-seated 4.5 m east of the
+    // spawn fence; service channel reduced to its surviving west wall.
+    { id: 'west-hydroponics', position: [-21.5, 0, 21] },
+    { id: 'east-service-channel', position: [22.5, 0, 6.5] },
     { id: 'east-solar-canopy', position: [26.75, 0, -19.5] },
     { id: 'atomic-beacon', position: [27, 0, -20] },
   ],

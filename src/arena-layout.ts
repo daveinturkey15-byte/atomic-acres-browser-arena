@@ -1,38 +1,43 @@
 // Nuke Town layout authority.
 //
-// Axis convention (Pass 78 fidelity rebuild): X runs ALONG the street, Z runs
-// ACROSS it. The two houses sit on opposite kerbs facing each other over the
-// central road, which is the single geometric fact that gives the reference
-// map its character. Everything below is 180-degree rotationally symmetric
-// about the origin so neither team owns a better half of the map.
+// Axis convention: X runs ALONG the street, Z runs ACROSS it. The two houses
+// sit on opposite kerbs facing each other over the central road. Everything is
+// 180-degree rotationally symmetric about the origin so neither team owns a
+// better half of the map.
 //
-// Pass 79 / HF-383, both halves now landed: "remove all the bulky items that
-// are in the way of stuff" AND "put the two vehicles that are open or whatever
-// in the middle of the street". The bulky read was fixed by resizing the two
-// 7.4 m canyon walls into slim planter pillars; the vehicle half reverses this
-// pass's earlier kerb-side restage: each van now sits IN THE MIDDLE OF THE
-// STREET, flush against one end of the bus and staggered diagonally opposite
-// its twin - the BO2 midfield read. Every seam around a van is either flush
-// or a genuine walk-through lane (>= 1.28 m), so the vans add hard cover on
-// the crossing routes without sealing or wedging them.
+// FULL-STEP REDESIGN, 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md).
+// The owner asked on 2026-08-24 for "the full step ... the same layout as
+// Black Ops 2 Nuketown", and artifacts/NUKETOWN-MEASUREMENT-2026-08-24.md
+// diagnosed why every prior pass failed to deliver it: divergence D1 - the
+// FLOW was rotated 90 degrees from the reference. Teams spawned in full-width
+// strips on the two SIDES of the street, so combat crossed the road; in the
+// reference, teams spawn in fenced garden yards at the two ENDS and fight
+// DOWN the street through three parallel lanes (the vehicle-choked road and
+// one house each side). Houses, garages, bus and mid-street vehicles already
+// matched (D6/D2); the spawn topology never did.
 //
-// Pass 79 / HF-383 remainder ("maybe make it a tad bigger because it feels a
-// little bit clustered"): the footprint deepens across the street from 60 to
-// 63 m (Z bounds +/-30 -> +/-31.5). Growth is Z-only by design: every back
-// yard gains 1.5 m of depth behind its spawns, which is where the clustered
-// read lived, while the entire re-staged street canyon - bus, mid-street vans,
-// planter pillars, front hedges, house facades and their exact seams - stays
-// byte-identical. The rear hedge runs, corner hedge blocks, side-verge cross
-// runs, boundary fences and verge mounds follow the fence line out; spawns,
-// patrols, bins, benches and cover keep their coordinates. Area becomes
-// 62 x 63 = 3906 m^2, still under the sub-4000 m^2 fidelity gate; diagonal
-// sprint becomes 10.16 s against the moved sub-10.5 s pin (was sub-10 s).
-export const ARENA_BOUNDS = Object.freeze({ minX: -31, maxX: 31, minZ: -31.5, maxZ: 31.5 });
+// What this redesign changes, and only this:
+//   - Spawns move to two END gardens behind spawn fences at x = -/+27.5,
+//     each fence with two door gaps and a central low trail mouth (D1, D5).
+//   - The street lengthens: bounds 62x63 -> 68x57. Growth is along X where
+//     the reference's length lives; the across-street depth gives back what
+//     the sideways design had borrowed (D8). Perimeter lap 28.7 s sprint,
+//     inside the fidelity gate's own 25-30 s reference band.
+//   - The hedge maze goes (D3): the canyon planter fins, corner hedge blocks
+//     and side-verge cross-runs existed to break ACROSS-street sightlines
+//     that no longer exist. The reference's own furniture - bus, mid-street
+//     vans, front-garden hedges, the houses - carries the lane-breaking duty
+//     for the new ALONG-street flow, and the reference authentically HAS
+//     long lanes; the sightline suite re-derives its ceilings from this
+//     geometry with that rationale recorded in the tests.
+// What deliberately does NOT move: houses, garages, bus, mid-street vans,
+// authored large-cover anchors, benches, front-garden hedge system (outer
+// ends follow the new bounds), yard fences, overdrive core, railgun rooms.
+export const ARENA_BOUNDS = Object.freeze({ minX: -34, maxX: 34, minZ: -28.5, maxZ: 28.5 });
 /** Half width of the drivable asphalt. The kerbs sit immediately outside it.
  * HF-383 completion: widened from 5 to 6.5 m so the mid-street vehicles plus
  * walkable flank channels fit beside the bus, matching the reference map's
- * road-to-bus proportion. Consumes verge, not footprint: ARENA_BOUNDS, the
- * sub-10 s diagonal gate and the sub-4000 m^2 area gate are untouched. */
+ * road-to-bus proportion. */
 export const STREET_HALF_WIDTH = 6.5;
 /** Z of each house's street-facing wall. Derived from the house depth (16.4 m). */
 export const HOUSE_FRONT_Z = 9.2;
@@ -49,14 +54,10 @@ export const CENTRAL_BUS = Object.freeze({
  * Two delivery vans staged IN THE MIDDLE OF THE STREET as a staggered pair,
  * one flush against each end of the central bus and offset toward opposite
  * kerbs diagonally - the reference map's bus-plus-two-vehicles midfield.
- * HF-383's second half ("put the two vehicles that are open or whatever in
- * the middle of the street") reverses this pass's interim kerb-side restage:
- * the owner wants the vehicles breaking the street itself, not parked at its
- * edges. Each van is flush to the bus end on its inner face (no seam to
- * enter) and leaves a >= 1.4 m walk-through lane on its outer face, so it
- * plays as hard cover on the crossing routes without walling the road.
- * Height clears the crouched eye-line; width breaks both combat stances'
- * eye-lines along and across the street. 180-degree symmetric by pairing.
+ * Each van is flush to the bus end on its inner face (no seam to enter) and
+ * leaves a >= 1.4 m walk-through lane on its outer face, so it plays as hard
+ * cover on the crossing routes without walling the road. Height clears the
+ * crouched eye-line. 180-degree symmetric by pairing.
  */
 export const PARKED_VAN_LAYOUT = Object.freeze([
   Object.freeze({ id: 'east-parked-van', x: 8.6, z: -1.5 }),
@@ -66,145 +67,61 @@ export const PARKED_VAN_LAYOUT = Object.freeze([
 export const PARKED_VAN_SIZE = Object.freeze([4.6, 2.3, 1.9] as const);
 
 /**
+ * REDESIGN: kerb-parked driveway cars, one per house, on the verge between the
+ * front hedge and the kerb - the reference's own break for the long sidewalk
+ * lanes (its yards park a car on each drive). Lower than the vans: crouch
+ * cover, but they kill the standing verge eye-line at |x| = 22. 180-degree
+ * symmetric by pairing.
+ */
+export const KERB_CAR_LAYOUT = Object.freeze([
+  // x = 15: mid-verge between the house frontage (x <= 14) and the bench at
+  // x = 19. The first seat (x = 22) parked the car through the destructible
+  // shed's plot at (22, -5) - the registry gate caught the overlap.
+  Object.freeze({ id: 'north-kerb-car', x: 15, z: -7.3 }),
+  Object.freeze({ id: 'south-kerb-car', x: -15, z: 7.3 }),
+]);
+export const KERB_CAR_SIZE = Object.freeze([4.4, 1.75, 1.8] as const);
+
+/**
  * Front-garden hedge rows closing the street flanks. The reference map's
- * houses plus their garden hedges do most of its sightline blocking; without
- * these, shallow corner-to-corner rays thread the empty verges beside each
- * house (60 m+ measured). Segments stop short of the house facades at
- * |x| = 12/12.5 and the perimeter at |x| = 26. 180-degree symmetric.
+ * houses plus their garden hedges do most of its verge sightline blocking.
+ * Inner ends keep their exact facade seams (|x| = 5 and 12); outer ends
+ * follow the redesigned bounds out to |x| = 29, one metre short of the end
+ * gardens' fences so the verge door lanes stay walkable. 180-degree symmetric.
  */
 export const FRONT_HEDGE_LAYOUT = Object.freeze([
   // North-west long run: stops 1 m short of the aqua house's west corner.
-  Object.freeze({ x: -15.5, z: -8.9, length: 21 }),
+  Object.freeze({ x: -17, z: -8.9, length: 24 }),
   // North-east short run: starts at the aqua house's east corner.
-  Object.freeze({ x: 19, z: -8.9, length: 14 }),
+  Object.freeze({ x: 20.5, z: -8.9, length: 17 }),
   // South-west short run (180-degree twin of north-east).
-  Object.freeze({ x: -19, z: 8.9, length: 14 }),
+  Object.freeze({ x: -20.5, z: 8.9, length: 17 }),
   // South-east long run (180-degree twin of north-west).
-  Object.freeze({ x: 15.5, z: 8.9, length: 21 }),
+  Object.freeze({ x: 17, z: 8.9, length: 24 }),
 ]);
 /** Hedge cross-section; height clears the 1.65 m standing eye-line. */
 export const FRONT_HEDGE_SIZE = Object.freeze({ height: 2.05, depth: 1.4 } as const);
 
 /**
- * Perpendicular planter pillars flanking the street canyon, two per side.
- *
- * HF-383 completion design, measured rather than assumed: each pillar spans
- * from the front-garden hedge line right up to the bus face plane (3.7 m),
- * so every shallow corner-to-corner standing eye-line that threads the
- * widened street meets one. Because each pillar is an ISLAND (clear 1.8 m
- * verge-side gap to the hedge line, and x-gaps to the vans and the bus),
- * ground movement flows around it and nothing seals: the previous Pass 78/79
- * stagings either chained pillar-van-bus into a continuous wall (splitting
- * the map's ground movement into two disconnected halves - measured with the
- * real character controller) or stopped short of the bus and reopened
- * 58-60 m killing lanes.
+ * Spawn-end fences: the redesign's replacement for the rear hedges, rotated
+ * onto the street ends where the reference keeps its spawn yards. Each fence
+ * is four solid runs leaving three openings a defender must actually watch:
+ * two door gaps (2.4 m at z = -/+10.5) and a central low trail mouth (1.8 m
+ * at z = 0) - the reference's under-fence side trail, ours by function.
+ * Segments are expressed per fence; the east fence is the exact 180-degree
+ * rotation of the west. Height clears the standing eye-line so spawn yards
+ * are not long-range shooting galleries.
  */
-export const FRONT_HEDGE_FIN_LAYOUT = Object.freeze([
-  Object.freeze({ x: 4, z: -5.5 }),
-  Object.freeze({ x: 13, z: -5.5 }),
-  Object.freeze({ x: -4, z: 5.5 }),
-  Object.freeze({ x: -13, z: 5.5 }),
+export const SPAWN_END_FENCE_X = 27.5;
+export const SPAWN_END_FENCE_SIZE = Object.freeze({ depth: 1.0, height: 2.2 } as const);
+export const SPAWN_END_FENCE_SEGMENTS: ReadonlyArray<readonly [zCentre: number, zLength: number]> = Object.freeze([
+  [-17.85, 12.3],  // z -24.0 .. -11.7
+  [-5.1, 8.4],     // z  -9.3 ..  -0.9
+  [5.1, 8.4],      // z   0.9 ..   9.3
+  [17.85, 12.3],   // z  11.7 ..  24.0
 ]);
-/** [width along the street, height, depth across the canyon]. Each pillar
- * spans the FULL flank from hedge line to bus face plane so both the street
- * channel and the kerb-side verge lane die against it. */
-// HF-383b declutter (owner, 2026-08-28): the pillars read as bulk. Their HEIGHT is
-// load-bearing - 2.05 m is what stops the 1.65 m standing eye-line, and lowering it
-// reopens the measured 58-60 m lanes - so decluttering slims the FOOTPRINT instead:
-// width 1.4 -> 1.0 along the street, depth 5.4 -> 4.8 across the canyon. The island
-// contract (1.8 m verge gap, x-gaps to vans and bus) grows, never shrinks, and the
-// sightline suite is the arbiter. Measured: depth 4.8 REOPENED a 54 m lane through the
-// 0.6 m verge slit ([-26,-3.5]->[28,-2.5]), so depth stays at its full 5.4 m span -
-// hedge line to bus face - and only the street-facing width slims.
-export const FRONT_HEDGE_FIN_SIZE = Object.freeze([1.0, 2.05, 5.4] as const);
 
-/**
- * Rear-boundary hedge runs splitting the back-yard strips behind each house.
- * Without them a standing ray runs the full map depth along the back fence
- * inside one team's half. Sits against the perimeter fence, clear of every
- * spawn point. HF-383 remainder: follows the fence out 1.5 m (z 29.1 -> 30.6,
- * keeping the old 0.9 m centre-to-bound offset); length is unchanged because
- * it spans along X, which did not grow.
- */
-export const REAR_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -3, z: -30.6 }),
-  Object.freeze({ x: 3, z: 30.6 }),
-]);
-/** [length along the street, height, depth]. */
-export const REAR_HEDGE_SIZE = Object.freeze([46, 2.05, 1.6] as const);
-
-/**
- * Back-corner hedge blocks seating each rear corner of the map: one face on
- * the perimeter fence, reaching into the yard far enough to break the
- * back-fence corridor ray that otherwise runs the full map width behind
- * each house. Positioned clear of every spawn, bin, bench and patrol point,
- * and short enough of the yard that no pocket is sealed off from its own
- * half: each block stands alone, so both back-yard strips stay enterable
- * around it.
- *
- * HF-383 audit: removal was tested and rejected - without them the
- * back-fence corridor lanes reopen at full map width and the authored spawns
- * sit exactly where a forward-shifted boundary hedge would have to stand to
- * replace them. They are against the back fences, out of the play corridors
- * the owner flagged, so they stay.
- *
- * HF-383 remainder: follows the fence out 1.5 m in Z (25.7 -> 27.2), which
- * keeps its exact abutment against the moved rear hedge band and leaves the
- * spawn rows' x/z clearances unchanged or wider.
- *
- * Repair round 2026-08-25: with the side-verge cross-runs re-seated (see
- * below) the ray audit exposed a 45.5 m lane along each back strip that
- * skimmed the yard-side face of these blocks by ~0.7 m. Depth out of the
- * fence grows 5.2 -> 7.0 so the block now abuts both the rear hedge band
- * behind it and the side-verge corridor's sight plane ahead of it; the
- * inland x-faces are untouched, so every spawn, bin and patrol clearance is
- * byte-identical and both back-yard strips stay enterable around the block.
- */
-export const CORNER_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -21.5, z: -27.2 }),
-  Object.freeze({ x: 21.5, z: -27.2 }),
-  Object.freeze({ x: 21.5, z: 27.2 }),
-  Object.freeze({ x: -21.5, z: 27.2 }),
-]);
-/** [width along the street, height, depth out of the fence]. */
-export const CORNER_HEDGE_SIZE = Object.freeze([5, 2.05, 7] as const);
-
-/**
- * Side-verge cross-runs: short hedge walls spanning the whole verge between
- * the front-garden hedge rows and the perimeter fences. A barrier parallel to
- * the fence cannot block a ray running parallel to it, so these cross the
- * verge instead, splitting each north-south verge ray into segments of about
- * 19 m. Clear of every spawn, bench, bin and lamp. HF-383 remainder: each run
- * recentred 0.75 m further out (z 17 -> 17.75) so both runs stay centred in
- * the verge segment the deeper fence gives them.
- *
- * Repair round 2026-08-25, recentred inland 0.6 m (x +/-28.5 -> +/-27.9):
- * the HF-383 Z-deepening reopened a 45.3 m standing eye-line down each side
- * verge - a diagonal from the rear corner pocket to the far front yard that
- * crossed z = -17.75 at x = 25.31, clearing this run's old inner face
- * (x = 25.7) by 0.39 m and then threading the cargo stack's east face
- * (25.4), the front-hedge end (26) and the opposite corner seam. The run now
- * spans x 25.1..30.7 and catches that crossing. The corner seam (corner-block
- * face x = 24 to run face x = 25.1) narrows from 1.7 m to a still-walkable
- * 1.1 m door: flood-fill verified as the rear yard pocket's walk-in both
- * before and after (nuketown-traversal green). An alternative repair - a
- * second staggered baffle run near z = 20 - was measured and rejected: the
- * north-east fence strip's only bypass threads a lamp/vessel pinch narrower
- * than the body, so any such baffle traps the strip (sealed-pocket gate).
- */
-export const SIDE_HEDGE_LAYOUT = Object.freeze([
-  Object.freeze({ x: -27.9, z: -17.75 }),
-  Object.freeze({ x: -27.9, z: 17.75 }),
-  Object.freeze({ x: 27.9, z: 17.75 }),
-  Object.freeze({ x: 27.9, z: -17.75 }),
-]);
-/** [width across the verge, height, depth along the fence]. */
-export const SIDE_HEDGE_SIZE = Object.freeze([5.6, 2.05, 1.6] as const);
-
-
-
-// Street-life props: the (±17,∓7.5) bench pair fouled the crossing planter
-// walls at x=±16 (HF-383) and moves to x=±19; the rest keep their spots.
+/** Street-life props: benches on the verges, paired by rotation. */
 export const NEIGHBOURHOOD_BENCH_LAYOUT: ReadonlyArray<readonly [number, number, number]> = Object.freeze([
   [19, -7.5, 0], [-19, 7.5, Math.PI], [6.5, -7.5, 0], [-6.5, 7.5, Math.PI],
 ]);
@@ -224,59 +141,82 @@ export const GARAGE_LAYOUT = Object.freeze([
 ]);
 export const GARAGE_SIZE = Object.freeze([7.2, 3.3, 6.6] as const);
 
-// Waist-high yard fencing. Two side runs and two front-garden rails, paired by
-// 180-degree rotation. Low enough to shoot over, solid enough to break a lane.
+// Waist-high yard fencing, paired by 180-degree rotation. Low enough to shoot
+// over, solid enough to break a lane. REDESIGN 2026-08-29: the (+/-22) side
+// runs are deleted - they divided front from rear for the old ACROSS-street
+// flow and, after the cultivation cluster re-seated 4.5 m east, one bisected
+// the greenhouse interior. The per-house (-/+11) rear dividers, the rear yard
+// closures and the spawn-end fences carry the yard structure now.
 export const YARD_FENCE_LAYOUT: ReadonlyArray<readonly [number, number, number, number]> = Object.freeze([
-  [22, -18, 0.25, 14], [-22, 18, 0.25, 14],
   [-11, -20, 0.25, 12], [11, 20, 0.25, 12],
 ]);
 export const YARD_FENCE_HEIGHT = 1.05;
 
+/**
+ * REDESIGN D3-completion: rear-yard closures. The reference fences each back
+ * yard per house; without these, a standing lane runs the full 60 m rear strip
+ * end to end (measured 57-60 m the moment the old rear hedges left). One
+ * closure at each house's inner rear corner and one past each garage, spanning
+ * house rear wall to the boundary. Full standing height; 180-degree symmetric.
+ */
+export const REAR_YARD_CLOSURE_LAYOUT: ReadonlyArray<readonly [x: number, z: number]> = Object.freeze([
+  [-6.5, -27], [21.6, -27],
+  [6.5, 27], [-21.6, 27],
+]);
+export const REAR_YARD_CLOSURE_SIZE = Object.freeze([1.0, 2.05, 3.4] as const);
+
 export const COVER_LAYOUT: ReadonlyArray<readonly [number, number, number, number]> = Object.freeze([
-  // HF-383: the former (±12,∓6.5) garden-mouth cover pairs are superseded by
-  // the planter pillars at x=±4/x=±13, which own the mouth-cover duty and
-  // could not be given a foul-free neighbouring slot inside the gated
-  // footprint. Rotational pairing preserved (both removed).
   [-20, -2, 2.4, 3.6], [20, 2, 2.4, 3.6],
   [-8, -22, 3, 2.2], [8, 22, 3, 2.2], [24, -13, 2.8, 4.4], [-24, 13, 2.8, 4.4],
 ]);
 
-// Team 1 is the exact 180-degree rotation of team 0. Every spawn sits in its
-// own team's yard, behind or beside that team's house, never across the road.
+/**
+ * REDESIGN: spawn-garden clutter, two blocks per end yard, breaking the 55 m
+ * boundary lane inside each garden the way the reference's yard props do.
+ * A SEPARATE layout because these must be STANDING-EYE TALL: ordinary cover
+ * is 1.6 m and the 1.65 m eye simply sees over it - measured, the boundary
+ * lane read 55 m straight through two 1.6 m blocks before this class existed.
+ * 180-degree symmetric by pairing.
+ */
+export const GARDEN_COVER_LAYOUT: ReadonlyArray<readonly [x: number, z: number, width: number, depth: number]> = Object.freeze([
+  [-32.5, -6.5, 2.2, 1.6], [32.5, 6.5, 2.2, 1.6],
+  [-32.5, 16, 2.2, 1.6], [32.5, -16, 2.2, 1.6],
+]);
+export const GARDEN_COVER_HEIGHT = 2.05;
+
+/**
+ * REDESIGN D1: spawns live in the two END gardens, behind the spawn fences,
+ * looking down the street - the reference's defining flow. Team 0 owns the
+ * WEST garden (x <= -28.2), team 1 the exact 180-degree rotation in the east.
+ * Back row against the boundary, mid row behind the fence line, one forward
+ * corner spawn per team. Every point verified against the built colliders by
+ * the spawn-safety suite; the frozen world-identity spawn pin is re-pinned
+ * once for this redesign with docs/NUKETOWN_REDESIGN_2026-08-29.md as the
+ * recorded reason.
+ */
 export const SPAWN_LAYOUT = Object.freeze({
   0: Object.freeze([
-    [-2, -27], [3, -27], [8, -27], [13, -27],
-    [-12, -26], [-17, -24], [-21, -20], [-24, -16],
-    [18, -25], [25, -25], [28, -13], [27, -10],
+    [-32.5, -20], [-32.5, -12], [-32.5, -4], [-32.5, 4], [-32.5, 12], [-32.5, 20],
+    [-30, -16], [-30.5, -5], [-30, 0], [-30, 8], [-30, 16],
+    [-31, -23],
   ] as const),
   1: Object.freeze([
-    [2, 27], [-3, 27], [-8, 27], [-13, 27],
-    [12, 26], [17, 24], [21, 20], [24, 16],
-    [-18, 25], [-25, 25], [-28, 13], [-27, 10],
+    [32.5, 20], [32.5, 12], [32.5, 4], [32.5, -4], [32.5, -12], [32.5, -20],
+    [30, 16], [30.5, 5], [30, 0], [30, -8], [30, -16],
+    [31, 23],
   ] as const),
 });
-// Parity-audit repair 2026-08-26, FINAL: the collider/visual parity audit gave
-// the greenhouse frame walls movement authority, which (a) put the former
-// (-/+25, -/+25) corner spawn inside the west rear sill volume and (b) let
-// the side-verge cross-run seal the greenhouse entry approach. Two geometry
-// repairs make the FROZEN spawn set live again, so this layout keeps matching
-// the world-identity frozen pin exactly: map.ts splits that rear sill into
-// two segments around a real 1.6 m doorway at x -25.8..-24.2 (the west spawn
-// stands in the doorway; the east twin needs no counterpart because its side
-// of the map carries the landmark plinth instead), and SIDE_HEDGE_LAYOUT
-// moves both cross-runs clear of every pinned cell. Interior spawns were
-// rejected twice: the hydro beds + entry sills leave a 0.47 m cross-strip
-// (a movement trap), and no interior position can satisfy exact rotation
-// because the plinth owns the mirrored east footprint.
 
+/** Bot patrol anchors along the redesigned street-axis flow: the two street
+ * mouths, the verge lanes beside each house, and the mid-street crossings.
+ * 180-degree symmetric by pairing. */
 export const PATROL_LAYOUT: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  [-15, -12], [15, 12], [-6, -6], [6, 6],
-  [-19, -7], [19, 7], [-24, -20], [24, 20],
+  [-22, 0], [22, 0], [-9, 5.2], [9, -5.2],
+  [0, 7.5], [0, -7.5], [-16, -7.5], [16, 7.5],
 ]);
 
 export const NEIGHBOURHOOD_BIN_POSITIONS: ReadonlyArray<readonly [number, number]> = Object.freeze([
-  // (±11,∓6.5) HF-383: moved out of the x=±13 pillar footprint.
-  [-20, -8.4], [20, 8.4], [11, -6.5], [-11, 6.5], [-29, -21], [29, 21],
+  [-20, -8.4], [20, 8.4], [11, -6.5], [-11, 6.5], [-24, -19], [24, 19],
 ]);
 
 export const NEIGHBOURHOOD_BENCH_COLLIDER_SIZE = Object.freeze([2.5, 1.34, 0.72] as const);

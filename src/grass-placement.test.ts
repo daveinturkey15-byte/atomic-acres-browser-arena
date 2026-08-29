@@ -47,18 +47,25 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
   // pass.
   // (v3 proof retained: '2766df53' -> '788f9625' was the HF-383 bounds
   // deepening, isolated the same way.)
+  // REDESIGN 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md):
+  // 'e034370e' -> 'cdef22cf'. Same isolation: the lawn bands derive from
+  // ARENA_BOUNDS, which became 68 x 57 when the flow rotated end-to-end;
+  // lattice, slot count (720), chunking (4) and every other assertion are
+  // unchanged and re-verified here at the new bands.
   it('produces a stable private placement checksum without consuming runtime RNG', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('e034370e');
+    expect(first.checksum).toBe('cdef22cf');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);
-    // Behaviour pin kept from HF-383: grass must cover the extended back-yard
-    // depth behind each spawn, on BOTH sides of the street.
-    const deepened = first.placements.filter((placement) => Math.abs(placement.z) > 30 && Math.abs(placement.z) <= 31.5);
+    // Behaviour pin kept from HF-383, re-seated by the 2026-08-29 redesign:
+    // spawns moved to the +/-X end gardens and the Z bounds tightened to
+    // +/-28.5, so the deep-lawn duty this guarded is now the last 1.5 m of
+    // both rear lawns against the new boundary.
+    const deepened = first.placements.filter((placement) => Math.abs(placement.z) > 27 && Math.abs(placement.z) <= 28.5);
     expect(deepened.length).toBeGreaterThan(0);
     expect(new Set(deepened.map((placement) => Math.sign(placement.z))).size).toBe(2);
     // NEW hard-surface pin (Pass 82): no placement may sit on the asphalt,

@@ -530,21 +530,23 @@ function addRouteArchitecture(root: THREE.Group): void {
   };
 
   // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
-  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as Array<[number, number]>) {
+  // REDESIGN 2026-08-29: whole west cultivation cluster +4.5 m east, clear
+  // of the spawn fence (see map.ts twin comment).
+  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as Array<[number, number]>) {
     const column = routeBox('trellis-column', [0.55, 3.8, 0.55], frame, 0.08);
     column.position.set(x, 1.9, z); decorative(column); root.add(column);
   }
   for (const z of [-24, -22.3, -20.7, -19]) {
     const rib = routeBox('trellis-rib', [6.1, 0.22, 0.36], frame, 0.05);
-    rib.position.set(-26.5, 4.0, z); decorative(rib); root.add(rib);
+    rib.position.set(-22, 4.0, z); decorative(rib); root.add(rib);
   }
-  for (const x of [-28.5, -27.5, -26.5, -25.5, -24.5]) {
+  for (const x of [-24, -23, -22, -21, -20]) {
     const slat = routeBox('trellis-slat', [0.18, 0.16, 6.8], trim, 0.04);
     slat.position.set(x, 4.08, -21.5); decorative(slat); root.add(slat);
   }
   for (const [x, y, z, scale] of [
-    [-28.7, 4.08, -23.6, 1.05], [-27.1, 4.16, -22.4, 0.82], [-26.5, 4.1, -21.1, 1.1],
-    [-25.1, 4.05, -19.8, 0.9], [-24.35, 3.92, -23.3, 0.78], [-28.2, 3.98, -19.6, 0.84],
+    [-24.2, 4.08, -23.6, 1.05], [-22.6, 4.16, -22.4, 0.82], [-22, 4.1, -21.1, 1.1],
+    [-20.6, 4.05, -19.8, 0.9], [-19.85, 3.92, -23.3, 0.78], [-23.7, 3.98, -19.6, 0.84],
   ] as Array<[number, number, number, number]>) {
     const vine = new THREE.Mesh(vineGeometry, vineMaterial);
     vine.name = 'trellis-vine-cluster';
@@ -555,35 +557,38 @@ function addRouteArchitecture(root: THREE.Group): void {
   }
 
   for (const [x, z, sx, sz] of [
-    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8],
-    // Rear wall is two segments: a 1.6 m doorway at x -25.8..-24.2 aligned
-    // with the frozen (-25, 25) corner spawn and the map.ts collision proxy.
-    [-28.025, 24.8, 4.45, 0.45], [-22.975, 24.8, 2.45, 0.45],
-    [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
+    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
+    // Rear wall is two segments with a true 1.6 m doorway at x -21.3..-19.7;
+    // both doorways mirror the map.ts movement colliders byte-for-byte.
+    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
+    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
   ] as Array<[number, number, number, number]>) {
     const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);
     sill.position.set(x, 1.5, z); decorative(sill); root.add(sill);
   }
-  for (const x of [-28.2, -26, -23.8]) {
+  for (const x of [-23.7, -21.5, -19.3]) {
     const roof = routeBox('greenhouse-roof-rib', [0.18, 0.18, 8.4], trim, 0.04);
-    roof.position.set(x, 3.45, 21); roof.rotation.z = x < -26 ? -0.22 : x > -26 ? 0.22 : 0; decorative(roof); root.add(roof);
+    roof.position.set(x, 3.45, 21); roof.rotation.z = x < -21.5 ? -0.22 : x > -21.5 ? 0.22 : 0; decorative(roof); root.add(roof);
   }
-  for (const x of [-27.7, -24.3]) {
+  for (const x of [-23.2, -19.8]) {
     const pane = routeBox('greenhouse-glass', [2.8, 0.08, 8], glass, 0.02);
-    pane.position.set(x, 3.5, 21); pane.rotation.z = x < -26 ? -0.22 : 0.22; decorative(pane); root.add(pane);
+    pane.position.set(x, 3.5, 21); pane.rotation.z = x < -21.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
   }
-  for (const [x, z] of [[-28.5, 19], [-26, 23], [-23.5, 19]] as Array<[number, number]>) {
+  for (const [x, z] of [[-24, 19], [-21.5, 23], [-19, 19]] as Array<[number, number]>) {
     const planter = routeBox('greenhouse-planter', [1.5, 0.55, 0.8], concrete, 0.12);
     planter.position.set(x, 0.28, z); decorative(planter); root.add(planter);
   }
 
   // East "service lane": waist-high channel walls and a folded solar maintenance canopy.
-  for (const x of [22.5, 28.5]) {
-    const wall = routeBox('service-channel-wall', [0.7, 1.5, 10], concrete, 0.12);
-    wall.position.set(x, 0.75, 9); decorative(wall); root.add(wall);
-    for (const z of [6, 9, 12]) {
+  // REDESIGN 2026-08-29: only the west channel wall survives (the east one
+  // paralleled the new spawn fence and sealed the SE yard - map.ts deleted
+  // its collider, so its visual goes too rather than standing as a ghost).
+  {
+    const wall = routeBox('service-channel-wall', [0.7, 1.5, 5], concrete, 0.12);
+    wall.position.set(22.5, 0.75, 6.5); decorative(wall); root.add(wall);
+    for (const z of [5, 8]) {
       const marker = routeBox('service-marker', [0.78, 0.16, 1.35], trim, 0.03);
-      marker.position.set(x, 1.18, z); decorative(marker); root.add(marker);
+      marker.position.set(22.5, 1.18, z); decorative(marker); root.add(marker);
     }
   }
   for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as Array<[number, number]>) {

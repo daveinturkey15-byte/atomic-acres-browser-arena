@@ -5,12 +5,15 @@ import {
   CENTRAL_BUS,
   PARKED_VAN_LAYOUT,
   FRONT_HEDGE_LAYOUT,
-  FRONT_HEDGE_FIN_LAYOUT,
-  REAR_HEDGE_LAYOUT,
-  REAR_HEDGE_SIZE,
-  SIDE_HEDGE_LAYOUT,
-  SIDE_HEDGE_SIZE,
-  FRONT_HEDGE_FIN_SIZE,
+  GARDEN_COVER_HEIGHT,
+  GARDEN_COVER_LAYOUT,
+  KERB_CAR_LAYOUT,
+  KERB_CAR_SIZE,
+  REAR_YARD_CLOSURE_LAYOUT,
+  REAR_YARD_CLOSURE_SIZE,
+  SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_END_FENCE_SIZE,
+  SPAWN_END_FENCE_X,
   FRONT_HEDGE_SIZE,
   PARKED_VAN_SIZE,
   COVER_LAYOUT,
@@ -25,8 +28,6 @@ import {
   SPAWN_LAYOUT,
   STREET_HALF_WIDTH,
   YARD_FENCE_HEIGHT,
-  CORNER_HEDGE_LAYOUT,
-  CORNER_HEDGE_SIZE,
   YARD_FENCE_LAYOUT,
 } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
@@ -168,9 +169,13 @@ export const ATOMIC_MANNEQUIN_LAYOUT: ReadonlyArray<readonly [x: number, z: numb
   // silhouette and the envelope gate rejects it.
   Object.freeze([-15, -14, 0] as const),
   Object.freeze([15, 14, Math.PI] as const),
-  // East back-yard strip behind the garage, facing back down the yard.
-  Object.freeze([18, -20, -Math.PI / 2] as const),
-  Object.freeze([-18, 20, Math.PI / 2] as const),
+  // REDESIGN 2026-08-29: the third (rear-yard) pair at (+/-18, -/+20) is
+  // RETIRED. The re-seated greenhouse east wall stands 0.3 m from the west
+  // seat, and the redesign filled both rear yards with real structure (yard
+  // closures, hydro beds, trees) - measured: no rear-yard point still holds
+  // the 3.29 m clearance envelope the mannequin gate demands, which is the
+  // envelope working as intended: the placeholder cover's duty passed to
+  // real furniture.
 ]);
 
 /**
@@ -789,33 +794,49 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   for (const [index, hedge] of FRONT_HEDGE_LAYOUT.entries()) {
     box(`front hedge ${index}`, [hedge.x, FRONT_HEDGE_SIZE.height / 2, hedge.z], [hedge.length, FRONT_HEDGE_SIZE.height, FRONT_HEDGE_SIZE.depth], palette.grassDark);
   }
-  for (const [index, fin] of FRONT_HEDGE_FIN_LAYOUT.entries()) {
-    const [finWidth, finHeight, finDepth] = FRONT_HEDGE_FIN_SIZE;
-    box(`front hedge fin ${index}`, [fin.x, finHeight / 2, fin.z], [finWidth, finHeight, finDepth], palette.grassDark);
+  // REDESIGN 2026-08-29 (D1/D3/D5): the canyon fins, rear hedges, corner
+  // blocks and side cross-runs are gone - they broke ACROSS-street lanes the
+  // end-to-end flow no longer has. In their place, the reference's own spawn
+  // boundary: one fence per street end, four solid runs each, leaving two
+  // door gaps and the central low trail mouth a defender must actually watch.
+  for (const [gardenIndex, [gx, gz, gWidth, gDepth]] of GARDEN_COVER_LAYOUT.entries()) {
+    box(`garden cover ${gardenIndex}`, [gx, GARDEN_COVER_HEIGHT / 2, gz], [gWidth, GARDEN_COVER_HEIGHT, gDepth], palette.timber, true, true, true, 'wood');
   }
-  for (const [index, rear] of REAR_HEDGE_LAYOUT.entries()) {
-    const [rearLength, rearHeight, rearDepth] = REAR_HEDGE_SIZE;
-    box(`rear hedge ${index}`, [rear.x, rearHeight / 2, rear.z], [rearLength, rearHeight, rearDepth], palette.grassDark);
+  for (const car of KERB_CAR_LAYOUT) {
+    const [carLength, carHeight, carWidth] = KERB_CAR_SIZE;
+    box(car.id, [car.x, carHeight / 2, car.z], [carLength, carHeight, carWidth], palette.coral, true, false, true, 'vehicle');
   }
-  // Back-corner blocks: the Pass 79 ray audit measured a 57 m standing
-  // eye-line running the full map width through each back-fence corridor;
-  // these seat each corner and split that lane.
-  for (const [index, corner] of CORNER_HEDGE_LAYOUT.entries()) {
-    const [cornerWidth, cornerHeight, cornerDepth] = CORNER_HEDGE_SIZE;
-    box(`corner hedge ${index}`, [corner.x, cornerHeight / 2, corner.z], [cornerWidth, cornerHeight, cornerDepth], palette.grassDark);
+  for (const [closureIndex, [closureX, closureZ]] of REAR_YARD_CLOSURE_LAYOUT.entries()) {
+    const [closureWidth, closureHeight, closureDepth] = REAR_YARD_CLOSURE_SIZE;
+    box(`rear yard hedge ${closureIndex}`, [closureX, closureHeight / 2, closureZ], [closureWidth, closureHeight, closureDepth], palette.grassDark);
   }
-  for (const [index, side] of SIDE_HEDGE_LAYOUT.entries()) {
-    const [sideDepth, sideHeight, sideLength] = SIDE_HEDGE_SIZE;
-    box(`side hedge ${index}`, [side.x, sideHeight / 2, side.z], [sideDepth, sideHeight, sideLength], palette.grassDark);
+  for (const [sideIndex, sign] of ([1, -1] as const).entries()) {
+    for (const [segmentIndex, [zCentre, zLength]] of SPAWN_END_FENCE_SEGMENTS.entries()) {
+      box(
+        `spawn end fence ${sideIndex}-${segmentIndex}`,
+        [sign * SPAWN_END_FENCE_X, SPAWN_END_FENCE_SIZE.height / 2, sign * zCentre],
+        [SPAWN_END_FENCE_SIZE.depth, SPAWN_END_FENCE_SIZE.height, zLength],
+        palette.timber,
+        true,
+        true,
+        true,
+        'wood', // 1 m planted plank run, not chain-link: the 'fence' name rule undercharges it
+      );
+    }
   }
 
   // Pass 59 collision audit objects: visible soft terrain keeps conservative AABB
   // movement/ballistic authority, and the irrigation vessel has matching hard cover.
   const moundAudit: Array<{ id: string; collider: string; bottomY: number }> = [];
   for (const [id, x, z, sx, sz] of [
-    // HF-383 remainder: mounds follow the deeper rear fence (z -28 -> -29.5).
-    ['west-verge', -24, -29.5, 4.6, 3.4],
-    ['east-verge', 24, 29.5, 4.6, 3.4],
+    // REDESIGN: the mounds move with the boundary - now soft shoulders in the
+    // two end gardens, flanking the spawn fences inside the new Z bounds.
+    // Cornered tight against boundary + fence junction so the flank corridors
+    // (z beyond the fence span) keep >= 2.5 m of walkable width. The first
+    // re-seat filled the corridor and sealed the whole rear strip - measured
+    // as 4,608 grid cells by the traversal gate before this fix.
+    ['west-verge', -33.2, -27.3, 1.6, 2.2],
+    ['east-verge', 33.2, 27.3, 1.6, 2.2],
   ] as const) {
     const colliderName = `terrain-mound-${id}-collider`;
     const authority = box(colliderName, [x, 0.55, z], [sx, 1.1, sz], palette.grass, true, false, true, 'earth');
@@ -907,24 +928,34 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // HF-390 lane: the trellis art (environment-assets) is timber ribs, slats
   // and vines; the 'column' name rule was rating these four wooden posts as
   // structural-metal (2.15 entry - steel-girder bullets-sponge). Wood.
-  for (const [x, z] of [[-29, -24], [-29, -19], [-24, -24], [-24, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55], 'wood');
+  // REDESIGN 2026-08-29: the whole west cultivation cluster (trellis +
+  // greenhouse + hydro beds) moves 4.5 m east so the new spawn fence at
+  // x = -27.5 no longer runs through it; it now dresses the west flank lane.
+  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55], 'wood');
   // The Blender hydroponics landmark is an open frame with beds rather than a full-height perimeter.
   // Older west/east/north/south proxy walls created an unseen enclosure; keep those routes open.
-  collisionProxy('service wall west', [22.5, 0.75, 9], [0.7, 1.5, 10]);
-  collisionProxy('service wall east', [28.5, 0.75, 9], [0.7, 1.5, 10]);
+  // REDESIGN 2026-08-29: the east service wall paralleled the new spawn fence
+  // 0.6 m behind its south door and sealed the whole SE yard (flood-measured:
+  // one 4,909-cell component). The fence owns that boundary now; the wall's
+  // yard-partition duty survives in its western twin, trimmed clear of the
+  // door band.
+  collisionProxy('service wall west', [22.5, 0.75, 6.5], [0.7, 1.5, 5]);
   for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
-  // Collider/visual parity DEFERRAL (2026-08-26, measured): giving the
-  // addRouteArchitecture sills movement authority seals the west spawn yard
-  // into one inescapable pocket -- flood-fill over the live physics
-  // colliders (0.25 m grid, 0.38 m capsule) yields a single 1294-cell
-  // component x[-30.5,-21.75] z[9.25,31] (1574 mirrored east) containing
-  // both teams' corner spawns and the (+/-24,+/-20) patrol points, because
-  // the greenhouse zone is the yards' only street connection while it is
-  // decorative. Doorway/hedge variants were also measured RED (see
-  // nuketown-traversal.test.ts for the full chain). Until environment-assets
-  // authors REAL openings together with these proxies, the sills stay
-  // decorative; walk-through here is the accepted cosmetic mismatch and the
-  // traversal suite pins zero 'greenhouse frame wall' colliders.
+  // REDESIGN 2026-08-29: the 2026-08-26 movement deferral for these walls is
+  // RESOLVED. Its reason - the west SIDE spawns whose only street connection
+  // ran through a decorative greenhouse - no longer exists: spawns moved to
+  // the end gardens and the cluster itself moved 4.5 m east of the spawn
+  // fence. The walls now carry real movement authority with two true 1.6 m+
+  // doorways (front aisle gap + rear doorway), which the traversal pocket
+  // audit measures drain fully. This CLOSES three accepted walk-through
+  // ledger rows instead of re-documenting them.
+  for (const [x, z, sx, sz] of ([
+    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
+    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
+    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
+  ] as Array<[number, number, number, number]>)) {
+    collisionProxy('greenhouse frame wall', [x, 1.5, z], [sx, 3, sz], 'wood');
+  }
 
   // HF-390 lane (2026-08-28): the movement deferral above is about ROUTES and
   // stays exactly as pinned (zero greenhouse colliders). Gunfire is separate
@@ -934,9 +965,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // (both doorways stay true holes), cost a negligible 0.08-entry glass toll,
   // and leave every traversal contract untouched.
   for (const [index, [x, z, sx, sz]] of ([
-    [-30, 21, 0.45, 8], [-22, 21, 0.45, 8],
-    [-28.025, 24.8, 4.45, 0.45], [-22.975, 24.8, 2.45, 0.45],
-    [-28.5, 17.2, 2.2, 0.45], [-23.5, 17.2, 2.2, 0.45],
+    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
+    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
+    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
   ] as Array<[number, number, number, number]>).entries()) {
     const pane = box(`greenhouse-shot-pane-${index}`, [x, 1.5, z], [sx, 3, sz], palette.glass, false, false, true, 'glass');
     pane.visible = false;
@@ -963,7 +994,7 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   for (const [index, [x, z]] of [[-30, -8], [30, 8]].entries()) {
     substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3], 'structural-metal');
   }
-  for (const [index, x] of [-29, -26, -23].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 21], [1.1, 0.7, 6.2], 'concrete');
+  for (const [index, x] of [-24.5, -21.5, -18.5].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 21], [1.1, 0.7, 6.2], 'concrete');
   substantial('authored-reclamation-tank-collider', [-29.5, 3.05, -14], [2.7, 5.6, 2.7], 'structural-metal');
   for (const [index, z] of [-6.5, 6.5].entries()) substantial(`authored-civic-post-collider-${index}`, [0, 3.25, z], [0.32, 6.5, 0.32], 'structural-metal');
   for (const [houseIndex, house] of HOUSE_LAYOUT.entries()) {
@@ -995,10 +1026,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // walls. HF-383 remainder: the north/south fences follow ARENA_BOUNDS out
   // to +/-31.5 (fence centreline +/-31.8); the west/east runs lengthen to
   // span the deeper map.
-  box('west fence', [-31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
-  box('east fence', [31.3, 1.5, 0], [0.6, 3, 64.6], palette.timber);
-  box('north fence', [0, 1.5, -31.8], [63, 3, 0.6], palette.timber);
-  box('south fence', [0, 1.5, 31.8], [63, 3, 0.6], palette.timber);
+  // REDESIGN 2026-08-29: the boundary fences DERIVE from ARENA_BOUNDS instead
+  // of restating them - the exporter learned this lesson in Pass 81 wave 1 and
+  // this block was the last restatement left. Side runs overlap the end runs'
+  // thickness so the corners lap, same contract as the Blender spec.
+  const boundaryHalfX = ARENA_BOUNDS.maxX + 0.3;
+  const boundaryHalfZ = ARENA_BOUNDS.maxZ + 0.3;
+  const sideFenceLength = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ + 1.6;
+  const endFenceLength = ARENA_BOUNDS.maxX - ARENA_BOUNDS.minX + 1;
+  box('west fence', [-boundaryHalfX, 1.5, 0], [0.6, 3, sideFenceLength], palette.timber);
+  box('east fence', [boundaryHalfX, 1.5, 0], [0.6, 3, sideFenceLength], palette.timber);
+  box('north fence', [0, 1.5, -boundaryHalfZ], [endFenceLength, 3, 0.6], palette.timber);
+  box('south fence', [0, 1.5, boundaryHalfZ], [endFenceLength, 3, 0.6], palette.timber);
   // HF-387 player-body half: these posts used to sit at +/-30.9, protruding
   // ~0.5 m into the play space past the world-boundary collider with NO
   // movement authority of their own. The audit marched the real capsule into
@@ -1008,9 +1047,12 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // outside face of the fence run, fully beyond ARENA_BOUNDS, so visible mass
   // and reachable eye shells agree again. Purely visual relocation; no
   // clearance constant or gameplay value changed.
-  for (let z = -28.5; z <= 28.5; z += 7.125) {
-    box('fence post', [-31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
-    box('fence post', [31.45, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+  const postX = boundaryHalfX + 0.15;
+  const postSpan = ARENA_BOUNDS.maxZ - 3.6;
+  for (let postIndex = 0; postIndex < 8; postIndex += 1) {
+    const z = -postSpan + (postIndex * (2 * postSpan)) / 7;
+    box('fence post', [-postX, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
+    box('fence post', [postX, 2.1, z], [0.8, 4.2, 0.8], palette.dark, false);
   }
 
   function sign(text: string, x: number, y: number, z: number, rotationY = 0): void {

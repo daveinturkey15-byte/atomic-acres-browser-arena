@@ -27,21 +27,22 @@ import {
  */
 const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [number, number, number]; reason: string }>> = {
   'atomic-acres': [
-    // Documented deferral (map.ts "the sills stay decorative" block +
-    // nuketown-traversal.test.ts pins ZERO 'greenhouse frame wall' colliders):
-    // giving the greenhouse frame walls movement authority seals the west
-    // spawn into the rear sill volume and blocks the yard's only street
-    // connection. Walk-through here is the accepted cosmetic mismatch until
-    // environment-assets authors REAL openings together with the proxies.
-    { name: 'greenhouse-frame-wall', centre: [-30, 1.5, 21], reason: 'documented traversal deferral (see map.ts + nuketown-traversal.test.ts)' },
-    { name: 'greenhouse-frame-wall', centre: [-28.02, 1.5, 24.8], reason: 'documented traversal deferral (see map.ts + nuketown-traversal.test.ts)' },
-    { name: 'greenhouse-frame-wall', centre: [-23.5, 1.5, 17.2], reason: 'documented traversal deferral (see map.ts + nuketown-traversal.test.ts)' },
+    // REDESIGN 2026-08-29: the three greenhouse-frame-wall rows are CLOSED -
+    // the walls carry real movement colliders now the west side spawns (the
+    // deferral's reason) are gone. The ledger shrinks, as its own contract
+    // demands for fixed entries.
     // addTree() root flares (environment-assets.ts): decorative buttress roots
     // hugging the base of an authored tree whose trunk IS collided
     // (authored-tree-trunk-collider-*). Ankle-height dressing partially sunk
-    // into the ground; the player collides with the trunk beside them.
+    // into the ground; the player collides with the trunk beside them. The
+    // rear hedges that used to swallow two of the four flares died in the
+    // 2026-08-29 redesign, so all four now stand in the open rear yards.
     { name: '(unnamed Mesh)', centre: [-18.53, 0.22, -28], reason: 'decorative root flare around a collided trunk' },
     { name: '(unnamed Mesh)', centre: [18.53, 0.22, 28], reason: 'decorative root flare around a collided trunk' },
+    { name: '(unnamed Mesh)', centre: [-19, 0.22, -27.53], reason: 'decorative root flare around a collided trunk' },
+    { name: '(unnamed Mesh)', centre: [-19.47, 0.22, -28], reason: 'decorative root flare around a collided trunk' },
+    { name: '(unnamed Mesh)', centre: [19.47, 0.22, 28], reason: 'decorative root flare around a collided trunk' },
+    { name: '(unnamed Mesh)', centre: [19, 0.22, 27.53], reason: 'decorative root flare around a collided trunk' },
   ],
   'gun-range': [
     // Merged static presentation batch (userData.presentationOnly): a batched

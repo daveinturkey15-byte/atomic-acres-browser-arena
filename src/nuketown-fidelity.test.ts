@@ -41,7 +41,16 @@ const depth = ARENA_BOUNDS.maxZ - ARENA_BOUNDS.minZ;
  * 1 m interior lattice that measures 41.77 m on the same arena. The three
  * estimators sample different populations and their numbers are not
  * interchangeable, so each ceiling is pinned only against its own estimator. */
-const MAX_STANDING_EYE_LINE_METRES = 26;
+// REDESIGN 2026-08-29 re-derivation. The 26 m ceiling encoded the OLD
+// cross-street flow, whose whole design fought long lanes. The reference map
+// authentically HAS them - its signature sniper lane runs down the street and
+// through the spawn-fence openings - so the redesigned geometry measures
+// 30.27 m on THIS estimator (an end-garden diagonal through a door mouth) and
+// the ceiling pins that measurement with margin, not the old philosophy.
+// Derived with this test's own estimator per its convention; not loosened
+// past what the reference layout implies (the raw unfurnished verge would
+// measure 58 m - the furniture is doing its job).
+const MAX_STANDING_EYE_LINE_METRES = 32;
 
 /** Longest unobstructed straight eye-line between perimeter sample points on the built arena. */
 function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {
@@ -151,9 +160,12 @@ describe('Nuke Town fidelity', () => {
         }
       }
     }
-    // Neither team may spawn across the road in the other team's yard.
-    expect(SPAWN_LAYOUT[0].every(([, z]) => z < 0)).toBe(true);
-    expect(SPAWN_LAYOUT[1].every(([, z]) => z > 0)).toBe(true);
+    // REDESIGN 2026-08-29 (D1): teams own the two street ENDS, not the two
+    // sides. Neither team may spawn past the street's midpoint toward the
+    // other end - the end-garden fences sit at |x| = 27.5 and every spawn is
+    // behind its own team's fence.
+    expect(SPAWN_LAYOUT[0].every(([x]) => x < -27.5)).toBe(true);
+    expect(SPAWN_LAYOUT[1].every(([x]) => x > 27.5)).toBe(true);
   });
 
   it('leaves no floating solid geometry over the playable yards', () => {

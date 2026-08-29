@@ -202,7 +202,10 @@ describe('Quality Graphics environment asset', () => {
     // now real authored solids in the spec (HF-387 - they were shot surfaces with no
     // movement or visual authority), minus the slimmer HF-383b planter fins. Exact
     // equality, as ever.
-    expect(provenance.runtimeAudit.triangles).toBe(42_132);
+    // REDESIGN 2026-08-29 wave 2: -88 = the two retired (+/-22) yard-fence
+    // side runs (44 beveled tris each); the cultivation cluster re-seat is
+    // pure translation and adds nothing.
+    expect(provenance.runtimeAudit.triangles).toBe(42_340);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

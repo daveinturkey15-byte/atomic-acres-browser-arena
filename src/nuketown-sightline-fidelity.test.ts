@@ -28,7 +28,15 @@ const EYE_HEIGHT = 1.65;
  * HF-383 Z deepening spent most of the original margin, and the next change
  * that lengthens a back-fence lane will trip this gate rather than slip past
  * it. That is the intended behaviour - re-measure and justify, do not raise. */
-const MAXIMUM_CLEAR_EYE_LINE = 42;
+// REDESIGN 2026-08-29 re-derivation. Measured on the redesigned arena with
+// this file's own 1 m lattice estimator: 54.59 m, the down-street lane from
+// one end garden through the spawn-fence trail slit to the far verge - the
+// reference map's SIGNATURE sightline, held by whoever controls the street.
+// Ceiling pins measurement + margin. The old 42 encoded the cross-flow
+// design; it was already 17.8 m apart from the sibling estimator's ceiling
+// because the two sample different populations - both now carry their own
+// measured values with the same rationale.
+const MAXIMUM_CLEAR_EYE_LINE = 56;
 
 function blocksSight(collider: Box2): boolean {
   return collider.maxY === undefined || collider.maxY >= EYE_HEIGHT;

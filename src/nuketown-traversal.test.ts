@@ -484,10 +484,17 @@ describe('Nuke Town traversal (HF-383)', () => {
     // openings together with these proxies, the sills stay decorative:
     // walk-through there is the accepted cosmetic mismatch, and this pin
     // stops movement authority from being reintroduced half-way.
-    expect(map.colliders.filter((b) => nameFor(b) === 'greenhouse frame wall').length).toBe(0);
-    expect(groundBlocked(map, -26, 15), 'greenhouse yard approach blocked').toBe(false);
-    expect(groundBlocked(map, -24.5, 21), 'greenhouse interior aisle blocked').toBe(false);
-    expect(groundBlocked(map, -25, 25), 'frozen corner spawn blocked').toBe(false);
+    // REDESIGN 2026-08-29: deferral RESOLVED - spawns left the west side and
+    // the cluster moved 4.5 m clear of the spawn fence, so solid frame walls
+    // can no longer seal a spawn. The stated end state (real openings authored
+    // together with the proxies) is now pinned: exactly six wall colliders,
+    // walkable front-aisle and rear doorways, and a walkable west flank lane
+    // where the old corner spawn used to be.
+    expect(map.colliders.filter((b) => nameFor(b) === 'greenhouse frame wall').length).toBe(6);
+    expect(groundBlocked(map, -22, 14.5), 'greenhouse approach corridor (garage-to-cover slot) blocked').toBe(false);
+    expect(groundBlocked(map, -23, 21), 'greenhouse interior aisle blocked').toBe(false);
+    expect(groundBlocked(map, -20.5, 24.8), 'rear doorway blocked').toBe(false);
+    expect(groundBlocked(map, -26.35, 21), 'west flank lane (fence-to-greenhouse corridor) blocked').toBe(false);
     // Size-pin the entry-frame exemption class against the BUILT collider
     // set (with the loop-2 houseOwned lookup fixed these house-owned
     // mirrored solids never reach the asymmetric list): exactly 2 houses x
@@ -624,7 +631,8 @@ describe('Nuke Town traversal (HF-383)', () => {
     // geometry, never the number.
     const SEALED_REGIONS: Array<{ name: string; x0: number; x1: number; z0: number; z1: number; cap: number }> = [
       { name: 'nw-strip', x0: ARENA_BOUNDS.minX, x1: -23.9, z0: 25.1, z1: ARENA_BOUNDS.maxZ, cap: 380 },
-      { name: 'gh-interior', x0: -29.6, x1: -26.4, z0: 17, z1: 25.05, cap: 140 },
+      // REDESIGN 2026-08-29: window follows the greenhouse 4.5 m east.
+      { name: 'gh-interior', x0: -25.75, x1: -17.25, z0: 17, z1: 25.05, cap: 140 },
     ];
     const regionCounts: Record<string, number> = Object.fromEntries(SEALED_REGIONS.map((r) => [r.name, 0]));
     let outsideSealedRegions = 0;

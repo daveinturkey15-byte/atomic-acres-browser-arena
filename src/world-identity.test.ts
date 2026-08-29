@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARENA_BOUNDS, COVER_LAYOUT, FRONT_HEDGE_FIN_LAYOUT, HOUSE_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
+import { ARENA_BOUNDS, CENTRAL_BUS, COVER_LAYOUT, HOUSE_LAYOUT, PARKED_VAN_LAYOUT, SPAWN_LAYOUT } from './arena-layout';
 import { ARENA_ROUTE_IDENTITIES, routeIdentityForPosition, routeIdentityTelemetry } from './world-identity';
 
 // Frozen Nuke Town gameplay-layout pin.
@@ -15,13 +15,14 @@ import { ARENA_ROUTE_IDENTITIES, routeIdentityForPosition, routeIdentityTelemetr
 // and the mouth-cover duty must demonstrably transfer to the fins.
 //
 // HF-383 REMAINDER (owner: "maybe make it a tad bigger because it feels a
-// little bit clustered"): the map deepened across the street from 60 to
-// 63 m; ARENA_BOUNDS minZ/maxZ moved -30/+30 -> -31.5/+31.5 and the rear
-// boundary dressing followed the fence out. Houses, cover and spawns keep
-// their exact coordinates, so only the bounds row is re-frozen. Proven red
-// against the previous freeze before this fixture moved.
+// FULL-STEP REDESIGN 2026-08-29 (docs/NUKETOWN_REDESIGN_2026-08-29.md):
+// divergence D1 - the flow was rotated 90 degrees from the reference. Spawns
+// move from side strips to the two END gardens behind spawn fences; bounds
+// become 68 x 57 (length onto the street axis). Houses and cover keep their
+// exact coordinates. Bounds and spawns rows re-frozen at the NEW exact
+// values; the previous freeze rows are in git history at this file.
 const FROZEN_HF383_LAYOUT = {
-  bounds: { minX: -31, maxX: 31, minZ: -31.5, maxZ: 31.5 },
+  bounds: { minX: -34, maxX: 34, minZ: -28.5, maxZ: 28.5 },
   houses: [
     { team: 0, x: 4, z: -17.4, facing: 1 },
     { team: 1, x: -4, z: 17.4, facing: -1 },
@@ -31,10 +32,20 @@ const FROZEN_HF383_LAYOUT = {
     [-8, -22, 3, 2.2], [8, 22, 3, 2.2], [24, -13, 2.8, 4.4], [-24, 13, 2.8, 4.4],
   ],
   spawns: {
-    0: [[-2, -27], [3, -27], [8, -27], [13, -27], [-12, -26], [-17, -24], [-21, -20], [-24, -16], [18, -25], [25, -25], [28, -13], [27, -10]],
-    1: [[2, 27], [-3, 27], [-8, 27], [-13, 27], [12, 26], [17, 24], [21, 20], [24, 16], [-18, 25], [-25, 25], [-28, 13], [-27, 10]],
+    0: [
+      [-32.5, -20], [-32.5, -12], [-32.5, -4], [-32.5, 4], [-32.5, 12], [-32.5, 20],
+      [-30, -16], [-30.5, -5], [-30, 0], [-30, 8], [-30, 16],
+      [-31, -23],
+    ],
+    1: [
+      [32.5, 20], [32.5, 12], [32.5, 4], [32.5, -4], [32.5, -12], [32.5, -20],
+      [30, 16], [30.5, 5], [30, 0], [30, -8], [30, -16],
+      [31, 23],
+    ],
   },
 };
+
+const STREET_LANE_LIMIT = 6.5;
 
 describe('Pass 27 world identity contract', () => {
   it('defines exactly three distinct macro-route roles with original landmarks', () => {
@@ -85,11 +96,16 @@ describe('Pass 27 world identity contract', () => {
     }
   });
 
-  it('transfers the garden-mouth cover duty to the planter fins', () => {
-    // The removal was only legal because the FRONT_HEDGE_FIN pillars at
-    // x = ±4 / ±13 own the mouth-cover duty; if the fins move off those
-    // lines the street loses its mid-cover entirely.
-    const finXs = FRONT_HEDGE_FIN_LAYOUT.map(({ x }) => x).sort((a, b) => a - b);
-    expect(finXs).toEqual([-13, -4, 4, 13]);
+  it('transfers the street mid-cover duty to the bus and mid-street vans', () => {
+    // REDESIGN 2026-08-29: the planter fins are gone with the rest of the
+    // cross-flow maze. The street's mid-cover duty for the new end-to-end
+    // flow belongs to the reference's own furniture: the central bus and the
+    // two vans staggered flush against its ends. If any of the three leaves
+    // the street centre, the road becomes a single uncontested lane.
+    expect(CENTRAL_BUS.x).toBe(0);
+    expect(CENTRAL_BUS.z).toBe(0);
+    const vanXs = PARKED_VAN_LAYOUT.map(({ x }) => x).sort((a, b) => a - b);
+    expect(vanXs).toEqual([-8.6, 8.6]);
+    for (const van of PARKED_VAN_LAYOUT) expect(Math.abs(van.z)).toBeLessThan(STREET_LANE_LIMIT);
   });
 });
