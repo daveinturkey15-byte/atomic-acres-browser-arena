@@ -15,6 +15,8 @@ import {
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
 import { ATOMIC_MANNEQUIN_LAYOUT, authoredLargeCoverIdAt } from './map';
+import { buildNuketownGardenDressing } from './nuketown-garden-dressing';
+import { buildNuketownHedgeFoliage } from './nuketown-hedge-foliage';
 import { buildNuketownLawnField } from './nuketown-lawn-field';
 import { buildNuketownMountainBackdrop } from './nuketown-mountain-backdrop';
 
@@ -345,8 +347,15 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // a palette batch.
   const lawn = buildNuketownLawnField(group, reduced);
   const backdrop = buildNuketownMountainBackdrop(group);
+  // 2026-08-29 redesign art: dress the two spawn end gardens (plank fences,
+  // flower borders, trail pavers, door shrubs) - instanced, seeded,
+  // presentation-only like its siblings above.
+  const gardens = buildNuketownGardenDressing(group);
+  const hedgeFoliage = buildNuketownHedgeFoliage(group);
   group.userData.nuketownLawnStats = lawn.stats;
+  group.userData.nuketownHedgeFoliageStats = hedgeFoliage.stats;
   group.userData.nuketownBackdropStats = backdrop.stats;
+  group.userData.nuketownGardenStats = gardens.stats;
   // updateArenaArt drives the lawn's GPU wind clock through this hook (the
   // per-frame caller in legacy-main already passes this group + now-ms).
   group.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);

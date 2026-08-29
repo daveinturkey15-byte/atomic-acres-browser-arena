@@ -32,6 +32,9 @@ export const definition = createProceduralArenaVisualDefinition({
     // spawn-fence trail mouth toward the east gardens.
     camera('nuke-town-plan', [0, 62, 0.01], [0, 0, 0], 'overview', 1.08),
     camera('nuke-town-street-axis', [-27, 1.7, 0], [34, 1.5, 0], 'overview', 1.08),
+    // What a spawning defender actually sees: the west garden looking back
+    // over the flower border and plank fence toward the street.
+    camera('nuke-town-west-garden', [-32.5, 1.7, -14], [-24, 1.2, 6], 'overview', 1.08),
     camera('nuke-town-aqua-upper-roof', [-10, 6, -20.4], [4, 5, -17.4], 'geometry', 1.08),
     // Keep the occluded wall and open portal probes at one legal room position.
     // The retired wall probe sat inside a narrow wall cavity and measured two
