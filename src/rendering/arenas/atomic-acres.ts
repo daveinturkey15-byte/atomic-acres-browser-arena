@@ -26,6 +26,12 @@ export const definition = createProceduralArenaVisualDefinition({
   budgets: budgets({ maximumDrawCalls: 560, maximumTriangles: 1_600_000 }),
   reviewCameras: [
     camera('nuke-town-overview', [30, 20, 34], [0, 2, 0], 'overview', 1.08),
+    // REDESIGN 2026-08-29: the flow rotated end-to-end (docs/
+    // NUKETOWN_REDESIGN_2026-08-29.md). Two cams pin the new axis: the full
+    // plan view, and the defender's read down the street from the west
+    // spawn-fence trail mouth toward the east gardens.
+    camera('nuke-town-plan', [0, 62, 0.01], [0, 0, 0], 'overview', 1.08),
+    camera('nuke-town-street-axis', [-27, 1.7, 0], [34, 1.5, 0], 'overview', 1.08),
     camera('nuke-town-aqua-upper-roof', [-10, 6, -20.4], [4, 5, -17.4], 'geometry', 1.08),
     // Keep the occluded wall and open portal probes at one legal room position.
     // The retired wall probe sat inside a narrow wall cavity and measured two

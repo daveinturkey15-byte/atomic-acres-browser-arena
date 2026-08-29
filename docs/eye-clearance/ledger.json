@@ -3,7 +3,7 @@
   "probeM": 0.15,
   "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality = static + interactive-world runtime colliders) then sweep-eye-clearance-live.mjs (traceBallistics probes vs canonical shot surfaces)",
   "ceilings": {
-    "atomic-acres": 24,
+    "atomic-acres": 9,
     "rustworks-1v1": 0,
     "skyline-terminal": 3,
     "gun-range": 2,
@@ -27,15 +27,10 @@
     },
     {
       "arena": "atomic-acres",
-      "rows": "greenhouse-shot-pane-0 x8 (crouch, d=0.000 hugging x=-29.93) + pane-5 x1",
-      "reason": "Authored shot-only glass with no movement collider - the greenhouse is walk-through by design (traversal pins protect that). Standing at the pane plane clips inherently, same class as the gun-range wallbang panels."
-    },
-    {
-      "arena": "atomic-acres",
-      "rows": "exterior-access-ramp x12 + interior-access-ramp x3 (d=0.028-0.142, all stances)",
+      "rows": "exterior-access-ramp x8 + interior-access-ramp x1 (d=0.078-0.128, all stances)",
       "reason": "Sub-15 cm flank/underside fringe beside the house ramps, pre-existing visually and newly measurable now the ramps are registered with true rotation. A geometry fix means clearance pads on ramp flanks, which is navigation-coupled (ramp-foot anchors and traversal gates live exactly there) - deferred with numbers, revisit on any player report."
     }
   ],
   "farcrysis": "excluded - parked by the owner 2026-08-28",
-  "rebaseline": "2026-08-29: atomic-acres 0 -> 24. NOT a game regression - an instrument-vision correction. The probe sees only REGISTERED shot surfaces; the ballistic-parity lane closed 22 ghost meshes the same night, so surfaces that always existed visually (house access ramps, greenhouse panes) became measurable for the first time. The other four arenas were unchanged (3/0/2/2), which is the control that separates new sight from new damage."
+  "rebaseline": "2026-08-29 (redesign): atomic-acres 24 -> 9. The full-step redesign gave the greenhouse frame walls real movement colliders, so no legal spot can stand at the shot-pane plane any more - all nine greenhouse-pane rows closed by geometry, not by ledger edit. The nine survivors are all the known ramp-flank fringe class (deferred with numbers above). Other four arenas unchanged (3/0/2/2) - the control still separates new sight from new damage. (Prior rebaseline 2026-08-29: 0 -> 24 was the instrument-vision correction when the ballistic-parity lane registered 22 ghost meshes.)"
 }

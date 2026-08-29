@@ -14,6 +14,8 @@
 export const VIEWPOINT_CATALOG = Object.freeze({
   'atomic-acres': Object.freeze([
     'nuke-town-overview',
+    'nuke-town-plan',
+    'nuke-town-street-axis',
     'nuke-town-aqua-upper-roof',
     'nuke-town-aqua-wall-closed',
     'nuke-town-aqua-door-open',
