@@ -168,14 +168,9 @@ const spec = {
   yardFences: YARD_FENCE_LAYOUT.map(([x, z, width, depth]) => ({
     position: [x, YARD_FENCE_HEIGHT / 2, z], size: [width, YARD_FENCE_HEIGHT, depth],
   })),
-  routeStructures: [
-    // REDESIGN 2026-08-29: hydroponics cluster re-seated 4.5 m east of the
-    // spawn fence; service channel reduced to its surviving west wall.
-    { id: 'west-hydroponics', position: [-21.5, 0, 21] },
-    { id: 'east-service-channel', position: [22.5, 0, 6.5] },
-    { id: 'east-solar-canopy', position: [26.75, 0, -19.5] },
-    { id: 'atomic-beacon', position: [27, 0, -20] },
-  ],
+  // DECLUTTER 2026-08-29: the campus routeStructures (hydroponics, service
+  // channel, solar canopy, beacon) left the playable area entirely.
+  routeStructures: [],
   boundaries: [
     {
       id: 'west',

@@ -41,6 +41,7 @@ export const NUKETOWN_BACKDROP_MAX_HEIGHT_M = 34;
 export const NUKETOWN_BACKDROP_SKIRT_Y_M = -0.42;
 
 const SEED = 0x0a82_5c17;
+const SNOW_COLOR = new THREE.Color(0xdde4e6);
 
 export interface NuketownBackdropStats {
   meshes: number;
@@ -78,6 +79,8 @@ type RidgeRingSpec = Readonly<{
   crestColor: number;
   /** Decorrelates the sine octaves between rings. */
   phase: number;
+  /** Altitude fraction above which the crest lerps toward snow; omit = none. */
+  snowline?: number;
 }>;
 
 /**
@@ -147,6 +150,11 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       const t = altitude * Math.min(1, height / spec.heightMax);
       if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
       else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
+      // v3: crests above the snowline blend toward cold rock-snow, scaled by
+      // how far past the line this vertex sits - only the tall peaks cap.
+      if (spec.snowline !== undefined && t > spec.snowline) {
+        vertexColor.lerp(SNOW_COLOR, Math.min(1, (t - spec.snowline) / (1 - spec.snowline)) * 0.85);
+      }
       const tone = 0.92 + jitterA * 0.16;
       colors.push(vertexColor.r * tone, vertexColor.g * tone, vertexColor.b * tone);
     }
@@ -220,6 +228,25 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
       footColor: 0x6b705f,
       crestColor: 0x848c94,
       phase: 4.7,
+      snowline: 0.8,
+    }),
+    ridgeMaterial,
+  );
+  // v3: a third, taller far range fills the gap between the main ridge's
+  // saddles so the horizon reads as a layered massif instead of one band;
+  // its peaks carry the snowline.
+  const farRange = new THREE.Mesh(
+    buildRidgeRing({
+      name: 'nuketown-mountain-far-range',
+      segments: 120,
+      innerRadius: 116,
+      outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M,
+      heightMin: 20,
+      heightMax: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+      footColor: 0x707a84,
+      crestColor: 0x9aa6b0,
+      phase: 8.3,
+      snowline: 0.66,
     }),
     ridgeMaterial,
   );
@@ -233,7 +260,7 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   skirt.position.y = NUKETOWN_BACKDROP_SKIRT_Y_M;
 
   let triangles = 0;
-  for (const mesh of [skirt, foothills, ridge]) {
+  for (const mesh of [skirt, foothills, ridge, farRange]) {
     if (mesh !== skirt) mesh.name = mesh.geometry.name;
     mesh.castShadow = false;
     mesh.receiveShadow = false;
@@ -246,13 +273,14 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   }
 
   parent.add(group);
-  const stats: NuketownBackdropStats = { meshes: 3, triangles: Math.round(triangles) };
+  const stats: NuketownBackdropStats = { meshes: 4, triangles: Math.round(triangles) };
   return {
     group,
     stats,
     dispose: () => {
       foothills.geometry.dispose();
       ridge.geometry.dispose();
+      farRange.geometry.dispose();
       skirt.geometry.dispose();
       ridgeMaterial.dispose();
       skirtMaterial.dispose();

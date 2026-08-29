@@ -15,6 +15,7 @@ import {
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
 import { ATOMIC_MANNEQUIN_LAYOUT, authoredLargeCoverIdAt } from './map';
+import { buildNuketownForestSurround } from './nuketown-forest-surround';
 import { buildNuketownGardenDressing } from './nuketown-garden-dressing';
 import { buildNuketownHedgeFoliage } from './nuketown-hedge-foliage';
 import { buildNuketownLawnField } from './nuketown-lawn-field';
@@ -34,11 +35,13 @@ const LEGACY_VEHICLE_NAMES = new Set([
 function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   const bark = texturedMaterial('./assets/original/textures/wood-deck.png', { color: 0x80593d, roughness: 0.98, repeatY: 4 });
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * scale, 0.64 * scale, 4.75 * scale, 14, 4), bark);
+  trunk.name = 'yard-trunk-bole';
   trunk.position.set(x, 2.37 * scale, z);
   trunk.castShadow = true;
   root.add(trunk);
   for (const rotation of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     const rootFlare = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale, 0.2 * scale, 1.35 * scale, 8), bark);
+    rootFlare.name = 'yard-root-flare';
     rootFlare.position.set(x + Math.sin(rotation) * 0.47 * scale, 0.22 * scale, z + Math.cos(rotation) * 0.47 * scale);
     rootFlare.rotation.z = Math.PI / 2.8;
     rootFlare.rotation.y = rotation;
@@ -50,6 +53,7 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   ));
   for (const [rotation, length, height] of [[-0.7, 2.3, 4.05], [0.55, 2.1, 4.25], [1.7, 1.8, 4.5], [2.65, 1.7, 4.65], [-2.4, 1.55, 4.8]] as Array<[number, number, number]>) {
     const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.17 * scale, length * scale, 9), bark);
+    branch.name = 'yard-tree-branch';
     branch.position.set(x + Math.sin(rotation) * 0.62 * scale, height * scale, z + Math.cos(rotation) * 0.62 * scale);
     branch.rotation.z = Math.PI / 2.9; branch.rotation.y = rotation; branch.castShadow = true; root.add(branch);
   }
@@ -61,6 +65,7 @@ function addTree(root: THREE.Group, x: number, z: number, scale: number): void {
   ];
   clusters.forEach(([ox, oy, oz, rx, ry, rz], index) => {
     const crown = new THREE.Mesh(new THREE.SphereGeometry(scale, 12, 8), leafMaterials[index % leafMaterials.length]);
+    crown.name = 'yard-tree-canopy';
     crown.position.set(x + ox * scale, oy * scale, z + oz * scale);
     crown.scale.set(rx, ry, rz);
     crown.rotation.set(index * 0.17, index * 0.43, index * 0.11);
@@ -127,10 +132,12 @@ function addStreetProps(root: THREE.Group): void {
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hydrantRed); cap.position.y = 0.9;
     hydrant.add(body, cap); root.add(hydrant);
   }
-  for (const [x, z] of [[-24, -8], [24, 8], [-9, -27], [9, 27]] as Array<[number, number]>) {
+  // DECLUTTER 2026-08-29: rear-yard pair only; the flank planters left.
+  for (const [x, z] of [[-9, -27], [9, 27]] as Array<[number, number]>) {
     const planter = roundedBox('concrete-planter', [2.2, 0.7, 1.05], concrete, 0.12); planter.position.set(x, 0.35, z); root.add(planter);
     for (const offset of [-0.6, 0, 0.6]) {
       const shrub = new THREE.Mesh(shrubGeometry, shrubMaterial);
+      shrub.name = 'planter-shrub';
       shrub.position.set(x + offset, 0.92 + (offset === 0 ? 0.08 : 0), z);
       shrub.scale.set(1, offset === 0 ? 1.15 : 0.86, 0.82);
       shrub.rotation.y = offset * 1.7;
@@ -172,20 +179,7 @@ function addStreetProps(root: THREE.Group): void {
     mast.add(base, pole, head, lens);
     root.add(mast);
   }
-  const tank = new THREE.Group();
-  tank.name = 'west-reclamation-tank';
-  tank.position.set(-29.5, 0, -14);
-  const shell = new THREE.Mesh(new THREE.CylinderGeometry(1.32, 1.35, 5.15, 18), metal);
-  shell.name = 'west-reclamation-tank-shell'; shell.position.y = 2.78; shell.castShadow = true; shell.receiveShadow = true;
-  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.32, 0.62, 18), metal);
-  crown.name = 'west-reclamation-tank-crown'; crown.position.y = 5.66; crown.castShadow = true;
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(1.38, 1.38, 0.24, 18), concrete);
-  band.name = 'west-reclamation-tank-band'; band.position.y = 1.15;
-  const feedPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), metal);
-  feedPipe.name = 'west-reclamation-tank-feed-pipe'; feedPipe.position.set(1.28, 2.3, 0.35);
-  decorative(band); decorative(feedPipe);
-  tank.add(shell, crown, band, feedPipe);
-  root.add(tank);
+  // DECLUTTER 2026-08-29: the reclamation tank left with its collider.
 }
 
 type FaunaFlight = Readonly<{ x: number; z: number; radius: number; height: number; phase: number; speed: number }>;
@@ -352,6 +346,10 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // presentation-only like its siblings above.
   const gardens = buildNuketownGardenDressing(group);
   const hedgeFoliage = buildNuketownHedgeFoliage(group);
+  // DECLUTTER 2026-08-29: the corner earth banks became a real instanced
+  // forest ring between the fence and the foothills.
+  const forest = buildNuketownForestSurround(group);
+  group.userData.nuketownForestStats = forest.stats;
   group.userData.nuketownLawnStats = lawn.stats;
   group.userData.nuketownHedgeFoliageStats = hedgeFoliage.stats;
   group.userData.nuketownBackdropStats = backdrop.stats;
@@ -504,7 +502,12 @@ function addStreetInfrastructure(root: THREE.Group): void {
 function addAtomicLandmark(root: THREE.Group): void {
   const landmark = new THREE.Group();
   landmark.name = 'original-atomic-landmark';
-  landmark.position.set(27, 0, -20);
+  // DECLUTTER 2026-08-29: the sculpture leaves the playable yard (its plinth
+  // collider is deleted) and becomes the out-of-bounds test-site landmark in
+  // the forest ring off the north-east corner - the reference's own tower
+  // lives outside the block the same way. Scaled up to read at 60 m.
+  landmark.position.set(44, 0, -40);
+  landmark.scale.setScalar(2.6);
   const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x54c8c7, emissive: 0x123b42, emissiveIntensity: 1.2, roughness: 0.36, metalness: 0.64 });
   const animationRings: THREE.Mesh[] = [];
   for (const [index, rotation] of [0, Math.PI / 3, -Math.PI / 3].entries()) {
@@ -527,10 +530,6 @@ function addRouteArchitecture(root: THREE.Group): void {
   const frame = new THREE.MeshStandardMaterial({ color: 0x26343a, roughness: 0.42, metalness: 0.68 });
   const trim = new THREE.MeshStandardMaterial({ color: 0xe5bd4b, roughness: 0.52, metalness: 0.32 });
   const concrete = texturedMaterial('./assets/original/textures/concrete-poured.png', { roughness: 0.9, repeatX: 2, repeatY: 4 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0x7fc6c3, transparent: true, opacity: 0.32, roughness: 0.18, metalness: 0.08, depthWrite: false });
-  const solar = new THREE.MeshStandardMaterial({ color: 0x173d58, emissive: 0x071d2c, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.72 });
-  const vineMaterial = new THREE.MeshStandardMaterial({ color: 0x496f47, roughness: 0.96 });
-  const vineGeometry = new THREE.IcosahedronGeometry(0.46, 1);
   const routeBox = (name: string, size: [number, number, number], material: THREE.Material, radius: number) => roundedBox(name, size, material, radius, 2);
   const routePanel = (name: string, size: [number, number, number], material: THREE.Material) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -538,79 +537,10 @@ function addRouteArchitecture(root: THREE.Group): void {
     return mesh;
   };
 
-  // West "skyline garden" route: a folded trellis reveal leading into a framed greenhouse.
-  // REDESIGN 2026-08-29: whole west cultivation cluster +4.5 m east, clear
-  // of the spawn fence (see map.ts twin comment).
-  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as Array<[number, number]>) {
-    const column = routeBox('trellis-column', [0.55, 3.8, 0.55], frame, 0.08);
-    column.position.set(x, 1.9, z); decorative(column); root.add(column);
-  }
-  for (const z of [-24, -22.3, -20.7, -19]) {
-    const rib = routeBox('trellis-rib', [6.1, 0.22, 0.36], frame, 0.05);
-    rib.position.set(-22, 4.0, z); decorative(rib); root.add(rib);
-  }
-  for (const x of [-24, -23, -22, -21, -20]) {
-    const slat = routeBox('trellis-slat', [0.18, 0.16, 6.8], trim, 0.04);
-    slat.position.set(x, 4.08, -21.5); decorative(slat); root.add(slat);
-  }
-  for (const [x, y, z, scale] of [
-    [-24.2, 4.08, -23.6, 1.05], [-22.6, 4.16, -22.4, 0.82], [-22, 4.1, -21.1, 1.1],
-    [-20.6, 4.05, -19.8, 0.9], [-19.85, 3.92, -23.3, 0.78], [-23.7, 3.98, -19.6, 0.84],
-  ] as Array<[number, number, number, number]>) {
-    const vine = new THREE.Mesh(vineGeometry, vineMaterial);
-    vine.name = 'trellis-vine-cluster';
-    vine.position.set(x, y, z);
-    vine.scale.set(scale * 1.3, scale * 0.52, scale * 1.45);
-    vine.rotation.set(x * 0.07, z * 0.11, y * 0.09);
-    decorative(vine); root.add(vine);
-  }
-
-  for (const [x, z, sx, sz] of [
-    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
-    // Rear wall is two segments with a true 1.6 m doorway at x -21.3..-19.7;
-    // both doorways mirror the map.ts movement colliders byte-for-byte.
-    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
-    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
-  ] as Array<[number, number, number, number]>) {
-    const sill = routeBox('greenhouse-frame-wall', [sx, 3, sz], frame, 0.08);
-    sill.position.set(x, 1.5, z); decorative(sill); root.add(sill);
-  }
-  for (const x of [-23.7, -21.5, -19.3]) {
-    const roof = routeBox('greenhouse-roof-rib', [0.18, 0.18, 8.4], trim, 0.04);
-    roof.position.set(x, 3.45, 21); roof.rotation.z = x < -21.5 ? -0.22 : x > -21.5 ? 0.22 : 0; decorative(roof); root.add(roof);
-  }
-  for (const x of [-23.2, -19.8]) {
-    const pane = routeBox('greenhouse-glass', [2.8, 0.08, 8], glass, 0.02);
-    pane.position.set(x, 3.5, 21); pane.rotation.z = x < -21.5 ? -0.22 : 0.22; decorative(pane); root.add(pane);
-  }
-  for (const [x, z] of [[-24, 19], [-21.5, 23], [-19, 19]] as Array<[number, number]>) {
-    const planter = routeBox('greenhouse-planter', [1.5, 0.55, 0.8], concrete, 0.12);
-    planter.position.set(x, 0.28, z); decorative(planter); root.add(planter);
-  }
-
-  // East "service lane": waist-high channel walls and a folded solar maintenance canopy.
-  // REDESIGN 2026-08-29: only the west channel wall survives (the east one
-  // paralleled the new spawn fence and sealed the SE yard - map.ts deleted
-  // its collider, so its visual goes too rather than standing as a ghost).
-  {
-    const wall = routeBox('service-channel-wall', [0.7, 1.5, 5], concrete, 0.12);
-    wall.position.set(22.5, 0.75, 6.5); decorative(wall); root.add(wall);
-    for (const z of [5, 8]) {
-      const marker = routeBox('service-marker', [0.78, 0.16, 1.35], trim, 0.03);
-      marker.position.set(22.5, 1.18, z); decorative(marker); root.add(marker);
-    }
-  }
-  for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as Array<[number, number]>) {
-    const column = routeBox('solar-column', [0.6, 4.2, 0.6], frame, 0.08);
-    column.position.set(x, 2.1, z); decorative(column); root.add(column);
-  }
-  const canopy = routeBox('solar-canopy', [8.2, 0.34, 9.2], solar, 0.12);
-  canopy.position.set(26.75, 4.45, -19.5); canopy.rotation.z = -0.08; decorative(canopy); root.add(canopy);
-  for (const x of [24.05, 25.85, 27.65, 29.45]) {
-    const seam = routeBox('solar-seam', [0.06, 0.04, 8.5], trim, 0.01);
-    seam.position.set(x, 4.66 + (26.75 - x) * 0.08, -19.5); seam.rotation.z = -0.08; decorative(seam); root.add(seam);
-  }
-
+  // DECLUTTER 2026-08-29: trellis garden + greenhouse visuals deleted with
+  // their colliders - the west flank is open garden now.
+  // DECLUTTER 2026-08-29: service channel + solar canopy visuals deleted
+  // with their colliders - the east flank is open garden now.
   // Layered modular lane barriers retain the exact invisible gameplay box while losing the blockout-cube silhouette.
   // Keyed by ANCHOR COORDINATE, never by COVER_LAYOUT array index: HF-383 removed
   // the two leading entries, which shifted every index and silently deleted the
@@ -961,6 +891,9 @@ export async function loadArenaArt(
   addTree(root, 27, 21, 0.9);
   addTree(root, -13, 28.5, 0.85); onProgress?.(5, 12);
   addTree(root, 13, -28.5, 0.85); onProgress?.(6, 12);
+  // DECLUTTER 2026-08-29: one tree per spawn garden (see map.ts twin note).
+  addTree(root, -30.6, 11.5, 0.9);
+  addTree(root, 30.6, -11.5, 0.9);
   addStreetProps(root); onProgress?.(7, 12);
   addModernGroundDetails(root, reduced);
 

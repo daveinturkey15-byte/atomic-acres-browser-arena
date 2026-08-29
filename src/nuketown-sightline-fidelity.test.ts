@@ -36,7 +36,12 @@ const EYE_HEIGHT = 1.65;
 // design; it was already 17.8 m apart from the sibling estimator's ceiling
 // because the two sample different populations - both now carry their own
 // measured values with the same rationale.
-const MAXIMUM_CLEAR_EYE_LINE = 56;
+// DECLUTTER 2026-08-29 re-derivation: deleting the service channel wall
+// (campus clutter) unclipped the last 2 m of the signature trail-mouth ->
+// far-garden diagonal; measured 56.44 m. The reference's own down-street
+// lanes run the full block, so the ceiling re-pins just above the measured
+// lane - not loosened beyond what the layout implies.
+const MAXIMUM_CLEAR_EYE_LINE = 57;
 
 function blocksSight(collider: Box2): boolean {
   return collider.maxY === undefined || collider.maxY >= EYE_HEIGHT;

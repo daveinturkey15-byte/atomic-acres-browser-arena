@@ -155,10 +155,12 @@ describe('Nuke Town lawn field (Pass 82)', () => {
   });
 
   it('rejects the yard props the arena authors on the lawns', () => {
-    expect(nuketownLawnPlacementAllowed(27, -20)).toBe(false); // landmark plinth
-    expect(nuketownLawnPlacementAllowed(27, 24)).toBe(false); // irrigation vessel
+    // DECLUTTER 2026-08-29: plinth/vessel/greenhouse left the map; the
+    // surviving and new props take their keep-out rows.
     expect(nuketownLawnPlacementAllowed(-33.2, -27.3)).toBe(false); // verge mound (redesign corner seat)
-    expect(nuketownLawnPlacementAllowed(-21.5, 21)).toBe(false); // greenhouse interior (redesign seat, +4.5 east)
+    expect(nuketownLawnPlacementAllowed(9, 27)).toBe(false); // rear-yard planter
+    expect(nuketownLawnPlacementAllowed(-32, 13.5)).toBe(false); // garden divider fence
+    expect(nuketownLawnPlacementAllowed(-30.6, 11.5)).toBe(false); // spawn-garden tree
     expect(nuketownLawnPlacementAllowed(-6.5, -27)).toBe(false); // rear yard hedge
     expect(nuketownLawnPlacementAllowed(-15, -25)).toBe(false); // mannequin
     expect(nuketownLawnPlacementAllowed(-16, -20)).toBe(true); // open west yard

@@ -41,6 +41,8 @@ import {
   NEIGHBOURHOOD_BIN_COLLIDER_SIZE,
   NEIGHBOURHOOD_BIN_POSITIONS,
   SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_GARDEN_DIVIDER_LAYOUT,
+  SPAWN_GARDEN_DIVIDER_SIZE,
   SPAWN_END_FENCE_SIZE,
   SPAWN_END_FENCE_X,
   YARD_FENCE_LAYOUT,
@@ -85,6 +87,9 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
       boxes.push(rect(sign * SPAWN_END_FENCE_X, sign * zCentre, SPAWN_END_FENCE_SIZE.depth, zLength));
     }
   }
+  for (const [x, z, length] of SPAWN_GARDEN_DIVIDER_LAYOUT) {
+    boxes.push(rect(x, z, length, SPAWN_GARDEN_DIVIDER_SIZE.depth));
+  }
   for (const [x, z, sizeX, sizeZ] of YARD_FENCE_LAYOUT) boxes.push(rect(x, z, sizeX, sizeZ));
   for (const [x, z, width, depth] of COVER_LAYOUT) boxes.push(rect(x, z, width, depth));
   for (const [x, z, width, depth] of GARDEN_COVER_LAYOUT) boxes.push(rect(x, z, width, depth));
@@ -101,49 +106,25 @@ export const NUKETOWN_LAWN_KEEPOUTS: readonly Box2[] = Object.freeze((() => {
   // Authored tree trunks (authored-tree-trunk-collider-N): [x, z, scale].
   for (const [x, z, scale] of [
     [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
+    [-30.6, 11.5, 0.9], [30.6, -11.5, 0.9],
   ] as const) boxes.push(rect(x, z, 0.68 * scale, 0.68 * scale));
-  // Irrigation terminals (authored-terminal-collider-N), yard pair + kerb pair.
-  for (const [x, z] of [[-24, -8], [24, 8], [-9, -27], [9, 27]] as const) boxes.push(rect(x, z, 1.25, 0.8));
-  // Hydroponics beds (authored-hydro-bed-collider-N) at z = 21.
-  for (const x of [-24.5, -21.5, -18.5]) boxes.push(rect(x, 21, 1.1, 6.2));
-  // Reclamation tank (authored-reclamation-tank-collider).
-  boxes.push(rect(-29.5, -14, 2.7, 2.7));
-  // Skyline trellis columns (collisionProxy 'skyline trellis column').
-  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as const) boxes.push(rect(x, z, 0.55, 0.55));
-  // Service channel wall (collisionProxy 'service wall west'; the east twin
-  // died with the 2026-08-29 redesign).
-  boxes.push(rect(22.5, 6.5, 0.7, 5));
-  // Solar canopy columns (collisionProxy 'solar canopy column').
-  for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) boxes.push(rect(x, z, 0.6, 0.6));
+  // Rear-yard concrete planters (authored-planter-collider-N).
+  for (const [x, z] of [[-9, -27], [9, 27]] as const) boxes.push(rect(x, z, 2.2, 1.05));
   // Street lamp poles ('lamp pole'); the yard pair stands on the lawns.
   for (const [x, z] of [[-18, -16], [18, 16], [-26, -2], [26, 2]] as const) boxes.push(rect(x, z, 0.15, 0.15));
   // Auxiliary lamps (authored-extra-lamp-collider-N) on the pavement edge.
   for (const [x, z] of [[-30, -8], [30, 8]] as const) boxes.push(rect(x, z, 0.3, 0.3));
-  // Atomic landmark plinth ('atomic landmark plinth').
-  boxes.push(rect(27, -20, 4.4, 4.4));
-  // East irrigation vessel ('east-irrigation-vessel-collider').
-  boxes.push(rect(27, 24, 3.8, 3.8));
   // Verge terrain mounds ('terrain-mound-*-collider'): blades rooted at y=0
   // under the raised ellipsoids would render buried inside them.
   boxes.push(rect(-33.2, -27.3, 1.6, 2.2));
   boxes.push(rect(33.2, 27.3, 1.6, 2.2));
-  // Quality earth-bank tier colliders ('quality-earth-bank-*-collider-N'):
-  // the corner banks deliberately overlap the playable side of the boundary,
-  // so their tiered authority boxes reach into the lawn corners. Blades
-  // rooted at y=0 inside them would render buried in the bank slopes.
-  // [x, z, width, depth] mirrored from the map.ts slice tables (bank z is
-  // -34 north / +34 south; only the in-bounds overlap matters here).
-  for (const [x, z, width, depth] of [
-    [-30, -34, 3, 16], [-27.5, -34, 2.5, 10], [-25.5, -34, 2, 5], // north-west
-    [30, -34, 3, 14], [27.5, -34, 2.5, 8], // north-east
-    [-30, 34, 3, 14], [-27.5, 34, 2.5, 8], // south-west
-    [30, 34, 3, 16], [27.5, 34, 2.5, 10], [25.5, 34, 2, 5], // south-east
-  ] as const) boxes.push(rect(x, z, width, depth));
+  // DECLUTTER 2026-08-29: greenhouse/trellis/service/solar/vessel/terminal/
+  // tank/plinth/earth-bank keep-outs all deleted with their props - lawn
+  // reclaims the opened yards.
   // Greenhouse interior (environment-assets addRouteArchitecture sills at
   // x -30/-22, z 17.2/24.8 + planters): the framed floor is planted beds, not
   // lawn, and the sills are decorative (no colliders) so no collider-derived
   // rect exists for them.
-  boxes.push({ minX: -26, maxX: -17, minZ: 16.7, maxZ: 25.3 });
 
   return boxes.map((box) => Object.freeze(box));
 })());

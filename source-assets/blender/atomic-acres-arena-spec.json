@@ -3588,40 +3588,7 @@
       ]
     }
   ],
-  "routeStructures": [
-    {
-      "id": "west-hydroponics",
-      "position": [
-        -21.5,
-        0,
-        21
-      ]
-    },
-    {
-      "id": "east-service-channel",
-      "position": [
-        22.5,
-        0,
-        6.5
-      ]
-    },
-    {
-      "id": "east-solar-canopy",
-      "position": [
-        26.75,
-        0,
-        -19.5
-      ]
-    },
-    {
-      "id": "atomic-beacon",
-      "position": [
-        27,
-        0,
-        -20
-      ]
-    }
-  ],
+  "routeStructures": [],
   "boundaries": [
     {
       "id": "west",

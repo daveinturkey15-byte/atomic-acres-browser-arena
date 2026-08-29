@@ -103,8 +103,10 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
     const first = buildNuketownMountainBackdrop(new THREE.Group());
     const second = buildNuketownMountainBackdrop(new THREE.Group());
     expect(first.stats).toEqual(second.stats);
-    expect(first.stats.meshes).toBe(3);
-    expect(first.stats.triangles).toBeLessThan(3_000);
+    // v3 2026-08-29: + the snowlined far range ring, and denser segments on
+    // the ridged profiles (owner asked for higher-quality mountains).
+    expect(first.stats.meshes).toBe(4);
+    expect(first.stats.triangles).toBeLessThan(6_000);
     const firstMeshes = ridgeMeshes(first.group);
     const secondMeshes = ridgeMeshes(second.group);
     expect(firstMeshes.length).toBe(secondMeshes.length);

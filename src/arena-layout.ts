@@ -113,6 +113,25 @@ export const FRONT_HEDGE_SIZE = Object.freeze({ height: 2.05, depth: 1.4 } as co
  * are not long-range shooting galleries.
  */
 export const SPAWN_END_FENCE_X = 27.5;
+/**
+ * DECLUTTER 2026-08-29: each end garden is sectioned like the reference's
+ * back yards - two short divider fences per garden run inward from the
+ * boundary, leaving a 1.5 m gate at the inner end. They kill the 55 m
+ * intra-yard eye-line the deleted reclamation tank used to break, and they
+ * are the reference's own furniture rather than campus hardware.
+ * [x of the run centre, z, length along X]; height matches the spawn fence.
+ */
+export const SPAWN_GARDEN_DIVIDER_LAYOUT: ReadonlyArray<readonly [x: number, z: number, length: number]> = Object.freeze([
+  // z +/-13.5 sits clear of the fence door gaps (centred +/-10.5) and the
+  // spawn rows; length 4 leaves a 2.0 m inner gate (1.24 m at capsule
+  // margins). The first seat at z +/-10.2 with a 1.5 m gate flood-measured
+  // as SEALED outer sections: gate 0.74 m at margins, and the divider's own
+  // margin band overlap-killed the fence door slice.
+  [-32, -13.5, 4], [-32, 13.5, 4],
+  [32, 13.5, 4], [32, -13.5, 4],
+]);
+export const SPAWN_GARDEN_DIVIDER_SIZE = Object.freeze({ depth: 0.25, height: 2.2 } as const);
+
 export const SPAWN_END_FENCE_SIZE = Object.freeze({ depth: 1.0, height: 2.2 } as const);
 export const SPAWN_END_FENCE_SEGMENTS: ReadonlyArray<readonly [zCentre: number, zLength: number]> = Object.freeze([
   [-17.85, 12.3],  // z -24.0 .. -11.7

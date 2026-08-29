@@ -706,30 +706,11 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
         cover_marker["atomic_collision_authority"] = "typescript-cover-box"
         env.objects.link(cover_marker)
 
-# Hydroponics frame, service trench and solar canopy—original lane landmarks.
-for x in (-29.5, -22.5):
-    for z in (17.2, 24.8): add_box(f"BLD_HYDRO_post_{x}_{z}", [x, 2.2, z], [0.35, 4.4, 0.35], M["metal"], 0.05)
-for x in (-29.5, -26.0, -22.5): add_box(f"BLD_HYDRO_beam_{x}", [x, 4.25, 21], [0.2, 0.2, 8], M["metal"], 0.03)
-for z in (17.4, 21, 24.6): add_box(f"BLD_HYDRO_cross_{z}", [-26.0, 4.3, z], [7.5, 0.18, 0.18], M["metal_light"], 0.03)
-for x in (-29.0, -27.0, -25.0, -23.0):
-    # Presentation beds stay ankle-low because they are not collision authority.
-    # Their visual silhouette must not promise cover or an impassable planter.
-    add_box(f"BLD_HYDRO_bed_{x}", [x, 0.18, 21], [1.1, 0.36, 6.2], M["concrete"], 0.08)
-    for z in (18.8, 21, 23.2): add_uv_sphere(f"BLD_HYDRO_crop_{x}_{z}", [x, 0.62, z], [0.38, 0.42, 0.38], M["foliage"])
-for x in (22.5, 28.5): add_box(f"BLD_SERVICE_wall_{x}", [x, 0.75, 9], [0.7, 1.5, 10], M["concrete_dark"], 0.09)
-for x, z in ((23, -27), (23, -17), (30.5, -22), (30.5, -12)):
-    add_box(f"BLD_SOLAR_post_{x}_{z}", [x, 2.1, z], [0.6, 4.2, 0.6], M["metal"], 0.08)
-for z in (-24.5, -19.5, -14.5):
-    panel = add_box(f"BLD_SOLAR_panel_{z}", [26.75, 4.35, z], [8.4, 0.16, 3.2], M["aqua"], 0.04, rotation=(0.12, 0, 0))
-    add_box(f"BLD_SOLAR_spine_{z}", [26.75, 4.0, z], [0.22, 0.65, 3.4], M["metal_light"], 0.03)
-
-# Compact original Atomic Acres campus beacon, subordinate to the model homes.
-add_box("BLD_BEACON_plinth", [27, 0.24, -20], [4.4, 0.48, 4.4], M["boundary"], 0.14)
-add_cylinder("BLD_BEACON_mast", [27, 2.45, -20], 0.2, 4.4, M["metal"], 16)
-for angle, major_radius in ((0, 1.0), (math.pi / 2, 1.22)):
-    add_torus(f"BLD_BEACON_ring_{angle}", [27, 2.55, -20], major_radius, 0.07, M["emissive_aqua"], rotation=(math.pi / 2, angle, 0))
-add_uv_sphere("BLD_BEACON_core", [27, 2.55, -20], [0.33, 0.33, 0.33], M["emissive_amber"])
-
+# DECLUTTER 2026-08-29: hydroponics, service trench and solar canopy left
+# the playable area with their colliders (owner: too crowded for the
+# reference read).
+# DECLUTTER 2026-08-29: the beacon left the yard; the atomic sculpture is
+# now the procedural out-of-bounds landmark (environment-assets).
 # Pass 27 World Identity: presentation-only route signatures, atmospheric
 # grounding and civil-defence/agritech storytelling. Everything is overhead,
 # flush to the floor, outside the playable bounds, or mounted on an existing
@@ -737,25 +718,14 @@ add_uv_sphere("BLD_BEACON_core", [27, 2.55, -20], [0.33, 0.33, 0.33], M["emissiv
 
 # Ground-contact/grime patches visually seat the two hero vehicles and major
 # route landmarks without an SSAO/post-processing dependency.
+# DECLUTTER 2026-08-29: only the bus keeps a grime seat; the other patches
+# belonged to deleted landmarks.
 for index, (x, z, width, depth) in enumerate((
-    (0.0, 0.0, 13.6, 6.1), (0.0, -26.0, 6.4, 4.2),
-    (-26.0, 21.0, 8.4, 9.2), (26.75, -13.0, 9.5, 6.0), (27.0, -20.0, 5.2, 5.2),
+    (0.0, 0.0, 13.6, 6.1),
 )):
     add_box(f"P27_CONTACT_patch_{index}", [x, 0.071, z], [width, 0.014, depth], M["rubber"], 0.06)
 
-# West / VERDANT ARRAY: low hydroponic beds remain traversable-looking while
-# elevated irrigation, violet grow rails and a reclamation tank form the skyline.
-for z in (17.7, 21.0, 24.3):
-    add_cylinder(f"P27_VERDANT_irrigation_{z}", [-26.0, 3.25, z], 0.075, 7.2, M["metal_light"], 12, rotation=(0, math.pi / 2, 0))
-    add_box(f"P27_VERDANT_grow_rail_{z}", [-26.0, 3.85, z], [6.4, 0.08, 0.1], M["grow_violet"], 0.015)
-for x in (-29.0, -27.0, -25.0, -23.0):
-    add_box(f"P27_VERDANT_row_light_{x}", [x, 1.35, 21], [0.05, 0.05, 5.5], M["grow_violet"], 0.01)
-add_cylinder("P27_VERDANT_reclamation_tank", [-29.5, 3.05, -14.0], 1.35, 5.6, M["metal_light"], 20)
-add_cylinder("P27_VERDANT_tank_cap", [-29.5, 5.9, -14.0], 1.42, 0.18, M["metal"], 20)
-for height in (1.2, 3.0, 4.8):
-    add_torus(f"P27_VERDANT_tank_band_{height}", [-29.5, height, -14.0], 1.38, 0.055, M["foliage"], rotation=(math.pi / 2, 0, 0))
-add_box("P27_ROUTE_verdant_header", [-29.5, 6.55, -14.0], [3.6, 0.42, 0.24], M["foliage"], 0.08)
-
+# DECLUTTER 2026-08-29: the VERDANT ARRAY hardware left with the greenhouse.
 # Central / CIVIC TRANSIT: an overhead civil-defence signal and flush evacuation
 # chevrons reinforce a broad exposed route. Supports sit beyond the carriageway.
 for z in (-6.5, 6.5):
@@ -770,18 +740,7 @@ for index, x in enumerate((-28, -20, -12, 0, 12, 20, 28)):
     stripe = add_box(f"P27_CIVIC_evacuation_chevron_{index}", [x, 0.073, offset], [3.2, 0.016, 0.28], M["metal_light"], 0.02)
     stripe["atomic_route_cue"] = "central-transit"
 
-# East / HELIO SERVICE: battery hardware mounts on existing service walls and
-# photovoltaic canopies; violet service diagnostics distinguish it from team IFF.
-for index, (x, z) in enumerate(((22.5, 7.0), (22.5, 10.8), (28.5, 7.0), (28.5, 10.8))):
-    add_box(f"P27_HELIO_battery_{index}", [x, 1.75, z], [0.58, 1.65, 1.45], M["aqua"], 0.08)
-    add_box(f"P27_HELIO_battery_status_{index}", [x + (-0.31 if x > 25 else 0.31), 1.92, z], [0.04, 0.34, 0.72], M["grow_violet"], 0.01)
-for z in (-24.5, -19.5, -14.5):
-    add_box(f"P27_HELIO_panel_spine_{z}", [26.75, 4.58, z], [7.9, 0.05, 0.12], M["aqua"], 0.01)
-for z in (-23.0, -17.0):
-    add_cylinder(f"P27_HELIO_coolant_{z}", [30.5, 2.7, z], 0.11, 6.0, M["metal_light"], 12, rotation=(math.pi / 2, 0, 0))
-add_box("P27_ROUTE_helio_header", [27.0, 6.25, -20.0], [4.2, 0.42, 0.24], M["aqua"], 0.08)
-add_box("P27_ROUTE_helio_status", [27.0, 5.72, -20.0], [2.8, 0.12, 0.18], M["grow_violet"], 0.02)
-
+# DECLUTTER 2026-08-29: the HELIO SERVICE hardware left with the canopy.
 # Civil-defence retrofits sit above traversal on both model homes.
 for house_index, house in enumerate(spec["houses"]):
     x, z = house["origin"]["x"], house["origin"]["z"]
@@ -811,16 +770,16 @@ for index, (x, z, height) in enumerate(((-46, -22, 16), (48, 26, 20), (-45, 34, 
 
 # Warm campus walls and low posts contain the exhibit without reading as a fortress.
 for boundary in spec["boundaries"]: add_box(f"BLD_BOUNDARY_{boundary['id']}", boundary["position"], boundary["size"], M["boundary"], 0.08)
-for x in (-30.9, 30.9):
-    for z in range(-27, 28, 6): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
-for z in (-29.9, 29.9):
-    for x in range(-28, 29, 8): add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
-for ridge_index, (x, z, sx, sy, sz) in enumerate((
-    (-40, -34, 18, 5, 12), (42, -34, 16, 4.5, 12),
-    (-42, 34, 16, 4.5, 12), (40, 34, 18, 5, 12),
-)):
-    ridge = add_uv_sphere(f"P33_SKYLINE_earth_bank_{ridge_index}", [x, -0.8, z], [sx, sy, sz], M["earth"], 16, 8)
-    ridge["atomic_skyline_only"] = True
+# Posts derive from the spec bounds (they once hardcoded the pre-redesign box).
+_bounds = spec["bounds"]
+for x in (_bounds["minX"] - 0.9, _bounds["maxX"] + 0.9):
+    for z in range(int(_bounds["minZ"] + 1.5), int(_bounds["maxZ"] - 1.4), 6):
+        add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
+for z in (_bounds["minZ"] - 1.4, _bounds["maxZ"] + 1.4):
+    for x in range(int(_bounds["minX"] + 6), int(_bounds["maxX"] - 5), 8):
+        add_box(f"BLD_BOUNDARY_post_{x}_{z}", [x, 1.55, z], [0.52, 3.1, 0.52], M["metal_light"], 0.08)
+# DECLUTTER 2026-08-29: the four corner earth-bank ellipsoids ("splat piles",
+# owner-called) are deleted; the forest surround + backdrop own the horizon.
 
 # Lamps, trees, utility boxes and compact tactical signage.
 for index, (x, z) in enumerate(((-18, -16), (18, 16), (-26, -2), (26, 2), (-30, -8), (30, 8))):

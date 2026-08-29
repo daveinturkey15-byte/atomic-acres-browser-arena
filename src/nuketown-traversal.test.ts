@@ -484,17 +484,15 @@ describe('Nuke Town traversal (HF-383)', () => {
     // openings together with these proxies, the sills stay decorative:
     // walk-through there is the accepted cosmetic mismatch, and this pin
     // stops movement authority from being reintroduced half-way.
-    // REDESIGN 2026-08-29: deferral RESOLVED - spawns left the west side and
-    // the cluster moved 4.5 m clear of the spawn fence, so solid frame walls
-    // can no longer seal a spawn. The stated end state (real openings authored
-    // together with the proxies) is now pinned: exactly six wall colliders,
-    // walkable front-aisle and rear doorways, and a walkable west flank lane
-    // where the old corner spawn used to be.
-    expect(map.colliders.filter((b) => nameFor(b) === 'greenhouse frame wall').length).toBe(6);
-    expect(groundBlocked(map, -22, 14.5), 'greenhouse approach corridor (garage-to-cover slot) blocked').toBe(false);
-    expect(groundBlocked(map, -23, 21), 'greenhouse interior aisle blocked').toBe(false);
-    expect(groundBlocked(map, -20.5, 24.8), 'rear doorway blocked').toBe(false);
-    expect(groundBlocked(map, -26.35, 21), 'west flank lane (fence-to-greenhouse corridor) blocked').toBe(false);
+    // DECLUTTER 2026-08-29 (owner: "still ... crowded"): the greenhouse left
+    // the map entirely with the rest of the campus architecture, so the wall
+    // count re-pins to ZERO and the old interior probes become open-yard
+    // probes - the west flank is a clean garden lane now, like the reference.
+    expect(map.colliders.filter((b) => nameFor(b) === 'greenhouse frame wall').length).toBe(0);
+    expect(groundBlocked(map, -22, 14.5), 'west flank approach blocked').toBe(false);
+    expect(groundBlocked(map, -23, 21), 'west flank yard blocked').toBe(false);
+    expect(groundBlocked(map, -20.5, 24.8), 'west rear yard blocked').toBe(false);
+    expect(groundBlocked(map, -26.35, 21), 'west flank lane blocked').toBe(false);
     // Size-pin the entry-frame exemption class against the BUILT collider
     // set (with the loop-2 houseOwned lookup fixed these house-owned
     // mirrored solids never reach the asymmetric list): exactly 2 houses x

@@ -72,7 +72,10 @@ const EXTRACTION = ARENA_PROXY_EXTRACTION;
  *   high-seas          16 /       150 m2         17 /   921,753.4 m2
  */
 const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = {
-  'atomic-acres': { meshes: 13, footprintM2: 200 },
+  // DECLUTTER 2026-08-29: the chrome vessel, greenhouse glass and solar
+  // hardware left the map (owner-called clutter), taking three reflective
+  // proxies with them - floor re-measured at 10.
+  'atomic-acres': { meshes: 10, footprintM2: 142 },
   'rustworks-1v1': { meshes: 2, footprintM2: 921_600 },
   'gun-range': { meshes: 6, footprintM2: 4_300 },
   'skyline-terminal': { meshes: 10, footprintM2: 447 },

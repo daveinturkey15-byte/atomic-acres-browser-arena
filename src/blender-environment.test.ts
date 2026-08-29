@@ -94,8 +94,10 @@ describe('Quality Graphics environment asset', () => {
     const collisionVisualOwners = (gltf.nodes ?? []).filter((node) => node.extras?.atomic_semantic === 'collision-visual-owner');
     expect(buffer.byteLength).toBeGreaterThan(50_000);
     expect(buffer.byteLength).toBeLessThan(7_500_000);
-    expect(gltf.meshes?.length).toBe(45);
-    expect(gltf.materials?.length).toBe(29);
+    // DECLUTTER 2026-08-29: campus architecture left the bake (-1 merged mesh,
+    // -1 material, -7,328 triangles).
+    expect(gltf.meshes?.length).toBe(44);
+    expect(gltf.materials?.length).toBe(28);
     expect(gltf.images).toHaveLength(33);
     expect(gltf.textures).toHaveLength(33);
     expect((gltf.materials ?? []).filter((material) =>
@@ -205,7 +207,7 @@ describe('Quality Graphics environment asset', () => {
     // REDESIGN 2026-08-29 wave 2: -88 = the two retired (+/-22) yard-fence
     // side runs (44 beveled tris each); the cultivation cluster re-seat is
     // pure translation and adds nothing.
-    expect(provenance.runtimeAudit.triangles).toBe(42_340);
+    expect(provenance.runtimeAudit.triangles).toBe(35_012);
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

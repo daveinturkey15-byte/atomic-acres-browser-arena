@@ -27,13 +27,13 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     // addTree() trunk-base and root flares (environment-assets, unnamed): the
     // 0.68 m 'authored-tree-trunk-collider-*' WOOD proxy beside each one is
     // the rated authority; a second surface over the tapered flare would bill
-    // the same trunk twice. Positions: 4 trunk flares at (+/-27,+/-21) and
-    // (+/-13,+/-28.5), root flares at (+/-18.53,+/-28). REDESIGN 2026-08-29:
-    // +2 - the rear hedges whose registered surfaces footprint-covered the
-    // two rear-yard trunk visuals at (+/-19,-/+28) are deleted, so those
-    // trunks (and one more exposed flare) now stand alone; their 0.68 m wood
-    // proxies stay the rated authority, same reason as ever.
-    { name: '(unnamed Mesh)', count: 8, reason: 'addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it' },
+    // the same trunk twice. 2026-08-29 declutter: the meshes are NAMED now
+    // (yard-trunk-bole / yard-root-flare), so the opaque unnamed pool is
+    // replaced by named rows at the measured counts - four boles (the other
+    // four trees are footprint-covered by registered surfaces) and six
+    // exposed flares. The 0.68 m wood trunk proxies stay the rated authority.
+    { name: 'yard-trunk-bole', count: 4, reason: 'tree bole over the authored wood trunk proxy; the proxy is the rated authority and a bole surface would double-charge it' },
+    { name: 'yard-root-flare', count: 6, reason: 'ankle-height root flare beside the collided trunk; a flare surface would double-charge the trunk proxy' },
     // (2026-08-29: the two animated-atomic-ring rows are deleted per this
     // gate's own stale-row law - the census stopped flagging the rings after
     // the redesign re-census, so the rows had become rot.)

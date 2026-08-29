@@ -12,6 +12,8 @@ import {
   REAR_YARD_CLOSURE_LAYOUT,
   REAR_YARD_CLOSURE_SIZE,
   SPAWN_END_FENCE_SEGMENTS,
+  SPAWN_GARDEN_DIVIDER_LAYOUT,
+  SPAWN_GARDEN_DIVIDER_SIZE,
   SPAWN_END_FENCE_SIZE,
   SPAWN_END_FENCE_X,
   FRONT_HEDGE_SIZE,
@@ -313,15 +315,9 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     return mesh;
   }
 
-  function collisionProxy(name: string, position: [number, number, number], size: [number, number, number], ballisticMaterial?: BallisticMaterialId): void {
-    const proxy = box(name, position, size, palette.dark, true, false, true, ballisticMaterial);
-    // This simple shell is intentionally visible in Performance so every
-    // authoritative route collider has a readable visual counterpart. Quality
-    // replaces it with the rounded authored route art in environment-assets.
-    proxy.visible = true;
-    proxy.userData.collisionProxy = true;
-  }
-
+  // (collisionProxy helper deleted with its last callers in the 2026-08-29
+  // declutter - authoredCollisionProxy below is the surviving authority
+  // helper for player-sized props.)
   function authoredCollisionProxy(
     name: string,
     position: [number, number, number],
@@ -810,6 +806,18 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     const [closureWidth, closureHeight, closureDepth] = REAR_YARD_CLOSURE_SIZE;
     box(`rear yard hedge ${closureIndex}`, [closureX, closureHeight / 2, closureZ], [closureWidth, closureHeight, closureDepth], palette.grassDark);
   }
+  for (const [dividerIndex, [dx, dz, dLength]] of SPAWN_GARDEN_DIVIDER_LAYOUT.entries()) {
+    box(
+      `spawn garden divider ${dividerIndex}`,
+      [dx, SPAWN_GARDEN_DIVIDER_SIZE.height / 2, dz],
+      [dLength, SPAWN_GARDEN_DIVIDER_SIZE.height, SPAWN_GARDEN_DIVIDER_SIZE.depth],
+      palette.timber,
+      true,
+      true,
+      true,
+      'wood',
+    );
+  }
   for (const [sideIndex, sign] of ([1, -1] as const).entries()) {
     for (const [segmentIndex, [zCentre, zLength]] of SPAWN_END_FENCE_SEGMENTS.entries()) {
       box(
@@ -853,50 +861,19 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     world.add(mound);
     moundAudit.push({ id, collider: colliderName, bottomY: -0.44 });
   }
-  // The large Quality-profile earth banks overlap the playable side of the
-  // boundary. Mirror their silhouettes in Performance and approximate each
-  // ellipsoid with tiered authority boxes so both render profiles have exactly
-  // the same movement and shot physics without blocking empty corner space.
-  const qualityEarthBankAudit: Array<{ id: string; colliders: string[] }> = [];
-  for (const bank of [
-    { id: 'north-west', position: [-40, -0.8, -34] as const, scale: [18, 5, 12] as const, slices: [[-30, 3, 16, 3], [-27.5, 2.5, 10, 1.8], [-25.5, 2, 5, 1]] as const },
-    { id: 'north-east', position: [42, -0.8, -34] as const, scale: [16, 4.5, 12] as const, slices: [[30, 3, 14, 2.8], [27.5, 2.5, 8, 1.5]] as const },
-    { id: 'south-west', position: [-42, -0.8, 34] as const, scale: [16, 4.5, 12] as const, slices: [[-30, 3, 14, 2.8], [-27.5, 2.5, 8, 1.5]] as const },
-    { id: 'south-east', position: [40, -0.8, 34] as const, scale: [18, 5, 12] as const, slices: [[30, 3, 16, 3], [27.5, 2.5, 10, 1.8], [25.5, 2, 5, 1]] as const },
-  ]) {
-    const visual = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), palette.grass);
-    visual.name = `quality-earth-bank-${bank.id}`;
-    visual.position.set(bank.position[0], bank.position[1], bank.position[2]);
-    visual.scale.set(bank.scale[0], bank.scale[1], bank.scale[2]);
-    visual.castShadow = true;
-    visual.receiveShadow = true;
-    visual.userData.impactSurface = 'soil';
-    visual.userData.performanceMirrorFor = `P33_SKYLINE_earth_bank_${qualityEarthBankAudit.length}`;
-    world.add(visual);
-    const bankColliders = bank.slices.map(([x, width, depth, height], index) => {
-      const name = `quality-earth-bank-${bank.id}-collider-${index}`;
-      const proxy = authoredCollisionProxy(name, [x, height / 2, bank.position[2]], [width, height, depth], 'earth');
-      proxy.userData.collisionAuthorityFor = visual.name;
-      return name;
-    });
-    visual.userData.collisionAuthorities = bankColliders;
-    qualityEarthBankAudit.push({ id: bank.id, colliders: bankColliders });
-  }
-  const vesselCollider = box('east-irrigation-vessel-collider', [27, 1.65, 24], [3.8, 3.3, 3.8], palette.chrome, true, false, true, 'structural-metal');
-  vesselCollider.visible = false;
-  vesselCollider.userData.collisionAuthorityFor = 'east-irrigation-vessel';
-  const irrigationVessel = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 3.3, 20), palette.chrome);
-  irrigationVessel.name = 'east-irrigation-vessel';
-  irrigationVessel.position.set(27, 1.65, 24);
-  irrigationVessel.castShadow = true;
-  irrigationVessel.receiveShadow = true;
-  irrigationVessel.userData.impactSurface = 'metal';
-  irrigationVessel.userData.collisionAuthority = vesselCollider.name;
-  world.add(irrigationVessel);
+  // DECLUTTER 2026-08-29: the four corner "quality earth banks" (huge
+  // ellipsoid splats reaching inside the bounds with tiered colliders) are
+  // deleted - the owner called them out by sight. The out-of-bounds ground
+  // read is now owned by the forest surround + mountain backdrop modules.
+  // DECLUTTER 2026-08-29 (owner: "still ... crowded for a cod style game").
+  // The agritech campus layer - trellis garden, greenhouse + hydro beds,
+  // reclamation tank, service walls, solar canopy, irrigation vessel and
+  // terminals, landmark plinth - is deleted from the playable area wholesale.
+  // The reference's yards are OPEN; identity now lives in the houses, the
+  // vehicles, the mannequins and the backdrop landmark beyond the boundary
+  // (environment-assets moves the atomic sculpture out there).
   world.userData.atomicCollisionAudit = {
     terrainMounds: moundAudit,
-    qualityEarthBanks: qualityEarthBankAudit,
-    largeCylinder: { id: irrigationVessel.name, collider: vesselCollider.name, bottomY: 0 },
   };
   // Lane cover interrupts ordinary combat rays every 12–18 metres. The four
   // outer anchors receive taller collision aligned to recognisable authored
@@ -924,59 +901,12 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     }
   });
 
-  // Route-shaping collision proxies for three distinct lanes. Rounded visual shells live in environment-assets.ts.
-  // HF-390 lane: the trellis art (environment-assets) is timber ribs, slats
-  // and vines; the 'column' name rule was rating these four wooden posts as
-  // structural-metal (2.15 entry - steel-girder bullets-sponge). Wood.
-  // REDESIGN 2026-08-29: the whole west cultivation cluster (trellis +
-  // greenhouse + hydro beds) moves 4.5 m east so the new spawn fence at
-  // x = -27.5 no longer runs through it; it now dresses the west flank lane.
-  for (const [x, z] of [[-24.5, -24], [-24.5, -19], [-19.5, -24], [-19.5, -19]] as const) collisionProxy('skyline trellis column', [x, 1.9, z], [0.55, 3.8, 0.55], 'wood');
-  // The Blender hydroponics landmark is an open frame with beds rather than a full-height perimeter.
-  // Older west/east/north/south proxy walls created an unseen enclosure; keep those routes open.
-  // REDESIGN 2026-08-29: the east service wall paralleled the new spawn fence
-  // 0.6 m behind its south door and sealed the whole SE yard (flood-measured:
-  // one 4,909-cell component). The fence owns that boundary now; the wall's
-  // yard-partition duty survives in its western twin, trimmed clear of the
-  // door band.
-  collisionProxy('service wall west', [22.5, 0.75, 6.5], [0.7, 1.5, 5]);
-  for (const [x, z] of [[23, -27], [23, -17], [30.5, -22], [30.5, -12]] as const) collisionProxy('solar canopy column', [x, 2.1, z], [0.6, 4.2, 0.6]);
-  // REDESIGN 2026-08-29: the 2026-08-26 movement deferral for these walls is
-  // RESOLVED. Its reason - the west SIDE spawns whose only street connection
-  // ran through a decorative greenhouse - no longer exists: spawns moved to
-  // the end gardens and the cluster itself moved 4.5 m east of the spawn
-  // fence. The walls now carry real movement authority with two true 1.6 m+
-  // doorways (front aisle gap + rear doorway), which the traversal pocket
-  // audit measures drain fully. This CLOSES three accepted walk-through
-  // ledger rows instead of re-documenting them.
-  for (const [x, z, sx, sz] of ([
-    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
-    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
-    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
-  ] as Array<[number, number, number, number]>)) {
-    collisionProxy('greenhouse frame wall', [x, 1.5, z], [sx, 3, sz], 'wood');
-  }
-
-  // HF-390 lane (2026-08-28): the movement deferral above is about ROUTES and
-  // stays exactly as pinned (zero greenhouse colliders). Gunfire is separate
-  // authority: a greenhouse wall is glazing in a thin frame, and bullets were
-  // crossing it with no impact and no cost. These shot-only glass panes mirror
-  // the six environment-assets 'greenhouse-frame-wall' segments byte-for-byte
-  // (both doorways stay true holes), cost a negligible 0.08-entry glass toll,
-  // and leave every traversal contract untouched.
-  for (const [index, [x, z, sx, sz]] of ([
-    [-25.5, 21, 0.45, 8], [-17.5, 21, 0.45, 8],
-    [-23.525, 24.8, 4.45, 0.45], [-18.475, 24.8, 2.45, 0.45],
-    [-24, 17.2, 2.2, 0.45], [-19, 17.2, 2.2, 0.45],
-  ] as Array<[number, number, number, number]>).entries()) {
-    const pane = box(`greenhouse-shot-pane-${index}`, [x, 1.5, z], [sx, 3, sz], palette.glass, false, false, true, 'glass');
-    pane.visible = false;
-    pane.userData.collisionProxy = true;
-    pane.userData.authoredCollisionAuthority = true;
-  }
-
-  // Original east-lane landmark doubles as readable hard cover; decorative rings are added by environment-assets.
-  box('atomic landmark plinth', [27, 0.38, -20], [4.4, 0.76, 4.4], palette.concrete);
+  // DECLUTTER 2026-08-29: trellis columns, greenhouse walls + shot panes,
+  // service wall and solar canopy columns all deleted with their visuals -
+  // the whole west/east campus architecture left the playable area. The
+  // landmark plinth went with it; the atomic sculpture now stands beyond the
+  // boundary as backdrop (environment-assets), where the reference keeps its
+  // own tower.
 
   // Player-sized authored objects need one shared authority contract even when
   // Quality replaces the procedural presentation with its Blender scene.
@@ -986,16 +916,21 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   };
   for (const [index, [x, z, scale]] of [
     [-19, -28, 1], [19, 28, 1], [-27, -21, 0.9], [27, 21, 0.9], [-13, 28.5, 0.85], [13, -28.5, 0.85],
+    // DECLUTTER 2026-08-29: one tree per spawn garden - the reference's own
+    // yard furniture, and it breaks the 55 m intra-yard eye-line the deleted
+    // reclamation tank used to interrupt.
+    [-30.6, 11.5, 0.9], [30.6, -11.5, 0.9],
   ].entries()) substantial(`authored-tree-trunk-collider-${index}`, [x, 2 * scale, z], [0.68 * scale, 4 * scale, 0.68 * scale], 'wood');
-  for (const [index, [x, z]] of [[-24, -8], [24, 8], [-9, -27], [9, 27]].entries()) {
-    // Sheet-metal service kiosks, not girders: thin-metal by what they look like.
-    substantial(`authored-terminal-collider-${index}`, [x, 0.85, z], [1.25, 1.7, 0.8], 'thin-metal');
+  // DECLUTTER 2026-08-29: the rear-yard concrete planters keep their visuals
+  // (suburban, on-reference) and now carry HONEST authority sized to what a
+  // player sees - the old 'terminal' colliders were the wrong story and the
+  // wrong size. The flank pair at (+/-24,+/-8) is deleted with its visuals.
+  for (const [index, [x, z]] of [[-9, -27], [9, 27]].entries()) {
+    substantial(`authored-planter-collider-${index}`, [x, 0.35, z], [2.2, 0.7, 1.05], 'concrete');
   }
   for (const [index, [x, z]] of [[-30, -8], [30, 8]].entries()) {
     substantial(`authored-extra-lamp-collider-${index}`, [x, 2.8, z], [0.3, 5.6, 0.3], 'structural-metal');
   }
-  for (const [index, x] of [-24.5, -21.5, -18.5].entries()) substantial(`authored-hydro-bed-collider-${index}`, [x, 0.35, 21], [1.1, 0.7, 6.2], 'concrete');
-  substantial('authored-reclamation-tank-collider', [-29.5, 3.05, -14], [2.7, 5.6, 2.7], 'structural-metal');
   for (const [index, z] of [-6.5, 6.5].entries()) substantial(`authored-civic-post-collider-${index}`, [0, 3.25, z], [0.32, 6.5, 0.32], 'structural-metal');
   for (const [houseIndex, house] of HOUSE_LAYOUT.entries()) {
     const { x, z, facing } = house;
