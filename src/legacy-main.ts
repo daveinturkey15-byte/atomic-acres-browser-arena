@@ -9289,24 +9289,40 @@ function handleMatchAdmissionFailure(
       // three's cache and poison every retry with the same silent skip-draw.
       // Purge synchronously here; the retry then re-creates those pipelines
       // with fresh timing instead of reusing the corpse.
-      if (renderRuntime.backend === 'webgpu') {
-        const swept = sweepErroredPipelines(
-          renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
-          scene,
-        );
-        document.documentElement.dataset.tintAdmissionSweeps = String(
-          Number(document.documentElement.dataset.tintAdmissionSweeps ?? '0') + 1,
-        );
-        document.documentElement.dataset.tintAdmissionLastPurge = String(swept.purged);
-      }
       const attempt = 4 - soloRendererAutoRetriesRemaining;
       setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 4)...`, 'warn');
       window.setTimeout(() => {
-        if (matchStartPreparing || gameStarted) return;
-        network.close();
-        resetForMode();
-        resetPrivateLobbyState();
-        void startGame('solo');
+        void (async () => {
+          if (matchStartPreparing || gameStarted) return;
+          if (renderRuntime.backend === 'webgpu') {
+            // Purge the errored pipeline cache entries, then RE-CREATE every
+            // missing pipeline through compileAsync: measured 2026-08-29, the
+            // async path is clean 5/5 on the affected Chrome 153 build while
+            // sync creation races Tint. After this pass the retry's renders
+            // find warm pipelines and never touch createRenderPipeline.
+            const swept = sweepErroredPipelines(
+              renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
+              scene,
+            );
+            try {
+              await renderRuntime.compile(scene, camera, scene);
+            } catch { /* the retry itself remains the arbiter */ }
+            const counters = {
+              sweeps: Number(sessionStorage.getItem('atomic-acres:tint-admission-sweeps') ?? '0') + 1,
+              purged: swept.purged,
+            };
+            try {
+              sessionStorage.setItem('atomic-acres:tint-admission-sweeps', String(counters.sweeps));
+              sessionStorage.setItem('atomic-acres:tint-admission-last-purge', String(counters.purged));
+            } catch { /* storage-less contexts lose only diagnostics */ }
+            document.documentElement.dataset.tintAdmissionSweeps = String(counters.sweeps);
+            document.documentElement.dataset.tintAdmissionLastPurge = String(counters.purged);
+          }
+          network.close();
+          resetForMode();
+          resetPrivateLobbyState();
+          void startGame('solo');
+        })();
       }, 1_500);
     } else if (rendererClassFailure) {
       // Both automatic WebGPU attempts failed the same way. Chrome 153's Tint bug is
