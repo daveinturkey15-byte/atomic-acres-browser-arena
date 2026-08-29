@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { VIEWMODEL_SHADOW_BUDGET_SCOPE } from './rendering/runtime-shadow-budget';
 import { presentationRandom } from './runtime-random';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -2281,6 +2282,7 @@ export class WeaponPresentation {
       if (!loadedModel) throw new Error(`Pass 65 match-start viewmodel unavailable after load: ${id}`);
       loadedModel.visible = false;
       loadedModel.traverse((node) => { node.layers.mask = this.root.layers.mask; });
+      deepFreezeSubtreeMatrices(loadedModel);
       this.models.set(id, loadedModel);
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.root.add(loadedModel);
@@ -2340,6 +2342,7 @@ export class WeaponPresentation {
       this.active = id;
       this.root.visible = true;
       for (const entry of this.models.values()) entry.visible = entry === model;
+      this.applyModelMatrixFreeze();
       this.updateActiveSockets(id);
       fireImportedWeapon(model);
       updateImportedWeapon(model, 1 / 60);
@@ -2459,6 +2462,7 @@ export class WeaponPresentation {
       this.active = id;
       this.root.visible = true;
       for (const entry of this.models.values()) entry.visible = entry === model;
+      this.applyModelMatrixFreeze();
       this.updateActiveSockets(id);
       reloadImportedWeapon(model);
       updateImportedWeapon(model, 0.16);
@@ -3005,6 +3009,7 @@ export class WeaponPresentation {
     if (!immediate && this.authoredArmsRoot) playFirstPersonArmAction(this.authoredArmsRoot, 'equip');
     if (activeModel && this.modelIsGpuReady(activeModel)) {
       for (const [weaponId, model] of this.models) model.visible = weaponId === id;
+      this.applyModelMatrixFreeze();
       this.modelLastUsed.set(id, ++this.modelUseCounter);
       this.updateActiveSockets(id);
       if (this.browserRuntime) this.trimBrowserWeaponModels();
@@ -3030,6 +3035,16 @@ export class WeaponPresentation {
       this.ensureBrowserWeapon(id);
     }
     this.configureWeaponFlashlight(id);
+  }
+
+  /** Perf (2026-08-29): only the mounted weapon rig may pay per-frame matrix
+   * costs. Hidden rigs (hundreds of nodes each) deep-freeze; the active rig
+   * unfreezes so its authored animations reach the renderer. */
+  private applyModelMatrixFreeze(): void {
+    for (const entry of this.models.values()) {
+      if (entry.visible) deepUnfreezeSubtreeMatrices(entry);
+      else deepFreezeSubtreeMatrices(entry);
+    }
   }
 
   setPresentationVisible(visible: boolean): void {
@@ -3371,7 +3386,10 @@ export class WeaponPresentation {
       const arms = this.root.getObjectByName('first-person-arms');
       if (arms) arms.visible = true;
       const model = this.mountedModel();
-      if (model) model.visible = true;
+      if (model) {
+        model.visible = true;
+        deepUnfreezeSubtreeMatrices(model);
+      }
     }
     const activeModel = this.mountedModel();
     if (activeModel) fireImportedWeapon(activeModel);

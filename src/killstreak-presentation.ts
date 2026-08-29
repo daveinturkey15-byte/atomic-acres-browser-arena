@@ -16,6 +16,7 @@ import {
 import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
@@ -2595,6 +2596,10 @@ export class KillstreakPresentation {
     entry.root.userData.presentationPoolInUse = false;
     entry.root.name = `prewarmed-${key}-${index + 1}`;
     entry.root.visible = false;
+    // Perf (2026-08-29): idle pool entries are ~4.2k scene nodes whose
+    // matrices three would recompose EVERY frame. Deep-freeze while pooled;
+    // checkout restores full dynamics and refreshes the world matrices once.
+    deepFreezeSubtreeMatrices(entry.root);
     this.prewarmed.push(entry);
     this.root.add(entry.root);
     return entry;
@@ -2931,6 +2936,9 @@ export class KillstreakPresentation {
     if (this.gpuPrewarmGeneration === sceneGeneration) return;
     if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
     this.gpuPrewarmActive = true;
+    // The staged compile passes move, animate and render the pooled
+    // vocabulary, so the idle-pool matrix freeze must lift for the rehearsal.
+    for (const entry of this.prewarmed) deepUnfreezeSubtreeMatrices(entry.root);
     const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
@@ -2938,6 +2946,12 @@ export class KillstreakPresentation {
     } finally {
       if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
       this.gpuPrewarmActive = false;
+      for (const entry of this.prewarmed) {
+        if (entry.root.userData.presentationPoolInUse !== true) {
+          deepFreezeSubtreeMatrices(entry.root);
+          entry.root.updateMatrixWorld(true);
+        }
+      }
     }
   }
 
@@ -3221,6 +3235,8 @@ export class KillstreakPresentation {
     const presented = this.entityPools.get(key)?.find((entry) => entry.root.userData.presentationPoolInUse !== true);
     if (!presented) return createPresentedEntity(entity);
     presented.root.userData.presentationPoolInUse = true;
+    deepUnfreezeSubtreeMatrices(presented.root);
+    presented.root.updateMatrixWorld(true);
     presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
     // Swarm source trees drive the animated instance matrices but must never
     // enter renderer traversal themselves. Their 24 authored hierarchies are
@@ -3242,6 +3258,8 @@ export class KillstreakPresentation {
     presented.target.set(0, 0, 0);
     presented.attitudeTarget.identity();
     presented.attitudeEuler.set(0, 0, 0, 'YXZ');
+    deepFreezeSubtreeMatrices(presented.root);
+    presented.root.updateMatrixWorld(true);
     delete presented.root.userData.supportSnapshotPhase;
   }
 

@@ -420,6 +420,7 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { parseRendererFallbackRecord, rendererFallbackNotice, RENDERER_FALLBACK_STORAGE_KEY } from './renderer-fallback-notice';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
@@ -2011,6 +2012,12 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
+// Perf (2026-08-29): the scene root never moves, but with matrixAutoUpdate
+// left on, three recomposes it every frame, marks it dirty, and FORCE-walks
+// the entire graph re-multiplying every world matrix. Freezing the root makes
+// the per-frame pass honor each subtree's own dirty state (and lets the
+// pooled-subtree walk skips in static-matrix-freeze.ts actually engage).
+scene.matrixAutoUpdate = false;
 // Chrome 153 Tint-race repair (2026-08-29): when a captured pipeline error
 // lands, purge the errored pipeline cache entries and bump materials so
 // three rebuilds them - re-creation usually succeeds because the failure is
@@ -14698,6 +14705,9 @@ async function ensureCorpsePresentationPool(): Promise<void> {
       await prewarmRiggedOperatorActions(root, RIGGED_OPERATOR_CORPSE_ACTION_NAMES);
       prepareCorpsePresentationRoot(root);
       root.visible = false;
+      // Perf (2026-08-29): pooled corpse rigs (~190 nodes each) stop their
+      // per-frame matrix recompose while idle.
+      deepFreezeSubtreeMatrices(root);
       scene.add(root);
       corpsePresentationPool.push({ root, team, inUse: false });
       await yieldDeploymentPrewarmFrame();
@@ -14717,6 +14727,7 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
       .addScaledVector(right, (index % 4 - 1.5) * 0.9);
     entry.root.rotation.set(0, Math.PI, 0);
     entry.root.visible = true;
+    deepUnfreezeSubtreeMatrices(entry.root);
   }
   let restored = false;
   return () => {
@@ -14726,6 +14737,10 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
       entry.root.visible = false;
       entry.root.position.set(0, 0, 0);
       entry.root.rotation.set(0, 0, 0);
+      if (!entry.inUse) {
+        deepFreezeSubtreeMatrices(entry.root);
+        entry.root.updateMatrixWorld(true);
+      }
     }
   };
 }
@@ -14872,6 +14887,8 @@ function disposeCorpsePresentation(root: THREE.Group): void {
   root.rotation.set(0, 0, 0);
   resetOperator(root);
   hideCorpseHeldWeapon(root);
+  deepFreezeSubtreeMatrices(root);
+  root.updateMatrixWorld(true);
   pooled.inUse = false;
 }
 
@@ -14922,6 +14939,7 @@ function spawnCorpsePresentation(victimId: string, source = corpseSource(victimI
   if (!pooled) return;
   pooled.inUse = true;
   const root = pooled.root;
+  deepUnfreezeSubtreeMatrices(root);
   resetOperator(root);
   hideCorpseHeldWeapon(root);
   root.name = 'fallen-operator';

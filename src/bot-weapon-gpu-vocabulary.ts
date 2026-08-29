@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { deepFreezeSubtreeMatrices } from './static-matrix-freeze';
 import { createOperatorWeaponPresentation } from './art-kit';
 import { BOT_WEAPON_POOL } from './bot-arsenal';
 import type { WeaponId } from './protocol';
@@ -57,6 +58,11 @@ export class BotWeaponGpuVocabulary {
   ) {
     this.root.name = 'retained-bot-weapon-gpu-vocabulary';
     this.root.visible = false;
+    // Perf (2026-08-29): the retained vocabulary (~600 nodes) exists for GPU
+    // residency only; stop its per-frame matrix recompose entirely. Nothing
+    // in it ever moves; the prewarm forces one updateMatrixWorld(true) off
+    // the stored local matrices.
+    this.root.matrixWorldAutoUpdate = false;
     this.root.userData.presentationOnly = true;
     this.root.userData.retainedBotWeaponGpuVocabulary = true;
     this.root.raycast = () => undefined;
@@ -173,6 +179,9 @@ export class BotWeaponGpuVocabulary {
     this.gpuReadyIds.clear();
     this.gpuReadySceneGeneration = null;
     this.root.visible = true;
+    this.root.matrixWorldAutoUpdate = true;
+    deepFreezeSubtreeMatrices(this.root);
+    this.root.updateMatrixWorld(true);
     try {
       await runtime.compileAndRender(this.root, camera, this.scene);
       this.assertActive();
@@ -190,6 +199,7 @@ export class BotWeaponGpuVocabulary {
       // texture and layout vocabulary remains warm. Live bot swaps still own
       // their distinct presentation clones; no vocabulary geometry may leak.
       this.root.visible = false;
+      this.root.matrixWorldAutoUpdate = false;
     }
   }
 
