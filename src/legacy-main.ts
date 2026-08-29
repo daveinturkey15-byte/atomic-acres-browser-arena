@@ -9305,7 +9305,13 @@ function handleMatchAdmissionFailure(
               scene,
             );
             try {
-              await renderRuntime.compile(scene, camera, scene);
+              // A device that just errored can leave compileAsync pending
+              // forever; the recovery must never strand the player on the
+              // deployment screen, so the pass is time-boxed and advisory.
+              await Promise.race([
+                renderRuntime.compile(scene, camera, scene),
+                new Promise((resolve) => { window.setTimeout(resolve, 8_000); }),
+              ]);
             } catch { /* the retry itself remains the arbiter */ }
             const counters = {
               sweeps: Number(sessionStorage.getItem('atomic-acres:tint-admission-sweeps') ?? '0') + 1,
