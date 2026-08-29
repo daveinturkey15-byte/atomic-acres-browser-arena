@@ -64,6 +64,7 @@ import {
 import { createWindField, sampleWind } from './weather/wind-field';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
+import { resolveEyeClearance } from './camera-eye-clearance';
 import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
 import { createSwimState, stepSwimState, swimMovementModifiers, type SwimState } from './water/swim-state';
@@ -318,7 +319,8 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
+import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2, segmentBoxHitTime,
+} from './collision';
 import {
   applyObstructionSpreadPenalty, // HF-343
   applyPenetrationDamage,
@@ -4051,6 +4053,75 @@ function traceWeaponPath(
     activeBallisticSurfaces(),
     interactiveWorldRuntime?.apertureQuery,
   );
+}
+
+// Owner 2026-08-29 wall/prone clipping: the camera resolve probes the SAME
+// canonical shot-surface set the eye-clearance sweep measures. The felt
+// clipping class is visual geometry protruding past the movement colliders
+// (house ramp flanks, airstair bellies), which a collider-only probe cannot
+// see. Nine 0.15 m probes per frame; traceBallisticPath's broad phase keeps
+// this well under the frame budget.
+let lastEyeClearanceResult: { x: number; y: number; z: number; pushedM: number } | null = null;
+const eyeClearanceProbeOriginScratch = new THREE.Vector3();
+// Fixtures the player occupies BY DESIGN are exempt from the camera resolve;
+// the eye-clearance ledger (docs/eye-clearance/ledger.json) records exactly
+// this accepted class: the gun-range wallbang panels are authored
+// solid:false / shots:true - deliberately walk-through. Everything else that
+// gets within the clearance radius is a visual fringe of solid geometry
+// (ramp flanks, airstair bellies - walkable slopes live in the physics
+// engine, not the box-collider list, so a collider-overlap test cannot
+// identify them).
+function eyeClearanceSurfaceIsSolidBacked(surface: BallisticSurface): boolean {
+  // Breakable window panes are excluded too: leaning through a broken window
+  // is legitimate, and the aperture state is not consulted on this path.
+  return !surface.name.includes('wallbang-panel') && surface.breakableWindowId === undefined;
+}
+// Per-frame probes run against a cached NEARBY subset of the canonical
+// surfaces (refreshed when the eye moves) so ten 0.15 m probes never walk
+// the full arena surface list. Zero allocations on the steady path.
+const EYE_CLEARANCE_NEARBY_RADIUS_M = 1.6;
+const EYE_CLEARANCE_REFRESH_DISTANCE_SQ = 0.49;
+const eyeClearanceNearbySurfaces: BallisticSurface[] = [];
+const eyeClearanceNearbyOrigin = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
+let eyeClearanceNearbyArenaSurfaces: readonly BallisticSurface[] | null = null;
+function refreshEyeClearanceNearbySurfaces(eye: Readonly<{ x: number; y: number; z: number }>): void {
+  const surfaces = activeBallisticSurfaces();
+  if (surfaces !== eyeClearanceNearbyArenaSurfaces) {
+    eyeClearanceNearbyArenaSurfaces = surfaces;
+    eyeClearanceNearbyOrigin.x = Number.POSITIVE_INFINITY;
+  }
+  eyeClearanceProbeOriginScratch.set(eye.x, eye.y, eye.z);
+  if (eyeClearanceNearbyOrigin.distanceToSquared(eyeClearanceProbeOriginScratch) < EYE_CLEARANCE_REFRESH_DISTANCE_SQ) return;
+  eyeClearanceNearbyOrigin.copy(eyeClearanceProbeOriginScratch);
+  eyeClearanceNearbySurfaces.length = 0;
+  for (const surface of surfaces) {
+    if (!eyeClearanceSurfaceIsSolidBacked(surface)) continue;
+    if (sphereIntersectsBox(eyeClearanceProbeOriginScratch, EYE_CLEARANCE_NEARBY_RADIUS_M, surface.bounds)) {
+      eyeClearanceNearbySurfaces.push(surface);
+    }
+  }
+}
+const eyeClearanceProbeEndScratch = { x: 0, y: 0, z: 0 };
+function eyeClearanceBallisticProbe(
+  start: Readonly<{ x: number; y: number; z: number }>,
+  direction: Readonly<{ x: number; y: number; z: number }>,
+  maxM: number,
+): { entryM: number; exitM: number } | null {
+  eyeClearanceProbeEndScratch.x = start.x + direction.x * maxM;
+  eyeClearanceProbeEndScratch.y = start.y + direction.y * maxM;
+  eyeClearanceProbeEndScratch.z = start.z + direction.z * maxM;
+  let bestEntry = Number.POSITIVE_INFINITY;
+  let bestExit = maxM;
+  for (const surface of eyeClearanceNearbySurfaces) {
+    const entry = segmentBoxHitTime(start, eyeClearanceProbeEndScratch, surface.bounds, 0);
+    if (entry === null) continue;
+    const entryM = entry * maxM;
+    if (entryM >= bestEntry) continue;
+    const reverse = segmentBoxHitTime(eyeClearanceProbeEndScratch, start, surface.bounds, 0);
+    bestEntry = entryM;
+    bestExit = reverse === null ? maxM : maxM * (1 - reverse);
+  }
+  return Number.isFinite(bestEntry) ? { entryM: bestEntry, exitM: bestExit } : null;
 }
 
 function applyInteractiveWorldBallisticTrace(
@@ -9206,6 +9277,21 @@ function handleMatchAdmissionFailure(
       // 2026-08-29 measurement: the Tint race is TIMING-sensitive - cold
       // network streaming fails 3/3, warm-cache/local timing 0/4. Later
       // attempts run on warm caches, so four tries multiply escape odds.
+      // REPAIR BEFORE RETRY: the debounced console-error repair cannot fire
+      // inside the admission window, so an errored pipeline would survive in
+      // three's cache and poison every retry with the same silent skip-draw.
+      // Purge synchronously here; the retry then re-creates those pipelines
+      // with fresh timing instead of reusing the corpse.
+      if (renderRuntime.backend === 'webgpu') {
+        const swept = sweepErroredPipelines(
+          renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
+          scene,
+        );
+        document.documentElement.dataset.tintAdmissionSweeps = String(
+          Number(document.documentElement.dataset.tintAdmissionSweeps ?? '0') + 1,
+        );
+        document.documentElement.dataset.tintAdmissionLastPurge = String(swept.purged);
+      }
       const attempt = 4 - soloRendererAutoRetriesRemaining;
       setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 4)...`, 'warn');
       window.setTimeout(() => {
@@ -24897,8 +24983,22 @@ function updatePhysics(dt: number): void {
     camera.position.y += traumaSample.offsetY;
     camera.rotation.z += traumaSample.rollRadians;
   }
+  // Owner 2026-08-29 wall/prone clipping regression: after every positional
+  // layer (bob, shake, trauma) has moved the eye, push it clear of any solid
+  // surface inside the near-plane + bob radius. Presentation-only; shot rays
+  // derive from player.yaw/pitch and the capsule never moves. This is the
+  // across-all-maps answer the per-arena geometry fixes kept missing (see
+  // docs/eye-clearance/ledger.json deferred classes).
   // Floor and terrain near-plane standoff: prevent camera frustum from dipping below floor
   camera.position.y = Math.max(player.position.y + 0.14, camera.position.y);
+  // ... and the surface resolve runs LAST with the final say: when the fixed
+  // standoff shoves the eye into a sloped underside (skyline airstair belly,
+  // ramp bellies), the resolve's own down probe still keeps it off floors
+  // while it clears the ceiling surface.
+  refreshEyeClearanceNearbySurfaces(camera.position);
+  const clearedEye = resolveEyeClearance(camera.position, eyeClearanceBallisticProbe);
+  lastEyeClearanceResult = clearedEye;
+  if (clearedEye.pushedM > 0) camera.position.set(clearedEye.x, clearedEye.y, clearedEye.z);
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
@@ -29764,6 +29864,9 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     recoverFromVisibilityRegain: () => void;
     openMenu: () => void;
+    cameraSeat: () => number[];
+    lastEyeClearance: () => { x: number; y: number; z: number; pushedM: number } | null;
+    setStanceForQa: (target: 'stand' | 'crouch' | 'prone') => string;
     fireOnce: () => void;
     setTriggerHeld: (held: boolean) => void;
     stageSmokeVolume: (distance?: number) => string;
@@ -33075,6 +33178,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   recoverFromVisibilityRegain: () => recoverFromSchedulingInterruption('debug visibility regain'),
   openMenu: () => openActiveMatchPause('debug-pause'),
+  cameraSeat: () => camera.position.toArray(),
+  lastEyeClearance: () => lastEyeClearanceResult,
+  setStanceForQa: (target: 'stand' | 'crouch' | 'prone') => {
+    // QA-only: drive the real stance machine to an absolute target so the
+    // eye-clearance verifier can measure every stance without pointer lock.
+    for (let guard = 0; guard < 3 && player.stance !== target; guard += 1) {
+      const action = target === 'stand' ? 'stand' : target === 'crouch' ? 'toggle-crouch' : 'toggle-prone';
+      if (!requestStance(action)) break;
+    }
+    return player.stance;
+  },
   fireOnce: () => {
     debugInputUnlocked = true;
     setLocalTriggerHeld(true);
