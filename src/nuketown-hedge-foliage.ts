@@ -22,9 +22,18 @@ import {
 const SEED = 0x3f8c_29d1;
 /** Blobs per square metre of exposed hedge face. First cut at 4.2/m2 read
  * as light barnacles on a dark slab (reviewed on the west-garden cam);
- * trimmed-hedge coverage needs the blobs dense and tone-matched. */
+ * trimmed-hedge coverage needs the blobs dense and tone-matched. The WebGL2
+ * compat route pays raw fill for every triangle (measured p95 drift on the
+ * 2026-08-29 art passes), so it takes a thinner scatter of larger blobs -
+ * same read at range, half the triangles. */
 const DENSITY_PER_M2 = 9;
+const COMPAT_DENSITY_PER_M2 = 4.5;
 const BLOB_RADIUS_M = 0.16;
+
+function compatRoute(): boolean {
+  return typeof document !== 'undefined'
+    && document.documentElement?.dataset.renderBackend === 'webgl2';
+}
 
 export interface NuketownHedgeFoliageStats {
   blobs: number;
@@ -103,13 +112,15 @@ export function buildNuketownHedgeFoliage(parent: THREE.Object3D): NuketownHedge
         place: () => [hedge.x - halfX + rng() * hedge.sizeX, hedge.height + 0.02, hedge.z - halfZ + rng() * hedge.sizeZ],
       },
     ];
+    const density = compatRoute() ? COMPAT_DENSITY_PER_M2 : DENSITY_PER_M2;
+    const scaleBoost = compatRoute() ? 1.32 : 1;
     for (const face of faces) {
-      const count = Math.max(2, Math.round(face.area * DENSITY_PER_M2));
+      const count = Math.max(2, Math.round(face.area * density));
       for (let index = 0; index < count; index += 1) {
         const [x, y, z] = face.place();
         slots.push({
           x, y, z,
-          scale: 0.55 + rng() * 0.5,
+          scale: (0.55 + rng() * 0.5) * scaleBoost,
           tone: Math.floor(rng() * LEAF_TONES.length) % LEAF_TONES.length,
           yaw: rng() * Math.PI * 2,
         });
