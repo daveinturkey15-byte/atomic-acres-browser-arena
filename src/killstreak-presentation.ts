@@ -20,6 +20,18 @@ import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-pre
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
 
+/** Owner 2026-08-29: camera-space lift (metres) applied to the possessed
+ * first-person cockpit viewmodel so the canopy glass frame sits high on the
+ * screen and the gunsight looks through open canopy. Regression guard for the
+ * "glass in the middle of the view" issue fixed weeks ago and lost. */
+export const FIRST_PERSON_COCKPIT_VIEW_LIFT_M = 0.08;
+/** Companion to the lift: pulls the cockpit viewmodel TOWARD the camera
+ * along the view axis. Because the canopy parts sit at different depths,
+ * the pull magnifies them unevenly - the frame spreads radially out of the
+ * sight picture (apex up, console off the bottom, rails to the edges),
+ * opening the glass pane around the reticle. (A uniform scale about the eye
+ * is a perspective no-op and cannot do this.) */
+export const FIRST_PERSON_COCKPIT_VIEW_PULL_M = 0.28;
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
 const MAX_BOMB_SHELLS = 20;
@@ -2515,6 +2527,7 @@ export class KillstreakPresentation {
   private readonly firstPersonSocketQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonRootQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonCockpitCameraPivot = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private readonly firstPersonCockpitUpScratch = new THREE.Vector3();
   private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
   private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
   private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
@@ -3647,8 +3660,18 @@ export class KillstreakPresentation {
     }
     const inverseParent = parent.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+    // Owner 2026-08-29: the canopy glass frame must sit HIGH in the possessed
+    // view so the gunsight looks through OPEN canopy, not through the frame.
+    // This was right weeks ago and regressed; anchoring it here (rather than
+    // in the authored GLB) covers the authored cockpit and the procedural
+    // fallback alike. Raising the viewmodel in camera space moves the whole
+    // glass structure up the screen.
+    const cameraUp = this.firstPersonCockpitUpScratch.set(0, 1, 0).applyQuaternion(cameraWorldQuaternion);
+    const cameraForward = this.firstPersonForwardScratch.set(0, 0, -1).applyQuaternion(cameraWorldQuaternion);
     const desiredParentPosition = parent.worldToLocal(
-      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition),
+      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition)
+        .addScaledVector(cameraUp, FIRST_PERSON_COCKPIT_VIEW_LIFT_M)
+        .addScaledVector(cameraForward, -FIRST_PERSON_COCKPIT_VIEW_PULL_M),
     );
     const pivotOffset = this.firstPersonCockpitPivotOffsetScratch.copy(authoredCameraPivot)
       .multiply(cockpit.scale)
@@ -3656,6 +3679,11 @@ export class KillstreakPresentation {
     cockpit.position.copy(desiredParentPosition).sub(pivotOffset);
     cockpit.updateMatrixWorld(true);
     if (this.firstPersonCockpitAlignment) return;
+    // Telemetry measures against the LIFTED target so the deliberate view
+    // lift never reads as pivot error.
+    const liftedCameraWorldPosition = cameraWorldPosition.clone()
+      .addScaledVector(cameraUp, FIRST_PERSON_COCKPIT_VIEW_LIFT_M)
+      .addScaledVector(cameraForward, -FIRST_PERSON_COCKPIT_VIEW_PULL_M);
     const cameraPivotWorldPosition = cockpit.localToWorld(authoredCameraPivot.clone());
     const inverseCameraQuaternion = cameraWorldQuaternion.clone().invert();
     const cameraSpacePosition = (name: string): readonly number[] | null => {
@@ -3672,7 +3700,7 @@ export class KillstreakPresentation {
       cockpitWorldPosition: Object.freeze(cockpit.getWorldPosition(new THREE.Vector3()).toArray()),
       parentName: parent.name,
       parentWorldScale: Object.freeze(parent.getWorldScale(new THREE.Vector3()).toArray()),
-      pivotErrorM: cameraPivotWorldPosition.distanceTo(cameraWorldPosition),
+      pivotErrorM: cameraPivotWorldPosition.distanceTo(liftedCameraWorldPosition),
       dashboardCameraSpacePosition: cameraSpacePosition('chopper-cockpit-dashboard-3d'),
       hudCameraSpacePosition: cameraSpacePosition('chopper-cockpit-hud-glass'),
       weaponCameraSpacePosition: cameraSpacePosition('chopper-gunner-weapon-view'),

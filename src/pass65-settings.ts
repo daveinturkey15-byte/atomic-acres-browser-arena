@@ -51,6 +51,13 @@ export type AudioSettings = Readonly<{
   schemaVersion: 1;
   gains: Readonly<Record<AudioBusId, number>>;
   mutes: Readonly<Record<AudioBusId, boolean>>;
+  /** One-time migration marker: the 2026-08-29 owner retune moved the
+   * game-music default 100 -> 50. Stored settings from before the retune
+   * carry the OLD default and would override the new one forever; when this
+   * marker is absent and the stored gain still equals that old default, the
+   * gain migrates to 50. Once the marker is written, a user deliberately
+   * choosing 100 again is respected. */
+  gameMusicRetuned: true;
 }>;
 
 export type AccessibilitySettings = Readonly<{
@@ -194,7 +201,7 @@ export function createDefaultPass65Settings(capabilities: CapabilityHints = {}):
   return Object.freeze({
     version: 1,
     graphics: presetGraphics(preset),
-    audio: Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes) }),
+    audio: Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes), gameMusicRetuned: true as const }),
     accessibility: Object.freeze({
       schemaVersion: 1,
       reducedMotion: false,
@@ -235,7 +242,12 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   const mutes = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [
     id, bool(rawMutes[id], defaults.audio.mutes[id]),
   ])) as Record<AudioBusId, boolean>;
-  const audio: AudioSettings = Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes) });
+  // 2026-08-29 owner retune migration: pre-retune stored settings hold the
+  // old game-music default (100) and would drown the new 50 default forever.
+  if (rawAudio.gameMusicRetuned !== true && gains['game-music'] === 100) {
+    gains['game-music'] = defaults.audio.gains['game-music'];
+  }
+  const audio: AudioSettings = Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes), gameMusicRetuned: true as const });
   const rawAccessibility = raw.accessibility && typeof raw.accessibility === 'object'
     ? raw.accessibility as Partial<AccessibilitySettings>
     : {};

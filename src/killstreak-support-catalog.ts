@@ -65,13 +65,17 @@ export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PRO
 export const DRONE_SWARM_FIRE_LANE_INTERVAL_MS = 460;
 
 export const CHOPPER_GUN_PROFILE = Object.freeze({
-  id: 'chopper-gun-standard-v1',
-  damage: 10,
-  minimumDamage: 7,
+  // Owner 2026-08-29: "its damage doesnt seem to work" - measured at 10/shell
+  // a bot took ~11 shells (~3s of sustained aimed fire) to kill, which reads
+  // as broken. Retuned to the reference feel: ~3 shells to drop a full-health
+  // hostile, cadence tightened to keep the heavy-thump rhythm.
+  id: 'chopper-gun-standard-v2',
+  damage: 34,
+  minimumDamage: 22,
   falloffStartM: 28,
   maximumRangeM: 78,
-  cadenceMs: 280,
-  rpm: 60_000 / 280,
+  cadenceMs: 240,
+  rpm: 60_000 / 240,
   penetration: 'solid-occluded',
   criticalHits: false,
 } as const);

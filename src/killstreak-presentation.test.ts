@@ -24,6 +24,8 @@ import {
   supportAircraftWingVisibility,
   supportVehiclePresentationTelemetry,
   supportVehicleStableAirframeBounds,
+  FIRST_PERSON_COCKPIT_VIEW_LIFT_M,
+  FIRST_PERSON_COCKPIT_VIEW_PULL_M,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_SWARM_GUN_PROFILE_ID, PILOTED_DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
@@ -1098,7 +1100,23 @@ describe('killstreak presentation', () => {
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
       .getWorldQuaternion(new THREE.Quaternion());
     expect(cockpitWorldQuaternion.angleTo(cameraQuaternion)).toBeLessThan(1e-6);
-    expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(cameraPosition)).toBeLessThan(1e-6);
+    // Owner 2026-08-29: the cockpit viewmodel rides LIFTED in camera space so
+    // the canopy glass frame sits high on the screen (regression guard for
+    // the mid-screen glass issue). The pivot must land exactly on the lifted
+    // target - neither at the raw camera (no lift = regression) nor anywhere
+    // else (misalignment).
+    const liftedTarget = cameraPosition.clone()
+      .addScaledVector(
+        new THREE.Vector3(0, 1, 0).applyQuaternion(cameraQuaternion),
+        FIRST_PERSON_COCKPIT_VIEW_LIFT_M,
+      )
+      .addScaledVector(
+        new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion),
+        -FIRST_PERSON_COCKPIT_VIEW_PULL_M,
+      );
+    expect(FIRST_PERSON_COCKPIT_VIEW_LIFT_M).toBeGreaterThan(0.05);
+    expect(FIRST_PERSON_COCKPIT_VIEW_PULL_M).toBeGreaterThan(0.05);
+    expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(liftedTarget)).toBeLessThan(1e-6);
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);

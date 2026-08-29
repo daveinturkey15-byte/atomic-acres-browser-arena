@@ -29624,6 +29624,14 @@ const debugWindow = window as Window & {
       pitch: number;
       lineOfSight: true;
     } | null;
+    aimPossessedChopperAtBot: (botId: string) => {
+      entityId: string;
+      botId: string;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+    } | null;
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -32270,6 +32278,39 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       yaw: player.yaw,
       pitch: player.pitch,
       lineOfSight: true,
+    };
+  },
+  aimPossessedChopperAtBot: (botId) => {
+    // QA-only: the training-dummy variant is gun-range-only; this aims the
+    // possessed autocannon at a live bot on ANY arena so possessed-fire
+    // damage can be probed without pointer lock.
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+    ));
+    const bot = bots.get(botId);
+    if (!entity || !bot || !bot.alive) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const targetPoint = bot.position.clone().setY(bot.position.y + 0.9);
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      botId: bot.id,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
     };
   },
   aimAtRemote: (zone: HitZone = 'body') => {

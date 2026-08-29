@@ -49,14 +49,16 @@ describe('Pass 65 support catalog', () => {
   });
 
   it('gives chopper fire a distinct non-critical authored profile', () => {
+    // Owner 2026-08-29 retune: ~3 shells to kill a full-health hostile (the
+    // 10/shell tune read as "damage doesn't work" in play).
     expect(CHOPPER_GUN_PROFILE).toMatchObject({
-      damage: 10,
-      minimumDamage: 7,
+      damage: 34,
+      minimumDamage: 22,
       criticalHits: false,
       penetration: 'solid-occluded',
     });
-    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 0)).toBe(10);
-    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, CHOPPER_GUN_PROFILE.maximumRangeM)).toBe(7);
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 0)).toBe(34);
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, CHOPPER_GUN_PROFILE.maximumRangeM)).toBe(22);
   });
 
   it('isolates the piloted sensor from gun and ballistic authority', () => {

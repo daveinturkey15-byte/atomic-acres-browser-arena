@@ -137,6 +137,28 @@ describe('Pass 65 settings contract', () => {
     }).privacy.shareGlobalLeaderboard).toBe(false);
   });
 
+  it('migrates the pre-retune game-music gain once and then respects a deliberate 100', () => {
+    // Pre-retune storage: no marker, gain at the OLD default -> migrates to 50.
+    const preRetune = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 100 }, mutes: {} },
+    });
+    expect(preRetune.audio.gains['game-music']).toBe(50);
+    expect(preRetune.audio.gameMusicRetuned).toBe(true);
+    // Post-retune storage where the user deliberately chose 100 again: kept.
+    const deliberate = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 100 }, mutes: {}, gameMusicRetuned: true },
+    });
+    expect(deliberate.audio.gains['game-music']).toBe(100);
+    // A pre-retune CUSTOM value (not the old default) is the user's own mix: kept.
+    const custom = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 80 }, mutes: {} },
+    });
+    expect(custom.audio.gains['game-music']).toBe(80);
+  });
+
   it('recovers corrupt storage and clamps every numeric boundary', () => {
     expect(parsePass65Settings('{bad')).toEqual(createDefaultPass65Settings());
     const settings = normalizePass65Settings({
