@@ -52,8 +52,18 @@ function applyStickyRendererFallback(): void {
   try {
     const raw = localStorage.getItem('atomic-acres:renderer-fallback:v1');
     if (!raw) return;
-    const record = JSON.parse(raw) as { userAgent?: string; at?: string };
+    const record = JSON.parse(raw) as { userAgent?: string; at?: string; shimGeneration?: number };
     if (record.userAgent !== navigator.userAgent) {
+      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
+      return;
+    }
+    // 2026-08-30: the Tint failure's ROOT CAUSE is fixed (chained-swizzle
+    // shader shim, src/webgpu-tint-swizzle-shim.ts - deterministic repro went
+    // 10-failures-then-fallback to 0-failures on stock Chrome 153). Records
+    // written by pre-shim builds carry no shimGeneration; ignore them so the
+    // shimmed WebGPU route gets its one honest retry. A post-shim failure
+    // writes shimGeneration >= 1 and sticks as before.
+    if ((record.shimGeneration ?? 0) < 1) {
       localStorage.removeItem('atomic-acres:renderer-fallback:v1');
       return;
     }

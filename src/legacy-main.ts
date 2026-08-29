@@ -422,6 +422,7 @@ import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environmen
 import { parseRendererFallbackRecord, rendererFallbackNotice, RENDERER_FALLBACK_STORAGE_KEY } from './renderer-fallback-notice';
 import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
+import { installTintSwizzleShim } from './webgpu-tint-swizzle-shim';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
   assertAtomicHouseAuthorityParity,
@@ -1825,6 +1826,10 @@ async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
 }
 let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
 if (runtimeRequest.requestedBackend === 'webgpu') {
+  // Chrome 153 Tint chained-swizzle workaround: must wrap navigator.gpu
+  // BEFORE the renderer requests its device (see the shim's header for the
+  // root cause and measurements).
+  document.documentElement.dataset.tintSwizzleShim = String(installTintSwizzleShim());
   try {
     renderRuntime = await WebGpuRenderRuntime.create({
       canvas,
@@ -9345,6 +9350,8 @@ function handleMatchAdmissionFailure(
           userAgent: navigator.userAgent,
           at: new Date().toISOString(),
           reason: error.message.slice(0, 200),
+          // Post-shim failures are real unknowns; bootstrap honors them.
+          shimGeneration: 1,
         }));
       } catch { /* Storage-less contexts just retry per session. */ }
       const fallbackUrl = new URL(window.location.href);

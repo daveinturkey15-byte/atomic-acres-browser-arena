@@ -38,21 +38,45 @@ await page.addInitScript(() => {
     if (device.__wrapped) return device;
     device.__wrapped = true;
     const createShaderModule = device.createShaderModule.bind(device);
+    window.__WGSL_SOURCES__ = window.__WGSL_SOURCES__ ?? new WeakMap();
     device.createShaderModule = (descriptor) => {
       const module = createShaderModule(descriptor);
-      try { module.__code = descriptor.code; module.__label = descriptor.label ?? null; } catch { /* frozen module */ }
+      // GPUShaderModule rejects expandos in some contexts; WeakMap always works.
+      window.__WGSL_SOURCES__.set(module, { code: descriptor.code, label: descriptor.label ?? null });
       return module;
+    };
+    const createRenderPipeline = device.createRenderPipeline.bind(device);
+    device.createRenderPipeline = (descriptor) => {
+      // Sync path: validation errors surface via error scope, not exceptions.
+      device.pushErrorScope('validation');
+      const pipeline = createRenderPipeline(descriptor);
+      const sources = window.__WGSL_SOURCES__;
+      const vertex = sources?.get(descriptor.vertex?.module)?.code ?? null;
+      const fragment = sources?.get(descriptor.fragment?.module)?.code ?? null;
+      const label = descriptor.label ?? null;
+      device.popErrorScope().then((error) => {
+        if (error) {
+          window.__WGSL_FAILURES__.push({
+            label,
+            error: String(error.message ?? error).slice(0, 500),
+            vertex,
+            fragment,
+          });
+        }
+      });
+      return pipeline;
     };
     const createRenderPipelineAsync = device.createRenderPipelineAsync.bind(device);
     device.createRenderPipelineAsync = async (descriptor) => {
       try {
         return await createRenderPipelineAsync(descriptor);
       } catch (error) {
+        const sources = window.__WGSL_SOURCES__;
         window.__WGSL_FAILURES__.push({
           label: descriptor.label ?? null,
           error: String(error?.message ?? error).slice(0, 500),
-          vertex: descriptor.vertex?.module?.__code ?? null,
-          fragment: descriptor.fragment?.module?.__code ?? null,
+          vertex: sources?.get(descriptor.vertex?.module)?.code ?? null,
+          fragment: sources?.get(descriptor.fragment?.module)?.code ?? null,
         });
         throw error;
       }
