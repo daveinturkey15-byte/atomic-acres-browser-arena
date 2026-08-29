@@ -417,6 +417,7 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
+import { parseRendererFallbackRecord, rendererFallbackNotice, RENDERER_FALLBACK_STORAGE_KEY } from './renderer-fallback-notice';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
   assertAtomicHouseAuthorityParity,
@@ -1887,6 +1888,35 @@ const gpuRetirement = createGpuRetirementScheduler({
 const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
 const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
+// Owner 2026-08-29 ("why is it still locked to 60 fps"): the sticky WebGL2
+// fallback was RIGHT but INVISIBLE - roughly half the frame rate with no
+// explanation and no way back short of DevTools. Surface it on the menu with
+// a one-click retry that clears the sticky record.
+{
+  const fallbackRecord = parseRendererFallbackRecord(
+    (() => { try { return localStorage.getItem(RENDERER_FALLBACK_STORAGE_KEY); } catch { return null; } })(),
+    navigator.userAgent,
+  );
+  const notice = rendererFallbackNotice(fallbackRecord, renderRuntime.backend);
+  if (notice.show) {
+    const banner = document.createElement('div');
+    banner.id = 'renderer-fallback-banner';
+    banner.style.cssText = 'margin:8px 12px;padding:8px 12px;border:1px solid #b98a2e;background:rgba(58,42,12,0.92);color:#e8c877;font:600 12px/1.45 system-ui;border-radius:6px;display:flex;gap:12px;align-items:center;';
+    const text = document.createElement('span');
+    text.textContent = notice.message;
+    const retry = document.createElement('button');
+    retry.textContent = notice.retryLabel;
+    retry.style.cssText = 'flex:none;padding:6px 10px;font:700 12px system-ui;background:#b98a2e;color:#1c1206;border:0;border-radius:4px;cursor:pointer;';
+    retry.addEventListener('click', () => {
+      try { localStorage.removeItem(RENDERER_FALLBACK_STORAGE_KEY); } catch { /* storage-less */ }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('renderer');
+      window.location.assign(url.toString());
+    });
+    banner.append(text, retry);
+    menu.prepend(banner);
+  }
+}
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
 const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
