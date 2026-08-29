@@ -27,7 +27,10 @@ export function deepFreezeSubtreeMatrices(root: THREE.Object3D): void {
     if (node.matrixAutoUpdate) node.updateMatrix();
     node.matrixAutoUpdate = false;
   });
-  root.updateMatrixWorld(true);
+  // No forced world refresh here: a frozen subtree is always invisible, so
+  // stale world matrices cannot render, and the swap paths this rides on are
+  // gated (pass65-weapon-runtime-behavior) to never walk inactive rigs.
+  // deepUnfreezeSubtreeMatrices does the one catch-up refresh instead.
   root.updateMatrixWorld = skipUpdateMatrixWorldWhileFrozen;
 }
 
