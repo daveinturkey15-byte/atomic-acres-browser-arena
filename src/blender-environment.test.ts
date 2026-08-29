@@ -32,6 +32,9 @@ describe('Quality Graphics environment asset', () => {
 
   it('mirrors collision-audit visuals into Quality without changing authority', () => {
     const procedural = new THREE.Group();
+    // DECLUTTER 2026-08-29: the vessel left the map; the mirror set is the
+    // two mounds. An extra procedural node must NOT be mirrored - keep the
+    // vessel name in the synthetic world as the negative control.
     for (const name of ['terrain-mound-west-verge', 'terrain-mound-east-verge', 'east-irrigation-vessel']) {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
       mesh.name = name;
@@ -39,8 +42,8 @@ describe('Quality Graphics environment asset', () => {
       procedural.add(mesh);
     }
     const quality = new THREE.Group();
-    expect(mirrorAtomicCollisionAuditVisuals(procedural, quality)).toBe(3);
-    expect(quality.children).toHaveLength(3);
+    expect(mirrorAtomicCollisionAuditVisuals(procedural, quality)).toBe(2);
+    expect(quality.children).toHaveLength(2);
     expect(quality.children.every((child) => child.userData.qualityProfileMirror === true)).toBe(true);
     expect(procedural.children).toHaveLength(3);
   });

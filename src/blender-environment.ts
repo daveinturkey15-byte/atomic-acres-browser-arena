@@ -88,7 +88,8 @@ export function markBlenderArenaFallback(error: unknown): void {
 }
 
 export function mirrorAtomicCollisionAuditVisuals(proceduralWorld: THREE.Object3D, qualityRoot: THREE.Group): number {
-  const names = ['terrain-mound-west-verge', 'terrain-mound-east-verge', 'east-irrigation-vessel'];
+  // DECLUTTER 2026-08-29: the irrigation vessel left the map; two mounds remain.
+  const names = ['terrain-mound-west-verge', 'terrain-mound-east-verge'];
   let mirrored = 0;
   for (const name of names) {
     const source = proceduralWorld.getObjectByName(name);
@@ -254,7 +255,7 @@ export async function loadBlenderArena(
   const proceduralWorld = scene.getObjectByName('Atomic Acres arena');
   if (!proceduralWorld) throw new Error('Authoritative procedural arena root is unavailable');
   const collisionAuditVisuals = mirrorAtomicCollisionAuditVisuals(proceduralWorld, root);
-  if (collisionAuditVisuals !== 3) throw new Error('Atomic collision-audit visual mirror failed: ' + collisionAuditVisuals + '/3');
+  if (collisionAuditVisuals !== 2) throw new Error('Atomic collision-audit visual mirror failed: ' + collisionAuditVisuals + '/2');
   for (const pane of arena.breakableWindows) {
     const authored = windows.get(pane.id)!;
     authored.visible = !pane.broken;
