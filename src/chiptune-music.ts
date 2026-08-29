@@ -299,3 +299,46 @@ export function chiptuneMaxConcurrency(
   }
   return Object.freeze(peak);
 }
+
+/**
+ * Pure lookahead scheduler step (2026-08-29). Given the last scheduled
+ * position and the current horizon, returns every event that must be
+ * committed now plus the new scheduled-until mark. Extracted from
+ * audio.ts's pump after ITS bug became the third and final reason the
+ * soundtrack had never been heard: the old loop marked a whole 15 s loop
+ * scheduled after emitting only the events inside the 0.75 s horizon, so
+ * each loop played one opening blip and 14 s of silence.
+ */
+export function advanceChiptuneSchedule(
+  track: ChiptuneTrackId,
+  scheduledUntilSeconds: number,
+  loopStartedAtSeconds: number,
+  horizonSeconds: number,
+): { events: Array<{ event: ChiptuneEvent; atSeconds: number }>; scheduledUntilSeconds: number } {
+  // Integer microseconds internally: float horizon arithmetic accumulates
+  // upward and either double-struck boundary notes (with a tolerance) or
+  // dropped them (with exact compares). Micros are exact at any horizon a
+  // browser session can reach, and the returned float round-trips losslessly.
+  const loopMicros = Math.round(chiptuneLoopSeconds(track) * 1e6);
+  const untilMicros = Math.max(0, Math.round((scheduledUntilSeconds - loopStartedAtSeconds) * 1e6));
+  const horizonMicros = Math.round((horizonSeconds - loopStartedAtSeconds) * 1e6);
+  const eventMicros = chiptuneLoopEvents(track).map((event) => ({
+    event,
+    offsetMicros: Math.round(event.offsetSeconds * 1e6),
+  }));
+  const toSchedule: Array<{ event: ChiptuneEvent; atSeconds: number }> = [];
+  let cursor = untilMicros;
+  let guard = 0;
+  while (cursor < horizonMicros && guard < 512) {
+    guard += 1;
+    const iteration = Math.floor(cursor / loopMicros);
+    const base = iteration * loopMicros;
+    for (const { event, offsetMicros } of eventMicros) {
+      const atMicros = base + offsetMicros;
+      if (atMicros < cursor || atMicros >= horizonMicros) continue;
+      toSchedule.push({ event, atSeconds: loopStartedAtSeconds + atMicros / 1e6 });
+    }
+    cursor = Math.min(horizonMicros, base + loopMicros);
+  }
+  return { events: toSchedule, scheduledUntilSeconds: loopStartedAtSeconds + cursor / 1e6 };
+}

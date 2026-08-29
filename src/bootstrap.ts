@@ -52,8 +52,17 @@ function applyStickyRendererFallback(): void {
   try {
     const raw = localStorage.getItem('atomic-acres:renderer-fallback:v1');
     if (!raw) return;
-    const record = JSON.parse(raw) as { userAgent?: string };
+    const record = JSON.parse(raw) as { userAgent?: string; at?: string };
     if (record.userAgent !== navigator.userAgent) {
+      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
+      return;
+    }
+    // 2026-08-29: the Chrome 153 Tint race is intermittent and timing-
+    // dependent (cold network 3/3 fail, warm cache 0/4), so a fallback older
+    // than 24 h retries WebGPU rather than pinning the player to half the
+    // frame rate until a browser update happens to land.
+    const recordedAt = Date.parse(record.at ?? '');
+    if (!Number.isFinite(recordedAt) || Date.now() - recordedAt > 24 * 60 * 60 * 1_000) {
       localStorage.removeItem('atomic-acres:renderer-fallback:v1');
       return;
     }

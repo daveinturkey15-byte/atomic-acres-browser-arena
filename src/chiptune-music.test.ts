@@ -10,6 +10,7 @@ import {
   selectChiptuneTrack,
   type ChiptuneTrackId,
   GAME_MUSIC_BUS_GAIN,
+  advanceChiptuneSchedule,
 } from './chiptune-music';
 import { AUDIO_RUNTIME_BUDGET } from './spatial-audio';
 
@@ -56,6 +57,48 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     const effectivePeak = Math.max(...events.map((event) => event.gain)) * GAME_MUSIC_BUS_GAIN * DEFAULT_MUSIC_SLIDER;
     expect(effectivePeak).toBeGreaterThanOrEqual(0.03);
     expect(effectivePeak).toBeLessThanOrEqual(0.09);
+  });
+
+  it('schedules EVERY loop event across consecutive horizon windows (regression: one blip per loop)', () => {
+    // RED against the pre-2026-08-29 pump: it marked a whole ~15 s loop
+    // scheduled after emitting only the events inside the 0.75 s horizon, so
+    // 95% of every loop was silently skipped. Walk two full loops in 0.75 s
+    // pump steps and require exactly two of every event, in order.
+    const track = 'fallout-drift' as const;
+    const loop = chiptuneLoopSeconds(track);
+    const perLoop = chiptuneLoopEvents(track).length;
+    let until = 100; // loop started at t=100 on the context clock
+    const scheduled: number[] = [];
+    const scheduledKeys: string[] = [];
+    for (let now = 100; now < 100 + loop * 2 + 1; now += 0.4) {
+      const step = advanceChiptuneSchedule(track, until, 100, now + 0.75);
+      for (const entry of step.events) scheduled.push(entry.atSeconds);
+      for (const entry of step.events) scheduledKeys.push(`${entry.atSeconds.toFixed(6)}|${entry.event.channel}|${entry.event.frequencyHz.toFixed(2)}`);
+      until = step.scheduledUntilSeconds;
+      expect(until).toBeLessThanOrEqual(now + 0.75 + 1e-9);
+    }
+    // The final horizon reaches into loop 3; count the first two loops only,
+    // and demand exactly one scheduling per event - no gaps, no duplicates.
+    // (Uniqueness keys include the channel: simultaneous lead+bass chords
+    // are authored and legal.)
+    const inWindow = scheduled.filter((at) => at < 100 + loop * 2 - 1e-6);
+    expect(inWindow.length).toBe(perLoop * 2);
+    const keysInWindow = scheduledKeys.filter((key) => Number(key.split('|')[0]) < 100 + loop * 2 - 1e-6);
+    expect(new Set(keysInWindow).size).toBe(keysInWindow.length);
+    for (let index = 1; index < scheduled.length; index += 1) {
+      expect(scheduled[index]).toBeGreaterThanOrEqual(scheduled[index - 1] - 1e-6);
+    }
+  });
+
+  it('keeps the RUNTIME bus coefficient on the same constant (regression: the restage was silently reverted)', async () => {
+    // The first audibility fix restaged createBus('game-music', 0.45) - and
+    // audio.ts's busBaseGain() fallthrough overwrote it back to 0.16 the
+    // moment configure() ran at boot. The owner heard nothing, again. Pin
+    // the file's own mapping so the two stagings can never diverge.
+    const { readFile } = await import('node:fs/promises');
+    const source = await readFile('src/audio.ts', 'utf8');
+    expect(source).toContain("if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;");
+    expect(source).toContain("this.createBus('game-music', GAME_MUSIC_BUS_GAIN);");
   });
 
   it('never overruns its loop, so it can repeat seamlessly', () => {

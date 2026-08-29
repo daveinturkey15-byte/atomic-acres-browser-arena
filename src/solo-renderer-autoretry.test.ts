@@ -24,7 +24,7 @@ describe('solo renderer auto-retry', () => {
     const clickHandler = legacyMain.slice(
       legacyMain.indexOf("element<HTMLButtonElement>('#solo').addEventListener"),
     );
-    const resetIndex = clickHandler.indexOf('soloRendererAutoRetriesRemaining = 2');
+    const resetIndex = clickHandler.indexOf('soloRendererAutoRetriesRemaining = 4');
     const startIndex = clickHandler.indexOf("void startGame('solo')");
     expect(resetIndex).toBeGreaterThan(-1);
     expect(startIndex).toBeGreaterThan(-1);

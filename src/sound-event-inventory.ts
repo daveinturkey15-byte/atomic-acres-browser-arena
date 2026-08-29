@@ -270,6 +270,11 @@ export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
   // rather than in the callsite contract.
   'setAcousticSpace', 'setOcclusionSampler',
   'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  // 2026-08-29 audio QA hooks: pure diagnostics for the harnesses that
+  // finally proved the chiptune's three stacked silences (staging, runtime
+  // coefficient revert, one-blip scheduler). The tone probe emits a bounded
+  // half-second sine only when a debug caller asks; neither is gameplay.
+  'debugMusicState', 'debugProbeTone',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{

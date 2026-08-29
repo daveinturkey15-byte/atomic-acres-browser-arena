@@ -8,12 +8,11 @@ import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
 import {
-  chiptuneLoopEvents,
-  chiptuneLoopSeconds,
   selectChiptuneTrack,
   type ChiptuneEvent,
   type ChiptuneTrackId,
   GAME_MUSIC_BUS_GAIN,
+  advanceChiptuneSchedule,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 // Pass 75: the intermittent "sense of place" layer above the continuous bed.
@@ -1312,6 +1311,50 @@ export class ArenaAudio {
     }
   }
 
+  /**
+   * QA graph bisection (2026-08-29): inject a half-second sine at a KNOWN
+   * gain either directly into the master or through a named bus, so the
+   * output analyser can attribute attenuation to a specific graph segment.
+   * Debug-only; returns false when the graph is unavailable.
+   */
+  debugProbeTone(target: 'master' | Exclude<AudioBusId, 'master'>, gain = 0.2): boolean {
+    if (!this.context || !this.master) return false;
+    const destination = target === 'master' ? this.master : this.buses.get(target);
+    if (!destination) return false;
+    try {
+      const oscillator = this.context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 440;
+      const envelope = this.context.createGain();
+      envelope.gain.value = gain;
+      oscillator.connect(envelope).connect(destination);
+      const now = this.context.currentTime;
+      oscillator.start(now);
+      oscillator.stop(now + 0.5);
+      oscillator.onended = () => {
+        try { oscillator.disconnect(); envelope.disconnect(); } catch { /* torn down */ }
+      };
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** QA: live music channel state - proves whether the notes reach the
+   * channel gain params at authored amplitude (input side) or die between
+   * the channel and the bus (graph side). */
+  debugMusicState(): { running: boolean; leadGain: number; bassGain: number; leadHz: number; scheduledAhead: number } | null {
+    const channels = this.musicChannels;
+    if (!channels || !this.context) return null;
+    return {
+      running: this.musicRunning,
+      leadGain: channels.lead.gain.gain.value,
+      bassGain: channels.bass.gain.gain.value,
+      leadHz: channels.lead.osc.frequency.value,
+      scheduledAhead: Number((this.musicScheduledUntilSeconds - this.context.currentTime).toFixed(3)),
+    };
+  }
+
   /** True while the background chiptune is scheduling. */
   get gameMusicRunning(): boolean {
     return this.musicRunning;
@@ -1335,23 +1378,17 @@ export class ArenaAudio {
     const channels = this.musicChannels;
     const track = this.musicTrack;
     if (!this.musicRunning || !this.context || !channels || !track) return;
-    const loopSeconds = chiptuneLoopSeconds(track);
     const horizon = this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS;
-    // Bound the work per frame. Without this a long tab-suspend would return and
-    // try to schedule every note it "missed" in one go.
-    let guard = 0;
-    while (this.musicScheduledUntilSeconds < horizon && guard < 512) {
-      guard += 1;
-      const iteration = Math.floor(
-        (this.musicScheduledUntilSeconds - this.musicLoopStartedAtSeconds) / loopSeconds);
-      const loopStart = this.musicLoopStartedAtSeconds + iteration * loopSeconds;
-      for (const event of chiptuneLoopEvents(track)) {
-        const at = loopStart + event.offsetSeconds;
-        if (at < this.musicScheduledUntilSeconds - 1e-6 || at >= horizon) continue;
-        this.scheduleChiptuneNote(channels[event.channel], event, at);
-      }
-      this.musicScheduledUntilSeconds = loopStart + loopSeconds;
+    const step = advanceChiptuneSchedule(
+      track,
+      this.musicScheduledUntilSeconds,
+      this.musicLoopStartedAtSeconds,
+      horizon,
+    );
+    for (const { event, atSeconds } of step.events) {
+      this.scheduleChiptuneNote(channels[event.channel], event, atSeconds);
     }
+    this.musicScheduledUntilSeconds = step.scheduledUntilSeconds;
   }
 
   /** Commits one note to a channel's oscillator: pitch, then a short envelope. */
@@ -3637,6 +3674,12 @@ export class ArenaAudio {
     if (id === 'announcements') return 0.5;
     if (id === 'ambience') return 0.12;
     if (id === 'menu-music') return 0.18;
+    // 2026-08-29: this fallthrough silently REVERTED the chiptune restage at
+    // runtime - configure() runs at boot and applyBusSetting overwrote the
+    // createBus(0.45) with 0.16 x slider, which is why the owner still heard
+    // nothing after the "music becomes audible" pass shipped. Single source
+    // of truth now; the contract test pins this file's mapping.
+    if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;
     return 0.16;
   }
 

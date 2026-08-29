@@ -418,6 +418,7 @@ import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
 import { parseRendererFallbackRecord, rendererFallbackNotice, RENDERER_FALLBACK_STORAGE_KEY } from './renderer-fallback-notice';
+import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
   assertAtomicHouseAuthorityParity,
@@ -2008,6 +2009,22 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
+// Chrome 153 Tint-race repair (2026-08-29): when a captured pipeline error
+// lands, purge the errored pipeline cache entries and bump materials so
+// three rebuilds them - re-creation usually succeeds because the failure is
+// a timing race. Installed only on the WebGPU route; telemetry rides the
+// documentElement for the QA probes.
+if (renderRuntime.backend === 'webgpu') {
+  installTintPipelineRepair({
+    getRenderer: () => renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
+    getScene: () => scene,
+    onRepair: (result, sweepsUsed) => {
+      document.documentElement.dataset.tintPipelineRepairs = String(sweepsUsed);
+      document.documentElement.dataset.tintPipelineLastPurge = String(result.purged);
+      setStatus(`Recovered ${result.purged} shader pipeline${result.purged === 1 ? '' : 's'} after a graphics driver hiccup.`, 'warn');
+    },
+  });
+}
 const botWeaponGpuVocabulary = new BotWeaponGpuVocabulary(scene, flattenOperatorMaterials);
 const killstreakPresentation = new KillstreakPresentation(
   scene,
@@ -9144,7 +9161,7 @@ function settleMatchAdmissionRun(token: MatchAdmissionToken): void {
 
 // Automatic solo redeploy budget for intermittent renderer pipeline failures. Restored
 // to 2 by every explicit Solo click; spent only on WebGPU/pipeline-class errors.
-let soloRendererAutoRetriesRemaining = 2;
+let soloRendererAutoRetriesRemaining = 4;
 
 function handleMatchAdmissionFailure(
   token: MatchAdmissionToken,
@@ -9186,8 +9203,11 @@ function handleMatchAdmissionFailure(
     const rendererClassFailure = /webgpu|pipeline|commandbuffer|queue completion|device lost|tint/i.test(error.message);
     if (soloRendererAutoRetriesRemaining > 0 && rendererClassFailure) {
       soloRendererAutoRetriesRemaining -= 1;
-      const attempt = 2 - soloRendererAutoRetriesRemaining;
-      setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 2)...`, 'warn');
+      // 2026-08-29 measurement: the Tint race is TIMING-sensitive - cold
+      // network streaming fails 3/3, warm-cache/local timing 0/4. Later
+      // attempts run on warm caches, so four tries multiply escape odds.
+      const attempt = 4 - soloRendererAutoRetriesRemaining;
+      setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 4)...`, 'warn');
       window.setTimeout(() => {
         if (matchStartPreparing || gameStarted) return;
         network.close();
@@ -27731,7 +27751,7 @@ element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (!requirePlayerName()) return;
   // A fresh explicit click restores the automatic retry budget (see
   // handleMatchAdmissionFailure): retries belong to an attempt, not to the session.
-  soloRendererAutoRetriesRemaining = 2;
+  soloRendererAutoRetriesRemaining = 4;
   network.close();
   resetForMode();
   resetPrivateLobbyState();
@@ -29818,6 +29838,9 @@ const debugWindow = window as Window & {
     interactShed: () => boolean;
     damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
     bulletHitShed: (placementId?: string, surfaceId?: string, damageQ?: number, penetrationEnergyQ?: number) => boolean;
+    audioTelemetry: () => Record<string, unknown>;
+    audioProbeTone: (target?: string, gain?: number) => boolean;
+    audioMusicState: () => Record<string, unknown> | null;
     detonateGrenadeAtShed: (placementId?: string, surfaceId?: string) => {
       accepted: boolean;
       placementId: string | null;
@@ -30703,6 +30726,13 @@ function debugRiggedOperatorJointScreenPositions(
 })();
 
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
+  // runtime coefficient revert). This probe ends the guessing: live bus
+  // gains, context state, the music scheduler flag and a real output
+  // amplitude sample, all readable by the QA harnesses.
+  audioTelemetry: () => ({ ...audio.telemetry(), gameMusicRunning: audio.gameMusicRunning }),
+  audioProbeTone: (target = 'master', gain = 0.2) => audio.debugProbeTone(target as never, gain),
+  audioMusicState: () => audio.debugMusicState(),
   admissionState: sampleAdmissionState,
   // Read-only handle on the live scene graph. Screenshots tell you THAT a frame
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
