@@ -1,4 +1,4 @@
-import { ARENA_BOUNDS, GARAGE_LAYOUT, HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
+import { ARENA_BOUNDS, SPAWN_END_FENCE_X, GARAGE_LAYOUT, HOUSE_LAYOUT, STREET_HALF_WIDTH } from './arena-layout';
 import type { Box2 } from './collision';
 
 export const GRASS_GROUND_LAYOUT_ID = 'manicured-verges-v4';
@@ -19,7 +19,7 @@ export const SIDEWALK_DEPTH_M = 1.1;
 export const HARD_SURFACE_HALF_DEPTH_M = STREET_HALF_WIDTH + KERB_DEPTH_M + SIDEWALK_DEPTH_M;
 
 export type GrassGroundRegion = Readonly<{
-  id: 'north-lawn' | 'south-lawn';
+  id: 'north-lawn' | 'south-lawn' | 'west-garden' | 'east-garden';
   minX: number;
   maxX: number;
   minZ: number;
@@ -52,6 +52,23 @@ export const GRASS_GROUND_REGIONS: readonly GrassGroundRegion[] = Object.freeze(
     maxX: ARENA_BOUNDS.maxX,
     minZ: HARD_SURFACE_HALF_DEPTH_M,
     maxZ: ARENA_BOUNDS.maxZ,
+  }),
+  // REDESIGN 2026-08-29: the street (and with it the hard-surface band) ends
+  // at the spawn fences now, so the two END GARDENS are lawn at street level
+  // too - without these strips the spawn yards were bare painted plates.
+  Object.freeze({
+    id: 'west-garden',
+    minX: ARENA_BOUNDS.minX,
+    maxX: -SPAWN_END_FENCE_X,
+    minZ: -HARD_SURFACE_HALF_DEPTH_M,
+    maxZ: HARD_SURFACE_HALF_DEPTH_M,
+  }),
+  Object.freeze({
+    id: 'east-garden',
+    minX: SPAWN_END_FENCE_X,
+    maxX: ARENA_BOUNDS.maxX,
+    minZ: -HARD_SURFACE_HALF_DEPTH_M,
+    maxZ: HARD_SURFACE_HALF_DEPTH_M,
   }),
 ]);
 
@@ -167,7 +184,13 @@ export function createGrassPlacements(colliders: readonly Box2[], maximum = GRAS
         // Four distance-cull chunks: each lawn band splits at the street's
         // mid-X so a camera at one end of the map can drop the far half.
         // (v3 split by z-sign, which the v4 bands make constant per region.)
-        chunk: regionIndex * 2 + (x >= (region.minX + region.maxX) / 2 ? 1 : 0),
+        // REDESIGN 2026-08-29: the two end-garden strips FOLD INTO their
+        // adjacent quadrant chunk (by z-sign and end) so the chunk count and
+        // its distance-cull semantics stay exactly four - a garden's blades
+        // cull with the map end they sit on.
+        chunk: regionIndex < 2
+          ? regionIndex * 2 + (x >= (region.minX + region.maxX) / 2 ? 1 : 0)
+          : (z < 0 ? 0 : 2) + (x >= 0 ? 1 : 0),
       }));
     }
     if (placements.length >= limit) break;

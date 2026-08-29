@@ -124,6 +124,10 @@ export interface InstancedGrassFieldOptions {
   scaleRange?: readonly [number, number];
   /** Blades sink slightly so roots never float on plate seams (metres). */
   rootSinkM?: number;
+  /** Blades merged into each instanced tuft (default 1 = single blade).
+   * A 3-blade tuft triples visual density per instance for the same
+   * instance count - the vegetation skill's merged-geometry recipe. */
+  bladesPerTuft?: number;
   /** Ground height lookup; default flat 0. */
   groundY?: (x: number, z: number) => number;
   /** Arena keep-out truth: return false to reject a candidate. */
@@ -194,6 +198,54 @@ export function createGrassBladeGeometry(
 
 /** Triangles per blade for the fixed segment count. */
 export const GRASS_BLADE_TRIANGLES = 2 * (BLADE_SEGMENTS - 1) + 1;
+
+/**
+ * A tuft = N blades fanned around one root, merged into ONE geometry so an
+ * instance renders a clump instead of a lone blade (same instance count,
+ * N x the visual density). Deterministic fixed tables - no RNG. The tallest
+ * blade keeps the full authored height so the art-only height cap holds by
+ * construction, exactly as for the single blade.
+ */
+export function createGrassTuftGeometry(
+  heightM: number,
+  widthM: number,
+  bendM: number,
+  bladesPerTuft: number,
+  name: string,
+): THREE.BufferGeometry {
+  if (bladesPerTuft <= 1) return createGrassBladeGeometry(heightM, widthM, bendM, name);
+  // Fixed per-blade variation tables (yaw, radial offset, height factor).
+  const YAWS = [0, 2.09, 4.19, 1.05, 3.14, 5.24];
+  const OFFS = [0, 0.024, 0.03, 0.027, 0.021, 0.033];
+  const HGTS = [1, 0.82, 0.9, 0.78, 0.86, 0.8];
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const rotated = new THREE.Matrix4();
+  const euler = new THREE.Euler();
+  for (let blade = 0; blade < bladesPerTuft; blade += 1) {
+    const part = createGrassBladeGeometry(heightM * HGTS[blade % HGTS.length], widthM, bendM, `${name}-part`);
+    euler.set(0, YAWS[blade % YAWS.length], 0);
+    rotated.makeRotationFromEuler(euler);
+    rotated.setPosition(
+      Math.cos(YAWS[blade % YAWS.length]) * OFFS[blade % OFFS.length],
+      0,
+      Math.sin(YAWS[blade % YAWS.length]) * OFFS[blade % OFFS.length],
+    );
+    part.applyMatrix4(rotated);
+    const base = positions.length / 3;
+    const pos = part.getAttribute('position');
+    for (let i = 0; i < pos.count; i += 1) positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const idx = part.index!;
+    for (let i = 0; i < idx.count; i += 1) indices.push(base + idx.getX(i));
+    part.dispose();
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.name = name;
+  return geometry;
+}
 
 // ---------------------------------------------------------------------------
 // Seeded PRNG — same mulberry32 idiom as the donor
@@ -305,10 +357,12 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     throw new Error(`${options.name}: tint spec peaks above 1.0 (${grassClumpTintPeak(tint).toFixed(3)}) — the range above material.color's white cap is silently thrown away`);
   }
 
-  const geometry = createGrassBladeGeometry(
+  const bladesPerTuft = Math.max(1, Math.floor(options.bladesPerTuft ?? 1));
+  const geometry = createGrassTuftGeometry(
     options.bladeHeightM,
     options.bladeWidthM ?? 0.055,
     options.bladeBendM ?? 0.09,
+    bladesPerTuft,
     `${options.name}-blade`,
   );
   const { material, time } = makeFieldMaterial(options.material, options.bladeHeightM);
@@ -389,7 +443,7 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
 
   const stats: InstancedGrassFieldStats = {
     blades,
-    triangles: blades * GRASS_BLADE_TRIANGLES,
+    triangles: blades * GRASS_BLADE_TRIANGLES * bladesPerTuft,
     drawCalls: meshes.length,
     regions: options.regions.length,
   };

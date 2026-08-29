@@ -7,6 +7,7 @@ import {
   HARD_SURFACE_HALF_DEPTH_M,
   isGrassGround,
 } from './grass-placement';
+import { SPAWN_END_FENCE_X } from './arena-layout';
 
 describe('Atomic Acres deterministic manicured-verge placement', () => {
   // manicured-verges-v4 (Pass 82): the v3 regions pre-dated the Pass 78 axis
@@ -52,12 +53,16 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
   // ARENA_BOUNDS, which became 68 x 57 when the flow rotated end-to-end;
   // lattice, slot count (720), chunking (4) and every other assertion are
   // unchanged and re-verified here at the new bands.
+  // Same day, art pass: 'cdef22cf' -> the two END-GARDEN strips join the
+  // region set (the street ends at the spawn fences, so the garden ground at
+  // street level is lawn), redistributing the same 720 slots; gardens fold
+  // into the four existing distance-cull chunks by quadrant.
   it('produces a stable private placement checksum without consuming runtime RNG', () => {
     const first = createGrassPlacements([]);
     const second = createGrassPlacements([]);
     expect(first).toEqual(second);
     expect(first.placements).toHaveLength(720);
-    expect(first.checksum).toBe('cdef22cf');
+    expect(first.checksum).toBe('11437d01');
     expect(first.chunks).toBe(4);
     expect(first.placements.every((placement) => isGrassGround(placement.x, placement.z))).toBe(true);
     expect(Math.max(...first.placements.map((placement) => placement.height))).toBeLessThanOrEqual(GRASS_MAX_HEIGHT);
@@ -72,7 +77,12 @@ describe('Atomic Acres deterministic manicured-verge placement', () => {
     // kerbstone or pavement band. |z| < 8.8 is the full hard-surface half
     // depth (STREET_HALF_WIDTH 6.5 + kerb 1.2 + sidewalk 1.1); v3 placed
     // dozens of blades inside it at both street ends.
-    expect(first.placements.every((placement) => Math.abs(placement.z) >= HARD_SURFACE_HALF_DEPTH_M)).toBe(true);
+    // REDESIGN 2026-08-29: the street ends at the spawn fences, so the pin
+    // holds INSIDE the street span; the end-garden strips are lawn at street
+    // level by design (and the fence x-band itself carries its own keep-out).
+    expect(first.placements.every((placement) => (
+      Math.abs(placement.x) > SPAWN_END_FENCE_X || Math.abs(placement.z) >= HARD_SURFACE_HALF_DEPTH_M
+    ))).toBe(true);
     // And both lawn bands must actually be populated.
     expect(new Set(first.placements.map((placement) => Math.sign(placement.z))).size).toBe(2);
   });

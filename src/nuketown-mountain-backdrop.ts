@@ -81,51 +81,73 @@ type RidgeRingSpec = Readonly<{
 }>;
 
 /**
- * One ridge ring: three vertex rows (inner foot at y~0.2 below ground, crest,
- * outer foot dipped to -2.5) triangulated into a closed strip. Crest radius
- * and height vary per angular segment through layered sines + seeded jitter,
- * which is what makes it read as a mountain RANGE instead of a crown of
- * identical cones.
+ * One ridge ring, v2 (owner 2026-08-29: "mountains should be implemented
+ * using the techniques I am sharing"). Five vertex rows per angular segment
+ * (inner foot, inner shoulder, crest, outer shoulder, outer foot) displaced
+ * by RIDGED octave noise - 1-|sin| octaves sharpen the crestline into peaks
+ * and saddles the way ridged FBM does, instead of the old three-row tent
+ * profile that read as one soft lump from every angle. Colour is banded by
+ * altitude (dry scrub foot, sage rock mid-slope, pale granite crest) with
+ * per-segment tonal break-up, and the shoulders carry their own radial spur
+ * jitter so spurs run down the slopes. Deterministic: same seeded stream.
  */
 function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   const positions: number[] = [];
   const colors: number[] = [];
   const indices: number[] = [];
   const foot = new THREE.Color(spec.footColor);
+  const mid = new THREE.Color(spec.footColor).lerp(new THREE.Color(spec.crestColor), 0.55);
   const crest = new THREE.Color(spec.crestColor);
   const vertexColor = new THREE.Color();
 
-  const rows = 3; // inner foot, crest, outer foot
+  // Ridged octave: 1-|sin| gives sharp peaks at the sine zero crossings.
+  const ridged = (angle: number, phase: number): number => {
+    const o1 = 1 - Math.abs(Math.sin(angle * 3 + phase));
+    const o2 = 1 - Math.abs(Math.sin(angle * 7 + phase * 2.3));
+    const o3 = 1 - Math.abs(Math.sin(angle * 13 + phase * 4.1));
+    const o4 = 1 - Math.abs(Math.sin(angle * 23 + phase * 7.9));
+    return (o1 * 0.42 + o2 * 0.28 + o3 * 0.19 + o4 * 0.11);
+  };
+
+  const rows = 5;
   for (let segment = 0; segment <= spec.segments; segment += 1) {
-    // The seam pair (segment 0 / segments) must share identical noise so the
-    // ring closes; reuse the angle-periodic sines and a wrapped jitter index.
     const wrapped = segment % spec.segments;
     const angle = (wrapped / spec.segments) * Math.PI * 2;
     const jitterA = mulberry32((SEED ^ (wrapped * 2654435761)) >>> 0)();
     const jitterB = mulberry32((SEED ^ ((wrapped + 977) * 40503)) >>> 0)();
+    const jitterC = mulberry32((SEED ^ ((wrapped + 4409) * 69069)) >>> 0)();
 
-    const undulation =
-      Math.sin(angle * 3 + spec.phase) * 0.45 +
-      Math.sin(angle * 7 + spec.phase * 2.3) * 0.3 +
-      Math.sin(angle * 13 + spec.phase * 4.1) * 0.25;
-    const heightT = Math.min(1, Math.max(0, 0.5 + 0.5 * undulation + (jitterA - 0.5) * 0.55));
+    const relief = ridged(angle, spec.phase);
+    const heightT = Math.min(1, Math.max(0.08, relief * 1.15 + (jitterA - 0.5) * 0.4));
     const height = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
-    const crestRadius =
-      spec.innerRadius +
-      (spec.outerRadius - spec.innerRadius) * (0.35 + 0.3 * (0.5 + 0.5 * Math.sin(angle * 5 - spec.phase)) + (jitterB - 0.5) * 0.2);
+    const band = spec.outerRadius - spec.innerRadius;
+    const crestRadius = spec.innerRadius
+      + band * (0.36 + 0.26 * ridged(angle * 0.5 + 1.3, spec.phase * 1.7) + (jitterB - 0.5) * 0.16);
+    // Spur jitter: shoulders wander off the crest line so ridgelines run
+    // DOWN the slopes instead of the slope being one straight cone face.
+    const spurIn = (jitterC - 0.5) * band * 0.18;
+    const spurOut = (0.5 - jitterC) * band * 0.14;
+    const innerShoulderR = spec.innerRadius + (crestRadius - spec.innerRadius) * 0.55 + spurIn;
+    const outerShoulderR = crestRadius + (spec.outerRadius - crestRadius) * 0.5 + spurOut;
+    const innerShoulderY = height * (0.4 + 0.18 * ridged(angle * 2.1, spec.phase + 2.2));
+    const outerShoulderY = height * (0.5 + 0.16 * ridged(angle * 1.7, spec.phase + 4.4));
 
-    const ringRows: Array<readonly [number, number]> = [
-      [spec.innerRadius, -0.2],
-      [crestRadius, height],
-      [spec.outerRadius, -2.5],
+    const ringRows: Array<readonly [number, number, number]> = [
+      [spec.innerRadius, -0.2, 0],
+      [Math.max(spec.innerRadius, innerShoulderR), innerShoulderY, 0.45],
+      [crestRadius, height, 1],
+      [Math.min(spec.outerRadius, outerShoulderR), outerShoulderY, 0.5],
+      [spec.outerRadius, -2.5, 0],
     ];
     for (let row = 0; row < rows; row += 1) {
-      const [radius, y] = ringRows[row];
+      const [radius, y, altitude] = ringRows[row];
       positions.push(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-      const t = row === 1 ? Math.min(1, height / spec.heightMax) : 0;
-      vertexColor.copy(foot).lerp(crest, t * 0.85 + (row === 1 ? 0.15 : 0));
-      // Small per-segment tonal break-up so long slopes are not one flat wash.
-      const tone = 0.94 + jitterA * 0.12;
+      // Altitude banding: scrub foot -> sage rock -> pale crest, scaled by
+      // how tall this segment actually is so low saddles stay scrubby.
+      const t = altitude * Math.min(1, height / spec.heightMax);
+      if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
+      else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
+      const tone = 0.92 + jitterA * 0.16;
       colors.push(vertexColor.r * tone, vertexColor.g * tone, vertexColor.b * tone);
     }
   }
@@ -175,7 +197,7 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   const foothills = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-foothills',
-      segments: 72,
+      segments: 108,
       innerRadius: NUKETOWN_BACKDROP_MIN_RADIAL_M + 6, // 64
       outerRadius: 92,
       heightMin: 4,
@@ -190,7 +212,7 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   const ridge = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-ridge',
-      segments: 88,
+      segments: 144,
       innerRadius: 96,
       outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M, // 132
       heightMin: 13,

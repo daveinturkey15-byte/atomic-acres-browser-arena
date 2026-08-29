@@ -18,7 +18,7 @@
  */
 import { describe, expect, it, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
-import { ARENA_BOUNDS } from './arena-layout';
+import { ARENA_BOUNDS, SPAWN_END_FENCE_X } from './arena-layout';
 import { HARD_SURFACE_HALF_DEPTH_M } from './grass-placement';
 import { buildArena } from './map';
 import {
@@ -59,7 +59,12 @@ describe('Nuke Town lawn field (Pass 82)', () => {
     expect(stats.blades).toBeGreaterThan(5_000); // a lawn, not a dressing pass
     expect(origins).toHaveLength(stats.blades);
     for (const origin of origins) {
-      expect(Math.abs(origin.z)).toBeGreaterThanOrEqual(HARD_SURFACE_HALF_DEPTH_M);
+      // REDESIGN 2026-08-29: the street (and its hard-surface band) ends at
+      // the spawn fences, so the |z| exclusion applies only inside the street
+      // span; the end gardens are lawn at street level by design.
+      if (Math.abs(origin.x) <= SPAWN_END_FENCE_X) {
+        expect(Math.abs(origin.z)).toBeGreaterThanOrEqual(HARD_SURFACE_HALF_DEPTH_M);
+      }
       expect(origin.z).toBeGreaterThanOrEqual(ARENA_BOUNDS.minZ);
       expect(origin.z).toBeLessThanOrEqual(ARENA_BOUNDS.maxZ);
       expect(origin.x).toBeGreaterThanOrEqual(ARENA_BOUNDS.minX);
@@ -105,9 +110,11 @@ describe('Nuke Town lawn field (Pass 82)', () => {
     }
   });
 
-  it('stays presentation-only: two instanced draws, shared geometry+material, no collider identity', () => {
+  it('stays presentation-only: four instanced draws, shared geometry+material, no collider identity', () => {
+    // REDESIGN 2026-08-29: two lawn bands + two end-garden strips = four
+    // regions, one draw each; still one geometry, one material, one graph.
     const { meshes, stats } = bladeOrigins();
-    expect(stats.drawCalls).toBeLessThanOrEqual(2);
+    expect(stats.drawCalls).toBeLessThanOrEqual(4);
     expect(meshes.length).toBe(stats.drawCalls);
     const materials = new Set(meshes.map((mesh) => mesh.material));
     const geometries = new Set(meshes.map((mesh) => mesh.geometry));
@@ -133,7 +140,7 @@ describe('Nuke Town lawn field (Pass 82)', () => {
     const full = bladeOrigins(false);
     const reduced = bladeOrigins(true);
     expect(reduced.stats.blades).toBeLessThan(full.stats.blades * 0.6);
-    expect(reduced.stats.drawCalls).toBeLessThanOrEqual(2);
+    expect(reduced.stats.drawCalls).toBeLessThanOrEqual(4);
     // Coverage: both sides of the street stay planted.
     expect(new Set(reduced.origins.map((origin) => Math.sign(origin.z))).size).toBe(2);
   });

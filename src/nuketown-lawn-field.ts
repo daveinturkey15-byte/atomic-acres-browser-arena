@@ -172,14 +172,23 @@ export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
  * cell for the reduced-world-detail route (fewer blades, same coverage).
  */
 export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean): InstancedGrassField {
+  // The WebGL2 compat route renders the field without the TSL wind graph and
+  // pays pure fill-rate for every blade; measured 2026-08-29 (p95 22.3 ms ->
+  // 27.7 ms at full tuft density on that route), so it takes a middle tier:
+  // still 2-blade tufts (denser than the old single blades), wider cells.
+  const compatRoute = typeof document !== 'undefined'
+    && document.documentElement?.dataset.renderBackend === 'webgl2';
   const field = buildInstancedGrassField({
     name: 'nuketown-lawn',
     seed: NUKETOWN_LAWN_SEED,
     regions: GRASS_GROUND_REGIONS,
-    cellSizeM: reduced ? 0.52 : 0.34,
+    cellSizeM: reduced ? 0.5 : compatRoute ? 0.36 : 0.3,
     bladeHeightM: NUKETOWN_LAWN_BLADE_HEIGHT_M,
-    bladeWidthM: 0.05,
-    bladeBendM: 0.05,
+    bladeWidthM: 0.062,
+    bladeBendM: 0.055,
+    // Owner 2026-08-29: lawns must read like the shared showcase grass, not
+    // sparse lone blades - 3-blade merged tufts triple density per instance.
+    bladesPerTuft: reduced || compatRoute ? 2 : 3,
     scaleRange: [0.68, 1.0],
     placementAllowed: nuketownLawnPlacementAllowed,
     material: {
