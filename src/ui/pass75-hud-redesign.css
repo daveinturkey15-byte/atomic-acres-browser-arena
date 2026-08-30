@@ -587,3 +587,15 @@ html[data-reduced-sensory='true'] #hud #hitmarker.headshot::after {
 html[data-reduced-sensory='true'] #damage-direction i::before {
   filter: none;
 }
+
+/* Owner 2026-08-30: while a support platform is possessed, the cockpit
+   instrument rail owns the bottom band - the rifle/ammo console and the
+   knife/grenade equipment block would otherwise sit underneath it. Vitals
+   stay (the operator's body can still take damage in the world). */
+#hud[data-support-possessed="true"] .hud-weapon-console,
+#hud[data-support-possessed="true"] #equipment-block {
+  display: none;
+}
+#hud[data-support-possessed="true"] #support-block {
+  opacity: 0.55;
+}

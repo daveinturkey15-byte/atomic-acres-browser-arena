@@ -150,6 +150,11 @@ export interface InstancedGrassField {
   stats: Readonly<InstancedGrassFieldStats>;
   /** Advance the shared wind clock (seconds). No-op on the WebGL2 route. */
   advanceWind(seconds: number): void;
+  /** Owner 2026-08-30 "make the grass breakable": flatten every blade tuft
+   * within radiusM of (x, z) - gunfire tramples a small circle, explosions a
+   * large one. Idempotent per blade; returns how many tufts were newly
+   * crushed. Presentation only. */
+  crushAt(x: number, z: number, radiusM: number): number;
   /** Dispose geometry + material (the group's parent removes the nodes). */
   dispose(): void;
 }
@@ -343,6 +348,12 @@ function makeFieldMaterial(
 // ---------------------------------------------------------------------------
 
 export function buildInstancedGrassField(options: InstancedGrassFieldOptions): InstancedGrassField {
+  const crushIndex: Array<{
+    mesh: THREE.InstancedMesh;
+    instanceXZ: Float32Array;
+    cells: Map<string, number[]>;
+    crushed: Uint8Array;
+  }> = [];
   const cell = options.cellSizeM ?? 0.33;
   const rootSink = options.rootSinkM ?? 0.02;
   const [scaleMinRaw, scaleMaxRaw] = options.scaleRange ?? [0.72, 1.0];
@@ -438,6 +449,19 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     mesh.userData.blocksShots = false;
     group.add(mesh);
     meshes.push(mesh);
+    // Breakable-grass index: per-instance planar positions plus a 2 m cell
+    // map so a crush query touches only nearby blades.
+    const instanceXZ = new Float32Array(instances.length * 2);
+    const cellsIndex = new Map<string, number[]>();
+    for (let k = 0; k < instances.length; k += 1) {
+      instanceXZ[k * 2] = instances[k].x;
+      instanceXZ[k * 2 + 1] = instances[k].z;
+      const cellKey = `${Math.floor(instances[k].x / 2)}:${Math.floor(instances[k].z / 2)}`;
+      const bucket = cellsIndex.get(cellKey);
+      if (bucket) bucket.push(k);
+      else cellsIndex.set(cellKey, [k]);
+    }
+    crushIndex.push({ mesh, instanceXZ, cells: cellsIndex, crushed: new Uint8Array(instances.length) });
     blades += instances.length;
   }
 
@@ -454,6 +478,41 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     stats,
     advanceWind: (seconds: number) => {
       if (time) time.value = seconds;
+    },
+    crushAt: (x: number, z: number, radiusM: number) => {
+      const radiusSq = radiusM * radiusM;
+      let crushedCount = 0;
+      const crushMatrix = new THREE.Matrix4();
+      const crushPosition = new THREE.Vector3();
+      const crushQuaternion = new THREE.Quaternion();
+      const crushScale = new THREE.Vector3();
+      for (const entry of crushIndex) {
+        let touched = false;
+        for (let cx = Math.floor((x - radiusM) / 2); cx <= Math.floor((x + radiusM) / 2); cx += 1) {
+          for (let cz = Math.floor((z - radiusM) / 2); cz <= Math.floor((z + radiusM) / 2); cz += 1) {
+            const bucket = entry.cells.get(`${cx}:${cz}`);
+            if (!bucket) continue;
+            for (const k of bucket) {
+              if (entry.crushed[k]) continue;
+              const dx = entry.instanceXZ[k * 2] - x;
+              const dz = entry.instanceXZ[k * 2 + 1] - z;
+              if (dx * dx + dz * dz > radiusSq) continue;
+              entry.crushed[k] = 1;
+              crushedCount += 1;
+              touched = true;
+              // Flatten: keep the tuft's footprint but collapse its height so
+              // the ground reads trampled rather than erased.
+              entry.mesh.getMatrixAt(k, crushMatrix);
+              crushMatrix.decompose(crushPosition, crushQuaternion, crushScale);
+              crushScale.y = 0.06;
+              crushMatrix.compose(crushPosition, crushQuaternion, crushScale);
+              entry.mesh.setMatrixAt(k, crushMatrix);
+            }
+          }
+        }
+        if (touched) entry.mesh.instanceMatrix.needsUpdate = true;
+      }
+      return crushedCount;
     },
     dispose: () => {
       geometry.dispose();

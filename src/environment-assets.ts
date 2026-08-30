@@ -389,6 +389,8 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // updateArenaArt drives the lawn's GPU wind clock through this hook (the
   // per-frame caller in legacy-main already passes this group + now-ms).
   group.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
+  // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
+  group.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
 
   group.userData.neighbourhoodLife = {
     flowers: flowerCount,
@@ -794,6 +796,20 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
     addPiece(houseIndex, house, 'workstation-monitor', [deskX, 4.75, deskZ - 0.38], [1.35, 0.88, 0.12], darkEquipment, 'dark-equipment');
     addPiece(houseIndex, house, 'workstation-leg-left', [deskX - 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
     addPiece(houseIndex, house, 'workstation-leg-right', [deskX + 0.95, 3.55, deskZ], [0.13, 0.82, 0.72], metal, 'metal');
+
+    // Owner 2026-08-30 richness: the rooms carried furniture but no LIFE -
+    // rug, wall art, lamp, backsplash, nightstand. All presentation-only.
+    addPiece(houseIndex, house, 'living-rug', [sofaX - 0.2, 0.03, sofaZ - 0.9], [3.6, 0.05, 2.6], fabric, 'fabric');
+    addPiece(houseIndex, house, 'wall-art-a', [sofaX - 2.6, 1.75, 3.32], [1.1, 0.78, 0.06], timber, 'timber');
+    addPiece(houseIndex, house, 'wall-art-b', [diningX + 0.4, 1.85, -3.32], [0.85, 0.6, 0.06], timber, 'timber');
+    const lampShade = addPiece(houseIndex, house, 'floor-lamp-shade', [sofaX + 1.9, 1.62, sofaZ + 0.3], [0.42, 0.36, 0.42], fabric, 'fabric');
+    const shadeMaterial = (lampShade.material as THREE.MeshStandardMaterial).clone();
+    shadeMaterial.emissive = new THREE.Color(0xffc27a);
+    shadeMaterial.emissiveIntensity = 1.4;
+    lampShade.material = shadeMaterial;
+    addPiece(houseIndex, house, 'floor-lamp-pole', [sofaX + 1.9, 0.8, sofaZ + 0.3], [0.07, 1.6, 0.07], metal, 'metal');
+    addPiece(houseIndex, house, 'kitchen-backsplash', [kitchenX, 1.45, kitchenZ + 0.35], [6.3, 0.6, 0.05], metal, 'metal');
+    addPiece(houseIndex, house, 'nightstand', [bedX + 1.9, 3.85, bedZ + 0.7], [0.55, 0.5, 0.5], timber, 'timber');
   });
 
   root.add(interiors);
@@ -807,8 +823,84 @@ export function addSemanticHouseInteriors(root: THREE.Group): void {
   };
 }
 
+function addBackyardLiving(root: THREE.Group): void {
+  const yards = new THREE.Group();
+  yards.name = 'backyard-living-sets';
+  const timberYard = new THREE.MeshStandardMaterial({ color: 0x8a6844, roughness: 0.92 });
+  const clothMaterial = new THREE.MeshStandardMaterial({ color: 0xe7e3d6, roughness: 0.95, side: THREE.DoubleSide });
+  const soil = new THREE.MeshStandardMaterial({ color: 0x5c4a33, roughness: 1 });
+  const yardBox = (name: string, size: [number, number, number], material: THREE.Material): THREE.Mesh => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.name = name;
+    return mesh;
+  };
+  for (const mirror of [1, -1] as const) {
+    // Behind-house yard anchor (west house yard when mirror=1).
+    const ax = -22 * mirror;
+    const az = -23.5 * mirror;
+    const set = new THREE.Group();
+    set.name = 'backyard-set';
+    // Round garden table with two chairs.
+    const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.06, 14), timberYard);
+    tableTop.name = 'backyard-table-top';
+    tableTop.position.set(ax, 0.74, az);
+    const tablePole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.72, 8), timberYard);
+    tablePole.name = 'backyard-table-pole';
+    tablePole.position.set(ax, 0.37, az);
+    set.add(tableTop, tablePole);
+    for (const seatAngle of [0.6, 3.5]) {
+      const chair = yardBox('backyard-chair', [0.5, 0.48, 0.5], timberYard);
+      chair.position.set(ax + Math.cos(seatAngle) * 1.15, 0.24, az + Math.sin(seatAngle) * 1.15);
+      const back = yardBox('backyard-chair-back', [0.5, 0.5, 0.08], timberYard);
+      back.position.set(ax + Math.cos(seatAngle) * 1.38, 0.72, az + Math.sin(seatAngle) * 1.38);
+      back.lookAt(ax, 0.72, az);
+      set.add(chair, back);
+    }
+    // Raised planter bed with soil fill (flowers from the bed system nearby).
+    const planterX = ax + 4.5 * mirror;
+    const planterZ = az - 3 * mirror;
+    const frame = yardBox('backyard-planter-frame', [2.6, 0.42, 1.2], timberYard);
+    frame.position.set(planterX, 0.21, planterZ);
+    const fill = yardBox('backyard-planter-soil', [2.4, 0.06, 1.0], soil);
+    fill.position.set(planterX, 0.4, planterZ);
+    set.add(frame, fill);
+    // Firewood stack against the garage line.
+    const stackX = ax - 3.4 * mirror;
+    for (let log = 0; log < 8; log += 1) {
+      const piece = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.85, 7), timberYard);
+      piece.name = 'backyard-firewood';
+      piece.rotation.z = Math.PI / 2;
+      piece.position.set(stackX + (log % 4) * 0.24 * mirror, 0.12 + Math.floor(log / 4) * 0.22, az + 2.4 * mirror);
+      set.add(piece);
+    }
+    // Washing line: two posts, a line, three hung sheets.
+    const lineZ = az + 4.2 * mirror;
+    for (const postOffset of [-2.2, 2.2]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.0, 7), timberYard);
+      post.name = 'backyard-line-post';
+      post.position.set(ax + postOffset, 1.0, lineZ);
+      set.add(post);
+    }
+    const line = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 4.4, 5), soil);
+    line.name = 'backyard-line';
+    line.rotation.z = Math.PI / 2;
+    line.position.set(ax, 1.92, lineZ);
+    set.add(line);
+    for (const sheetOffset of [-1.3, 0, 1.3]) {
+      const sheet = yardBox('backyard-sheet', [1.0, 0.85, 0.02], clothMaterial);
+      sheet.position.set(ax + sheetOffset, 1.48, lineZ + 0.01);
+      sheet.rotation.y = (sheetOffset === 0 ? 0.04 : -0.05);
+      set.add(sheet);
+    }
+    set.traverse((node) => { decorative(node); });
+    yards.add(set);
+  }
+  root.add(yards);
+}
+
 function addNarrativeDressing(root: THREE.Group, reduced: boolean): void {
   addSemanticHouseInteriors(root);
+  addBackyardLiving(root);
   const dark = new THREE.MeshStandardMaterial({ color: 0x25343a, roughness: 0.62, metalness: 0.28 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xe5b842, emissive: 0x6b4210, emissiveIntensity: 0.5, roughness: 0.52, metalness: 0.2 });
   const routeMarkers: Array<[string, number, number, number, number]> = [

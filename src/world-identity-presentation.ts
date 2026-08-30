@@ -298,8 +298,11 @@ export function createWorldIdentityPresentation(
     color: 0xd8d1bd,
     roughness: 0.94,
     metalness: 0,
-    emissive: 0x17120c,
-    emissiveIntensity: 0.18,
+    // Owner 2026-08-30: the interior point lights are deliberately inert
+    // (emissive-only occlusion policy guards D3D12 pipeline compilation), so
+    // the ceiling panels themselves carry the warm room glow.
+    emissive: 0x8a6a42,
+    emissiveIntensity: 0.55,
   });
   const ceilings = new THREE.InstancedMesh(ceilingGeometry, ceilingMaterial, ceilingPlacements.length);
   ceilings.name = 'pass29-structural-room-ceilings';

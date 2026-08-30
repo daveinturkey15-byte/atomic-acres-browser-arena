@@ -20541,6 +20541,7 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
 
 function spawnGrenadeExplosionVisual(point: THREE.Vector3, now: number): void {
   grenadeExplosionPresentation.emit(point, now);
+  crushLawnAt(point, 2.6);
   grenadeExplosions += 1;
   lastGrenadeExplosionFrameAt = now;
 }
@@ -21445,12 +21446,22 @@ function updateTargets(now: number): void {
   }
 }
 
+// Owner 2026-08-30 "make the grass breakable": gunfire tramples a small
+// circle of lawn tufts, blasts flatten a large one. Presentation only; the
+// crush hook lives on the street-life group so it follows arena rebuilds.
+function crushLawnAt(point: THREE.Vector3, radiusM: number): void {
+  const crush = neighbourhoodLifeRoot?.userData.nuketownLawnCrush as
+    ((x: number, z: number, radiusM: number) => number) | undefined;
+  if (crush) crush(point.x, point.z, radiusM);
+}
+
 function spawnImpactFlash(
   point: THREE.Vector3,
   surface: ImpactPresentationSurface = 'concrete',
   normal = new THREE.Vector3(0, 1, 0),
 ): void {
   impactPresentation.impact(point, normal.normalize(), surface);
+  if (point.y < 0.6) crushLawnAt(point, 0.3);
   // HF-371: the ballistic dust cloud projects from the same canonical surface
   // registry entry as the sparks above, so the cloud can never disagree with
   // the impact it hangs over. Every shooter in the match routes through here.
@@ -21615,6 +21626,10 @@ function updateSupportStatusHud(): void {
   feedback.hidden = !ownedSupport;
   feedback.dataset.supportKind = ownedSupport?.kind ?? 'none';
   feedback.dataset.possessed = String(Boolean(possession && ownedSupport?.id === possession.entityId));
+  // Owner 2026-08-30: the cockpit instrument rail overlapped the rifle ammo
+  // panel and equipment block. While possessed, the operator HUD yields the
+  // bottom band to the cockpit (CSS keys on this flag).
+  hudRoot.dataset.supportPossessed = String(Boolean(possession));
   feedback.dataset.awaitingOperation = 'false';
   liveSupportActivationIds.clear();
   for (const entity of killstreakSnapshot.entities) {

@@ -105,7 +105,8 @@ const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
   fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 3.8,
-  interiorLightIntensity: 10,
+  // Owner 2026-08-30 interior richness: 10 read as murk inside the houses.
+  interiorLightIntensity: 16,
   routeLightCount: 3,
   streetLightCount: 4,
   interiorLightCount: 4,

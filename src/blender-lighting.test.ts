@@ -80,7 +80,8 @@ describe('Pass 30 stormfront early-morning arena lighting', () => {
       skyHorizon: 0xdda77d,
       sunPosition: [-48, 42, 30],
       routeLightIntensity: 3,
-      interiorLightIntensity: 10,
+      // Owner 2026-08-30: 10 read as murk inside the houses.
+      interiorLightIntensity: 16,
       godRayStrength: 0.05,
     });
     // Owner 2026-08-29 re-pin: the old >4:1 sun:hemisphere pin ENCODED the
