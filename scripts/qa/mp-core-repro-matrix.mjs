@@ -56,17 +56,15 @@ const CONNECT_TIMEOUT = 120_000;
 const OUT_DIR = arg('--out', 'artifacts/qa/mp-core-repro');
 
 // Every arena, TDM and FFA (gun-range forces its own range mode):
+// Owner 2026-08-30 scope: Nuke Town heavily (both modes + the chopper
+// probe), the other arenas briefly (one mode each). farcrysis is parked and
+// locked unselectable (owner 2026-08-28), so it has no lobby lane.
 const LANES = [
   { arena: 'atomic-acres', mode: 'tdm', chopperProbe: true },
   { arena: 'atomic-acres', mode: 'ffa' },
   { arena: 'rustworks-1v1', mode: 'tdm' },
-  { arena: 'rustworks-1v1', mode: 'ffa' },
-  { arena: 'skyline-terminal', mode: 'tdm' },
   { arena: 'skyline-terminal', mode: 'ffa' },
-  { arena: 'farcrysis', mode: 'tdm' },
-  { arena: 'farcrysis', mode: 'ffa' },
   { arena: 'high-seas', mode: 'tdm' },
-  { arena: 'high-seas', mode: 'ffa' },
   { arena: 'gun-range', mode: 'range' },
 ];
 
@@ -251,6 +249,16 @@ async function probeWeapon(page) {
     return { weapon: s.player.weapon, ammo: s.player.ammo, reserve: s.player.reserve };
   };
   // --- shoot ---
+  // Face the arena centre first: the movement probe can end nose-to-wall,
+  // and HF-343 then honestly refuses the shot (viewmodel-contact-raise).
+  // The probe measures the FIRE PATH, not wall-contact policy.
+  await page.evaluate(() => {
+    const d = window.__ATOMIC_ACRES_DEBUG__;
+    const s = d.snapshot();
+    const [x, , z] = s.player.position;
+    d.teleportPlayer(x, s.player.position[1], z, Math.atan2(x, z), 0);
+  });
+  await page.waitForTimeout(300);
   const beforeShot = await readPlayer();
   await page.click('body');
   await page.mouse.move(640, 360);
@@ -317,6 +325,8 @@ async function chopperInScene(page) {
     });
     return found;
   });
+}
+
 // F6: guest frame timing baseline vs during an AI-flown chopper overhead.
 async function probeChopperLag(host, guest, record) {
   const probe = record.chopperLag = { staged: false, entitySeen: false, baseline: null, during: null, note: 'installed-Chrome WebGPU measurement (owner backend)' };
@@ -338,6 +348,8 @@ async function probeChopperLag(host, guest, record) {
 }
 
 await mkdir(OUT_DIR, { recursive: true });
+const lanes = [];
+let startGateViolations = 0;
 let chatFailures = 0;
 
 for (const [laneIndex, lane] of LANES.entries()) {
@@ -347,6 +359,16 @@ for (const [laneIndex, lane] of LANES.entries()) {
   try {
     host = await openPage('host');
     guest = await openPage('guest');
+
+    // Host creates the room; arena is selected before the guest joins.
+    // (Reconstructed 2026-08-30 - a past multi-agent pass corrupted this
+    // script: missing lanes/startGateViolations declarations, a swallowed
+    // chopperInScene close, the per-lane result log head, and this block.)
+    await host.evaluate(() => document.querySelector('#host')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await host.waitForFunction(() => (document.querySelector('#room-code')?.textContent ?? '').trim().length > 0, undefined, { timeout: CONNECT_TIMEOUT });
+    const roomCode = (await host.textContent('#room-code')).trim();
+    await host.selectOption('#lobby-arena', lane.arena);
+    await host.waitForTimeout(500);
 
     // ---- F2: start gating, sampled across the whole join window ----
     const gateSamples = [];
@@ -372,7 +394,12 @@ for (const [laneIndex, lane] of LANES.entries()) {
     )));
     gateSamples.push({ phase: 'joined-not-ready', roster: 2, startDisabled: await host.evaluate(() => document.querySelector('#lobby-start')?.disabled ?? null) });
     record.startGateSamples = gateSamples;
-    record.startGateViolation = gateSamples.some((s) => s.startDisabled === false && s.roster < 2);
+    // 2026-08-30 re-pin: a host ALONE may legitimately start a bot match
+    // (canHostCommitStart's connected >= 1 is by design), so enabled-start
+    // before the host knows about a joiner is not the owner's fault. The
+    // fault is starting while a known joiner is not ready: any enabled
+    // sample once the roster shows the guest.
+    record.startGateViolation = gateSamples.some((s) => s.startDisabled === false && s.roster >= 2);
 
     // ---- F3: lobby chat both directions ----
     record.chatHostToGuest = await probeChat(host, guest, `host ping ${lane.arena}`);
@@ -455,14 +482,14 @@ for (const [laneIndex, lane] of LANES.entries()) {
     await guest?.close().catch(() => {});
   }
   lanes.push(record);
-await hostBrowser.close().catch(() => {});
-await guestBrowser.close().catch(() => {});
+  console.log(`${record.ok ? 'OK  ' : 'FAIL'} ${lane.arena}/${lane.mode}`
     + ` host=${record.hostMove?.movedM ?? '?'}m guest=${record.guestMove?.movedM ?? '?'}m`
     + ` chat=${record.chatHostToGuest?.deliveredToReceiver}/${record.chatGuestToHost?.deliveredToReceiver}`
     + ` shoot=${record.hostWeapon?.shoot?.fired}/${record.guestWeapon?.shoot?.fired}`
     + `${record.error ? ` error=${record.error}` : ''}`);
 }
-await browser.close();
+await hostBrowser.close().catch(() => {});
+await guestBrowser.close().catch(() => {});
 peerProcess?.kill();
 
 const moved = lanes.filter((l) => l.hostMove && l.guestMove);
