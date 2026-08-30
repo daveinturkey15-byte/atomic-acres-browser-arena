@@ -299,7 +299,7 @@ try {
   browser = await chromium.launch({
     executablePath: browserExecutablePath,
     headless: false,
-    args: [
+    args: ['--mute-audio', 
       '--enable-unsafe-webgpu',
       '--ignore-gpu-blocklist',
       '--use-angle=d3d11',

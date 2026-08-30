@@ -151,7 +151,7 @@ try {
   browser = await chromium.launch({
     headless: true,
     executablePath,
-    args: [
+    args: ['--mute-audio', 
       '--enable-unsafe-webgpu',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',

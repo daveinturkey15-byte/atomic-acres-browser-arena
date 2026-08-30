@@ -109,7 +109,7 @@ mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
   headless: false, channel: 'chrome',
-  args: ['--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-features=CalculateNativeWinOcclusion', '--disable-background-timer-throttling'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-features=CalculateNativeWinOcclusion', '--disable-background-timer-throttling'],
 });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const session = await page.context().newCDPSession(page);

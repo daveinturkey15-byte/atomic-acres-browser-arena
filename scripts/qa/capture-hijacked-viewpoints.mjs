@@ -45,7 +45,7 @@ const STATIONS = [
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: true,
-  args: ['--use-angle=d3d11', '--enable-unsafe-webgpu'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu'],
 });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errors = [];

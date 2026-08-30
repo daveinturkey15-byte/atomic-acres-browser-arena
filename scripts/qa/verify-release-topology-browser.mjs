@@ -28,7 +28,7 @@ rootUrl.searchParams.set('renderer', 'webgl2');
 // this flag and must not let optional leaderboard traffic contaminate it.
 rootUrl.searchParams.set('externalServices', 'off');
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const context = await browser.newContext({ viewport: { width: 1100, height: 700 } });
 const failures = [];
 const routes = {};

@@ -16,7 +16,7 @@ const RENDERER = arg('--renderer', 'webgl2');
 const browser = await chromium.launch({
   headless: false,
   channel: arg('--browser-channel', 'chrome'),
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',

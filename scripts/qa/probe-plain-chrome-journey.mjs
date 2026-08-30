@@ -19,7 +19,7 @@ const browser = await chromium.launch({
   channel: arg('--browser-channel', 'chrome'),
   // Anti-throttling only by default. --extra-flag adds one Chrome flag per use, so the
   // masking flag can be bisected: the harness set ran green while default Chrome failed.
-  args: [
+  args: ['--mute-audio', 
     ...argv.flatMap((value, index) => (argv[index - 1] === '--extra-flag' ? [value] : [])),
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',

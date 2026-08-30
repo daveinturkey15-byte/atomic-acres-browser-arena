@@ -6,7 +6,7 @@ const timeout = 30_000;
 const errors = [];
 const browser = await chromium.launch({
   headless: process.env.QA_HEADFUL !== '1',
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',

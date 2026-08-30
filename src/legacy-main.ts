@@ -128,6 +128,7 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
+import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
   DOMINATION_WIN_SCORE,
@@ -10557,6 +10558,21 @@ const viewmodelProbeUp = new THREE.Vector3();
 const viewmodelProbeStart = new THREE.Vector3();
 const viewmodelProbeEnd = new THREE.Vector3();
 const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+// Owner 2026-08-30: dressing AABBs for the viewmodel POSE fold only (never
+// the fire gate). Rebuilt lazily whenever the arena or dressing roots change.
+let presentationObstructionBoxes: Box2[] = [];
+let presentationObstructionKey = '';
+
+function activePresentationObstructionBoxes(): readonly Box2[] {
+  const dressingRoot = arena.root.getObjectByName('test1-dressing') ?? arena.root.getObjectByName('test2-dressing');
+  const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}`;
+  if (key !== presentationObstructionKey) {
+    presentationObstructionKey = key;
+    presentationObstructionBoxes = collectPresentationObstructionBoxes([neighbourhoodLifeRoot, dressingRoot]);
+  }
+  return presentationObstructionBoxes;
+}
+
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
   viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
@@ -10564,6 +10580,10 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
   viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
   viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
   const colliders = activeWorldColliders();
+  // Pose-only obstruction set: dressing folds the weapon on screen, but the
+  // fire-admission gate (which recomputes with colliders alone) is untouched -
+  // decoration may bend the gun, never refuse the trigger.
+  const dressingBoxes = activePresentationObstructionBoxes();
   const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
   let nearestForward: number | null = null;
   for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
@@ -10575,9 +10595,15 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
       .addScaledVector(viewmodelProbeUp, verticalOffset);
     viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
     const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (!hit) continue;
-    const distance = hit.time * profile.probeLengthMeters;
-    nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
+    if (hit) {
+      const distance = hit.time * profile.probeLengthMeters;
+      nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
+    }
+    const dressingHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, dressingBoxes, probePaddingMeters);
+    if (dressingHit) {
+      const distance = dressingHit.time * profile.probeLengthMeters;
+      nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
+    }
   }
   // Owner 2026-08-30 ("gun still clips through walls and floor"): most
   // authored floors are raycast planes, not movement boxes, so a down-pitched

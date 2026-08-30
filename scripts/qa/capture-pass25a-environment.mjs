@@ -4,7 +4,8 @@ import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const record = process.argv.includes('--record');
-const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+const chromiumArgs = [
+  '--mute-audio','--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 try {

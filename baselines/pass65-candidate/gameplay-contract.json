@@ -2728,8 +2728,8 @@
         "durationMs": 20000,
         "pickupRadius": 1.65,
         "position": [
-          9.6,
-          0.82,
+          0,
+          3.75,
           0
         ],
         "spawnIntervalMs": 90000

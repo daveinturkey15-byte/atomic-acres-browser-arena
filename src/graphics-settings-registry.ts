@@ -199,7 +199,7 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
   control({
     key: 'frameRateLimit', id: 'graphics-frame-rate-limit', category: 'display', label: 'Maximum FPS',
-    description: 'Bounds presentation work without changing the fixed-step simulation. The final slider position is uncapped.',
+    description: 'Bounds presentation work without changing the fixed-step simulation. The final slider position is uncapped. UNCAPPED means the game imposes no limit - your real ceiling is then the browser’s vsync, which paces frames to your monitor’s refresh. A page cannot switch vsync off itself; launch Chrome with --disable-gpu-vsync --disable-frame-rate-limit (tools/play-atomic-acres-no-vsync.cmd does exactly that) to run above it.',
     kind: 'range', minimum: 30, maximum: 361, step: 1, unit: 'fps', unlimitedSentinel: 361,
     applyMode: 'live', runtimeConsumer: 'frame-scheduler',
   }),

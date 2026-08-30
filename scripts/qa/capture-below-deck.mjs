@@ -45,7 +45,7 @@ const STATIONS = [
   { id: 'floor-check-down', pos: [0, 1.7, -6], yaw: Math.PI, pitch: -1.1, note: 'looking at the deck under our feet' },
 ];
 
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-unsafe-webgpu'] });
+const browser = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu'] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error).slice(0, 160)));

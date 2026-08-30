@@ -8,7 +8,7 @@ const browser = process.env.QA_BROWSER === 'firefox'
   ? await firefox.launch({ headless: true })
   : await chromium.launch({
       headless: process.env.QA_HEADFUL !== '1',
-      args: [
+      args: ['--mute-audio', 
         '--disable-background-timer-throttling',
         '--disable-renderer-backgrounding',
         '--allow-loopback-in-peer-connection',

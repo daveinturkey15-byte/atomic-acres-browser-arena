@@ -633,7 +633,7 @@ export async function measureChromeParity({
     browser = await chromium.launch({
       executablePath: chromeExecutable,
       headless: false, // HEADED
-      args: [
+      args: ['--mute-audio', 
         '--enable-unsafe-webgpu',
         '--use-webgpu-adapter=default',
         '--enable-features=Vulkan,DefaultANGLEVulkan,VulkanFromANGLE',

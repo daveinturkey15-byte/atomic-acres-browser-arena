@@ -24,7 +24,7 @@ const BASE = arg('--url', 'http://127.0.0.1:41911');
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

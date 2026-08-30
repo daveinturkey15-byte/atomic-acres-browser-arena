@@ -49,7 +49,7 @@ const DIRECTIONS = [
   { label: 'east', yaw: -Math.PI / 2 },
 ];
 
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-unsafe-webgpu'] });
+const browser = await chromium.launch({ headless: true, args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu'] });
 const results = [];
 const startedAt = Date.now();
 

@@ -7,7 +7,7 @@ const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:41911';
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: ['--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-background-timer-throttling'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-background-timer-throttling'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=hf383gpu`, { waitUntil: 'domcontentloaded' });

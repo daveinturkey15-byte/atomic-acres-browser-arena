@@ -20,7 +20,7 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({
   headless: false,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',

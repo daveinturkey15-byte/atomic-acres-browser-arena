@@ -39,7 +39,9 @@ const NATURAL_MINOR_SEMITONES = Object.freeze([0, 2, 3, 5, 7, 8, 10]);
 // Owner 2026-08-30: "half the sound of the music its too loud" - second
 // halving on top of the 2026-08-29 retune (0.61 -> 0.214 -> 0.107). Sliders
 // and stored settings are untouched; the bus base is the single knob.
-export const GAME_MUSIC_BUS_GAIN = 0.107;
+// Owner 2026-08-30 (third halving, in-game playtest: "music is still loud,
+// I asked you to make it 50% quieter"): 0.107 -> 0.054.
+export const GAME_MUSIC_BUS_GAIN = 0.054;
 
 export type ChiptuneChannel = 'lead' | 'bass';
 export type ChiptuneTrackId = 'siren-groves' | 'fallout-drift';

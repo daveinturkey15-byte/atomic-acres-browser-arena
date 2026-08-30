@@ -312,16 +312,24 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     # The along='x' park rotation maps local offsets (ox, oz) -> (-oz, ox),
     # so the local list is the WORLD seat list transformed through its
     # inverse (world x -> -local z, world z -> local x).
-    for seat_z, seat_side in ((4.3, -1), (0.5, -1), (-0.5, 1), (-4.3, 1)):
-        add_box(f"{prefix}_seat_{seat_z}", [x + seat_side * 1.7, 0.325, z + seat_z], [0.9, 0.45, 1.6], M["aqua"], 0.05)
-        add_box(f"{prefix}_seat_back_{seat_z}", [x + seat_side * 1.7, 0.72, z + seat_z + (0.72 if seat_z > 0 else -0.72)], [0.9, 0.5, 0.16], M["aqua"], 0.04)
-    add_box(f"{prefix}_roof", [x, 2.19, z], [4.75, 0.12, length - 0.7], M["trim"], 0.14)
+    # v6: recentred benches + cab/engine interiors (same inverse transform).
+    for seat_z, seat_side in ((1.1, -1), (-1.1, -1), (-1.1, 1), (1.1, 1)):
+        add_box(f"{prefix}_seat_{seat_z}_{seat_side}", [x + seat_side * 1.95, 0.225, z + seat_z], [0.75, 0.45, 1.5], M["aqua"], 0.05)
+        add_box(f"{prefix}_seat_back_{seat_z}_{seat_side}", [x + seat_side * 1.95, 0.66, z + seat_z + (0.68 if seat_side < 0 else -0.68)], [0.75, 0.58, 0.14], M["aqua"], 0.04)
+    for bay_end in (-1, 1):
+        add_box(f"{prefix}_bay_bench_{bay_end}", [x + bay_end * -1.35, 0.75, z + bay_end * 5.6], [2.3, 1.5, 1.0], M["rubber"], 0.06)
+        add_box(f"{prefix}_bay_bulkhead_{bay_end}", [x + bay_end * -1.65, 0.95, z + bay_end * 3.9], [1.6, 1.9, 0.14], M["metal"], 0.05)
+        add_box(f"{prefix}_bay_seat_{bay_end}", [x + bay_end * -1.35, 0.3, z + bay_end * 4.5], [0.7, 0.6, 0.7], M["aqua"], 0.05)
+    add_box(f"{prefix}_roof", [x, 2.94, z], [4.75, 0.12, 8.2], M["trim"], 0.14)
+    for deck_end in (-1, 1):
+        add_box(f"{prefix}_deck_{deck_end}", [x, 2.19, z + deck_end * 5.2], [4.75, 0.12, 2.2], M["trim"], 0.1)
+        add_box(f"{prefix}_roof_riser_{deck_end}", [x, 2.625, z + deck_end * 4.1], [4.75, 0.75, 0.2], M["metal"], 0.08)
     add_box(f"{prefix}_headliner", [x, 2.115, z], [4.5, 0.03, length - 0.9], M["rubber"], 0.02)
     # Original Atomic Acres civic-showcase trim, held inside the existing footprint.
-    add_box(f"{prefix}_roof_visor", [x, 2.3, z - half - 0.18], [4.3, 0.14, 0.55], body_material, 0.08)
-    add_box(f"{prefix}_front_glass", [x, 1.48, z - half - 0.015], [4.12, 0.9, 0.09], M["glass"], 0.03)
-    add_box(f"{prefix}_windshield_divider", [x, 1.48, z - half - 0.075], [0.12, 0.92, 0.08], M["metal"], 0.02)
-    add_box(f"{prefix}_rear_glass", [x, 1.46, z + half + 0.015], [3.95, 0.85, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_roof_visor", [x, 2.34, z - half - 0.18], [4.3, 0.14, 0.55], body_material, 0.08)
+    add_box(f"{prefix}_front_glass", [x, 1.6, z - half - 0.015], [4.12, 1.0, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_windshield_divider", [x, 1.6, z - half - 0.075], [0.12, 1.02, 0.08], M["metal"], 0.02)
+    add_box(f"{prefix}_rear_glass", [x, 1.58, z + half + 0.015], [3.95, 0.95, 0.09], M["glass"], 0.03)
     add_box(f"{prefix}_front_fascia", [x, 0.7, z - half - 0.07], [4.82, 0.6, 0.14], body_material, 0.05)
     add_box(f"{prefix}_front_grille", [x, 0.45, z - half - 0.16], [2.35, 0.3, 0.08], M["metal_light"], 0.03)
     for grille_x in (-0.8, -0.4, 0, 0.4, 0.8):
@@ -330,7 +338,7 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     for side in (-1, 1):
         for index in range(window_count):
             wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
-            add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 1.47, wz], [0.07, 0.86, 1.62], M["glass"], 0.025)
+            add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 1.6, wz], [0.07, 0.9, 1.62], M["glass"], 0.025)
         add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 0.8, z], [0.06, 0.16, length - 0.7], M["trim"], 0.018)
         add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 0.95, z + 0.35], [0.05, 0.28, length - 2.2], body_material, 0.025)
         # v4: frames trace the OPEN apertures at local z = side*2.8; the old
@@ -349,7 +357,7 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
         add_box(f"{prefix}_{end}_bumper", [x, 0.42, end_z], [5.25, 0.28, 0.22], M["metal_light"], 0.07)
         for side in (-1, 1):
             add_uv_sphere(f"{prefix}_{end}_lamp_{side}", [x + side * 1.75, 0.85, end_z + (-0.08 if end == "front" else 0.08)], [0.22, 0.16, 0.08], M["emissive_amber"])
-    add_box(f"{prefix}_destination", [x, 2.02, z - half - 0.15], [3.0, 0.34, 0.08], M["emissive_aqua"], 0.025)
+    add_box(f"{prefix}_destination", [x, 2.88, z - half - 0.15], [3.0, 0.34, 0.08], M["emissive_aqua"], 0.025)
     add_box(f"{prefix}_number_plate", [x, 0.58, z - half - 0.22], [1.15, 0.28, 0.04], M["yellow"], 0.018)
     for side in (-1, 1):
         add_box(f"{prefix}_mirror_arm_{side}", [x + side * 2.85, 1.7, z - half + 0.55], [0.58, 0.08, 0.08], M["metal"], 0.02)

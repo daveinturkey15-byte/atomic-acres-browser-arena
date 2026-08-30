@@ -64,7 +64,7 @@ const report = { base: BASE, capturedAt: null, viewports: [], notes: [] };
 const HEADED = argv.includes('--headed');
 const browser = await chromium.launch({
   headless: !HEADED,
-  args: ['--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'],
 });
 try {
   for (const viewport of VIEWPORTS) {

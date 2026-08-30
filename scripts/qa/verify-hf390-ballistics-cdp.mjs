@@ -32,7 +32,7 @@ const ARENAS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

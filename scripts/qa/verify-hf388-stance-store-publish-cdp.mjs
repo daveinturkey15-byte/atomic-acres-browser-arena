@@ -36,7 +36,7 @@ const TAG = arg('--tag', 'run');
 const OUT = `artifacts/hf388/stance-publish-${TAG}`;
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const session = await page.context().newCDPSession(page);
 await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});

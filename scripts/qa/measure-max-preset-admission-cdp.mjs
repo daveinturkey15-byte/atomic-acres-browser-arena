@@ -58,7 +58,7 @@ const HEADLESS = arg('--headless', '0') === '1';
 const browser = await chromium.launch({
   headless: HEADLESS,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

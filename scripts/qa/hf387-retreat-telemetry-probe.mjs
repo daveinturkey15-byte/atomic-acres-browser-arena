@@ -25,7 +25,7 @@ const BASE = arg('--url', 'http://127.0.0.1:42187');
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: true,
-  args: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
+  args: ['--mute-audio', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const session = await page.context().newCDPSession(page);

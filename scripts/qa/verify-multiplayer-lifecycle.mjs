@@ -7,6 +7,7 @@ const cycles = Number(process.env.QA_MULTIPLAYER_CYCLES ?? 20);
 const guestCount = Number(process.env.QA_MULTIPLAYER_GUESTS ?? 1);
 if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 3) throw new Error(`Invalid QA_MULTIPLAYER_GUESTS: ${guestCount}`);
 const chromiumArgs = [
+  '--mute-audio',
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
   '--allow-loopback-in-peer-connection', '--disable-features=WebRtcHideLocalIpsWithMdns',
 ];

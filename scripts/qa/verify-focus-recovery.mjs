@@ -9,7 +9,7 @@ const peerPort = Number(process.env.QA_PEER_PORT ?? 9000);
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({
   headless: !headed,
-  args: [
+  args: ['--mute-audio', 
     '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
   ],

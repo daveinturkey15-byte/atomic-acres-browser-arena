@@ -74,7 +74,7 @@ async function runQA() {
 
   const browser = await chromium.launch({
     headless: true,
-    args: [
+    args: ['--mute-audio', 
       '--enable-unsafe-webgpu',
       '--use-gl=angle',
       '--use-angle=default',

@@ -16,7 +16,7 @@ const browser = await chromium.launch({
   // bundled chromium does NOT (fails at requestDevice). Measured 2026-08-25.
   headless: true,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

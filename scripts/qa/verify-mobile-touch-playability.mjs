@@ -55,7 +55,7 @@ const proxy = await startStableDevProxy({ target: new URL(BASE) });
 
 const browser = await chromium.launch({
   headless: !HEADED,
-  args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });
 
 /** Rectangles a finger has to hit, read from the live overlay. */

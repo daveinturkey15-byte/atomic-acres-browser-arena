@@ -16,7 +16,7 @@ if (!Number.isInteger(captureWidth) || !Number.isInteger(captureHeight) || captu
 }
 const output = process.env.OUTPUT_DIR ?? `artifacts/pass29/${profile}`;
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: captureWidth, height: captureHeight }, deviceScaleFactor: 1 });
   const errors = [];

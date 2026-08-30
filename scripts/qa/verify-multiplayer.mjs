@@ -7,6 +7,7 @@ const connectionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 3
 const interactionTimeoutMs = process.env.QA_HEADED === '1' ? 30_000 : blenderRenderModes.includes(renderMode) ? 45_000 : renderMode === 'performance' ? 20_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
 const chromiumArgs = [
+  '--mute-audio',
   '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows',

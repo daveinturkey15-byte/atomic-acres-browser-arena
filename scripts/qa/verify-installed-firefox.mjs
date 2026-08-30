@@ -530,7 +530,7 @@ async function runChromeParityCycles(seed) {
   const browser = await chromium.launch({
     executablePath: chromeExecutable,
     headless: parityHeadless,
-    args: ['--enable-unsafe-webgpu'],
+    args: ['--mute-audio', '--enable-unsafe-webgpu'],
   });
   try {
     const context = await browser.newContext({

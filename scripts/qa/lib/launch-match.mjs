@@ -30,6 +30,7 @@ export async function launchSoloMatch({
   extraQuery = '',
 } = {}) {
   const args = [
+    '--mute-audio',
     '--use-angle=d3d11', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',

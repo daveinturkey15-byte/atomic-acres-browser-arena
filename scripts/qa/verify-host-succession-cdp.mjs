@@ -76,7 +76,7 @@ const peerProcess = await ensurePeerServer();
 const browser = await chromium.launch({
   headless: false,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

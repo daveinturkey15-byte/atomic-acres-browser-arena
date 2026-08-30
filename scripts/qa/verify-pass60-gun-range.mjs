@@ -7,7 +7,7 @@ const timeout = 45_000;
 const errors = [];
 const browser = await chromium.launch({
   headless: true,
-  args: [
+  args: ['--mute-audio', 
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--allow-loopback-in-peer-connection', '--disable-features=WebRtcHideLocalIpsWithMdns',
   ],

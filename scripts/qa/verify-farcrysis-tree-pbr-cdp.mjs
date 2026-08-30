@@ -41,7 +41,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
 const BUNDLE_NOW = await servedBundle();
 if (BUNDLE_NOW !== BUNDLE_AT_START) {

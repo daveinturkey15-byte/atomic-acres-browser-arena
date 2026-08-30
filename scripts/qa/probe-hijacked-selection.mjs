@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=d3d11', '--enable-unsafe-webgpu'] });
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(`[console.${m.type()}]`, m.text().slice(0, 400)); });
 page.on('pageerror', (e) => console.log('[pageerror]', String(e).slice(0, 400)));

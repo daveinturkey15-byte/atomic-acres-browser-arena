@@ -110,6 +110,7 @@ const peerProcess = await ensurePeerServer();
 // CDP focus emulation so an unfocused window cannot read like a wedged arena
 // (the verify-arena-boot-cdp.mjs lesson).
 const CHROME_ARGS = [
+  '--mute-audio',
   '--use-angle=d3d11',
   '--enable-unsafe-webgpu',
   '--ignore-gpu-blocklist',

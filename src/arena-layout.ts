@@ -35,10 +35,11 @@ export const HOUSE_FRONT_Z = 9.2;
 export const CENTRAL_BUS = Object.freeze({
   x: 0,
   z: 0,
-  // v5 (owner 2026-08-30): roof drops 3.8 -> 2.25 so the crate stairway can
-  // reach it with three of the proven 0.75 m jump rises. Interior headroom
-  // stays 2.13 (street floor to roof slab underside).
-  size: Object.freeze([12.6, 2.25, 5.6] as const),
+  // v6 (owner 2026-08-30 playtest: "too low... similar height to before but
+  // sort the amount of blocks"): main roof back up to 3.0 with 2.25 END DECKS
+  // over the cab/engine bays, so the same two street crates still reach the
+  // roof in 0.75 m rises (crate 0.75 -> crate 1.5 -> deck 2.25 -> roof 3.0).
+  size: Object.freeze([12.6, 3.0, 5.6] as const),
   /** Length of the authored bus body the collider wraps. */
   assetLength: 12.4,
 });

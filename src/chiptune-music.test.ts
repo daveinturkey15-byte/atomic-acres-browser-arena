@@ -61,8 +61,9 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     // Owner 2026-08-30: "half the sound of the music" - second halving
     // (bus 0.214 -> 0.107). The band halves with it; the floor still fails
     // RED against the original never-heard staging.
-    expect(effectivePeak).toBeGreaterThanOrEqual(0.0075);
-    expect(effectivePeak).toBeLessThanOrEqual(0.0225);
+    // Owner 2026-08-30: band re-pinned for the third halving (0.107 -> 0.054).
+    expect(effectivePeak).toBeGreaterThanOrEqual(0.00375);
+    expect(effectivePeak).toBeLessThanOrEqual(0.01125);
   });
 
   it('schedules EVERY loop event across consecutive horizon windows (regression: one blip per loop)', () => {

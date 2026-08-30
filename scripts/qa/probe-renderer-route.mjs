@@ -20,7 +20,7 @@ const WAIT_MS = Number(arg('--wait', '25000'));
 
 const browser = await chromium.launch({
   headless: true,
-  args: ['--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 

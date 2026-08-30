@@ -45,7 +45,11 @@ export const OVERDRIVE_PICKUP_RADIUS = 1.65;
  * for both teams in practice; hollowing the bus to keep the centre seat was
  * rejected as a structural rewrite of the map's hard cover anchor mid-pass.
  */
-export const OVERDRIVE_POSITION = Object.freeze({ x: 9.6, y: 0.82, z: 0 });
+// Owner 2026-08-30 ("2x damage needs a better spawn spot, top of bus"):
+// the core hovers over the v6 main roof (top 3.0). Pickup is Y-gated so the
+// aisle below cannot collect it through the roof slab.
+export const OVERDRIVE_POSITION = Object.freeze({ x: 0, y: 3.75, z: 0 });
+export const OVERDRIVE_PICKUP_HEIGHT_WINDOW_M = 1.9;
 
 export type OverdriveState = Readonly<{
   generation: number;
@@ -98,7 +102,9 @@ export function claimOverdrive(
     return { state: advanced, claimed: false };
   }
   const distance = Math.hypot(position.x - advanced.position.x, position.z - advanced.position.z);
-  if (distance > OVERDRIVE_PICKUP_RADIUS || Math.abs(position.y - advanced.position.y) > 2.4) {
+  // v6: the height window tightens from 2.4 so the aisle below the bus roof
+  // cannot claim the core through the slab (roof eye dy 0.95, aisle dy 2.05).
+  if (distance > OVERDRIVE_PICKUP_RADIUS || Math.abs(position.y - advanced.position.y) > OVERDRIVE_PICKUP_HEIGHT_WINDOW_M) {
     return { state: advanced, claimed: false };
   }
   const safeNow = Number.isFinite(now) ? now : 0;

@@ -45,7 +45,7 @@ const SAMPLE = () => {
 
 const browser = await chromium.launch({
   headless: true,
-  args: ['--use-angle=d3d11', '--ignore-gpu-blocklist'],
+  args: ['--mute-audio', '--use-angle=d3d11', '--ignore-gpu-blocklist'],
 });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 page.on('pageerror', (error) => console.error('[pageerror]', error.message));

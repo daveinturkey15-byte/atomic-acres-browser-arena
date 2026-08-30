@@ -640,11 +640,13 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // and the same footprint as ever. The old single body box answered the
   // "should the windows become real apertures" question recorded in
   // docs/ballistic-parity/ - the owner decided yes.
-  // v5 (owner 2026-08-30): mountable roof + walk-in interior. Hull 0-1.0,
-  // glass band 1.0-1.95 (inside standing eye 1.86 and outside eye 1.7 both
-  // see through), roof band/headers to 2.25, walkable roof slab top 2.25.
-  const busHullTopY = 1.0;
-  const busWindowTopY = 1.95;
+  // v6 (owner 2026-08-30 playtest): taller two-tier bus. Hull 0-1.1, glass
+  // band 1.1-2.1 (movement-solid, SHOOT-THROUGH once its breakable panes
+  // shatter), end decks top 2.25 over the cab/engine bays, main roof top 3.0.
+  const busHullTopY = 1.1;
+  const busWindowTopY = 2.1;
+  const busDeckTopY = 2.25;
+  const busMidHalf = 4.1; // main-roof section |x| extent; decks beyond.
   const busSideZ = busWidth / 2 - 0.14; // hull centreline (z +/-2.66)
   const busDoorHalf = 0.85;
   // Door centres mirror the coach art's frames: north side toward the west
@@ -665,18 +667,50 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       box(`central bus hull ${sideName} ${fromX < doorCentre ? 'a' : 'b'}`,
         [CENTRAL_BUS.x + centre, busHullTopY / 2, CENTRAL_BUS.z + side * busSideZ],
         [width, busHullTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
-      box(`central bus window ${sideName} ${fromX < doorCentre ? 'a' : 'b'}`,
+      // v6 window authority is SPLIT so the glass can break without the
+      // traversal contract changing:
+      //   * an invisible movement-only proxy keeps the band solid to bodies
+      //     (you still cannot walk through a shattered window frame), and
+      //   * per-bay BREAKABLE panes are the visible glass AND the ballistic
+      //     authority, tiling the proxy's exact footprint so the coach art's
+      //     windows stay rated (the parity gate caught the ghost the first
+      //     cut created by simply switching the band's shots off).
+      const bandProxy = box(`central bus window band ${sideName} ${fromX < doorCentre ? 'a' : 'b'}`,
         [CENTRAL_BUS.x + centre, (busHullTopY + busWindowTopY) / 2, CENTRAL_BUS.z + side * (busWidth / 2 + 0.02)],
-        [width, busWindowTopY - busHullTopY, 0.12], palette.glass, true, false, true, 'glass');
+        [width, busWindowTopY - busHullTopY, 0.12], palette.glass, true, false, false, 'glass');
+      bandProxy.visible = false;
+      bandProxy.userData.collisionProxy = true;
+      bandProxy.userData.authoredCollisionAuthority = true;
+      // v6 ("bus glass isn't breaking with shooting"): per-bay breakable
+      // panes - shots shatter them exactly like house windows, and the
+      // empty frame then shoots through while the proxy still stops bodies.
+      const bayCount = Math.max(1, Math.round(width / 2.1));
+      const bayWidth = width / bayCount;
+      for (let bay = 0; bay < bayCount; bay += 1) {
+        const bayCentre = fromX + bayWidth * (bay + 0.5);
+        const paneId = `central-bus-pane-${sideName}-${fromX < doorCentre ? 'a' : 'b'}-${bay}`;
+        const pane = box(paneId,
+          [CENTRAL_BUS.x + bayCentre, (busHullTopY + busWindowTopY) / 2, CENTRAL_BUS.z + side * (busWidth / 2 + 0.02)],
+          [bayWidth, busWindowTopY - busHullTopY, 0.12],
+          palette.glass, false, true, true, 'glass', paneId);
+        pane.userData.breakableWindowId = paneId;
+        pane.userData.dynamic = true;
+        breakableWindows.push({ id: paneId, mesh: pane, broken: false });
+      }
     }
-    // Header over the door aperture (open to the top of the glass band).
-    box(`central bus door header ${sideName}`,
-      [CENTRAL_BUS.x + doorCentre, (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
-      [busDoorHalf * 2, busHeight - busWindowTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
-    // Roof band above the windows.
-    box(`central bus roof band ${sideName}`,
-      [CENTRAL_BUS.x, (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
-      [busLength, busHeight - busWindowTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
+    // v6 roof-band wall over the MID section. Its underside is 2.2 m - real
+    // standing clearance through the door mouths beneath it, and above the
+    // traversal audit's head-clearance rule so the doorways audit as the
+    // walkable mouths they actually are. It runs the full mid length, so it
+    // IS the door header; no separate header box.
+    box(`central bus roof band mid ${sideName}`,
+      [CENTRAL_BUS.x, (2.2 + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
+      [busMidHalf * 2, busHeight - 2.2, 0.28], palette.mustard, true, true, true, 'vehicle');
+    for (const deckEnd of [-1, 1] as const) {
+      box(`central bus deck lip ${sideName} ${deckEnd < 0 ? 'west' : 'east'}`,
+        [CENTRAL_BUS.x + deckEnd * (busMidHalf + (busLength / 2 - busMidHalf) / 2), (busWindowTopY + busDeckTopY) / 2, CENTRAL_BUS.z + side * busSideZ],
+        [busLength / 2 - busMidHalf, busDeckTopY - busWindowTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
+    }
   }
   // Closed ends below the raked end glazing (whose shot-only proxies remain
   // the glass authority above 1.9 m).
@@ -685,11 +719,21 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
       [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), busWindowTopY / 2, CENTRAL_BUS.z],
       [0.3, busWindowTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
     box(`central bus end roofline ${end < 0 ? 'west' : 'east'}`,
-      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z],
-      [0.3, busHeight - busWindowTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
+      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), (busWindowTopY + busDeckTopY) / 2, CENTRAL_BUS.z],
+      [0.3, busDeckTopY - busWindowTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
   }
-  // Walkable roof: a real 12 cm slab whose top face is the third stair rise.
-  box('central bus roof', [CENTRAL_BUS.x, busHeight - 0.06, CENTRAL_BUS.z], [busLength, 0.12, busWidth], palette.white, true, true, true, 'vehicle');
+  // v6 walkable surfaces: two END DECKS at 2.25 (the third 0.75 rise from
+  // the tall crates) and the MAIN roof at 3.0 (the fourth), with riser faces
+  // closing the step between them.
+  for (const deckEnd of [-1, 1] as const) {
+    box(`central bus deck ${deckEnd < 0 ? 'west' : 'east'}`,
+      [CENTRAL_BUS.x + deckEnd * (busMidHalf + (busLength / 2 - busMidHalf) / 2), busDeckTopY - 0.06, CENTRAL_BUS.z],
+      [busLength / 2 - busMidHalf, 0.12, busWidth], palette.white, true, true, true, 'vehicle');
+    box(`central bus roof riser ${deckEnd < 0 ? 'west' : 'east'}`,
+      [CENTRAL_BUS.x + deckEnd * busMidHalf, (busDeckTopY + busHeight) / 2, CENTRAL_BUS.z],
+      [0.24, busHeight - busDeckTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
+  }
+  box('central bus roof', [CENTRAL_BUS.x, busHeight - 0.06, CENTRAL_BUS.z], [busMidHalf * 2, 0.12, busWidth], palette.white, true, true, true, 'vehicle');
   // Bot cover reasoning keeps one bus-sized envelope; movement/ballistics
   // come from the pieces above.
   physicalCover.push({
@@ -715,18 +759,41 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // interior walls.
     box(`central bus wheel ${index}`, [CENTRAL_BUS.x + wheelX, 0.45, CENTRAL_BUS.z + wheelZ], [1.3, 0.9, 0.4], palette.dark, true, false, true, 'vehicle');
   }
-  // v5 interior: four bench seats along the sides with a clear centre aisle,
-  // placed clear of both door mouths. Low movement-solid cover you can crouch
-  // behind or hop over.
-  for (const [index, [seatX, seatSide]] of ([
-    [-4.3, -1], [-0.5, -1], [0.5, 1], [4.3, 1],
-  ] as Array<[number, number]>).entries()) {
-    box(`central bus seat ${index}`,
-      [CENTRAL_BUS.x + seatX, 0.225, CENTRAL_BUS.z + seatSide * 1.7],
-      [1.6, 0.45, 0.9], palette.aqua, true, true, true, 'vehicle');
-    box(`central bus seat back ${index}`,
-      [CENTRAL_BUS.x + seatX + (seatX < 0 ? -0.72 : 0.72), 0.62, CENTRAL_BUS.z + seatSide * 1.7],
-      [0.16, 0.5, 0.9], palette.aqua, true, true, true, 'vehicle');
+  // v6 interior ("needs better quality inside too, not just random
+  // geometry"): a real coach cabin, authored once and mirrored 180 degrees so
+  // the fairness contract holds - the driver cab at the west end has an
+  // engine/luggage bay as its exact rotational twin at the east end. Every
+  // interior piece is either FLUSH to a hull (<0.2 m gap - no standable cell)
+  // or leaves >=0.85 m of walkable clearance, so no sealed pockets form.
+  const busMirrored = (
+    name: string,
+    twinName: string,
+    [pieceX, pieceY, pieceZ]: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    shots = true,
+  ): void => {
+    box(name, [CENTRAL_BUS.x + pieceX, pieceY, CENTRAL_BUS.z + pieceZ], size, material, true, shots, true, 'vehicle');
+    box(twinName, [CENTRAL_BUS.x - pieceX, pieceY, CENTRAL_BUS.z - pieceZ], size, material, true, shots, true, 'vehicle');
+  };
+  // Cab (west) / engine bay (east): dash+workbench flush to the north hull,
+  // half bulkhead flush behind, seat block sealed into the bulkhead corner.
+  busMirrored('central bus cab dash', 'central bus engine workbench', [-5.6, 0.75, -1.35], [1, 1.5, 2.3], palette.dark);
+  busMirrored('central bus cab bulkhead', 'central bus engine bulkhead', [-3.9, 0.95, -1.65], [0.14, 1.9, 1.6], palette.mustard);
+  busMirrored('central bus cab seat', 'central bus engine crate', [-4.5, 0.3, -1.35], [0.7, 0.6, 0.7], palette.aqua);
+  // Three bench pairs per side; backs face the near end so each seat's twin
+  // (mirrored in x AND z) is byte-symmetric. Stanchions stand at the aisle
+  // corner of every bench.
+  // Two bench pairs per side, in the central band BETWEEN the door strips
+  // (aperture x +/-1.95..3.65): v5 already proved a bench in the doorway
+  // seals the interior, and the v6 first cut re-proved it (351-cell pocket).
+  for (const [index, seatX] of ([-1.1, 1.1] as const).entries()) {
+    busMirrored(`central bus seat ${index} north`, `central bus seat ${index} south`,
+      [seatX, 0.225, -1.95], [1.5, 0.45, 0.75], palette.aqua);
+    busMirrored(`central bus seat back ${index} north`, `central bus seat back ${index} south`,
+      [seatX - 0.68, 0.66, -1.95], [0.14, 0.58, 0.75], palette.aqua);
+    busMirrored(`central bus stanchion ${index} north`, `central bus stanchion ${index} south`,
+      [seatX + 0.62, 1.5, -1.5], [0.07, 1.2, 0.07], palette.white, false);
   }
 
   // HF-390 lane: the Quality art coach (environment-assets buildRetroCoach at
@@ -743,8 +810,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     ['coach windshield', -6.82, 0.14],
     ['coach rear glass', 6.82, -0.14],
   ] as Array<[string, number, number]>) {
-    // v5: the raked end glazing follows the lowered glass band (1.0-1.95).
-    const pane = box(name, [CENTRAL_BUS.x + endX, 1.48, CENTRAL_BUS.z + endZ], [0.27, 0.95, 4.28], palette.glass, false, false, true, 'glass');
+    // v6: the raked end glazing follows the 1.1-2.1 glass band.
+    const pane = box(name, [CENTRAL_BUS.x + endX, 1.6, CENTRAL_BUS.z + endZ], [0.27, 1, 4.28], palette.glass, false, false, true, 'glass');
     pane.visible = false;
     pane.userData.collisionProxy = true;
     pane.userData.authoredCollisionAuthority = true;

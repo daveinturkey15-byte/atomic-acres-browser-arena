@@ -21,7 +21,7 @@ const OUT = arg('--out', 'artifacts/fc-shore/frame');
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

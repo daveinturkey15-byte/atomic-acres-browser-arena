@@ -127,6 +127,7 @@ function killRunWindows() {
 }
 
 const CHROMIUM_ARGS = [
+  '--mute-audio',
   '--use-angle=d3d11',
   '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding',

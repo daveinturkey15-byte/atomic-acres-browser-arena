@@ -1106,46 +1106,83 @@ export function buildRetroCoach(): THREE.Group {
   // v4 (owner 2026-08-29): the coach is ENTERABLE - the solid body becomes a
   // hull with a door aperture per side (local z +/-2.8, mirroring the
   // collision), an open interior, and the same silhouette.
-  // v5 (owner 2026-08-30): the coach follows the mountable-roof collision -
-  // hull to 1.0, glass band 1.0-1.95, roof band to 2.25, walkable roof slab
-  // top at 2.25, seat benches inside.
+  // v6 (owner 2026-08-30 playtest): taller two-tier coach - hull to 1.1,
+  // glass band 1.1-2.1, END DECKS top 2.25 over cab/engine bays, MAIN roof
+  // top 3.0. Cab (driver) and engine bay interiors mirror the colliders.
   for (const side of [-1, 1]) {
     const doorLocalZ = side * 2.8;
     const segments: Array<[number, number]> = [[-6.8, doorLocalZ - 0.85], [doorLocalZ + 0.85, 6.8]];
     for (const [fromZ, toZ] of segments) {
       const length = toZ - fromZ;
-      part(root, roundedBox('coach-body', [0.3, 1.0, length], bodyMat, 0.12, 3), [side * 2.5, 0.5, (fromZ + toZ) / 2]);
-      part(root, roundedBox('coach-roof-band', [0.3, 0.3, length], bodyMat, 0.08, 3), [side * 2.5, 2.1, (fromZ + toZ) / 2]);
+      part(root, roundedBox('coach-body', [0.3, 1.1, length], bodyMat, 0.12, 3), [side * 2.5, 0.55, (fromZ + toZ) / 2]);
     }
-    part(root, roundedBox('coach-door-header', [0.3, 0.3, 1.7], bodyMat, 0.08), [side * 2.5, 2.1, doorLocalZ]);
+    // Mid roof-band wall (underside 2.2 = door headroom) + end deck lips.
+    part(root, roundedBox('coach-roof-band', [0.3, 0.8, 8.2], bodyMat, 0.08, 3), [side * 2.5, 2.6, 0]);
+    for (const deckEnd of [-1, 1]) {
+      part(root, roundedBox('coach-deck-lip', [0.3, 0.15, 2.2], bodyMat, 0.06), [side * 2.5, 2.175, deckEnd * 5.2]);
+    }
     part(root, roundedBox('coach-lower', [0.36, 0.4, 13.2], MAT.tealMetal(), 0.14), [side * 2.53, 0.2, 0]);
   }
   for (const end of [-1, 1]) {
-    part(root, roundedBox('coach-end-cap', [5.3, 1.95, 0.34], bodyMat, 0.16, 3), [0, 0.975, end * 6.63]);
-    part(root, roundedBox('coach-end-roofline', [5.3, 0.3, 0.34], bodyMat, 0.1, 3), [0, 2.1, end * 6.63]);
+    part(root, roundedBox('coach-end-cap', [5.3, 2.1, 0.34], bodyMat, 0.16, 3), [0, 1.05, end * 6.63]);
+    part(root, roundedBox('coach-end-roofline', [5.3, 0.15, 0.34], bodyMat, 0.1, 3), [0, 2.175, end * 6.63]);
   }
   part(root, roundedBox('coach-floor', [4.9, 0.12, 13.2], MAT.dark(), 0.05), [0, 0.1, 0]);
-  part(root, roundedBox('coach-roof', [5.08, 0.12, 12.8], MAT.cream(), 0.06), [0, 2.19, 0]);
+  // Two-tier walkable top: end decks at 2.25, main roof at 3.0, risers between.
+  for (const deckEnd of [-1, 1]) {
+    part(root, roundedBox('coach-deck', [5.08, 0.12, 2.2], MAT.cream(), 0.06), [0, 2.19, deckEnd * 5.2]);
+    part(root, roundedBox('coach-roof-riser', [5.08, 0.75, 0.2], bodyMat, 0.06), [0, 2.625, deckEnd * 4.1]);
+  }
+  part(root, roundedBox('coach-roof', [5.08, 0.12, 8.2], MAT.cream(), 0.06), [0, 2.94, 0]);
   // Dark headliner so the interior ceiling reads as trim instead of a
   // blown-out cream field a foot above the camera.
-  part(root, roundedBox('coach-headliner', [4.6, 0.03, 12.4], MAT.dark(), 0.01), [0, 2.115, 0]);
-  const glass = MAT.glass();
-  for (const side of [-1, 1]) {
-    for (let z = -4.8; z <= 4.8; z += 2.4) part(root, roundedBox('coach-window', [0.055, 0.88, 1.85], glass, 0.06), [side * 2.67, 1.47, z]);
+  part(root, roundedBox('coach-headliner', [4.6, 0.03, 8.0], MAT.dark(), 0.01), [0, 2.82, 0]);
+  for (const deckEnd of [-1, 1]) {
+    part(root, roundedBox('coach-deck-headliner', [4.6, 0.03, 2.0], MAT.dark(), 0.01), [0, 2.13, deckEnd * 5.2]);
   }
-  part(root, roundedBox('windshield', [4.28, 0.9, 0.08], glass, 0.07), [0, 1.48, -6.82], [-0.08, 0, 0]);
-  part(root, roundedBox('rear-glass', [4.18, 0.85, 0.08], glass, 0.07), [0, 1.46, 6.82]);
+  const glass = MAT.glass();
+  // v6: the coach no longer authors its own side glass. The map's BREAKABLE
+  // window panes (map.ts, 'central-bus-pane-*') are the visible glass AND
+  // the ballistic authority, so the bus has exactly ONE source of truth for
+  // a window: shoot it, it shatters, and the frame behind it is this art.
+  // Art glass here sat 0.15 m inboard of those panes, which is inside the
+  // hull but outside every ballistic footprint - the parity gate correctly
+  // called that a ghost surface. End glazing below keeps its own proxies.
+  part(root, roundedBox('windshield', [4.28, 1.0, 0.08], glass, 0.07), [0, 1.6, -6.82], [-0.08, 0, 0]);
+  part(root, roundedBox('rear-glass', [4.18, 0.95, 0.08], glass, 0.07), [0, 1.58, 6.82]);
   // Interior benches mirror the seat colliders (rotated frame: collider x
   // becomes local z, collider z becomes local x).
   const seatMat = new THREE.MeshStandardMaterial({ color: 0x2e6b70, roughness: 0.6, metalness: 0.1 });
-  for (const [seatZ, seatSide] of [[-4.3, -1], [-0.5, -1], [0.5, 1], [4.3, 1]] as const) {
-    part(root, roundedBox('coach-seat', [0.9, 0.45, 1.6], seatMat, 0.08), [seatSide * 1.7, 0.325, seatZ]);
-    part(root, roundedBox('coach-seat-back', [0.9, 0.5, 0.16], seatMat, 0.06), [seatSide * 1.7, 0.72, seatZ + (seatZ < 0 ? -0.72 : 0.72)]);
+  // v6 benches mirror the recentred colliders (world (x,z) -> local (z,x));
+  // backs sit toward the near end so each bench's 180-degree twin matches.
+  for (const [worldX, worldZ, backX] of [
+    [-1.1, -1.95, -1.78], [1.1, -1.95, 0.42], [1.1, 1.95, 1.78], [-1.1, 1.95, -0.42],
+  ] as const) {
+    // The park rotation maps local (ox, oz) -> world (-oz, ox), so a world
+    // (x, z) collider is authored here at local (z, -x). Getting this sign
+    // wrong mirrors the art against its own colliders (the parity gate
+    // caught exactly that on the first v6 cut).
+    part(root, roundedBox('coach-seat', [0.75, 0.45, 1.5], seatMat, 0.08), [worldZ, 0.225, -worldX]);
+    part(root, roundedBox('coach-seat-back', [0.75, 0.58, 0.14], seatMat, 0.06), [worldZ, 0.66, -backX]);
   }
-  for (const stanchionZ of [-2.0, 2.0]) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.0, 8), MAT.brass());
+  // Cab (driver) and its engine-bay twin, matching the interior colliders.
+  const cabMat = MAT.dark();
+  for (const bayEnd of [-1, 1]) {
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-dash' : 'coach-engine-bench', [2.3, 1.5, 1.0], cabMat, 0.08), [bayEnd * -1.35, 0.75, bayEnd * 5.6]);
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-bulkhead' : 'coach-engine-bulkhead', [1.6, 1.9, 0.14], bodyMat, 0.05), [bayEnd * -1.65, 0.95, bayEnd * 3.9]);
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-seat' : 'coach-engine-crate', [0.7, 0.6, 0.7], seatMat, 0.06), [bayEnd * -1.35, 0.3, bayEnd * 4.5]);
+  }
+  const wheelRim = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 8, 16), MAT.brass());
+  wheelRim.name = 'coach-steering-wheel';
+  wheelRim.position.set(-1.35, 1.35, 5.05);
+  wheelRim.rotation.x = Math.PI / 2.6;
+  root.add(wheelRim);
+  for (const [stanchionWorldX, stanchionWorldZ] of [
+    [-0.48, -1.5], [1.72, -1.5], [0.48, 1.5], [-1.72, 1.5],
+  ] as const) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 1.2, 8), MAT.brass());
     pole.name = 'coach-stanchion';
-    pole.position.set(0, 1.1, stanchionZ);
+    pole.position.set(stanchionWorldZ, 1.5, -stanchionWorldX);
     root.add(pole);
   }
   for (const x of [-1.8, 1.8]) for (const z of [-4.6, 4.6]) wheel(root, x, z, 0.45);

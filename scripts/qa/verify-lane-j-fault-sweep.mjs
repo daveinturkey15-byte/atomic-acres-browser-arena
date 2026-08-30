@@ -73,7 +73,7 @@ async function ensurePeerServer() {
 const peerProcess = await ensurePeerServer();
 const browser = await chromium.launch({
   headless: true,
-  args: [
+  args: ['--mute-audio', 
     '--use-angle=d3d11',
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
