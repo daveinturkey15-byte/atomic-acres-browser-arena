@@ -12,6 +12,11 @@ function between(startNeedle: string, endNeedle: string): string {
   return main.slice(start, end);
 }
 
+// Re-pinned 2026-08-30 (owner: "cant see any flames ... crimson one"): the
+// authoritative reach clamp and the remote-shot reach are FAMILY properties
+// now, so the crimson variant is clamped to the same 18 m as the map tank
+// instead of inheriting the 50 m bullet reach. The 18 m invariant these
+// pins guard is unchanged - only the predicate's spelling moved.
 describe('timed map weapon legacy-main integration', () => {
   it('checkpoints both authorities, restores them after final clock construction, and reliably repairs late joiners', () => {
     const checkpoint = between('function createHostMatchCheckpoint(', '\nfunction persistActiveHostMatchCheckpoint(');
@@ -93,7 +98,7 @@ describe('timed map weapon legacy-main integration', () => {
     expect(resolve.indexOf("if (request.weapon === 'flare-gun') {", flareSpawn - 700)).toBeLessThan(
       resolve.indexOf("if (request.weapon === 'explosive-crossbow') {"),
     );
-    expect(resolve).toContain("if (weapon === 'flamethrower' && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0");
+    expect(resolve).toContain("isFlamethrowerFamilyWeapon(weapon) && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0");
   });
 
   it('uses dedicated local, remote, bot, and support effect paths with the canonical 18 m flame clamp', () => {
@@ -108,11 +113,11 @@ describe('timed map weapon legacy-main integration', () => {
     const remote = between('function renderRemoteShot(', '\nfunction showDamageDirection(');
     expect(remote).toContain("if (message.weapon === 'flare-gun') {");
     expect(remote).toContain('flareProjectileSystem.spawn({');
-    expect(remote).toContain("message.weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 50");
+    expect(remote).toContain("isFlamethrowerFamilyWeapon(message.weapon) ? FLAMETHROWER_EFFECT.rangeM : 50");
     expect(remote).toContain('flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, visibleEnd, performance.now())');
 
     const support = between('function applyKillstreakEntityShot(', '\nfunction killstreakSlotFor(');
-    expect(support).toContain("const maximumDistance = weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 220");
+    expect(support).toContain("const maximumDistance = isFlamethrowerFamilyWeapon(weapon) ? FLAMETHROWER_EFFECT.rangeM : 220");
     expect(main).toContain("const shotLength = flamethrowerShot\n        ? Math.min(distance + 2, FLAMETHROWER_EFFECT.rangeM)");
     expect(main).toContain('if (flamethrowerShot) flamethrowerStreamPresentation.emit(botMuzzle ?? origin, pelletVisibleEnd, now)');
   });

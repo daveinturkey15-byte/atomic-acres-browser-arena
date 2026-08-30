@@ -124,6 +124,15 @@ export type SheetSurfaceDefinition = Readonly<{
     vAxis: Point3;
     halfU: number;
     halfV: number;
+    /**
+     * Owner 2026-08-30 ("i keep seeing through its walls"): a surface whose
+     * RENDERED outline is not its bounding rectangle. Points are in frame
+     * units quantised by SHED_PANEL_COORD_Q (+/-Q maps to +/-halfU / +/-halfV),
+     * matching how apertures are already quantised. Ballistics and movement
+     * keep using the bounding frame - only presentation clips - so a gable
+     * triangle cannot become a hole you can shoot through.
+     */
+    outlineUVQ?: readonly Readonly<{ uQ: number; vQ: number }>[];
   }>;
   detachableChunkId: string | null;
 }>;
@@ -321,6 +330,15 @@ export function validateDestructibleShedDefinition(definition: DestructibleShedD
     }
     if (surface.detachableChunkId !== null && !definition.preauthoredChunkIds.includes(surface.detachableChunkId)) {
       errors.push(`${surface.id}: unknown detachable chunk`);
+    }
+    const outline = surface.frame.outlineUVQ;
+    if (outline !== undefined) {
+      if (outline.length < 3) {
+        errors.push(`${surface.id}: outlineUVQ needs at least three points`);
+      } else if (!outline.every((point) => Number.isSafeInteger(point.uQ) && Number.isSafeInteger(point.vQ)
+        && Math.abs(point.uQ) <= SHED_PANEL_COORD_Q && Math.abs(point.vQ) <= SHED_PANEL_COORD_Q)) {
+        errors.push(`${surface.id}: outlineUVQ points must be integers within +/-${SHED_PANEL_COORD_Q}`);
+      }
     }
   }
   const usedChunkIds = definition.surfaces

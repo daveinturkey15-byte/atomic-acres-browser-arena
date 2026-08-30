@@ -12,11 +12,15 @@ import {
   HOUSE_LAYOUT,
   PARKED_VAN_LAYOUT,
   PARKED_VAN_SIZE,
+  STREET_CRATE_HEIGHT,
+  STREET_CRATE_LOW_X,
+  STREET_CRATE_TALL_HEIGHT,
+  STREET_CRATE_TALL_X,
   STREET_HALF_WIDTH,
 } from '../../src/arena-layout';
 import { createHouseArchitecture } from '../../src/house-navigation';
 // Anchors live with the art authority in src/map.ts, not with the layout constants.
-import { AUTHORED_LARGE_COVER_ANCHORS } from '../../src/map';
+import { AUTHORED_LARGE_COVER_ANCHORS, AUTHORED_LARGE_COVER_HEIGHT, authoredLargeCoverIdAt } from '../../src/map';
 
 const output = resolve(process.argv[2] ?? 'source-assets/blender/atomic-acres-arena-spec.json');
 const houses = HOUSE_LAYOUT.map((house) => createHouseArchitecture(house.team, house.x, house.z, house.facing));
@@ -70,6 +74,30 @@ const BOUNDARY_END_Z = ARENA_DEPTH / 2 + BOUNDARY_THICKNESS / 2;
 const BOUNDARY_SIDE_LENGTH = ARENA_DEPTH + BOUNDARY_THICKNESS + BOUNDARY_OVERHANG * 2;
 const BOUNDARY_END_LENGTH = ARENA_WIDTH + BOUNDARY_OVERHANG * 2;
 
+/** Plain lane cover; the two street classes and authored anchors override it. */
+const DEFAULT_COVER_HEIGHT = 1.6;
+/**
+ * Owner 2026-08-30, "collision is bad on things like the bench and some crates".
+ * COVER_LAYOUT only carries [x, z, width, depth], so the height a cover box
+ * collides at was re-derived independently in three places and the Blender
+ * generator - the only art the 'blender' render profile shows, since that
+ * profile hides arena.root (src/legacy-main.ts:27418) - had NO height channel
+ * at all and baked a flat 1.6 m block. The 2026-08-29/30 jump-stairway pass
+ * moved the street crates to 0.75 / 1.5 m in src/map.ts:913-915 and
+ * src/environment-assets.ts:635-637 but could not move the GLB, so the crate
+ * the owner actually SEES stood 0.85 m proud of the box he collides with.
+ * Publishing the height makes the spec authority-carrying instead of a hint.
+ * (This ternary is still a fourth copy of the rule; hoisting a shared
+ * coverHeightAt() into src/arena-layout.ts is the real cure and is filed as a
+ * follow-up - both owning files belong to other lanes this pass.)
+ */
+const coverHeightAt = (x: number, z: number): number => (
+  authoredLargeCoverIdAt(x, z) ? AUTHORED_LARGE_COVER_HEIGHT
+    : Math.abs(x) === STREET_CRATE_LOW_X ? STREET_CRATE_HEIGHT
+      : Math.abs(x) === STREET_CRATE_TALL_X ? STREET_CRATE_TALL_HEIGHT
+        : DEFAULT_COVER_HEIGHT
+);
+
 if (SIDEWALK_DEPTH <= 0) {
   throw new Error(
     `STREET_HALF_WIDTH ${STREET_HALF_WIDTH} plus a ${CURB_DEPTH} m kerb leaves no pavement `
@@ -94,7 +122,9 @@ const spec = {
   houses,
   garages: GARAGE_LAYOUT,
   garageSize: GARAGE_SIZE,
-  cover: COVER_LAYOUT,
+  // [x, z, width, depth, HEIGHT] - the height channel is v6 (2026-08-30); see
+  // coverHeightAt above for why the generator must not re-guess it.
+  cover: COVER_LAYOUT.map(([x, z, width, depth]) => [x, z, width, depth, coverHeightAt(x, z)]),
   // Which lane anchors carry authored art, keyed by COORDINATE not by index.
   // The generator used to branch on `index == 4..7` and label the marker with
   // `[index - 4]`. HF-383b cut COVER_LAYOUT to six entries, so indices 6 and 7

@@ -9,6 +9,12 @@ import {
   shouldPresentZeroHit,
 } from './zero-hit-feedback';
 
+// Re-pinned 2026-08-30 (owner: "the machien gun dont hit or do damage
+// properly and look bad"): the host resolves chopper damage from the CAMERA
+// socket, so feedback traced from the muzzle socket ran down a parallel line
+// and contradicted the damage. The ordering invariant this guards is
+// unchanged; only the ray the trace starts from moved onto the authoritative
+// one.
 describe('HF-386 zero-damage world-hit feedback', () => {
   it('coalesces same-instant shotgun pellets and autocannon cadence behind one throttle', () => {
     expect(shouldPresentZeroHit(Number.NEGATIVE_INFINITY, 1_000, 0)).toBe(true);
@@ -118,8 +124,8 @@ describe('HF-386 zero-damage world-hit feedback', () => {
       'chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch)',
     );
     const rayAt = gunnerBlock.indexOf('chopperGunnerAuthoritativeRay(');
-    const traceAt = gunnerBlock.indexOf("traceWeaponPath(muzzle, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg')");
-    const tracerAt = gunnerBlock.indexOf('spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, chopperTrace.travelDistance)');
+    const traceAt = gunnerBlock.indexOf("traceWeaponPath(rayOrigin, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg')");
+    const tracerAt = gunnerBlock.indexOf('spawnTracer(muzzle, rayOrigin.clone().addScaledVector(aim, chopperTrace.travelDistance)');
     const markerAt = gunnerBlock.indexOf('spawnImpactFlash(point, firstImpact.surface.material, normal)');
     const audioAt = gunnerBlock.indexOf('audio.impact(surface, point.distanceTo(camera.position));');
     const cueAt = gunnerBlock.indexOf('presentZeroDamageHit(now)');

@@ -20,8 +20,11 @@ import {
   MAX_RETAINED_CARE_REWARDS,
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   adrenalineModifiers,
+  chopperGunnerAuthoritativeRay,
   droneSwarmStepMinimumAltitudeY,
   type KillstreakActivationIntent,
+  type KillstreakEntitySnapshot,
+  type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
 import {
@@ -1271,5 +1274,95 @@ describe('possessed autocannon shell splash (owner 2026-08-30)', () => {
     const { shotFired, chopperDamage } = pumpFire(CHOPPER_GUN_SPLASH_RADIUS_M + 2);
     expect(shotFired).toBe(true);
     expect(chopperDamage).toEqual([]);
+  });
+});
+
+/**
+ * HF-404 — "the machien gun dont hit or do damage properly".
+ *
+ * The first-person controller's yaw is an unbounded accumulator: it is never
+ * wrapped, so a gunner who keeps turning ships 7.5, 13.8, 20.1 rad. The aim
+ * authority CLAMPED that into [-pi, pi] instead of wrapping it, so the moment
+ * the turret swept past a half turn of accumulated yaw the host pinned the aim
+ * at the clamp boundary and the damage ray stopped following the crosshair.
+ * Yaw is periodic and pitch is not, so yaw wraps and pitch still clamps.
+ */
+describe('HF-404 possessed aim yaw wraps, never clamps', () => {
+  const SWEPT_YAW = 7.5;
+  const SAME_HEADING = 7.5 - Math.PI * 2;
+  const CLAMP_BOUNDARY_YAW = Math.PI;
+  // The authoritative cadence puts the first possessed shell at 1_600.
+  const FIRST_SHOT_AT = 1_600;
+
+  function possessedGunner(): Readonly<{
+    runtime: HostKillstreakRuntime;
+    entityId: string;
+    entity: KillstreakEntitySnapshot;
+  }> {
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke']));
+    earn(runtime, 8);
+    const entityId = runtime.activate(intent('chopper', 4), 1_000, DEFAULT_WORLD).entityIds[0]!;
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-chopper-gunner',
+    }, 1_001).accepted).toBe(true);
+    runtime.advance(FIRST_SHOT_AT - 1, DEFAULT_WORLD);
+    const entity = runtime.snapshotFor('owner', FIRST_SHOT_AT - 1).entities
+      .find((candidate) => candidate.kind === 'chopper')!;
+    expect(entity).toBeDefined();
+    return Object.freeze({ runtime, entityId, entity });
+  }
+
+  /** Fires one shell aimed with `commandedYaw` at a hostile placed 20 m down the `expectedYaw` ray. */
+  function shellDamage(commandedYaw: number, expectedYaw: number, commandedPitch = -0.2, expectedPitch = commandedPitch) {
+    const { runtime, entityId, entity } = possessedGunner();
+    const ray = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, expectedYaw, expectedPitch);
+    const victim: KillstreakTarget = {
+      id: 'swept-hostile',
+      kind: 'player',
+      team: 1,
+      lifeId: 3,
+      alive: true,
+      position: [
+        ray.origin[0] + ray.direction[0] * 20,
+        ray.origin[1] + ray.direction[1] * 20,
+        ray.origin[2] + ray.direction[2] * 20,
+      ],
+    };
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 2, entityId,
+      action: 'pilot-control', yawQ: commandedYaw, pitchQ: commandedPitch, fire: true,
+    }, FIRST_SHOT_AT - 1).accepted).toBe(true);
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [DEFAULT_WORLD.targets[0]!, victim],
+    };
+    return runtime.advance(FIRST_SHOT_AT, world).damageEvents.filter((event) => event.source === 'chopper');
+  }
+
+  it('resolves a swept 7.5 rad yaw to exactly the same aim as 7.5 - 2*pi', () => {
+    expect(shellDamage(SWEPT_YAW, SAME_HEADING).map((event) => event.targetId)).toEqual(['swept-hostile']);
+    // The control-side truth: the wrapped value really is the same heading.
+    expect(shellDamage(SAME_HEADING, SAME_HEADING).map((event) => event.targetId)).toEqual(['swept-hostile']);
+  });
+
+  it('does not pin a swept yaw at the +pi clamp boundary', () => {
+    // This is the regression itself: under the old clamp, 7.5 rad resolved to
+    // pi and the shell went here instead of down the crosshair.
+    expect(shellDamage(SWEPT_YAW, CLAMP_BOUNDARY_YAW)).toEqual([]);
+  });
+
+  it('keeps wrapping past a full turn in both directions', () => {
+    expect(shellDamage(SAME_HEADING + Math.PI * 4, SAME_HEADING).map((event) => event.targetId))
+      .toEqual(['swept-hostile']);
+    expect(shellDamage(SAME_HEADING - Math.PI * 6, SAME_HEADING).map((event) => event.targetId))
+      .toEqual(['swept-hostile']);
+  });
+
+  it('still clamps pitch, because the elevation limit is a real mechanical stop', () => {
+    // Commanding 3 rad of elevation must resolve to the authored 0.5 ceiling,
+    // not wrap round to a downward heading.
+    expect(shellDamage(SAME_HEADING, SAME_HEADING, 3, 0.5).map((event) => event.targetId))
+      .toEqual(['swept-hostile']);
   });
 });

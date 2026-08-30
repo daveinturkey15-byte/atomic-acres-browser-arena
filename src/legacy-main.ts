@@ -24,6 +24,7 @@ import { applyTeamSwap, prescribeTeams, teamSwapRefusal } from './team-prescript
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
+import { wrapAngleRadians } from './animation-additive-pose';
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
@@ -380,7 +381,7 @@ import {
   type Stance,
 } from './gameplay';
 import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countdown-continuity';
-import { adsSightProfile } from './ads-sight-profile';
+import { adsAimingFovDegrees, adsSightProfile } from './ads-sight-profile';
 import { ArenaMap, buildArena } from './map';
 import {
   admitCrossbowThroughGlass,
@@ -2060,6 +2061,26 @@ const flareProjectileSystem = new FlareProjectileSystem(
   reducedRenderMode,
   true,
 );
+// HF-402: the flamethrower FAMILY, not one literal weapon id. Every weapon
+// that delivers an ignited fuel stream shares the same 18 m reach, the same
+// stream presentation and the same ground ignition; only livery, damage and
+// ammo differ. The crimson care-package variant is deliberately a separate
+// weapon id (HF-334), so every `weapon === 'flamethrower'` equality quietly
+// dropped it into the ballistic path: a bullet tracer instead of flames, no
+// ground fire, and a 90 m presentation reach against an 18 m authority reach.
+// Reach, presentation and authority all key off this set so that a third
+// variant cannot reintroduce the same asymmetry. The catalog has no flame
+// trait field to derive this from (family is 'launcher', shared with the
+// flare gun), so crimson-flamethrower.test.ts pins this list against the
+// catalog: any weapon authored with an ignited-fuel-stream calibre must
+// appear here.
+const FLAMETHROWER_FAMILY_WEAPON_IDS: ReadonlySet<WeaponId> = new Set<WeaponId>([
+  'flamethrower',
+  'crimson-flamethrower',
+]);
+function isFlamethrowerFamilyWeapon(weapon: WeaponId): boolean {
+  return FLAMETHROWER_FAMILY_WEAPON_IDS.has(weapon);
+}
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
   scene,
   reducedRenderMode,
@@ -5363,7 +5384,7 @@ const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
   if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
-  if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
+  if (isFlamethrowerFamilyWeapon(weapon)) return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
 }
 
@@ -12251,7 +12272,8 @@ function onNetworkMessage(message: GameMessage): void {
     )?.message.weapon;
     const hostCanonicalFlame = message.hostAuthority !== undefined
       && message.kind === 'shot'
-      && (admittedActionWeapon === 'flare-gun' || admittedActionWeapon === 'flamethrower');
+      && (admittedActionWeapon === 'flare-gun'
+        || (admittedActionWeapon !== undefined && isFlamethrowerFamilyWeapon(admittedActionWeapon)));
     if (!areCombatantsHostile(message.by, attackerTeam, targetId, targetTeam) && !hostCanonicalFlame) return;
     const targetLifeId = targetIsLocal ? localContinuity : remoteTarget?.continuity ?? botTarget!.continuity;
     if (network.role === 'client') {
@@ -12908,8 +12930,12 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   let remoteShotEnd: THREE.Vector3 | null = null;
-  if (request.weapon !== 'flamethrower') remoteShotEnd = renderRemoteShot(visualShot);
-  if (request.weapon !== 'flamethrower') {
+  // HF-402: the whole flamethrower family defers its presentation and its
+  // killstreak-entity pass until after the admission block below, so a stream
+  // weapon is never also drawn as a bullet.
+  const remoteFlamethrowerShot = isFlamethrowerFamilyWeapon(request.weapon);
+  if (!remoteFlamethrowerShot) remoteShotEnd = renderRemoteShot(visualShot);
+  if (!remoteFlamethrowerShot) {
     applyKillstreakEntityShot(
       request.by,
       sender.snapshot.team,
@@ -12968,21 +12994,28 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     }
   }
 
-  if (request.weapon === 'flamethrower') {
-    const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower, request.by, request.shotId);
-    if (!consumption.accepted) {
-      timedMapWeaponAudit.shotsRejected += 1;
-      timedMapWeaponAudit.lastReason = consumption.reason;
-      admittedRemoteShots.get(request.by)?.delete(visualShot.nonce);
-      finish('rejected', consumption.reason === 'invalid' ? 'malformed' : 'weapon-mismatch', admission.appliedRewindMs);
-      return;
+  if (remoteFlamethrowerShot) {
+    // HF-402: only the arena-bound map flamethrower is a timed map weapon.
+    // The crimson variant carries its own finite ammo (HF-334) and must never
+    // be metered against — or consume — the map weapon's host tank, so the
+    // consumption gate stays keyed to that one id while the presentation and
+    // ground-ignition lanes below serve the whole family.
+    if (request.weapon === 'flamethrower') {
+      const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower, request.by, request.shotId);
+      if (!consumption.accepted) {
+        timedMapWeaponAudit.shotsRejected += 1;
+        timedMapWeaponAudit.lastReason = consumption.reason;
+        admittedRemoteShots.get(request.by)?.delete(visualShot.nonce);
+        finish('rejected', consumption.reason === 'invalid' ? 'malformed' : 'weapon-mismatch', admission.appliedRewindMs);
+        return;
+      }
+      applyTimedMapWeaponState('flamethrower', consumption.state);
+      timedMapWeaponAudit.shotsAccepted += 1;
+      recordMatchDiagnostic('timed-weapon-shot', 'accepted', {
+        actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
+      }, request.shotId);
+      broadcastTimedMapWeaponState();
     }
-    applyTimedMapWeaponState('flamethrower', consumption.state);
-    timedMapWeaponAudit.shotsAccepted += 1;
-    recordMatchDiagnostic('timed-weapon-shot', 'accepted', {
-      actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
-    }, request.shotId);
-    broadcastTimedMapWeaponState();
     remoteShotEnd = renderRemoteShot(visualShot);
     if (remoteShotEnd) {
       flamethrowerGroundFires.ignite({
@@ -13013,7 +13046,11 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     (origin, impact, weapon) => {
       const delta = impact.clone().sub(origin);
       const distance = delta.length();
-      if (weapon === 'flamethrower' && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0;
+      // HF-402: the 18 m reach is a family property. Keyed to the one literal
+      // id, the crimson variant kept the generic ballistic reach here while
+      // its presentation stopped at 18 m — authority and feedback disagreeing
+      // about where the stream ends.
+      if (isFlamethrowerFamilyWeapon(weapon) && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0;
       const trace = traceWeaponPath(origin, delta, distance, weapon);
       return trace.reachedDistance ? trace.damageMultiplier : 0;
     },
@@ -13299,13 +13336,13 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
   }
   const traceDistance = message.weapon === 'railgun'
     ? RAILGUN_BEAM_LENGTH_M
-    : message.weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 50;
+    : isFlamethrowerFamilyWeapon(message.weapon) ? FLAMETHROWER_EFFECT.rangeM : 50;
   const trace = traceWeaponPath(origin, direction, traceDistance, message.weapon);
   applyInteractiveWorldBallisticTrace(trace, origin, direction, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-  if (message.weapon === 'flamethrower') {
+  if (isFlamethrowerFamilyWeapon(message.weapon)) {
     flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, visibleEnd, performance.now());
     flamethrowerStreamPresentation.igniteGround(visibleEnd, performance.now());
   } else if (message.weapon !== 'railgun') {
@@ -17891,7 +17928,11 @@ function tryFire(now: number): void {
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   const projectileShot = spec.fireKind === 'projectile';
-  const flamethrowerShot = player.weapon === 'flamethrower';
+  // HF-402: family, not id. This one equality gated the entire flamethrower
+  // presentation, so picking up the crimson variant produced a bullet tracer
+  // out to 90 m with no stream and no ground ignition, while the host still
+  // resolved damage against an 18 m stream.
+  const flamethrowerShot = isFlamethrowerFamilyWeapon(player.weapon);
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
   // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
   // the barrel axis, so the protected centre cone still applies unchanged.
@@ -18069,7 +18110,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower') {
+  if (flamethrowerShot) {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -19048,6 +19089,12 @@ function broadcastHostedBotFlamethrowerPresentation(
   end: THREE.Vector3,
   actionNonce: number,
 ): void {
+  // HF-402: the bot lane stays keyed to the single map id on purpose. The
+  // catalog bars bots from the crimson variant (policies.bot: 'never') and the
+  // presentation wire schema pins `weapon: 'flamethrower'`, so widening this
+  // guard would only let a bot broadcast a message that misnames its weapon.
+  // Bot authority (the reach below in updateBots) is keyed the same way, so
+  // the two never disagree.
   if (network.role !== 'host' || bot.weapon !== 'flamethrower') return;
   const message: BotFlamethrowerStreamPresentationMessage = {
     type: 'bot-weapon-presentation',
@@ -20846,7 +20893,7 @@ function traceAuthoritativeSmokeShotSegments(
     const direction = rawDirection.clone().normalize();
     const requestedDistance = weapon === 'railgun'
       ? RAILGUN_BEAM_LENGTH_M
-      : weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 110;
+      : isFlamethrowerFamilyWeapon(weapon) ? FLAMETHROWER_EFFECT.rangeM : 110;
     const trace = traceWeaponPath(origin, direction, requestedDistance, weapon);
     const end = origin.clone().addScaledVector(direction, trace.travelDistance);
     return Object.freeze({
@@ -22038,16 +22085,59 @@ function adrenalineRuntimeDebugSnapshot(now = performance.now()) {
   });
 }
 
+/** Padding the killstreak line-of-sight segment test inflates every solid by. */
+const KILLSTREAK_LINE_OF_SIGHT_PADDING_M = 0.02;
+/**
+ * HF-403: how deep inside a solid an endpoint must sit before that solid stops
+ * counting as cover for it. 0.05 m is far below a test-bay dummy collider's
+ * 0.36 m horizontal and 1.05 m vertical half-extents (HF-318), and far above
+ * the zero depth of a combatant merely standing on a box, so a roof still
+ * blocks line of sight for whoever is standing on it.
+ */
+const KILLSTREAK_LINE_OF_SIGHT_INTERIOR_MARGIN_M = 0.05;
+
+/** True when the point sits strictly inside the solid, by the interior margin. */
+function killstreakSolidEnclosesPoint(box: Box2, point: { x: number; y: number; z: number }): boolean {
+  const margin = KILLSTREAK_LINE_OF_SIGHT_INTERIOR_MARGIN_M;
+  const minY = (box.minY ?? 0) + margin;
+  const maxY = (box.maxY ?? 8) - margin;
+  if (box.maxX - box.minX <= margin * 2 || box.maxZ - box.minZ <= margin * 2 || maxY <= minY) return false;
+  // Eroding every face by the same margin shrinks the box about its own centre,
+  // which is the point boxFrame rotates around, so this stays exact for the
+  // oriented colliders too.
+  return sphereIntersectsBox(point, 1e-4, {
+    minX: box.minX + margin,
+    maxX: box.maxX - margin,
+    minY,
+    maxY,
+    minZ: box.minZ + margin,
+    maxZ: box.maxZ - margin,
+    rotation: box.rotation,
+  });
+}
+
 function killstreakLineOfSight(
   solids: ArenaMap['colliders'],
   from: readonly [number, number, number],
   to: readonly [number, number, number],
 ): boolean {
-  return !solids.some((box) => segmentIntersectsBox(
-    { x: from[0], y: from[1], z: from[2] },
-    { x: to[0], y: to[1], z: to[2] },
-    box,
-  ));
+  const start = { x: from[0], y: from[1], z: from[2] };
+  const end = { x: to[0], y: to[1], z: to[2] };
+  // HF-403: a solid that CONTAINS one of the endpoints is not cover for that
+  // endpoint — nothing hides behind the box it is standing inside. HF-318 made
+  // every active training dummy a solid world box, and the test bay publishes
+  // each dummy as a killstreak target at its own collider's geometric centre,
+  // so every support line-of-sight query to a dummy terminated 0.36 m deep
+  // inside the dummy's own solid and reported "blocked". That is why carpet
+  // bomber, piloted drone and chopper gunner all went inert in the test bay
+  // while working everywhere else: dummies are the only combatants that are
+  // also world solids. Authority is unchanged for every ordinary query — the
+  // segment test still runs first, and only the one box an endpoint is already
+  // buried in is discounted, so real cover between two points outside the
+  // solids blocks exactly as before.
+  return !solids.some((box) => segmentIntersectsBox(start, end, box, KILLSTREAK_LINE_OF_SIGHT_PADDING_M)
+    && !killstreakSolidEnclosesPoint(box, start)
+    && !killstreakSolidEnclosesPoint(box, end));
 }
 
 // ---------------------------------------------------------------------------
@@ -22385,7 +22475,7 @@ function applyKillstreakEntityShot(
 ): boolean {
   if (network.role === 'client' || directions.length === 0) return false;
   const spec = WEAPONS[weapon];
-  const maximumDistance = weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 220;
+  const maximumDistance = isFlamethrowerFamilyWeapon(weapon) ? FLAMETHROWER_EFFECT.rangeM : 220;
   let applied = false;
   const destroyed = new Set<string>();
   for (const authoredDirection of directions) {
@@ -22488,6 +22578,16 @@ function requestKillstreakControl(
   now = performance.now(),
 ): boolean {
   killstreakControlSequence += 1;
+  // HF-404: player.yaw is an unbounded accumulator — it is never wrapped, so a
+  // gunner who keeps turning ships 7.5, 13.8, 20.1 rad. The control-intent wire
+  // contract is yawQ in [-pi, pi] (killstreak-protocol parseKillstreakControl),
+  // so an unwrapped yaw made the guest's ENTIRE control message fail
+  // validation — aim, pitch, thrust and trigger with it — and the host's own
+  // boundary pinned the turret at the clamp. Normalise into the contract here,
+  // once, for every caller. Yaw is periodic, so this changes no heading.
+  const normalizedControl = control.yawQ === undefined
+    ? control
+    : { ...control, yawQ: wrapAngleRadians(control.yawQ) };
   const message: KillstreakControlIntentMessage = {
     type: 'killstreak-control-intent',
     by: player.id,
@@ -22496,7 +22596,7 @@ function requestKillstreakControl(
     sequence: killstreakControlSequence,
     entityId,
     action,
-    ...control,
+    ...normalizedControl,
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
@@ -22984,6 +23084,14 @@ function updateKillstreakPossession(now: number): void {
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
       const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      // HF-404: trace the AUTHORITATIVE ray, not a parallel one. The host
+      // resolves damage from shotRay.origin (the camera socket); tracing from
+      // shotRay.tracerOrigin (the muzzle socket) instead put every spark,
+      // decal, impact sound and zero-damage cue on a line offset by the whole
+      // camera-to-muzzle vector, so the feedback disagreed with the damage.
+      // The tracer still LEAVES the barrel — only its endpoint is now the
+      // host's endpoint, which is what the crosshair is aimed at.
+      const rayOrigin = new THREE.Vector3(...shotRay.origin);
       const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
       const aim = new THREE.Vector3(...shotRay.direction);
       // HF-386: presentation-only trace along the authoritative aim line so a
@@ -22993,11 +23101,11 @@ function updateKillstreakPossession(now: number): void {
       // through walls, and the range is the autocannon's authoritative 78 m
       // rather than an arbitrary number. Host damage authority is untouched:
       // this trace never mutates interactive-world state.
-      const chopperTrace = traceWeaponPath(muzzle, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg');
-      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, chopperTrace.travelDistance), 0xffb347);
+      const chopperTrace = traceWeaponPath(rayOrigin, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg');
+      spawnTracer(muzzle, rayOrigin.clone().addScaledVector(aim, chopperTrace.travelDistance), 0xffb347);
       const firstImpact = chopperTrace.impacts[0];
       if (firstImpact) {
-        const point = muzzle.clone().addScaledVector(aim, firstImpact.entryDistance);
+        const point = rayOrigin.clone().addScaledVector(aim, firstImpact.entryDistance);
         const normal = new THREE.Vector3(
           firstImpact.entryNormal.x,
           firstImpact.entryNormal.y,
@@ -25147,7 +25255,13 @@ function updatePhysics(dt: number): void {
       ? magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION)
       : player.weapon === 'railgun'
         ? magnifiedFovDegrees(preferredFov, RAILGUN_SCOPE_MAGNIFICATION)
-        : Math.max(55, preferredFov - 20);
+        // HF-405: everything else reads its AUTHORED optic instead of falling
+        // into one generic iron-sight number. The crossbow's compact 1.5x
+        // glass had been built and authored for passes without a single
+        // reader. The three branches above keep their own constants because
+        // each drives a matching full-screen overlay or thermal pipeline that
+        // is keyed to the same magnification.
+        : adsAimingFovDegrees(player.weapon, preferredFov);
   const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
   // A one-frame 82 -> 32 degree sniper projection jump invalidated most of the
   // visible render list at once and forced a measured WebGPU ScenePass rebuild.

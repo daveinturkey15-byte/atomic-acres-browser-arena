@@ -710,6 +710,21 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+/**
+ * HF-404: yaw is periodic; pitch is not. Aim yaw arrives from a first-person
+ * camera whose yaw is an unbounded accumulator, so clamping it to [-pi, pi]
+ * pinned the turret at the clamp boundary the moment the gunner swept past a
+ * half turn of accumulated yaw — the damage ray stopped following the
+ * crosshair entirely while the cockpit camera kept rotating. Wrapping is the
+ * only correct normalisation: 7.5 rad and 7.5 - 2*pi are the same heading.
+ * Pitch stays clamped because its limits are a real mechanical stop.
+ */
+function wrapAngle(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const wrapped = value - Math.PI * 2 * Math.floor((value + Math.PI) / (Math.PI * 2));
+  return wrapped <= -Math.PI ? wrapped + Math.PI * 2 : wrapped;
+}
+
 function finiteTuple(value: SupportVec3 | undefined): value is SupportVec3 {
   return value !== undefined && value.length === 3 && value.every(Number.isFinite);
 }
@@ -2010,7 +2025,7 @@ export class HostKillstreakRuntime {
       }
       if (entity.kind === 'chopper') {
         if (entity.gunController === 'ai' || entity.gunController.actorId !== actor.actorId || entity.gunController.lifeId !== actor.lifeId) return reject('not-gun-controller');
-        entity.aimYaw = clamp(intent.yawQ ?? entity.aimYaw, -Math.PI, Math.PI);
+        entity.aimYaw = wrapAngle(intent.yawQ ?? entity.aimYaw);
         entity.aimPitch = clamp(intent.pitchQ ?? entity.aimPitch, -1.2, 0.5);
         // Fire is a held-state intent. Assignment (rather than OR-latching)
         // makes release authoritative and lets the host apply the slow cadence.
@@ -2028,7 +2043,7 @@ export class HostKillstreakRuntime {
       } else if (entity.kind === 'drone' && entity.mode === 'piloted') {
         if (intent.missileFire === true) return reject('missile-unavailable');
         if (actor.possession?.kind !== 'piloted-drone' || actor.possession.entityId !== entity.id) return reject('not-drone-controller');
-        entity.yaw = clamp(intent.yawQ ?? entity.yaw, -Math.PI, Math.PI);
+        entity.yaw = wrapAngle(intent.yawQ ?? entity.yaw);
         entity.pitch = clamp(intent.pitchQ ?? entity.pitch, -1.2, 1.2);
         entity.thrust = clamp(intent.thrustQ ?? entity.thrust, -1, 1);
         entity.strafe = clamp(intent.strafeQ ?? entity.strafe, -1, 1);

@@ -14,10 +14,27 @@ export type ThermalGhostTarget = Readonly<{
 
 export const THERMAL_GHOST_ORANGE_HEX = 0xff7a1a;
 export const THERMAL_GHOST_MAX_TARGETS = 16;
-// Both retained third-person operator LODs contain nine body primitives. Keep
-// three explicit extension slots, then fail closed instead of drawing a
-// partial body if a future authored variant exceeds the frozen corpus bound.
-export const THERMAL_GHOST_MAX_BODY_LAYERS = 12;
+// Measured 2026-08-30 from every shipped operator GLB, counting glTF
+// primitives because GLTFLoader emits one SkinnedMesh per primitive (the three
+// multi-primitive meshes in each Pass 74 skin become a Group of Meshes):
+//   pass65-third-person-operator-lod0/1/2 ...........  9 primitives, 4 materials
+//   pass74-operator-skin-navalops-lod0/1 ............ 30 primitives, 4 materials
+//   pass74-operator-skin-explorer-lod0/1 ............ 42 primitives, 4 materials
+//   pass74-operator-skin-symbiote-lod0/1 ............ 46 primitives, 4 materials
+// The retired bound of 12 was anchored on the pass65 operator alone. Pass 74
+// then shipped three skins at 3.3-5.1x that size and bots draw from all of
+// them (BOT_OPERATOR_SKIN_POOL), so nearly every revealed body failed the
+// completeness preflight below and the M14, Railgun and Chopper Gunner reveals
+// -- all three delegate their body drawing to this one renderer -- drew
+// nothing. 62 = ceil(46 x 4/3): the measured corpus maximum plus the same
+// one-third extension headroom the retired 9 -> 12 bound carried, so one more
+// authored variant can land without another blackout.
+export const THERMAL_GHOST_MAX_BODY_LAYERS = 62;
+// Whole-pool ceiling: the per-body bound above x the admission cap sync()
+// enforces. Each layer owns one model mesh and one halo mesh, so the pool tops
+// out at 1,984 presentation meshes (1,472 for the real corpus maximum of 46).
+// The pool stays bounded -- a runaway target set cannot grow it past this.
+export const THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS = THERMAL_GHOST_MAX_BODY_LAYERS * THERMAL_GHOST_MAX_TARGETS;
 // The retained operator corpus owns four shared appearance materials per
 // instance. Five slots per admitted target leaves one bounded extension slot
 // without allowing target churn to create hundreds of live bind groups.
@@ -97,6 +114,11 @@ export type ThermalGhostTelemetry = Readonly<{
   completeOperatorModels: boolean;
   incompleteTargets: number;
   maxBodyLayers: number;
+  maxTotalBodyLayers: number;
+  /** High-water body-layer count actually observed, for bound re-derivation. */
+  maxObservedBodyLayers: number;
+  bodyLayerBudgetExceeded: boolean;
+  oversizedBodyRejections: number;
 }>;
 
 type GhostLayer = {
@@ -468,6 +490,10 @@ export class ThermalGhostPresentation {
     completeOperatorModels: true,
     incompleteTargets: 0,
     maxBodyLayers: THERMAL_GHOST_MAX_BODY_LAYERS,
+    maxTotalBodyLayers: THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS,
+    maxObservedBodyLayers: 0,
+    bodyLayerBudgetExceeded: false,
+    oversizedBodyRejections: 0,
   };
   private generation = 0;
   private activeTargets = 0;
@@ -477,9 +503,40 @@ export class ThermalGhostPresentation {
   private activeSourceBodyLayers = 0;
   private activeNormalMaterialSlots = 0;
   private materialBudgetExceeded = false;
+  private materialBudgetWarned = false;
+  private maxObservedBodyLayers = 0;
+  private bodyLayerBudgetExceeded = false;
+  private oversizedBodyRejections = 0;
+  private readonly warnedBodyLayerCounts = new Set<number>();
   private haloMaterialDisposed = false;
   private evidenceControlHidden = false;
   private duplicateSourceRootInputs = 0;
+
+  /**
+   * Pool exhaustion used to fail silently: the record came back incomplete,
+   * every weapon sharing this renderer stopped revealing anything, and the only
+   * evidence was an `incompleteTargets` count nobody was reading. Each cause now
+   * names its measured overflow once per distinct size, so the next oversized
+   * asset lands in the console instead of in an owner bug report.
+   */
+  private warnOversizedBody(targetId: string, bodyLayers: number): void {
+    if (this.warnedBodyLayerCounts.has(bodyLayers)) return;
+    this.warnedBodyLayerCounts.add(bodyLayers);
+    console.warn(
+      `[thermal-ghost] through-wall reveal failed closed for "${targetId}": ${bodyLayers} body layers exceed `
+      + `THERMAL_GHOST_MAX_BODY_LAYERS=${THERMAL_GHOST_MAX_BODY_LAYERS}. The M14, Railgun and Chopper Gunner `
+      + 'reveals all share this pool; re-derive the bound from the shipped operator corpus maximum.',
+    );
+  }
+
+  private warnMaterialBudgetExceeded(targetId: string, owned: number, required: number): void {
+    if (this.materialBudgetWarned) return;
+    this.materialBudgetWarned = true;
+    console.warn(
+      `[thermal-ghost] through-wall reveal failed closed for "${targetId}": ${owned} resident + ${required} new `
+      + `exact materials exceed THERMAL_GHOST_MAX_EXACT_MODEL_MATERIALS=${THERMAL_GHOST_MAX_EXACT_MODEL_MATERIALS}.`,
+    );
+  }
 
   private acquireExactModelMaterials(source: THREE.Mesh): THREE.Material[] | null {
     const originals = sourceMaterials(source);
@@ -539,11 +596,12 @@ export class ThermalGhostPresentation {
       candidateMeshes.push(node);
       if (node instanceof THREE.SkinnedMesh) skinnedBodyMeshes.push(node);
     });
-    // The shipped rig owns exactly nine skinned body primitives. Static meshes
-    // can be attached below the named visual at runtime (weapon/gear effects),
-    // but they are not part of the animated operator corpus and previously
-    // pushed every real actor above the 12-layer fail-closed bound. Procedural
-    // fixtures and fallback actors without a skinned visual retain all meshes.
+    // Every shipped rig is entirely skinned (9 primitives on the pass65
+    // operator, 30/42/46 on the Pass 74 skins). Static meshes can be attached
+    // below the named visual at runtime (weapon/gear effects), but they are not
+    // part of the animated operator corpus and previously pushed real actors
+    // above the fail-closed layer bound. Procedural fixtures and fallback
+    // actors without a skinned visual retain all meshes.
     const sourceBodyMeshes: THREE.Mesh[] = namedOperatorVisual && skinnedBodyMeshes.length > 0
       ? skinnedBodyMeshes
       : candidateMeshes;
@@ -552,12 +610,19 @@ export class ThermalGhostPresentation {
       sourceBodyMeshes.flatMap((mesh) => sourceMaterials(mesh))
         .filter((material) => !this.exactMaterialCache.has(material)),
     ).size;
+    this.maxObservedBodyLayers = Math.max(this.maxObservedBodyLayers, sourceBodyMeshes.length);
     const complete = !unsupportedInstancedBody
       && sourceBodyMeshes.length > 0
       && sourceBodyMeshes.length <= THERMAL_GHOST_MAX_BODY_LAYERS
       && this.ownedExactMaterials.size + requiredNewMaterials <= THERMAL_GHOST_MAX_EXACT_MODEL_MATERIALS;
+    if (sourceBodyMeshes.length > THERMAL_GHOST_MAX_BODY_LAYERS) {
+      this.bodyLayerBudgetExceeded = true;
+      this.oversizedBodyRejections += 1;
+      this.warnOversizedBody(target.id, sourceBodyMeshes.length);
+    }
     if (!complete && this.ownedExactMaterials.size + requiredNewMaterials > THERMAL_GHOST_MAX_EXACT_MODEL_MATERIALS) {
       this.materialBudgetExceeded = true;
+      this.warnMaterialBudgetExceeded(target.id, this.ownedExactMaterials.size, requiredNewMaterials);
     }
     if (complete) for (const node of sourceBodyMeshes) {
       const parent = node.parent;
@@ -733,6 +798,13 @@ export class ThermalGhostPresentation {
     this.activeSourceBodyLayers = 0;
     this.activeNormalMaterialSlots = 0;
     this.materialBudgetExceeded = false;
+    this.materialBudgetWarned = false;
+    this.maxObservedBodyLayers = 0;
+    this.bodyLayerBudgetExceeded = false;
+    this.oversizedBodyRejections = 0;
+    // Match teardown, so the next match warns again for a still-oversized asset
+    // rather than staying quiet on a stale session-lifetime dedupe.
+    this.warnedBodyLayerCounts.clear();
     this.duplicateSourceRootInputs = 0;
   }
 
@@ -933,6 +1005,9 @@ export class ThermalGhostPresentation {
     state.materialBudgetExceeded = this.materialBudgetExceeded;
     state.completeOperatorModels = completeOperatorModels;
     state.incompleteTargets = incompleteTargets;
+    state.maxObservedBodyLayers = this.maxObservedBodyLayers;
+    state.bodyLayerBudgetExceeded = this.bodyLayerBudgetExceeded;
+    state.oversizedBodyRejections = this.oversizedBodyRejections;
     return state;
   }
 

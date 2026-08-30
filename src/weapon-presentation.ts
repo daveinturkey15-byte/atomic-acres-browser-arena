@@ -4666,6 +4666,17 @@ export class WeaponPresentation {
   }
 
   update(pose: WeaponPose): WeaponActionEvent[] {
+    // Owner 2026-08-30 ("randomly top of shotgun detached ... m14 scope part
+    // is flying in the air above the gun"). Hidden weapon models have their
+    // subtree matrices DEEP-FROZEN (matrixAutoUpdate off) so a parked model
+    // costs nothing per frame. Any path that reveals a model without
+    // re-running applyModelMatrixFreeze therefore renders it - and every part
+    // under it - at the WORLD transform it was frozen at, which is exactly a
+    // rib or an optic hanging in the air away from the receiver. It is
+    // intermittent because it depends on which of several reveal paths ran.
+    // Rather than chase each path, the invariant is enforced once, per frame,
+    // where it can never be bypassed: whatever is visible is unfrozen.
+    this.applyModelMatrixFreeze();
     const actionEvents: WeaponActionEvent[] = [];
     const smoothing = (rate: number) => 1 - Math.exp(-rate * pose.dt);
     // HF-365: advance the arm-motion clock before anything reads it, and keep

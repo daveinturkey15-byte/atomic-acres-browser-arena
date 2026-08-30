@@ -53,7 +53,10 @@ describe('shared interactive-world runtime adapter', () => {
       revision: 0,
       consumers: FIELD_SHED_DEFINITION.consumers,
     });
-    expect(runtime.telemetry()).toMatchObject({ sheds: 1, presentationDraws: 4, movementColliders: 9, ballisticSurfaces: 9 });
+    // Re-pinned 2026-08-30 (owner: "i keep seeing through its walls"): the
+    // authored envelope gained gable-north/gable-south to close the open ends,
+    // so the shed publishes 11 surfaces, not 9. Nothing was loosened.
+    expect(runtime.telemetry()).toMatchObject({ sheds: 1, presentationDraws: 4, movementColliders: 11, ballisticSurfaces: 11 });
     runtime.dispose();
   });
 

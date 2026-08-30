@@ -46,13 +46,30 @@ function ridgedMetalBumpTexture(): THREE.DataTexture {
 }
 
 function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
-  const { halfU, halfV } = surface.frame;
+  const { halfU, halfV, outlineUVQ } = surface.frame;
   const shape = new THREE.Shape();
-  shape.moveTo(-halfU, -halfV);
-  shape.lineTo(halfU, -halfV);
-  shape.lineTo(halfU, halfV);
-  shape.lineTo(-halfU, halfV);
-  shape.closePath();
+  if (outlineUVQ && outlineUVQ.length >= 3) {
+    // Owner 2026-08-30: a gable is a triangle, not its bounding rectangle -
+    // rendering the rectangle would stand a slab up to 1.04 m proud of the
+    // sloped roofline at each end. Ballistics still use the bounding frame.
+    const point = (index: number) => ({
+      u: outlineUVQ[index]!.uQ / SHED_PANEL_COORD_Q * halfU,
+      v: outlineUVQ[index]!.vQ / SHED_PANEL_COORD_Q * halfV,
+    });
+    const first = point(0);
+    shape.moveTo(first.u, first.v);
+    for (let index = 1; index < outlineUVQ.length; index += 1) {
+      const next = point(index);
+      shape.lineTo(next.u, next.v);
+    }
+    shape.closePath();
+  } else {
+    shape.moveTo(-halfU, -halfV);
+    shape.lineTo(halfU, -halfV);
+    shape.lineTo(halfU, halfV);
+    shape.lineTo(-halfU, halfV);
+    shape.closePath();
+  }
   for (const aperture of state.apertures) {
     const hole = new THREE.Path();
     hole.absellipse(

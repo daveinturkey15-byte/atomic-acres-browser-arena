@@ -347,13 +347,41 @@ function makeFieldMaterial(
 // Field build
 // ---------------------------------------------------------------------------
 
+/** 2 m broad-phase cell for the crush index. */
+const CRUSH_CELL_M = 2;
+/**
+ * Numeric broad-phase key. The string form (`${cx}:${cz}`) allocated one
+ * template string per probed cell per region on EVERY impact — crushAt runs
+ * from spawnImpactFlash, i.e. once per bullet that hits low ground. Offset
+ * 4096 cells = +-8 km of arena, far past the +-40 m bounds.
+ */
+function crushCellKey(cx: number, cz: number): number {
+  return (cx + 4096) * 8192 + (cz + 4096);
+}
+
+/**
+ * Discrete instanceMatrix update ranges kept before they are collapsed into
+ * one covering range. Ranges only accumulate while a mesh is not being
+ * rendered (nothing uploads them), so this bounds the frustum-culled case.
+ */
+const CRUSH_UPDATE_RANGE_LIMIT = 8;
+
 export function buildInstancedGrassField(options: InstancedGrassFieldOptions): InstancedGrassField {
   const crushIndex: Array<{
     mesh: THREE.InstancedMesh;
     instanceXZ: Float32Array;
-    cells: Map<string, number[]>;
+    cells: Map<number, number[]>;
     crushed: Uint8Array;
+    /** Union of instance indices changed since the last GPU upload. */
+    pendingMin: number;
+    pendingMax: number;
   }> = [];
+  // Crush scratch, allocated ONCE with the field: crushAt used to build four
+  // three objects per call and is called per impact.
+  const crushMatrix = new THREE.Matrix4();
+  const crushPosition = new THREE.Vector3();
+  const crushQuaternion = new THREE.Quaternion();
+  const crushScale = new THREE.Vector3();
   const cell = options.cellSizeM ?? 0.33;
   const rootSink = options.rootSinkM ?? 0.02;
   const [scaleMinRaw, scaleMaxRaw] = options.scaleRange ?? [0.72, 1.0];
@@ -452,16 +480,23 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     // Breakable-grass index: per-instance planar positions plus a 2 m cell
     // map so a crush query touches only nearby blades.
     const instanceXZ = new Float32Array(instances.length * 2);
-    const cellsIndex = new Map<string, number[]>();
+    const cellsIndex = new Map<number, number[]>();
     for (let k = 0; k < instances.length; k += 1) {
       instanceXZ[k * 2] = instances[k].x;
       instanceXZ[k * 2 + 1] = instances[k].z;
-      const cellKey = `${Math.floor(instances[k].x / 2)}:${Math.floor(instances[k].z / 2)}`;
-      const bucket = cellsIndex.get(cellKey);
+      const key = crushCellKey(Math.floor(instances[k].x / CRUSH_CELL_M), Math.floor(instances[k].z / CRUSH_CELL_M));
+      const bucket = cellsIndex.get(key);
       if (bucket) bucket.push(k);
-      else cellsIndex.set(cellKey, [k]);
+      else cellsIndex.set(key, [k]);
     }
-    crushIndex.push({ mesh, instanceXZ, cells: cellsIndex, crushed: new Uint8Array(instances.length) });
+    crushIndex.push({
+      mesh,
+      instanceXZ,
+      cells: cellsIndex,
+      crushed: new Uint8Array(instances.length),
+      pendingMin: Number.POSITIVE_INFINITY,
+      pendingMax: -1,
+    });
     blades += instances.length;
   }
 
@@ -482,15 +517,19 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     crushAt: (x: number, z: number, radiusM: number) => {
       const radiusSq = radiusM * radiusM;
       let crushedCount = 0;
-      const crushMatrix = new THREE.Matrix4();
-      const crushPosition = new THREE.Vector3();
-      const crushQuaternion = new THREE.Quaternion();
-      const crushScale = new THREE.Vector3();
       for (const entry of crushIndex) {
-        let touched = false;
-        for (let cx = Math.floor((x - radiusM) / 2); cx <= Math.floor((x + radiusM) / 2); cx += 1) {
-          for (let cz = Math.floor((z - radiusM) / 2); cz <= Math.floor((z + radiusM) / 2); cz += 1) {
-            const bucket = entry.cells.get(`${cx}:${cz}`);
+        const attribute = entry.mesh.instanceMatrix;
+        // An empty range list means the renderer uploaded (and cleared) what
+        // was pending, so the accumulated union starts again from here.
+        if (attribute.updateRanges.length === 0) {
+          entry.pendingMin = Number.POSITIVE_INFINITY;
+          entry.pendingMax = -1;
+        }
+        let touchedMin = Number.POSITIVE_INFINITY;
+        let touchedMax = -1;
+        for (let cx = Math.floor((x - radiusM) / CRUSH_CELL_M); cx <= Math.floor((x + radiusM) / CRUSH_CELL_M); cx += 1) {
+          for (let cz = Math.floor((z - radiusM) / CRUSH_CELL_M); cz <= Math.floor((z + radiusM) / CRUSH_CELL_M); cz += 1) {
+            const bucket = entry.cells.get(crushCellKey(cx, cz));
             if (!bucket) continue;
             for (const k of bucket) {
               if (entry.crushed[k]) continue;
@@ -499,7 +538,8 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
               if (dx * dx + dz * dz > radiusSq) continue;
               entry.crushed[k] = 1;
               crushedCount += 1;
-              touched = true;
+              if (k < touchedMin) touchedMin = k;
+              if (k > touchedMax) touchedMax = k;
               // Flatten: keep the tuft's footprint but collapse its height so
               // the ground reads trampled rather than erased.
               entry.mesh.getMatrixAt(k, crushMatrix);
@@ -510,7 +550,23 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
             }
           }
         }
-        if (touched) entry.mesh.instanceMatrix.needsUpdate = true;
+        if (touchedMax < 0) continue;
+        // A bare needsUpdate re-uploads the WHOLE instanceMatrix: Nuke Town's
+        // two lawn bands measure 11,975 and 11,984 instances, 767 KB each, and
+        // gunfire crushes on impact frames. Placement is row-major over the
+        // region grid, so a crush circle is a short contiguous span - upload
+        // that span instead. Measured here: 11 KB for a 0.3 m bullet crush and
+        // 219 KB for a 3 m blast, against 767 KB every time before.
+        // Ranges are in ARRAY elements (16 per instance).
+        entry.pendingMin = Math.min(entry.pendingMin, touchedMin);
+        entry.pendingMax = Math.max(entry.pendingMax, touchedMax);
+        if (attribute.updateRanges.length >= CRUSH_UPDATE_RANGE_LIMIT) {
+          attribute.clearUpdateRanges();
+          attribute.addUpdateRange(entry.pendingMin * 16, (entry.pendingMax - entry.pendingMin + 1) * 16);
+        } else {
+          attribute.addUpdateRange(touchedMin * 16, (touchedMax - touchedMin + 1) * 16);
+        }
+        attribute.needsUpdate = true;
       }
       return crushedCount;
     },

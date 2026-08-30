@@ -10,6 +10,7 @@ import {
   createPass65CrossbowModel,
   disposePass65WeaponModel,
   fireImportedWeapon,
+  importedWeaponAnimatedNodeNames,
   isPass65PresentationGenerationCurrent,
   loadPass65FieldKnifeAsset,
   loadPass65WeaponPresentation,
@@ -104,6 +105,15 @@ export function batchStaticMeshes(
 ): StaticBatchStats {
   const simplifyMaterials = materialMode !== 'preserve';
   root.updateWorldMatrix(true, true);
+  destination.updateWorldMatrix(true, false);
+  // Merged geometry is baked into the DESTINATION's space, not world space.
+  // Baking world matrices and then adding the batch under a destination that
+  // carries its own transform applies that transform twice. Measured on the
+  // procedural magazines (optimizeAttachedWeapon batches each one into itself):
+  // carbine 0.222 m, SMG 0.273 m, LMG 0.277 m, pistol 0.302 m, machine pistol
+  // 0.352 m of drop - the magazine visibly detached and hung below the gun.
+  const destinationInverse = destination.matrixWorld.clone().invert();
+  const meshToDestination = new THREE.Matrix4();
   const groups = new Map<string, { material: THREE.Material; classification: string; renderOrder: number; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
   root.traverse((node) => {
     const hasDynamicAncestor = (() => {
@@ -200,7 +210,7 @@ export function batchStaticMeshes(
       geometry = geometry.toNonIndexed();
       indexed.dispose();
     }
-    geometry.applyMatrix4(node.matrixWorld);
+    geometry.applyMatrix4(meshToDestination.multiplyMatrices(destinationInverse, node.matrixWorld));
     if (vertexPalette) {
       const colors = new Float32Array(geometry.getAttribute('position').count * 3);
       for (let index = 0; index < colors.length; index += 3) {
@@ -259,6 +269,34 @@ export function batchStaticMeshes(
   return { sourceMeshes, batches: batchCount };
 }
 
+function isDescendantOf(node: THREE.Object3D, ancestor: THREE.Object3D): boolean {
+  for (let current: THREE.Object3D | null = node; current; current = current.parent) {
+    if (current === ancestor) return true;
+  }
+  return false;
+}
+
+/**
+ * The node a merged weapon batch must hang from: the deepest authored-clip-
+ * driven node that still contains every mesh in the weapon. The Pass 65
+ * firearms park their whole frame under `weapon-action-driver`, so merging
+ * "static" meshes into the weapon ROOT lifts them out of the node the clips
+ * animate. Falls back to the weapon root for procedural models, which have no
+ * authored clips at all.
+ */
+function authoredAnimationBatchDestination(weapon: THREE.Group, animated: ReadonlySet<string>): THREE.Object3D {
+  if (animated.size === 0) return weapon;
+  const meshes: THREE.Mesh[] = [];
+  weapon.traverse((node) => { if (node instanceof THREE.Mesh) meshes.push(node); });
+  const first = meshes[0];
+  if (!first) return weapon;
+  for (let node: THREE.Object3D | null = first.parent; node && node !== weapon.parent; node = node.parent) {
+    if (!animated.has(node.name)) continue;
+    if (meshes.every((mesh) => isDescendantOf(mesh, node!))) return node;
+  }
+  return weapon;
+}
+
 /** Batch immutable pieces of a socket-attached third-person weapon. */
 export function optimizeAttachedWeapon(
   weapon: THREE.Group,
@@ -278,8 +316,25 @@ export function optimizeAttachedWeapon(
     const articulated = weapon.getObjectByName(name);
     if (articulated) articulated.userData.dynamic = true;
   }
-  const stats = batchStaticMeshes(weapon, weapon, () => '', materialMode);
+  // A mesh is only "static" relative to the node the authored clips drive.
+  // Merging the Pass 65 frames into the weapon root froze the merged body
+  // while every node still under `weapon-action-driver` - the action, the
+  // magazine and the semantic optic LENS - kept following the clip, so those
+  // pieces flew off the gun by the clip's own translation: measured on
+  // m14-ebr/slug-shotgun fp-lod0, 0.070 m fire, 0.129 m reload, 0.271 m melee
+  // and 0.400 m unequip in weapon-local units. Batch INTO the driver instead.
+  const animatedNames = importedWeaponAnimatedNodeNames(weapon);
+  const destination = authoredAnimationBatchDestination(weapon, animatedNames);
+  // Anything else the clips drive stays articulated for the same reason, even
+  // when it is not in the hardcoded procedural list (the crossbow's semantic
+  // loaded bolt, for instance).
+  for (const name of animatedNames) {
+    const driven = weapon.getObjectByName(name);
+    if (driven && driven !== destination && isDescendantOf(driven, destination)) driven.userData.dynamic = true;
+  }
+  const stats = batchStaticMeshes(weapon, destination, () => '', materialMode);
   weapon.userData.attachedWeaponBatchStats = stats;
+  weapon.userData.attachedWeaponBatchDestination = destination.name || null;
   return stats;
 }
 

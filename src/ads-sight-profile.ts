@@ -1,4 +1,6 @@
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
 import { WEAPON_IDS, type WeaponId } from './protocol';
+import { magnifiedFovDegrees } from './weapon-presentation-state';
 
 export type AdsSightMarker = 'reflex' | 'aperture' | 'posts' | 'bead' | 'diamond' | 'chevron' | 'cross' | 'scope';
 
@@ -46,4 +48,51 @@ export function adsSightProfile(weapon: WeaponId): AdsSightProfile {
 export function adsSightCatalogComplete(): boolean {
   return WEAPON_IDS.length === Object.keys(ADS_SIGHT_PROFILES).length
     && WEAPON_IDS.every((weapon) => ADS_SIGHT_PROFILES[weapon]?.id === weapon);
+}
+
+/** Degrees the generic iron-sight ADS takes off the player's preferred field of view. */
+export const ADS_IRON_SIGHT_FOV_REDUCTION_DEGREES = 20;
+/** Floor on the generic iron-sight ADS, so a low preferred FOV cannot tunnel. */
+export const ADS_IRON_SIGHT_MINIMUM_FOV_DEGREES = 55;
+
+/**
+ * The magnification a weapon's authored optic actually delivers, or null when
+ * the weapon aims down bare iron sights.
+ *
+ * HF-405: the owner asked for "a better scope 1.5x on the crossbow". The optic
+ * was already authored — weapon-catalog gives explosive-crossbow
+ * `optic.magnification: 1.5` and weapon-model builds the compact glass — but
+ * the ADS ladder hard-coded a three-weapon list (sniper/m14-ebr/railgun) and
+ * dropped every other weapon into the generic iron-sight fallback, so the
+ * authored number had no reader anywhere in src/. Deriving it from the catalog
+ * means a weapon that authors an optic gets its true magnification without
+ * anyone remembering to extend a list.
+ */
+export function authoredOpticMagnification(weapon: WeaponId): number | null {
+  const optic = WEAPON_CATALOG.find((definition) => definition.id === weapon)?.optic ?? null;
+  if (!optic || !Number.isFinite(optic.magnification) || optic.magnification <= 1) return null;
+  return optic.magnification;
+}
+
+/** The generic iron-sight ADS field of view, with no optic involved. */
+export function ironSightAdsFovDegrees(baseFovDegrees: number): number {
+  return Math.max(ADS_IRON_SIGHT_MINIMUM_FOV_DEGREES, baseFovDegrees - ADS_IRON_SIGHT_FOV_REDUCTION_DEGREES);
+}
+
+/**
+ * ADS field of view for a weapon with no dedicated full-screen optic pipeline.
+ *
+ * Magnification is measured against the player's preferred FOV, exactly as the
+ * sniper/DMR/railgun branches measure theirs, so one weapon's "1.5x" means the
+ * same thing as another's "3x". The result is the TIGHTER of the authored optic
+ * and the generic iron-sight ADS: at the default 82 degree base the generic ADS
+ * is already 62 degrees (about 1.45x), so a weakly authored optic — the flare
+ * gun's 1.1x would open the view back up to 74.5 degrees — must never make
+ * aiming worse than iron sights.
+ */
+export function adsAimingFovDegrees(weapon: WeaponId, baseFovDegrees: number): number {
+  const ironSight = ironSightAdsFovDegrees(baseFovDegrees);
+  const magnification = authoredOpticMagnification(weapon);
+  if (magnification === null) return ironSight;
+  return Math.min(ironSight, magnifiedFovDegrees(baseFovDegrees, magnification));
 }

@@ -14,11 +14,11 @@
   "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-  "runtimeGlbSha256": "eb63f60efd9aa5373e86944d7d6b873f6210719f5b4e1085647ed6272ee393ea",
-  "sourceBlendSha256": "116e50f8b30f2f1838711356e773e642f83da39ad5abab40cb7df0120beccd7d",
-  "sourceSpecSha256": "a00dc0c5efdbb5a065fb48f0497155d1c30513eb17066ddb0e38576bac2d6924",
+  "runtimeGlbSha256": "10be12fc291b7c74407e6473e5ec9708eca263cf124af7891f20f6b48a522a18",
+  "sourceBlendSha256": "474ade27e5cf9a0e78ab1f55c3795e0fe0584a92fe4d63cb5c224b4bc6901886",
+  "sourceSpecSha256": "6cf6489ea3b8a90704cc7dd67bd4ddbeacbf5a7e79d49ce8ecca6a57af493d6f",
   "runtimeAudit": {
-    "bytes": 7394720,
+    "bytes": 7394736,
     "meshNodes": 44,
     "materials": 28,
     "triangles": 36712,
@@ -53,5 +53,5 @@
     "twoConsecutiveGlbBuildsByteIdentical": false,
     "note": "Rebaked at Pass 81 from the re-derived spec (HF-383c), then rebaked again after HF-383-cover-index-regression was FIXED rather than merely recorded. The generator used to select authored large cover by literal COVER_LAYOUT array index (4/5/6/7); HF-383b removed two leading entries, so indices 6 and 7 stopped existing and the service skip and generator trailer were never BUILT - not merely unlabelled. The exporter now publishes AUTHORED_LARGE_COVER_ANCHORS and the generator branches on the anchor's id, matching how src/map.ts and src/environment-assets.ts already key it, so authoredLargePhysicalCoverAssets is back to 4 and all four ids are present in the shipped bytes. Reproducibility is semantic rather than byte-identical across Blender authoring runs; triangle count is reproducible for a given spec."
   },
-  "note": "Bus v6 (owner 2026-08-30 playtest): two-tier coach - hull 0-1.1, glass 1.1-2.1, end decks 2.25, main roof 3.0, cab/engine interiors, recentred benches, local-frame signs corrected against the colliders."
+  "note": "Bus v6 + crate-height authority (owner 2026-08-30): the arena spec now carries cover HEIGHT, so the baked street crates match their colliders instead of re-guessing the pre-stairway sizes."
 }

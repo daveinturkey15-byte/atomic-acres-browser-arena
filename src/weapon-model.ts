@@ -1172,6 +1172,29 @@ function runtime(root: THREE.Object3D): ImportedWeaponRuntime | null {
   return nested;
 }
 
+const NO_ANIMATED_NODES: ReadonlySet<string> = Object.freeze(new Set<string>());
+
+/**
+ * Node names the authored Pass 65 clips actually drive. Every firearm parents
+ * its whole frame under `weapon-action-driver` and every clip translates that
+ * node, so a mesh below it is static only RELATIVE TO IT - never relative to
+ * the model root. Consumers that re-parent or merge "static" geometry must
+ * treat these nodes as the boundary, or the merged body stops following the
+ * clip while its siblings keep moving.
+ */
+export function importedWeaponAnimatedNodeNames(root: THREE.Object3D): ReadonlySet<string> {
+  const state = runtime(root);
+  if (!state) return NO_ANIMATED_NODES;
+  const names = new Set<string>();
+  for (const action of state.actions.values()) {
+    for (const track of action.getClip().tracks) {
+      const nodeName = THREE.PropertyBinding.parseTrackName(track.name).nodeName;
+      if (nodeName) names.add(nodeName);
+    }
+  }
+  return names;
+}
+
 function playMatching(root: THREE.Object3D, fragment: string): void {
   const state = runtime(root);
   if (!state) return;

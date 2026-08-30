@@ -393,3 +393,51 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(e2e).not.toContain('errors.filter');
   });
 });
+
+/**
+ * HF-404 — "the machien gun dont hit or do damage properly". Two of the three
+ * stacked defects live outside the runtime: the control message the aim rides
+ * in, and the ray the player's own feedback is drawn down.
+ */
+describe('HF-404 Chopper Gunner aim reaches the host and the feedback matches it', () => {
+  it('normalises the unbounded first-person yaw into the control-intent wire contract', () => {
+    const start = legacy.indexOf('function requestKillstreakControl(');
+    const block = legacy.slice(start, legacy.indexOf('\nfunction requestPossessedChopperMissile(', start));
+    // player.yaw accumulates without ever wrapping, and parseKillstreakControl
+    // rejects yawQ outside [-pi, pi] — so an unwrapped sweep did not merely
+    // mis-aim, it discarded the guest's whole control message (pitch, thrust
+    // and trigger with it) at the protocol boundary.
+    expect(block).toContain('wrapAngleRadians(control.yawQ)');
+    expect(block).toContain('...normalizedControl,');
+    expect(block).not.toContain('...control,\n    timing: nextCombatTiming(),');
+    const protocolSource = readFileSync(new URL('./killstreak-protocol.ts', import.meta.url), 'utf8');
+    expect(protocolSource).toContain('finite(value.yawQ, -Math.PI, Math.PI)');
+  });
+
+  it('draws the owner tracer and impact down the AUTHORITATIVE ray, not a parallel one', () => {
+    const start = legacy.indexOf('const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);');
+    expect(start).toBeGreaterThan(-1);
+    const block = legacy.slice(start, legacy.indexOf('nextLocalSupportGunReportAt = now +', start));
+    // The host resolves damage from shotRay.origin (camera socket). Tracing
+    // from shotRay.tracerOrigin (muzzle socket) put the sparks, decal, impact
+    // sound and zero-damage cue on a line offset by the entire camera-to-muzzle
+    // vector. The tracer still LEAVES the barrel; only its endpoint changed.
+    expect(block).toContain('const rayOrigin = new THREE.Vector3(...shotRay.origin);');
+    expect(block).toContain("const chopperTrace = traceWeaponPath(rayOrigin, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg');");
+    expect(block).toContain('spawnTracer(muzzle, rayOrigin.clone().addScaledVector(aim, chopperTrace.travelDistance), 0xffb347);');
+    expect(block).toContain('const point = rayOrigin.clone().addScaledVector(aim, firstImpact.entryDistance);');
+    expect(block).not.toContain('traceWeaponPath(muzzle,');
+  });
+
+  it('keeps hit feedback wired for possessed fire', () => {
+    // Damage numbers, the cockpit target-confirm plate and the hitmarker all
+    // hang off one owner-facing entry point; the autocannon must reach it.
+    const start = legacy.indexOf('function recordOwnerSupportDamage(');
+    const block = legacy.slice(start, legacy.indexOf('\nfunction killstreakActorModifiers(', start));
+    expect(block).toContain("event.source === 'chopper'");
+    expect(block).toContain('showDamageNumber(event.damage,');
+    expect(block).toContain('showGunnerTargetConfirm(event, anchor, performance.now());');
+    expect(block).toContain('audio.hit(false);');
+    expect(legacy).toContain('recordOwnerSupportDamage(event);');
+  });
+});

@@ -130,3 +130,63 @@ describe('HF-334 grant wiring', () => {
     expect(body).not.toContain('applyTimedMapWeaponState');
   });
 });
+
+/**
+ * HF-402 — "cant see any flames ... when i pick up the crimson one".
+ *
+ * The whole flamethrower presentation hung off one literal id equality
+ * (`player.weapon === 'flamethrower'`), so the crimson variant fell into the
+ * ballistic branch: a bullet tracer, no stream, no ground ignition, and a 90 m
+ * presentation reach while the host still resolved damage against the 18 m
+ * stream. Reach, presentation and authority now key off one family predicate.
+ */
+describe('HF-402 flamethrower family, not one literal weapon id', () => {
+  const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+  const familyMembers = (() => {
+    const start = main.indexOf('const FLAMETHROWER_FAMILY_WEAPON_IDS');
+    const body = main.slice(start, main.indexOf(']', start));
+    return [...body.matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1]).sort();
+  })();
+
+  it('lists exactly the catalog weapons that deliver an ignited fuel stream', () => {
+    // The catalog has no flame trait field to derive the family from - `family`
+    // is 'launcher', shared with the projectile flare gun - so the calibre is
+    // the only authored discriminator. Add a third stream weapon and this fails
+    // until it is listed, which is the regression this pin exists to stop.
+    const streamWeapons = WEAPON_CATALOG
+      .filter((weapon) => weapon.penetration.calibreLabel === 'ignited fuel stream')
+      .map((weapon) => weapon.id)
+      .sort();
+    expect(streamWeapons).toContain('flamethrower');
+    expect(streamWeapons).toContain('crimson-flamethrower');
+    expect(familyMembers).toEqual(streamWeapons);
+  });
+
+  it('gates the local flame presentation on the family predicate', () => {
+    expect(main).toContain('const flamethrowerShot = isFlamethrowerFamilyWeapon(player.weapon);');
+    expect(main).not.toContain("const flamethrowerShot = player.weapon === 'flamethrower'");
+  });
+
+  it('gives authority and presentation the same 18 m reach predicate', () => {
+    expect(main).toContain('if (isFlamethrowerFamilyWeapon(weapon) && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0;');
+    expect(main).toContain('const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;');
+    expect(main).not.toContain("weapon === 'flamethrower' && distance > FLAMETHROWER_EFFECT.rangeM");
+  });
+
+  it('renders a remote crimson shot as a stream rather than a bullet tracer', () => {
+    expect(main).toContain('const remoteFlamethrowerShot = isFlamethrowerFamilyWeapon(request.weapon);');
+    expect(main).toContain('  if (isFlamethrowerFamilyWeapon(message.weapon)) {\n    flamethrowerStreamPresentation.emit(');
+  });
+
+  it('still meters only the map weapon against the timed-map-weapon tank', () => {
+    // HF-334's separation must survive the family widening: the crimson variant
+    // carries its own finite ammo and must never consume the map host tank.
+    const start = main.indexOf('  if (remoteFlamethrowerShot) {');
+    expect(start).toBeGreaterThan(-1);
+    const body = main.slice(start, main.indexOf('const derived = deriveAuthoritativeShotOutcomes', start));
+    const literalGate = body.indexOf("if (request.weapon === 'flamethrower') {");
+    expect(literalGate).toBeGreaterThan(-1);
+    expect(body.indexOf('consumeTimedMapWeaponShot')).toBeGreaterThan(literalGate);
+    expect(body.indexOf('flamethrowerGroundFires.ignite(')).toBeGreaterThan(-1);
+  });
+});

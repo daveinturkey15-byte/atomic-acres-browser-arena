@@ -687,7 +687,20 @@ _AUTHORED_COVER_BY_ANCHOR = {
     for ax, az, cover_id in spec.get("authoredLargeCover", [])
 }
 
-for index, (x, z, width, depth) in enumerate(spec["cover"]):
+for index, entry in enumerate(spec["cover"]):
+    # v6 (owner 2026-08-30, "collision is bad on ... some crates"). Cover entries
+    # now carry HEIGHT. They used to be [x, z, width, depth] only, so this
+    # generator baked every plain crate as a 1.6 m block while the jump-stairway
+    # pass had already dropped the four street crates to 0.75 / 1.5 m colliders.
+    # The 'blender' render profile hides the procedural arena, so that 0.85 m of
+    # phantom crate was the ONLY crate the owner could see. Refuse a pre-v6 spec
+    # loudly instead of silently guessing 1.6 again.
+    if len(entry) < 5:
+        raise ValueError(
+            f"cover[{index}] carries no height channel; re-run "
+            "scripts/blender/export-atomic-acres-arena-spec.ts (spec predates 2026-08-30)."
+        )
+    x, z, width, depth, height = entry[:5]
     authored_id = _AUTHORED_COVER_BY_ANCHOR.get((round(float(x), 3), round(float(z), 3)))
     accent = M["aqua"] if index % 2 == 0 else M["coral"]
     if authored_id == "north-cargo-stack":
@@ -728,9 +741,15 @@ for index, (x, z, width, depth) in enumerate(spec["cover"]):
         for wheel_index, wheel_z in enumerate((z - depth * 0.3, z + depth * 0.3)):
             add_cylinder(f"P32_LARGE_COVER_generator_wheel_{wheel_index}", [x, 0.44, wheel_z], 0.42, width + 0.08, M["rubber"], 16, rotation=(0, math.pi / 2, 0))
     else:
-        add_box(f"BLD_COVER_{index}_core", [x, 0.8, z], [width, 1.6, depth], M["concrete_dark"], 0.15)
-        add_box(f"BLD_COVER_{index}_plate", [x, 1.32, z], [max(0.5, width - 0.25), 0.22, depth + 0.08], accent, 0.04)
-        for side in (-1, 1): add_box(f"BLD_COVER_{index}_foot_{side}", [x + side * (width / 2 - 0.18), 0.18, z], [0.28, 0.36, depth + 0.35], M["metal"], 0.04)
+        # Every part is now derived from the collider height instead of the old
+        # 1.6 m literals. The plate keeps its authored seat 0.28 m below the top
+        # (top face 0.17 m proud of the plate, as the 1.6 m crate had), and the
+        # base skirt is capped at 48% of the crate so a 0.75 m stair step cannot
+        # be swallowed by its own feet.
+        foot_height = min(0.36, height * 0.48)
+        add_box(f"BLD_COVER_{index}_core", [x, height / 2, z], [width, height, depth], M["concrete_dark"], 0.15)
+        add_box(f"BLD_COVER_{index}_plate", [x, height - 0.28, z], [max(0.5, width - 0.25), 0.22, depth + 0.08], accent, 0.04)
+        for side in (-1, 1): add_box(f"BLD_COVER_{index}_foot_{side}", [x + side * (width / 2 - 0.18), foot_height / 2, z], [0.28, foot_height, depth + 0.35], M["metal"], 0.04)
     if authored_id is not None:
         cover_marker = bpy.data.objects.new(f"P32_LARGE_COVER_ASSET_{authored_id}", None)
         cover_marker.location = game_location((x, 1.1, z))

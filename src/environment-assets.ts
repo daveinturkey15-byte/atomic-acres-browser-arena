@@ -247,7 +247,13 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   for (const [x, z, rotation] of NEIGHBOURHOOD_BENCH_LAYOUT) {
     const bench = new THREE.Group(); bench.name = 'street-bench'; bench.position.set(x, 0, z); bench.rotation.y = rotation;
     const seat = streetBox('bench-seat', [2.5, 0.16, 0.62], timber); seat.position.y = 0.72;
-    const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 1.22, 0.29); back.rotation.x = -0.1;
+    // Owner 2026-08-30 ("collision is bad on things like the bench"): the
+    // backrest used to top out at y 1.6847 and reach z +0.4056 while the
+    // registered collider is [2.5, 1.34, 0.72] about the anchor - 0.345 m of
+    // backrest and 0.046 m of its rear face were phantom geometry you could
+    // shoot and walk through. Re-seated so the visible bench sits exactly
+    // inside its collider: y [0, 1.34], z +/-0.31.
+    const back = streetBox('bench-back', [2.5, 0.92, 0.14], timber); back.position.set(0, 0.87531, 0.194); back.rotation.x = -0.1;
     for (const side of [-1, 1]) {
       const leg = streetBox('bench-leg', [0.13, 0.72, 0.42], steel); leg.position.set(side * 0.9, 0.36, 0); bench.add(leg);
     }
