@@ -35,7 +35,10 @@ export const HOUSE_FRONT_Z = 9.2;
 export const CENTRAL_BUS = Object.freeze({
   x: 0,
   z: 0,
-  size: Object.freeze([12.6, 3.8, 5.6] as const),
+  // v5 (owner 2026-08-30): roof drops 3.8 -> 2.25 so the crate stairway can
+  // reach it with three of the proven 0.75 m jump rises. Interior headroom
+  // stays 2.13 (street floor to roof slab underside).
+  size: Object.freeze([12.6, 2.25, 5.6] as const),
   /** Length of the authored bus body the collider wraps. */
   assetLength: 12.4,
 });
@@ -113,14 +116,23 @@ export const COVER_LAYOUT: ReadonlyArray<readonly [number, number, number, numbe
   // v3 re-seat for the house-per-end anatomy: two street crates between the
   // vans and the garages, two rear-verge stacks, two flank stacks breaking
   // the long verge lanes at the house front corners.
-  [-12, -2, 2.4, 3.6], [12, 2, 2.4, 3.6],
+  // v5 (owner 2026-08-30): the street pair becomes a two-step STAIRWAY onto
+  // the bus roof - a 0.75 m low crate and a 1.5 m tall crate flanking each
+  // bus end (ground -> low -> tall -> 2.25 roof, every rise the proven jump).
+  [-10.1, -1.3, 1.7, 2.2], [10.1, 1.3, 1.7, 2.2],
+  [-8.1, -1.3, 1.7, 2.2], [8.1, 1.3, 1.7, 2.2],
   [-9, -26, 3, 2.2], [9, 26, 3, 2.2], [27, -13, 2.8, 4.4], [-27, 13, 2.8, 4.4],
 ]);
 
-/** Owner 2026-08-29: the two street crates beside the bus are JUMP-MOUNTABLE
- * platforms (jump apex measures 0.82 m at 6.35 m/s vs 24.5 gravity), not
- * eye-height cover. Applies to the +/-12 street pair only. */
+/** Owner 2026-08-29/30: the street crates are JUMP-MOUNTABLE platforms
+ * (jump apex measures 0.82 m at 6.35 m/s vs 24.5 gravity). v5 makes them a
+ * stairway: the outer pair is one rise, the inner pair two rises, the bus
+ * roof the third. */
 export const STREET_CRATE_HEIGHT = 0.75;
+export const STREET_CRATE_TALL_HEIGHT = 1.5;
+/** |x| of the outer (low) and inner (tall) stair crates in COVER_LAYOUT. */
+export const STREET_CRATE_LOW_X = 10.1;
+export const STREET_CRATE_TALL_X = 8.1;
 
 /**
  * REDESIGN D1: spawns live in the two END gardens, behind the spawn fences,

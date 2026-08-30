@@ -1106,35 +1106,54 @@ export function buildRetroCoach(): THREE.Group {
   // v4 (owner 2026-08-29): the coach is ENTERABLE - the solid body becomes a
   // hull with a door aperture per side (local z +/-2.8, mirroring the
   // collision), an open interior, and the same silhouette.
+  // v5 (owner 2026-08-30): the coach follows the mountable-roof collision -
+  // hull to 1.0, glass band 1.0-1.95, roof band to 2.25, walkable roof slab
+  // top at 2.25, seat benches inside.
   for (const side of [-1, 1]) {
     const doorLocalZ = side * 2.8;
     const segments: Array<[number, number]> = [[-6.8, doorLocalZ - 0.85], [doorLocalZ + 0.85, 6.8]];
     for (const [fromZ, toZ] of segments) {
       const length = toZ - fromZ;
-      part(root, roundedBox('coach-body', [0.3, 1.5, length], bodyMat, 0.14, 3), [side * 2.5, 1.05, (fromZ + toZ) / 2]);
-      part(root, roundedBox('coach-roof-band', [0.3, 0.7, length], bodyMat, 0.1, 3), [side * 2.5, 3.4, (fromZ + toZ) / 2]);
+      part(root, roundedBox('coach-body', [0.3, 1.0, length], bodyMat, 0.12, 3), [side * 2.5, 0.5, (fromZ + toZ) / 2]);
+      part(root, roundedBox('coach-roof-band', [0.3, 0.3, length], bodyMat, 0.08, 3), [side * 2.5, 2.1, (fromZ + toZ) / 2]);
     }
-    part(root, roundedBox('coach-door-header', [0.3, 0.5, 1.7], bodyMat, 0.08), [side * 2.5, 3.0, doorLocalZ]);
-    part(root, roundedBox('coach-lower', [0.36, 0.72, 13.2], MAT.tealMetal(), 0.2), [side * 2.53, 0.78, 0]);
+    part(root, roundedBox('coach-door-header', [0.3, 0.3, 1.7], bodyMat, 0.08), [side * 2.5, 2.1, doorLocalZ]);
+    part(root, roundedBox('coach-lower', [0.36, 0.4, 13.2], MAT.tealMetal(), 0.14), [side * 2.53, 0.2, 0]);
   }
   for (const end of [-1, 1]) {
-    part(root, roundedBox('coach-end-cap', [5.3, 1.9, 0.34], bodyMat, 0.16, 3), [0, 0.97, end * 6.63]);
-    part(root, roundedBox('coach-end-roofline', [5.3, 0.5, 0.34], bodyMat, 0.12, 3), [0, 3.5, end * 6.63]);
+    part(root, roundedBox('coach-end-cap', [5.3, 1.95, 0.34], bodyMat, 0.16, 3), [0, 0.975, end * 6.63]);
+    part(root, roundedBox('coach-end-roofline', [5.3, 0.3, 0.34], bodyMat, 0.1, 3), [0, 2.1, end * 6.63]);
   }
   part(root, roundedBox('coach-floor', [4.9, 0.12, 13.2], MAT.dark(), 0.05), [0, 0.1, 0]);
-  part(root, roundedBox('coach-roof', [5.08, 0.34, 12.8], MAT.cream(), 0.16), [0, 3.88, 0]);
+  part(root, roundedBox('coach-roof', [5.08, 0.12, 12.8], MAT.cream(), 0.06), [0, 2.19, 0]);
+  // Dark headliner so the interior ceiling reads as trim instead of a
+  // blown-out cream field a foot above the camera.
+  part(root, roundedBox('coach-headliner', [4.6, 0.03, 12.4], MAT.dark(), 0.01), [0, 2.115, 0]);
   const glass = MAT.glass();
   for (const side of [-1, 1]) {
-    for (let z = -4.8; z <= 4.8; z += 2.4) part(root, roundedBox('coach-window', [0.055, 1.34, 1.85], glass, 0.08), [side * 2.67, 2.68, z]);
+    for (let z = -4.8; z <= 4.8; z += 2.4) part(root, roundedBox('coach-window', [0.055, 0.88, 1.85], glass, 0.06), [side * 2.67, 1.47, z]);
   }
-  part(root, roundedBox('windshield', [4.28, 1.36, 0.08], glass, 0.09), [0, 2.64, -6.82], [-0.08, 0, 0]);
-  part(root, roundedBox('rear-glass', [4.18, 1.18, 0.08], glass, 0.09), [0, 2.64, 6.82]);
-  for (const x of [-1.8, 1.8]) for (const z of [-4.6, 4.6]) wheel(root, x, z, 0.74);
+  part(root, roundedBox('windshield', [4.28, 0.9, 0.08], glass, 0.07), [0, 1.48, -6.82], [-0.08, 0, 0]);
+  part(root, roundedBox('rear-glass', [4.18, 0.85, 0.08], glass, 0.07), [0, 1.46, 6.82]);
+  // Interior benches mirror the seat colliders (rotated frame: collider x
+  // becomes local z, collider z becomes local x).
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x2e6b70, roughness: 0.6, metalness: 0.1 });
+  for (const [seatZ, seatSide] of [[-4.3, -1], [-0.5, -1], [0.5, 1], [4.3, 1]] as const) {
+    part(root, roundedBox('coach-seat', [0.9, 0.45, 1.6], seatMat, 0.08), [seatSide * 1.7, 0.325, seatZ]);
+    part(root, roundedBox('coach-seat-back', [0.9, 0.5, 0.16], seatMat, 0.06), [seatSide * 1.7, 0.72, seatZ + (seatZ < 0 ? -0.72 : 0.72)]);
+  }
+  for (const stanchionZ of [-2.0, 2.0]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.0, 8), MAT.brass());
+    pole.name = 'coach-stanchion';
+    pole.position.set(0, 1.1, stanchionZ);
+    root.add(pole);
+  }
+  for (const x of [-1.8, 1.8]) for (const z of [-4.6, 4.6]) wheel(root, x, z, 0.45);
   for (const x of [-1.75, 1.75]) {
-    const light = new THREE.Mesh(new THREE.CircleGeometry(0.26, 20), new THREE.MeshStandardMaterial({ color: 0xfff0b2, emissive: 0xffb84d, emissiveIntensity: 2.3 }));
-    light.position.set(x, 1.55, -6.88); root.add(light);
+    const light = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), new THREE.MeshStandardMaterial({ color: 0xfff0b2, emissive: 0xffb84d, emissiveIntensity: 2.3 }));
+    light.position.set(x, 0.72, -6.88); root.add(light);
   }
-  const sign = decal('ATOM-LINER 86', 3.6, 0.9); sign.position.set(0, 3.25, -6.9); root.add(sign);
+  const sign = decal('ATOM-LINER 86', 3.2, 0.7); sign.position.set(0, 2.08, -6.9); root.add(sign);
   return root;
 }
 

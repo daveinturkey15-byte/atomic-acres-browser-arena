@@ -6,6 +6,7 @@ import {
   HOUSE_LAYOUT,
   NEIGHBOURHOOD_BENCH_LAYOUT,
   NEIGHBOURHOOD_BIN_POSITIONS,
+ STREET_CRATE_HEIGHT, STREET_CRATE_LOW_X, STREET_CRATE_TALL_HEIGHT, STREET_CRATE_TALL_X,
 } from './arena-layout';
 import {
   batchStaticMeshes,
@@ -626,10 +627,12 @@ function addRouteArchitecture(root: THREE.Group): void {
       }
       decorative(generator); root.add(generator);
     }
-    // Owner 2026-08-29: the +/-12 street pair is a 0.75 m jump-mountable
-    // platform - its dressing scales to the REAL crate height instead of
-    // floating at the old 1.6 m silhouette.
-    const crateHeight = authoredLargeCoverIdAt(x, z) ? 2.2 : Math.abs(x) === 12 ? 0.75 : 1.6;
+    // Owner 2026-08-29/30: the street crates are a jump STAIRWAY to the bus
+    // roof - dressing scales to each step's real collider height (outer pair
+    // 0.75 m, inner pair 1.5 m).
+    const crateHeight = authoredLargeCoverIdAt(x, z) ? 2.2
+      : Math.abs(x) === STREET_CRATE_LOW_X ? STREET_CRATE_HEIGHT
+        : Math.abs(x) === STREET_CRATE_TALL_X ? STREET_CRATE_TALL_HEIGHT : 1.6;
     const cap = routeBox('barrier-cap', [width + 0.18, 0.16, depth + 0.18], index % 2 ? trim : frame, 0.05);
     cap.position.set(x, crateHeight - 0.02, z); decorative(cap); root.add(cap);
     const bodyHeight = Math.max(0.4, crateHeight - 0.42);

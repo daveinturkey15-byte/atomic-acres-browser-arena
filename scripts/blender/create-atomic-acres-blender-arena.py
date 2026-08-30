@@ -288,10 +288,9 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     x, z = centre
     before = {obj.name for obj in env.objects}
     half = length / 2
-    # v4 (owner 2026-08-29): the bus is ENTERABLE. The solid body becomes two
-    # segmented side hulls with a door aperture each (local z = side*2.8,
-    # mirroring the TypeScript colliders and the performance coach art), a
-    # floor, closed end caps, window pillars and roof bands.
+    # v5 (owner 2026-08-30): mountable-roof anatomy - hull 0-1.0, glass band
+    # 1.0-1.95, roof band/headers to 2.25, walkable roof slab top 2.25, seat
+    # benches inside. Mirrors the TypeScript colliders and the coach art.
     door_half = 0.85
     for hull_side in (-1, 1):
         hull_door_z = z + hull_side * 2.8
@@ -301,53 +300,62 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
         )):
             seg_len = z1 - z0
             seg_mid = (z0 + z1) / 2
-            add_box(f"{prefix}_hull_low_{hull_side}_{seg_index}", [x + hull_side * 2.45, 0.925, seg_mid], [0.3, 1.85, seg_len], M["metal"], 0.1)
-            add_box(f"{prefix}_hull_roofband_{hull_side}_{seg_index}", [x + hull_side * 2.42, 3.3, seg_mid], [0.28, 0.7, seg_len], body_material, 0.08)
-        add_box(f"{prefix}_door_header_{hull_side}", [x + hull_side * 2.44, 3.05, hull_door_z], [0.28, 0.6, door_half * 2], body_material, 0.06)
+            add_box(f"{prefix}_hull_low_{hull_side}_{seg_index}", [x + hull_side * 2.45, 0.5, seg_mid], [0.3, 1.0, seg_len], M["metal"], 0.1)
+            add_box(f"{prefix}_hull_roofband_{hull_side}_{seg_index}", [x + hull_side * 2.42, 2.1, seg_mid], [0.28, 0.3, seg_len], body_material, 0.08)
+        add_box(f"{prefix}_door_header_{hull_side}", [x + hull_side * 2.44, 2.1, hull_door_z], [0.28, 0.3, door_half * 2], body_material, 0.06)
     for cap_end in (-1, 1):
-        add_box(f"{prefix}_end_cap_{cap_end}", [x, 0.95, z + cap_end * (half - 0.18)], [5.2, 1.9, 0.35], M["metal"], 0.12)
-        add_box(f"{prefix}_end_roofline_{cap_end}", [x, 3.35, z + cap_end * (half - 0.18)], [5.2, 0.6, 0.35], body_material, 0.1)
+        add_box(f"{prefix}_end_cap_{cap_end}", [x, 0.975, z + cap_end * (half - 0.18)], [5.2, 1.95, 0.35], M["metal"], 0.12)
+        add_box(f"{prefix}_end_roofline_{cap_end}", [x, 2.1, z + cap_end * (half - 0.18)], [5.2, 0.3, 0.35], body_material, 0.1)
     add_box(f"{prefix}_floor", [x, 0.08, z], [4.6, 0.16, length - 0.8], M["rubber"], 0.03)
-    add_box(f"{prefix}_roof", [x, 3.52, z], [4.75, 0.34, length - 0.7], M["trim"], 0.14)
+    # v5 (owner 2026-08-30): interior seat benches mirroring the TypeScript
+    # seat colliders (local frame: collider x runs along this builder's z).
+    # The along='x' park rotation maps local offsets (ox, oz) -> (-oz, ox),
+    # so the local list is the WORLD seat list transformed through its
+    # inverse (world x -> -local z, world z -> local x).
+    for seat_z, seat_side in ((4.3, -1), (0.5, -1), (-0.5, 1), (-4.3, 1)):
+        add_box(f"{prefix}_seat_{seat_z}", [x + seat_side * 1.7, 0.325, z + seat_z], [0.9, 0.45, 1.6], M["aqua"], 0.05)
+        add_box(f"{prefix}_seat_back_{seat_z}", [x + seat_side * 1.7, 0.72, z + seat_z + (0.72 if seat_z > 0 else -0.72)], [0.9, 0.5, 0.16], M["aqua"], 0.04)
+    add_box(f"{prefix}_roof", [x, 2.19, z], [4.75, 0.12, length - 0.7], M["trim"], 0.14)
+    add_box(f"{prefix}_headliner", [x, 2.115, z], [4.5, 0.03, length - 0.9], M["rubber"], 0.02)
     # Original Atomic Acres civic-showcase trim, held inside the existing footprint.
-    add_box(f"{prefix}_roof_visor", [x, 3.58, z - half - 0.18], [4.3, 0.18, 0.55], body_material, 0.08)
-    add_box(f"{prefix}_front_glass", [x, 2.55, z - half - 0.015], [4.12, 1.24, 0.09], M["glass"], 0.03)
-    add_box(f"{prefix}_windshield_divider", [x, 2.55, z - half - 0.075], [0.12, 1.26, 0.08], M["metal"], 0.02)
-    add_box(f"{prefix}_rear_glass", [x, 2.52, z + half + 0.015], [3.95, 1.12, 0.09], M["glass"], 0.03)
-    add_box(f"{prefix}_front_fascia", [x, 1.42, z - half - 0.07], [4.82, 0.94, 0.14], body_material, 0.05)
-    add_box(f"{prefix}_front_grille", [x, 0.92, z - half - 0.16], [2.35, 0.38, 0.08], M["metal_light"], 0.03)
+    add_box(f"{prefix}_roof_visor", [x, 2.3, z - half - 0.18], [4.3, 0.14, 0.55], body_material, 0.08)
+    add_box(f"{prefix}_front_glass", [x, 1.48, z - half - 0.015], [4.12, 0.9, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_windshield_divider", [x, 1.48, z - half - 0.075], [0.12, 0.92, 0.08], M["metal"], 0.02)
+    add_box(f"{prefix}_rear_glass", [x, 1.46, z + half + 0.015], [3.95, 0.85, 0.09], M["glass"], 0.03)
+    add_box(f"{prefix}_front_fascia", [x, 0.7, z - half - 0.07], [4.82, 0.6, 0.14], body_material, 0.05)
+    add_box(f"{prefix}_front_grille", [x, 0.45, z - half - 0.16], [2.35, 0.3, 0.08], M["metal_light"], 0.03)
     for grille_x in (-0.8, -0.4, 0, 0.4, 0.8):
-        add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.92, z - half - 0.26], [0.06, 0.28, 0.03], M["metal"], 0.01)
+        add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.45, z - half - 0.26], [0.06, 0.22, 0.03], M["metal"], 0.01)
     window_count = 5 if length > 12 else 4
     for side in (-1, 1):
         for index in range(window_count):
             wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
-            add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 2.54, wz], [0.07, 1.18, 1.62], M["glass"], 0.025)
-        add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 1.54, z], [0.06, 0.18, length - 0.7], M["trim"], 0.018)
-        add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 1.86, z + 0.35], [0.05, 0.42, length - 2.2], body_material, 0.025)
+            add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 1.47, wz], [0.07, 0.86, 1.62], M["glass"], 0.025)
+        add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 0.8, z], [0.06, 0.16, length - 0.7], M["trim"], 0.018)
+        add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 0.95, z + 0.35], [0.05, 0.28, length - 2.2], body_material, 0.025)
         # v4: frames trace the OPEN apertures at local z = side*2.8; the old
         # glass leaves are gone - you walk through.
         door_z = z + side * 2.8
         frame_x = x + side * 2.67
-        add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 2.45, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
+        add_box(f"{prefix}_door_frame_{side}_top", [frame_x, 1.98, door_z], [0.08, 0.1, 1.7], M["metal_light"], 0.02)
         for frame_z in (-0.85, 0.85):
-            add_box(f"{prefix}_door_frame_{side}_upright_{frame_z}", [frame_x, 1.25, door_z + frame_z], [0.08, 2.4, 0.1], M["metal_light"], 0.02)
+            add_box(f"{prefix}_door_frame_{side}_upright_{frame_z}", [frame_x, 1.0, door_z + frame_z], [0.08, 2.0, 0.1], M["metal_light"], 0.02)
         add_box(f"{prefix}_step_{side}", [x + side * 2.72, 0.12, door_z], [0.42, 0.18, 1.45], M["metal_light"], 0.025)
     for wheel_x in (x - 2.48, x + 2.48):
         for wheel_z in (z - half + 2.2, z + half - 2.2):
-            add_cylinder(f"{prefix}_wheel_{wheel_x}_{wheel_z}", [wheel_x, 0.72, wheel_z], 0.72, 0.42, M["rubber"], 20, rotation=(0, math.pi / 2, 0))
-            add_cylinder(f"{prefix}_wheel_hub_{wheel_x}_{wheel_z}", [wheel_x + (-0.23 if wheel_x < x else 0.23), 0.72, wheel_z], 0.28, 0.06, M["metal_light"], 16, rotation=(0, math.pi / 2, 0))
+            add_cylinder(f"{prefix}_wheel_{wheel_x}_{wheel_z}", [wheel_x, 0.45, wheel_z], 0.45, 0.42, M["rubber"], 20, rotation=(0, math.pi / 2, 0))
+            add_cylinder(f"{prefix}_wheel_hub_{wheel_x}_{wheel_z}", [wheel_x + (-0.23 if wheel_x < x else 0.23), 0.45, wheel_z], 0.2, 0.06, M["metal_light"], 16, rotation=(0, math.pi / 2, 0))
     for end, end_z in (("front", z - half - 0.08), ("rear", z + half + 0.08)):
-        add_box(f"{prefix}_{end}_bumper", [x, 0.58, end_z], [5.25, 0.32, 0.22], M["metal_light"], 0.07)
+        add_box(f"{prefix}_{end}_bumper", [x, 0.42, end_z], [5.25, 0.28, 0.22], M["metal_light"], 0.07)
         for side in (-1, 1):
-            add_uv_sphere(f"{prefix}_{end}_lamp_{side}", [x + side * 1.75, 1.35, end_z + (-0.08 if end == "front" else 0.08)], [0.22, 0.16, 0.08], M["emissive_amber"])
-    add_box(f"{prefix}_destination", [x, 3.05, z - half - 0.15], [3.35, 0.48, 0.08], M["emissive_aqua"], 0.025)
+            add_uv_sphere(f"{prefix}_{end}_lamp_{side}", [x + side * 1.75, 0.85, end_z + (-0.08 if end == "front" else 0.08)], [0.22, 0.16, 0.08], M["emissive_amber"])
+    add_box(f"{prefix}_destination", [x, 2.02, z - half - 0.15], [3.0, 0.34, 0.08], M["emissive_aqua"], 0.025)
     add_box(f"{prefix}_number_plate", [x, 0.58, z - half - 0.22], [1.15, 0.28, 0.04], M["yellow"], 0.018)
     for side in (-1, 1):
-        add_box(f"{prefix}_mirror_arm_{side}", [x + side * 2.85, 2.25, z - half + 0.55], [0.58, 0.08, 0.08], M["metal"], 0.02)
-        add_box(f"{prefix}_mirror_{side}", [x + side * 3.12, 2.25, z - half + 0.55], [0.1, 0.42, 0.3], M["glass"], 0.03)
+        add_box(f"{prefix}_mirror_arm_{side}", [x + side * 2.85, 1.7, z - half + 0.55], [0.58, 0.08, 0.08], M["metal"], 0.02)
+        add_box(f"{prefix}_mirror_{side}", [x + side * 3.12, 1.7, z - half + 0.55], [0.1, 0.42, 0.3], M["glass"], 0.03)
     marker = bpy.data.objects.new(f"{prefix}_ASSET_{destination}", None)
-    marker.location = game_location((x, 1.8, z))
+    marker.location = game_location((x, 1.2, z))
     marker["atomic_asset_class"] = "physical-transit-bus"
     marker["atomic_asset_variant"] = destination
     marker["atomic_collision_authority"] = "typescript-vehicle-boxes"

@@ -40,7 +40,9 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     // under-chassis wheels stand beside the NEW rated authorities (the
     // movement-solid glass window bands and the vehicle hull pieces); a
     // second surface on each would double-charge the same pane or panel.
-    { name: 'coach-window', count: 8, reason: 'coach art glazing over the rated movement-glass window band; one pane, one charge' },
+    // (2026-08-30: the coach-window row is deleted per the stale-row law -
+    // bus v5's shorter glazing panes fell below the census height threshold,
+    // so the row matched nothing.)
     // (2026-08-29: the two animated-atomic-ring rows are deleted per this
     // gate's own stale-row law - the census stopped flagging the rings after
     // the redesign re-census, so the rows had become rot.)

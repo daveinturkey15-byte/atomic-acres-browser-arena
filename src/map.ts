@@ -18,6 +18,9 @@ import {
   PATROL_LAYOUT,
   SPAWN_LAYOUT,
   STREET_CRATE_HEIGHT,
+  STREET_CRATE_LOW_X,
+  STREET_CRATE_TALL_HEIGHT,
+  STREET_CRATE_TALL_X,
   STREET_HALF_WIDTH,
 } from './arena-layout';
 import { classifyImpactSurface } from './combat-feedback';
@@ -637,8 +640,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // and the same footprint as ever. The old single body box answered the
   // "should the windows become real apertures" question recorded in
   // docs/ballistic-parity/ - the owner decided yes.
-  const busHullTopY = 1.85;
-  const busWindowTopY = 3.05;
+  // v5 (owner 2026-08-30): mountable roof + walk-in interior. Hull 0-1.0,
+  // glass band 1.0-1.95 (inside standing eye 1.86 and outside eye 1.7 both
+  // see through), roof band/headers to 2.25, walkable roof slab top 2.25.
+  const busHullTopY = 1.0;
+  const busWindowTopY = 1.95;
   const busSideZ = busWidth / 2 - 0.14; // hull centreline (z +/-2.66)
   const busDoorHalf = 0.85;
   // Door centres mirror the coach art's frames: north side toward the west
@@ -663,10 +669,10 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
         [CENTRAL_BUS.x + centre, (busHullTopY + busWindowTopY) / 2, CENTRAL_BUS.z + side * (busWidth / 2 + 0.02)],
         [width, busWindowTopY - busHullTopY, 0.12], palette.glass, true, false, true, 'glass');
     }
-    // Header over the door aperture (the aperture itself is open to 2.4 m).
+    // Header over the door aperture (open to the top of the glass band).
     box(`central bus door header ${sideName}`,
-      [CENTRAL_BUS.x + doorCentre, (2.4 + busWindowTopY) / 2, CENTRAL_BUS.z + side * busSideZ],
-      [busDoorHalf * 2, busWindowTopY - 2.4, 0.28], palette.mustard, true, true, true, 'vehicle');
+      [CENTRAL_BUS.x + doorCentre, (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
+      [busDoorHalf * 2, busHeight - busWindowTopY, 0.28], palette.mustard, true, true, true, 'vehicle');
     // Roof band above the windows.
     box(`central bus roof band ${sideName}`,
       [CENTRAL_BUS.x, (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z + side * busSideZ],
@@ -676,10 +682,14 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   // the glass authority above 1.9 m).
   for (const end of [-1, 1] as const) {
     box(`central bus end cap ${end < 0 ? 'west' : 'east'}`,
-      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), 0.95, CENTRAL_BUS.z],
-      [0.3, 1.9, busWidth], palette.mustard, true, true, true, 'vehicle');
+      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), busWindowTopY / 2, CENTRAL_BUS.z],
+      [0.3, busWindowTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
+    box(`central bus end roofline ${end < 0 ? 'west' : 'east'}`,
+      [CENTRAL_BUS.x + end * (busLength / 2 - 0.15), (busWindowTopY + busHeight) / 2, CENTRAL_BUS.z],
+      [0.3, busHeight - busWindowTopY, busWidth], palette.mustard, true, true, true, 'vehicle');
   }
-  box('central bus roof', [CENTRAL_BUS.x, busHeight - 0.1, CENTRAL_BUS.z], [busLength, 0.2, busWidth], palette.white, true, true, true, 'vehicle');
+  // Walkable roof: a real 12 cm slab whose top face is the third stair rise.
+  box('central bus roof', [CENTRAL_BUS.x, busHeight - 0.06, CENTRAL_BUS.z], [busLength, 0.12, busWidth], palette.white, true, true, true, 'vehicle');
   // Bot cover reasoning keeps one bus-sized envelope; movement/ballistics
   // come from the pieces above.
   physicalCover.push({
@@ -701,7 +711,22 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
   for (const [index, [wheelX, wheelZ]] of ([
     [-4.64, -1.71], [4.64, 1.71], [-4.56, 1.89], [4.56, -1.89],
   ] as Array<[number, number]>).entries()) {
-    box(`central bus wheel ${index}`, [CENTRAL_BUS.x + wheelX, 0.74, CENTRAL_BUS.z + wheelZ], [1.49, 1.48, 0.45], palette.dark, true, false, true, 'vehicle');
+    // v5: arches shrink with the lower bus so they read as wheel wells, not
+    // interior walls.
+    box(`central bus wheel ${index}`, [CENTRAL_BUS.x + wheelX, 0.45, CENTRAL_BUS.z + wheelZ], [1.3, 0.9, 0.4], palette.dark, true, false, true, 'vehicle');
+  }
+  // v5 interior: four bench seats along the sides with a clear centre aisle,
+  // placed clear of both door mouths. Low movement-solid cover you can crouch
+  // behind or hop over.
+  for (const [index, [seatX, seatSide]] of ([
+    [-4.3, -1], [-0.5, -1], [0.5, 1], [4.3, 1],
+  ] as Array<[number, number]>).entries()) {
+    box(`central bus seat ${index}`,
+      [CENTRAL_BUS.x + seatX, 0.225, CENTRAL_BUS.z + seatSide * 1.7],
+      [1.6, 0.45, 0.9], palette.aqua, true, true, true, 'vehicle');
+    box(`central bus seat back ${index}`,
+      [CENTRAL_BUS.x + seatX + (seatX < 0 ? -0.72 : 0.72), 0.62, CENTRAL_BUS.z + seatSide * 1.7],
+      [0.16, 0.5, 0.9], palette.aqua, true, true, true, 'vehicle');
   }
 
   // HF-390 lane: the Quality art coach (environment-assets buildRetroCoach at
@@ -718,7 +743,8 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     ['coach windshield', -6.82, 0.14],
     ['coach rear glass', 6.82, -0.14],
   ] as Array<[string, number, number]>) {
-    const pane = box(name, [CENTRAL_BUS.x + endX, 2.64, CENTRAL_BUS.z + endZ], [0.27, 1.36, 4.28], palette.glass, false, false, true, 'glass');
+    // v5: the raked end glazing follows the lowered glass band (1.0-1.95).
+    const pane = box(name, [CENTRAL_BUS.x + endX, 1.48, CENTRAL_BUS.z + endZ], [0.27, 0.95, 4.28], palette.glass, false, false, true, 'glass');
     pane.visible = false;
     pane.userData.collisionProxy = true;
     pane.userData.authoredCollisionAuthority = true;
@@ -815,8 +841,11 @@ export function buildArena(scene: THREE.Scene): ArenaMap {
     // Keyed by anchor coordinate, never by array index - see
     // AUTHORED_LARGE_COVER_ANCHORS for why an index broke this silently.
     const id = authoredLargeCoverIdAt(x, z);
-    // Owner 2026-08-29: the street pair is jump-mountable, not eye cover.
-    const height = id ? AUTHORED_LARGE_COVER_HEIGHT : Math.abs(x) === 12 ? STREET_CRATE_HEIGHT : 1.6;
+    // Owner 2026-08-29/30: the street crates are a jump stairway to the bus
+    // roof - outer pair one rise, inner pair two.
+    const height = id ? AUTHORED_LARGE_COVER_HEIGHT
+      : Math.abs(x) === STREET_CRATE_LOW_X ? STREET_CRATE_HEIGHT
+        : Math.abs(x) === STREET_CRATE_TALL_X ? STREET_CRATE_TALL_HEIGHT : 1.6;
     const authoritativeCover = box(`cover ${index}`, [x, height / 2, z], [w, height, d], index % 2 ? palette.coral : palette.aqua);
     if (id) {
       // Keep one simple AABB for movement/projectile authority, but render a
