@@ -1,5 +1,5 @@
 import { chromium } from '@playwright/test';
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--use-angle=d3d11','--enable-unsafe-webgpu','--ignore-gpu-blocklist','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--disable-features=CalculateNativeWinOcclusion'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--mute-audio','--use-angle=d3d11','--enable-unsafe-webgpu','--ignore-gpu-blocklist','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--disable-features=CalculateNativeWinOcclusion'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.goto('http://127.0.0.1:41988/?release=latest&renderer=webgpu&render=quality&seed=probe&previewTime=0', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });

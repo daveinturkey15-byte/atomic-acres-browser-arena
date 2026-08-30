@@ -936,6 +936,7 @@ test('records one unique real-bay video after every canonical support passes F a
     headless: !headed,
     executablePath,
     args: [
+      '--mute-audio',
       '--enable-gpu',
       '--use-angle=d3d11',
       '--ignore-gpu-blocklist',

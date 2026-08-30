@@ -330,7 +330,7 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2, segmentBoxHitTime,
+import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2, segmentBoxHitTime,
 } from './collision';
 import {
   applyObstructionSpreadPenalty, // HF-343
@@ -877,14 +877,22 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
-  VIEWMODEL_CONTACT_PROBE_OFFSETS,
-  VIEWMODEL_CONTACT_PROFILES,
-  viewmodelContactProbePaddingMeters,
   viewmodelFireAdmission, // HF-343
-  viewmodelFloorClearance,
-  viewmodelObstructionPose,
   type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
+import {
+  resolveViewmodelObstructionPose,
+  sampleViewmodelContactProbes,
+  type ViewmodelObstructionPoseInput,
+} from './systems/viewmodel-contact-probe';
+import {
+  deriveThermalRevealMode,
+  selectThermalRevealPrewarmTargets,
+  selectThermalRevealTargets,
+  thermalRevealActive,
+  type ThermalRevealActivation,
+  type ThermalRevealCandidate,
+} from './systems/thermal-reveal-selection';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -951,11 +959,7 @@ import {
 } from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, deriveDmrThermalRevealActive, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
-import {
-  THERMAL_GHOST_MAX_TARGETS,
-  ThermalGhostPresentation,
-  type ThermalGhostTarget,
-} from './thermal-ghost-presentation';
+import { ThermalGhostPresentation } from './thermal-ghost-presentation';
 import {
   pass73AdsRevealReadbackRegion,
   quantizePass73AdsRevealReadback,
@@ -3825,12 +3829,54 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
   return changed;
 }
 
+/**
+ * Owner 2026-08-30: "its physics to destruction and push need some help" - shed
+ * wreckage sat inert while you walked straight through it. interactive-world-runtime
+ * has supported source: 'player-contact' for a while but nothing ever called it.
+ *
+ * Host-only, and deliberately so: major-debris bodies are host-authoritative and
+ * guests receive the result in the replicated envelope, so a guest running this
+ * would be fighting the host's state rather than adding to it. Every live actor
+ * contributes - local player, bots and remotes - so wreckage reacts to the whole
+ * match and not merely to whoever happens to be hosting.
+ *
+ * Remotes pass no velocity because PlayerSnapshot does not carry one; the runtime
+ * then uses its nominal walk speed and pushes along actor->body, which is the
+ * right read for "someone walked into this" and is what the local paths converge
+ * on anyway once the actor is moving toward the debris.
+ */
+function pushDebrisFromActorContact(): boolean {
+  if (!interactiveWorldRuntime) return false;
+  let pushes = 0;
+  if (player.hp > 0) {
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: player.position,
+      actorVelocity: player.velocity,
+    });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: bot.position,
+      actorVelocity: bot.velocity,
+    });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: remote.root.position,
+    });
+  }
+  return pushes > 0;
+}
+
 function stepInteractiveWorldAuthority(): void {
   if (!interactiveWorldRuntime || !gameStarted || matchState.phase !== 'active') return;
   interactiveWorldTick += 1;
   if (!interactiveWorldRuntime.hasHostAuthority()) return;
   let changed = reconcileInteractiveWorldDoorObstructions();
   changed = interactiveWorldRuntime.step(interactiveWorldTick) || changed;
+  changed = pushDebrisFromActorContact() || changed;
   if (characterPhysics && interactiveWorldTick % 6 === 0 && characterPhysics.majorDebrisBodyCount() > 0) {
     changed = interactiveWorldRuntime.adoptMajorDebrisPhysics(characterPhysics.majorDebrisSnapshots()) || changed;
   }
@@ -10638,16 +10684,15 @@ viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
 
-const viewmodelProbeDirection = new THREE.Vector3();
-const viewmodelProbeRight = new THREE.Vector3();
-const viewmodelProbeUp = new THREE.Vector3();
-const viewmodelProbeStart = new THREE.Vector3();
-const viewmodelProbeEnd = new THREE.Vector3();
-const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+// The nine-probe contact lattice, its scratch vectors and the analytic ground
+// clamp now live in src/systems/viewmodel-contact-probe.ts. It had two copies
+// here - the live pose and the HF-343 diagnostics - which had already drifted.
 // Owner 2026-08-30: dressing AABBs for the viewmodel POSE fold only (never
 // the fire gate). Rebuilt lazily whenever the arena or dressing roots change.
 let presentationObstructionBoxes: Box2[] = [];
 let presentationObstructionKey = '';
+/** Retained empty set for the probe paths that must NOT see dressing. */
+const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
 
 function activePresentationObstructionBoxes(): readonly Box2[] {
   const dressingRoot = arena.root.getObjectByName('test1-dressing') ?? arena.root.getObjectByName('test2-dressing');
@@ -10659,62 +10704,29 @@ function activePresentationObstructionBoxes(): readonly Box2[] {
   return presentationObstructionBoxes;
 }
 
+/**
+ * The live world slice the contact lattice reads. Assembled in one place so
+ * the pose and any diagnostic view of it cannot disagree about the world.
+ */
+function currentViewmodelObstructionInput(): ViewmodelObstructionPoseInput {
+  return {
+    weapon: player.weapon,
+    position: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    colliders: activeWorldColliders(),
+    // Pose-only obstruction set: dressing folds the weapon on screen, but the
+    // fire-admission gate (which recomputes with colliders alone) is untouched -
+    // decoration may bend the gun, never refuse the trigger.
+    dressingBoxes: activePresentationObstructionBoxes(),
+    grounded: playerGrounded,
+    prone: player.stance === 'prone',
+    stanceEyeHeightMeters: stanceEyeHeight(player.stance),
+  };
+}
+
 function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
-  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
-  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
-  const colliders = activeWorldColliders();
-  // Pose-only obstruction set: dressing folds the weapon on screen, but the
-  // fire-admission gate (which recomputes with colliders alone) is untouched -
-  // decoration may bend the gun, never refuse the trigger.
-  const dressingBoxes = activePresentationObstructionBoxes();
-  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
-  let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
-    const verticalOffset = offset.vertical === 'upper'
-      ? profile.probeUpperOffsetMeters
-      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
-    viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
-      .addScaledVector(viewmodelProbeUp, verticalOffset);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (hit) {
-      const distance = hit.time * profile.probeLengthMeters;
-      nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
-    }
-    const dressingHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, dressingBoxes, probePaddingMeters);
-    if (dressingHit) {
-      const distance = dressingHit.time * profile.probeLengthMeters;
-      nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
-    }
-  }
-  // Owner 2026-08-30 ("gun still clips through walls and floor"): most
-  // authored floors are raycast planes, not movement boxes, so a down-pitched
-  // forward probe sailed straight through the ground and the viewmodel
-  // rendered half-buried (worst while prone looking down - the weapon
-  // dismembered into the floor). Clamp the forward obstruction analytically
-  // against the stance ground plane so the SAME contact fold that keeps the
-  // weapon camera-side of walls also keeps it above the floor.
-  if (playerGrounded && viewmodelProbeDirection.y < -0.001) {
-    const groundPlaneY = player.position.y - stanceEyeHeight(player.stance);
-    const groundDistance = (player.position.y - groundPlaneY) / -viewmodelProbeDirection.y;
-    if (groundDistance > 0 && groundDistance < profile.probeLengthMeters) {
-      nearestForward = nearestForward === null ? groundDistance : Math.min(nearestForward, groundDistance);
-    }
-  }
-  viewmodelProbeStart.copy(player.position);
-  viewmodelProbeEnd.copy(player.position);
-  viewmodelProbeEnd.y -= 1.05;
-  const floorHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.035);
-  const floorClearance = viewmodelFloorClearance(
-    floorHit ? floorHit.time * 1.05 : null,
-    playerGrounded,
-    stanceEyeHeight(player.stance),
-  );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
+  return resolveViewmodelObstructionPose(currentViewmodelObstructionInput());
 }
 
 function currentViewmodelSurfaceRetreat(): number {
@@ -10729,35 +10741,34 @@ function currentViewmodelSurfaceRetreat(): number {
 // spawn names its geometry instead of staying invisible. Read-only; never
 // referenced by gameplay.
 function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
-  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
-  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
-  const colliders = activeWorldColliders();
-  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
+  // The fire gate never sees dressing geometry, so neither does this view of
+  // it: passing the dressing set here would report a block the trigger cannot
+  // actually suffer.
+  const sweep = sampleViewmodelContactProbes({
+    weapon: player.weapon,
+    position: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    colliders: activeWorldColliders(),
+    dressingBoxes: NO_DRESSING_OBSTRUCTION_BOXES,
+  });
+  const profile = sweep.profile;
+  const probePaddingMeters = sweep.probePaddingMeters;
   let nearestForward: number | null = null;
   let nearestBox: unknown = null;
   const probes: Array<{ offset: string; hitMeters: number | null }> = [];
-  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
-    const verticalOffset = offset.vertical === 'upper'
-      ? profile.probeUpperOffsetMeters
-      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
-    viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
-      .addScaledVector(viewmodelProbeUp, verticalOffset);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (!hit) {
-      probes.push({ offset: `${offset.rightScale}/${offset.vertical}`, hitMeters: null });
+  for (const sample of sweep.samples) {
+    const label = `${sample.offset.rightScale}/${sample.offset.vertical}`;
+    const distance = sample.colliderMeters;
+    if (distance === null) {
+      probes.push({ offset: label, hitMeters: null });
       continue;
     }
-    const distance = hit.time * profile.probeLengthMeters;
     if (nearestForward === null || distance < nearestForward) {
       nearestForward = distance;
-      nearestBox = hit.box;
+      nearestBox = sample.colliderBox;
     }
-    probes.push({ offset: `${offset.rightScale}/${offset.vertical}`, hitMeters: Math.round(distance * 1000) / 1000 });
+    probes.push({ offset: label, hitMeters: Math.round(distance * 1000) / 1000 });
   }
   // Mirror the exact tryFire gate inputs: surfaceLift deliberately 0.
   const pose = currentViewmodelObstructionPose();
@@ -17495,45 +17506,51 @@ function updateDmrThermal(): void {
  * ghosts again after the match-bound compile.
  */
 function prewarmThermalGhostPipelines(): void {
-  const targets: ThermalGhostTarget[] = [];
-  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
+  const targets = selectThermalRevealPrewarmTargets(
+    { id: player.id, team: player.team },
+    deriveThermalRevealMode(gameMode, privateMatchMode),
+    thermalRevealCandidates(),
+    // Match admission has already staged the retained corpse operators visible
+    // behind the opaque deployment surface; the selector fills any remaining
+    // target slots from that exact rigged corpus so even an otherwise empty
+    // private lobby submits both programs before its first guest.
+    corpsePresentationPool,
+  );
+  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // record per live ID; aliases would duplicate the same skinned children.
+  if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
+}
+
+/**
+ * Every live actor the reveal may consider, remotes before bots. Order is
+ * load-bearing: the presentation layer caps the target count, so it decides
+ * who survives a crowded frame.
+ */
+function thermalRevealCandidates(): ThermalRevealCandidate[] {
+  const candidates: ThermalRevealCandidate[] = [];
   for (const remote of remotes.values()) {
-    if (remote.snapshot.hp <= 0) continue;
-    const relation = mode !== 'ffa' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({
+    candidates.push({
       id: remote.snapshot.id,
-      relation,
+      team: remote.snapshot.team,
+      kind: 'player',
+      alive: remote.snapshot.hp > 0,
       root: remote.root,
       lifeId: remote.snapshot.deaths,
       continuityId: remote.continuity,
     });
   }
   for (const bot of bots.values()) {
-    if (!bot.alive) continue;
-    const relation = mode !== 'ffa' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({
+    candidates.push({
       id: bot.id,
-      relation,
+      team: bot.team,
+      kind: 'bot',
+      alive: bot.alive,
       root: bot.root,
       lifeId: bot.deaths,
       continuityId: bot.continuity,
     });
   }
-  // Match admission has already staged the retained corpse operators visible
-  // behind the opaque deployment surface. Fill any remaining target slots
-  // from that exact rigged corpus so even an otherwise empty private lobby
-  // submits both the shared model and halo programs before its first guest.
-  for (const [index, entry] of corpsePresentationPool.entries()) {
-    if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
-    targets.push({
-      id: `thermal-prewarm-corpse-${index}`,
-      relation: entry.team === player.team ? 'friendly' : 'hostile',
-      root: entry.root,
-    });
-  }
-  // Exact-model and orange-halo materials are relation-invariant. Retain one
-  // record per live ID; aliases would duplicate the same skinned children.
-  if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
+  return candidates;
 }
 
 function updateThermalGhosts(): void {
@@ -17543,43 +17560,22 @@ function updateThermalGhosts(): void {
   // operator model plus an orange body-following halo.
   const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
   const railgunRevealActive = railgunScopeState.revealActive;
-  if (!dmrThermalActive && !railgunRevealActive && !chopperThermal) {
+  const activation: ThermalRevealActivation = {
+    dmrThermalActive,
+    railgunRevealActive,
+    chopperThermal,
+  };
+  if (!thermalRevealActive(activation)) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
     return;
   }
-  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
-  const targets: ThermalGhostTarget[] = [];
-  const observer = { id: player.id, team: player.team };
-  const addTarget = (
-    id: string,
-    team: Team,
-    kind: 'player' | 'bot',
-    root: THREE.Object3D,
-    lifeId: number,
-    continuityId: number,
-  ): void => {
-    if (targets.some((target) => target.id === id)) return;
-    if (railgunRevealActive && !dmrThermalActive && !chopperThermal
-      && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
-    const relation = mode !== 'ffa' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root, lifeId, continuityId });
-  };
-  for (const remote of remotes.values()) {
-    if (remote.snapshot.hp <= 0) continue;
-    addTarget(
-      remote.snapshot.id,
-      remote.snapshot.team,
-      'player',
-      remote.root,
-      remote.snapshot.deaths,
-      remote.continuity,
-    );
-  }
-  for (const bot of bots.values()) {
-    if (!bot.alive) continue;
-    addTarget(bot.id, bot.team, 'bot', bot.root, bot.deaths, bot.continuity);
-  }
+  const targets = selectThermalRevealTargets(
+    activation,
+    { id: player.id, team: player.team },
+    deriveThermalRevealMode(gameMode, privateMatchMode),
+    thermalRevealCandidates(),
+  );
   // Admission prewarm may retain attached corpse-corpus records. The live
   // target set owns the visible reveal and releases every unseen prewarm ID so
   // one ADS cannot carry hidden duplicate model/material residency.

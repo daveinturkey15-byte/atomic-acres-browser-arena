@@ -887,6 +887,7 @@ async function runTrial(trial: number): Promise<TrialReceipt> {
       viewport: VIEWPORT,
       deviceScaleFactor: 1,
       args: [
+        '--mute-audio',
         '--disable-background-timer-throttling',
         '--disable-renderer-backgrounding',
         '--disable-backgrounding-occluded-windows',
