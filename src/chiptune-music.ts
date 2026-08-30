@@ -36,7 +36,10 @@ const NATURAL_MINOR_SEMITONES = Object.freeze([0, 2, 3, 5, 7, 8, 10]);
 // 35% of the first audible staging, with the mixer slider defaulting to 50%
 // so the player has full headroom in both directions.
 // 0.214 x 0.50 default = 0.107 effective (was 0.45 x 0.68 = 0.306).
-export const GAME_MUSIC_BUS_GAIN = 0.214;
+// Owner 2026-08-30: "half the sound of the music its too loud" - second
+// halving on top of the 2026-08-29 retune (0.61 -> 0.214 -> 0.107). Sliders
+// and stored settings are untouched; the bus base is the single knob.
+export const GAME_MUSIC_BUS_GAIN = 0.107;
 
 export type ChiptuneChannel = 'lead' | 'bass';
 export type ChiptuneTrackId = 'siren-groves' | 'fallout-drift';

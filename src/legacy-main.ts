@@ -10551,6 +10551,20 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
     const distance = hit.time * profile.probeLengthMeters;
     nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
   }
+  // Owner 2026-08-30 ("gun still clips through walls and floor"): most
+  // authored floors are raycast planes, not movement boxes, so a down-pitched
+  // forward probe sailed straight through the ground and the viewmodel
+  // rendered half-buried (worst while prone looking down - the weapon
+  // dismembered into the floor). Clamp the forward obstruction analytically
+  // against the stance ground plane so the SAME contact fold that keeps the
+  // weapon camera-side of walls also keeps it above the floor.
+  if (playerGrounded && viewmodelProbeDirection.y < -0.001) {
+    const groundPlaneY = player.position.y - stanceEyeHeight(player.stance);
+    const groundDistance = (player.position.y - groundPlaneY) / -viewmodelProbeDirection.y;
+    if (groundDistance > 0 && groundDistance < profile.probeLengthMeters) {
+      nearestForward = nearestForward === null ? groundDistance : Math.min(nearestForward, groundDistance);
+    }
+  }
   viewmodelProbeStart.copy(player.position);
   viewmodelProbeEnd.copy(player.position);
   viewmodelProbeEnd.y -= 1.05;

@@ -866,7 +866,8 @@ export class ArenaAudio {
         this.ui = this.createBus('ui', 0.42);
         this.announcements = this.createBus('announcements', 0.5);
         this.ambience = this.createBus('ambience', 0.12);
-        this.createBus('menu-music', 0.18);
+        // Owner 2026-08-30 music halving (see GAME_MUSIC_BUS_GAIN).
+        this.createBus('menu-music', 0.09);
         // 2026-08-29 (owner: the chiptunes were promised and never heard).
         // The old staging multiplied out to ~0.009 amplitude at the default
         // slider (-41 dBFS) - inaudible under any gunfire. 0.45 x restaged

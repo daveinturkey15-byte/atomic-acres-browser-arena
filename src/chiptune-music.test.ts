@@ -58,8 +58,11 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     const DEFAULT_MUSIC_SLIDER = 0.5;
     for (const event of events) expect(event.gain).toBeGreaterThan(0);
     const effectivePeak = Math.max(...events.map((event) => event.gain)) * GAME_MUSIC_BUS_GAIN * DEFAULT_MUSIC_SLIDER;
-    expect(effectivePeak).toBeGreaterThanOrEqual(0.015);
-    expect(effectivePeak).toBeLessThanOrEqual(0.045);
+    // Owner 2026-08-30: "half the sound of the music" - second halving
+    // (bus 0.214 -> 0.107). The band halves with it; the floor still fails
+    // RED against the original never-heard staging.
+    expect(effectivePeak).toBeGreaterThanOrEqual(0.0075);
+    expect(effectivePeak).toBeLessThanOrEqual(0.0225);
   });
 
   it('schedules EVERY loop event across consecutive horizon windows (regression: one blip per loop)', () => {
