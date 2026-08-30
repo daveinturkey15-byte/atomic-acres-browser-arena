@@ -117,13 +117,39 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   //    arena's own warm key is what turns one flat ambient constant into the
   //    two-band, normal-gated fill the upstream extraction calls for, using the
   //    irradiance convolution PMREM already runs instead of a shader patch.
+  //
+  // CORRECTION to point 2 (art pass 2026-08-30): `scene.environment` measures
+  // NULL on all eight arenas on the WebGPU quality route, so PMREM is not
+  // reaching the scene and the lower-hemisphere authoring below currently
+  // lights nothing. It is kept - it costs nothing and is correct the moment the
+  // IBL is reconnected - but no lighting decision may lean on it. See the
+  // matching note at the top of src/rendering/arenas/test1.ts.
+  //
+  // ART PASS 2026-08-30: THE BLEACH BAND WAS EATING THE WHOLE VISIBLE SKY, and
+  // the visible sky is far narrower than v2 assumed. The stop positions below
+  // are MEASURED against the two cameras that exist, not guessed.
+  //
+  // The menu flyover pitches 33 degrees down from 22 m, and this arena's own
+  // ridge ring rises 3.5 degrees above its horizon, so the only sky it can ever
+  // show is y 0.487-0.497 - the last 1.3% of this gradient. Sampling the
+  // rendered frame row by row proved it: moving the blue stop from 0.45 to 0.47
+  // changed the frame by nothing at all. Whatever that sliver holds IS the
+  // flyover's sky, and v2 filled it with the palest, least saturated part of a
+  // five-percent desaturating ramp (#a3bcc9 at 0.38, saturation 0.19; #ccc9b6
+  // at 0.45, saturation 0.11) - the "flat cream wash" in the review.
+  //
+  // So the dust haze is authored as what it physically is: a shallow layer
+  // sitting ON the horizon, about a degree thick, with real sky held down to
+  // 0.49. A level player (who sees y 0.31-0.50) still gets a hazy horizon line;
+  // the flyover gets sky.
   'range-midmorning': Object.freeze([
-    [0, '#3f6da6'],
-    [0.14, '#5182b5'],
-    [0.28, '#77a0c5'],
-    [0.38, '#a3bcc9'],
-    [0.45, '#ccc9b6'],
-    [0.5, '#e5d7b8'],
+    [0, '#2f5f9e'],
+    [0.16, '#3b73b0'],
+    [0.32, '#4e8ac2'],
+    [0.42, '#66a0d0'],
+    [0.474, '#8fbcdc'],
+    [0.492, '#b7c8cf'],
+    [0.4985, '#e7d9ba'],
     [0.53, '#d6c092'],
     [0.7, '#b39a72'],
     [1, '#7d6c4e'],
@@ -135,14 +161,28 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   // and the pool-house eaves comes from the environment rather than from
   // tinting the flat ambient warm - which would also have warmed the shaded
   // side of every wall, the specific failure the extraction warns about.
+  //
+  // ART PASS 2026-08-30: same correction as range-midmorning above, for the
+  // opposite reason. The amber ramp opened at 0.36 and the muddy transition
+  // stop (#a1929e, saturation 0.08) sat in the middle of the band a level
+  // player looks at, so the estate's sky graded through grey on its way to
+  // gold. The gold is pulled into the last 10% - which is where a golden-hour
+  // glow physically is, since the sun is 18 degrees up - and real evening blue
+  // is held down to 0.40, so the arena finally has a cool half of the sky to
+  // separate its warm surfaces against.
+  // Same measured discipline as range-midmorning: this arena's flyover samples
+  // y 0.44-0.50, so the whole cool half has to live below 0.44 to be seen at
+  // all. It is worth the stop budget - the estate's surfaces are all warm, and
+  // an entirely amber dome was leaving 56-72% of the frame's chroma weight in
+  // one 10-degree hue bin.
   'estate-golden-hour': Object.freeze([
-    [0, '#264f8e'],
-    [0.14, '#3a68a0'],
-    [0.28, '#6b85a8'],
-    [0.36, '#a1929e'],
-    [0.43, '#d5a37e'],
-    [0.47, '#f3b877'],
-    [0.5, '#ffcf90'],
+    [0, '#1d4a8c'],
+    [0.16, '#2f5c9b'],
+    [0.30, '#47709f'],
+    [0.40, '#6b7f9c'],
+    [0.462, '#a98a92'],
+    [0.482, '#e39f6d'],
+    [0.4985, '#ffcf90'],
     [0.53, '#e8c294'],
     [0.7, '#c2a87f'],
     [1, '#8a7657'],
@@ -199,18 +239,39 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     rgb: [255, 255, 255] as [number, number, number], shadowRgb: [120, 156, 184] as [number, number, number],
     alpha: 0.58, scale: 0.54,
   }),
-  // Owner 2026-08-30: Test1 clear (brief: no clouds); Test2 sparse warm wisps.
-  'range-midmorning': null,
+  // Test1. The brief says "a hard, clear sky", and v2 read that as clouds:null.
+  // That is right OVERHEAD and wrong at the horizon: the two cameras that
+  // matter both look at the low sky (a level player sees y 0.31-0.50, the menu
+  // flyover only 0.487-0.497), so clouds:null left every frame anyone looks at
+  // with an empty band - half of "the sky has nothing in it" in the review. A
+  // distant cumulus line ALONG the horizon is what a desert range actually has
+  // at mid-morning and it costs the brief nothing: the band is 0.462-0.488,
+  // i.e. 1-3.5 degrees of elevation, so everything above 4 degrees stays hard
+  // and clear. The small scale keeps them distant cloud rather than a deck, and
+  // the shadow colour is cool and dark enough to read against the haze band
+  // they sit on - white-on-cream was invisible.
+  'range-midmorning': Object.freeze({
+    count: 34, bandTop: 0.462, bandBottom: 0.488,
+    rgb: [255, 251, 242] as [number, number, number], shadowRgb: [118, 132, 156] as [number, number, number],
+    alpha: 0.5, scale: 0.3,
+  }),
   // v2: the band was 0.16-0.50, so more than half of it sat above the visible
   // sky band (0.31-0.50 for a level camera) and the rest ran straight into the
   // horizon line. Pulled to 0.24-0.46 so the deck is where a player actually
   // looks, and re-coloured for a low key: warm lit tops, cool violet-grey
   // undersides rather than the previous grey-brown, so the cloud deck carries
   // the same warm-key/cool-sky separation as the surfaces below it.
+  // Art pass 2026-08-30: 0.24-0.46 put the whole deck above the sliver of sky
+  // the menu flyover can actually see (y 0.47-0.50, measured off the rendered
+  // frame - this arena's ridge ring hides everything higher), so the preview
+  // showed an empty amber band. Pulled to 0.44-0.488 at a smaller scale, which
+  // is where both the flyover and a level player's low sky overlap, and the
+  // count raised: a golden-hour sky whose only structure is a gradient is
+  // exactly the plateau the extraction's sky roll-off item warns about.
   'estate-golden-hour': Object.freeze({
-    count: 20, bandTop: 0.24, bandBottom: 0.46,
-    rgb: [255, 208, 158] as [number, number, number], shadowRgb: [92, 88, 118] as [number, number, number],
-    alpha: 0.42, scale: 0.7,
+    count: 30, bandTop: 0.44, bandBottom: 0.488,
+    rgb: [255, 214, 166] as [number, number, number], shadowRgb: [82, 78, 112] as [number, number, number],
+    alpha: 0.5, scale: 0.36,
   }),
 });
 

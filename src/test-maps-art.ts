@@ -118,13 +118,38 @@ const SAMPLE: { albedo: [number, number, number]; height: number; roughness: num
   albedo: SAMPLE_ALBEDO, height: 0, roughness: 1, ao: 1,
 };
 
+/**
+ * AO IS BAKED AS sqrt(ao), NOT ao.
+ *
+ * `aoMap` multiplies the INDIRECT term only, and indirect is the entire
+ * lighting budget of every shadowed pixel — these arenas have no
+ * `scene.environment` (measured 2026-08-30: null on all eight arenas on the
+ * WebGPU route), so a shadowed surface is lit by the flat ambient, the global
+ * hemisphere and the 0.22 shadow-side fill and nothing else. An authored AO
+ * floor of 0.28 (hedge) or 0.10 (travertine joints) therefore removes 72-90%
+ * of ALL the light a crevice will ever receive, which is why the crevices
+ * measured at linear luma 0.0005 while the same material's open face measured
+ * 0.12 on the same frame.
+ *
+ * Upstream states the rule outright (UPSTREAM_TECHNIQUE_EXTRACTION, "Two-band
+ * normal-gated bounce fill", citing materialpatch.js:49-58): the fill bands are
+ * "occluded by sqrt(AO), never AO - a fill term that AO can drive to zero is
+ * not a fill, it is another way to make a black hole". We cannot patch the
+ * shader from here, but sqrt is a pointwise function of the authored value, so
+ * baking sqrt(ao) into the map is exactly equivalent and costs nothing.
+ *
+ * It also has the right SHAPE: contact darkening at ao 0.8 is barely touched
+ * (0.89) while a floor at 0.10 lifts to 0.32, so grooves keep their read and
+ * stop being holes. Every `ao` expression below is authored as the real
+ * occlusion; the sqrt is applied once, here.
+ */
 function emit(r: number, g: number, b: number, height: number, roughness: number, ao = 1): SurfaceSample {
   SAMPLE_ALBEDO[0] = r;
   SAMPLE_ALBEDO[1] = g;
   SAMPLE_ALBEDO[2] = b;
   SAMPLE.height = height;
   SAMPLE.roughness = roughness;
-  SAMPLE.ao = ao;
+  SAMPLE.ao = Math.sqrt(clamp01(ao));
   return SAMPLE;
 }
 
@@ -234,9 +259,28 @@ const plywoodSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(PLYWOOD_DARK, tone > 0.6 ? PLYWOOD_PALE : PLYWOOD_MID, tone, height, 0.86 + knot * 0.08, 1 - seam * 0.45 - knot * 0.2);
 };
 
-const STEEL_SHADOW = rgb(0x4d565c);
-const STEEL_MID = rgb(0x848c92);
-const RUST = rgb(0x8d4c26);
+// PAINT AND GALVANISING ARE A BRIGHT BASE, NOT A DARK ONE.
+//
+// This set is worn by three container tints and by the galvanised roofing, and
+// `material.color` MULTIPLIES it and is capped at white (gotcha: three.js
+// material.color cannot lighten). v2 authored the base at real *bare steel*
+// values (STEEL_MID linear Y 0.257, STEEL_SHADOW 0.090), so the brightest
+// possible container came out at linear Y 0.091 and the darkest at 0.025 -
+// charcoal, an order of magnitude under any painted container - and the roofs
+// at 0.039-0.112. What actually ships on a container yard is a coat of paint or
+// a hot-dip galvanised layer, and both are BRIGHTER than the steel underneath:
+// galvanising is 0.30-0.40 and container paint sits on a white-ish primer.
+//
+// The base is therefore authored as the painted/galvanised sheet itself
+// (0.22-0.50 linear Y) and left nearly neutral, so the tint carries hue and the
+// NORMAL map carries the rib shading - which is what the 22 mm relief was
+// forged for. Measured before/after on the same camera: container top
+// 0.0011 -> 0.079 linear Y, firing-line roof 0.0022 -> 0.21.
+const STEEL_SHADOW = rgb(0x7f888e);
+const STEEL_MID = rgb(0xb9c1c6);
+// Oxide stays the dark accent, but lifted off the floor: at 0.110 it was below
+// the crush threshold as soon as a container tint multiplied it.
+const RUST = rgb(0xa8613a);
 
 /**
  * Corrugated container steel. tileMetres 2.4, 512 px = 4.7 mm/texel.
@@ -264,9 +308,15 @@ const corrugatedSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(base, rustMask > 0.35 ? RUST : STEEL_MID, clamp01(rustMask * 1.4) * 0.85 + (rustMask > 0.35 ? 0 : t * 0.15), height, roughness, 1 - rail * 0.35 - (1 - rib) * 0.2);
 };
 
-const SANDBAG_SHADOW = rgb(0x6b5c37);
-const SANDBAG_MID = rgb(0x9c8b5c);
-const SANDBAG_SUN = rgb(0xc3b184);
+// Hessian, not dust. The v2 stops sat at hue 43-44, inside the 35-44 degree
+// band hardpan, plywood and cinder already occupied, so a sandbag line and the
+// ground it stands on measured as the same colour and the map had no
+// separation to read cover against. Jute is genuinely greener and greyer than
+// desert dust: hue moves to 50-53 and saturation drops, which is a material
+// correction rather than a repaint.
+const SANDBAG_SHADOW = rgb(0x776f4d);
+const SANDBAG_MID = rgb(0xa8a173);
+const SANDBAG_SUN = rgb(0xcfc9a2);
 
 /**
  * Filled hessian sandbag courses. tileMetres 1.6, 512 px = 3.1 mm/texel.
@@ -295,9 +345,20 @@ const sandbagSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(SANDBAG_SHADOW, tone > 0.62 ? SANDBAG_SUN : SANDBAG_MID, tone, height, 0.97 - lobe * 0.04, 0.35 + lobe * 0.65);
 };
 
-const CINDER_SHADOW = rgb(0x6f6a60);
-const CINDER_MID = rgb(0x9d968a);
-const CINDER_PALE = rgb(0xbcb4a6);
+// THE ONE COOL NEUTRAL ON A WARM MAP.
+//
+// Portland-cement CMU is a cool grey; v2 authored it at hue 38-40, which is
+// hardpan's own hue at a tenth of the saturation - a desaturated version of the
+// ground rather than a contrast to it. On a map whose other five families all
+// live between 35 and 53 degrees, the tower and the stores block were the only
+// large masses that could carry a neutral, and they were spending it on more
+// khaki. Moved to hue 200-207 at the same low saturation and lifted to real
+// CMU reflectance (0.16-0.44 linear Y): the buildings now read cool against
+// warm dust, which is the separation the shipped arenas get from teal and
+// brick.
+const CINDER_SHADOW = rgb(0x6e767c);
+const CINDER_MID = rgb(0x9ba3a9);
+const CINDER_PALE = rgb(0xc2c8cb);
 
 /**
  * Cinderblock with struck mortar joints. tileMetres 1.6, 512 px = 3.1 mm/texel.
@@ -324,9 +385,13 @@ const cinderSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(CINDER_SHADOW, tone > 0.58 ? CINDER_PALE : CINDER_MID, tone, height, 0.93 + aggregate * 0.06, 1 - joint * 0.5 - aggregate * 0.1);
 };
 
-const TARP_SHADOW = rgb(0x4c5638);
-const TARP_MID = rgb(0x6e7a50);
-const TARP_SUN = rgb(0x99a274);
+// Olive-drab proofed canvas measures 0.12-0.18 linear Y in shade; the v2 dark
+// stop was 0.085, so every awning and camo net crushed the moment it fell out
+// of the sun - and awnings are the one large horizontal that never catches an
+// 18-degree key.
+const TARP_SHADOW = rgb(0x5e6b45);
+const TARP_MID = rgb(0x7d8a5b);
+const TARP_SUN = rgb(0xa5ae80);
 
 /**
  * Olive-drab canvas awning/camo net. tileMetres 2.0, 512 px = 3.9 mm/texel.
@@ -375,7 +440,12 @@ const travertineSurface: SurfaceDescription = (u, v, noise) => {
   const height = 0.78 - pitting * 0.5 - joint * 0.78 - banding * 0.05;
   // Honed stone is smooth; the open pores and the joints are not.
   const roughness = 0.42 + pitting * 0.45 + joint * 0.4;
-  return emitMix(TRAVERTINE_JOINT, tone > 0.62 ? TRAVERTINE_PALE : TRAVERTINE_MID, tone, height, roughness, 1 - joint * 0.55 - pitting * 0.35);
+  // A 25 mm joint between two pavers is a shallow groove, not a light trap:
+  // 0.55 + 0.35 could drive the corner of a paver to 0.10 occlusion, the
+  // deepest authored value in either map, and the terrace is the arena's
+  // largest single surface. 0.40/0.24 keeps the joint reading (0.36 at a
+  // corner, 0.60 after the sqrt bake) without making it a hole.
+  return emitMix(TRAVERTINE_JOINT, tone > 0.62 ? TRAVERTINE_PALE : TRAVERTINE_MID, tone, height, roughness, 1 - joint * 0.4 - pitting * 0.24);
 };
 
 const STUCCO_SHADE = rgb(0xcfc4ae);
@@ -397,9 +467,13 @@ const stuccoSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(STUCCO_SHADE, tone > 0.62 ? STUCCO_SUN : STUCCO_MID, tone, height, 0.82 + grain * 0.14 + wash * 0.06, 1 - grain * 0.16 - wash * 0.14);
 };
 
-const HEDGE_DEEP = rgb(0x22381f);
-const HEDGE_MID = rgb(0x3f5c33);
-const HEDGE_LIT = rgb(0x6c8a45);
+// Box foliage in shade is 0.05-0.07 linear Y, not 0.033. Combined with this
+// surface's 0.28 AO floor the deep stop resolved under 0.01 in any shadow,
+// which is what turned the clipped hedges - the arena's only large green mass -
+// into black blocks in the flyover.
+const HEDGE_DEEP = rgb(0x2e4629);
+const HEDGE_MID = rgb(0x4a6b3a);
+const HEDGE_LIT = rgb(0x74924b);
 
 /**
  * Clipped box hedge. tileMetres 1.0, 512 px = 2.0 mm/texel.
@@ -417,7 +491,9 @@ const hedgeSurface: SurfaceDescription = (u, v, noise) => {
   // Waxy on the sunlit clipped face, matte in the crevices: a constant here
   // measured as a flat 240 across the whole map and read as painted plastic.
   const roughness = 0.99 - depth * 0.22;
-  return emitMix(HEDGE_DEEP, tone > 0.58 ? HEDGE_LIT : HEDGE_MID, tone, height, roughness, 0.28 + depth * 0.72);
+  // 0.28 -> 0.4: a clipped hedge face is open foliage, not a closed cavity, and
+  // the deepest crevice still sees a good part of the sky.
+  return emitMix(HEDGE_DEEP, tone > 0.58 ? HEDGE_LIT : HEDGE_MID, tone, height, roughness, 0.4 + depth * 0.6);
 };
 
 const POOL_GROUT = rgb(0x4e8e9b);
@@ -447,9 +523,15 @@ const poolTileSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(POOL_GROUT, tone > 0.6 ? POOL_GLINT : POOL_TILE, tone, height, 0.14 + grout * 0.62, 1 - grout * 0.4);
 };
 
-const COURT_SHADOW = rgb(0x6c4234);
-const COURT_MID = rgb(0x8d5a49);
-const COURT_SUN = rgb(0xa87160);
+// Painted acrylic topcoat, not bare clay. The v2 stops were a desaturated
+// brown at hue 14-15, one bin away from the timber decking (27-34) and two from
+// the travertine (39-41), so the sunken court - the map's centre objective -
+// had no colour of its own from the air. Kept terracotta (the brief's
+// Mediterranean estate, not a repaint) but taken to a real painted chroma and
+// lifted off the crush floor: 0.073 -> 0.11 linear Y on the shaded stop.
+const COURT_SHADOW = rgb(0x8a4436);
+const COURT_MID = rgb(0xb05a44);
+const COURT_SUN = rgb(0xc9775c);
 
 /**
  * Acrylic sport-court topcoat. tileMetres 3.0, 512 px = 5.9 mm/texel.
@@ -467,9 +549,11 @@ const courtSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(COURT_SHADOW, tone > 0.6 ? COURT_SUN : COURT_MID, tone, height, 0.62 + silica * 0.24 - wear * 0.08, 1 - silica * 0.14);
 };
 
-const TIMBER_SHADOW = rgb(0x5b402a);
-const TIMBER_MID = rgb(0x8a6642);
-const TIMBER_SUN = rgb(0xb08d5f);
+// Oiled hardwood in shade is ~0.09 linear Y; 0.061 put the lounger decking
+// under the crush floor on the shaded half of every board.
+const TIMBER_SHADOW = rgb(0x6d5136);
+const TIMBER_MID = rgb(0x96714b);
+const TIMBER_SUN = rgb(0xb99669);
 
 /**
  * Oiled hardwood decking. tileMetres 1.6, 512 px = 3.1 mm/texel.
@@ -615,19 +699,46 @@ export function test1Materials(): Test1Materials {
   // multiplies and is capped at white, so a tint can only ever darken; the hex
   // values are therefore chosen bright and the corrugation's own value range
   // carries the shading (gotcha: three.js material.color cannot lighten).
+  //
+  // METALNESS 0, not 0.55 (extraction doc, "Metalness discipline: bare metal is
+  // 1, every oxide/paint/dirt layer on top of it is 0"). A painted container is
+  // a dielectric coat over steel and never shows the steel; upstream's rule
+  // says so directly. Here it is not even a stylistic call. Metalness scales
+  // diffuse by (1 - metalness) and hands the energy to the specular
+  // environment term - and `scene.environment` is NULL on this route (measured
+  // 2026-08-30 on all eight arenas; the PMREM in arena-environment-ibl.ts is
+  // not reaching the scene), so 0.55 was deleting 55% of a container's response
+  // and getting nothing back. Combined with the dark v2 base that is the whole
+  // reason the container yard rendered as black boxes: measured 0.0011 linear
+  // Y on a container top in full sun, against 0.12 for the dust beside it.
+  //
+  // The authored `roughness` is deliberately omitted: `surfaceStandardMaterial`
+  // forces the scalar to 1 whenever a roughnessMap exists (surface-forge.ts),
+  // so passing one here only misleads the next reader - the forge's roughness
+  // field is the authority, and material-compatibility.ts clamps the scalar to
+  // 0.98 on top of it.
   const container = (color: number, name: string): THREE.MeshStandardMaterial =>
-    forgedMaterial(corrugated, name, { color, roughness: 0.7, metalness: 0.55, normalScale: 1.1, metresPerTile: 2.4 });
+    forgedMaterial(corrugated, name, { color, metalness: 0, normalScale: 1.1, metresPerTile: 2.4 });
 
   return Object.freeze({
     hardpan: forgedMaterial(hardpan, 'test1-hardpan', { roughness: 0.99, normalScale: 0.85, metresPerTile: 4 }),
     road: forgedMaterial(hardpan, 'test1-road', { color: 0xc3b59b, roughness: 0.97, normalScale: 1.1, metresPerTile: 5 }),
     plywood: forgedMaterial(plywood, 'test1-plywood', { roughness: 0.9, metresPerTile: 1.2 }),
-    plywoodDark: forgedMaterial(plywood, 'test1-plywood-dark', { color: 0xa1815a, roughness: 0.93, metresPerTile: 1.2 }),
+    // The boundary fence and the target posts. 0xa1815a took the ply's own
+    // dark stop to 0.037 linear Y, so the fence - a 74 m band across the top of
+    // every flyover frame - crushed on its shaded side.
+    plywoodDark: forgedMaterial(plywood, 'test1-plywood-dark', { color: 0xc0a071, roughness: 0.93, metresPerTile: 1.2 }),
     sandbag: forgedMaterial(sandbag, 'test1-sandbag', { roughness: 0.99, normalScale: 1.05, metresPerTile: 1.6 }),
     containerRed: container(0xd97a62, 'test1-container-red'),
     containerBlue: container(0x6f9fc4, 'test1-container-blue'),
     containerGreen: container(0x8fa878, 'test1-container-green'),
-    steel: forgedMaterial(corrugated, 'test1-steel', { color: 0xa8b1b7, roughness: 0.55, metalness: 0.7, normalScale: 0.4, metresPerTile: 3.6 }),
+    // Galvanised roofing: the corrugated set de-rusted and tighter. Hot-dip
+    // zinc weathers to a chalked oxide within a season, which is a dielectric
+    // (extraction: "every oxide layer on top of it is 0"), and with no
+    // scene.environment the old 0.7 was subtracting 70% of the roofs' only
+    // light source. These four roofs are the largest horizontals on the map and
+    // measured 0.0022 linear Y - the black slabs in the flyover.
+    steel: forgedMaterial(corrugated, 'test1-steel', { color: 0xd7dee2, metalness: 0.08, normalScale: 0.4, metresPerTile: 3.6 }),
     cinder: forgedMaterial(cinder, 'test1-cinder', { roughness: 0.95, normalScale: 1.15, metresPerTile: 1.6 }),
     tarp: forgedMaterial(tarp, 'test1-tarp', { roughness: 0.96, side: THREE.DoubleSide, metresPerTile: 2 }),
   });
@@ -777,10 +888,16 @@ export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials)
   dressing.userData.presentationOnly = true;
   root.add(dressing);
 
-  const steelDark = new THREE.MeshStandardMaterial({ color: 0x3d4448, roughness: 0.6, metalness: 0.6 });
-  const drumOlive = new THREE.MeshStandardMaterial({ color: 0x5b6844, roughness: 0.7, metalness: 0.4 });
-  const drumRust = new THREE.MeshStandardMaterial({ color: 0x7c4a2c, roughness: 0.8, metalness: 0.3 });
-  const rubber = new THREE.MeshStandardMaterial({ color: 0x23211e, roughness: 0.95, metalness: 0.05 });
+  // Same metalness discipline as the containers above: a painted drum and a
+  // rusted drum are both a dielectric layer over the steel, and with
+  // scene.environment null the metal branch returns nothing to replace the
+  // diffuse it removes. Only genuinely bare, polished metal keeps any.
+  const steelDark = new THREE.MeshStandardMaterial({ color: 0x5d666b, roughness: 0.6, metalness: 0.12 });
+  const drumOlive = new THREE.MeshStandardMaterial({ color: 0x6d7c50, roughness: 0.7, metalness: 0 });
+  const drumRust = new THREE.MeshStandardMaterial({ color: 0x955c38, roughness: 0.8, metalness: 0 });
+  // Tyre carbon black bottoms out near 0.045 linear Y in life; 0x23211e is
+  // 0.017, i.e. below the crush floor before a single light reaches it.
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x36322c, roughness: 0.95, metalness: 0 });
   const flagRed = new THREE.MeshStandardMaterial({ color: 0xc23c2c, roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
   const paintWhite = new THREE.MeshStandardMaterial({ color: 0xe6e0cf, roughness: 0.85, metalness: 0 });
   const paintYellow = new THREE.MeshStandardMaterial({ color: 0xd8b23c, roughness: 0.88, metalness: 0 });
@@ -1011,15 +1128,57 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
 
   // The dry hillside the estate is cut into. The terrace slabs stop 1.5 m
   // outside the estate wall; without this the ground simply ended there and
-  // the ridge ring rose out of a void. Sunk 0.2 m so the wall stands on
-  // travertine, and named 'terrain' so the parity audit's walkable-surface
-  // rule excludes it explicitly rather than by a footprint-share accident.
-  const hillside = materials.hedge.clone();
+  // the ridge ring rose out of a void. Named 'terrain' so the parity audit's
+  // walkable-surface rule excludes it explicitly rather than by a
+  // footprint-share accident.
+  //
+  // IT IS A RING, NOT A SLAB. v2 laid one 176 x 156 m box spanning y -0.30 to
+  // 0.00 across the whole map, and src/test-maps.ts decomposes the terrace into
+  // ten bands around THREE cutouts precisely so the pool, the sunken parterre
+  // and the sunken court are not buried ("A one-piece slab buried all three -
+  // measured on the first art pass: the water sheet sat under the floor").
+  // This dressing box reintroduced exactly that: it is coplanar with the
+  // terrace tops so the terrace wins the depth test where they overlap, but in
+  // the three cutouts nothing contests it, and it capped all three at y = 0.
+  // That is what the flyover's three black rectangles were - not shadow, and
+  // not the surfaces underneath. The pool basin, the water sheet at y = -0.35,
+  // the court floor at -0.35 and the parterre at -0.55 were all under a lid,
+  // which is why the brief's headline element ("a turquoise pool throwing
+  // light") had no turquoise anywhere in frame.
+  //
+  // Four bands outside the terrace footprint (x +/-39.5, z +/-30.5) restore the
+  // continuous ground without covering anything. Presentation-only and
+  // cast:false exactly as before; three extra draws against a 420 budget.
+  //
+  // The SURFACE changed with it. A dry hillside was wearing a clone of the
+  // clipped-box-hedge forge - 40-cell leaf clumps at a 5 m tile over an AO
+  // floor of 0.28 - which is both the wrong material and, at 0.010-0.065 linear
+  // Y after the tint, the darkest large surface in either arena. Stucco's
+  // trowel/grain field at 5 m reads as sun-baked soil and carries a value the
+  // ochre tint can actually multiply.
+  const hillside = materials.stucco.clone();
   hillside.name = 'test2-hillside';
-  hillside.color.setHex(0x9a9366);
+  // Grey-ochre, not orange. A saturated tint here reads as a Martian plate
+  // under this arena's golden key, and this band is the largest single area in
+  // any flyover frame, so its chroma dominates the whole arena's hue budget.
+  hillside.color.setHex(0x9c9a80);
   hillside.roughness = 1;
   hillside.userData.metresPerTile = 5;
-  addBox(dressing, 'test2-hillside-terrain', [0, -0.15, 0], [176, 0.3, 156], hillside, 0, false);
+  // Half-extents of the terrace band decomposition in src/test-maps.ts (its
+  // aprons are 79 wide and reach z = +/-30.5), and of the ground the ridge
+  // ring's 78 m inner rim needs covered.
+  const TERRACE_HALF_X = 39.5;
+  const TERRACE_HALF_Z = 30.5;
+  const GROUND_HALF_X = 88;
+  const GROUND_HALF_Z = 78;
+  const endBand = (GROUND_HALF_Z - TERRACE_HALF_Z) / 2;
+  const sideBand = (GROUND_HALF_X - TERRACE_HALF_X) / 2;
+  for (const side of [-1, 1] as const) {
+    addBox(dressing, 'test2-hillside-terrain',
+      [0, -0.15, side * (TERRACE_HALF_Z + endBand)], [GROUND_HALF_X * 2, 0.3, endBand * 2], hillside, 0, false);
+    addBox(dressing, 'test2-hillside-terrain',
+      [side * (TERRACE_HALF_X + sideBand), -0.15, 0], [sideBand * 2, 0.3, TERRACE_HALF_Z * 2], hillside, 0, false);
+  }
 
   // --- vegetation + ridgeline --------------------------------------------
   // The estate palette: dark clipped cypress, olive broadleaf, box shrub, over

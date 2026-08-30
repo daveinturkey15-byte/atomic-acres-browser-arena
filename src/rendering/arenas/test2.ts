@@ -11,6 +11,13 @@ import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared
  * (docs/UPSTREAM_TECHNIQUE_EXTRACTION_2026-08-30.md, "Lighting, sky and
  * atmosphere"), tuned for the opposite end of the day:
  *
+ * 0. WHAT IS NOT TRUE ON THIS ROUTE. See the identical note in test1.ts:
+ *    `scene.environment` measures NULL on all eight arenas on the WebGPU
+ *    quality route (2026-08-30), so the PMREM every claim below leans on is not
+ *    reaching any surface. `arenaEnvironmentScale('test2') = 0.22` is inert,
+ *    the authored ground hemisphere lights nothing, and metalness is a pure
+ *    subtraction. The numbers here are authored for the route as it runs.
+ *
  * 1. THE SKY IS NOW THE ARENA'S OWN. 'estate-golden-hour' was being replaced at
  *    runtime by the terminal airport-dawn panorama - a clear blue mid-morning
  *    dome standing in for golden hour - and, through the PMREM in
@@ -18,13 +25,17 @@ import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared
  *    and reflection source. Removed in sky-backdrop.ts. Its authored sun disc
  *    was additionally 21.6 degrees BELOW the horizon, so its glow was baked
  *    into the ground half of the IBL; it now sits on the key.
- * 2. WARM BOUNCE COMES FROM THE GROUND HEMISPHERE, NOT FROM A WARM CONSTANT.
- *    The preset's lower hemisphere is authored as lit travertine, so coping,
- *    balustrade undersides and pool-house eaves pick up the warm bounce the
- *    brief asks for while the flat ambient stays COOL - the extraction is
- *    explicit that lerping the two instead of gating them puts a warm street
- *    bounce on every wall and makes shadows warmer than the sun casting them.
- *    Flat ambient 0.46 -> 0.36 and re-hued 0xa9c2d8 -> 0x8fb2d8 accordingly.
+ * 2. THE FLAT AMBIENT STAYS COOL. The extraction is explicit that lerping a
+ *    warm bounce into the fill instead of normal-gating it puts a warm street
+ *    bounce on every wall and makes shadows warmer than the sun casting them,
+ *    so the one flat term this definition owns is held cool (0xa9c2d8 ->
+ *    0x8fb2d8) and the warmth is left to the key.
+ *
+ *    v2 also cut it 0.46 -> 0.36 on the strength of the preset's authored
+ *    ground hemisphere reaching surfaces through PMREM. It does not (note 0),
+ *    so the intensity is restored (art pass 2026-08-30). Shadowed pixels in the
+ *    shipped flyover measured mean linear Y 0.038 against Atomic Acres' 0.050
+ *    and Farcrysis' 0.121 at an identical key.
  * 3. THE KEY IS RE-SPECTRALISED AT CONSTANT LUMINANCE. 0xffd9a0 at 2.9 has
  *    Rec.709 luminance 0.867 * 2.9 = 2.513. The golden-hour hue 0xffcf92
  *    measures 0.835, so 3.0 reproduces the same 2.51 luminous key with a fully
@@ -51,15 +62,23 @@ export const definition = createProceduralArenaVisualDefinition({
   sharedAssetDependencies: SHARED_GAMEPLAY_ASSETS,
   lighting: {
     sunColor: 0xffcf92, sunIntensity: 3,
-    ambientColor: 0x8fb2d8, ambientIntensity: 0.36,
+    ambientColor: 0x8fb2d8, ambientIntensity: 0.46,
     practicals: [
       { id: 'test2-estate-practicals', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
     ],
   },
-  // Matched to the new horizon band rather than to the sun: the average view
-  // across this arena is not into the key, and a fog tinted to the glow itself
-  // put amber haze on the shaded side of every wall.
-  fog: { color: 0xe9c9a0, near: 58, far: 178 },
+  // Matched to the horizon band rather than to the sun: the average view across
+  // this arena is not into the key, and a fog tinted to the glow itself put
+  // amber haze on the shaded side of every wall.
+  //
+  // near 58 was well inside the map. TEST2_BOUNDS is 76 x 58 m, a 95.6 m
+  // diagonal, so a corner-to-corner sightline spent its last 40% inside the fog
+  // band and every long lane graded toward one amber - which is most of why
+  // this arena's rendered chroma collapsed into a single hue bin (55-72% of the
+  // frame's chroma weight, against 37-44% for Atomic Acres and Farcrysis).
+  // near 98 puts the whole playfield in front of the haze; the ridge and the
+  // hillside behind it still recede.
+  fog: { color: 0xe6cbab, near: 98, far: 186 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.051 },
   atmosphere: { preset: 'estate-golden-hour', mist: 0.1, dust: 0.08, clouds: true },
   colorPipeline: colorPipeline('pass81.test2.hdr.v1', 1.07),
