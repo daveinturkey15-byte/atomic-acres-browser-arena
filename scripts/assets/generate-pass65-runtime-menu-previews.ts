@@ -8,6 +8,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
 import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
 import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
+import testArenaChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
 import { menuPreviewDefinition, menuPreviewPose } from '../../src/ui/menu-preview-camera';
 import type { ArenaId } from '../../src/map-selection';
 import { canonicalPass65PreviewArenaDependencies } from './pass65-menu-preview-arena-dependencies';
@@ -54,9 +55,19 @@ const choreography = {
   arenas: {
     ...choreographyJson.arenas,
     // Key order is load-bearing: the roster assertion below compares this
-    // against ARENA_SELECTIONS order, where farcrysis is fifth and high-seas sixth.
+    // against ARENA_SELECTIONS order, where farcrysis is fifth and high-seas
+    // sixth, and test1/test2 are seventh and eighth. `pass79-test-arena-previews`
+    // declares those two in that order in one file, so spreading it last places
+    // both keys correctly.
+    //
+    // 2026-08-30: test1/test2 were merged into src/ui/menu-preview-camera.ts
+    // when their recipes were authored, but NOT here, so this capture tool still
+    // described six arenas while ARENA_SELECTIONS had grown to eight. The roster
+    // assertion below therefore rejected every run, which is why the two arenas
+    // shipped byte-copied placeholder media instead of a capture.
     ...farcrysisChoreographyJson.arenas,
     ...highSeasChoreographyJson.arenas,
+    ...testArenaChoreographyJson.arenas,
   },
 } as unknown as typeof choreographyJson;
 const generatedAt = choreography.generatedAt;
@@ -752,7 +763,12 @@ async function main(): Promise<void> {
       browser = await chromium.launch({
         headless: true,
         executablePath,
-        args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+        // --mute-audio is a standing owner rule on this machine (the owner sits at
+        // this PC): a capture drives a live match for minutes at a time and must
+        // never make a sound. It is a playback flag only - the encoded audio bed
+        // is synthesised by ffmpeg in the finalizer, so muting the capture browser
+        // cannot change a single output byte.
+        args: ['--mute-audio', '--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
       });
       const page = await browser.newPage({
         viewport: { width: choreography.capture.viewport[0], height: choreography.capture.viewport[1] },

@@ -17,7 +17,7 @@
   },
   "generator": {
     "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-    "sha256": "c450443ae83cc604dbebc12ce5bd65b72f079c7621b6ecbe6514f1a53c26baa6"
+    "sha256": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15"
   },
   "arenas": [
     {
@@ -106,5 +106,12 @@
         "sha256": "3ed172952467b213bc716a065cafeae40b95312bed7994902d90408e02fce770"
       }
     }
-  ]
+  ],
+  "generatorRepin": {
+    "date": "2026-08-30",
+    "asset": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "from": "c450443ae83cc604dbebc12ce5bd65b72f079c7621b6ecbe6514f1a53c26baa6",
+    "to": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15",
+    "reason": "The capture generator changed, so its pin moved with it. Two edits: (1) source-assets/menu/pass79-test-arena-previews/choreography.json is now merged into the capture choreography, which it never was - the file existed and src/ui/menu-preview-camera.ts already read it, but this tool still described six arenas while ARENA_SELECTIONS had grown to eight, so its roster assertion rejected every run and test1/test2 could only ship placeholder media. (2) The capture browser is launched with --mute-audio, a standing owner rule on this machine. Neither edit touches the pass77 capture path, the encoding profiles or any pass77 byte; the farcrysis and high-seas media recorded below are unchanged and still re-derive to the digests above."
+  }
 }

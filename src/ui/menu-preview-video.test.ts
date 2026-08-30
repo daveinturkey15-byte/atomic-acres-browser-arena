@@ -30,10 +30,11 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   'gun-range': 'pass66-runtime-preview-v15',
   farcrysis: 'pass77-arena-preview-v1',
   'high-seas': 'pass77-arena-preview-v1',
-  // owner 2026-08-30: Test1/Test2 arenas added — placeholder byte-copies ship
-  // under their own cache family until the real captures land.
-  test1: 'pass79-test-arena-placeholder-v1',
-  test2: 'pass79-test-arena-placeholder-v1',
+  // owner 2026-08-30: Test1/Test2 arenas added. They briefly shipped placeholder
+  // byte-copies under 'pass79-test-arena-placeholder-v1'; their own captures
+  // landed the same day under this key.
+  test1: 'pass79-test-arena-preview-v1',
+  test2: 'pass79-test-arena-preview-v1',
 });
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';

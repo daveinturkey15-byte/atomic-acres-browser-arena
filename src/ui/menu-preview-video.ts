@@ -24,9 +24,13 @@ const CACHE_KEY = 'pass66-runtime-preview-v15';
 // locked, so they carry their own cache key. Reusing v15 for new bytes is exactly
 // what the cache-family lock exists to prevent.
 const PASS77_CACHE_KEY = 'pass77-arena-preview-v1';
-// Test1/Test2 placeholder media are copies of other arenas' bytes; they get
-// their own cache family so the real captures can land under a bumped key.
-const TEST_ARENA_PLACEHOLDER_CACHE_KEY = 'pass79-test-arena-placeholder-v1';
+// Test1/Test2 (owner 2026-08-30). These shipped for a few hours as placeholder
+// byte-copies of the gun-range and high-seas media under
+// 'pass79-test-arena-placeholder-v1', which meant hovering Test1 played the Gun
+// Range flyover. They now carry their own captured media, so the key is bumped
+// off the placeholder family - a new byte under an old key is exactly what the
+// cache-family lock exists to prevent.
+const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -128,38 +132,36 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // Placeholder preview, real capture queued (owner 2026-08-30): test1 ships
-  // byte-copies of the gun-range media until the range training ground has its
-  // own authored flyover.
+  // owner 2026-08-30: Test1/Test2 now ship their own captures, taken from their
+  // actual authoritative runtime arenas on the canonical WebGPU route by the
+  // same offline recipe the first six used, then encoded by
+  // scripts/assets/finalize-pass79-test-arena-menu-previews.mjs.
   'test1': Object.freeze({
     arenaId: 'test1',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // TEST1',
-    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    motionLabel: 'AUTHORED RANGE FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-test1-v1',
     mediaAvailable: true,
-    webm: `${ROOT}/test1.webm?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
-    mp4: `${ROOT}/test1.mp4?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
-    poster: `${ROOT}/test1.webp?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    webm: `${ROOT}/test1.webm?v=${PASS79_CACHE_KEY}`,
+    mp4: `${ROOT}/test1.mp4?v=${PASS79_CACHE_KEY}`,
+    poster: `${ROOT}/test1.webp?v=${PASS79_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,
   }),
-  // Placeholder preview, real capture queued (owner 2026-08-30): test2 ships
-  // byte-copies of the high-seas media until the hillside mansion has its own
-  // authored flyover.
   'test2': Object.freeze({
     arenaId: 'test2',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // TEST2',
-    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    motionLabel: 'AUTHORED ESTATE FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-test2-v1',
     mediaAvailable: true,
-    webm: `${ROOT}/test2.webm?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
-    mp4: `${ROOT}/test2.mp4?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
-    poster: `${ROOT}/test2.webp?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    webm: `${ROOT}/test2.webm?v=${PASS79_CACHE_KEY}`,
+    mp4: `${ROOT}/test2.mp4?v=${PASS79_CACHE_KEY}`,
+    poster: `${ROOT}/test2.webp?v=${PASS79_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

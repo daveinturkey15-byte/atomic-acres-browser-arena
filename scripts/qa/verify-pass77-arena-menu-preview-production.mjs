@@ -9,11 +9,12 @@
  * has to include the gate, or the next refactor silently unwires a card and QA
  * finds out from the owner.
  *
- * This verifier owns the additive pass77 family only. It deliberately re-derives
- * everything it asserts rather than trusting the finalizer's own receipt, and it
- * pins the one contract that makes an additive family legitimate: the retained
- * Pass 66 masters choreography still describes exactly the four arenas it was
- * captured for. Pass 74 broke that by appending a fifth arena to the retained
+ * This verifier owns the additive pass77 family, and since 2026-08-30 it also
+ * owns the SHELF-WIDE invariants no per-family gate can express (see "THE SHELF
+ * INVARIANTS" near the bottom). It deliberately re-derives everything it asserts
+ * rather than trusting the finalizer's own receipt, and it pins the one contract
+ * that makes an additive family legitimate: the retained Pass 66 masters
+ * choreography still describes exactly the four arenas it was captured for. Pass 74 broke that by appending a fifth arena to the retained
  * file, which moved its digest and took the retained gate red; the fifth arena
  * belongs in its own extension recipe beside it, which is where it now lives.
  *
@@ -23,7 +24,7 @@
  * issue found, not just the first.
  */
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +41,8 @@ const manifestPath = path.join(root, 'assets.manifest.json');
 const finalizerPath = path.join(root, 'scripts/assets/finalize-pass77-arena-menu-previews.mjs');
 const generatorPath = path.join(root, 'scripts/assets/generate-pass65-runtime-menu-previews.ts');
 const runtimeSourcePath = path.join(root, 'src/ui/menu-preview-video.ts');
+const mapSelectionPath = path.join(root, 'src/map-selection.ts');
+const menuSourceRoot = path.join(root, 'source-assets/menu');
 const cameraSourcePath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const runtimeRoot = path.join(root, 'public/assets/original/menu-previews');
 
@@ -50,9 +53,21 @@ const RETAINED_ARENAS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rust
 const FAMILY_ID = 'pass77-farcrysis-high-seas-menu-previews';
 const CACHE_KEY = 'pass77-arena-preview-v1';
 const MOTION_CONTRACT = 'pass66-authoritative-runtime-menu-preview-v2';
+/**
+ * Every extension recipe on the shelf, not just this family's two.
+ *
+ * The per-arena loop below only ever looks up the arenas in this family's
+ * provenance, so the extra entries cost it nothing; the camera-import check at
+ * the bottom iterates the whole map, which is what makes it notice a recipe the
+ * runtime evaluator forgot to merge. test1/test2 were added here on 2026-08-30
+ * after exactly that: their recipe was merged into src/ui/menu-preview-camera.ts
+ * but not into the capture generator, so no capture could run for them.
+ */
 const EXTENSION_RECIPES = Object.freeze({
   farcrysis: 'source-assets/menu/pass77-farcrysis-preview/choreography.json',
   'high-seas': 'source-assets/menu/pass75-high-seas-preview/choreography.json',
+  test1: 'source-assets/menu/pass79-test-arena-previews/choreography.json',
+  test2: 'source-assets/menu/pass79-test-arena-previews/choreography.json',
 });
 
 const failures = [];
@@ -272,6 +287,195 @@ else {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// THE SHELF INVARIANTS (2026-08-30).
+//
+// Everything above this line verifies ONE family against ITS OWN provenance,
+// and that is exactly how two arenas shipped another map's footage without a
+// single gate going red:
+//
+//   1. Coverage was a hardcoded roster. `ARENAS` is ['farcrysis','high-seas'],
+//      taken from this family's provenance; the retained gate's roster is its
+//      own four. test1 and test2 were selectable, shipped three files each and
+//      belonged to NO family - so no verifier ever opened their bytes. A gate
+//      that only checks what it was told about cannot report what it was never
+//      told about.
+//   2. Every digest check was intra-arena. `pinDigest(file.path, file.sha256)`
+//      compares a file to ITS OWN recorded hash, so a byte-for-byte copy of
+//      another arena's preview passes perfectly - it matches the digest that was
+//      recorded from the copy. Nothing anywhere compared one arena against
+//      another, so duplicated footage was invisible by construction.
+//
+// The assertions below are therefore whole-shelf rather than per-family, and
+// they DERIVE their rosters instead of listing them, so the next arena cannot
+// fall into the same gap:
+//
+//   A. Every selectable arena ships its own preview trio, and every preview file
+//      on the public shelf is claimed by exactly one family's provenance.
+//   B. No two arenas share a preview digest.
+// ---------------------------------------------------------------------------
+
+/**
+ * The arena roster, derived from ARENA_SELECTIONS rather than listed here.
+ *
+ * This verifier is plain ESM and src/map-selection.ts pulls in the gameplay and
+ * bot modules, so the roster is read out of the source text. Each entry is an
+ * `Object.freeze({ ... })` whose `id` and `selectable` both precede its
+ * `matchRules: Object.freeze({`, so splitting on that token yields one chunk per
+ * arena carrying both. A shape change makes the roster empty or short, which
+ * fails loudly immediately below rather than silently passing an empty loop.
+ */
+function selectableArenaRoster(source) {
+  const start = source.indexOf('export const ARENA_SELECTIONS');
+  const end = source.indexOf('\n]);', start);
+  if (start < 0 || end < 0) return null;
+  const roster = [];
+  for (const chunk of source.slice(start, end).split('Object.freeze({')) {
+    const id = /^\s*id: '([a-z0-9-]+)' as const,$/m.exec(chunk)?.[1];
+    if (!id) continue;
+    roster.push({ id, selectable: !/^\s*selectable: false,$/m.test(chunk) });
+  }
+  return roster;
+}
+
+const selectionSource = await readFile(mapSelectionPath, 'utf8').catch(() => null);
+const roster = selectionSource === null ? null : selectableArenaRoster(selectionSource);
+if (!roster || roster.length < RETAINED_ARENAS.length + ARENAS.length) {
+  fail(`could not derive the arena roster from src/map-selection.ts (found ${roster?.length ?? 0}); the shelf invariants cannot run`);
+}
+const selectableArenas = (roster ?? []).filter((arena) => arena.selectable).map((arena) => arena.id);
+
+/**
+ * Every menu-preview file every family claims, indexed by public path.
+ *
+ * Families are DISCOVERED (source-assets/menu/<family>/provenance.json), never
+ * listed, so a family added beside the existing ones extends this check with no
+ * edit here. Both provenance shapes are read: the retained Pass 66 family
+ * carries a top-level `runtimeFiles`, the additive families carry
+ * `arenas[].runtimeFiles`.
+ */
+const declaredCacheKeys = new Map();
+
+async function declaredPreviewFiles() {
+  const claims = new Map();
+  const directories = await readdir(menuSourceRoot, { withFileTypes: true }).catch(() => []);
+  for (const directory of directories) {
+    if (!directory.isDirectory()) continue;
+    const file = path.join(menuSourceRoot, directory.name, 'provenance.json');
+    const document = await readFile(file, 'utf8').then(JSON.parse).catch(() => null);
+    if (!document) continue;
+    if (typeof document.cacheKey === 'string') declaredCacheKeys.set(directory.name, document.cacheKey);
+    const declared = [
+      ...(Array.isArray(document.runtimeFiles) ? document.runtimeFiles : []),
+      ...(Array.isArray(document.arenas) ? document.arenas.flatMap((arena) => arena.runtimeFiles ?? []) : []),
+    ];
+    for (const entry of declared) {
+      if (typeof entry?.path !== 'string') continue;
+      if (!entry.path.startsWith('public/assets/original/menu-previews/')) continue;
+      const existing = claims.get(entry.path);
+      if (existing && existing.family !== directory.name) {
+        fail(`${entry.path} is claimed by two preview families: ${existing.family} and ${directory.name}`);
+      }
+      claims.set(entry.path, { family: directory.name, sha256: entry.sha256 });
+    }
+  }
+  return claims;
+}
+
+const declaredFiles = await declaredPreviewFiles();
+const shippedFiles = (await readdir(runtimeRoot).catch(() => []))
+  .filter((name) => /\.(mp4|webm|webp)$/.test(name))
+  .map((name) => `public/assets/original/menu-previews/${name}`)
+  .sort();
+
+// A. Coverage. Every selectable arena ships all three files, and every shipped
+//    file is owned by a family. Both halves matter: a missing file is the blank
+//    card the owner reported, and an unclaimed file is media that no gate
+//    anywhere re-derives - which is the state test1/test2 shipped in.
+for (const arenaId of selectableArenas) {
+  for (const extension of ['mp4', 'webm', 'webp']) {
+    const relativePath = `public/assets/original/menu-previews/${arenaId}.${extension}`;
+    const bytes = await sizeOf(relativePath);
+    if (bytes === null || bytes <= 0) {
+      fail(`selectable arena ${arenaId} ships no ${extension} menu preview (${relativePath})`);
+      continue;
+    }
+    if (!declaredFiles.has(relativePath)) {
+      fail(`${relativePath} ships to players but no preview family's provenance claims it, so no gate re-derives its bytes`);
+    }
+    const ceiling = extension === 'webp' ? budget?.maximumPosterBytes : budget?.maximumBytesPerVideo;
+    if (budget && bytes > ceiling) fail(`${relativePath} is ${bytes} bytes, over the inherited ${ceiling} byte budget`);
+  }
+}
+for (const relativePath of shippedFiles) {
+  if (!declaredFiles.has(relativePath)) fail(`${relativePath} is on the public shelf but unclaimed by every preview family`);
+}
+
+// A2. One manifest claim per file. assets.manifest.json is what the public-asset
+//     provenance gate re-hashes, and it drives that gate purely by declared
+//     digest - so TWO entries claiming the same path is a coin flip over which
+//     digest is authoritative. That is not hypothetical: on 2026-08-30 the
+//     retired placeholder entry and the real capture family both claimed all six
+//     test1/test2 preview files, and the placeholder still pinned the stub bytes.
+const manifestClaims = new Map();
+for (const asset of manifest?.assets ?? []) {
+  for (const file of asset.files ?? []) {
+    if (typeof file?.path !== 'string' || !file.path.startsWith('public/assets/original/menu-previews/')) continue;
+    const existing = manifestClaims.get(file.path);
+    if (existing && existing !== asset.id) {
+      fail(`${file.path} is claimed by two assets.manifest.json entries: ${existing} and ${asset.id}`);
+    }
+    manifestClaims.set(file.path, asset.id);
+  }
+}
+for (const relativePath of shippedFiles) {
+  if (!manifestClaims.has(relativePath)) fail(`${relativePath} ships to players but assets.manifest.json declares no entry for it`);
+}
+
+// B. Distinctness. The defect this closes: test1.{mp4,webm,webp} were
+//    byte-identical copies of gun-range.* and test2.* of high-seas.*, so
+//    hovering Test1 in the live menu played the Gun Range flyover. Every
+//    per-file digest still matched its own provenance record, because the record
+//    was taken FROM the copy - which is why this has to be a cross-arena
+//    comparison and cannot live inside any one family's section above.
+// C. Cache-family honesty. New bytes under an old key are what the cache-family
+//    lock exists to prevent, and a key nothing references means the family's
+//    media is unreachable from the menu. Both are shelf-wide, not per-family.
+for (const [family, cacheKey] of declaredCacheKeys) {
+  if (runtimeSource !== null && !runtimeSource.includes(cacheKey)) {
+    fail(`preview family ${family} declares cache key ${cacheKey}, which src/ui/menu-preview-video.ts never references`);
+  }
+}
+
+const digestOwners = new Map();
+for (const relativePath of shippedFiles) {
+  const arenaId = path.basename(relativePath).replace(/\.(mp4|webm|webp)$/, '');
+  let digest = null;
+  try {
+    digest = await sha256File(path.join(root, relativePath));
+  } catch (error) {
+    fail(`${relativePath} could not be hashed for the cross-arena distinctness check: ${error.message}`);
+    continue;
+  }
+  // Re-derive every claim, not just this family's. The per-arena loops above
+  // only pin the arenas their own provenance lists, so without this a family
+  // whose media drifted after its provenance was written would go unnoticed
+  // exactly the way test1/test2 did.
+  const claim = declaredFiles.get(relativePath);
+  if (claim && typeof claim.sha256 === 'string' && claim.sha256 !== digest) {
+    fail(`${relativePath} does not match the digest recorded by preview family ${claim.family}: recorded ${claim.sha256}, got ${digest}`);
+  }
+  const owner = digestOwners.get(digest);
+  if (owner && owner.arenaId !== arenaId) {
+    fail(`${relativePath} is byte-identical to ${owner.path}: ${arenaId} would play ${owner.arenaId} footage in the menu (sha256 ${digest})`);
+  } else if (owner) {
+    fail(`${relativePath} is byte-identical to ${owner.path}; one arena must not ship the same bytes under two containers`);
+  } else {
+    digestOwners.set(digest, { arenaId, path: relativePath });
+  }
+}
+
 if (failures.length > 0) {
   console.error(`Pass 77 arena menu preview verification FAILED (${failures.length} issue${failures.length === 1 ? '' : 's'}):`);
   for (const failure of failures) console.error(`- ${failure}`);
@@ -283,6 +487,12 @@ console.log(JSON.stringify({
   cacheKey: CACHE_KEY,
   arenas: ARENAS,
   retainedMastersArenas: RETAINED_ARENAS,
+  shelf: {
+    selectableArenas,
+    shippedPreviewFiles: shippedFiles.length,
+    claimedPreviewFiles: declaredFiles.size,
+    distinctPreviewDigests: digestOwners.size,
+  },
   finalMediaSetSha256: provenance.finalMediaSet.sha256,
   provenanceSha256: createHash('sha256').update(await readFile(provenancePath)).digest('hex'),
   verified: 'passed',
