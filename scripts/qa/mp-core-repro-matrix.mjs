@@ -249,14 +249,22 @@ async function probeWeapon(page) {
     return { weapon: s.player.weapon, ammo: s.player.ammo, reserve: s.player.reserve };
   };
   // --- shoot ---
-  // Face the arena centre first: the movement probe can end nose-to-wall,
-  // and HF-343 then honestly refuses the shot (viewmodel-contact-raise).
-  // The probe measures the FIRE PATH, not wall-contact policy.
-  await page.evaluate(() => {
+  // The movement probe can end nose-to-wall, and HF-343 then honestly
+  // refuses the shot (viewmodel-contact-raise) - that is policy, not the F5
+  // fault. The F5 question is "can this player fire AT ALL", so rotate
+  // through up to eight headings until one clears the contact gate.
+  await page.evaluate(async () => {
     const d = window.__ATOMIC_ACRES_DEBUG__;
-    const s = d.snapshot();
-    const [x, , z] = s.player.position;
-    d.teleportPlayer(x, s.player.position[1], z, Math.atan2(x, z), 0);
+    for (let step = 0; step < 8; step += 1) {
+      const s = d.snapshot();
+      const [x, y, z] = s.player.position;
+      d.teleportPlayer(x, y, z, s.player.yaw + Math.PI / 4, 0);
+      await new Promise((r) => setTimeout(r, 120));
+      const before = d.snapshot().player.ammo;
+      d.fireOnce();
+      await new Promise((r) => setTimeout(r, 150));
+      if (d.snapshot().player.ammo < before) return; // heading clears; probe proper follows
+    }
   });
   await page.waitForTimeout(300);
   const beforeShot = await readPlayer();

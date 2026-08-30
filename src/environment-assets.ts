@@ -262,6 +262,111 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // v3 (owner HITL 2026-08-29): the mannequin art is DELETED with its
   // colliders - "random manekins that look like bots standing around".
 
+  // Owner 2026-08-30 richness pass: suburban streetscape props. All pieces
+  // deliberately sit under the collider-visual parity gate's walk-through
+  // thresholds (min footprint < 0.35 m or height < 0.9 m), so like the
+  // benches they are honest thin/short dressing with no gameplay authority.
+  {
+    const poleTimber = new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.94 });
+    const wireMaterial = new THREE.MeshStandardMaterial({ color: 0x181b1c, roughness: 0.6 });
+    const polePositions: ReadonlyArray<readonly [number, number]> = [[-27, -8.6], [-9, -8.6], [9, -8.6], [27, -8.6]];
+    const attachY = 6.9;
+    for (const [x, z] of polePositions) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7.2, 7), poleTimber);
+      pole.name = 'street-power-pole';
+      pole.position.set(x, 3.6, z);
+      const crossarm = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.09), poleTimber);
+      crossarm.name = 'street-power-crossarm';
+      crossarm.position.set(x, attachY, z);
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.7, 0.05), poleTimber);
+      brace.name = 'street-power-brace';
+      brace.position.set(x + 0.35, attachY - 0.35, z);
+      brace.rotation.z = 0.55;
+      decorative(pole); decorative(crossarm); decorative(brace);
+      group.add(pole, crossarm, brace);
+      for (const side of [-0.55, 0.55]) {
+        const insulator = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.14, 6), wireMaterial);
+        insulator.name = 'street-power-insulator';
+        insulator.position.set(x + side, attachY + 0.11, z);
+        decorative(insulator); group.add(insulator);
+      }
+    }
+    for (let span = 0; span < polePositions.length - 1; span += 1) {
+      const [ax, az] = polePositions[span];
+      const [bx, bz] = polePositions[span + 1];
+      for (const side of [-0.55, 0.55]) {
+        const curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(ax + side, attachY + 0.16, az),
+          new THREE.Vector3((ax + bx) / 2 + side, attachY - 0.55, (az + bz) / 2),
+          new THREE.Vector3(bx + side, attachY + 0.16, bz),
+        );
+        const wire = new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.014, 5, false), wireMaterial);
+        wire.name = 'street-power-line';
+        decorative(wire); group.add(wire);
+      }
+    }
+
+    const hydrantRed = new THREE.MeshStandardMaterial({ color: 0xa63a2c, roughness: 0.55, metalness: 0.25 });
+    for (const [x, z] of [[-13, 7.9], [13, -7.9]] as const) {
+      const hydrant = new THREE.Group();
+      hydrant.name = 'street-hydrant';
+      hydrant.position.set(x, 0, z);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.62, 8), hydrantRed);
+      barrel.position.y = 0.31;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 0.16, 8), hydrantRed);
+      cap.position.y = 0.68;
+      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.14, 6), hydrantRed);
+      nozzle.rotation.z = Math.PI / 2;
+      nozzle.position.set(0.16, 0.42, 0);
+      hydrant.add(barrel, cap, nozzle);
+      decorative(hydrant); group.add(hydrant);
+    }
+
+    const mailSteel = new THREE.MeshStandardMaterial({ color: 0x3a4c55, roughness: 0.5, metalness: 0.4 });
+    for (const [x, z, yaw] of [[-16.5, -9.2, Math.PI / 2], [16.5, 9.2, -Math.PI / 2]] as const) {
+      const mailbox = new THREE.Group();
+      mailbox.name = 'street-mailbox';
+      mailbox.position.set(x, 0, z);
+      mailbox.rotation.y = yaw;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.05, 0.08), poleTimber);
+      post.position.y = 0.52;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.26, 0.24), mailSteel);
+      box.position.y = 1.14;
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.5, 8, 1, false, 0, Math.PI), mailSteel);
+      lid.rotation.z = Math.PI / 2;
+      lid.position.y = 1.27;
+      const flag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.05), hydrantRed);
+      flag.position.set(0.2, 1.3, 0.15);
+      mailbox.add(post, box, lid, flag);
+      decorative(mailbox); group.add(mailbox);
+    }
+
+    const acShell = new THREE.MeshStandardMaterial({ color: 0xb9bfc0, roughness: 0.42, metalness: 0.55 });
+    const acGrille = new THREE.MeshStandardMaterial({ color: 0x50585a, roughness: 0.7, metalness: 0.35 });
+    for (const [x, z] of [[-22.8, -13.8], [22.8, 13.8]] as const) {
+      const unit = new THREE.Group();
+      unit.name = 'street-ac-unit';
+      unit.position.set(x, 0, z);
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.72, 0.42), acShell);
+      shell.position.y = 0.4;
+      const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.05, 12), acGrille);
+      fan.rotation.x = Math.PI / 2;
+      fan.position.set(0, 0.46, 0.22);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.52), acGrille);
+      pad.position.y = 0.04;
+      unit.add(shell, fan, pad);
+      decorative(unit); group.add(unit);
+    }
+
+    const grateMaterial = new THREE.MeshStandardMaterial({ color: 0x22282a, roughness: 0.8, metalness: 0.3 });
+    for (const [x, z] of [[-7, -6.2], [7, 6.2], [-21, 6.2], [21, -6.2]] as const) {
+      const grate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.4), grateMaterial);
+      grate.name = 'street-drain-grate';
+      grate.position.set(x, 0.045, z);
+      decorative(grate); group.add(grate);
+    }
+  }
+
   group.userData.streetBatchStats = batchStaticMeshes(group, group, () => '', 'vertex-lit');
 
   // Pass 82 "better grass and surrounding mountains in nuketown". Both layers

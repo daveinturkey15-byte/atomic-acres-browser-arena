@@ -15,7 +15,7 @@
   "runtimeGlb": "public/assets/original/models/atomic-acres-blender-arena.glb",
   "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
   "runtimeGlbSha256": "8d30be0c7c707964f5358eac804253821a144b980317feacc2d4f367738d8f94",
-  "sourceBlendSha256": "55bfb350d8605246424fff8e471894e07895cf1877bdc3aefa3afadbec4a3795",
+  "sourceBlendSha256": "69f2ae00c01d1107b418e0b5cdb293e3c1cf6c385312cfeb831ecbe2af03274a",
   "sourceSpecSha256": "e28e55b04be092ee05bd36e4e942c31adcc2ca98ef6b37c46fb8532cdda1dc03",
   "runtimeAudit": {
     "bytes": 7368216,
