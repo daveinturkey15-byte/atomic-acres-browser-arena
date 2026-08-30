@@ -42,8 +42,26 @@ const arg = (name, fallback) => {
 };
 const list = (value) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
 
+// Owner 2026-08-30: same fix as verify-cross-browser-matrix.mjs. A hardcoded
+// arena list here meant test1/test2 were never opened in any browser by the
+// gate; deriving it from the source roster makes new arenas covered by default.
+function selectableArenaIds() {
+  const source = readFileSync(resolve(HERE, '../../src/map-selection.ts'), 'utf8');
+  const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
+  const found = [...body.matchAll(/id:\s*'([a-z0-9-]+)'\s*as const/g)];
+  const ids = [];
+  for (let i = 0; i < found.length; i += 1) {
+    const start = found[i].index;
+    const end = i + 1 < found.length ? found[i + 1].index : body.length;
+    if (!/selectable:\s*false/.test(body.slice(start, end))) ids.push(found[i][1]);
+  }
+  if (ids.length === 0) throw new Error('cross-browser gate: could not derive any selectable arena from src/map-selection.ts');
+  return ids;
+}
+
+
 const BASE = arg('--url', 'http://127.0.0.1:41876');
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas');
+const ARENAS = arg('--arenas', selectableArenaIds().join(','));
 const SAMPLE_MS = arg('--sample-ms', '8000');
 const LANES = arg('--lanes', 'chrome,edge,firefox,opera,webkit,mobile,tablet');
 // Default required set = the browsers actually installed here. Opera is

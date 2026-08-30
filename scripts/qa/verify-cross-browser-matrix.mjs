@@ -38,12 +38,41 @@
 //     [--out artifacts/qa/cross-browser-matrix.json]
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { startStableDevProxy } from './stable-dev-proxy.mjs';
+
+// Owner 2026-08-30. This list used to be a hardcoded six-arena string, so when
+// test1/test2 shipped they were never opened in ANY browser by this gate - the
+// exact same failure mode that let two arenas ship another map's menu preview:
+// a roster frozen in a verifier that nobody updates when the roster grows.
+// Deriving it from src/map-selection.ts means adding an arena automatically
+// extends browser coverage, and the assertion below makes an incomplete run say
+// so out loud instead of passing quietly.
+const MAP_SELECTION_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/map-selection.ts');
+
+function selectableArenaIds() {
+  const source = readFileSync(MAP_SELECTION_PATH, 'utf8');
+  const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
+  const ids = [];
+  // Each entry opens with `id: '<arena>' as const,` and may later carry
+  // `selectable: false`; the next `id:` bounds the entry we are inspecting.
+  const pattern = /id:\s*'([a-z0-9-]+)'\s*as const/g;
+  const found = [...body.matchAll(pattern)];
+  for (let i = 0; i < found.length; i += 1) {
+    const start = found[i].index;
+    const end = i + 1 < found.length ? found[i + 1].index : body.length;
+    if (!/selectable:\s*false/.test(body.slice(start, end))) ids.push(found[i][1]);
+  }
+  if (ids.length === 0) throw new Error('cross-browser matrix: could not derive any selectable arena from src/map-selection.ts');
+  return ids;
+}
+
+const SELECTABLE_ARENA_IDS = selectableArenaIds();
+
 import {
   BROWSER_LANES, foregroundWindow, killByToken, closeGracefully, processIsRunning,
   competingBrowserAutomation,
@@ -59,7 +88,14 @@ const arg = (name, fallback) => {
 const list = (value) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
 
 const BASE = arg('--url', 'http://127.0.0.1:41876');
-const ARENAS = list(arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas'));
+const ARENAS = list(arg('--arenas', SELECTABLE_ARENA_IDS.join(',')));
+const ALLOW_PARTIAL_ARENAS = argv.includes('--allow-partial-arenas');
+const UNCOVERED_SELECTABLE_ARENAS = SELECTABLE_ARENA_IDS.filter((arena) => !ARENAS.includes(arena));
+if (UNCOVERED_SELECTABLE_ARENAS.length > 0 && !ALLOW_PARTIAL_ARENAS) {
+  console.error(`cross-browser matrix: these selectable arenas would never be opened in a browser: ${UNCOVERED_SELECTABLE_ARENAS.join(', ')}.`);
+  console.error('Pass --allow-partial-arenas to run a deliberate subset; the receipt records the gap either way.');
+  process.exit(1);
+}
 const SAMPLE_MS = Number(arg('--sample-ms', '12000'));
 const RECEIVER_PORT = Number(arg('--port', '9913'));
 const LANE_TIMEOUT_MS = Number(arg('--timeout', '900000'));
