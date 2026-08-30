@@ -26071,7 +26071,10 @@ function updateHud(now: number): void {
   }
   const [aqua, coral] = teamScores();
   const scores: [number, number] = [aqua, coral];
-  const presentation = matchPresentationAt(matchState, now, scores, player.team, currentMatchRules(), arena.label);
+  // Domination presents its own contract (FIRST SQUAD TO 200), not the
+  // arena's kill rules.
+  const presentation = matchPresentationAt(matchState, now, scores, player.team,
+    dominationModeActive() ? { durationMs: DOMINATION_TIME_LIMIT_MS, scoreLimit: DOMINATION_WIN_SCORE } : currentMatchRules(), arena.label);
   const ffaHud = gameMode !== 'solo' && privateMatchMode === 'ffa';
   const orderedFfa = ffaHud
     ? freeForAllLeaders([...authoritativeScores.values()].filter((score) => !score.id.startsWith('host-bot-')))

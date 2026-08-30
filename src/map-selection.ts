@@ -5,7 +5,7 @@ import type { ArenaId } from './arena-identity';
 
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -153,6 +153,42 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'SEAS',
     menuLede: 'Board an original superyacht arena where layered decks, compact interiors, and exposed bow-to-stern lanes reward constant movement.',
     summary: 'Original superyacht · layered decks · close-quarters lanes',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  Object.freeze({
+    id: 'test1' as const,
+    routeId: 'test1' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'TEST1',
+    displayName: 'Test1',
+    titleLead: 'TEST',
+    titleAccent: '1',
+    menuLede: 'Fight across a sun-bleached range training ground — sandbag firing lanes, a two-storey range tower, and a container-yard flank.',
+    summary: 'Range training ground · tower · container yard',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  Object.freeze({
+    id: 'test2' as const,
+    routeId: 'test2' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'TEST2',
+    displayName: 'Test2',
+    titleLead: 'TEST',
+    titleAccent: '2',
+    menuLede: 'Storm a hillside mansion — pool deck, sunken court and garden terraces, with three-zone Domination as the headline mode.',
+    summary: 'Hillside mansion · three lanes · Domination',
     rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
     soloBotCount: 2,
     maximumSoloBots: 2,

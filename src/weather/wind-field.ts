@@ -219,6 +219,10 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   farcrysis: profile('farcrysis', 'humid-monsoon-gusting', -0.42, 3.1, 5.2, 19, 1.45, false),
   // Open water: the stiffest steady breeze in the game, broad ocean fronts.
   'high-seas': profile('high-seas', 'open-ocean-stiff-breeze', 1.71, 11.0, 5.8, 34, 0.6, false),
+  // Dry open range: moderate steady wind, gusty enough to flap canvas.
+  'test1': profile('test1', 'dry-range-gusty-crosswind', 0.94, 4.6, 3.8, 20, 0.8, false),
+  // Hillside garden air: soft late-afternoon breeze, lazy broad fronts.
+  'test2': profile('test2', 'hillside-garden-soft-breeze', -1.18, 2.2, 1.8, 18, 1.1, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

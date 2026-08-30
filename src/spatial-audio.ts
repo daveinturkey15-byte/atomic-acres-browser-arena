@@ -32,6 +32,11 @@ export function arenaFootstepSurface(arenaId: ArenaId, atomicSurface: FootstepSu
   if (arenaId === 'rustworks-1v1') return 'metal';
   if (arenaId === 'gun-range' || arenaId === 'skyline-terminal') return 'concrete';
   if (arenaId === 'high-seas') return 'wood';
+  // Test1's dominant walkable is packed range dirt; Test2's is travertine
+  // pool deck and terrace stone. Falling through would project Atomic's road
+  // bands across both.
+  if (arenaId === 'test1') return 'soil';
+  if (arenaId === 'test2') return 'concrete';
   return atomicSurface;
 }
 
@@ -267,6 +272,18 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     continuousVoices: 2, bedFrequencyHz: 46, airFrequencyHz: 151, airLowpassHz: 620, airQ: 1.85, airGain: 0.007,
     modulationHz: 0.09, modulationDepth: 0.1,
     bedPosition: Object.freeze({ x: 0, y: 0, z: 24 }), airPosition: Object.freeze({ x: 0, y: 8.92, z: -28 }),
+  }),
+  'test1': Object.freeze({
+    arenaId: 'test1', identity: 'dry-range-wind-and-flag-canvas', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 55, airFrequencyHz: 182, airLowpassHz: 700, airQ: 1.8, airGain: 0.007,
+    modulationHz: 0.1, modulationDepth: 0.1,
+    bedPosition: Object.freeze({ x: -18, y: 3, z: 8 }), airPosition: Object.freeze({ x: 16, y: 6, z: -10 }),
+  }),
+  'test2': Object.freeze({
+    arenaId: 'test2', identity: 'hillside-garden-breeze-and-pool-water', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 50, airFrequencyHz: 168, airLowpassHz: 660, airQ: 1.85, airGain: 0.0065,
+    modulationHz: 0.085, modulationDepth: 0.09,
+    bedPosition: Object.freeze({ x: -20, y: 3, z: 12 }), airPosition: Object.freeze({ x: 22, y: 5, z: -16 }),
   }),
 });
 

@@ -33,6 +33,9 @@ describe('Pass 66 command shell', () => {
       'rustrig',
       'gun-range',
       'high-seas',
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1',
+      'test2',
     ]);
     // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
     expect(markup).not.toContain('data-arena-route="farcrysis"');

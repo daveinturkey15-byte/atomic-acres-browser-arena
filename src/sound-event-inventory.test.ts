@@ -287,7 +287,9 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('3d91f753d1c2d5cd28dcf637c711cb90bb3d9ff6ac7d6340e1531a9f1df3e084');
+    // owner 2026-08-30: Test1/Test2 arenas added — digest recomputed over the
+    // eight-arena variant rows.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('a0928557c02d3ed78766ea12fb8c3a72e631f27db3730300ed1f66fbec141ef0');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

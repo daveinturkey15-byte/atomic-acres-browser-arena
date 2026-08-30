@@ -816,6 +816,53 @@
       "attributionRequired": false
     },
     {
+      "id": "atomic-acres-pass79-test-arena-placeholder-previews",
+      "kind": "original-project-placeholder-menu-video-and-loading-family",
+      "creator": "Atomic Acres project",
+      "source": "byte-for-byte copies of the shipped gun-range (test1) and high-seas (test2) preview/loading assets",
+      "generatedAsOf": "2026-08-30",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/test1.mp4",
+          "sha256": "28c9d908aa66cd2a136d88d7fba937d7b3a7530d044ea8d96e747e9996a6dfe4"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test1.webm",
+          "sha256": "e21f10cca5d641ae32ee98eaec661851036343560f7bb30be932b39c9fbda4a3"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test1.webp",
+          "sha256": "a2eddd02ddee15e95486d04f765a326ff5fdea3a868f7f7e0a12cfd7bafed401"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.mp4",
+          "sha256": "1c9834b5975930e4bd5a0ece25495deacdaa0f9111673bd6e96203f1ea082603"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.webm",
+          "sha256": "132873e79cf467bf57b8382427fbdeed97cd83ed4b0079640612aab1f5b7fb21"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.webp",
+          "sha256": "43804a7161c9f6a0165102a3247dc0e0d7715ffda13fc5fc731d4a16b5ae755b"
+        },
+        {
+          "path": "public/assets/original/loading/test1-loading.webp",
+          "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
+        },
+        {
+          "path": "public/assets/original/loading/test2-loading.webp",
+          "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
+        }
+      ],
+      "owner": "src/ui/menu-preview-video.ts MENU_PREVIEW_VIDEO_DEFINITIONS['test1'|'test2']; deployment loading surface backdrops",
+      "placeholderStatus": "placeholder",
+      "format": "test1.mp4 7484987 B, test1.webm 3533559 B, test1.webp 83282 B, test2.mp4 7966835 B, test2.webm 6574988 B, test2.webp 248186 B, test1-loading.webp 169200 B, test2-loading.webp 208500 B; same encodes as their source families (2560x1440 previews, 1536x864 loading)",
+      "modifications": "PLACEHOLDER (owner 2026-08-30): Test1 preview/loading bytes are copies of the gun-range assets and Test2's are copies of the high-seas assets, so the new arena cards and loading surfaces render real media until each arena's own capture is queued and recorded here with fresh hashes.",
+      "attributionRequired": false
+    },
+    {
       "id": "pass74-operator-skin-explorer-2026-08-22",
       "kind": "original-project-blender-operator-archetype-skin",
       "creator": "Atomic Acres project",

@@ -114,6 +114,10 @@ export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = O
   'gun-range': 'interior-room',
   'farcrysis': 'open-field',
   'high-seas': 'open-water',
+  'test1': 'open-field',
+  // Test2 plays outdoors but between travertine walls, hedges and the pool
+  // court — a step more reflective than bare open ground.
+  'test2': 'urban-yard',
 });
 
 export const DEFAULT_ACOUSTIC_SPACE: AcousticSpace = 'open-field';

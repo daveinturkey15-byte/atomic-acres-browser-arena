@@ -82,6 +82,8 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'support.chopper-gun',
   // HF-337: positional variants so teammates and enemies can locate support fire.
   'support.chopper-gun.positional',
+  // Owner 2026-08-30: possessed chopper missile launch whoosh.
+  'support.missile-launch.positional',
   'support.chopper-damage',
   'support.carpet-aircraft',
   'support.carpet-bomb',
@@ -371,6 +373,8 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
+  // Owner 2026-08-30: chopper missile launch whoosh, host and guest impact loops.
+  runtimeCallsite('missileLaunch', 'impact.launchPosition ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] } : undefined', 2, ['support.missile-launch.positional']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -901,6 +905,13 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
+  existingEvent({
+    id: 'support.missile-launch.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['launch'],
+    emitterSymbols: ['missileLaunch'],
+    contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'Owner 2026-08-30: possessed Chopper Gunner missile leaving the wing rail - ignition thump + rising rocket-motor whoosh, spatial at the launch socket via the railgun spatial-chain pattern, flat weapons bus when the origin is unknown (older peers). Fires on drop-phase impacts for host and guests alike.',
+  }),
   plannedEvent({
     id: 'support.chopper-damage', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['hit', 'critical', 'destroyed'],
@@ -1020,6 +1031,9 @@ const events: SoundEventInventoryEntry[] = [
       'gun-range.ventilation', 'gun-range.ballast-buzz',
       'farcrysis.jungle-insect', 'farcrysis.breeze',
       'high-seas.diesel-engine', 'high-seas.open-sea-wind',
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1.range-wind', 'test1.flag-canvas',
+      'test2.garden-breeze', 'test2.pool-water',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
@@ -1030,6 +1044,8 @@ const events: SoundEventInventoryEntry[] = [
     variants: [
       'atomic-acres.yard-life', 'skyline-terminal.apron', 'rustworks-1v1.rig-metal',
       'gun-range.range-plant', 'farcrysis.jungle', 'high-seas.open-water',
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1.open-air-range', 'test2.garden-estate',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Pass 75: sparse intermittent one-shots layered above the two continuous beds, giving each arena a sense of place rather than a drone. Every event is a repository-procedural recipe (oscillator sweep, or the shared noise buffer through a band-pass) - no sampled audio. Placed on a random bearing at an authored distance around the live listener, scheduled on a randomised per-arena gap so the layer never develops an audible period, and skipped entirely when the shared spatial-voice budget is full so ambience can never crowd out combat.',
@@ -1047,7 +1063,8 @@ const events: SoundEventInventoryEntry[] = [
   }),
   plannedEvent({
     id: 'music.game', family: 'music', bus: 'game-music', delivery: 'global-nonspatial',
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas'],
+    // owner 2026-08-30: Test1/Test2 arenas added.
+    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1060,7 +1077,9 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 });
 // Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union,
 // including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
-export const SOUND_EVENT_INVENTORY_SHA256 = '3d91f753d1c2d5cd28dcf637c711cb90bb3d9ff6ac7d6340e1531a9f1df3e084';
+// owner 2026-08-30: recomputed again for the Test1/Test2 arena variants
+// (arena-bed, arena-events and game-music rows).
+export const SOUND_EVENT_INVENTORY_SHA256 = 'a0928557c02d3ed78766ea12fb8c3a72e631f27db3730300ed1f66fbec141ef0';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

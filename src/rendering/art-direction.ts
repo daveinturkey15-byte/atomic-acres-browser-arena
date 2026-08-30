@@ -479,6 +479,85 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.7,
     },
   }),
+  // Test1: dusty outdoor firing range under hard mid-morning sun. KHAKI-SAGE
+  // dust, not cream and not sodium — the warm hue space was already owned by
+  // atomic-acres (cream: red+green up) and rustworks-1v1 (sodium: red up,
+  // green down), so the range takes the one dry axis left: green-led military
+  // canvas with red and blue both eased. Values were settled by running the
+  // art-direction.test.ts probe metric against every existing arena and
+  // test2 simultaneously (owner 2026-08-30): weakest measured pair for this
+  // entry is 6.8/255 against the 5.5/255 floor.
+  'test1': frozen({
+    id: 'test1',
+    brief: 'Sun-bleached range training ground — khaki canvas, hard dry light.',
+    cdl: {
+      // Green-led khaki: this is olive-drab plywood and canvas, which no
+      // other arena owns. Red stays a hair over blue so the dust never reads
+      // cold.
+      gain: [0.92, 1.05, 0.91],
+      lift: [0.002, 0.006, 0.0005],
+      gamma: [1.08, 1.08, 1.1],
+    },
+    // Dry and bleached: the lowest saturation of the outdoor arenas — hard
+    // sun washes colour out of canvas and plywood. (Scene stage only; the
+    // probe gate measures the CDL/split-tone identity above.)
+    saturationScale: 0.98,
+    contrastScale: 1.02,
+    crosstalkDelta: -0.08,
+    splitTone: {
+      shadowTint: 0x315952,      // slate blue-green container shade
+      highlightTint: 0xeae5d2,   // hot bleached off-white sun on dust
+      strengthScale: 1.4,
+      shadowBalance: 0.44,
+      highlightBalance: 0.58,
+    },
+    midtoneContrastDelta: 0.05,
+    vignette: { base: 0.05, settingScale: 1 },
+    bloom: { intensityScale: 1, thresholdScale: 1.05 },
+    atmosphere: {
+      mistNear: 0xd8cdb0, mistFar: 0xf5eeda,
+      smokeNear: 0x4a4438, smokeFar: 0xa89a80,
+      dustNear: 0xe0cf9e, dustFar: 0xfcf0cc,
+      density: 0.95,
+    },
+  }),
+  // Test2: hillside luxury mansion in late-afternoon golden light. The
+  // strongest amber cast in the catalog — a LOW sun, not rustworks' sodium
+  // night: the whole frame leans gold while the shade stays pool-water blue.
+  // Values were settled by the same probe-metric run as test1 (owner
+  // 2026-08-30): weakest measured pair for this entry is 6.8/255 against the
+  // 5.5/255 floor, with rustworks-1v1 the nearest neighbour.
+  'test2': frozen({
+    id: 'test2',
+    brief: 'Golden-hour hillside mansion — low amber sun, cool pool-blue shade.',
+    cdl: {
+      // Deep golden hour: red hard up, green and blue stepped down in order
+      // (r > g > b). More cast than rustworks' sodium but aimed at a bright
+      // sunlit frame, where rustworks spends its red on night practicals.
+      gain: [1.17, 0.92, 0.83],
+      lift: [0.002, 0.006, 0.0005],
+      gamma: [1.08, 1.08, 1.1],
+    },
+    saturationScale: 1.18,
+    contrastScale: 1.01,
+    crosstalkDelta: -0.13,
+    splitTone: {
+      shadowTint: 0x204b72,      // pool-water blue in the hedge shade
+      highlightTint: 0xf8be98,   // low golden sun on travertine
+      strengthScale: 1.2,
+      shadowBalance: 0.58,
+      highlightBalance: 0.36,
+    },
+    midtoneContrastDelta: 0.05,
+    vignette: { base: 0.08, settingScale: 1 },
+    bloom: { intensityScale: 1.15, thresholdScale: 1 },
+    atmosphere: {
+      mistNear: 0xd8c8a8, mistFar: 0xffe8c4,
+      smokeNear: 0x453a30, smokeFar: 0xa08a70,
+      dustNear: 0xe8d0a0, dustFar: 0xffedc8,
+      density: 0.8,
+    },
+  }),
 });
 
 // Fail closed at module init: an out-of-bounds authored value is a build

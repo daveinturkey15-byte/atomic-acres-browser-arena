@@ -12,6 +12,8 @@ export const ARENA_IDS = Object.freeze([
   'gun-range',
   'farcrysis',
   'high-seas',
+  'test1',
+  'test2',
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];

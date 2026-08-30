@@ -43,7 +43,8 @@ describe('canonical prerecorded menu preview choreography', () => {
   });
 
   it('uses authored LOD0 helicopter framing and a dedicated cat POV for the range', () => {
-    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas'] as const) {
+    // owner 2026-08-30: Test1/Test2 arenas added — both fly the helicopter recipe.
+    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas', 'test1', 'test2'] as const) {
       const definition = menuPreviewDefinition(arenaId);
       expect(definition.kind).toBe('helicopter');
       if (definition.kind !== 'helicopter') throw new Error('unreachable definition');
@@ -53,7 +54,8 @@ describe('canonical prerecorded menu preview choreography', () => {
   });
 
   it('holds occasional helicopter trim values and blends bounded seeded corrections', () => {
-    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas'] as const) {
+    // owner 2026-08-30: Test1/Test2 arenas added — same bounded-trim contract.
+    for (const arenaId of ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'high-seas', 'test1', 'test2'] as const) {
       const definition = menuPreviewDefinition(arenaId);
       const unique = new Set<string>();
       let heldFramePairs = 0;

@@ -56,6 +56,10 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   'skyline-terminal': [],
   'rustworks-1v1': [],
   'high-seas': [],
+  // Owner 2026-08-30: new arenas start with empty ledgers - no accepted
+  // shoot-through rows; anything the audit finds must be fixed, not accepted.
+  test1: [],
+  test2: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -82,6 +86,8 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   'skyline-terminal': 0,
   'rustworks-1v1': 0,
   'high-seas': 0,
+  test1: 0,
+  test2: 0,
   'gun-range': 0,
   farcrysis: 0,
 });

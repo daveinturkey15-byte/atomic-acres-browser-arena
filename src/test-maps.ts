@@ -90,9 +90,20 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
   box(builder, 'test1 tower parapet south east', [2.35, 3.2, 3.2], [2, 1, 0.25], towerWall);
   box(builder, 'test1 tower parapet west', [-3.2, 3.2, 0], [0.25, 1, 6.7], towerWall);
   box(builder, 'test1 tower parapet east', [3.2, 3.2, 0], [0.25, 1, 6.7], towerWall);
-  for (let step = 0; step < 7; step += 1) {
+  // Observation glazing on the deck (reflective surfaces for the RAY TRACED
+  // preset - the tracer needs something to reflect on every arena).
+  const rangeGlass = new THREE.MeshStandardMaterial({
+    color: 0xb8ccd4, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.42,
+  });
+  box(builder, 'test1 tower glazing north', [0, 3.3, -3.05], [4.6, 0.85, 0.08], rangeGlass, { solid: false, shots: false });
+  box(builder, 'test1 tower glazing west', [-3.05, 3.3, 0], [0.08, 0.85, 4.6], rangeGlass, { solid: false, shots: false });
+  // 0.295 m rises on 0.8 m treads: measured live, the controller autosteps
+  // 0.38 m from flat ground but refuses 0.38 m box-to-box; sub-0.3 rises
+  // climb reliably. Nine rises land exactly on the 2.66 m deck.
+  for (let step = 0; step < 9; step += 1) {
+    const rise = 2.66 / 9;
     box(builder, `test1 tower stair ${step}`,
-      [0, 0.19 + step * 0.38, 3.3 + (6 - step) * 0.55], [1.6, 0.38 + step * 0.76, 0.55], steel);
+      [0, (rise / 2) * (step + 1), 3.3 + (8 - step) * 0.8], [1.6, rise * (step + 1), 0.8], steel);
   }
 
   // West lane: the firing line. Sandbag half-walls, silhouette targets on

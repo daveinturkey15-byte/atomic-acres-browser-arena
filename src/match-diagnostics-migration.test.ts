@@ -11,6 +11,12 @@ const arenaExpansionMigration = readFileSync(
   new URL('../worker/migrations/0005_expand_match_diagnostic_arenas.sql', import.meta.url),
   'utf8',
 );
+// owner 2026-08-30: Test1/Test2 arenas added — 0006 rebuilds the CHECK to the
+// eight-arena set, so the full chain must run before every canonical arena inserts.
+const testArenaExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0006_add_test_arenas.sql', import.meta.url),
+  'utf8',
+);
 
 const insertDiagnostic = (database: DatabaseSync, receiptId: string, arena: string): void => {
   database.prepare(`
@@ -44,6 +50,7 @@ describe('match diagnostics arena expansion migration', () => {
       insertDiagnostic(database, 'retained-row', 'atomic-acres');
 
       database.exec(arenaExpansionMigration);
+      database.exec(testArenaExpansionMigration);
 
       for (const arena of ARENA_IDS) insertDiagnostic(database, `new-${arena}`, arena);
 

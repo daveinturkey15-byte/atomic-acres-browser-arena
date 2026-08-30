@@ -44,6 +44,13 @@ describe('arena selectability', () => {
     expect(offered.length).toBeLessThan(registryOrder.length);
   });
 
+  // owner 2026-08-30: Test1/Test2 arenas added — both ship selectable.
+  it('offers the Test1 and Test2 arenas in the menu', () => {
+    const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
+    expect(offered).toContain('test1');
+    expect(offered).toContain('test2');
+  });
+
   it('leaves the first offered arena as the default the menu preselects', () => {
     // pass64-shell marks index 0 selected and reads ARENA_SELECTIONS[0] for the canvas
     // label and solo button, so the two lists must agree on the default or the menu

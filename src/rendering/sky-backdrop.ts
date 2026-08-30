@@ -6,7 +6,9 @@ export type SkyBackdropPreset =
   | 'airport-dawn'
   | 'indoor-range'
   | 'jungle-golden-hour'
-  | 'open-ocean-day';
+  | 'open-ocean-day'
+  | 'range-midmorning'
+  | 'estate-golden-hour';
 
 export const SKY_BACKDROP_TEXTURE_SIZE = Object.freeze({ width: 2_048, height: 1_024 });
 export const ATOMIC_ACRES_GENERATED_SKY_ASSET_URL = './assets/original/skies/atomic-acres-sunset.webp';
@@ -93,6 +95,24 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0.82, '#a9cfe8'],
     [1, '#dceaf2'],
   ] as const),
+  // Owner 2026-08-30: Test1 - hard clear late-morning over dust; pale zenith
+  // into a bleached warm horizon.
+  'range-midmorning': Object.freeze([
+    [0, '#6f9cc8'],
+    [0.4, '#8fb4d4'],
+    [0.72, '#c3d3d8'],
+    [0.9, '#e8ddc2'],
+    [1, '#f4e3ba'],
+  ] as const),
+  // Owner 2026-08-30: Test2 - late-afternoon golden hour over the hills.
+  'estate-golden-hour': Object.freeze([
+    [0, '#3e6da8'],
+    [0.35, '#6f8fb8'],
+    [0.6, '#b7a293'],
+    [0.8, '#e8b276'],
+    [0.93, '#f7c877'],
+    [1, '#ffe3a1'],
+  ] as const),
 });
 
 /**
@@ -145,6 +165,13 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     rgb: [255, 255, 255] as [number, number, number], shadowRgb: [120, 156, 184] as [number, number, number],
     alpha: 0.58, scale: 0.54,
   }),
+  // Owner 2026-08-30: Test1 clear (brief: no clouds); Test2 sparse warm wisps.
+  'range-midmorning': null,
+  'estate-golden-hour': Object.freeze({
+    count: 22, bandTop: 0.16, bandBottom: 0.5,
+    rgb: [255, 214, 168] as [number, number, number], shadowRgb: [96, 76, 96] as [number, number, number],
+    alpha: 0.44, scale: 0.74,
+  }),
 });
 
 function skyRandom(seed: number): () => number {
@@ -176,6 +203,9 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   'jungle-golden-hour': Object.freeze({ x: 0.62, y: 0.24, coreRgb: [255, 253, 245] as [number, number, number], glowRgb: [214, 234, 250] as [number, number, number], coreRadius: 13, glowRadius: 66 }),
   // High and tight: midday sun over water is small, white and fierce.
   'open-ocean-day': Object.freeze({ x: 0.38, y: 0.22, coreRgb: [255, 255, 250] as [number, number, number], glowRgb: [214, 236, 255] as [number, number, number], coreRadius: 11, glowRadius: 58 }),
+  // Owner 2026-08-30: Test1 high hard sun; Test2 low golden sun.
+  'range-midmorning': Object.freeze({ x: 0.56, y: 0.2, coreRgb: [255, 253, 244] as [number, number, number], glowRgb: [236, 236, 214] as [number, number, number], coreRadius: 12, glowRadius: 62 }),
+  'estate-golden-hour': Object.freeze({ x: 0.3, y: 0.62, coreRgb: [255, 238, 196] as [number, number, number], glowRgb: [255, 178, 92] as [number, number, number], coreRadius: 17, glowRadius: 88 }),
 });
 
 function paintSun(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
@@ -359,6 +389,9 @@ export function skyBackdropPreset(preset: string): SkyBackdropPreset {
   return preset === 'sunset-farmland' || preset === 'industrial-night'
     || preset === 'airport-dawn' || preset === 'indoor-range'
     || preset === 'jungle-golden-hour' || preset === 'open-ocean-day'
+    // Owner 2026-08-30: Test1/Test2 daylight presets, backed by the terminal
+    // generated sky (clear-day dome fits both moods; bespoke skies queued).
+    || preset === 'range-midmorning' || preset === 'estate-golden-hour'
     ? preset
     : 'airport-dawn';
 }
@@ -367,7 +400,7 @@ export function skyBackdropAssetForPreset(preset: string): string | null {
   const resolved = skyBackdropPreset(preset);
   if (resolved === 'sunset-farmland') return ATOMIC_ACRES_GENERATED_SKY_ASSET_URL;
   if (resolved === 'industrial-night') return RUSTWORKS_GENERATED_SKY_ASSET_URL;
-  if (resolved === 'airport-dawn') return TERMINAL_GENERATED_SKY_ASSET_URL;
+  if (resolved === 'airport-dawn' || resolved === 'range-midmorning' || resolved === 'estate-golden-hour') return TERMINAL_GENERATED_SKY_ASSET_URL;
   return null;
 }
 

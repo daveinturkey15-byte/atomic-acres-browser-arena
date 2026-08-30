@@ -136,6 +136,9 @@ describe('collider/visual parity gate (all six arenas)', () => {
       'skyline-terminal': 0,
       'rustworks-1v1': 0,
       'high-seas': 0,
+      // Owner 2026-08-30: new arenas enter at ceiling 0 - the strictest floor.
+      test1: 0,
+      test2: 0,
       'gun-range': 0,
       farcrysis: 0,
     });

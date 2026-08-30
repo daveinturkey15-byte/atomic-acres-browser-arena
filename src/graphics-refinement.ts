@@ -32,6 +32,9 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane (64x64 island).
   'farcrysis': Object.freeze({ halfWidth: 44, halfHeight: 44, near: 4, far: 150 }),
   'high-seas': Object.freeze({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 }),
+  // Test1: 52x38 range ground. Test2: 64x48 hillside estate.
+  'test1': Object.freeze({ halfWidth: 34, halfHeight: 27, near: 4, far: 176 }),
+  'test2': Object.freeze({ halfWidth: 40, halfHeight: 32, near: 4, far: 182 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -45,6 +48,9 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
   'farcrysis': 0.18,
   'high-seas': 0.2,
+  // Test1 dusty matte plywood/sandbag range; Test2 reflective travertine and pool.
+  'test1': 0.16,
+  'test2': 0.22,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

@@ -6,9 +6,10 @@ export const MATCH_DIAGNOSTIC_RETENTION_DAYS = 30;
 
 export const MATCH_DIAGNOSTIC_BACKENDS = ['webgpu', 'webgl-compatibility'] as const;
 export const MATCH_DIAGNOSTIC_ARENAS = [
-  'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas',
+  'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2',
 ] as const;
-export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa'] as const;
+// Owner 2026-08-30: Domination ships with the Test2 arena.
+export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa', 'domination'] as const;
 export const MATCH_DIAGNOSTIC_ROLES = ['offline', 'host', 'guest'] as const;
 export const MATCH_DIAGNOSTIC_ADMISSIONS = ['accepted', 'rejected', 'observed'] as const;
 export const MATCH_DIAGNOSTIC_EVENT_CATEGORIES = ['damage', 'health', 'regen', 'death', 'admission'] as const;

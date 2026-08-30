@@ -1,6 +1,7 @@
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
 import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
 import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
+import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -138,6 +139,12 @@ const FARCRYSIS_CHOREOGRAPHY = farcrysisChoreographyJson as unknown as Readonly<
   recipeId: string;
   arenas: Readonly<{ farcrysis: HelicopterRecipe }>;
 }>;
+// Test1/Test2 (owner 2026-08-30): same extension pattern — the Pass 66 masters
+// choreography stays digest-pinned, so the new arenas ride beside it.
+const TEST_ARENAS_CHOREOGRAPHY = testArenasChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ test1: HelicopterRecipe; test2: HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
@@ -146,6 +153,7 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     // authoring roster check compares against that order, so keep it here too.
     ...FARCRYSIS_CHOREOGRAPHY.arenas,
     ...HIGH_SEAS_CHOREOGRAPHY.arenas,
+    ...TEST_ARENAS_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

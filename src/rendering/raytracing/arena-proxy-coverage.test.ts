@@ -81,6 +81,10 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   'skyline-terminal': { meshes: 10, footprintM2: 447 },
   farcrysis: { meshes: 4, footprintM2: 326_000 },
   'high-seas': { meshes: 17, footprintM2: 921_700 },
+  // Owner 2026-08-30: measured on the authored builds - test1 tower glazing
+  // (extraction admits the large north pane), test2 pool water + car glass.
+  test1: { meshes: 1, footprintM2: 3 },
+  test2: { meshes: 3, footprintM2: 120 },
 };
 
 type Coverage = {
@@ -139,6 +143,7 @@ beforeAll(async () => {
     { buildGunRange, buildRustworks1v1, buildSkylineTerminal },
     { buildFarcrysis },
     { buildHighSeas },
+    { buildTest1, buildTest2 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -147,6 +152,7 @@ beforeAll(async () => {
     import('../../additional-maps'),
     import('../../farcrysis'),
     import('../../high-seas'),
+    import('../../test-maps'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -159,6 +165,9 @@ beforeAll(async () => {
     'skyline-terminal': buildSkylineTerminal,
     farcrysis: buildFarcrysis,
     'high-seas': (scene: THREE.Scene) => buildHighSeas(scene),
+    // Owner 2026-08-30: Test1/Test2 join the proxy-coverage sweep.
+    test1: buildTest1,
+    test2: buildTest2,
   };
 
   for (const id of ALL_ARENA_IDS) {

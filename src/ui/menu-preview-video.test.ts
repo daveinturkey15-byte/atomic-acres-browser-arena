@@ -30,6 +30,10 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   'gun-range': 'pass66-runtime-preview-v15',
   farcrysis: 'pass77-arena-preview-v1',
   'high-seas': 'pass77-arena-preview-v1',
+  // owner 2026-08-30: Test1/Test2 arenas added — placeholder byte-copies ship
+  // under their own cache family until the real captures land.
+  test1: 'pass79-test-arena-placeholder-v1',
+  test2: 'pass79-test-arena-placeholder-v1',
 });
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
@@ -68,7 +72,8 @@ describe('prerecorded map-selection previews', () => {
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
-    expect(assets).toHaveLength(18);
+    // owner 2026-08-30: Test1/Test2 arenas added — six arenas became eight.
+    expect(assets).toHaveLength(24);
   });
 
   it('keeps helicopter flyovers and the cat POV semantically explicit', () => {

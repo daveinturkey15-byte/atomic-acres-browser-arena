@@ -53,7 +53,8 @@ describe('spatial audio contracts', () => {
 
   it('covers all arenas with distinct original beds inside continuous budgets', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
-    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(6);
+    // owner 2026-08-30: Test1/Test2 arenas added — six distinct beds became eight.
+    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(8);
     expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });

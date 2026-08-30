@@ -10,7 +10,9 @@ import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './a
 import { ARENA_VISUAL_REGISTRY, ArenaVisualStreamController, type ArenaVisualRegistry } from './arena-visual-stream';
 import { skyBackdropAssetForPreset, skyBackdropPreset } from './sky-backdrop';
 
-const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas'];
+// owner 2026-08-30: Test1/Test2 arenas added — eight ids; ARENA_VISUAL_REGISTRY
+// entries for them land separately with the arena visual modules.
+const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2'];
 
 describe('Pass 64 arena visual definitions', () => {
   it('defines exactly one dynamically imported contract for every stable arena ID', async () => {

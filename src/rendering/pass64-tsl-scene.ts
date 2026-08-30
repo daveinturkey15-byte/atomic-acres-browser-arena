@@ -253,6 +253,20 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-7, -25, 2, 3.6], [7, 20, 2, 3.6]],
     { count: 48, minX: -14, maxX: 14, minZ: -44, maxZ: 44 },
   ),
+  // Test1: dry outdoor range — low mist over the firing lanes, dust across
+  // the whole 52x38 ground.
+  'test1': atmosphereLayout(
+    [[-18, -10, 10, 3.2], [18, 10, 10, 3.2], [0, -14, 9, 2.8]],
+    [[-14, 8, 2, 3.6], [14, -8, 2, 3.6]],
+    { count: 56, minX: -26, maxX: 26, minZ: -19, maxZ: 19 },
+  ),
+  // Test2: hillside mansion — soft garden haze at the terraces, light pollen
+  // dust across the 64x48 grounds.
+  'test2': atmosphereLayout(
+    [[-22, -16, 12, 3.6], [22, 16, 12, 3.6], [0, 0, 9, 2.8], [0, -20, 10, 3.0]],
+    [[-18, 14, 2.2, 3.8], [18, -14, 2.2, 3.8]],
+    { count: 48, minX: -32, maxX: 32, minZ: -24, maxZ: 24 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

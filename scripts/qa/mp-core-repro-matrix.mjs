@@ -66,6 +66,10 @@ const LANES = [
   { arena: 'skyline-terminal', mode: 'ffa' },
   { arena: 'high-seas', mode: 'tdm' },
   { arena: 'gun-range', mode: 'range' },
+  // Owner 2026-08-30: the Test arenas join the matrix - Test2 runs its
+  // headline Domination mode over the wire.
+  { arena: 'test1', mode: 'tdm' },
+  { arena: 'test2', mode: 'domination' },
 ];
 
 function peerServerReady() {
@@ -477,7 +481,11 @@ for (const [laneIndex, lane] of LANES.entries()) {
       && record.guestArenaId === lane.arena
       && record.hostMove.movedM >= MOVE_THRESHOLD_M
       && record.guestMove.movedM >= MOVE_THRESHOLD_M
-      && seen.every((s) => s.remoteCount === 1 && s.hp > 0)
+      // Owner 2026-08-30 re-pin: the chopper-probe lane's AI autocannon now
+      // genuinely kills (v2 damage + shell splash), so a dead-but-respawning
+      // remote is expected there; the sync fault this guards is the remote
+      // VANISHING. Non-chopper lanes keep the stricter alive check.
+      && seen.every((s) => s.remoteCount === 1 && (lane.chopperProbe ? true : s.hp > 0))
       && !record.startGateViolation;
     if (record.startGateViolation) startGateViolations += 1;
     if (!(record.chatHostToGuest.deliveredToReceiver && record.chatGuestToHost.deliveredToReceiver)) chatFailures += 1;

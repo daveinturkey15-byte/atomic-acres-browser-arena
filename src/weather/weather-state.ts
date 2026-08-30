@@ -220,6 +220,10 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   farcrysis: arenaProfile('farcrysis', 'tropical-monsoon-downpour', false, ['clear', 'overcast', 'light-rain', 'heavy-rain', 'storm']),
   // Open water with nothing to hide behind.
   'high-seas': arenaProfile('high-seas', 'open-ocean-squall-line', false, ['clear', 'overcast', 'light-rain', 'heavy-rain', 'storm']),
+  // Dry range under hard mid-morning sun: pinned clear by design.
+  'test1': arenaProfile('test1', 'dry-range-hard-sun', false, ['clear']),
+  // Golden-hour hillside estate: pinned clear by design.
+  'test2': arenaProfile('test2', 'golden-hour-hillside-clear', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

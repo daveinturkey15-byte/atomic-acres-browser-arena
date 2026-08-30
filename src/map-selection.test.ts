@@ -12,7 +12,8 @@ import {
 } from './map-selection';
 
 describe('opening arena selection', () => {
-  it('publishes six unique, fully described maps', () => {
+  // owner 2026-08-30: Test1/Test2 arenas added — six maps became eight.
+  it('publishes eight unique, fully described maps', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
       'skyline-terminal',
@@ -20,9 +21,11 @@ describe('opening arena selection', () => {
       'gun-range',
       'farcrysis',
       'high-seas',
+      'test1',
+      'test2',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(6);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Test1', 'Test2']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(8);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -90,12 +93,28 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
+    // owner 2026-08-30: Test1/Test2 arenas added — both host up to 6 with 2-bot solo.
+    for (const [id, label, name] of [['test1', 'TEST1', 'Test1'], ['test2', 'TEST2', 'Test2']] as const) {
+      expect(arenaSelection(id)).toMatchObject({
+        id,
+        selectorLabel: label,
+        displayName: name,
+        multiplayer: true,
+        fieldSupport: true,
+        overdrive: false,
+        soloBotCount: 2,
+        maximumSoloBots: 2,
+        rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+        matchRules: { durationMs: 300_000, scoreLimit: null },
+      });
+    }
   });
 
   it('binds hosted round clocks and canvas labels to the selected arena', () => {
     // HF-359: includes farcrysis round clock and canvas label
+    // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -103,6 +122,8 @@ describe('opening arena selection', () => {
       'Gun Range multiplayer arena',
       'Farcrysis multiplayer arena',
       'High Seas multiplayer arena',
+      'Test1 multiplayer arena',
+      'Test2 multiplayer arena',
     ]);
   });
 
@@ -115,6 +136,9 @@ describe('opening arena selection', () => {
       'gun-range': true,
       'farcrysis': false,
       'high-seas': true,
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1': true,
+      'test2': true,
     });
   });
 
@@ -127,6 +151,9 @@ describe('opening arena selection', () => {
     expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(1);
     expect(activeSoloBotTarget(arenaSelection('farcrysis'), 100)).toBe(2); // HF-359
     expect(activeSoloBotTarget(arenaSelection('high-seas'), 100)).toBe(2);
+    // owner 2026-08-30: Test1/Test2 arenas added.
+    expect(activeSoloBotTarget(arenaSelection('test1'), 100)).toBe(2);
+    expect(activeSoloBotTarget(arenaSelection('test2'), 100)).toBe(2);
   });
 
   it('derives the solo launch label from the canonical arena catalog', () => {
@@ -136,6 +163,9 @@ describe('opening arena selection', () => {
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       'START RANGE',
+      '2 BOTS SKIRMISH',
+      '2 BOTS SKIRMISH',
+      // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
     ]);
@@ -154,6 +184,9 @@ describe('opening arena selection', () => {
     expect(decodeArenaId('farcry')).toBe('farcrysis');
     expect(decodeArenaId('f4rcry')).toBe('farcrysis');
     expect(decodeArenaId('high-seas')).toBe('high-seas');
+    // owner 2026-08-30: Test1/Test2 arenas added — route id equals stable id.
+    expect(decodeArenaId('test1')).toBe('test1');
+    expect(decodeArenaId('test2')).toBe('test2');
   });
 
   it('distinguishes strict current IDs from compatibility routes and aliases', () => {

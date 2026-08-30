@@ -69,6 +69,12 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'bow-air-gap', xQ: 0, zQ: -0.72, altitudeM: 14 },
     { id: 'yacht-overflight', xQ: 0, zQ: 0, altitudeM: 26 },
   ], 3.2),
+  // Open range ground: no authored recovery portals — the collider set alone
+  // is enough over a flat 52x38 field.
+  'test1': definition('test1', 40, []),
+  'test2': definition('test2', 45, [
+    { id: 'estate-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

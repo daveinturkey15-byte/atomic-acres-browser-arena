@@ -261,6 +261,20 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.9, kind: 'foam', colorWarm: 0xffffff, colorCool: 0xcfe2ea, radiusM: 0.055, fallMps: -0.08, windPull: 0.97, flutterMps: 0.9, spinRadiansPerSecond: 1.3, opacity: 0.15 },
     0.35, 24, 12, 5,
   ),
+  // Dry outdoor range: hard-sun dust off the berms, seed fluff and grit on the gusts.
+  'test1': arena(
+    'test1', 'range-dust-and-dry-grit',
+    { density: 0.75, colorWarm: 0xf2e0b4, colorCool: 0xd4c8a8, radiusM: 0.016, riseMps: 0.06, swirlMps: 0.24, windPull: 0.75, opacity: 0.1 },
+    { density: 0.45, kind: 'seed', colorWarm: 0xe8d8a8, colorCool: 0xb8a988, radiusM: 0.04, fallMps: 0.3, windPull: 0.85, flutterMps: 0.6, spinRadiansPerSecond: 1.6, opacity: 0.11 },
+    0.5, 20, 12, 4,
+  ),
+  // Golden-hour estate: pollen glinting over the pool, soft garden dust.
+  'test2': arena(
+    'test2', 'garden-pollen-and-soft-dust',
+    { density: 0.7, colorWarm: 0xffedc0, colorCool: 0xdcd8b8, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.15, windPull: 0.5, opacity: 0.09 },
+    { density: 0.5, kind: 'seed', colorWarm: 0xf6e6b8, colorCool: 0xc8c49c, radiusM: 0.045, fallMps: 0.24, windPull: 0.7, flutterMps: 0.55, spinRadiansPerSecond: 1.4, opacity: 0.12 },
+    0.6, 21, 13, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

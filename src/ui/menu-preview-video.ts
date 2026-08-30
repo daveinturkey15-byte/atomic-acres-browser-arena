@@ -24,6 +24,9 @@ const CACHE_KEY = 'pass66-runtime-preview-v15';
 // locked, so they carry their own cache key. Reusing v15 for new bytes is exactly
 // what the cache-family lock exists to prevent.
 const PASS77_CACHE_KEY = 'pass77-arena-preview-v1';
+// Test1/Test2 placeholder media are copies of other arenas' bytes; they get
+// their own cache family so the real captures can land under a bumped key.
+const TEST_ARENA_PLACEHOLDER_CACHE_KEY = 'pass79-test-arena-placeholder-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -121,6 +124,42 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     webm: `${ROOT}/high-seas.webm?v=${PASS77_CACHE_KEY}`,
     mp4: `${ROOT}/high-seas.mp4?v=${PASS77_CACHE_KEY}`,
     poster: `${ROOT}/high-seas.webp?v=${PASS77_CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
+  // Placeholder preview, real capture queued (owner 2026-08-30): test1 ships
+  // byte-copies of the gun-range media until the range training ground has its
+  // own authored flyover.
+  'test1': Object.freeze({
+    arenaId: 'test1',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // TEST1',
+    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-test1-v1',
+    mediaAvailable: true,
+    webm: `${ROOT}/test1.webm?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    mp4: `${ROOT}/test1.mp4?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    poster: `${ROOT}/test1.webp?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
+  // Placeholder preview, real capture queued (owner 2026-08-30): test2 ships
+  // byte-copies of the high-seas media until the hillside mansion has its own
+  // authored flyover.
+  'test2': Object.freeze({
+    arenaId: 'test2',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // TEST2',
+    motionLabel: 'AUTHORED COCKPIT FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-test2-v1',
+    mediaAvailable: true,
+    webm: `${ROOT}/test2.webm?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    mp4: `${ROOT}/test2.mp4?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
+    poster: `${ROOT}/test2.webp?v=${TEST_ARENA_PLACEHOLDER_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

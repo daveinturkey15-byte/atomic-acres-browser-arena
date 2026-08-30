@@ -98,6 +98,27 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-7, -25, 2, 3.6, 0.8], [7, 20, 2, 3.6, 3.1], [0, 2, 1.8, 3.2, 4.7],
     ] as SmokeCard[]),
   }),
+  // Test1: dry outdoor range — sparse low mist over the lanes, a little
+  // smoke drifting off the container yard.
+  'test1': Object.freeze({
+    mist: Object.freeze([
+      [-18, -10, 10, 3.2], [18, 10, 10, 3.2], [-10, 12, 8, 2.6],
+      [10, -12, 8, 2.6], [0, -14, 9, 2.8], [0, 8, 8, 2.6],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-14, 8, 2, 3.6, 1.0], [14, -8, 2, 3.6, 3.4],
+    ] as SmokeCard[]),
+  }),
+  // Test2: hillside mansion — soft garden haze at the terraces and pool deck.
+  'test2': Object.freeze({
+    mist: Object.freeze([
+      [-22, -16, 12, 3.6], [22, 16, 12, 3.6], [-14, 10, 9, 2.8],
+      [14, -10, 9, 2.8], [0, -20, 10, 3.0], [0, 0, 9, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-18, 14, 2.2, 3.8, 0.9], [18, -14, 2.2, 3.8, 3.2],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
@@ -123,6 +144,15 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'high-seas') return {
     count: quality ? 48 : 28, minX: -14, maxX: 14, minZ: -44, maxZ: 44, color: 0xd7eef2, opacity: quality ? 0.1 : 0.07,
   };
+  // Test1/Test2 (owner 2026-08-30): the fallthrough below is the gun-range
+  // INDOOR lane strip (z -44..-3), which sits mostly outside both new arenas'
+  // bounds — dust would hang beyond the walls. Dry range dust / warm pollen.
+  if (arenaId === 'test1') return {
+    count: quality ? 56 : 32, minX: -26, maxX: 26, minZ: -19, maxZ: 19, color: 0xe0cf9e, opacity: quality ? 0.14 : 0.1,
+  };
+  if (arenaId === 'test2') return {
+    count: quality ? 48 : 28, minX: -32, maxX: 32, minZ: -24, maxZ: 24, color: 0xe8d0a0, opacity: quality ? 0.1 : 0.07,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -138,6 +168,10 @@ export function atmosphereFogRange(profile: RenderProfile, arenaId: ArenaId): Re
   // clearing. Ported from the Pass 69 hidden lane.
   if (arenaId === 'farcrysis') return profile === 'blender' ? { near: 14, far: 46 } : { near: 18, far: 52 };
   if (arenaId === 'high-seas') return profile === 'blender' ? { near: 42, far: 132 } : { near: 48, far: 142 };
+  // Test1/Test2 (owner 2026-08-30): open outdoor sightlines — the indoor
+  // fallthrough below would fog the far berms/terraces of both new arenas.
+  if (arenaId === 'test1') return profile === 'blender' ? { near: 44, far: 130 } : { near: 48, far: 140 };
+  if (arenaId === 'test2') return profile === 'blender' ? { near: 46, far: 136 } : { near: 50, far: 146 };
   return profile === 'blender' ? { near: 38, far: 96 } : { near: 42, far: 105 };
 }
 
@@ -469,6 +503,13 @@ export class AtmosphereSystem {
           ? { shadow: 0x485868, light: 0xe8ad86, smoke: 0x59666c, warm: 0xd49b6a }
           : arenaId === 'high-seas'
             ? { shadow: 0x4f7380, light: 0xd9f0eb, smoke: 0x718b91, warm: 0xe1b77e }
+          // Test1/Test2 (owner 2026-08-30): dry sun-bleached range dust and
+          // golden-hour garden haze — the neutral facility fallthrough would
+          // grey out both outdoor moods.
+          : arenaId === 'test1'
+            ? { shadow: 0x6e6a5c, light: 0xf0dfb4, smoke: 0x8a8172, warm: 0xd8bd8c }
+          : arenaId === 'test2'
+            ? { shadow: 0x5c6a72, light: 0xffe0a8, smoke: 0x87837a, warm: 0xe3b57e }
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);

@@ -148,6 +148,27 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('hs.spray-hiss', 'rustle', 3, [3_400, 2_100], 0.95, 0.014, 1.9, 10),
     event('hs.bilge-pump', 'thump', 2, [88, 58], 0.42, 0.015, 0, 19),
   ]),
+  'test1': profile('test1', 'dry-open-air-range', [7, 16], [
+    event('t1.dry-gust', 'whoosh', 5, [340, 150], 1.60, 0.019, 1.0, 16),
+    event('t1.distant-bird', 'chirp', 4, [2_300, 2_900], 0.12, 0.020, 0, 42),
+    event('t1.canvas-flap', 'rustle', 4, [1_500, 900], 0.60, 0.017, 1.4, 13),
+    event('t1.sand-hiss', 'rustle', 3, [3_000, 2_000], 1.10, 0.012, 1.8, 10),
+    event('t1.container-tick', 'clank', 3, [1_350, 1_050], 0.10, 0.014, 0, 24),
+    event('t1.plywood-knock', 'thump', 2, [180, 120], 0.20, 0.016, 0, 20),
+    event('t1.tower-creak', 'creak', 2, [140, 90], 1.10, 0.015, 0, 26),
+    event('t1.hawk-cry', 'call', 2, [1_800, 1_350], 0.40, 0.018, 0, 60),
+  ]),
+  'test2': profile('test2', 'golden-hour-garden-estate', [6, 14], [
+    event('t2.garden-bird', 'chirp', 6, [2_400, 3_100], 0.10, 0.024, 0, 22),
+    event('t2.soft-breeze', 'whoosh', 4, [300, 130], 1.80, 0.016, 0.9, 15),
+    event('t2.hedge-rustle', 'rustle', 4, [2_200, 1_400], 1.30, 0.015, 1.6, 12),
+    event('t2.pool-lap', 'whoosh', 5, [380, 170], 0.95, 0.018, 1.1, 14),
+    event('t2.fountain-drip', 'clank', 3, [2_600, 2_100], 0.10, 0.012, 0, 10),
+    event('t2.awning-creak', 'creak', 2, [170, 110], 0.90, 0.013, 0, 20),
+    event('t2.dove-coo', 'call', 3, [520, 400], 0.34, 0.018, 0, 32),
+    event('t2.gate-clink', 'clank', 2, [1_600, 1_250], 0.12, 0.013, 0, 27),
+    event('t2.distant-songbird', 'call', 2, [1_900, 2_500], 0.45, 0.015, 0, 50),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */
