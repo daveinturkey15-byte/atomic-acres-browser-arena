@@ -108,13 +108,17 @@ export function evaluateKillstreakActivation(input: KillstreakActivationGateInpu
   // text chat, guest awaiting canonical authority, pending world repair) are
   // not separable from the boolean; report the honest generic lock.
   if (!input.gameplayInputEnabled) return denied(slotId, 'input-disabled');
-  if (!input.arenaSupportsFieldSupport) return denied(slotId, 'arena-unsupported');
   if (input.tacticalMapOpen) return denied(slotId, 'menu-open');
   if (input.targetingActive) return denied(slotId, 'targeting-open');
   // A control toggle on a platform the player already owns is exempt from the
-  // possession and charge checks: entering and LEAVING the gun both arrive on
-  // this path, and the charge was spent when the platform was called in.
+  // possession, charge AND arena checks: entering and LEAVING the gun both
+  // arrive on this path, and the platform is already legitimately in the
+  // world - on the killstreak range the test-bay stations spawn it, so
+  // checking arena support here locked the owner out of every platform he
+  // trained there (owner report 2026-08-30: "cant enter them to control
+  // them, at least in killstreak range").
   if (input.controlTogglePress) return Object.freeze({ allowed: true as const, slotId });
+  if (!input.arenaSupportsFieldSupport) return denied(slotId, 'arena-unsupported');
   if (input.possessionActive) return denied(slotId, 'possession-active');
   if (!input.hasActorSnapshot) return denied(slotId, 'no-authority-snapshot');
   if (!input.projectionEarned) return denied(slotId, 'not-earned');

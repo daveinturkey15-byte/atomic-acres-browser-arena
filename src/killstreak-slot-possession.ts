@@ -32,3 +32,16 @@ export function selectControllableSupportEntity(
   candidates.sort((left, right) => left.id.localeCompare(right.id));
   return candidates[0] ?? null;
 }
+
+/**
+ * Slot-sharing alternatives that resolve a slot-key press to a CONTROLLABLE
+ * platform the player already owns. The killstreak-range stations hand out a
+ * piloted drone while the loadout slot still shows yardhawk (its direct
+ * slot-2 alternative) - without this mapping the key above a live owned
+ * drone activated nothing and the owner could never enter it. Deliberately
+ * ONLY the exclusive pair: broader families (chopper vs the slot-3/4
+ * strikes) would steal real activation presses in live matches.
+ */
+export function controllableAlternativeForSlotId(slotId: string): ControllableKillstreakId | null {
+  return slotId === 'yardhawk' ? 'piloted-drone' : null;
+}

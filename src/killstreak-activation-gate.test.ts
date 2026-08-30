@@ -66,13 +66,13 @@ describe('HF-316(b) killstreak activation pre-flight gate', () => {
     // (arena before tactical map), targeting overlay, POSSESSION, then the
     // availability split (snapshot before earned).
     //
-    // Possession moved after the arena/map/targeting group so the
-    // control-toggle exemption can sit in front of it while those three still
-    // refuse a toggle: you should not be able to jump into a chopper gun with
-    // the tactical map or a targeting overlay open, and gun-range supports no
-    // field support at all. That ordering change is deliberate and is what
-    // made it possible to take control of a platform whose charge was already
-    // spent (the owner's "can't take control when I press the key again").
+    // Possession AND arena support sit after the map/targeting pair so the
+    // control-toggle exemption can sit in front of both while map/targeting
+    // still refuse a toggle: you should not be able to jump into a chopper
+    // gun with the tactical map or a targeting overlay open, but a platform
+    // already in the world is controllable even on an arena (gun-range) whose
+    // own field-support ACTIVATION is disabled - its test bay is exactly
+    // where platforms get spawned for training.
     const worstCase = blocked({
       playerAlive: false,
       matchPhase: 'ended',
@@ -103,9 +103,15 @@ describe('HF-316(b) killstreak activation pre-flight gate', () => {
         ...(result.reason === 'not-earned' ? { projectionEarned: true } : {}),
       };
     }
+    // 2026-08-30: arena-unsupported moved BEHIND the map/targeting pair so
+    // the control-toggle exemption can also sit in front of IT - the
+    // killstreak-range test bay legitimately spawns controllable platforms on
+    // an arena with no field-support activation, and the owner could not
+    // enter them ("cant enter them to control them, at least in killstreak
+    // range").
     expect(order).toEqual([
       'dead', 'match-inactive', 'input-disabled',
-      'arena-unsupported', 'menu-open', 'targeting-open', 'possession-active',
+      'menu-open', 'targeting-open', 'arena-unsupported', 'possession-active',
       'no-authority-snapshot', 'not-earned',
     ]);
     expect(evaluateKillstreakActivation(input)).toEqual({ allowed: true, slotId: 'care-package' });

@@ -98,7 +98,16 @@ export function viewmodelContactProbePaddingMeters(profile: ViewmodelContactProf
   );
 }
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
-const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
+// Owner 2026-08-30 ("clipping ... or prone, longtime issue"): flat-ground
+// prone probes ~0.19 m of floor lift, and with the old 0.115 baseline every
+// open-field prone sat at ~0.88 highReadyBlend - the weapon folded ~90
+// degrees with the forearm rammed through the camera, which is what the
+// prone view has been showing. The baseline is the measured FLAT-GROUND
+// value (+1 cm slack), so the fold engages only when clearance is genuinely
+// tighter than normal prone (under low cover, muzzle to a wall). The fire
+// gate already passed lift as 0 for exactly this reason; presentation now
+// matches it.
+const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.2;
 const VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS = 0.085;
 const VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS = 0.04;
 

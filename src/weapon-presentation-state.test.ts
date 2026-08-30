@@ -120,7 +120,11 @@ describe('weapon presentation state', () => {
     expect(Object.keys(VIEWMODEL_CONTACT_PROFILES).sort()).toEqual([...WEAPON_IDS].sort());
     for (const weapon of WEAPON_IDS) {
       const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
-      const response = viewmodelContactResponse(weapon, 0.7, 0.2, true, 0);
+      // 2026-08-30 re-pin: the prone floor-lift baseline moved to the
+      // measured flat-ground value (0.2), so this deep-contact fixture uses a
+      // lift genuinely past it (under-cover squeeze), not open-field prone -
+      // which must no longer fold at all.
+      const response = viewmodelContactResponse(weapon, 0.7, 0.29, true, 0);
       expect(profile.weapon).toBe(weapon);
       expect(profile.probeLengthMeters).toBeGreaterThanOrEqual(1.15);
       expect(profile.fullStowDistanceMeters).toBeGreaterThanOrEqual(0.5);

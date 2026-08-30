@@ -560,7 +560,7 @@ import {
   registerCarpetCorridorPoint,
   type CarpetCorridorTargeting,
 } from './carpet-corridor-targeting';
-import {
+import { controllableAlternativeForSlotId,
   controllableKillstreakId,
   selectControllableSupportEntity,
 } from './killstreak-slot-possession';
@@ -22396,8 +22396,17 @@ function requestPossessedChopperMissile(now = performance.now()): boolean {
 
 function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.now()): void {
   const fieldSupport = localFieldSupportProjection();
-  const id = fieldSupport.loadout.slots[slotIndex];
-  if (!id) return;
+  const slotId = fieldSupport.loadout.slots[slotIndex];
+  if (!slotId) return;
+  // Owner 2026-08-30 ("cant enter them to control them, at least in
+  // killstreak range"): a slot key must also reach a live owned platform of
+  // the slot's CONTROLLABLE alternative - the range's drone station hands
+  // out a piloted drone while the slot still shows yardhawk.
+  const alternative = controllableAlternativeForSlotId(slotId);
+  const id = alternative
+    && selectControllableSupportEntity(alternative, player.id, killstreakSnapshot.entities) !== null
+    ? alternative
+    : slotId;
   // HF-316: the owner reported killstreak keys that "sometimes" do nothing. Every
   // refusal below used to be a bare return, so a blocked activation was
   // indistinguishable from a dead key. Evaluate the pre-flight once and SAY why.
