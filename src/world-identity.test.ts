@@ -29,7 +29,12 @@ const FROZEN_HF383_LAYOUT = {
     { team: 1, x: 19, z: 17.4, facing: -1 },
   ],
   cover: [
-    [-12, -2, 2.4, 3.6], [12, 2, 2.4, 3.6],
+    // v5 re-freeze (owner 2026-08-30 "jump ontop of both boxes outside bus
+    // to then get on buss roof"): the street pair becomes the two-step crate
+    // stairway onto the 2.25 m bus roof. Tall pair at |z| 1.6 so the vans'
+    // standable cover cells stay clear (measured 0.11 m clip at 1.3).
+    [-10.1, -1.3, 1.7, 2.2], [10.1, 1.3, 1.7, 2.2],
+    [-8.1, -1.6, 1.7, 2.2], [8.1, 1.6, 1.7, 2.2],
     [-9, -26, 3, 2.2], [9, 26, 3, 2.2], [27, -13, 2.8, 4.4], [-27, 13, 2.8, 4.4],
   ],
   spawns: {
@@ -88,7 +93,8 @@ describe('Pass 27 world identity contract', () => {
     // |x| = 12, a class deleted with the maze; the v3 street crates at
     // (+/-12, -/+2) are the new mid-street furniture, not a fin return
     // (different z, different size, frozen above).
-    expect(COVER_LAYOUT.length).toBe(6);
+    // v5: 8 rows - the street pair split into the low+tall stair crates.
+    expect(COVER_LAYOUT.length).toBe(8);
   });
 
   it('keeps cover rotationally paired under 180-degree symmetry', () => {

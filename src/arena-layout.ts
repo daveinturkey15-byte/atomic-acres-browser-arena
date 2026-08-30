@@ -119,8 +119,10 @@ export const COVER_LAYOUT: ReadonlyArray<readonly [number, number, number, numbe
   // v5 (owner 2026-08-30): the street pair becomes a two-step STAIRWAY onto
   // the bus roof - a 0.75 m low crate and a 1.5 m tall crate flanking each
   // bus end (ground -> low -> tall -> 2.25 roof, every rise the proven jump).
+  // Tall pair sits at |z| 1.6 (not 1.3): at 1.3 its corner clipped the
+  // parked vans' standable cover cells by 0.11 m (HF-383 traversal gate).
   [-10.1, -1.3, 1.7, 2.2], [10.1, 1.3, 1.7, 2.2],
-  [-8.1, -1.3, 1.7, 2.2], [8.1, 1.3, 1.7, 2.2],
+  [-8.1, -1.6, 1.7, 2.2], [8.1, 1.6, 1.7, 2.2],
   [-9, -26, 3, 2.2], [9, 26, 3, 2.2], [27, -13, 2.8, 4.4], [-27, 13, 2.8, 4.4],
 ]);
 
