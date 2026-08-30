@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
+import { buildArena } from './map';
 import { BLENDER_ARENA_ASSET, enforceAtomicMaterialDepthContract, mirrorAtomicCollisionAuditVisuals, proceduralArenaRootVisible } from './blender-environment';
 import { definition as atomicAcresVisualDefinition } from './rendering/arenas/atomic-acres';
 
@@ -99,7 +100,10 @@ describe('Quality Graphics environment asset', () => {
     expect(buffer.byteLength).toBeLessThan(7_500_000);
     // DECLUTTER 2026-08-29: campus architecture left the bake (-1 merged mesh,
     // -1 material, -7,328 triangles).
-    expect(gltf.meshes?.length).toBe(44);
+    // Re-pinned 2026-08-30 (owner: "bus glass isnt breaking with shooting"):
+    // +10 meshes, the ten breakable bus window panes the GLB must now author
+    // so Quality Graphics can bind the same windows gameplay registers.
+    expect(gltf.meshes?.length).toBe(54);
     expect(gltf.materials?.length).toBe(28);
     expect(gltf.images).toHaveLength(33);
     expect(gltf.textures).toHaveLength(33);
@@ -107,8 +111,10 @@ describe('Quality Graphics environment asset', () => {
       material.normalTexture && material.pbrMetallicRoughness?.metallicRoughnessTexture)).toHaveLength(20);
     expect(gltf.images?.every((image) => typeof image.bufferView === 'number' && image.uri === undefined)).toBe(true);
     expect(gltf.buffers?.every((bufferInfo) => !bufferInfo.uri)).toBe(true);
-    expect(semanticWindows).toHaveLength(6);
-    expect(new Set(semanticWindows.map((node) => node.extras?.atomic_window_id)).size).toBe(6);
+    // Re-pinned 2026-08-30: 6 house windows + 10 breakable bus panes. Derived
+    // from the gameplay authority so it tracks the map instead of a literal.
+    expect(semanticWindows).toHaveLength(buildArena(new THREE.Scene()).breakableWindows.length);
+    expect(new Set(semanticWindows.map((node) => node.extras?.atomic_window_id)).size).toBe(buildArena(new THREE.Scene()).breakableWindows.length);
     expect(auditedApertures).toHaveLength(16);
     expect(new Set(auditedApertures.map((node) => node.extras?.atomic_aperture_id)).size).toBe(16);
     expect(auditedApertures.every((node) => node.extras?.atomic_aperture_clear === true)).toBe(true);
@@ -222,9 +228,13 @@ describe('Quality Graphics environment asset', () => {
       schema: string;
       houses: Array<{ solids: Array<{ id: string; kind: string; breakable: boolean }> }>;
     };
-    const expected = spec.houses.flatMap((house) => house.solids)
-      .filter((solid) => solid.kind === 'glass' && solid.breakable)
-      .map((solid) => solid.id)
+    // Re-pinned 2026-08-30: the expected set is no longer "house glass solids"
+    // - it is every breakable window the GAMEPLAY map registers, which is
+    // exactly what blender-environment.ts demands of the GLB at runtime. The
+    // old house-only derivation is why ten new bus panes could be added to
+    // the map and silently reject the whole Quality arena at load.
+    const expected = buildArena(new THREE.Scene()).breakableWindows
+      .map((pane) => pane.id)
       .sort();
     const actual = (gltf.nodes ?? [])
       .map((node) => node.extras?.atomic_window_id)

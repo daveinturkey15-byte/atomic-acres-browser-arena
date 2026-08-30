@@ -283,7 +283,8 @@ def add_torus(name: str, position, major: float, minor: float, material, rotatio
     return obj
 
 
-def add_transit_bus(prefix: str, centre, length: float, body_material, destination: str, along: str = "z"):
+def add_transit_bus(prefix: str, centre, length: float, body_material, destination: str, along: str = "z",
+                    window_semantic_prefix: str | None = None):
     """Build a complete original bus asset around an existing collision footprint."""
     x, z = centre
     before = {obj.name for obj in env.objects}
@@ -334,11 +335,33 @@ def add_transit_bus(prefix: str, centre, length: float, body_material, destinati
     add_box(f"{prefix}_front_grille", [x, 0.45, z - half - 0.16], [2.35, 0.3, 0.08], M["metal_light"], 0.03)
     for grille_x in (-0.8, -0.4, 0, 0.4, 0.8):
         add_box(f"{prefix}_grille_slot_{grille_x}", [x + grille_x, 0.45, z - half - 0.26], [0.06, 0.22, 0.03], M["metal"], 0.01)
-    window_count = 5 if length > 12 else 4
+    # v6 (owner 2026-08-30): the side glass is no longer an evenly spaced
+    # decorative row. It mirrors the TypeScript BREAKABLE panes bay-for-bay -
+    # same segment split around the door apertures, same bay count, same
+    # widths - and carries their semantic ids, so the Quality GLB binds the
+    # same windows the authored path does. Without this the runtime rejects
+    # the whole GLB ("missing semantic windows") and every Quality player
+    # silently drops to the fallback art.
+    door_half = 0.85
+    door_x = 2.8
     for side in (-1, 1):
-        for index in range(window_count):
-            wz = z - half + 1.5 + index * ((length - 3.0) / max(1, window_count - 1))
-            add_box(f"{prefix}_side_window_{side}_{index}", [x + side * 2.53, 1.6, wz], [0.07, 0.9, 1.62], M["glass"], 0.025)
+        side_name = "north" if side < 0 else "south"
+        door_centre = -side * door_x
+        segments = ((-half, door_centre - door_half), (door_centre + door_half, half))
+        for from_x, to_x in segments:
+            seg_label = "a" if from_x < door_centre else "b"
+            seg_width = to_x - from_x
+            bays = max(1, int(seg_width / 2.1 + 0.5))
+            bay_width = seg_width / bays
+            for bay in range(bays):
+                bay_centre = from_x + bay_width * (bay + 0.5)
+                semantic = (f"{window_semantic_prefix}-{side_name}-{seg_label}-{bay}"
+                            if window_semantic_prefix else None)
+                add_box(
+                    f"{prefix}_side_window_{side_name}_{seg_label}_{bay}",
+                    [x + side * 2.82, 1.6, z - bay_centre],
+                    [0.12, 1.0, bay_width], M["glass"], 0.025, semantic=semantic,
+                )
         add_box(f"{prefix}_side_identity_stripe_{side}", [x + side * 2.64, 0.8, z], [0.06, 0.16, length - 0.7], M["trim"], 0.018)
         add_box(f"{prefix}_side_sweep_{side}", [x + side * 2.67, 0.95, z + 0.35], [0.05, 0.28, length - 2.2], body_material, 0.025)
         # v4: frames trace the OPEN apertures at local z = side*2.8; the old
@@ -626,6 +649,7 @@ add_transit_bus(
     "P32_BUS_ATOM_LINER",
     (central_bus["position"][0], central_bus["position"][2]),
     central_bus["length"], M["yellow"], "ATOM_LINER_86", along="x",
+    window_semantic_prefix="central-bus-pane",
 )
 
 # Waist-high yard fencing, paired by rotation, matching the TypeScript colliders.
