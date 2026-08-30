@@ -127,6 +127,15 @@ import {
 } from './additional-maps';
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
+import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
+import {
+  DOMINATION_TIME_LIMIT_MS,
+  DOMINATION_WIN_SCORE,
+  advanceDomination,
+  createDominationState,
+  dominationObjectiveFor,
+  type DominationState,
+} from './domination-mode';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -3230,6 +3239,9 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   'skyline-terminal': buildSkylineTerminal,
   farcrysis: buildFarcrysis,
   'high-seas': buildHighSeas,
+  // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
+  test1: buildTest1,
+  test2: buildTest2,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -7233,6 +7245,15 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
         respawnAtHostTimeMs: Math.max(0, target.respawnAt),
       }))
     : null;
+  const domination = phase === 'active' && privateMatchConfig.mode === 'domination' && dominationState
+    ? Object.freeze({
+      zones: dominationState.zones.map((zone) => Object.freeze({
+        id: zone.id, owner: zone.owner, capturingTeam: zone.capturingTeam,
+        progress: Math.max(0, Math.min(1, zone.progress)), contested: zone.contested,
+      })),
+      scores: [dominationState.scores[0], dominationState.scores[1]] as const,
+    })
+    : null;
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -7246,6 +7267,7 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     matchClock,
     testBayDoor,
     testDummies,
+    domination,
   };
 }
 
@@ -8709,7 +8731,7 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // enforces. During countdown, only the JOINER is placed (onto the smaller
     // side); already-ready members keep their teams and their readiness -
     // re-stamping the whole roster mid-countdown would un-ready everyone.
-    if (joiningNewMember && privateMatchConfig.mode === 'tdm') {
+    if (joiningNewMember && privateMatchConfig.mode !== 'ffa') {
       if (currentPhase === 'waiting') {
         for (const member of prescribeTeams([...hostLobbyMembers.values()])) {
           hostLobbyMembers.set(member.id, { ...member, ready: false });
@@ -8911,7 +8933,7 @@ function applyHostLobbyConfig(config: PrivateMatchConfig): void {
   network.setCapacity(config.capacity);
   // HF-328: entering TDM prescribes teams deterministically and stamps the canonical
   // AQUA/CORAL identities, rather than leaving it to the autoBalance toggle.
-  const nextMembers = config.mode === 'tdm'
+  const nextMembers = config.mode !== 'ffa'
     ? prescribeTeams([...hostLobbyMembers.values()])
     : [...hostLobbyMembers.values()];
   for (const member of nextMembers) hostLobbyMembers.set(member.id, { ...member, ready: false });
@@ -9896,6 +9918,12 @@ function renderPrivateLobby(): void {
   const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
   const botInput = element<HTMLSelectElement>('#lobby-bots');
   const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
+  const dominationOption = modeInput.querySelector<HTMLOptionElement>('option[value="domination"]');
+  if (dominationOption) {
+    const lobbyArena = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+    dominationOption.disabled = lobbyArena !== 'test2';
+    dominationOption.textContent = lobbyArena === 'test2' ? 'DOMINATION' : 'DOMINATION (TEST2)';
+  }
   modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
   capacityInput.value = String(capacity);
   botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
@@ -10699,7 +10727,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false }));
   sprite.userData.presentationOnly = true;
   sprite.raycast = () => {};
-  sprite.visible = privateMatchMode === 'tdm' && snapshot.team === player.team;
+  sprite.visible = privateMatchMode !== 'ffa' && snapshot.team === player.team;
   sprite.position.y = 2.5;
   sprite.scale.set(2.4, 0.6, 1);
   root.add(sprite);
@@ -15137,7 +15165,8 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
 }
 
 function activeSpawnMode(): SpawnMode {
-  return gameMode === 'solo' ? 'solo' : privateMatchMode;
+  // Domination spawns exactly like TDM: home end, flip under pressure.
+  return gameMode === 'solo' ? 'solo' : privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
 }
 
 function recentSpawnDeathPoints(now = performance.now()): THREE.Vector3[] {
@@ -16082,8 +16111,8 @@ async function startGame(
   element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
     : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
-  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
+  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+  element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
@@ -17249,7 +17278,7 @@ function dmrThermalSolidOccluded(
 }
 
 function dmrThermalContacts(): readonly DmrThermalContact[] {
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   const observer = camera.position;
   dmrThermalContactBuffer.length = 0;
   for (const remote of remotes.values()) {
@@ -17257,7 +17286,7 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
     const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
     contact.position.copy(remote.target);
     contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
+    contact.relation = mode !== 'ffa' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
     contact.living = remote.snapshot.hp > 0;
     if (!contact.occlusionSampled
       || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
@@ -17269,7 +17298,7 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
     const contact = acquireDmrThermalContact(bot.id, 'bot');
     contact.position.copy(bot.position);
     contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
+    contact.relation = mode !== 'ffa' && bot.team === player.team ? 'friendly' : 'hostile';
     contact.living = bot.alive;
     if (!contact.occlusionSampled
       || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
@@ -17328,10 +17357,10 @@ function updateDmrThermal(): void {
  */
 function prewarmThermalGhostPipelines(): void {
   const targets: ThermalGhostTarget[] = [];
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
-    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    const relation = mode !== 'ffa' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({
       id: remote.snapshot.id,
       relation,
@@ -17342,7 +17371,7 @@ function prewarmThermalGhostPipelines(): void {
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
-    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
+    const relation = mode !== 'ffa' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({
       id: bot.id,
       relation,
@@ -17380,7 +17409,7 @@ function updateThermalGhosts(): void {
     railgunPresentation.syncExactOperatorReveal(false, null);
     return;
   }
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   const targets: ThermalGhostTarget[] = [];
   const observer = { id: player.id, team: player.team };
   const addTarget = (
@@ -17394,7 +17423,7 @@ function updateThermalGhosts(): void {
     if (targets.some((target) => target.id === id)) return;
     if (railgunRevealActive && !dmrThermalActive && !chopperThermal
       && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
-    const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
+    const relation = mode !== 'ffa' && team === player.team ? 'friendly' as const : 'hostile' as const;
     targets.push({ id, relation, root, lifeId, continuityId });
   };
   for (const remote of remotes.values()) {
@@ -17459,7 +17488,7 @@ function updateRailgun(now: number): void {
 
 /** Hostile combatants to reveal through walls while the railgun scope is up. */
 function railgunThermalContacts(): RailgunThermalContact[] {
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   const observer = { id: player.id, team: player.team };
   const contacts: RailgunThermalContact[] = [];
   for (const remote of remotes.values()) {
@@ -18806,6 +18835,24 @@ function selectBotTacticalWaypoint(
   targetAlive = player.alive,
 ): number {
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
+  // Owner 2026-08-30: in Domination, bots play the objective - head for the
+  // patrol point nearest the team's next zone (nearest non-owned; defend
+  // when all owned) instead of shadowing the player.
+  if (dominationModeActive() && dominationState) {
+    const objective = dominationObjectiveFor(dominationState, bot.team, [bot.position.x, bot.position.y, bot.position.z]);
+    if (objective && arena.patrolPoints.length > 0) {
+      let bestIndex = 0;
+      let bestDistance = Infinity;
+      for (let index = 0; index < arena.patrolPoints.length; index += 1) {
+        const point = arena.patrolPoints[index]!;
+        const dx = point.x - objective.centre[0];
+        const dz = point.z - objective.centre[2];
+        const distance = dx * dx + dz * dz;
+        if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
+      }
+      return bestIndex;
+    }
+  }
   return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
     const eye = waypointEyePoint(point);
     return {
@@ -21975,6 +22022,107 @@ function killstreakLineOfSight(
     { x: to[0], y: to[1], z: to[2] },
     box,
   ));
+}
+
+// ---------------------------------------------------------------------------
+// Domination (owner 2026-08-30, Test2): host/solo-authoritative zone truth.
+// ---------------------------------------------------------------------------
+let dominationState: DominationState | null = null;
+const DOMINATION_TEAM_COLORS: Readonly<Record<'aqua' | 'coral' | 'neutral', number>> = Object.freeze({
+  aqua: 0x37d6d6, coral: 0xe4574f, neutral: 0xcccccc,
+});
+
+/** Domination is Test2's headline: always in solo, host-selected in lobbies. */
+function dominationModeActive(): boolean {
+  if (selectedArena.id !== 'test2' || !gameStarted) return false;
+  return gameMode === 'solo' || privateMatchMode === 'domination';
+}
+
+function dominationDisplayState(): { zones: ReadonlyArray<{ id: string; owner: Team | null; capturingTeam: Team | null; progress: number; contested: boolean }>; scores: readonly [number, number] } | null {
+  if (!dominationModeActive()) return null;
+  if (network.role === 'client') {
+    const replicated = privateLobbySnapshot?.domination;
+    return replicated ? { zones: replicated.zones, scores: replicated.scores } : null;
+  }
+  if (!dominationState) return null;
+  return {
+    zones: dominationState.zones.map((zone) => ({
+      id: zone.id, owner: zone.owner, capturingTeam: zone.capturingTeam, progress: zone.progress, contested: zone.contested,
+    })),
+    scores: dominationState.scores,
+  };
+}
+
+function advanceDominationAuthority(now: number): void {
+  if (!dominationModeActive() || network.role === 'client') {
+    dominationState = null;
+    return;
+  }
+  if (matchState.phase !== 'active') {
+    if (matchState.phase === 'warmup') dominationState = null;
+    return;
+  }
+  if (!dominationState) dominationState = createDominationState(TEST2_DOMINATION_ZONES, now);
+  const presences = killstreakWorldState().targets
+    .filter((target) => target.kind === 'player' || target.kind === 'bot')
+    .map((target) => ({ team: target.team, alive: target.alive, position: target.position }));
+  const events = advanceDomination(dominationState, presences, now);
+  for (const event of events) {
+    if (event.kind === 'captured') {
+      addFeed(`${event.by === 0 ? 'AQUA' : 'CORAL'} CAPTURED ${event.zone}`, event.by === 0 ? 'aqua' : 'coral');
+    } else if (event.kind === 'neutralized') {
+      addFeed(`${event.by === 0 ? 'AQUA' : 'CORAL'} NEUTRALIZED ${event.zone}`, event.by === 0 ? 'aqua' : 'coral');
+    }
+  }
+}
+
+/** Tint the authored Test2 flag banners to the owning squad's colour. */
+function presentDominationFlags(): void {
+  const display = dominationDisplayState();
+  if (!display) return;
+  for (const zone of display.zones) {
+    const banner = arena.root.getObjectByName(`test2-zone-flag-banner-${zone.id}`) as THREE.Mesh | undefined;
+    const material = banner?.material as THREE.MeshStandardMaterial | undefined;
+    if (!material) continue;
+    const tint = zone.owner === 0 ? DOMINATION_TEAM_COLORS.aqua : zone.owner === 1 ? DOMINATION_TEAM_COLORS.coral : DOMINATION_TEAM_COLORS.neutral;
+    if (material.color.getHex() !== tint) material.color.setHex(tint);
+  }
+}
+
+function ensureDominationHud(): HTMLElement {
+  let strip = document.getElementById('domination-zones');
+  if (!strip) {
+    strip = document.createElement('div');
+    strip.id = 'domination-zones';
+    for (const zoneId of ['A', 'B', 'C']) {
+      const pip = document.createElement('span');
+      pip.className = 'domination-pip';
+      pip.dataset.zone = zoneId;
+      pip.textContent = zoneId;
+      strip.appendChild(pip);
+    }
+    element<HTMLElement>('#hud').appendChild(strip);
+  }
+  return strip;
+}
+
+function updateDominationHud(): void {
+  const display = dominationDisplayState();
+  const existing = document.getElementById('domination-zones');
+  if (!display) {
+    if (existing) existing.hidden = true;
+    return;
+  }
+  const strip = ensureDominationHud();
+  strip.hidden = false;
+  for (const zone of display.zones) {
+    const pip = strip.querySelector<HTMLElement>(`[data-zone="${zone.id}"]`);
+    if (!pip) continue;
+    pip.dataset.owner = zone.owner === 0 ? 'aqua' : zone.owner === 1 ? 'coral' : 'neutral';
+    pip.dataset.contested = String(zone.contested);
+    pip.style.setProperty('--capture-progress', zone.progress.toFixed(2));
+  }
+  presentDominationFlags();
 }
 
 function killstreakWorldState(): KillstreakWorld {
@@ -25306,9 +25454,17 @@ function endTimedMatchFromAuthority(now: number): void {
 function updateMatchState(now: number): void {
   if (matchAdmissionPresentationPaused) return;
   const previous = matchState.phase;
-  const scores = teamScores();
-  const rules = currentMatchRules();
+  // Owner 2026-08-30: Domination feeds its zone-tick points and its own
+  // win-score/timer through the SAME team advance - advanceMatch's
+  // higher-team-wins logic IS the Domination win rule.
+  advanceDominationAuthority(now);
+  const dominationDisplay = dominationDisplayState();
+  const scores: [number, number] = dominationDisplay ? [dominationDisplay.scores[0], dominationDisplay.scores[1]] : teamScores();
+  const rules = dominationDisplay
+    ? { durationMs: DOMINATION_TIME_LIMIT_MS, scoreLimit: DOMINATION_WIN_SCORE }
+    : currentMatchRules();
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
+  updateDominationHud();
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
     .filter((score) => !score.id.startsWith('host-bot-')));
   matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
@@ -25952,10 +26108,12 @@ function updateHud(now: number): void {
   }
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
+  const dominationHudState = dominationDisplayState();
   const hudScores: [number, number] = selectedArena.id === 'gun-range'
     ? [rangeScore, targetHits]
-    : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+    : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
+      : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
+  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);

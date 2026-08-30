@@ -263,3 +263,12 @@ describe('private match lobby', () => {
     expect(latencyQuality(220)).toBe('poor');
   });
 });
+
+describe('Domination lobby contract (owner 2026-08-30)', () => {
+  it('admits Domination only on Test2', () => {
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test2', mode: 'domination' })).toBe(true);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'atomic-acres', mode: 'domination' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test1', mode: 'domination' })).toBe(false);
+    expect(isPrivateMatchConfig({ ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'test2', mode: 'tdm' })).toBe(true);
+  });
+});

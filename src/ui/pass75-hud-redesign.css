@@ -599,3 +599,36 @@ html[data-reduced-sensory='true'] #damage-direction i::before {
 #hud[data-support-possessed="true"] #support-block {
   opacity: 0.55;
 }
+
+/* Owner 2026-08-30: Domination zone pips (Test2). Created lazily by
+   ensureDominationHud(); coloured by data-owner, ringed by capture progress. */
+#domination-zones {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+#domination-zones .domination-pip {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  color: #10181a;
+  border-radius: 6px;
+  background:
+    conic-gradient(rgba(255, 255, 255, 0.85) calc(var(--capture-progress, 0) * 360deg), rgba(255, 255, 255, 0.12) 0)
+    border-box;
+  border: 2px solid transparent;
+}
+#domination-zones .domination-pip::before { content: none; }
+#domination-zones .domination-pip[data-owner="neutral"] { background-color: #b9c2c6; }
+#domination-zones .domination-pip[data-owner="aqua"] { background-color: #37d6d6; }
+#domination-zones .domination-pip[data-owner="coral"] { background-color: #e4574f; }
+#domination-zones .domination-pip[data-contested="true"] { animation: domination-contested 0.8s steps(2, end) infinite; }
+@keyframes domination-contested { 50% { filter: brightness(1.7); } }

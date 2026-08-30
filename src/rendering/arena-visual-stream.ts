@@ -15,6 +15,9 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   // HF-359 (Pass 74): farcrysis revived from the Pass 69 hidden lane.
   'farcrysis': () => import('./arenas/farcrysis'),
   'high-seas': () => import('./arenas/high-seas'),
+  // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
+  'test1': () => import('./arenas/test1'),
+  'test2': () => import('./arenas/test2'),
 });
 
 export async function loadArenaVisualModule(

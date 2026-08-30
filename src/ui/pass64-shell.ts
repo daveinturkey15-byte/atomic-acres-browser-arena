@@ -147,7 +147,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="private-lobby-heading"><span><small>PRIVATE MATCH</small><strong id="private-lobby-title">WAITING ROOM</strong></span><b id="lobby-capacity-label">1 / 4</b></div>
         <div class="lobby-settings">
           <label>MAP<select id="lobby-arena">${SELECTABLE_ARENAS.map((entry) => `<option value="${entry.id}">${entry.displayName.toUpperCase()}</option>`).join('')}</select></label>
-          <label>MODE<select id="lobby-mode"><option value="ffa" selected>FREE FOR ALL</option><option value="tdm">TEAM DEATHMATCH</option></select></label>
+          <label>MODE<select id="lobby-mode"><option value="ffa" selected>FREE FOR ALL</option><option value="tdm">TEAM DEATHMATCH</option><option value="domination">DOMINATION</option></select></label>
           <!-- HF-328: squad identity is prescribed (AQUA/CORAL colour names); the free name input and colour picker were removed. Swap-after stays available via the host-checked SWAP SIDES request. -->
           <div class="lobby-squad-identity" id="lobby-squad-identity"><small>SQUAD</small><strong id="lobby-squad-label" style="--lobby-squad-color:#55e6ff">AQUA</strong></div>
           <button id="lobby-swap-sides" type="button" disabled title="Request to swap sides — the host accepts only swaps that keep teams within one player.">SWAP SIDES</button>

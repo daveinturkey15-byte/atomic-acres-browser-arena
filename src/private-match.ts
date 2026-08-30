@@ -14,7 +14,7 @@ import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 re
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
-export type MatchMode = 'tdm' | 'ffa';
+export type MatchMode = 'tdm' | 'ffa' | 'domination';
 export type LobbyPhase = 'waiting' | 'countdown' | 'active' | 'ended';
 export type MultiplayerArenaId = ArenaId;
 
@@ -91,6 +91,9 @@ export type LobbySnapshot = Readonly<{
   /** HF-347: absent on snapshots from hosts predating the dummy authority;
    * null outside an active gun-range match. Guests reconcile every heartbeat. */
   testDummies?: readonly GunRangeDummySnapshotEntry[] | null;
+  /** Owner 2026-08-30: present on active Domination matches; null otherwise.
+   * Optional so pre-Domination hosts still validate. */
+  domination?: DominationLobbyState | null;
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
@@ -104,6 +107,39 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   durationMs: 300_000,
   scoreLimit: null,
 });
+
+/** Owner 2026-08-30: replicated Domination zone truth (host-authoritative). */
+export type DominationZoneSnapshotEntry = Readonly<{
+  id: 'A' | 'B' | 'C';
+  owner: Team | null;
+  capturingTeam: Team | null;
+  /** 0..1 toward the capturing team's current ownership flip. */
+  progress: number;
+  contested: boolean;
+}>;
+export type DominationLobbyState = Readonly<{
+  zones: readonly DominationZoneSnapshotEntry[];
+  scores: readonly [number, number];
+}>;
+
+export function isDominationLobbyState(value: unknown): value is DominationLobbyState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Record<string, unknown>;
+  if (!Array.isArray(state.zones) || state.zones.length !== 3) return false;
+  const ids = new Set<string>();
+  for (const zone of state.zones as Array<Record<string, unknown>>) {
+    if (!zone || typeof zone !== 'object') return false;
+    if (zone.id !== 'A' && zone.id !== 'B' && zone.id !== 'C') return false;
+    ids.add(zone.id as string);
+    if (zone.owner !== null && zone.owner !== 0 && zone.owner !== 1) return false;
+    if (zone.capturingTeam !== null && zone.capturingTeam !== 0 && zone.capturingTeam !== 1) return false;
+    if (typeof zone.progress !== 'number' || !Number.isFinite(zone.progress) || zone.progress < 0 || zone.progress > 1) return false;
+    if (typeof zone.contested !== 'boolean') return false;
+  }
+  if (ids.size !== 3) return false;
+  return Array.isArray(state.scores) && state.scores.length === 2
+    && (state.scores as unknown[]).every((score) => typeof score === 'number' && Number.isSafeInteger(score) && score >= 0 && score <= 100_000);
+}
 
 export const REJOIN_GRACE_MS = 90_000;
 export const MAX_PRIVATE_MATCH_DURATION_MS = 900_000;
@@ -126,7 +162,8 @@ export function isRoomCapacity(value: unknown): value is RoomCapacity {
 }
 
 export function isMatchMode(value: unknown): value is MatchMode {
-  return value === 'tdm' || value === 'ffa';
+  // Owner 2026-08-30: Domination ships with the Test2 arena.
+  return value === 'tdm' || value === 'ffa' || value === 'domination';
 }
 
 /** HF-377: the only kill limits a lobby can publish. `null` means uncapped and
@@ -162,7 +199,9 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
         && config.hostedBotCount === 0
         && config.autoBalance === false
         && config.durationMs === GUN_RANGE_ROUND_MS
-        && config.scoreLimit === null);
+        && config.scoreLimit === null)
+    // Owner 2026-08-30: Domination is authored for Test2's three zones only.
+    && (config.mode !== 'domination' || config.arenaId === 'test2');
 }
 
 export function isLobbyMember(value: unknown): value is LobbyMember {
@@ -279,11 +318,17 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
         && snapshot.testDummies.every(isGunRangeDummySnapshotEntry)
         && new Set((snapshot.testDummies as GunRangeDummySnapshotEntry[]).map((entry) => entry.id)).size === snapshot.testDummies.length
       : snapshot.testDummies === null);
+  // Owner 2026-08-30: Domination truth rides the lobby heartbeat. Tolerate
+  // absence (older host); require well-formed state on active Domination.
+  const activeDomination = snapshot.config.mode === 'domination' && snapshot.phase === 'active';
+  const validDomination = snapshot.domination === undefined
+    || (activeDomination ? isDominationLobbyState(snapshot.domination) : snapshot.domination === null);
   return validHostStart && validEpochStart
     && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null)
     && validMatchClock
     && validTestDummies
-    && validTestBayDoor;
+    && validTestBayDoor
+    && validDomination;
 }
 
 /**

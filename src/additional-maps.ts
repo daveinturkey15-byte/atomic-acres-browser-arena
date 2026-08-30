@@ -25,7 +25,7 @@ import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
 import { applyBotEmissiveBrightness } from './operator-model';
 
-type Builder = {
+export type Builder = {
   root: THREE.Group;
   colliders: Box2[];
   physicsColliders: Box2[];
@@ -44,7 +44,7 @@ export const GUN_RANGE_FIRING_LINE_BARRIER: Readonly<Box2> = Object.freeze({
   maxY: 8,
 });
 
-const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
+export const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
 type RustSurfaceKind = 'deck' | 'oxidised' | 'painted-steel';
@@ -87,7 +87,7 @@ function applyRustSurface(material: THREE.MeshStandardMaterial, kind: RustSurfac
   return material;
 }
 
-function box(
+export function box(
   builder: Builder,
   name: string,
   position: [number, number, number],
@@ -286,7 +286,7 @@ function skylineOpeningParityAudit(
  * are deliberately excluded: only non-solid, non-raycast presentation detail
  * enters these static batches.
  */
-function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
+export function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
   const groups = new Map<string, {
     material: THREE.Material;
     castShadow: boolean;
@@ -353,7 +353,7 @@ function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentati
   };
 }
 
-function emptyTelemetry(): ArenaMap['houseTelemetry'] {
+export function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   return {
     houses: 0,
     groundRooms: 0,
@@ -366,7 +366,7 @@ function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   };
 }
 
-function spawnRecord(team0: readonly [number, number][], team1: readonly [number, number][]): Record<Team, THREE.Vector3[]> {
+export function spawnRecord(team0: readonly [number, number][], team1: readonly [number, number][]): Record<Team, THREE.Vector3[]> {
   return {
     0: team0.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
     1: team1.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
