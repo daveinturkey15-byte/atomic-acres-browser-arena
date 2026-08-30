@@ -360,7 +360,11 @@ describe('first-person anatomical presentation', () => {
           ...REST_POSE,
           prone: true,
           surfaceRetreat: 0.7,
-          surfaceLift: 0.2,
+          // 2026-08-30 re-pin: 0.2 is now the flat-ground prone BASELINE
+          // (which must not fold at all); a genuine under-cover squeeze sits
+          // past it. The deep-contact contract this test defends is about the
+          // squeeze.
+          surfaceLift: 0.29,
         });
       }
       const state = presentation.presentationState();

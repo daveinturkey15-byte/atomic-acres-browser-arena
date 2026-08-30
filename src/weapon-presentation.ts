@@ -3254,7 +3254,7 @@ export class WeaponPresentation {
     const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
-      HIP_VIEWMODEL_POSITION.y + this.contactResponse.additionalLiftMeters
+      HIP_VIEWMODEL_POSITION.y + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters
         - this.contactResponse.additionalDropMeters,
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
@@ -5038,7 +5038,7 @@ export class WeaponPresentation {
       viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral
         + this.stancePose.lateralMeters * stanceHip,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
-        + this.contactResponse.additionalLiftMeters - this.contactResponse.additionalDropMeters
+        + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters - this.contactResponse.additionalDropMeters
         + switchDrop + reloadStage.lift + floorActionClearance
         - presentationKick * 0.095
         // HF-388: the landing dip is now an authored attack-rebound-settle

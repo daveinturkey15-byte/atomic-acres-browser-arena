@@ -37,20 +37,15 @@ function deferredQueueProbe(publishCompletion: () => void): Readonly<{
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Pass 64 render runtime boundary', () => {
-  it('makes WebGPU fail-closed by default and keeps WebGL2 behind an explicit compatibility query', () => {
-    expect(resolveRenderRuntimeRequest('')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu&requireWebGPU=1')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgl2')).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-  });
-
-  it('falls back to WebGL2 on browsers without WebGPU unless WebGPU is explicitly forced', () => {
-    // Firefox/Safari/older Edge expose no navigator.gpu: the default request
-    // must gracefully use WebGL2 so the game still runs there.
-    expect(resolveRenderRuntimeRequest('', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-    expect(resolveRenderRuntimeRequest('?renderer=webgl2', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-    // An explicit ?renderer=webgpu stays a hard contract even when unavailable.
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu', false)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+  it('is WebGPU-only: every request spelling resolves to the fail-closed WebGPU contract', () => {
+    // Owner 2026-08-30: "retire all webgl2 stuff, full webgpu, no fallback."
+    // A browser without a working WebGPU device gets the requirement screen
+    // at renderer init; nothing routes to a second engine any more - not the
+    // retired ?renderer=webgl2 spelling, not missing navigator.gpu.
+    for (const search of ['', '?renderer=webgpu', '?renderer=webgpu&requireWebGPU=1', '?renderer=webgl2']) {
+      expect(resolveRenderRuntimeRequest(search)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+      expect(resolveRenderRuntimeRequest(search, false)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+    }
   });
 
   it('maps every exposed tone-mapping label to a real Three renderer mode', () => {

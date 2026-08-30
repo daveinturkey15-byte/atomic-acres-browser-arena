@@ -55,6 +55,11 @@ export type ViewmodelContactResponse = Readonly<{
   yawRadians: number;
   rollRadians: number;
   additionalLiftMeters: number;
+  /** Constant presentation lift while prone. Reload/recoil dips ride up to
+   * ~5 cm lower than the settled pose; the old full-fold lift absorbed them
+   * by accident, the flat-prone baseline does not. Kept OUT of
+   * additionalLiftMeters so contact-delta identities stay exact. */
+  proneFloorGuardMeters: number;
   additionalDropMeters: number;
   scale: number;
   minimumScale: number;
@@ -229,12 +234,16 @@ export function viewmodelContactResponse(
       // Carry it into the camera-space root so the complete skinned sleeves and
       // receiver remain above the prone floor instead of only reporting lift.
       + lift * floorBlend
-      // Retain the accepted wall-drop telemetry and response, while a real
-      // floor contact counter-lifts ninety-two percent of it. This keeps the
-      // connected weapon/hands above the prone plane without weakening the
-      // established high-ready/drop gate or changing gameplay authority.
-      + wallDropMeters * floorBlend * 0.92,
+      // Retain the accepted wall-drop telemetry and response, while floor
+      // contact counter-lifts ninety-two percent of it. PRONE keys the
+      // counter-lift directly: lying down, the floor plane is always 0.61 m
+      // below the eye, so a wall-contact drop must be countered even when the
+      // floor-lift blend reads zero (the 2026-08-30 baseline re-measure made
+      // flat-ground prone read zero, and the anatomy gate caught the muzzle
+      // digging 3.6 cm through the prone floor at full wall retreat).
+      + wallDropMeters * Math.max(prone ? 1 : 0, floorBlend) * 0.92,
     additionalDropMeters: wallDropMeters,
+    proneFloorGuardMeters: prone ? 0.1 : 0,
     scale: 1 - (1 - profile.minimumScale) * highReadyBlend,
     minimumScale: profile.minimumScale,
     aimAuthority: 'camera-forward-unchanged',

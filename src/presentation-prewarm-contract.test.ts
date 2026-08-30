@@ -617,7 +617,11 @@ describe('presentation prewarm startup contract', () => {
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
     expect(source).toContain("source: 'webgpu-submission' as const");
     expect(source).toContain('document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;');
-    expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
+    // 2026-08-30 re-pin: 1s tripped the on-screen error box on transient
+    // compositor hitches; 3s is a real stall. The eager scheduler-gap reset
+    // keeps its own 1s constant.
+    expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 3_000');
+    expect(source).toContain('WEBGPU_SCHEDULER_GAP_RESET_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
     expect(source).toContain('documentFocused: document.hasFocus()');
     expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now);");

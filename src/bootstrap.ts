@@ -38,54 +38,9 @@ const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
 
-/**
- * Steer a browser with a KNOWN-broken WebGPU compiler straight onto the compat route.
- *
- * The record is written by the in-game fallback after two failed deploys (measured:
- * Chrome 153 fails 9/9 un-instrumented WebGPU deploys with an internal Tint error, on
- * old builds and new alike). Without this, every session replays ~90 seconds of failed
- * attempts before recovering - which reads as "the game doesn't work", because for a
- * minute and a half it doesn't. Keyed to the FULL user agent so any browser update
- * clears it and WebGPU is tried again; an explicit ?renderer= always wins.
- */
-function applyStickyRendererFallback(): void {
-  try {
-    const raw = localStorage.getItem('atomic-acres:renderer-fallback:v1');
-    if (!raw) return;
-    const record = JSON.parse(raw) as { userAgent?: string; at?: string; shimGeneration?: number };
-    if (record.userAgent !== navigator.userAgent) {
-      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
-      return;
-    }
-    // 2026-08-30: the Tint failure's ROOT CAUSE is fixed (chained-swizzle
-    // shader shim, src/webgpu-tint-swizzle-shim.ts - deterministic repro went
-    // 10-failures-then-fallback to 0-failures on stock Chrome 153). Records
-    // written by pre-shim builds carry no shimGeneration; ignore them so the
-    // shimmed WebGPU route gets its one honest retry. A post-shim failure
-    // writes shimGeneration >= 1 and sticks as before.
-    if ((record.shimGeneration ?? 0) < 1) {
-      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
-      return;
-    }
-    // 2026-08-29: the Chrome 153 Tint race is intermittent and timing-
-    // dependent (cold network 3/3 fail, warm cache 0/4), so a fallback older
-    // than 24 h retries WebGPU rather than pinning the player to half the
-    // frame rate until a browser update happens to land.
-    const recordedAt = Date.parse(record.at ?? '');
-    if (!Number.isFinite(recordedAt) || Date.now() - recordedAt > 24 * 60 * 60 * 1_000) {
-      localStorage.removeItem('atomic-acres:renderer-fallback:v1');
-      return;
-    }
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('renderer')) return;
-    url.searchParams.set('renderer', 'webgl2');
-    window.history.replaceState(null, '', url);
-  } catch { /* Storage-less contexts keep the per-session recovery. */ }
-}
 
 async function loadLatestBuild(): Promise<void> {
   document.title = 'Nuke Town — Browser Arena FPS';
-  applyStickyRendererFallback();
   app.replaceChildren();
   await import('./main');
 }

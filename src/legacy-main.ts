@@ -419,7 +419,6 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
-import { parseRendererFallbackRecord, rendererFallbackNotice, RENDERER_FALLBACK_STORAGE_KEY } from './renderer-fallback-notice';
 import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
 import { installTintSwizzleShim } from './webgpu-tint-swizzle-shim';
@@ -1816,16 +1815,11 @@ const runtimeRequest = resolveRenderRuntimeRequest(
   window.location.search,
   typeof navigator !== 'undefined' && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined',
 );
-async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
-  return LegacyWebGlRenderRuntime.create({
-    canvas,
-    alpha: false,
-    antialias: activeRenderConfig.antialias,
-    powerPreference: 'high-performance',
-  });
-}
+// Owner 2026-08-30: WebGPU only - no WebGL2 fallback engine. A browser
+// without a working WebGPU device gets a truthful requirement screen instead
+// of half the frame rate with no explanation.
 let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
-if (runtimeRequest.requestedBackend === 'webgpu') {
+{
   // Chrome 153 Tint chained-swizzle workaround: must wrap navigator.gpu
   // BEFORE the renderer requests its device (see the shim's header for the
   // root cause and measurements).
@@ -1838,23 +1832,24 @@ if (runtimeRequest.requestedBackend === 'webgpu') {
       requireWebGPU: true,
     });
   } catch (webGpuError) {
-    // An explicit ?renderer=webgpu must fail closed (HITL contract). An
-    // auto-selected WebGPU that fails at init (present but broken adapter) falls
-    // back to WebGL2 so the game still runs on that browser/GPU combination.
-    const forcedWebGpu = new URLSearchParams(window.location.search).get('renderer') === 'webgpu';
-    if (forcedWebGpu) throw webGpuError;
     appendClientRuntimeLog({
       kind: 'error',
-      message: `WebGPU init failed, falling back to WebGL2: ${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)}`,
+      message: `WebGPU init failed: ${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)}`,
       stack: webGpuError instanceof Error ? webGpuError.stack : undefined,
     }, clientPersistentStorage());
-    renderRuntime = await createWebGl2Runtime();
+    showFatalError(new Error(
+      'This game needs WebGPU. Use a current Chrome, Edge or Firefox (Windows) - '
+      + 'or check that graphics acceleration is enabled in your browser settings. '
+      + `(${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)})`,
+    ));
+    throw webGpuError;
   }
-} else {
-  renderRuntime = await createWebGl2Runtime();
 }
-if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
-const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
+renderRuntime.assertCandidateReady();
+// WebGL2 retirement (2026-08-30): these seams stay typed so the remaining
+// legacy call sites compile as dead optional chains until their modules are
+// physically deleted in the follow-up sweep.
+const legacyRenderer = ((): THREE.WebGLRenderer | null => null)();
 function submitWebGpuFrame(
   now = performance.now(),
   force = false,
@@ -1897,35 +1892,8 @@ const gpuRetirement = createGpuRetirementScheduler({
 const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
 const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
-// Owner 2026-08-29 ("why is it still locked to 60 fps"): the sticky WebGL2
-// fallback was RIGHT but INVISIBLE - roughly half the frame rate with no
-// explanation and no way back short of DevTools. Surface it on the menu with
-// a one-click retry that clears the sticky record.
-{
-  const fallbackRecord = parseRendererFallbackRecord(
-    (() => { try { return localStorage.getItem(RENDERER_FALLBACK_STORAGE_KEY); } catch { return null; } })(),
-    navigator.userAgent,
-  );
-  const notice = rendererFallbackNotice(fallbackRecord, renderRuntime.backend);
-  if (notice.show) {
-    const banner = document.createElement('div');
-    banner.id = 'renderer-fallback-banner';
-    banner.style.cssText = 'margin:8px 12px;padding:8px 12px;border:1px solid #b98a2e;background:rgba(58,42,12,0.92);color:#e8c877;font:600 12px/1.45 system-ui;border-radius:6px;display:flex;gap:12px;align-items:center;';
-    const text = document.createElement('span');
-    text.textContent = notice.message;
-    const retry = document.createElement('button');
-    retry.textContent = notice.retryLabel;
-    retry.style.cssText = 'flex:none;padding:6px 10px;font:700 12px system-ui;background:#b98a2e;color:#1c1206;border:0;border-radius:4px;cursor:pointer;';
-    retry.addEventListener('click', () => {
-      try { localStorage.removeItem(RENDERER_FALLBACK_STORAGE_KEY); } catch { /* storage-less */ }
-      const url = new URL(window.location.href);
-      url.searchParams.delete('renderer');
-      window.location.assign(url.toString());
-    });
-    banner.append(text, retry);
-    menu.prepend(banner);
-  }
-}
+// (2026-08-30) The sticky WebGL2 fallback banner is retired with the
+// fallback itself - the renderer is WebGPU or an honest requirement screen.
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
 const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
@@ -1971,13 +1939,8 @@ const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
-const atomicSignal = renderRuntime.backend === 'webgl2'
-  ? new AtomicSignalPass(renderRuntime.renderer, renderProfile, (reason) => {
-      document.documentElement.classList.remove('atomic-signal-render');
-      document.documentElement.dataset.atomicSignal = 'fallback';
-      console.warn('[Nuke Town Atomic Signal fallback]', reason);
-    }, atomicSignalBypass)
-  : null;
+const atomicSignal = ((): AtomicSignalPass | null => null)();
+void atomicSignalBypass;
 const grassQuery = new URLSearchParams(window.location.search).get('grass');
 const mistQuery = new URLSearchParams(window.location.search).get('mist');
 const cloudsQuery = new URLSearchParams(window.location.search).get('clouds');
@@ -1993,23 +1956,12 @@ const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQu
 const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
 // Both renderer backends own grade, dither/grain and vignette in their GPU
 // pipeline. CSS post overlays must never double-apply on the WebGPU route.
-document.documentElement.classList.toggle(
-  'atomic-signal-render',
-  renderRuntime.backend === 'webgpu' || (atomicSignal?.telemetry().enabled ?? false),
-);
+document.documentElement.classList.toggle('atomic-signal-render', true);
 document.documentElement.dataset.atomicSignal = atomicSignal?.telemetry().enabled ? 'active' : 'tsl-hdr';
 let webglContextLost = false;
 let webglContextLosses = 0;
 let webglContextRestorations = 0;
 let staticShadowDynamicRefreshes = 0;
-if (renderRuntime.backend === 'webgl2') {
-  renderRuntime.renderer.domElement.addEventListener('webglcontextlost', (event) => {
-    event.preventDefault();
-    webglContextLost = true;
-    webglContextLosses += 1;
-    document.documentElement.dataset.webglContext = 'lost';
-  });
-}
 document.documentElement.dataset.webglContext = 'ready';
 // Both public profiles can reduce their internal framebuffer when sustained
 // frame time exceeds the detected display budget. Shadows disable
@@ -2035,7 +1987,9 @@ if (renderRuntime.backend === 'webgpu') {
     onRepair: (result, sweepsUsed) => {
       document.documentElement.dataset.tintPipelineRepairs = String(sweepsUsed);
       document.documentElement.dataset.tintPipelineLastPurge = String(result.purged);
-      setStatus(`Recovered ${result.purged} shader pipeline${result.purged === 1 ? '' : 's'} after a graphics driver hiccup.`, 'warn');
+      // Diagnostics only: with the chained-swizzle shim the repair should
+      // never fire; if it does, telemetry needs it - the player does not.
+      console.warn(`[atomic-acres:webgpu] recovered ${result.purged} errored pipeline(s), sweep ${sweepsUsed}`);
     },
   });
 }
@@ -2094,7 +2048,7 @@ const timedMapWeaponPresentation = new TimedMapWeaponPresentation(scene, reduced
 const flareProjectileSystem = new FlareProjectileSystem(
   scene,
   reducedRenderMode,
-  renderRuntime.backend !== 'webgl2',
+  true,
 );
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
   scene,
@@ -4366,9 +4320,8 @@ async function prewarmOverdrivePresentation(): Promise<void> {
     overdriveRoot.scale.setScalar(1);
   }
 }
-const atmosphereSystem = renderRuntime.backend === 'webgl2'
-  ? new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id)
-  : null;
+const atmosphereSystem = ((): AtmosphereSystem | null => null)();
+void mistQuery;
 // HF-371 weather. Deliberately NOT gated on the webgl2 backend the way
 // AtmosphereSystem is: rain authors no custom shaders (stock materials plus
 // procedural DataTextures), so it is valid on both backends and rainBypassReason
@@ -4428,31 +4381,9 @@ let localSwimState: SwimState = createSwimState();
 let swimWeaponHintShown = false;
 waterSystem.configure(selectedArena.id, renderProfile);
 ensureRustworksStarfield(scene, selectedArena.id);
-const grassSystem = renderRuntime.backend === 'webgl2'
-  ? new GrassSystem(
-      scene,
-      renderProfile,
-      rendererLabel,
-      grassQuery,
-      // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
-      // must never seed its permanent placements from their collision geometry.
-      selectedArena.id === 'atomic-acres' ? activeWorldColliders() : [],
-      atomicLighting,
-    )
-  : null;
+const grassSystem = ((): GrassSystem | null => null)();
+void grassQuery;
 grassSystem?.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
-if (renderRuntime.backend === 'webgl2') {
-  renderRuntime.renderer.domElement.addEventListener('webglcontextrestored', () => {
-    webglContextLost = false;
-    webglContextRestorations += 1;
-    document.documentElement.dataset.webglContext = 'ready';
-    renderRuntime.requestShadowUpdate(activeRenderConfig.shadows);
-    atomicSignal?.invalidateValidation();
-    atmosphereSystem?.handleContextRestored();
-    grassSystem?.handleContextRestored();
-    resize();
-  });
-}
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 applyPresentationEffectsBudget = (budget) => {
   atmosphereSystem?.setDensityScale(budget.particleDensityScale);
@@ -5967,7 +5898,12 @@ let lastFrame = performance.now();
 let lastPresentedFrameAt = lastFrame;
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
-const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
+// Owner 2026-08-30 ("graphics error warnings"): 1s tripped on transient
+// compositor hitches (screenshots, driver churn, heavy shared-machine load)
+// and painted a permanent red error box over healthy sessions. 3s is a real
+// stall; the eager scheduler-gap RESET keeps its own 1s threshold below.
+const LIVE_WEBGPU_PRESENTATION_STALL_MS = 3_000;
+const WEBGPU_SCHEDULER_GAP_RESET_MS = 1_000;
 let lastObservedWebGpuCompletionSequence = 0;
 
 function resetWebGpuPresentationEpoch(reason: string, now: number): void {
@@ -9336,32 +9272,15 @@ function handleMatchAdmissionFailure(
         })();
       }, 1_500);
     } else if (rendererClassFailure) {
-      // Both automatic WebGPU attempts failed the same way. Chrome 153's Tint bug is
-      // environmental, so a third identical attempt is not a plan - route this session
-      // onto the WebGL2 compatibility renderer instead, which does not involve Tint at
-      // all. ?renderer=webgl2 is the repo's own hard compat contract. One deploy click
-      // after the reload and the player is in the match.
-      setStatus('Renderer failed repeatedly in this browser - switching to the compatibility renderer. Deploy again after the reload.', 'warn');
-      // Leave a sticky record so the NEXT session skips the failed attempts entirely
-      // and boots straight onto the compat route (read in bootstrap.ts). Keyed to the
-      // full user agent: a Chrome update invalidates it and WebGPU gets tried again.
-      try {
-        localStorage.setItem('atomic-acres:renderer-fallback:v1', JSON.stringify({
-          userAgent: navigator.userAgent,
-          at: new Date().toISOString(),
-          reason: error.message.slice(0, 200),
-          // Post-shim failures are real unknowns; bootstrap honors them.
-          shimGeneration: 1,
-        }));
-      } catch { /* Storage-less contexts just retry per session. */ }
-      const fallbackUrl = new URL(window.location.href);
-      fallbackUrl.searchParams.set('renderer', 'webgl2');
-      // Carry the arena and finish the deploy on the other side. Without this the
-      // player lands back on the menu mid-recovery needing one more click, and the
-      // owner's live report shows what that reads as: "I couldnt even load into
-      // nuke town" - he had bailed inside the retry window, reasonably.
-      fallbackUrl.searchParams.set('redeploy', selectedArena.id);
-      window.setTimeout(() => { window.location.assign(fallbackUrl.toString()); }, 1_200);
+      // Owner 2026-08-30: no WebGL2 fallback. Four repaired-and-retried
+      // WebGPU attempts failing the same way is an environment problem the
+      // player must hear about honestly, on the menu, with their retries
+      // reset for another manual attempt.
+      soloRendererAutoRetriesRemaining = 4;
+      setStatus(
+        'The graphics driver kept refusing this deployment. Close other GPU-heavy apps or restart the browser, then deploy again.',
+        'error',
+      );
     } else {
       setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
     }
@@ -28475,6 +28394,7 @@ function monitorSelectedArenaRender(now: number): void {
 const runtimeErrorLog: string[] = [];
 let consecutiveFrameErrors = 0;
 
+let runtimeErrorLogHideTimer: number | null = null;
 function reportRuntimeError(context: string, error: unknown): void {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   const stack = error instanceof Error && error.stack ? error.stack.split('\n').slice(1, 4).join(' | ').trim() : '';
@@ -28495,6 +28415,15 @@ function reportRuntimeError(context: string, error: unknown): void {
   if (el) {
     el.hidden = false;
     el.textContent = runtimeErrorLog.join('\n');
+    // Owner 2026-08-30: a transient hiccup used to leave this red box on
+    // screen for the rest of the session. The full detail persists in the
+    // client runtime log and console either way; the on-screen surface is a
+    // 12-second toast that re-arms on every new entry.
+    if (runtimeErrorLogHideTimer !== null) window.clearTimeout(runtimeErrorLogHideTimer);
+    runtimeErrorLogHideTimer = window.setTimeout(() => {
+      runtimeErrorLogHideTimer = null;
+      el.hidden = true;
+    }, 12_000);
   }
 }
 
@@ -28553,7 +28482,7 @@ function frame(now: number, scheduleNext = true): void {
       && gameStarted && matchState.phase === 'active' && menuLifecycle.surface === 'hidden'
       && document.visibilityState === 'visible' && document.hasFocus();
     if (activeForegroundWebGpuFrame
-      && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
+      && shouldResetPresentationAfterSchedulerGap(rawFrameMs, WEBGPU_SCHEDULER_GAP_RESET_MS)) {
       resetWebGpuPresentationEpoch('foreground scheduler gap', now);
     }
     monitorCompletedWebGpuQueueHealth(now);

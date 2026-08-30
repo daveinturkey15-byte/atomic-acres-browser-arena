@@ -536,21 +536,15 @@ export type PresentationPrewarmRuntime = Readonly<{
 }>;
 
 export function resolveRenderRuntimeRequest(search: string, webGpuAvailable = true): RenderRuntimeRequest {
-  const query = new URLSearchParams(search);
-  const explicit = query.get('renderer');
-  // An explicit ?renderer=webgpu stays a hard WebGPU contract (HITL evidence and
-  // rollback boundary must not silently become WebGL2). ?renderer=webgl2 forces
-  // the compatibility backend.
-  if (explicit === 'webgl2') return { requestedBackend: 'webgl2', requireWebGPU: false };
-  if (explicit === 'webgpu') return { requestedBackend: 'webgpu', requireWebGPU: true };
-  // Default: prefer WebGPU whenever navigator.gpu exists. HF-331 note: Firefox
-  // ships WebGPU on Windows since 141 (installed Firefox 154 exposes
-  // navigator.gpu here), so Firefox takes this WebGPU route today - the old
-  // "Firefox and Safari ship without WebGPU" assumption is stale. Browsers
-  // without navigator.gpu (Safari today, older Edge) gracefully use WebGL2 so
-  // the game still runs. The backend reported back is still the true one, so
-  // nothing is misrepresented as WebGPU.
-  if (!webGpuAvailable) return { requestedBackend: 'webgl2', requireWebGPU: false };
+  // Owner 2026-08-30: "retire all webgl2 stuff, full webgpu, no fallback."
+  // WebGPU is the only route. Chrome ships it everywhere; Firefox ships it on
+  // Windows since 141 (installed Firefox 154 exposes navigator.gpu here). A
+  // browser without navigator.gpu gets the honest requirement screen at
+  // renderer init instead of a silently slower second engine. ?renderer=webgl2
+  // is retired with the fallback; ?renderer=webgpu stays the explicit HITL
+  // contract spelling of the same thing.
+  void search;
+  void webGpuAvailable;
   return { requestedBackend: 'webgpu', requireWebGPU: true };
 }
 

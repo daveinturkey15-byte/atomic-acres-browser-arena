@@ -31,30 +31,17 @@ describe('solo renderer auto-retry', () => {
     expect(resetIndex).toBeLessThan(startIndex);
   });
 
-  it('falls back to the WebGL2 compat route when both WebGPU attempts fail the same way', () => {
-    // Chrome 153's Tint failure is environmental, so a third identical WebGPU attempt is
-    // not a plan. The escalation must preserve the page's own params and only ever ADD
-    // renderer=webgl2 - the repo's hard compat contract.
-    expect(legacyMain).toContain("} else if (rendererClassFailure) {");
-    expect(legacyMain).toContain("fallbackUrl.searchParams.set('renderer', 'webgl2')");
-  });
-
-  it('remembers the fallback per browser version so the next session skips the pain', () => {
-    // Measured: Chrome 153 fails 9/9 plain WebGPU deploys, on Pass 73 and HEAD alike.
-    // Re-litigating that verdict every session costs ~90 s of visible failure each time.
-    expect(legacyMain).toContain("localStorage.setItem('atomic-acres:renderer-fallback:v1'");
-    expect(legacyMain).toContain('userAgent: navigator.userAgent');
+  it('stops honestly after the retry budget - no fallback engine, no sticky record (owner 2026-08-30)', () => {
+    // The Chrome 153 root cause is fixed by the chained-swizzle shim, and the
+    // WebGL2 engine is retired. Exhausted retries reset the budget and tell
+    // the player the truth on the menu; nothing may silently reroute the
+    // session to a second renderer or persist a downgrade for next time.
+    expect(legacyMain).toContain('The graphics driver kept refusing this deployment.');
+    expect(legacyMain).not.toContain("searchParams.set('renderer', 'webgl2')");
+    expect(legacyMain).not.toContain("localStorage.setItem('atomic-acres:renderer-fallback:v1'");
     const bootstrap = readFileSync('src/bootstrap.ts', 'utf8');
-    expect(bootstrap).toContain("localStorage.getItem('atomic-acres:renderer-fallback:v1')");
-    // A browser update must clear the record and try WebGPU again.
-    expect(bootstrap).toContain('record.userAgent !== navigator.userAgent');
-    // An explicit ?renderer= param always wins over the sticky record.
-    expect(bootstrap).toContain("url.searchParams.has('renderer')");
-    // And it must steer BEFORE the game module loads, or the renderer is already chosen.
-    const steer = bootstrap.indexOf('applyStickyRendererFallback();');
-    const load = bootstrap.indexOf("await import('./main')");
-    expect(steer).toBeGreaterThan(-1);
-    expect(steer).toBeLessThan(load);
+    expect(bootstrap).not.toContain('renderer-fallback:v1');
+    expect(bootstrap).not.toContain('applyStickyRendererFallback');
   });
 
   it('keeps the honest failure message when the error is not renderer-class', () => {
