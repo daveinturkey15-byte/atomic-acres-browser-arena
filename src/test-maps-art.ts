@@ -1,16 +1,95 @@
 /**
- * Test1/Test2 procedural art (owner 2026-08-30, "improve everything...with
- * the skills I said"). Applies the ingested all-procedural discipline
- * (register rows 34/35): every texture is painted in code on a canvas at
- * load, every prop is authored geometry, nothing is downloaded.
+ * Test1/Test2 procedural art — forged PBR surfaces plus the shared
+ * environment kit.
  *
- * Presentation-only by contract: nothing here adds colliders, shot surfaces,
- * spawns or navigation. Deterministic: seeded mulberry32, no Math.random.
- * Headless-safe: the parity audit runs these builders under a noop canvas
- * shim, so every texture bails to null (plain colours) when 2D painting is
- * unavailable.
+ * OWNER 2026-08-30, on playing the first pass: "test 1 and test 2 map are a
+ * good start but only a small portion of the map and style, we need a deeper
+ * recreation ... we need to use some of your better techniques to sort the
+ * quality of trees, grass mountains etc, i seen so much better, and lighting".
+ *
+ * WHAT CHANGED AND WHY
+ * --------------------
+ * v1 of this file painted 13 canvas textures and bound exactly one slot,
+ * `material.map`. Every hardpan, plywood, cinderblock and travertine surface
+ * in both maps was therefore a FLAT PAINTED PLANE: no normal, no roughness
+ * variation, no AO, so nothing broke at a grazing angle, nothing caught the
+ * sun, and the "lit by a constant" read the owner called out survived any
+ * amount of lighting work. v1 also hand-rolled its vegetation and backdrop —
+ * 140 cloned cones, 18 squashed hemispheres, and a dead-straight row of 12
+ * cypress cones with 12 separate trunk draws.
+ *
+ * v2 replaces both halves with the two kits built for exactly this
+ * (docs/UPSTREAM_TECHNIQUE_EXTRACTION_2026-08-30.md):
+ *
+ *   - src/rendering/surface-forge.ts. ONE authored `SurfaceDescription` per
+ *     surface yields albedo + a Sobel tangent NORMAL + roughness + AO, all
+ *     four derived from the same height/colour function so they cannot
+ *     disagree, plus a shared two-scale micro/macro detail layer pinned to a
+ *     fixed physical size. Every surface in both maps now has a normal map.
+ *   - src/rendering/environment-kit.ts. Deterministic instanced vegetation
+ *     (Poisson with layered inter-layer clearance, position-hashed variation,
+ *     two build-time LOD tiers, contact skirts) and a displaced ridgeline
+ *     ring in place of the hemisphere hills.
+ *
+ * BAKE BUDGET (the forge measures ~105 ms per 512 px set — budget it)
+ * ------------------------------------------------------------------
+ * Surfaces are SHARED, not one per material. Six forged sets per arena carry
+ * eleven Test1 materials and eight Test2 materials; near-identical materials
+ * differ only by tint, roughness and repeat, which costs nothing.
+ *
+ * MEASURED end to end on dave-gaming-pc (Node 24), each arena in its OWN
+ * process so the shared tiles are paid once per measurement exactly as they
+ * are at boot, calling the real `test1Materials()` / `test2Materials()` against
+ * a byte-accurate 2D canvas. Two runs each, 2026-08-30:
+ *
+ *   test1Materials()   502 / 540 ms   6 sets + both shared tiles  (~81 ms/set)
+ *   test2Materials()   666 / 630 ms   6 sets + both shared tiles (~102 ms/set)
+ *   shared micro tile   12 ms   shared macro tile   24 ms
+ *
+ * Only ONE arena is ever built, so the boot cost a player pays is ~0.52 s
+ * (Test1) or ~0.65 s (Test2) — comfortably inside the ~1.2 s ceiling, with
+ * room for a seventh surface later if one is ever justified. Test2 is the
+ * dearer half because travertine, stucco and pool tile each run a `warp`,
+ * which is three fbm stacks rather than one; that is the knob to turn first if
+ * a future surface pushes the budget.
+ *
+ * NOTHING here is baked at 1024. `surfaceTexelBudget` says every authored band
+ * already clears the 5-texel Nyquist floor at 512 (the per-surface numbers are
+ * on each description), and 1024 measures 358 ms — 3.4x the cost for bands
+ * that are already resolved.
+ *
+ * CONTRACTS (unchanged from v1, and all still enforced)
+ * ----------------------------------------------------
+ * - PRESENTATION ONLY. Nothing in this file adds a collider, shot surface,
+ *   spawn or navigation. Every mesh is tagged `presentationOnly`, has its
+ *   `raycast` replaced with a no-op, and the vegetation kit does the same.
+ * - DETERMINISTIC. Seeded mulberry32 and integer position hashes only; no
+ *   `Math.random`, no `Date`, no iteration-order dependence.
+ * - HEADLESS-SAFE. `forgeSurface` probes for a real, readable 2D canvas and
+ *   returns an all-null set when there is none, so the collider/visual parity
+ *   audit and the vitest suites pay ZERO bake cost and fall back to flat
+ *   colours. The environment kit is pure `three` geometry.
+ * - DRESSING NEVER BECOMES GHOST COVER. Every prop below is under 0.9 m tall,
+ *   thinner than 0.35 m in its widest axis, sits at or above the 2.6 m
+ *   reachable ceiling, lies outside the arena bounds, or carries a name the
+ *   parity audit's foliage/cloth rules exclude by construction. Anything that
+ *   should stop a body or a bullet is authored in src/test-maps.ts as a real
+ *   collider instead.
  */
 import * as THREE from 'three';
+import {
+  buildEnvironment,
+  type ClearancePredicate,
+  type EnvironmentBuildResult,
+  type PlantKind,
+} from './rendering/environment-kit';
+import {
+  forgeSurface,
+  surfaceStandardMaterial,
+  type ForgedSurface,
+  type SurfaceDescription,
+  type SurfaceSample,
+} from './rendering/surface-forge';
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG (threejs-procedural-vegetation skill)
@@ -26,435 +105,538 @@ function mulberry32(seed: number): () => number {
 }
 
 // ---------------------------------------------------------------------------
-// Canvas texture factory (farcrysis ground-texture recipe, headless-safe)
+// Surface authoring helpers
 // ---------------------------------------------------------------------------
 
-type Painter = (context: CanvasRenderingContext2D, size: number, rng: () => number) => void;
+/**
+ * One scratch sample, reused for every texel. The forge copies the returned
+ * value immediately (surface-forge.ts `SurfaceDescription`), so a description
+ * must NOT allocate 262 144 objects per bake.
+ */
+const SAMPLE_ALBEDO: [number, number, number] = [0, 0, 0];
+const SAMPLE: { albedo: [number, number, number]; height: number; roughness: number; ao: number } = {
+  albedo: SAMPLE_ALBEDO, height: 0, roughness: 1, ao: 1,
+};
 
-const textureCache = new Map<string, THREE.CanvasTexture | null>();
-
-function paintedTexture(name: string, size: number, seed: number, painter: Painter): THREE.CanvasTexture | null {
-  const cached = textureCache.get(name);
-  if (cached !== undefined) return cached;
-  let texture: THREE.CanvasTexture | null = null;
-  try {
-    if (typeof document !== 'undefined') {
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext('2d');
-      // The parity audit's shimmed context swallows draw calls; detect a real
-      // context by verifying a painted pixel actually reads back.
-      if (context) {
-        painter(context, size, mulberry32(seed));
-        const probe = context.getImageData?.(0, 0, 1, 1);
-        if (probe && probe.data && probe.data.length >= 4) {
-          texture = new THREE.CanvasTexture(canvas);
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-          texture.anisotropy = 4;
-          texture.colorSpace = THREE.SRGBColorSpace;
-        }
-      }
-    }
-  } catch {
-    texture = null;
-  }
-  textureCache.set(name, texture);
-  return texture;
+function emit(r: number, g: number, b: number, height: number, roughness: number, ao = 1): SurfaceSample {
+  SAMPLE_ALBEDO[0] = r;
+  SAMPLE_ALBEDO[1] = g;
+  SAMPLE_ALBEDO[2] = b;
+  SAMPLE.height = height;
+  SAMPLE.roughness = roughness;
+  SAMPLE.ao = ao;
+  return SAMPLE;
 }
 
-function fbmMottle(context: CanvasRenderingContext2D, size: number, rng: () => number, colors: readonly string[], blobs: number, radiusScale = 0.06, alpha = 0.1): void {
-  for (let index = 0; index < blobs; index += 1) {
-    const radius = size * radiusScale * (0.4 + rng() * 1.2);
-    const x = rng() * size;
-    const y = rng() * size;
-    const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-    const color = colors[index % colors.length]!;
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, 'rgba(0,0,0,0)');
-    context.globalAlpha = alpha * (0.5 + rng() * 0.8);
-    context.fillStyle = gradient;
-    context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-  }
-  context.globalAlpha = 1;
+type Rgb = readonly [number, number, number];
+
+/** sRGB 0..1 triple from a hex literal, so palettes stay readable as colours. */
+function rgb(hex: number): Rgb {
+  return [((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255] as const;
 }
 
-function speckle(context: CanvasRenderingContext2D, size: number, rng: () => number, colors: readonly string[], count: number, maxRadius = 2.2): void {
-  for (let index = 0; index < count; index += 1) {
-    context.fillStyle = colors[index % colors.length]!;
-    context.globalAlpha = 0.16 + rng() * 0.3;
-    const radius = 0.5 + rng() * maxRadius;
-    context.beginPath();
-    context.arc(rng() * size, rng() * size, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-  context.globalAlpha = 1;
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
 
-// ---- Test1 painters --------------------------------------------------------
-
-function paintHardpan(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#b59a6e';
-  context.fillRect(0, 0, size, size);
-  fbmMottle(context, size, rng, ['#c8ad7c', '#a68a5c', '#94794e', '#c4a877'], 160, 0.08, 0.14);
-  speckle(context, size, rng, ['#8a744c', '#6f5c3c', '#d0b98a'], 700, 1.8);
-  // Tyre ruts: paired shallow arcs worn into the dust.
-  for (let rut = 0; rut < 7; rut += 1) {
-    const cx = rng() * size;
-    const cy = rng() * size;
-    const radius = size * (0.2 + rng() * 0.45);
-    const start = rng() * Math.PI * 2;
-    const sweep = 0.6 + rng() * 1.4;
-    context.strokeStyle = 'rgba(110, 90, 58, 0.32)';
-    context.lineWidth = 5 + rng() * 4;
-    for (const offset of [0, 14]) {
-      context.beginPath();
-      context.arc(cx, cy, radius + offset, start, start + sweep);
-      context.stroke();
-    }
-  }
-  // Boot-scuffed pale patches around the middle band (the firing line).
-  fbmMottle(context, size, rng, ['#d4bd8e'], 22, 0.05, 0.2);
+function clamp01(value: number): number {
+  return value < 0 ? 0 : value > 1 ? 1 : value;
 }
 
-function paintPlywood(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#c09c64';
-  context.fillRect(0, 0, size, size);
-  // Long grain streaks.
-  for (let streak = 0; streak < 140; streak += 1) {
-    context.strokeStyle = rng() > 0.5 ? 'rgba(146, 114, 66, 0.25)' : 'rgba(214, 182, 126, 0.22)';
-    context.lineWidth = 1 + rng() * 2;
-    const y = rng() * size;
-    context.beginPath();
-    context.moveTo(0, y);
-    context.bezierCurveTo(size * 0.3, y + (rng() - 0.5) * 14, size * 0.7, y + (rng() - 0.5) * 14, size, y + (rng() - 0.5) * 8);
-    context.stroke();
-  }
-  // Knots.
-  for (let knot = 0; knot < 9; knot += 1) {
-    const x = rng() * size;
-    const y = rng() * size;
-    for (let ring = 4; ring > 0; ring -= 1) {
-      context.strokeStyle = `rgba(122, 92, 50, ${0.12 + ring * 0.06})`;
-      context.lineWidth = 1.4;
-      context.beginPath();
-      context.ellipse(x, y, ring * 3.4, ring * 2.2, rng(), 0, Math.PI * 2);
-      context.stroke();
-    }
-  }
-  // Panel seams.
-  context.strokeStyle = 'rgba(96, 74, 42, 0.5)';
-  context.lineWidth = 3;
-  for (const fraction of [0.25, 0.5, 0.75]) {
-    context.beginPath();
-    context.moveTo(size * fraction, 0);
-    context.lineTo(size * fraction, size);
-    context.stroke();
-  }
+function smooth(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
 }
 
-function paintCorrugated(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#7c8288';
-  context.fillRect(0, 0, size, size);
-  const ridge = size / 24;
-  for (let x = 0; x < size; x += ridge) {
-    const gradient = context.createLinearGradient(x, 0, x + ridge, 0);
-    gradient.addColorStop(0, 'rgba(255,255,255,0.16)');
-    gradient.addColorStop(0.45, 'rgba(0,0,0,0.02)');
-    gradient.addColorStop(0.75, 'rgba(0,0,0,0.24)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0.08)');
-    context.fillStyle = gradient;
-    context.fillRect(x, 0, ridge, size);
-  }
-  // Rust streaks bleeding down from bolt rows.
-  for (let bolt = 0; bolt < 26; bolt += 1) {
-    const x = rng() * size;
-    const y = rng() * size * 0.4;
-    const length = size * (0.1 + rng() * 0.3);
-    const gradient = context.createLinearGradient(x, y, x, y + length);
-    gradient.addColorStop(0, 'rgba(148, 84, 42, 0.5)');
-    gradient.addColorStop(1, 'rgba(148, 84, 42, 0)');
-    context.fillStyle = gradient;
-    context.fillRect(x - 1.6, y, 3.2, length);
-    context.fillStyle = 'rgba(60, 48, 38, 0.8)';
-    context.beginPath();
-    context.arc(x, y, 2.4, 0, Math.PI * 2);
-    context.fill();
-  }
+/** Emit a two-stop colour ramp without allocating an intermediate triple. */
+function emitMix(a: Rgb, b: Rgb, t: number, height: number, roughness: number, ao = 1): SurfaceSample {
+  return emit(lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t), height, roughness, ao);
 }
 
-function paintSandbag(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#9a8a5e';
-  context.fillRect(0, 0, size, size);
+/**
+ * Shortest distance between two coordinates on the unit circle. Every
+ * authored feature uses this rather than `|a - b|` so a groove or a rut
+ * placed near u = 0 stays continuous across the tile seam — the property the
+ * v1 canvas painters lacked, where blobs drawn near an edge were clipped and
+ * the tile showed a seam grid at high repeat counts.
+ */
+function wrapDelta(a: number, b: number): number {
+  const d = Math.abs(a - b) % 1;
+  return d > 0.5 ? 1 - d : d;
+}
+
+/** 1 at the groove centre falling smoothly to 0 at `halfWidth`. Seamless. */
+function groove(coord: number, centre: number, halfWidth: number): number {
+  return 1 - smooth(0, halfWidth, wrapDelta(coord, centre));
+}
+
+/**
+ * Seamless anisotropic streaking.
+ *
+ * The noise toolkit wraps x and y on the SAME integer period, so
+ * `fbm(u * 3, v * 48, 48)` would tear at u = 1. A phase-modulated sinusoid
+ * carries the fine direction instead: `sin(2*pi*cycles*coord + warp)` is
+ * periodic for integer `cycles` whatever periodic field `warp` is, which is
+ * what lets plywood grain, corrugation and plank runs be both directional and
+ * seam-free.
+ */
+function streak(coord: number, cycles: number, warp: number): number {
+  return 0.5 + 0.5 * Math.sin(coord * Math.PI * 2 * cycles + warp);
+}
+
+// ---------------------------------------------------------------------------
+// Test1 surfaces
+// ---------------------------------------------------------------------------
+
+const HARDPAN_SHADOW = rgb(0x7d6540);
+const HARDPAN_MID = rgb(0xb0925c);
+const HARDPAN_BLEACH = rgb(0xd8c193);
+
+/**
+ * Dust hardpan with tyre ruts. tileMetres 4, 512 px = 7.8 mm/texel.
+ * Finest band: the 32-cell grit Worley = 12.5 cm cells = 16 texels/cell.
+ */
+const hardpanSurface: SurfaceDescription = (u, v, noise) => {
+  const drift = noise.fbm(u * 8, v * 8, 8, 4);
+  const grit = 1 - noise.worley(u * 32, v * 32, 32);
+  // Two ruts 1.65 m apart on the 4 m tile — one light-truck track width.
+  const rut = Math.max(groove(u, 0.29, 0.052), groove(u, 0.71, 0.052));
+  const bleach = smooth(0.52, 0.92, drift);
+  const tone = clamp01(drift * 0.85 + grit * 0.3 - rut * 0.45);
+  const height = 0.5 + (drift - 0.5) * 0.55 + grit * 0.22 - rut * 0.4;
+  // Compacted rut floors are polished by traffic; loose dust is fully matte.
+  const roughness = 0.99 - rut * 0.22 - bleach * 0.05;
+  const ao = 1 - rut * 0.3 - grit * 0.12;
+  return emitMix(HARDPAN_SHADOW, tone > 0.55 ? HARDPAN_BLEACH : HARDPAN_MID, tone, height, roughness, ao);
+};
+
+const PLYWOOD_DARK = rgb(0x8b6a3c);
+const PLYWOOD_MID = rgb(0xbf9d64);
+const PLYWOOD_PALE = rgb(0xdcc08a);
+
+/**
+ * Softwood ply sheet. tileMetres 1.2, 512 px = 2.3 mm/texel.
+ * Finest band: 26 grain cycles = 19.7 texels/cycle.
+ */
+const plywoodSurface: SurfaceDescription = (u, v, noise) => {
+  const wander = (noise.fbm(u * 6, v * 6, 6, 3) - 0.5) * 8;
+  const grain = streak(v, 26, wander);
+  const figure = noise.fbm(u * 4, v * 4, 4, 3);
+  // Knots: the Worley feature points are the knot centres, so the rings fall
+  // out of the same field rather than being scattered separately.
+  const cell = noise.worley(u * 4, v * 4, 4);
+  const knot = 1 - smooth(0, 0.16, cell);
+  const rings = knot > 0 ? 0.5 + 0.5 * Math.sin(cell * 90) : 0;
+  // Sheet seam every 0.6 m: a real 4 mm shadow gap between panels.
+  const seam = groove(u, 0.5, 0.02) + groove(u, 0, 0.02);
+  const tone = clamp01(0.28 + grain * 0.34 + figure * 0.34 - knot * 0.55 - seam * 0.4);
+  const height = 0.62 + (grain - 0.5) * 0.1 - knot * 0.22 - rings * knot * 0.12 - seam * 0.55;
+  return emitMix(PLYWOOD_DARK, tone > 0.6 ? PLYWOOD_PALE : PLYWOOD_MID, tone, height, 0.86 + knot * 0.08, 1 - seam * 0.45 - knot * 0.2);
+};
+
+const STEEL_SHADOW = rgb(0x4d565c);
+const STEEL_MID = rgb(0x848c92);
+const RUST = rgb(0x8d4c26);
+
+/**
+ * Corrugated container steel. tileMetres 2.4, 512 px = 4.7 mm/texel.
+ * Finest band: 12 corrugations = 20 cm pitch = 42.7 texels/cycle. The 22 mm
+ * relief on a 2.4 m tile gives a peak slope of 19 degrees, which is what puts
+ * a real sun-catch band down every rib instead of a painted gradient.
+ */
+const corrugatedSurface: SurfaceDescription = (u, v, noise) => {
+  const rib = streak(u, 12, 0);
+  // Bolt/weld rows at the container's two horizontal rails.
+  const rail = Math.max(groove(v, 0.08, 0.03), groove(v, 0.92, 0.03));
+  const oxide = noise.fbm(u * 6, v * 6, 6, 4);
+  // Rust bleeds DOWNWARD from the rails: v is up, so the streak field is
+  // sampled with a bias that only opens below a rail.
+  const bleed = clamp01((noise.fbm(u * 24, v * 3, 3, 2) - 0.42) * 3.4) * smooth(0.55, 0.1, v);
+  const rustMask = clamp01(rail * 0.8 + bleed * 0.75 + smooth(0.72, 0.95, oxide) * 0.6);
+  const shade = clamp01(rib * 0.85 + oxide * 0.25);
+  const height = 0.5 + (rib - 0.5) * 0.86 - rail * 0.22;
+  const base = shade > 0.55 ? STEEL_MID : STEEL_SHADOW;
+  const t = rustMask > 0.5 ? 1 : clamp01(shade + rustMask * 0.4);
+  // Metalness discipline (extraction doc): bare steel stays smooth, every
+  // oxide layer on top of it is matte. The material carries metalness; the
+  // roughness map carries the split.
+  const roughness = lerp(0.34, 0.95, rustMask) + (1 - rib) * 0.06;
+  return emitMix(base, rustMask > 0.35 ? RUST : STEEL_MID, clamp01(rustMask * 1.4) * 0.85 + (rustMask > 0.35 ? 0 : t * 0.15), height, roughness, 1 - rail * 0.35 - (1 - rib) * 0.2);
+};
+
+const SANDBAG_SHADOW = rgb(0x6b5c37);
+const SANDBAG_MID = rgb(0x9c8b5c);
+const SANDBAG_SUN = rgb(0xc3b184);
+
+/**
+ * Filled hessian sandbag courses. tileMetres 1.6, 512 px = 3.1 mm/texel.
+ * 6 courses x 3 bags = 27 cm x 53 cm bags; the finest band is the 48-cycle
+ * hessian weave at 10.7 texels/cycle. Relief is 60 mm: sandbags are the one
+ * surface on this map whose silhouette is genuinely made of the normal map.
+ */
+const sandbagSurface: SurfaceDescription = (u, v, noise) => {
   const rows = 6;
-  const rowHeight = size / rows;
-  for (let row = 0; row < rows; row += 1) {
-    const offset = row % 2 === 0 ? 0 : rowHeight * 0.9;
-    for (let x = -1; x < 8; x += 1) {
-      const bagWidth = rowHeight * 1.8;
-      const bx = x * bagWidth + offset;
-      const by = row * rowHeight;
-      const gradient = context.createRadialGradient(bx + bagWidth / 2, by + rowHeight / 2, 2, bx + bagWidth / 2, by + rowHeight / 2, bagWidth * 0.7);
-      gradient.addColorStop(0, `rgba(196, 178, 126, ${0.5 + rng() * 0.2})`);
-      gradient.addColorStop(1, 'rgba(96, 84, 52, 0.55)');
-      context.fillStyle = gradient;
-      context.beginPath();
-      context.ellipse(bx + bagWidth / 2, by + rowHeight / 2, bagWidth * 0.52, rowHeight * 0.46, 0, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-  speckle(context, size, rng, ['#6f6244', '#b8a672'], 500, 1.2);
-}
+  const cols = 3;
+  const ry = v * rows;
+  const row = Math.floor(ry);
+  const fy = ry - row;
+  // Even row count keeps the half-bag stagger continuous across the v seam.
+  const cx = u * cols + (row % 2) * 0.5;
+  const col = Math.floor(cx);
+  const fx = cx - col;
+  const dx = (fx - 0.5) * 2;
+  const dy = (fy - 0.5) * 2;
+  const inside = clamp01(1 - (dx * dx * 0.82 + dy * dy));
+  const lobe = Math.sqrt(inside);
+  const weave = streak(u * cols, 16, 0) * 0.5 + streak(v * rows, 16, 0) * 0.5;
+  const dirt = noise.fbm(u * 10, v * 10, 10, 3);
+  const tone = clamp01(lobe * 0.72 + weave * 0.14 + dirt * 0.2 - 0.06);
+  const height = lobe * 0.92 + weave * 0.05;
+  return emitMix(SANDBAG_SHADOW, tone > 0.62 ? SANDBAG_SUN : SANDBAG_MID, tone, height, 0.97 - lobe * 0.04, 0.35 + lobe * 0.65);
+};
 
-function paintCinderblock(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#9c9488';
-  context.fillRect(0, 0, size, size);
-  fbmMottle(context, size, rng, ['#aaa398', '#8b8377', '#948a7c'], 90, 0.07, 0.16);
+const CINDER_SHADOW = rgb(0x6f6a60);
+const CINDER_MID = rgb(0x9d968a);
+const CINDER_PALE = rgb(0xbcb4a6);
+
+/**
+ * Cinderblock with struck mortar joints. tileMetres 1.6, 512 px = 3.1 mm/texel.
+ * 8 courses x 4 blocks = 20 cm x 40 cm — real CMU. The 15 mm mortar joint is
+ * the finest band at 4.8 texels; the joint carries a smooth shoulder so it
+ * reads as a recess rather than a one-texel line at mip 0.
+ */
+const cinderSurface: SurfaceDescription = (u, v, noise) => {
   const rows = 8;
-  const rowHeight = size / rows;
-  const blockWidth = size / 4;
-  context.strokeStyle = 'rgba(70, 66, 58, 0.55)';
-  context.lineWidth = 3;
-  for (let row = 0; row <= rows; row += 1) {
-    context.beginPath();
-    context.moveTo(0, row * rowHeight);
-    context.lineTo(size, row * rowHeight);
-    context.stroke();
-  }
-  for (let row = 0; row < rows; row += 1) {
-    const offset = row % 2 === 0 ? 0 : blockWidth / 2;
-    for (let x = -1; x <= 4; x += 1) {
-      context.beginPath();
-      context.moveTo(x * blockWidth + offset, row * rowHeight);
-      context.lineTo(x * blockWidth + offset, (row + 1) * rowHeight);
-      context.stroke();
-    }
-  }
-  speckle(context, size, rng, ['#7c766a', '#b3aca0'], 420, 1.6);
-}
+  const cols = 4;
+  const ry = v * rows;
+  const row = Math.floor(ry);
+  const fy = ry - row;
+  const cx = u * cols + (row % 2) * 0.5;
+  const fx = cx - Math.floor(cx);
+  const joint = clamp01(
+    (1 - smooth(0.0, 0.06, Math.min(fy, 1 - fy)))
+    + (1 - smooth(0.0, 0.03, Math.min(fx, 1 - fx))),
+  );
+  const aggregate = 1 - noise.worley(u * 40, v * 40, 40);
+  const stain = noise.fbm(u * 5, v * 5, 5, 4);
+  const tone = clamp01(0.34 + stain * 0.5 + aggregate * 0.24 - joint * 0.5);
+  const height = 0.72 + aggregate * 0.16 + (stain - 0.5) * 0.08 - joint * 0.7;
+  return emitMix(CINDER_SHADOW, tone > 0.58 ? CINDER_PALE : CINDER_MID, tone, height, 0.93 + aggregate * 0.06, 1 - joint * 0.5 - aggregate * 0.1);
+};
 
-function paintTarp(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#6f7a52';
-  context.fillRect(0, 0, size, size);
-  // Weave.
-  context.globalAlpha = 0.12;
-  for (let line = 0; line < size; line += 4) {
-    context.fillStyle = line % 8 === 0 ? '#5c6644' : '#7d8a5e';
-    context.fillRect(0, line, size, 2);
-    context.fillRect(line, 0, 2, size);
-  }
-  context.globalAlpha = 1;
-  fbmMottle(context, size, rng, ['#5a6644', '#7f8c60', '#4c563a'], 60, 0.09, 0.16);
-  // Sun-faded fold lines.
-  for (let fold = 0; fold < 6; fold += 1) {
-    context.strokeStyle = 'rgba(214, 218, 186, 0.18)';
-    context.lineWidth = 6 + rng() * 6;
-    const y = rng() * size;
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(size, y + (rng() - 0.5) * 60);
-    context.stroke();
-  }
-}
+const TARP_SHADOW = rgb(0x4c5638);
+const TARP_MID = rgb(0x6e7a50);
+const TARP_SUN = rgb(0x99a274);
 
-// ---- Test2 painters --------------------------------------------------------
+/**
+ * Olive-drab canvas awning/camo net. tileMetres 2.0, 512 px = 3.9 mm/texel.
+ * Finest band: the 40-cycle weave at 12.8 texels/cycle.
+ */
+const tarpSurface: SurfaceDescription = (u, v, noise) => {
+  const warpThread = streak(u, 40, 0);
+  const weftThread = streak(v, 40, 0);
+  const weave = Math.max(warpThread, weftThread) * 0.5 + warpThread * weftThread * 0.5;
+  // Slack folds: a low-frequency warp field, so the sheet sags between poles.
+  const fold = noise.warp(u * 4, v * 4, 4, 1.4);
+  const fade = noise.fbm(u * 3, v * 3, 3, 2);
+  const tone = clamp01(0.24 + weave * 0.2 + fold * 0.42 + fade * 0.24);
+  const height = 0.42 + (weave - 0.5) * 0.18 + (fold - 0.5) * 0.8;
+  return emitMix(TARP_SHADOW, tone > 0.6 ? TARP_SUN : TARP_MID, tone, height, 0.95 - weave * 0.06, 0.72 + weave * 0.28);
+};
 
-function paintTravertine(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#d8cbb4';
-  context.fillRect(0, 0, size, size);
-  fbmMottle(context, size, rng, ['#e4d9c4', '#cbbda2', '#d2c2a4'], 130, 0.07, 0.14);
-  // Veining.
-  for (let vein = 0; vein < 26; vein += 1) {
-    context.strokeStyle = `rgba(168, 152, 122, ${0.14 + rng() * 0.14})`;
-    context.lineWidth = 0.8 + rng() * 1.4;
-    let x = rng() * size;
-    let y = rng() * size;
-    context.beginPath();
-    context.moveTo(x, y);
-    for (let step = 0; step < 8; step += 1) {
-      x += (rng() - 0.5) * size * 0.16;
-      y += (rng() - 0.3) * size * 0.1;
-      context.lineTo(x, y);
-    }
-    context.stroke();
-  }
-  // Paver grid with soft joint shadows.
-  const cell = size / 5;
-  context.strokeStyle = 'rgba(122, 110, 88, 0.5)';
-  context.lineWidth = 4;
-  for (let line = 0; line <= 5; line += 1) {
-    context.beginPath(); context.moveTo(0, line * cell); context.lineTo(size, line * cell); context.stroke();
-    context.beginPath(); context.moveTo(line * cell, 0); context.lineTo(line * cell, size); context.stroke();
-  }
-  speckle(context, size, rng, ['#b8a988', '#e8dfc9'], 320, 1.4);
-}
+// ---------------------------------------------------------------------------
+// Test2 surfaces
+// ---------------------------------------------------------------------------
 
-function paintStucco(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#e8e0d0';
-  context.fillRect(0, 0, size, size);
-  fbmMottle(context, size, rng, ['#efe8da', '#ddd2be', '#e2d8c4'], 150, 0.05, 0.14);
-  speckle(context, size, rng, ['#cfc4ac', '#f4eee0', '#c4b89e'], 900, 1.1);
-  // Faint weather streaks under an implied cornice.
-  for (let streak = 0; streak < 14; streak += 1) {
-    const x = rng() * size;
-    const length = size * (0.12 + rng() * 0.2);
-    const gradient = context.createLinearGradient(x, 0, x, length);
-    gradient.addColorStop(0, 'rgba(150, 138, 116, 0.16)');
-    gradient.addColorStop(1, 'rgba(150, 138, 116, 0)');
-    context.fillStyle = gradient;
-    context.fillRect(x - 2, 0, 4, length);
-  }
-}
+const TRAVERTINE_JOINT = rgb(0x9b8f76);
+const TRAVERTINE_MID = rgb(0xd6c9b0);
+const TRAVERTINE_PALE = rgb(0xece2cd);
 
-function paintCourt(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  // Acrylic sport surface with painted key + centre circle + boundary.
-  context.fillStyle = '#8a5a4a';
-  context.fillRect(0, 0, size, size);
-  fbmMottle(context, size, rng, ['#966452', '#7c5042', '#8f5c4c'], 90, 0.06, 0.16);
-  speckle(context, size, rng, ['#6f4638', '#a06a56'], 500, 1.1);
-  context.strokeStyle = 'rgba(240, 236, 226, 0.85)';
-  context.lineWidth = size * 0.012;
-  const margin = size * 0.06;
-  context.strokeRect(margin, margin, size - margin * 2, size - margin * 2);
-  // Centre line + circle.
-  context.beginPath(); context.moveTo(margin, size / 2); context.lineTo(size - margin, size / 2); context.stroke();
-  context.beginPath(); context.arc(size / 2, size / 2, size * 0.11, 0, Math.PI * 2); context.stroke();
-  // Keys at each end.
-  for (const end of [0, 1]) {
-    const y = end === 0 ? margin : size - margin;
-    const dir = end === 0 ? 1 : -1;
-    context.strokeRect(size * 0.34, y, size * 0.32, dir * size * 0.2);
-    context.beginPath();
-    context.arc(size / 2, y + dir * size * 0.2, size * 0.09, end === 0 ? 0 : Math.PI, end === 0 ? Math.PI : Math.PI * 2);
-    context.stroke();
-  }
-}
+/**
+ * Travertine pavers. tileMetres 2.4, 512 px = 4.7 mm/texel.
+ * 3 x 3 pavers = 80 cm. Finest band: the 25 mm joint groove at 5.3 texels,
+ * and the 24-cell pitting Worley at 21 texels/cell.
+ */
+const travertineSurface: SurfaceDescription = (u, v, noise) => {
+  const cells = 3;
+  const fx = u * cells - Math.floor(u * cells);
+  const fy = v * cells - Math.floor(v * cells);
+  const joint = clamp01(
+    (1 - smooth(0, 0.012, Math.min(fx, 1 - fx)))
+    + (1 - smooth(0, 0.012, Math.min(fy, 1 - fy))),
+  );
+  // Bedding-plane veining: fbm sampled through an fbm-displaced coordinate,
+  // which is what makes the veins wander instead of running straight.
+  const vein = noise.warp(u * 6, v * 6, 6, 1.8);
+  const banding = smooth(0.44, 0.56, vein);
+  const pit = 1 - noise.worley(u * 24, v * 24, 24);
+  const pitting = smooth(0.72, 1, pit);
+  const tone = clamp01(0.46 + vein * 0.42 - pitting * 0.3 - joint * 0.6);
+  const height = 0.78 - pitting * 0.5 - joint * 0.78 - banding * 0.05;
+  // Honed stone is smooth; the open pores and the joints are not.
+  const roughness = 0.42 + pitting * 0.45 + joint * 0.4;
+  return emitMix(TRAVERTINE_JOINT, tone > 0.62 ? TRAVERTINE_PALE : TRAVERTINE_MID, tone, height, roughness, 1 - joint * 0.55 - pitting * 0.35);
+};
 
-function paintDeckWood(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#8a6844';
-  context.fillRect(0, 0, size, size);
-  const plank = size / 8;
-  for (let row = 0; row < 8; row += 1) {
-    context.fillStyle = row % 2 === 0 ? 'rgba(255, 232, 190, 0.07)' : 'rgba(60, 40, 22, 0.09)';
-    context.fillRect(0, row * plank, size, plank);
-    context.strokeStyle = 'rgba(66, 48, 28, 0.6)';
-    context.lineWidth = 2.4;
-    context.beginPath(); context.moveTo(0, row * plank); context.lineTo(size, row * plank); context.stroke();
-    for (let streak = 0; streak < 16; streak += 1) {
-      context.strokeStyle = `rgba(120, 88, 52, ${0.12 + rng() * 0.16})`;
-      context.lineWidth = 1;
-      const y = row * plank + rng() * plank;
-      context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(size, y + (rng() - 0.5) * 5);
-      context.stroke();
-    }
-  }
-}
+const STUCCO_SHADE = rgb(0xcfc4ae);
+const STUCCO_MID = rgb(0xe9e0cf);
+const STUCCO_SUN = rgb(0xf6efe0);
 
-function paintHedge(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#3f5c34';
-  context.fillRect(0, 0, size, size);
-  for (let leaf = 0; leaf < 2600; leaf += 1) {
-    const shade = rng();
-    context.fillStyle = shade > 0.72 ? '#5c7d48' : shade > 0.4 ? '#47663a' : '#324a2a';
-    context.globalAlpha = 0.5 + rng() * 0.5;
-    const radius = 1.4 + rng() * 3.4;
-    context.beginPath();
-    context.arc(rng() * size, rng() * size, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-  context.globalAlpha = 1;
-}
+/**
+ * Warm white villa stucco. tileMetres 2.4, 512 px = 4.7 mm/texel.
+ * Finest band: the 36-cell trowel-grain Worley at 14.2 texels/cell.
+ */
+const stuccoSurface: SurfaceDescription = (u, v, noise) => {
+  const trowel = noise.warp(u * 5, v * 5, 5, 2.2);
+  const grain = 1 - noise.worley(u * 36, v * 36, 36);
+  // A weathering wash that only opens toward the bottom of the wall (v up),
+  // so the rendered facade darkens at the plinth the way real render does.
+  const wash = smooth(0.34, 0, v) * smooth(0.4, 0.75, noise.fbm(u * 7, v * 7, 7, 3));
+  const tone = clamp01(0.38 + trowel * 0.44 + grain * 0.18 - wash * 0.36);
+  const height = 0.6 + (trowel - 0.5) * 0.34 + grain * 0.24;
+  return emitMix(STUCCO_SHADE, tone > 0.62 ? STUCCO_SUN : STUCCO_MID, tone, height, 0.82 + grain * 0.14 + wash * 0.06, 1 - grain * 0.16 - wash * 0.14);
+};
 
-function paintPoolFloor(context: CanvasRenderingContext2D, size: number, rng: () => number): void {
-  context.fillStyle = '#7fc4cf';
-  context.fillRect(0, 0, size, size);
-  const cell = size / 16;
-  context.strokeStyle = 'rgba(60, 130, 140, 0.5)';
-  context.lineWidth = 1.6;
-  for (let line = 0; line <= 16; line += 1) {
-    context.beginPath(); context.moveTo(0, line * cell); context.lineTo(size, line * cell); context.stroke();
-    context.beginPath(); context.moveTo(line * cell, 0); context.lineTo(line * cell, size); context.stroke();
-  }
-  // Caustic webbing: bright interlocking arcs.
-  for (let arc = 0; arc < 130; arc += 1) {
-    context.strokeStyle = `rgba(228, 250, 252, ${0.1 + rng() * 0.22})`;
-    context.lineWidth = 1.6 + rng() * 2.2;
-    const x = rng() * size;
-    const y = rng() * size;
-    const radius = 8 + rng() * 26;
-    const start = rng() * Math.PI * 2;
-    context.beginPath();
-    context.arc(x, y, radius, start, start + 1 + rng() * 1.6);
-    context.stroke();
-  }
-}
+const HEDGE_DEEP = rgb(0x22381f);
+const HEDGE_MID = rgb(0x3f5c33);
+const HEDGE_LIT = rgb(0x6c8a45);
+
+/**
+ * Clipped box hedge. tileMetres 1.0, 512 px = 2.0 mm/texel.
+ * Finest band: the 40-cell leaf-clump Worley at 12.8 texels/cell. 30 mm of
+ * relief on a 1 m tile is what turns a flat green box into a surface whose
+ * clipped face catches the sun and holds shadow between the clumps.
+ */
+const hedgeSurface: SurfaceDescription = (u, v, noise) => {
+  const clump = 1 - noise.worley(u * 40, v * 40, 40);
+  const mass = noise.fbm(u * 8, v * 8, 8, 4);
+  const sprig = noise.fbm(u * 20, v * 20, 20, 2);
+  const depth = clamp01(clump * 0.62 + sprig * 0.38);
+  const tone = clamp01(depth * 0.72 + mass * 0.34 - 0.1);
+  const height = depth * 0.86 + mass * 0.14;
+  // Waxy on the sunlit clipped face, matte in the crevices: a constant here
+  // measured as a flat 240 across the whole map and read as painted plastic.
+  const roughness = 0.99 - depth * 0.22;
+  return emitMix(HEDGE_DEEP, tone > 0.58 ? HEDGE_LIT : HEDGE_MID, tone, height, roughness, 0.28 + depth * 0.72);
+};
+
+const POOL_GROUT = rgb(0x4e8e9b);
+const POOL_TILE = rgb(0x76bfcb);
+const POOL_GLINT = rgb(0xbfe9ee);
+
+/**
+ * Glazed pool tile with a baked caustic web. tileMetres 1.2, 512 px =
+ * 2.3 mm/texel. 4 x 4 tiles = 30 cm; the 12 mm grout line is the finest band
+ * at 5.1 texels.
+ */
+const poolTileSurface: SurfaceDescription = (u, v, noise) => {
+  const cells = 4;
+  const fx = u * cells - Math.floor(u * cells);
+  const fy = v * cells - Math.floor(v * cells);
+  const grout = clamp01(
+    (1 - smooth(0, 0.02, Math.min(fx, 1 - fx)))
+    + (1 - smooth(0, 0.02, Math.min(fy, 1 - fy))),
+  );
+  // Caustics: the ridged inverse of a warped field. Baked into ALBEDO only —
+  // the tile itself is flat, so caustic light must not tilt its normal.
+  const web = noise.warp(u * 7, v * 7, 7, 2.6);
+  const caustic = Math.pow(1 - Math.abs(web - 0.5) * 2, 4);
+  const glaze = noise.fbm(u * 12, v * 12, 12, 2);
+  const tone = clamp01(0.4 + glaze * 0.24 + caustic * 0.62 - grout * 0.7);
+  const height = 0.82 - grout * 0.85;
+  return emitMix(POOL_GROUT, tone > 0.6 ? POOL_GLINT : POOL_TILE, tone, height, 0.14 + grout * 0.62, 1 - grout * 0.4);
+};
+
+const COURT_SHADOW = rgb(0x6c4234);
+const COURT_MID = rgb(0x8d5a49);
+const COURT_SUN = rgb(0xa87160);
+
+/**
+ * Acrylic sport-court topcoat. tileMetres 3.0, 512 px = 5.9 mm/texel.
+ * Finest band: the 44-cell silica-grain Worley at 11.6 texels/cell. The court
+ * MARKINGS are deliberately geometry, not texture — at this mapping a 5 cm
+ * line would be 8.5 texels across a whole 12 m court and would blur to a
+ * smear by mip 2, so `applyTest2Dressing` lays them as flush painted quads.
+ */
+const courtSurface: SurfaceDescription = (u, v, noise) => {
+  const silica = 1 - noise.worley(u * 44, v * 44, 44);
+  const rollMark = noise.fbm(u * 4, v * 4, 4, 3);
+  const wear = smooth(0.55, 0.95, noise.fbm(u * 9, v * 9, 9, 2));
+  const tone = clamp01(0.4 + rollMark * 0.36 + silica * 0.22 + wear * 0.12);
+  const height = 0.55 + silica * 0.34 + (rollMark - 0.5) * 0.12;
+  return emitMix(COURT_SHADOW, tone > 0.6 ? COURT_SUN : COURT_MID, tone, height, 0.62 + silica * 0.24 - wear * 0.08, 1 - silica * 0.14);
+};
+
+const TIMBER_SHADOW = rgb(0x5b402a);
+const TIMBER_MID = rgb(0x8a6642);
+const TIMBER_SUN = rgb(0xb08d5f);
+
+/**
+ * Oiled hardwood decking. tileMetres 1.6, 512 px = 3.1 mm/texel.
+ * 8 boards = 20 cm; the 15 mm board gap is the finest band at 4.8 texels.
+ */
+const timberSurface: SurfaceDescription = (u, v, noise) => {
+  const boards = 8;
+  const by = v * boards;
+  const board = Math.floor(by);
+  const fy = by - board;
+  const gap = 1 - smooth(0, 0.045, Math.min(fy, 1 - fy));
+  // Per-board tone shift, hashed off the board index so neighbours differ.
+  const boardTone = noise.hash(board, 7);
+  const wander = (noise.fbm(u * 5, v * 5, 5, 3) - 0.5) * 6;
+  const grain = streak(v, 30, wander);
+  const weather = noise.fbm(u * 3, v * 3, 3, 3);
+  const tone = clamp01(0.26 + grain * 0.3 + weather * 0.28 + boardTone * 0.22 - gap * 0.7);
+  const height = 0.7 + (grain - 0.5) * 0.14 - gap * 0.8;
+  return emitMix(TIMBER_SHADOW, tone > 0.6 ? TIMBER_SUN : TIMBER_MID, tone, height, 0.7 + weather * 0.22 + gap * 0.1, 1 - gap * 0.55);
+};
 
 // ---------------------------------------------------------------------------
 // Material factory
 // ---------------------------------------------------------------------------
 
-function texturedStandard(
-  color: number,
-  roughness: number,
-  metalness: number,
-  texture: THREE.CanvasTexture | null,
-  repeat: readonly [number, number] = [1, 1],
-): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({ color: texture ? 0xffffff : color, roughness, metalness });
-  if (texture) {
-    const map = texture.clone();
-    map.needsUpdate = true;
-    map.repeat.set(repeat[0], repeat[1]);
-    material.map = map;
-  }
+type ForgedMaterialOptions = {
+  color?: number;
+  roughness?: number;
+  metalness?: number;
+  normalScale?: number;
+  aoMapIntensity?: number;
+  side?: THREE.Side;
+  /**
+   * World metres one texture tile spans on any mesh wearing this material.
+   * Defaults to the surface's authored `tileMetres`; raise it to stretch the
+   * same forged set over a coarser structure (the galvanised steel is the one
+   * variant that wants a different density from its parent corrugation).
+   */
+  metresPerTile: number;
+};
+
+/**
+ * A material on a forged set.
+ *
+ * The forged set is cached by name and its four textures are SHARED by every
+ * material built from it, so no variant may write a repeat onto them. Scale is
+ * carried per MESH instead, by `worldTiled` — see the note there for why the
+ * old per-material repeat could not be right for more than one mesh size.
+ */
+function forgedMaterial(forged: ForgedSurface, name: string, options: ForgedMaterialOptions): THREE.MeshStandardMaterial {
+  const material = surfaceStandardMaterial(forged, {
+    color: options.color ?? 0xffffff,
+    roughness: options.roughness ?? 0.92,
+    metalness: options.metalness ?? 0,
+    normalScale: options.normalScale ?? 1,
+    aoMapIntensity: options.aoMapIntensity ?? 1,
+    side: options.side,
+  });
+  material.name = name;
+  material.userData.metresPerTile = options.metresPerTile;
   return material;
+}
+
+/**
+ * Re-scale a box's UVs so a shared material tiles at a FIXED WORLD SIZE.
+ *
+ * `BoxGeometry` emits 0..1 per face whatever the face measures, so a single
+ * `map.repeat` can only ever be correct for one mesh size. v1 tuned each
+ * repeat to whichever mesh was biggest and every other user of that material
+ * came out at the wrong density — the 84 m ground slab and a 5 m shed roof
+ * wearing one hardpan repeat differ by a factor of seventeen. Scaling the
+ * geometry's own UVs makes the density a property of the MESH, which is what
+ * it physically is, and lets eleven Test1 materials share six forged sets
+ * without a single cloned texture.
+ *
+ * One scale pair has to serve all six faces, so the pair is chosen from the
+ * face the viewer actually reads: a SLAB (thin in Y) is read from above, so
+ * the pair is (width, depth); a WALL (thin in X or Z) is read on its long
+ * elevation, so the pair is (long horizontal, height). Getting those right is
+ * what matters — the remaining faces are the 0.3-1 m edge bands where the
+ * difference is not readable.
+ */
+export function worldTiled<T extends THREE.Mesh>(mesh: T, size: readonly [number, number, number]): T {
+  const material = mesh.material as THREE.Material | undefined;
+  const metres = typeof material?.userData?.metresPerTile === 'number' ? material.userData.metresPerTile : 0;
+  const uv = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute | undefined;
+  if (!(metres > 0) || !uv) return mesh;
+  const [sizeX, sizeY, sizeZ] = size;
+  const slab = sizeY <= Math.min(sizeX, sizeZ);
+  const su = Math.max(slab ? sizeX : Math.max(sizeX, sizeZ), 0.01) / metres;
+  const sv = Math.max(slab ? sizeZ : sizeY, 0.01) / metres;
+  for (let index = 0; index < uv.count; index += 1) {
+    uv.setXY(index, uv.getX(index) * su, uv.getY(index) * sv);
+  }
+  uv.needsUpdate = true;
+  return mesh;
 }
 
 export type Test1Materials = Readonly<{
   hardpan: THREE.MeshStandardMaterial;
+  /** Compacted approach road / berm face: hardpan at a coarser world scale. */
+  road: THREE.MeshStandardMaterial;
   plywood: THREE.MeshStandardMaterial;
   plywoodDark: THREE.MeshStandardMaterial;
   sandbag: THREE.MeshStandardMaterial;
   containerRed: THREE.MeshStandardMaterial;
   containerBlue: THREE.MeshStandardMaterial;
   containerGreen: THREE.MeshStandardMaterial;
+  /** Galvanised structure: the corrugated set, de-rusted and tighter. */
+  steel: THREE.MeshStandardMaterial;
   cinder: THREE.MeshStandardMaterial;
   tarp: THREE.MeshStandardMaterial;
 }>;
 
+/**
+ * Six forged sets carrying eleven materials. The repeats below are authored in
+ * WORLD terms: a BoxGeometry face is 0..1 in UV whatever its size, so a repeat
+ * of R means R tiles across that face, and the numbers are picked so the
+ * surface's `tileMetres` lands close to its real-world scale on the mesh the
+ * material is dominantly used on.
+ */
 export function test1Materials(): Test1Materials {
-  const hardpanTexture = paintedTexture('test1-hardpan', 1024, 0xa11a, paintHardpan);
-  const plywoodTexture = paintedTexture('test1-plywood', 512, 0xa22b, paintPlywood);
-  const corrugatedTexture = paintedTexture('test1-corrugated', 512, 0xa33c, paintCorrugated);
-  const sandbagTexture = paintedTexture('test1-sandbag', 512, 0xa44d, paintSandbag);
-  const cinderTexture = paintedTexture('test1-cinder', 512, 0xa55e, paintCinderblock);
-  const tarpTexture = paintedTexture('test1-tarp', 512, 0xa66f, paintTarp);
-  const container = (color: number, tintName: string): THREE.MeshStandardMaterial => {
-    const material = texturedStandard(color, 0.68, 0.34, corrugatedTexture, [2.2, 1]);
-    // Tint the grey corrugation toward the container colour.
-    if (material.map) material.color.setHex(color).multiplyScalar(1.35);
-    material.name = tintName;
-    return material;
-  };
+  const hardpan = forgeSurface('test1-hardpan', hardpanSurface, {
+    size: 512, seed: 0xa11a, tileMetres: 4, reliefMetres: 0.032, anisotropy: 8,
+  });
+  const plywood = forgeSurface('test1-plywood', plywoodSurface, {
+    size: 512, seed: 0xa22b, tileMetres: 1.2, reliefMetres: 0.006,
+  });
+  const corrugated = forgeSurface('test1-corrugated', corrugatedSurface, {
+    size: 512, seed: 0xa33c, tileMetres: 2.4, reliefMetres: 0.022,
+  });
+  const sandbag = forgeSurface('test1-sandbag', sandbagSurface, {
+    size: 512, seed: 0xa44d, tileMetres: 1.6, reliefMetres: 0.06,
+  });
+  const cinder = forgeSurface('test1-cinder', cinderSurface, {
+    size: 512, seed: 0xa55e, tileMetres: 1.6, reliefMetres: 0.014,
+  });
+  const tarp = forgeSurface('test1-tarp', tarpSurface, {
+    size: 512, seed: 0xa66f, tileMetres: 2, reliefMetres: 0.01,
+  });
+
+  // Container colours are a TINT on one shared corrugation set. `map`
+  // multiplies and is capped at white, so a tint can only ever darken; the hex
+  // values are therefore chosen bright and the corrugation's own value range
+  // carries the shading (gotcha: three.js material.color cannot lighten).
+  const container = (color: number, name: string): THREE.MeshStandardMaterial =>
+    forgedMaterial(corrugated, name, { color, roughness: 0.7, metalness: 0.55, normalScale: 1.1, metresPerTile: 2.4 });
+
   return Object.freeze({
-    hardpan: texturedStandard(0xb59a6e, 0.98, 0.02, hardpanTexture, [7, 5.4]),
-    plywood: texturedStandard(0xc4a069, 0.92, 0.02, plywoodTexture, [1.6, 1]),
-    plywoodDark: texturedStandard(0x8a6e44, 0.94, 0.02, plywoodTexture, [2.4, 1]),
-    sandbag: texturedStandard(0x9a8a5e, 0.99, 0, sandbagTexture, [1.6, 1]),
-    containerRed: container(0x8a3c2c, 'test1-container-red'),
-    containerBlue: container(0x3c5a74, 'test1-container-blue'),
-    containerGreen: container(0x53644a, 'test1-container-green'),
-    cinder: texturedStandard(0x9c9488, 0.95, 0.04, cinderTexture, [1.8, 1]),
-    tarp: texturedStandard(0x6f7a52, 0.96, 0, tarpTexture, [1.4, 1]),
+    hardpan: forgedMaterial(hardpan, 'test1-hardpan', { roughness: 0.99, normalScale: 0.85, metresPerTile: 4 }),
+    road: forgedMaterial(hardpan, 'test1-road', { color: 0xc3b59b, roughness: 0.97, normalScale: 1.1, metresPerTile: 5 }),
+    plywood: forgedMaterial(plywood, 'test1-plywood', { roughness: 0.9, metresPerTile: 1.2 }),
+    plywoodDark: forgedMaterial(plywood, 'test1-plywood-dark', { color: 0xa1815a, roughness: 0.93, metresPerTile: 1.2 }),
+    sandbag: forgedMaterial(sandbag, 'test1-sandbag', { roughness: 0.99, normalScale: 1.05, metresPerTile: 1.6 }),
+    containerRed: container(0xd97a62, 'test1-container-red'),
+    containerBlue: container(0x6f9fc4, 'test1-container-blue'),
+    containerGreen: container(0x8fa878, 'test1-container-green'),
+    steel: forgedMaterial(corrugated, 'test1-steel', { color: 0xa8b1b7, roughness: 0.55, metalness: 0.7, normalScale: 0.4, metresPerTile: 3.6 }),
+    cinder: forgedMaterial(cinder, 'test1-cinder', { roughness: 0.95, normalScale: 1.15, metresPerTile: 1.6 }),
+    tarp: forgedMaterial(tarp, 'test1-tarp', { roughness: 0.96, side: THREE.DoubleSide, metresPerTile: 2 }),
   });
 }
 
 export type Test2Materials = Readonly<{
   travertine: THREE.MeshStandardMaterial;
   stucco: THREE.MeshStandardMaterial;
+  /** Cut ashlar (coping, balustrade, plinths): travertine at 1/10 the scale. */
   stone: THREE.MeshStandardMaterial;
   hedge: THREE.MeshStandardMaterial;
   poolTile: THREE.MeshStandardMaterial;
@@ -463,20 +645,35 @@ export type Test2Materials = Readonly<{
 }>;
 
 export function test2Materials(): Test2Materials {
-  const travertineTexture = paintedTexture('test2-travertine', 1024, 0xb11a, paintTravertine);
-  const stuccoTexture = paintedTexture('test2-stucco', 512, 0xb22b, paintStucco);
-  const hedgeTexture = paintedTexture('test2-hedge', 512, 0xb33c, paintHedge);
-  const poolTexture = paintedTexture('test2-pool-floor', 512, 0xb44d, paintPoolFloor);
-  const courtTexture = paintedTexture('test2-court', 1024, 0xb55e, paintCourt);
-  const deckTexture = paintedTexture('test2-deck-wood', 512, 0xb66f, paintDeckWood);
+  const travertine = forgeSurface('test2-travertine', travertineSurface, {
+    size: 512, seed: 0xb11a, tileMetres: 2.4, reliefMetres: 0.009, anisotropy: 8,
+  });
+  const stucco = forgeSurface('test2-stucco', stuccoSurface, {
+    size: 512, seed: 0xb22b, tileMetres: 2.4, reliefMetres: 0.005,
+  });
+  const hedge = forgeSurface('test2-hedge', hedgeSurface, {
+    size: 512, seed: 0xb33c, tileMetres: 1, reliefMetres: 0.03,
+  });
+  const poolTile = forgeSurface('test2-pool-tile', poolTileSurface, {
+    size: 512, seed: 0xb44d, tileMetres: 1.2, reliefMetres: 0.004,
+  });
+  const court = forgeSurface('test2-court', courtSurface, {
+    size: 512, seed: 0xb55e, tileMetres: 3, reliefMetres: 0.003,
+  });
+  const timber = forgeSurface('test2-timber', timberSurface, {
+    size: 512, seed: 0xb66f, tileMetres: 1.6, reliefMetres: 0.007,
+  });
+
   return Object.freeze({
-    travertine: texturedStandard(0xd8cbb4, 0.9, 0.03, travertineTexture, [9, 7]),
-    stucco: texturedStandard(0xe8e0d0, 0.92, 0.02, stuccoTexture, [2.4, 1.2]),
-    stone: texturedStandard(0xb0a692, 0.94, 0.03, travertineTexture, [1.2, 0.5]),
-    hedge: texturedStandard(0x3f5c34, 0.98, 0, hedgeTexture, [2, 1]),
-    poolTile: texturedStandard(0x7fc4cf, 0.36, 0.05, poolTexture, [2, 1.2]),
-    court: texturedStandard(0x87584a, 0.9, 0.02, courtTexture, [1, 1]),
-    timber: texturedStandard(0x7a5c3c, 0.88, 0.04, deckTexture, [1.6, 1]),
+    travertine: forgedMaterial(travertine, 'test2-travertine', { roughness: 0.86, normalScale: 0.9, metresPerTile: 2.4 }),
+    stucco: forgedMaterial(stucco, 'test2-stucco', { roughness: 0.9, normalScale: 0.9, metresPerTile: 3 }),
+    // Cut ashlar: the same travertine, read at a third of the scale so coping
+    // and balustrade run as 0.8 m blocks rather than 2.4 m slabs.
+    stone: forgedMaterial(travertine, 'test2-stone', { color: 0xcfc5ae, roughness: 0.88, normalScale: 1.1, metresPerTile: 0.8 }),
+    hedge: forgedMaterial(hedge, 'test2-hedge', { roughness: 0.97, normalScale: 1.4, metresPerTile: 1 }),
+    poolTile: forgedMaterial(poolTile, 'test2-pool-tile', { roughness: 0.3, metalness: 0.05, normalScale: 0.7, metresPerTile: 1.2 }),
+    court: forgedMaterial(court, 'test2-court', { roughness: 0.72, normalScale: 0.8, metresPerTile: 3 }),
+    timber: forgedMaterial(timber, 'test2-timber', { roughness: 0.8, normalScale: 1.1, metresPerTile: 1.6 }),
   });
 }
 
@@ -488,6 +685,7 @@ function presentationMesh(mesh: THREE.Mesh | THREE.InstancedMesh, castShadow = t
   mesh.castShadow = castShadow;
   mesh.receiveShadow = true;
   mesh.userData.presentationOnly = true;
+  mesh.userData.blocksShots = false;
   mesh.raycast = () => undefined;
   return mesh;
 }
@@ -497,6 +695,7 @@ function addBox(root: THREE.Group, name: string, position: [number, number, numb
   mesh.name = name;
   mesh.position.set(...position);
   mesh.rotation.y = rotationY;
+  worldTiled(mesh, size);
   root.add(presentationMesh(mesh, castShadow));
   return mesh;
 }
@@ -509,11 +708,69 @@ function addCylinder(root: THREE.Group, name: string, position: [number, number,
   return mesh;
 }
 
+/** An axis-aligned keep-out box for the vegetation clearance predicate. */
+type KeepOut = readonly [minX: number, maxX: number, minZ: number, maxZ: number];
+
+/**
+ * Builds the kit's `allow` predicate from planting bands plus keep-out rects.
+ *
+ * THE RULE THIS ENCODES: no vegetation stands in a fighting area unless it is
+ * too short to hide anyone. Vegetation is presentation-only — a round crosses
+ * it without a scratch — so a canopy that blocks SIGHT while blocking no shots
+ * is the worst object a map can contain, and the extraction doc's clearance
+ * contract exists exactly to keep it out. Everything the player can actually
+ * hide behind on these maps is an authored, collided, shot-rated mass in
+ * src/test-maps.ts (hedge blocks, planters, berms, containers); the kit
+ * supplies the density AROUND the fight.
+ *
+ * Bands are declared PER KIND, because the answer differs by height: a 0.5 m
+ * dry-scrub tuft sits below the crouched eye-line and is welcome along a
+ * verge, while a 1.1 m shrub or a 5 m cypress is not, and lives beyond the
+ * fence or wall. Keep-outs are inflated by the plant's canopy radius at its
+ * final scale, so an overhang is rejected as well as a trunk.
+ */
+function clearancePredicate(
+  bandsByKind: Readonly<Record<PlantKind, readonly KeepOut[]>>,
+  keepOuts: readonly KeepOut[],
+): ClearancePredicate {
+  return (x, z, radiusM, kind) => {
+    let inBand = false;
+    for (const [minX, maxX, minZ, maxZ] of bandsByKind[kind]) {
+      if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) { inBand = true; break; }
+    }
+    if (!inBand) return false;
+    for (const [minX, maxX, minZ, maxZ] of keepOuts) {
+      if (x >= minX - radiusM && x <= maxX + radiusM && z >= minZ - radiusM && z <= maxZ + radiusM) return false;
+    }
+    return true;
+  };
+}
+
+/** No planting of this kind anywhere. Keeps the per-kind band table total. */
+const NO_BAND: readonly KeepOut[] = Object.freeze([]);
+
+/** Mirror a keep-out rect through the origin (the Test2 fairness involution). */
+function rotated(rect: KeepOut): KeepOut {
+  return [-rect[1], -rect[0], -rect[3], -rect[2]] as const;
+}
+
+/** Mirror a keep-out rect across z = 0 (the Test1 fairness involution). */
+function mirroredZ(rect: KeepOut): KeepOut {
+  return [rect[0], rect[1], -rect[3], -rect[2]] as const;
+}
+
 // ---------------------------------------------------------------------------
-// Test1 dressing
+// Test1 dressing — the range complex
 // ---------------------------------------------------------------------------
 
-export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials): void {
+/**
+ * Vegetation and backdrop for Test1, plus the small props.
+ *
+ * Every keep-out below is authored as a `[minX, maxX, minZ, maxZ]` rect and
+ * mirrored through z = 0, which is the involution that swaps the two teams on
+ * this map (see the symmetry note at the top of src/test-maps.ts).
+ */
+export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials): EnvironmentBuildResult {
   const rng = mulberry32(0x7e571);
   const dressing = new THREE.Group();
   dressing.name = 'test1-dressing';
@@ -525,125 +782,221 @@ export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials)
   const drumRust = new THREE.MeshStandardMaterial({ color: 0x7c4a2c, roughness: 0.8, metalness: 0.3 });
   const rubber = new THREE.MeshStandardMaterial({ color: 0x23211e, roughness: 0.95, metalness: 0.05 });
   const flagRed = new THREE.MeshStandardMaterial({ color: 0xc23c2c, roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+  const paintWhite = new THREE.MeshStandardMaterial({ color: 0xe6e0cf, roughness: 0.85, metalness: 0 });
+  const paintYellow = new THREE.MeshStandardMaterial({ color: 0xd8b23c, roughness: 0.88, metalness: 0 });
 
-  // Perimeter berm ring + distant dry ridge (outside the fence, sells a real
-  // training compound instead of a box in a void).
-  const bermMaterial = materials.hardpan.clone();
-  for (const [bx, bz, bw, bd, yaw] of [
-    [0, -24.5, 62, 7, 0], [0, 24.5, 62, 7, 0], [-31, 0, 7, 48, 0], [31, 0, 7, 48, 0],
+  // --- perimeter berm ring + ridgeline backdrop + scrub -------------------
+  // Both live OUTSIDE the fence, so nothing here can occlude a lane.
+  const bermMaterial = materials.road;
+  for (const [bx, bz, bw, bd] of [
+    [0, -30, 74, 8], [0, 30, 74, 8], [-37, 0, 8, 60], [37, 0, 8, 60],
   ] as const) {
-    const berm = addBox(dressing, 'test1-berm-ring', [bx, 1.1, bz], [bw, 2.6, bd], bermMaterial, yaw, false);
-    berm.rotation.z = 0;
-  }
-  const ridgeMaterial = new THREE.MeshStandardMaterial({ color: 0x9a8a68, roughness: 1, metalness: 0 });
-  // Rounded, overlapping and sunk: sharp low-segment cones read as pyramids
-  // (measured on the first pass); wide 12-segment domes read as dry hills.
-  for (let hill = 0; hill < 18; hill += 1) {
-    const angle = (hill / 18) * Math.PI * 2 + rng() * 0.3;
-    const radius = 52 + rng() * 26;
-    const hillRadius = 16 + rng() * 18;
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(hillRadius, 12, 7, 0, Math.PI * 2, 0, Math.PI / 2), ridgeMaterial);
-    mesh.name = 'test1-ridge-hill';
-    mesh.scale.y = 0.22 + rng() * 0.16;
-    mesh.position.set(Math.cos(angle) * radius, -1.2, Math.sin(angle) * radius);
-    mesh.rotation.y = rng() * Math.PI;
-    dressing.add(presentationMesh(mesh, false));
+    addBox(dressing, 'test1-berm-ring', [bx, 1.3, bz], [bw, 2.6, bd], bermMaterial, 0, false);
   }
 
-  // Fence post rhythm: timber uprights + a top rail band break up the long
-  // perimeter planes.
-  for (let post = -6; post <= 6; post += 1) {
-    addBox(dressing, 'test1-fence-post-n', [post * 4.2, 1.4, -18.9], [0.22, 2.8, 0.22], materials.plywoodDark);
-    addBox(dressing, 'test1-fence-post-s', [post * 4.2, 1.4, 18.9], [0.22, 2.8, 0.22], materials.plywoodDark);
-  }
-  for (let post = -4; post <= 4; post += 1) {
-    addBox(dressing, 'test1-fence-post-w', [-25.9, 1.4, post * 4.4], [0.22, 2.8, 0.22], materials.plywoodDark);
-    addBox(dressing, 'test1-fence-post-e', [25.9, 1.4, post * 4.4], [0.22, 2.8, 0.22], materials.plywoodDark);
-  }
-  addBox(dressing, 'test1-fence-rail-n', [0, 2.5, -18.85], [53, 0.18, 0.14], materials.plywoodDark, 0, false);
-  addBox(dressing, 'test1-fence-rail-s', [0, 2.5, 18.85], [53, 0.18, 0.14], materials.plywoodDark, 0, false);
+  // The verge INSIDE the fence takes dry-scrub only: 0.5 m tufts sit below the
+  // crouched eye-line, so they can add density along a boundary without ever
+  // hiding a body. Shrubs and trees are barred from the playfield entirely
+  // (NO_BAND) and live in the treeline pass below.
+  const test1Verge: readonly KeepOut[] = [
+    [-31.4, -27.4, -22.4, 22.4], [27.4, 31.4, -22.4, 22.4],
+    [-31.4, 31.4, -22.4, -18.4], [-31.4, 31.4, 18.4, 22.4],
+  ];
+  const test1KeepOutHalf: readonly KeepOut[] = [
+    [-6.5, 6.5, -22.6, -17.0],    // spawn hut + its covered mouth
+    [-27.5, -15.5, -22.6, -15.5], // approach road, apron and its barriers
+    [15.5, 28.5, -20.5, -13.5],   // ammunition/stores block
+    [-32, 32, -21.6, -17.4],      // the end berm line and its walking room
+  ];
+  const test1KeepOuts: readonly KeepOut[] = [
+    ...test1KeepOutHalf, ...test1KeepOutHalf.map(mirroredZ),
+  ];
+  buildEnvironment(dressing, {
+    name: 'test1-verge',
+    vegetation: {
+      seed: 0x7e5711,
+      namePrefix: 'test1-foliage-verge',
+      area: { minX: -31.4, maxX: 31.4, minZ: -22.4, maxZ: 22.4 },
+      palette: { dryScrub: 0x9d8b58, litter: 0x9c8a60 },
+      layers: [{ kind: 'dry-scrub', count: 220, spacings: [1.05] }],
+      allow: clearancePredicate(
+        { 'dry-scrub': test1Verge, shrub: NO_BAND, conifer: NO_BAND, broadleaf: NO_BAND },
+        test1KeepOuts,
+      ),
+      lod: { nearBandM: 26 },
+    },
+  });
 
-  // Watch the lanes: red range flags on the firing line, drum clusters, tyre
-  // stacks, ammo crates, a cable run on timber poles down the east road.
-  for (const flagZ of [-16, 16]) {
-    addCylinder(dressing, 'test1-flag-pole', [-24.5, 2.2, flagZ], 0.05, 0.07, 4.4, steelDark, 6);
-    addBox(dressing, 'test1-flag-cloth', [-24.1, 4, flagZ + 0.45], [0.9, 0.55, 0.03], flagRed);
+  // The treeline OUTSIDE the compound, between the berm ring (41 m) and the
+  // ridge's 66 m inner rim: scrub trees, thorn shrub and heavy tuft cover on
+  // the approach country. Nothing here is inside the fence, so no clearance
+  // question arises and the layers can be as dense as the budget allows.
+  const test1Treeline: readonly KeepOut[] = [
+    [-52, -42, -48, 48], [42, 52, -48, 48],
+    [-52, 52, -48, -35], [-52, 52, 35, 48],
+  ];
+  const environment = buildEnvironment(dressing, {
+    name: 'test1-treeline',
+    vegetation: {
+      seed: 0x7e5713,
+      namePrefix: 'test1-foliage-treeline',
+      area: { minX: -52, maxX: 52, minZ: -48, maxZ: 48 },
+      // Dry-country palette: bleached scrub over the map's own dust colour.
+      palette: { dryScrub: 0x9d8b58, shrub: 0x6f7443, trunk: 0x6a5539, coniferCanopy: 0x40532f, litter: 0x9c8a60 },
+      layers: [
+        { kind: 'conifer', count: 34, spacings: [6.5], scaleRange: [0.7, 1.1] },
+        { kind: 'shrub', count: 90, spacings: [3.2, 2.4] },
+        { kind: 'dry-scrub', count: 220, spacings: [2.2, 1.4, 1.3] },
+      ],
+      allow: clearancePredicate(
+        { conifer: test1Treeline, shrub: test1Treeline, 'dry-scrub': test1Treeline, broadleaf: NO_BAND },
+        [],
+      ),
+      // Everything out here is beyond the fence, so the whole belt is far tier
+      // and costs one merged silhouette draw per kind.
+      lod: { nearBandM: 34 },
+    },
+    ridge: {
+      seed: 0x7e5712,
+      // Gameplay reaches hypot(32.4, 23.4) = 39.9 m at the fence corners; the
+      // kit THROWS if the inner rim falls inside the declared clear radius, so
+      // this is a checked contract rather than a hope.
+      arenaClearRadiusM: 42,
+      innerRadiusM: 66,
+      outerRadiusM: 172,
+      peakHeightM: 30,
+      lobes: [3, 7, 13],
+      nearColor: 0x8e7f5e,
+      farColor: 0xa79a78,
+      // Matched to the arena definition's fog colour (src/rendering/arenas/
+      // test1.ts, fog 0xdbd2bc) so the ridge dissolves into the haze it sits in.
+      hazeColor: 0xdbd2bc,
+      hazeStrength: 0.7,
+      name: 'test1-ridge-ring',
+    },
+  });
+
+  // --- fence rhythm -------------------------------------------------------
+  // 0.22 m uprights: thinner than the parity audit's 0.35 m census floor in
+  // both axes, so they are honestly dressing rather than unrated ghost cover.
+  for (let post = -7; post <= 7; post += 1) {
+    addBox(dressing, 'test1-fence-post-n', [post * 4.2, 1.5, -22.9], [0.22, 3, 0.22], materials.plywoodDark);
+    addBox(dressing, 'test1-fence-post-s', [post * 4.2, 1.5, 22.9], [0.22, 3, 0.22], materials.plywoodDark);
   }
-  for (let drum = 0; drum < 9; drum += 1) {
-    const x = -4 + rng() * 8;
-    const z = -16 + rng() * 32;
-    if (Math.abs(x) < 5 && Math.abs(z) < 6) continue; // clear of the tower
-    // 0.85 m tall: below the walkthrough census - visibly a drum, honestly
-    // not cover (the parity gate refuses walk-through cover-height dressing).
-    addCylinder(dressing, 'test1-drum', [x, 0.425, z], 0.4, 0.4, 0.85, rng() > 0.5 ? drumOlive : drumRust, 12);
+  for (let post = -5; post <= 5; post += 1) {
+    addBox(dressing, 'test1-fence-post-w', [-31.9, 1.5, post * 4.2], [0.22, 3, 0.22], materials.plywoodDark);
+    addBox(dressing, 'test1-fence-post-e', [31.9, 1.5, post * 4.2], [0.22, 3, 0.22], materials.plywoodDark);
   }
-  for (const [tx, tz] of [[-7.5, 3], [8.5, -4], [5.5, 14.5]] as const) {
-    for (let tyre = 0; tyre < 3; tyre += 1) {
-      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.16, 8, 14), rubber);
-      mesh.name = 'test1-tyre';
-      mesh.position.set(tx + (rng() - 0.5) * 0.2, 0.18 + tyre * 0.34, tz + (rng() - 0.5) * 0.2);
-      mesh.rotation.x = Math.PI / 2;
-      dressing.add(presentationMesh(mesh));
+  for (const railZ of [-22.85, 22.85]) {
+    addBox(dressing, 'test1-fence-rail', [0, 2.7, railZ], [64, 0.18, 0.14], materials.plywoodDark, 0, false);
+  }
+  for (const railX of [-31.85, 31.85]) {
+    addBox(dressing, 'test1-fence-rail-end', [railX, 2.7, 0], [0.14, 0.18, 46], materials.plywoodDark, 0, false);
+  }
+
+  // --- firing line furniture ---------------------------------------------
+  // Lane numbers 1..7 on the firing-point kerb. 0.42 m tall: under the 0.9 m
+  // census floor, so these are dressing by measurement, not by assertion.
+  for (let lane = 0; lane < 7; lane += 1) {
+    const laneZ = (lane - 3) * 5;
+    addBox(dressing, 'test1-lane-marker', [-15.5, 0.21, laneZ], [0.06, 0.42, 0.6], paintWhite, 0, false);
+    addBox(dressing, 'test1-lane-number', [-15.46, 0.26, laneZ], [0.03, 0.26, 0.34], paintYellow, 0, false);
+  }
+  // Red range flags at both ends of the firing line (cloth: excluded from the
+  // ballistic census by name, and correctly so - a round crosses a flag).
+  for (const flagZ of [-19.5, 19.5]) {
+    addCylinder(dressing, 'test1-flag-pole', [-19.5, 2.4, flagZ], 0.05, 0.07, 4.8, steelDark, 6);
+    addBox(dressing, 'test1-flag-cloth', [-19.1, 4.4, flagZ + 0.45], [0.9, 0.55, 0.03], flagRed);
+  }
+  // Camo netting strung across the container yard, resting on the container
+  // tops (2.6 m). Its underside sits at 2.92 m — above the 2.6 m reachable
+  // ceiling — and 'tarp' is a cloth exclusion in the ballistic census, which
+  // is right: a round crosses netting.
+  for (const netZ of [-8, 8]) {
+    const net = addBox(dressing, 'test1-camo-net-tarp', [21, 2.95, netZ], [9, 0.06, 6.4], materials.tarp, 0, false);
+    net.rotation.z = 0.035;
+  }
+
+  // --- yard and apron clutter --------------------------------------------
+  // Everything below is authored in explicit z-MIRROR PAIRS rather than
+  // scattered: the props sit in the gaps between authored masses, and a random
+  // scatter over a map this dense reliably drops a drum inside a container.
+  // Drums are 0.85 m: visibly a drum, honestly not cover, and under the parity
+  // audit's 0.9 m walk-through census floor by measurement.
+  const drumSpots: ReadonlyArray<readonly [number, number]> = [
+    [-6.5, 6.5], [11.2, 5.5], [19.5, 7.8], [24.5, 0], [2.5, 13.5], [-19.5, 13.5],
+  ];
+  for (const [dx, dz] of drumSpots) {
+    for (const end of [-1, 1] as const) {
+      addCylinder(dressing, 'test1-drum', [dx, 0.425, end * dz], 0.4, 0.4, 0.85, rng() > 0.5 ? drumOlive : drumRust, 12);
     }
   }
-  for (let crate = 0; crate < 6; crate += 1) {
-    const x = 6 + rng() * 16;
-    const z = -14 + rng() * 28;
-    addBox(dressing, 'test1-ammo-crate', [x, 0.24, z], [0.9, 0.48, 0.55], materials.plywoodDark, rng() * Math.PI);
+  for (const [tx, tz] of [[-11.6, 6], [12.6, 4.6], [9.6, 15.5]] as const) {
+    for (const end of [-1, 1] as const) {
+      for (let tyre = 0; tyre < 3; tyre += 1) {
+        const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.16, 8, 14), rubber);
+        mesh.name = 'test1-tyre';
+        mesh.position.set(tx + (rng() - 0.5) * 0.2, 0.18 + tyre * 0.34, end * tz + (rng() - 0.5) * 0.2);
+        mesh.rotation.x = Math.PI / 2;
+        dressing.add(presentationMesh(mesh));
+      }
+    }
   }
-  for (const poleZ of [-12, 0, 12]) {
-    addCylinder(dressing, 'test1-power-pole', [24.6, 2.6, poleZ], 0.09, 0.12, 5.2, materials.plywoodDark, 7);
-    addBox(dressing, 'test1-power-cross', [24.6, 4.7, poleZ], [1.4, 0.09, 0.09], materials.plywoodDark);
+  // Ammunition crates: inside the stores blocks and on the yard's open aisles.
+  const crateSpots: ReadonlyArray<readonly [number, number]> = [
+    [19.4, 17.2], [20.6, 16.3], [24.2, 17.4], [25.4, 16.4], [22, 18.4],
+    [10.9, 1.6], [11.3, -1.8], [22.4, 7.4],
+  ];
+  for (const [cx, cz] of crateSpots) {
+    for (const end of [-1, 1] as const) {
+      addBox(dressing, 'test1-ammo-crate', [cx, 0.24, end * cz], [0.9, 0.48, 0.55], materials.plywoodDark, rng() * Math.PI);
+    }
+  }
+  // Vehicle-park bay markings: flat paint, 40 mm proud of the apron.
+  for (const parkZ of [-1, 1] as const) {
+    for (let bay = 0; bay < 4; bay += 1) {
+      addBox(dressing, 'test1-bay-stripe', [-26 + bay * 3.4, 0.04, parkZ * 18.5], [0.16, 0.04, 5.2], paintYellow, 0, false);
+    }
+  }
+  // Power line down the yard, inboard of the fence and clear of the container
+  // rows: 0.24 m poles, cross-arms above head height.
+  for (const poleZ of [-16, -8, 0, 8, 16]) {
+    addCylinder(dressing, 'test1-power-pole', [31.2, 2.8, poleZ], 0.09, 0.12, 5.6, materials.plywoodDark, 7);
+    addBox(dressing, 'test1-power-cross', [31.2, 5.1, poleZ], [1.4, 0.09, 0.09], materials.plywoodDark);
+  }
+  // Range-control mast on the tower roof: above the deck, thin, and paired
+  // with the loudspeaker drum that sells the tower as a working building.
+  addCylinder(dressing, 'test1-control-mast', [1.6, 5.4, 0], 0.06, 0.09, 5.4, steelDark, 6);
+  addBox(dressing, 'test1-control-speaker', [1.6, 7.6, 0.34], [0.34, 0.34, 0.3], steelDark, 0, false);
+
+  // Contact grime: a thin dust fillet where each block meets the hardpan, so
+  // walls stop reading as decals stood on a plane (extraction doc, "Contact
+  // grounding"). 0.22 m tall - dressing by measurement.
+  for (const [gx, gz, gw, gd] of [
+    [0, 0, 20.4, 8.4],                              // tower core + both annexes
+    [-13.8, 0, 6.4, 34],                            // covered firing line
+    [-29.5, 0, 4, 42],                              // downrange backstop berm
+    [0, -20, 10.6, 4.8], [0, 20, 10.6, 4.8],        // spawn sheds
+    [22, -16.7, 11.4, 5.6], [22, 16.7, 11.4, 5.6],  // ammunition/stores blocks
+  ] as const) {
+    addBox(dressing, 'test1-contact-grime', [gx, 0.11, gz], [gw + 0.6, 0.22, gd + 0.6], bermMaterial, 0, false);
   }
 
-  // Camo net over the north shack: a tarp canopy on angled poles.
-  for (const netSide of [-1, 1] as const) {
-    const net = addBox(dressing, 'test1-camo-net', [-14, 3.4, netSide * 13], [7, 0.06, 6.6], materials.tarp, 0, false);
-    net.rotation.z = 0.08 * netSide;
-    net.rotation.x = -0.06 * netSide;
-  }
-
-  // Dry scrub: instanced crossed-plane tufts around the map edge (vegetation
-  // skill: Fibonacci-free deterministic scatter, presentation-only).
-  const tuftGeometry = new THREE.ConeGeometry(0.4, 0.34, 6);
-  const tuftMaterial = new THREE.MeshStandardMaterial({ color: 0x99885a, roughness: 1, metalness: 0 });
-  const tuftCount = 140;
-  const tufts = new THREE.InstancedMesh(tuftGeometry, tuftMaterial, tuftCount);
-  tufts.name = 'test1-scrub-tufts';
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  let placed = 0;
-  let attempts = 0;
-  while (placed < tuftCount && attempts < tuftCount * 30) {
-    attempts += 1;
-    const x = -25 + rng() * 50;
-    const z = -18 + rng() * 36;
-    // Keep the fighting lanes clean: scrub hugs the fence line only (the
-    // west firing lane runs the full z-extent, so no mid-lane band there).
-    const nearEdge = Math.abs(x) > 21 || Math.abs(z) > 16;
-    if (!nearEdge) continue;
-    const scale = 0.6 + rng() * 1;
-    quaternion.setFromAxisAngle(up, rng() * Math.PI * 2);
-    matrix.compose(
-      new THREE.Vector3(x, 0.15 * scale, z),
-      quaternion,
-      new THREE.Vector3(scale, scale * 0.75, scale),
-    );
-    tufts.setMatrixAt(placed, matrix);
-    placed += 1;
-  }
-  tufts.count = placed;
-  tufts.instanceMatrix.needsUpdate = true;
-  tufts.computeBoundingSphere();
-  dressing.add(presentationMesh(tufts, false));
+  return environment;
 }
 
 // ---------------------------------------------------------------------------
-// Test2 dressing
+// Test2 dressing — the estate
 // ---------------------------------------------------------------------------
 
-export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials): void {
+/**
+ * Vegetation, backdrop and props for Test2.
+ *
+ * Every keep-out is authored once and rotated 180 degrees through the origin,
+ * which is Test2's fairness involution: it maps team 0's half onto team 1's
+ * and Domination zone A onto zone C.
+ */
+export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials): EnvironmentBuildResult {
   const rng = mulberry32(0x7e572);
   const dressing = new THREE.Group();
   dressing.name = 'test2-dressing';
@@ -652,48 +1005,158 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
 
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd9dee2, roughness: 0.16, metalness: 0.85 });
   const canvasCream = new THREE.MeshStandardMaterial({ color: 0xefe6d2, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
-  const soil = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 1, metalness: 0 });
-  const trunk = new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.95, metalness: 0 });
-  const cypressFoliage = new THREE.MeshStandardMaterial({ color: 0x3a5a34, roughness: 0.95, metalness: 0 });
+  const gravel = new THREE.MeshStandardMaterial({ color: 0x9a9078, roughness: 1, metalness: 0 });
+  const courtLine = new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.7, metalness: 0 });
   const glassBlue = new THREE.MeshStandardMaterial({ color: 0x9fc8d8, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.35 });
 
-  // Villa facades dressed onto the estate walls: pilasters, window bands and a
-  // cornice line so the perimeter reads as the mansion, not a fence.
+  // The dry hillside the estate is cut into. The terrace slabs stop 1.5 m
+  // outside the estate wall; without this the ground simply ended there and
+  // the ridge ring rose out of a void. Sunk 0.2 m so the wall stands on
+  // travertine, and named 'terrain' so the parity audit's walkable-surface
+  // rule excludes it explicitly rather than by a footprint-share accident.
+  const hillside = materials.hedge.clone();
+  hillside.name = 'test2-hillside';
+  hillside.color.setHex(0x9a9366);
+  hillside.roughness = 1;
+  hillside.userData.metresPerTile = 5;
+  addBox(dressing, 'test2-hillside-terrain', [0, -0.15, 0], [176, 0.3, 156], hillside, 0, false);
+
+  // --- vegetation + ridgeline --------------------------------------------
+  // The estate palette: dark clipped cypress, olive broadleaf, box shrub, over
+  // a pale gravel litter. Shared by both passes so the two belts read as one
+  // planting scheme.
+  const estatePalette = {
+    trunk: 0x6b563c,
+    broadleafCanopy: 0x5d7440,
+    coniferCanopy: 0x2c4630,
+    shrub: 0x47653a,
+    dryScrub: 0x8c8d5c,
+    litter: 0xa39a80,
+  } as const;
+
+  // INSIDE the estate wall: a clipped border in the 0.6..4.6 m strip behind the
+  // wall, and nothing else. The three lanes carry their green as authored
+  // hedge blocks and planters in src/test-maps.ts — collided, shot-rated and
+  // symmetric — because a 5 m cypress standing in a lane would block sight
+  // while stopping no bullet, which is the one thing presentation art must
+  // never do. Cypress is admitted here (the border is behind the wall, out of
+  // every lane) and broadleaf is not: its 1.6 m canopy overhangs too far.
+  const test2Border: readonly KeepOut[] = [
+    [-37.4, -33.4, -28.4, 28.4], [33.4, 37.4, -28.4, 28.4],
+    [-37.4, 37.4, -28.4, -24.4], [-37.4, 37.4, 24.4, 28.4],
+  ];
+  const test2KeepOutHalf: readonly KeepOut[] = [
+    [-38, -28, -14, 14],          // west motor court and its spawn fan
+    [-30, 30, -27, -19.6],        // the north villa wing, veranda and its roof
+    [-35.5, -24.5, -21, -11],     // the outbuildings on the west diagonal
+    [24.5, 35.5, -21, -11],       // the outbuildings on the east diagonal
+  ];
+  const test2KeepOuts: readonly KeepOut[] = [
+    ...test2KeepOutHalf, ...test2KeepOutHalf.map(rotated),
+  ];
+  buildEnvironment(dressing, {
+    name: 'test2-border',
+    vegetation: {
+      seed: 0x7e5721,
+      namePrefix: 'test2-foliage-border',
+      area: { minX: -37.4, maxX: 37.4, minZ: -28.4, maxZ: 28.4 },
+      palette: estatePalette,
+      layers: [
+        // Cypress sentinels first: they own the largest clearance, so every
+        // later layer is spaced off them rather than the other way round.
+        { kind: 'conifer', count: 26, spacings: [4.6], scaleRange: [0.95, 1.3] },
+        { kind: 'shrub', count: 80, spacings: [2.4, 1.9] },
+      ],
+      allow: clearancePredicate(
+        { conifer: test2Border, shrub: test2Border, broadleaf: NO_BAND, 'dry-scrub': NO_BAND },
+        test2KeepOuts,
+      ),
+      lod: { nearBandM: 30 },
+    },
+  });
+
+  // OUTSIDE the wall: the hillside the estate is cut into, between the wall and
+  // the ridge's 78 m inner rim. Olive broadleaf, more cypress, thorn shrub and
+  // dry scrub, with no clearance question to answer.
+  const test2Hillside: readonly KeepOut[] = [
+    [-64, -46, -56, 56], [46, 64, -56, 56],
+    [-64, 64, -56, -36], [-64, 64, 36, 56],
+  ];
+  const environment = buildEnvironment(dressing, {
+    name: 'test2-hillside',
+    vegetation: {
+      seed: 0x7e5723,
+      namePrefix: 'test2-foliage-hillside',
+      area: { minX: -64, maxX: 64, minZ: -56, maxZ: 56 },
+      palette: estatePalette,
+      layers: [
+        { kind: 'broadleaf', count: 44, spacings: [7.5] },
+        { kind: 'conifer', count: 40, spacings: [6, 5.4] },
+        { kind: 'shrub', count: 120, spacings: [3.4, 2.8, 2.4] },
+        { kind: 'dry-scrub', count: 200, spacings: [2.2, 1.8, 1.4, 1.3] },
+      ],
+      allow: clearancePredicate(
+        { broadleaf: test2Hillside, conifer: test2Hillside, shrub: test2Hillside, 'dry-scrub': test2Hillside },
+        [],
+      ),
+      lod: { nearBandM: 44 },
+    },
+    ridge: {
+      seed: 0x7e5722,
+      // Gameplay reaches hypot(38.4, 29.4) = 48.4 m at the wall corners.
+      arenaClearRadiusM: 50,
+      innerRadiusM: 78,
+      outerRadiusM: 196,
+      peakHeightM: 34,
+      lobes: [2, 5, 11],
+      nearColor: 0x7d7a5c,
+      farColor: 0x9d9375,
+      // Arena fog is 0xe9c9a0 (src/rendering/arenas/test2.ts): a golden-hour
+      // haze, so the hillsides warm as they recede instead of greying out.
+      hazeColor: 0xe9c9a0,
+      hazeStrength: 0.74,
+      name: 'test2-ridge-ring',
+    },
+  });
+
+  // --- pool life ----------------------------------------------------------
+  // Umbrella canopies sit at 2.72 m, above the 2.6 m reachable ceiling; poles
+  // are 0.1 m. Both halves are 180-degree pairs of each other.
   for (const side of [-1, 1] as const) {
-    const wallZ = side * 24.9;
-    for (let pilaster = -3; pilaster <= 3; pilaster += 1) {
-      addBox(dressing, 'test2-pilaster', [pilaster * 9, 1.6, wallZ - side * 0.15], [0.8, 3.2, 0.3], materials.stucco);
+    for (const along of [-1, 1] as const) {
+      const ux = side * along * 11;
+      const uz = side * -10.4;
+      addCylinder(dressing, 'test2-umbrella-pole', [ux, 1.36, uz], 0.05, 0.05, 2.72, chrome, 8);
+      const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.8, 10), canvasCream);
+      canopy.name = 'test2-umbrella-canopy';
+      canopy.position.set(ux, 3.1, uz);
+      dressing.add(presentationMesh(canopy));
     }
-    addBox(dressing, 'test2-cornice', [0, 3.05, wallZ - side * 0.2], [64, 0.35, 0.5], materials.stone, 0, false);
-    for (let window = -3; window <= 3; window += 1) {
-      addBox(dressing, 'test2-wall-window', [window * 9 + 4.5, 1.9, wallZ - side * 0.2], [2.6, 1.5, 0.1], glassBlue, 0, false);
-    }
-  }
-  for (const side of [-1, 1] as const) {
-    const wallX = side * 32.9;
-    addBox(dressing, 'test2-cornice-end', [wallX - side * 0.2, 3.05, 0], [0.5, 0.35, 48], materials.stone, 0, false);
-    for (let window = -2; window <= 2; window += 1) {
-      addBox(dressing, 'test2-end-window', [wallX - side * 0.2, 1.9, window * 9 + 4.5], [0.1, 1.5, 2.6], glassBlue, 0, false);
-    }
+    addCylinder(dressing, 'test2-pool-ladder-a', [side * 7.1, 0.35, side * -12.2], 0.04, 0.04, 1.3, chrome, 6);
+    addCylinder(dressing, 'test2-pool-ladder-b', [side * 7.1, 0.35, side * -11.6], 0.04, 0.04, 1.3, chrome, 6);
+    addBox(dressing, 'test2-towel-stack', [side * -9.4, 0.62, side * -11.2], [0.6, 0.4, 0.5], canvasCream, 0.3, false);
   }
 
-  // Pool life: umbrellas, upgraded loungers, towel stack, chrome pool ladder.
-  for (const umbrellaSide of [-1, 1] as const) {
-    const ux = umbrellaSide * 11;
-    addCylinder(dressing, 'test2-umbrella-pole', [ux, 1.5, -10.6], 0.05, 0.05, 3, chrome, 8);
-    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.8, 10), canvasCream);
-    canopy.name = 'test2-umbrella-canopy';
-    canopy.position.set(ux, 3.1, -10.6);
-    dressing.add(presentationMesh(canopy));
+  // --- court markings -----------------------------------------------------
+  // Geometry, not texture: at the court surface's 5.9 mm/texel a 50 mm line
+  // is 8.5 texels across a 12 m court and blurs away by mip 2. Flush quads at
+  // 30 mm proud of the sunken floor stay crisp at every distance.
+  const courtY = -0.34;
+  for (const edge of [-1, 1] as const) {
+    addBox(dressing, 'test2-court-line-side', [edge * 6.6, courtY, 0], [0.08, 0.03, 9.4], courtLine, 0, false);
+    addBox(dressing, 'test2-court-line-end', [0, courtY, edge * 4.7], [13.2, 0.03, 0.08], courtLine, 0, false);
+    addBox(dressing, 'test2-court-line-key', [edge * 5.2, courtY, 0], [2.6, 0.03, 3.6], courtLine, 0, false);
   }
-  addCylinder(dressing, 'test2-pool-ladder-a', [6.9, 0.35, -12.2], 0.04, 0.04, 1.3, chrome, 6);
-  addCylinder(dressing, 'test2-pool-ladder-b', [6.9, 0.35, -11.6], 0.04, 0.04, 1.3, chrome, 6);
-  addBox(dressing, 'test2-towel-stack', [-9.4, 0.62, -11.2], [0.6, 0.4, 0.5], canvasCream, 0.3, false);
-
-  // Court gear: hoop at each end + shade pergola over the north benches.
+  addBox(dressing, 'test2-court-line-centre', [0, courtY, 0], [0.08, 0.03, 9.4], courtLine, 0, false);
+  const centreCircle = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.04, 6, 36), courtLine);
+  centreCircle.name = 'test2-court-line-circle';
+  centreCircle.position.set(0, courtY, 0);
+  centreCircle.rotation.x = Math.PI / 2;
+  dressing.add(presentationMesh(centreCircle, false));
+  // Hoops: 0.11 m poles, backboards above the reachable ceiling.
   for (const hoopEnd of [-1, 1] as const) {
-    const hx = hoopEnd * 6.9;
-    addCylinder(dressing, 'test2-hoop-pole', [hx, 1.9, 0], 0.09, 0.11, 3.8, chrome, 8);
+    const hx = hoopEnd * 7.4;
+    addCylinder(dressing, 'test2-hoop-pole', [hx, 1.7, 0], 0.09, 0.11, 4, chrome, 8);
     addBox(dressing, 'test2-hoop-board', [hx - hoopEnd * 0.5, 3.35, 0], [0.08, 1, 1.6], glassBlue, 0, false);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 6, 14), new THREE.MeshStandardMaterial({ color: 0xd4622c, roughness: 0.5, metalness: 0.5 }));
     ring.name = 'test2-hoop-ring';
@@ -702,66 +1165,62 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
     dressing.add(presentationMesh(ring, false));
   }
 
-  // Garden: cypress sentinels along the terrace, planter shrubs, a gravel
-  // path band, and box hedge balls by the balustrade gaps.
-  const cypressCount = 12;
-  const cypressGeometry = new THREE.ConeGeometry(0.52, 4.8, 8);
-  const cypress = new THREE.InstancedMesh(cypressGeometry, cypressFoliage, cypressCount);
-  cypress.name = 'test2-cypress-row';
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  for (let tree = 0; tree < cypressCount; tree += 1) {
-    const x = -27.5 + (tree % 6) * 11 + (tree >= 6 ? 5.5 : 0);
-    const z = tree >= 6 ? 22.6 : 12.2;
-    quaternion.setFromAxisAngle(up, (tree % 5) * 0.7);
-    const scale = 0.85 + (tree % 3) * 0.14;
-    matrix.compose(new THREE.Vector3(x, 2.2 * scale, z), quaternion, new THREE.Vector3(scale, scale, scale));
-    cypress.setMatrixAt(tree, matrix);
-  }
-  cypress.instanceMatrix.needsUpdate = true;
-  cypress.computeBoundingSphere();
-  dressing.add(presentationMesh(cypress));
-  for (let tree = 0; tree < cypressCount; tree += 1) {
-    const x = -27.5 + (tree % 6) * 11 + (tree >= 6 ? 5.5 : 0);
-    const z = tree >= 6 ? 22.6 : 12.2;
-    addCylinder(dressing, 'test2-cypress-trunk', [x, 0.3, z], 0.09, 0.12, 0.6, trunk, 6);
-  }
-
-  // Planter shrubs: three-lobe blobs above the authored planter hedges.
-  const shrubGeometry = new THREE.IcosahedronGeometry(0.62, 1);
-  const shrubCount = 10;
-  const shrubs = new THREE.InstancedMesh(shrubGeometry, materials.hedge, shrubCount);
-  shrubs.name = 'test2-planter-shrubs';
-  const shrubSpots: Array<[number, number, number]> = [
-    [-8, 2.2, -6], [8, 2.2, -6], [-8, 2.2, 6], [8, 2.2, 6],
-    [-13, 1.5, 9.5], [13, 1.5, 9.5], [0, 1.5, 9.5],
-    [-10, 2.3, 15], [10, 2.3, 15], [0, 2.3, 19],
-  ];
-  for (let shrub = 0; shrub < shrubCount; shrub += 1) {
-    const [x, y, z] = shrubSpots[shrub]!;
-    quaternion.setFromAxisAngle(up, (shrub % 7) * 0.5);
-    const scale = 0.8 + (shrub % 4) * 0.12;
-    matrix.compose(new THREE.Vector3(x + (rng() - 0.5) * 0.4, y, z + (rng() - 0.5) * 0.3), quaternion, new THREE.Vector3(scale, scale * 0.8, scale));
-    shrubs.setMatrixAt(shrub, matrix);
-  }
-  shrubs.instanceMatrix.needsUpdate = true;
-  shrubs.computeBoundingSphere();
-  dressing.add(presentationMesh(shrubs));
-
-  // Motor court: a second parked car silhouette + planter urns at the mouths.
-  for (const motorSide of [-1, 1] as const) {
-    for (const urnZ of [-1, 1]) {
-      addCylinder(dressing, 'test2-urn', [motorSide * 23.5, 0.42, urnZ * 2 + motorSide * 2], 0.4, 0.3, 0.84, materials.stone, 9);
+  // --- garden dressing ----------------------------------------------------
+  // Gravel beds and parterre planting inside the sunken garden, plus urns on
+  // the motor courts. Everything under 0.9 m, all in 180-degree pairs.
+  for (const side of [-1, 1] as const) {
+    for (let bed = 0; bed < 4; bed += 1) {
+      // Parterre beds sit ON the sunken garden floor (top at -0.55), so they
+      // are 30 mm proud of it rather than floating at grade.
+      const bx = side * (-5.2 + bed * 3.5);
+      const bz = side * (11.6 + (bed % 2) * 4.6);
+      addBox(dressing, 'test2-parterre-bed', [bx, -0.52, bz], [3, 0.06, 3.4], gravel, 0, false);
+    }
+    for (const urnAlong of [-1, 1] as const) {
+      const ux = side * 30.5;
+      const uz = side * urnAlong * 3.4;
+      addCylinder(dressing, 'test2-urn', [ux, 0.42, uz], 0.4, 0.3, 0.84, materials.stone, 9);
       const urnShrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 1), materials.hedge);
       urnShrub.name = 'test2-urn-shrub';
-      urnShrub.position.set(motorSide * 23.5, 1.1, urnZ * 2 + motorSide * 2);
+      urnShrub.position.set(ux, 1.1, uz);
       dressing.add(presentationMesh(urnShrub));
+    }
+    // Villa wing detail. The wing wall runs z = side * (25.7 .. 26.3), and BOTH
+    // the pilasters and the window band are set 0.12 m proud of its inner face
+    // rather than standing clear of it: the ballistic census needs a quarter of
+    // a mesh's footprint covered by a registered shot surface, and 0.22 m of
+    // each 0.34 m pilaster (0.20 m of each 0.30 m window) lands inside the
+    // wall's. Standing them off the wall - which is what v1 did against the old
+    // perimeter - makes them ghost cover a round crosses silently.
+    for (let bay = -3; bay <= 3; bay += 1) {
+      addBox(dressing, 'test2-pilaster', [side * bay * 8.5, 2.1, side * 25.75], [0.9, 4.2, 0.34], materials.stucco);
+    }
+    // Window bays sit between the pilasters and clear of the authored glazed
+    // doors at |x| = 14 (test-maps.ts), so no two panes fight for the same face.
+    for (const windowX of [-21.25, -4.25, 4.25, 21.25]) {
+      addBox(dressing, 'test2-wing-window', [side * windowX, 2.2, side * 25.75], [2.6, 1.6, 0.3], glassBlue, 0, false);
+    }
+    addBox(dressing, 'test2-cornice', [0, 4.35, side * 26], [56, 0.4, 0.7], materials.stone, 0, false);
+    addBox(dressing, 'test2-cornice-end', [side * 38.2, 3.3, 0], [0.5, 0.35, 58], materials.stone, 0, false);
+  }
+
+  // Contact grounding under the estate's heavy masses.
+  for (const [gx, gz, gw, gd] of [
+    [0, -25.4, 56, 3.2], [0, 25.4, 56, 3.2],
+    [-24, -19, 10, 9], [24, 19, 10, 9], [24, -19, 10, 9], [-24, 19, 10, 9],
+    [-32, 0, 11, 15], [32, 0, 11, 15],
+  ] as const) {
+    addBox(dressing, 'test2-contact-grime', [gx, 0.05, gz], [gw + 0.6, 0.1, gd + 0.6], gravel, 0, false);
+  }
+
+  // A few scattered loungers and planters, jittered on the seeded stream so
+  // the deck does not read as a grid. Height 0.4 m: dressing by measurement.
+  for (const side of [-1, 1] as const) {
+    for (let lounger = 0; lounger < 3; lounger += 1) {
+      const lx = side * (9.4 + lounger * 2.4 + rng() * 0.3);
+      addBox(dressing, 'test2-lounger', [lx, 0.3, side * -11.4], [0.8, 0.4, 2], materials.timber, side * 0.06, true);
     }
   }
 
-  // Garden soil beds under the hedges.
-  for (const [bx, bz, bw, bd] of [[-10, 15, 5.6, 2.2], [10, 15, 5.6, 2.2], [0, 19, 5.6, 2.2]] as const) {
-    addBox(dressing, 'test2-soil-bed', [bx, 0.02, bz], [bw, 0.06, bd], soil, 0, false);
-  }
+  return environment;
 }

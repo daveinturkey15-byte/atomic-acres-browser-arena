@@ -655,11 +655,30 @@
  * PART 4 - the Chopper Gunner cockpit joins the same grammar.
  * ------------------------------------------------------------------------ */
 
+/* Owner 2026-08-30 ("the hud ... look[s] bad"). The strip used to be ONE card
+   wrapping both controls, so LMB GUN and RMB MISSILES were forced to read at
+   the same weight - the flat-boxes complaint in miniature. The container is now
+   pure layout and each control carries its own material, which is what lets
+   pass65-hud.css make the missile cell the loud one. Both pass75-hud-redesign
+   .css and the previous version of this rule painted the container, and both
+   sheets are unlayered, so the reset has to be explicit rather than absent. */
 #gunner-cockpit-hud #gunner-control-strip {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Material only - depth and blur. Colour, edge and weight stay with
+   pass65-hud.css for the same reason the rails below do: this sheet is
+   unlayered and would win any axis it touched, splitting one cockpit across
+   two sheets that cannot see each other. */
+#gunner-cockpit-hud #gunner-gun-control,
+#gunner-cockpit-hud #gunner-missile-status {
   border-radius: var(--p77-radius, 2px);
-  border: 1px solid rgb(233 208 191 / 0.18);
-  background-image: linear-gradient(178deg, rgb(51 31 17 / 0.56) 0%, rgb(19 10 4 / 0.78) 100%);
-  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(253 245 240 / 0.14);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(253 245 240 / 0.10);
   -webkit-backdrop-filter: blur(10px) saturate(1.4);
   backdrop-filter: blur(10px) saturate(1.4);
 }
@@ -679,9 +698,10 @@
   backdrop-filter: blur(10px) saturate(1.4);
 }
 
-#gunner-cockpit-hud #gunner-control-strip {
-  border-left: 2px solid var(--hud-amber, #f2b74f);
-}
+/* The amber rail that used to run down the outside of the whole strip is gone
+   with the container card: an accent that covers both controls equally is an
+   accent that ranks neither. pass65-hud.css now puts the lit edge on the
+   missile cell alone, and turns it green the instant the tube is loaded. */
 
 #gunner-cockpit-hud #gunner-hull,
 #gunner-cockpit-hud #gunner-ammo,

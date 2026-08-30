@@ -1079,70 +1079,181 @@
        height (1e043fb2) and it never reached main, which is the taller cockpit
        the owner remembers. The wedge clip keeps the sight corridor clear. */
     height: clamp(280px, 58vh, 620px);
-    border-top: 1px solid rgba(126, 255, 173, 0.38);
-    background: linear-gradient(to top, rgba(2, 12, 9, 0.74), rgba(2, 12, 9, 0.2) 58%, transparent);
+    /* Owner 2026-08-30: the canopy pillars were the largest mint surface on
+       screen and set the whole cockpit's colour reading. Warm ink with a lit
+       amber edge puts them on the committed deck without moving a pixel. */
+    border-top: 1px solid rgba(255, 178, 96, 0.26);
+    background: linear-gradient(to top, rgba(12, 7, 3, 0.80), rgba(12, 7, 3, 0.22) 58%, transparent);
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before {
     left: 0;
-    border-right: 2px solid rgba(126, 255, 173, 0.48);
+    border-right: 2px solid rgba(255, 168, 82, 0.42);
     clip-path: polygon(0 0, 18% 0, 100% 100%, 0 100%);
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::after {
     right: 0;
-    border-left: 2px solid rgba(126, 255, 173, 0.48);
+    border-left: 2px solid rgba(255, 168, 82, 0.42);
     clip-path: polygon(82% 0, 100% 0, 100% 100%, 0 100%);
   }
 
+  /* Owner 2026-08-30: "the hud ... look[s] bad". Measured on the live build at
+     1920x1080, the cockpit was six identical mint boxes plus two identical
+     control boxes - twelve numbers rendered at two sizes, so the three a gunner
+     actually acts on inside a 30-second possession (time remaining, hull, and
+     whether a missile is loaded) took as long to find as the ones he never
+     acts on at all. This palette exists so hierarchy can be carried by TONE as
+     well as size: bone is a value, mute is telemetry, burnt orange is "act on
+     me", and green is reserved for the single state that means "fire now".
+     Green is state here, never chrome - that is exactly the split the mint
+     cockpit did not make. Scoped to the chopper root, so the Piloted Drone
+     variant keeps its own long-standing look untouched. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] {
+    --gunner-bone: #fbf3e9;
+    --gunner-read: #e8d6c1;
+    --gunner-mute: #b39d86;
+    --gunner-signal: #ff9d3f;
+    --gunner-signal-dim: rgba(255, 157, 63, 0.38);
+    --gunner-ok: #7dffa6;
+    --gunner-ink-deep: rgba(10, 5, 2, 0.80);
+    --gunner-hair: rgba(233, 208, 191, 0.16);
+  }
+
+  /* Bone-white aim arms on an amber bloom rather than mint: white is the
+     highest-contrast mark over arbitrary terrain, and the warm bloom joins the
+     reticle to the rest of the cockpit instead of leaving it the one green
+     object on a warm deck. Geometry is untouched - the centre corridor
+     contract in src/pass70-chopper-gunner-contract.test.ts owns that. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-reticle {
+    color: rgba(255, 244, 228, 0.97);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-reticle > span {
+    box-shadow: 0 0 6px rgba(255, 157, 63, 0.58);
+  }
+
+  /* The status band is an identity plate - platform, weapon, who is flying -
+     and none of it changes during the possession. It reads last on purpose:
+     muted ink, a dim accent, and no value larger than the telemetry tier. */
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status {
     left: max(18px, env(safe-area-inset-left));
     top: max(18px, env(safe-area-inset-top));
     min-width: 0;
     grid-template-columns: auto auto;
-    gap: 5px 10px;
-    padding: 5px 9px;
+    gap: 4px 9px;
+    padding: 5px 10px;
     border: 0;
-    border-left: 2px solid rgba(126, 255, 173, 0.82);
+    border-left: 2px solid var(--gunner-signal-dim);
+    /* Flat translucent fill, no gradient and no radius: HF-389 established
+       that these two rails are diegetic strips rather than cards, and
+       tests/e2e/pass74-chopper-hud.spec.ts measures exactly that on the
+       composed page. Only the accent colour moves onto the warm deck. */
     background: rgba(2, 14, 10, 0.24);
+    color: var(--gunner-read);
     transform: none;
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status small {
+    color: var(--gunner-mute);
+    letter-spacing: 0.2em;
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status span {
     grid-column: 1 / -1;
     font-size: 9px;
-    opacity: 0.78;
+    color: var(--gunner-mute);
+    opacity: 0.72;
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-status strong {
     font-size: 12px;
+    color: var(--gunner-read);
     text-align: left;
   }
 
+  /* Two tiers on one rail instead of one flat row of six. Row 1 is the act
+     layer (TIME, HULL) at roughly 2x the type size and on the burnt-orange
+     accent; row 2 is telemetry (AMMO, ALT, SPD, DAMAGE) at the 9px label floor
+     with muted values. Same six readouts, same six ids, same writers - only
+     the reading order changes. */
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-instruments {
     left: max(18px, env(safe-area-inset-left));
     bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
     width: min(430px, calc(100vw - 36px));
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     border: 0;
-    border-left: 2px solid rgba(126, 255, 173, 0.62);
+    border-left: 2px solid var(--gunner-signal);
+    /* Same rail contract as .gunner-status above - flat fill, square, one
+       axis of edge. Measured by tests/e2e/pass74-chopper-hud.spec.ts. */
     background: rgba(2, 14, 10, 0.22);
     transform: none;
   }
 
+  /* Explicit placement, because the act layer is not the DOM order. The shell
+     markup (HULL AMMO ALT SPD TIME DAMAGE) is enumerated by
+     src/pass70-chopper-gunner-contract.test.ts and by two e2e specs, so leaving
+     it exactly as authored is what keeps this change presentation-only: the
+     grid does the reordering and pass64-shell.ts is not touched at all. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) { grid-area: 1 / 1 / 2 / 3; }
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1) { grid-area: 1 / 3 / 2 / 5; }
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(2) { grid-area: 2 / 1 / 3 / 2; }
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(3) { grid-area: 2 / 2 / 3 / 3; }
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(4) { grid-area: 2 / 3 / 3 / 4; }
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(6) { grid-area: 2 / 4 / 3 / 5; }
+
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout {
-    padding: 5px 8px 6px;
-    border-color: rgba(120, 255, 170, 0.12);
+    padding: 5px 9px 6px;
+    border-color: var(--gunner-hair);
+    color: var(--gunner-read);
     text-align: left;
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout small {
     font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--gunner-mute);
   }
 
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout strong {
     margin-top: 3px;
-    font-size: clamp(14px, 1.5vw, 19px);
+    font-size: clamp(12px, 1.02vw, 16px);
+    color: var(--gunner-read);
+  }
+
+  /* Act layer. The 2px lit edge and the short wash are what make the two cells
+     read as one band rather than as two more boxes in the row. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1),
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) {
+    padding-block: 6px 8px;
+    border-block-start: 2px solid var(--gunner-signal);
+    background: linear-gradient(180deg, rgba(255, 157, 63, 0.14), transparent 66%);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1) small,
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) small {
+    color: var(--gunner-signal);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1) strong,
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) strong {
+    margin-top: 2px;
+    font-size: clamp(21px, 1.95vw, 32px);
+    letter-spacing: -0.005em;
+    color: var(--gunner-bone);
+  }
+
+  /* Telemetry keeps a hairline top edge so the two rows still line up as one
+     instrument, at a fifth of the accent's weight. */
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(2),
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(3),
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(4),
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(6) {
+    border-block-start: 1px solid var(--gunner-hair);
+  }
+
+  #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(6) {
+    border-inline-end: 0;
   }
 
   /* HF-335: one control strip on the bottom-right rail - LMB GUN | RMB
@@ -1168,15 +1279,23 @@
   #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #gunner-control-strip { display: flex; }
   #gunner-cockpit-hud[data-support-kind] #gunner-control-strip[hidden] { display: none; }
 
+  /* Owner 2026-08-30: the two controls were the same box at the same size, but
+     only one of them is a decision. LMB GUN is a belt-fed autocannon that never
+     runs dry (it renders a literal infinity), so it recedes; RMB MISSILES is a
+     six-round magazine on a cooldown and is the only thing on this HUD the
+     gunner can get wrong. The missile panel therefore carries the widest cell,
+     the largest value ramp and the lit accent, and its readiness is a filled
+     state chip rather than one more line of orange text. */
   #gunner-control-strip .gunner-control {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
+    align-content: center;
     gap: clamp(3px, 0.2vw, 6px) clamp(8px, 0.62vw, 14px);
     min-width: clamp(122px, 9.6vw, 208px);
     padding: clamp(7px, 0.55vw, 13px) clamp(9px, 0.68vw, 16px);
-    border-right: 2px solid rgba(126, 255, 173, 0.82);
-    background: rgba(2, 14, 10, 0.46);
-    color: #f8f0e6;
+    border-right: 2px solid var(--gunner-signal-dim, rgba(255, 157, 63, 0.38));
+    background: linear-gradient(285deg, var(--gunner-ink-deep, rgba(10, 5, 2, 0.80)), rgba(10, 5, 2, 0.32));
+    color: var(--gunner-read, #e8d6c1);
     text-align: right;
   }
 
@@ -1185,16 +1304,16 @@
     grid-row: 1 / 3;
     align-self: center;
     padding: clamp(4px, 0.34vw, 8px) clamp(6px, 0.46vw, 11px);
-    border: 1px solid rgba(126, 255, 173, 0.75);
+    border: 1px solid rgba(233, 208, 191, 0.28);
     border-radius: 3px;
     font: 900 clamp(11px, 0.86vw, 18px)/1 Inter, system-ui, sans-serif;
-    color: #f8f0e6;
-    background: rgba(2, 24, 15, 0.72);
+    color: var(--gunner-read, #e8d6c1);
+    background: rgba(10, 5, 2, 0.72);
   }
   #gunner-control-strip .gunner-control span {
     font: 900 clamp(9px, 0.62vw, 14px)/1 Inter, system-ui, sans-serif;
     letter-spacing: 0.16em;
-    color: #7effad;
+    color: var(--gunner-mute, #b39d86);
   }
   #gunner-control-strip .gunner-control-value {
     display: flex;
@@ -1210,16 +1329,49 @@
   #gunner-control-strip .gunner-control-value b { font: inherit; }
   #gunner-control-strip .gunner-control em {
     grid-column: 1 / -1;
+    justify-self: end;
+    padding: 3px 7px;
+    border-radius: 2px;
     font: 850 clamp(9px, 0.6vw, 13px)/1 Inter, system-ui, sans-serif;
     letter-spacing: 0.14em;
-    color: #ff9b58;
+    color: var(--gunner-signal, #ff9d3f);
+    background: rgba(255, 157, 63, 0.15);
   }
 
-  #gunner-control-strip #gunner-missile-status { border-right-color: rgba(255, 180, 84, 0.82); background: rgba(18, 10, 2, 0.46); color: #ffe4bd; }
+  /* The gun cell: half the value ramp, no accent, bottom-aligned so the two
+     controls share a baseline rather than competing for the same height. */
+  #gunner-control-strip #gunner-gun-control {
+    align-self: end;
+    min-width: clamp(104px, 7.4vw, 168px);
+  }
+  #gunner-control-strip #gunner-gun-control .gunner-control-value {
+    font-size: clamp(13px, 0.95vw, 19px);
+    color: var(--gunner-read, #e8d6c1);
+  }
+
+  #gunner-control-strip #gunner-missile-status {
+    min-width: clamp(150px, 12vw, 248px);
+    border-right-color: var(--gunner-signal, #ff9d3f);
+    background: linear-gradient(285deg, rgba(42, 20, 4, 0.86), rgba(16, 8, 2, 0.44));
+    color: var(--gunner-bone, #fbf3e9);
+  }
   #gunner-control-strip #gunner-missile-status[hidden] { display: none; }
-  #gunner-control-strip #gunner-missile-status kbd { border-color: rgba(255, 190, 104, 0.75); color: #fff0d6; background: rgba(31, 17, 3, 0.72); }
-  #gunner-control-strip #gunner-missile-status span { color: #ffbc67; letter-spacing: 0.18em; }
-  #gunner-control-strip #gunner-missile-status[data-ready="true"] em { color: #83ffb1; }
+  /* Same ramp as the act layer on the instruments rail, so "how many missiles"
+     and "how long left" are read at one size and everything else at half it.
+     Measured composed: 22/34/34px at 1280x720, 1920x1080 and 3440x1440 against
+     25/32/32px for TIME and HULL, and 13/18/19px for the gun and telemetry. */
+  #gunner-control-strip #gunner-missile-status .gunner-control-value {
+    font-size: clamp(22px, 1.72vw, 34px);
+    color: var(--gunner-bone, #fbf3e9);
+  }
+  #gunner-control-strip #gunner-missile-status kbd { border-color: rgba(255, 168, 82, 0.62); color: var(--gunner-bone, #fbf3e9); background: rgba(38, 18, 3, 0.78); }
+  #gunner-control-strip #gunner-missile-status span { color: var(--gunner-signal, #ff9d3f); letter-spacing: 0.18em; }
+  /* READY is the one green on the deck: it means "the trigger will do
+     something right now", which is the only state on this HUD worth a colour
+     change of its own. EMPTY and a running cooldown both stay amber. */
+  #gunner-control-strip #gunner-missile-status[data-ready="true"] { border-right-color: var(--gunner-ok, #7dffa6); background: linear-gradient(285deg, rgba(12, 46, 24, 0.86), rgba(9, 26, 14, 0.44)); }
+  #gunner-control-strip #gunner-missile-status[data-ready="true"] kbd { border-color: rgba(125, 255, 166, 0.52); }
+  #gunner-control-strip #gunner-missile-status[data-ready="true"] em { color: var(--gunner-ok, #7dffa6); background: rgba(125, 255, 166, 0.17); }
 
   /* The cockpit-frame pillars are painted after the HUD children, so the two
      telemetry rails claim their own layer to stay fully legible (HF-335). */
@@ -1284,12 +1436,23 @@
       width: auto;
       grid-template-columns: auto auto;
     }
+    /* The two-tier rail survives the phone: 4 columns is what keeps the act
+       layer (TIME, HULL) at 2 columns each on row 1, so it stays legible at
+       390x844 while the four telemetry cells drop to the 9px label floor.
+       Measured at 390px wide: 360px rail, 90px telemetry cells, ~82px tall -
+       which clears the control strip's pinned 104px stack height above it. */
     #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-instruments {
       left: max(8px, env(safe-area-inset-left));
       width: min(360px, calc(100vw - 16px));
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       transform: none;
     }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout { padding: 4px 6px 5px; }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout strong { font-size: 12px; }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1),
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) { padding-block: 5px 6px; }
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(1) strong,
+    #gunner-cockpit-hud[data-support-kind="chopper-gunner"] .gunner-readout:nth-child(5) strong { font-size: clamp(19px, 5.4vw, 24px); }
     #gunner-cockpit-hud[data-support-kind="chopper-gunner"] #chopper-thermal {
       left: auto;
       right: max(8px, env(safe-area-inset-right));
@@ -1310,6 +1473,12 @@
       flex: 1 1 0;
       padding: 6px 8px;
     }
+    /* Even on a 390px phone the missile cell keeps the larger share and the
+       larger value: it is still the only control with a decision in it. */
+    #gunner-control-strip #gunner-missile-status { flex: 1.4 1 0; min-width: 0; }
+    #gunner-control-strip #gunner-missile-status .gunner-control-value { font-size: clamp(19px, 5vw, 24px); }
+    #gunner-control-strip #gunner-gun-control .gunner-control-value { font-size: 13px; }
+    #gunner-control-strip .gunner-control em { padding: 2px 5px; }
     #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::before,
     #gunner-cockpit-hud[data-support-kind="chopper-gunner"]::after {
       width: clamp(24px, 7vw, 54px);
