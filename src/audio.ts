@@ -3134,6 +3134,27 @@ export class ArenaAudio {
     this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, weaponDestination);
   }
 
+  /**
+   * Owner 2026-08-30 ("make a cool sound"): possessed chopper missile launch -
+   * an ignition thump under a rising rocket-motor whoosh. Spatial at the wing
+   * socket when the emitter is known; falls back to the flat weapons bus.
+   */
+  missileLaunch(emitter?: SpatialPoint): void {
+    let destination: AudioNode | null = this.weapons;
+    if (emitter) {
+      const distance = Math.hypot(
+        emitter.x - this.listenerPosition.x,
+        emitter.y - this.listenerPosition.y,
+        emitter.z - this.listenerPosition.z,
+      );
+      destination = this.createSupportGunSpatialDestination(emitter, distance) ?? this.weapons;
+    }
+    if (!destination) return;
+    this.sweep(150, 42, 0.24, 0.3, 'sine', destination);
+    this.noise({ duration: 0.55, volume: 0.32, filter: 'bandpass', frequency: 950, q: 0.55 }, destination);
+    this.noise({ duration: 0.38, volume: 0.18, filter: 'highpass', frequency: 2_600, q: 0.5 }, destination);
+  }
+
   private createSupportGunSpatialDestination(
     emitter: SpatialPoint,
     distance: number,

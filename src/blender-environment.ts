@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { retryLoad } from './retry-load';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { ArenaMap } from './map';
@@ -128,9 +129,9 @@ export async function loadBlenderArena(
   telemetry.status = 'loading';
   telemetry.error = null;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf = await loader.loadAsync(BLENDER_ARENA_ASSET, (event) => {
+  const gltf = await retryLoad('blender arena glb', () => loader.loadAsync(BLENDER_ARENA_ASSET, (event) => {
     onProgress?.(event.loaded, event.total || event.loaded || 1);
-  });
+  }));
   const root = gltf.scene;
   root.name = 'Atomic Acres Quality Graphics arena';
   const materials = new Set<THREE.Material>();

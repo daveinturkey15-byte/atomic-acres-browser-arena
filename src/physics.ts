@@ -1,4 +1,5 @@
 import type * as RapierTypes from '@dimforge/rapier3d-compat';
+import { retryLoad } from './retry-load';
 import type { Box2, Point3 } from './collision';
 import type { Stance } from './gameplay';
 import { SIMULATION_HZ } from './gameplay';
@@ -157,7 +158,7 @@ export class CharacterPhysics {
     bounds: Box2,
     safetyFloorY = 0,
   ): Promise<CharacterPhysics> {
-    const { default: RAPIER } = await import('@dimforge/rapier3d-compat');
+    const { default: RAPIER } = await retryLoad('rapier3d chunk', () => import('@dimforge/rapier3d-compat'));
     // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
     // the legacy positional form and emits a warning even though the public
     // RAPIER.init() API takes no arguments. Suppress only that upstream message

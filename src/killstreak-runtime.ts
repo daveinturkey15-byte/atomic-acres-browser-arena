@@ -48,6 +48,15 @@ export const CHOPPER_MISSILE_FLIGHT_MS = 780;
 export const CHOPPER_MISSILE_SOCKET_LOCAL_M: SupportVec3 = [-1.15, -0.45, -0.6];
 export const CHOPPER_MISSILE_MAX_RANGE_M = 120;
 export const CHOPPER_MISSILE_BLAST_RADIUS_M = 4.5;
+/**
+ * Owner 2026-08-30 ("the normal gun previously had splash damage and a good
+ * radius so you could actually hit people"): possessed autocannon shells now
+ * BURST where they land. A clean centre-ray hit still deals the full profile
+ * damage; a near-miss chips everyone inside the burst radius instead of
+ * evaporating. AI-controlled choppers keep their target-locked fire.
+ */
+export const CHOPPER_GUN_SPLASH_RADIUS_M = 2.6;
+export const CHOPPER_GUN_SPLASH_MAX_DAMAGE = 16;
 export const CHOPPER_MISSILE_MAX_DAMAGE = 240;
 export const PILOTED_DRONE_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs;
 export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
@@ -2576,6 +2585,21 @@ export class HostKillstreakRuntime {
           hit.endpoint,
           ray.tracerOrigin,
         ));
+      } else {
+        // Owner 2026-08-30: shell burst on the surface the ray strikes - a
+        // near-miss suppresses and chips instead of doing nothing at all.
+        const burst = chopperMissileGroundTarget(firingPosition, firingAttitude, entity.aimYaw, entity.aimPitch, world);
+        this.damageAround(
+          owner,
+          entity.activationId,
+          'chopper',
+          burst,
+          CHOPPER_GUN_SPLASH_RADIUS_M,
+          CHOPPER_GUN_SPLASH_MAX_DAMAGE,
+          nowMs,
+          world,
+          damageEvents,
+        );
       }
     }
     entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;

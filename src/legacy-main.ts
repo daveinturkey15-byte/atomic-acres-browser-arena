@@ -11473,6 +11473,12 @@ function onNetworkMessage(message: GameMessage): void {
     }
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
+      // Owner 2026-08-30: guests hear the launch too.
+      if (impact.phase === 'drop' && impact.source === 'chopper') {
+        audio.missileLaunch(impact.launchPosition
+          ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] }
+          : undefined);
+      }
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
@@ -11483,9 +11489,15 @@ function onNetworkMessage(message: GameMessage): void {
       audio.explosion(presentedAt);
       supportExplosionPresentation.emit(
         point,
-        impact.source === 'chopper' ? CHOPPER_MISSILE_BLAST_RADIUS_M : CARPET_BOMBER_BLAST_RADIUS_M,
+        impact.source === 'chopper' ? 3.2 : CARPET_BOMBER_BLAST_RADIUS_M,
         presentedAt,
       );
+      // Owner 2026-08-30: chopper missiles carry the full grenade blast
+      // anatomy on guests as well, and trample the lawn.
+      if (impact.source === 'chopper') {
+        grenadeExplosionPresentation.emit(point, presentedAt);
+        crushLawnAt(point, 3);
+      }
       // HF-352: Camera shake from remote support impact
       cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
         distanceUnits: point.distanceTo(player.position),
@@ -22887,6 +22899,12 @@ function updatePass65KillstreakRuntime(now: number): void {
       shedBlastClass: 'carpet-bomber-obliteration';
     }> = [];
     for (const impact of result.impactEvents) {
+      // Owner 2026-08-30: the missile leaving the rail is audible, not silent.
+      if (impact.phase === 'drop' && impact.source === 'chopper') {
+        audio.missileLaunch(impact.launchPosition
+          ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] }
+          : undefined);
+      }
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
@@ -22935,7 +22953,15 @@ function updatePass65KillstreakRuntime(now: number): void {
       } else {
         applyInteractiveWorldExplosion(point, CHOPPER_MISSILE_BLAST_RADIUS_M, CHOPPER_MISSILE_MAX_DAMAGE);
         audio.explosion(now);
-        supportExplosionPresentation.emit(point, CHOPPER_MISSILE_BLAST_RADIUS_M, now);
+        // Presentation radius deliberately tighter than the 4.5 m authority
+        // radius: the full-size additive sphere reads as a flat disc from the
+        // cockpit; a denser ball + the grenade anatomy reads as a blast.
+        supportExplosionPresentation.emit(point, 3.2, now);
+        // Owner 2026-08-30 ("have a cool explosion"): layer the grenade blast
+        // anatomy (shockwave ring, hot core, dark smoke) over the additive
+        // fireball, and trample the lawn under the blast.
+        grenadeExplosionPresentation.emit(point, now);
+        crushLawnAt(point, 3);
         cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
           distanceUnits: point.distanceTo(player.position),
           family: 'support',
@@ -29746,6 +29772,8 @@ const debugWindow = window as Window & {
       yaw: number;
       pitch: number;
     } | null;
+    /** QA-only: exact RMB missile request for the locally possessed chopper. */
+    firePossessedChopperMissile: () => boolean;
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -32397,6 +32425,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lineOfSight: true,
     };
   },
+  firePossessedChopperMissile: () => requestPossessedChopperMissile(),
   aimPossessedChopperAtBot: (botId) => {
     // QA-only: the training-dummy variant is gun-range-only; this aims the
     // possessed autocannon at a live bot on ANY arena so possessed-fire

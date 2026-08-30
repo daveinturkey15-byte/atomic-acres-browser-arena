@@ -37,6 +37,12 @@ const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
 const MAX_BOMB_SHELLS = 20;
 const EMBERS_PER_CARPET_IMPACT = 6;
+/** Owner 2026-08-30: chopper missiles burst embers too (tighter than carpet). */
+const EMBERS_PER_MISSILE_IMPACT = 6;
+const MISSILE_IMPACT_FLASH_RADIUS_M = 1.9;
+const MISSILE_TRAIL_PUFF_INTERVAL_MS = 34;
+const MISSILE_NOSE_AXIS = new THREE.Vector3(0, 1, 0);
+const MISSILE_FLIGHT_DIRECTION_SCRATCH = new THREE.Vector3();
 const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
 export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
@@ -1469,8 +1475,16 @@ type PooledBombShell = {
   startY: number;
   // HF-335: true 3D flight for chopper missiles. Null = legacy vertical drop.
   startOrigin: THREE.Vector3 | null;
+} & PooledBombShellExtras & {
   createdAtMs: number;
   impactAtMs: number;
+};
+
+type PooledBombShellExtras = {
+  /** Owner 2026-08-30: rocket exhaust flame, visible only on chopper missiles. */
+  exhaust: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
+  lastTrailPuffAtMs: number;
+  trailPuffOrdinal: number;
 };
 
 type PooledEmber = {
@@ -2455,6 +2469,28 @@ function createPooledBombShell(index: number): PooledBombShell {
   root.rotation.x = Math.PI / 2;
   root.userData.presentationOnly = true;
   root.userData.poolSlot = index;
+  // Owner 2026-08-30 ("look cooler like they're actually firing a missile
+  // with like a rocket trail"): additive exhaust flame at the tail. The
+  // shell's +Y axis is its nose for missile flights, so the cone apex points
+  // backwards along -Y.
+  const exhaust = new THREE.Mesh(
+    new THREE.ConeGeometry(0.26, 1.05, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xffa63c,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  exhaust.name = 'chopper-missile-exhaust';
+  exhaust.rotation.x = Math.PI;
+  exhaust.position.y = -0.75;
+  exhaust.visible = false;
+  exhaust.userData.presentationOnly = true;
+  exhaust.raycast = () => undefined;
+  root.add(exhaust);
   return {
     root,
     inactiveName,
@@ -2464,6 +2500,9 @@ function createPooledBombShell(index: number): PooledBombShell {
     startOrigin: null, // HF-335
     createdAtMs: 0,
     impactAtMs: 0,
+    exhaust,
+    lastTrailPuffAtMs: 0,
+    trailPuffOrdinal: 0,
   };
 }
 
@@ -3397,6 +3436,31 @@ export class KillstreakPresentation {
       if (shell.startOrigin) {
         // HF-335: true 3D flight along the launch→impact vector.
         shell.root.position.lerpVectors(shell.startOrigin, shell.impactPosition, progress);
+        // Owner 2026-08-30: rocket trail - shed a glowing puff every few
+        // frames along the flight path (pooled embers, no allocation).
+        if (shell.exhaust.visible && nowMs - shell.lastTrailPuffAtMs >= MISSILE_TRAIL_PUFF_INTERVAL_MS) {
+          shell.lastTrailPuffAtMs = nowMs;
+          const puff = firstInactive(this.emberPool);
+          if (puff) {
+            const lane = shell.trailPuffOrdinal * 3;
+            const seed = (shell.root.userData.poolSlot as number) * 977 + 131;
+            shell.trailPuffOrdinal += 1;
+            puff.active = true;
+            puff.radius = 0.22 + deterministicUnit(seed, lane) * 0.18;
+            puff.createdAtMs = nowMs;
+            puff.expiresAtMs = nowMs + 560;
+            puff.origin.copy(shell.root.position);
+            puff.origin.x += (deterministicUnit(seed, lane + 1) - 0.5) * 0.3;
+            puff.origin.z += (deterministicUnit(seed, lane + 2) - 0.5) * 0.3;
+            puff.velocity.set(0, 2.6, 0);
+            puff.root.name = 'chopper-missile-trail-puff';
+            puff.root.position.copy(puff.origin);
+            puff.root.scale.setScalar(puff.radius);
+            puff.root.material.color.setHex(shell.trailPuffOrdinal % 3 === 0 ? 0x8d8d8d : 0xffb03a);
+            puff.root.material.opacity = 0.8;
+            puff.root.visible = true;
+          }
+        }
       } else {
         shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
       }
@@ -3512,7 +3576,9 @@ export class KillstreakPresentation {
         shell.root.name = isChopperMissile ? 'pass70-chopper-missile-shell' : 'pass65-carpet-bomb-shell';
         if (shell.startOrigin) {
           shell.root.rotation.set(0, 0, 0);
-          shell.root.scale.setScalar(1);
+          // Owner 2026-08-30: a longer missile body reads as a rocket, not a
+          // dropped bomb shell.
+          shell.root.scale.set(1.15, 2.3, 1.15);
         } else {
           shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
           shell.root.scale.set(
@@ -3524,11 +3590,19 @@ export class KillstreakPresentation {
         shell.root.material.color.setHex(isChopperMissile ? 0xb09a58 : 0x2a2a2a);
         if (shell.startOrigin) {
           shell.root.position.copy(shell.startOrigin);
-          // HF-335: orient nose-first along the true flight vector.
-          shell.root.lookAt(shell.impactPosition);
+          // Owner 2026-08-30: the shell geometry's length axis is +Y, so
+          // lookAt (which aims +Z) flew the missile sideways. Align the nose
+          // axis to the true flight vector instead, and light the exhaust.
+          MISSILE_FLIGHT_DIRECTION_SCRATCH
+            .subVectors(shell.impactPosition, shell.startOrigin)
+            .normalize();
+          shell.root.quaternion.setFromUnitVectors(MISSILE_NOSE_AXIS, MISSILE_FLIGHT_DIRECTION_SCRATCH);
         } else {
           shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
         }
+        shell.exhaust.visible = isChopperMissile && shell.startOrigin !== null;
+        shell.lastTrailPuffAtMs = nowMs;
+        shell.trailPuffOrdinal = 0;
         shell.root.visible = true;
         continue;
       }
@@ -3537,9 +3611,11 @@ export class KillstreakPresentation {
       if (!flash) break;
       flash.active = true;
       flash.createdAtMs = nowMs;
-      flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
-      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : 0.55;
-      flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
+      // Owner 2026-08-30: chopper missile impacts were a 0.55 m blink -
+      // invisible next to their 4.5 m blast authority. Sized to be seen.
+      flash.expiresAtMs = nowMs + (isCarpet ? 600 : 640);
+      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : MISSILE_IMPACT_FLASH_RADIUS_M;
+      flash.maximumOpacity = isCarpet ? 0.9 : 0.85;
       flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass70-chopper-missile-impact-flash';
       flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
       flash.root.scale.setScalar(flash.baseRadius);
@@ -3547,9 +3623,10 @@ export class KillstreakPresentation {
       flash.root.material.opacity = flash.maximumOpacity;
       flash.root.visible = true;
 
-      if (isCarpet) {
+      if (isCarpet || isChopperMissile) {
         const seed = impactSeed(impact);
-        for (let particle = 0; particle < EMBERS_PER_CARPET_IMPACT; particle += 1) {
+        const emberCount = isCarpet ? EMBERS_PER_CARPET_IMPACT : EMBERS_PER_MISSILE_IMPACT;
+        for (let particle = 0; particle < emberCount; particle += 1) {
           const ember = firstInactive(this.emberPool);
           if (!ember) break;
           const lane = particle * 5;

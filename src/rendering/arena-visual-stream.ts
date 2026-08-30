@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ArenaId } from '../map-selection';
 import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-definition';
+import { retryLoad } from '../retry-load';
 
 export type ArenaVisualModule = Readonly<{ definition: ArenaVisualDefinition }>;
 export type ArenaVisualImporter = () => Promise<ArenaVisualModule>;
@@ -20,7 +21,7 @@ export async function loadArenaVisualModule(
   arenaId: ArenaId,
   registry: ArenaVisualRegistry = ARENA_VISUAL_REGISTRY,
 ): Promise<ArenaVisualModule> {
-  const module = await registry[arenaId]();
+  const module = await retryLoad(`arena module ${arenaId}`, () => registry[arenaId]());
   if (module.definition.id !== arenaId) {
     throw new Error(`Arena module identity mismatch: requested ${arenaId}, loaded ${module.definition.id}`);
   }

@@ -24,6 +24,12 @@ import {
   type KillstreakActivationIntent,
   type KillstreakWorld,
 } from './killstreak-runtime';
+import {
+  CHOPPER_GUN_SPLASH_MAX_DAMAGE,
+  CHOPPER_GUN_SPLASH_RADIUS_M,
+  chopperMissileGroundTarget,
+  type KillstreakDamageEvent,
+} from './killstreak-runtime';
 
 const DEFAULT_WORLD: KillstreakWorld = {
   bounds: { minX: -40, maxX: 40, minZ: -45, maxZ: 45, floorY: 0, ceilingY: 40 },
@@ -1205,5 +1211,65 @@ describe('FFA care-crate capture hostility (mode-aware, not raw team)', () => {
     runtime.advance(7_100, tdmWorld);
     expect(runtime.beginCareCapture('mate', 1, entityId, 7_100, tdmWorld).accepted).toBe(true);
     expect(runtime.snapshotFor('mate', 7_100).entities.some((entity) => entity.id === entityId)).toBe(false);
+  });
+});
+
+describe('possessed autocannon shell splash (owner 2026-08-30)', () => {
+  // "the normal gun previously had splash damage and a good radius so you
+  // could actually hit people" - a near-miss must chip, a wide miss must not.
+  function pumpFire(enemyOffsetM: number) {
+    const world: KillstreakWorld = {
+      ...DEFAULT_WORLD,
+      targets: [{ id: 'owner', kind: 'player', team: 0, lifeId: 1, alive: true, position: [0, 1.7, 0] }],
+    };
+    const runtime = new HostKillstreakRuntime(7);
+    runtime.registerActor('owner', 0, 1, loadout(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']));
+    earn(runtime, 8);
+    const entityId = runtime.activate(intent('chopper', 3), 10_000, world).entityIds[0];
+    expect(runtime.control({
+      by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId, action: 'toggle-chopper-gunner',
+    }, 10_001).accepted).toBe(true);
+    // Hold fire straight down (pitch clamps at -1.2) and keep the hostile at a
+    // fixed offset from the live authoritative burst point while the route
+    // moves the aircraft; capture the first admitted chopper damage event.
+    let sequence = 2;
+    let shotFired = false;
+    const chopperDamage: KillstreakDamageEvent[] = [];
+    for (let atMs = 10_100; atMs <= 13_000; atMs += 100) {
+      runtime.control({
+        by: 'owner', matchEpoch: 7, lifeId: 1, sequence: sequence++, entityId, action: 'pilot-control', yawQ: 0, pitchQ: -1.2, fire: true,
+      }, atMs - 1);
+      const live = runtime.snapshotFor('owner', atMs - 1).entities[0]!;
+      const burst = chopperMissileGroundTarget(live.position, live.attitude, 0, -1.2, world);
+      const stepWorld: KillstreakWorld = {
+        ...world,
+        targets: [
+          ...world.targets,
+          { id: 'enemy', kind: 'player', team: 1, lifeId: 3, alive: true, position: [burst[0] + enemyOffsetM, 1.7, burst[2]] },
+        ],
+      };
+      const result = runtime.advance(atMs, stepWorld);
+      if (result.shotEvents.some((event) => event.source === 'chopper')) shotFired = true;
+      chopperDamage.push(...result.damageEvents.filter((event) => event.source === 'chopper'));
+      if (chopperDamage.length > 0) break;
+    }
+    return { shotFired, chopperDamage };
+  }
+
+  it('bursts a near-miss into splash damage inside the shell radius', () => {
+    // 1.2 m beside the burst: outside the 1 m direct-hit capsule, inside the
+    // 2.6 m shell radius.
+    const { shotFired, chopperDamage } = pumpFire(1.2);
+    expect(shotFired).toBe(true);
+    expect(chopperDamage.length).toBeGreaterThanOrEqual(1);
+    expect(chopperDamage[0]!.targetId).toBe('enemy');
+    expect(chopperDamage[0]!.damage).toBeGreaterThanOrEqual(1);
+    expect(chopperDamage[0]!.damage).toBeLessThanOrEqual(CHOPPER_GUN_SPLASH_MAX_DAMAGE);
+  });
+
+  it('leaves hostiles outside the shell radius untouched on a miss', () => {
+    const { shotFired, chopperDamage } = pumpFire(CHOPPER_GUN_SPLASH_RADIUS_M + 2);
+    expect(shotFired).toBe(true);
+    expect(chopperDamage).toEqual([]);
   });
 });
