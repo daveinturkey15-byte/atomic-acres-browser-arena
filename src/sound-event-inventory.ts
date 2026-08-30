@@ -83,6 +83,7 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   // HF-337: positional variants so teammates and enemies can locate support fire.
   'support.chopper-gun.positional',
   // Owner 2026-08-30: possessed chopper missile launch whoosh.
+  'match.domination-cue',
   'support.missile-launch.positional',
   'support.chopper-damage',
   'support.carpet-aircraft',
@@ -375,6 +376,9 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
   // Owner 2026-08-30: chopper missile launch whoosh, host and guest impact loops.
   runtimeCallsite('missileLaunch', 'impact.launchPosition ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] } : undefined', 2, ['support.missile-launch.positional']),
+  // Owner 2026-08-30: Domination zone ownership cues (friendly rise / loss fall).
+  runtimeCallsite('dominationCue', 'false', 1, ['match.domination-cue']),
+  runtimeCallsite('dominationCue', 'zone.owner === player.team', 1, ['match.domination-cue']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -906,6 +910,13 @@ const events: SoundEventInventoryEntry[] = [
     coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
   existingEvent({
+    id: 'match.domination-cue', family: 'announcements', bus: 'ui', delivery: 'listener-local',
+    variants: ['friendly-capture', 'loss'],
+    emitterSymbols: ['dominationCue'],
+    contractRefs: ['R500'], concurrency: LOCAL_FEEDBACK, lifecycleOwner: 'match-epoch',
+    coverageDetail: 'Owner 2026-08-30: Domination zone ownership change cue on the UI bus - bright two-note rise when your squad captures, low pair on a loss or neutralization. Fired from the replica-side HUD diff so host, solo and guests all hear it exactly once per ownership change.',
+  }),
+  existingEvent({
     id: 'support.missile-launch.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['launch'],
     emitterSymbols: ['missileLaunch'],
@@ -1079,7 +1090,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
 // owner 2026-08-30: recomputed again for the Test1/Test2 arena variants
 // (arena-bed, arena-events and game-music rows).
-export const SOUND_EVENT_INVENTORY_SHA256 = 'a0928557c02d3ed78766ea12fb8c3a72e631f27db3730300ed1f66fbec141ef0';
+export const SOUND_EVENT_INVENTORY_SHA256 = '30bd32440d37d9a7de29e863e4b399d702635c41a8dc4cec3bdcd08b27f748f8';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

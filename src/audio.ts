@@ -3135,6 +3135,20 @@ export class ArenaAudio {
   }
 
   /**
+   * Owner 2026-08-30: Domination ownership cue - a bright two-note rise for
+   * your squad taking a zone, a flat low pair for losses/neutralizations.
+   */
+  dominationCue(friendly: boolean): void {
+    if (friendly) {
+      this.sweep(520, 660, 0.11, 0.16, 'triangle', this.ui);
+      this.sweep(660, 880, 0.14, 0.16, 'triangle', this.ui);
+      return;
+    }
+    this.sweep(320, 250, 0.12, 0.15, 'triangle', this.ui);
+    this.sweep(250, 190, 0.15, 0.14, 'triangle', this.ui);
+  }
+
+  /**
    * Owner 2026-08-30 ("make a cool sound"): possessed chopper missile launch -
    * an ignition thump under a rising rocket-motor whoosh. Spatial at the wing
    * socket when the emitter is known; falls back to the flat weapons bus.

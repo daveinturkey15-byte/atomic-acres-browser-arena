@@ -22066,12 +22066,26 @@ function advanceDominationAuthority(now: number): void {
   const presences = killstreakWorldState().targets
     .filter((target) => target.kind === 'player' || target.kind === 'bot')
     .map((target) => ({ team: target.team, alive: target.alive, position: target.position }));
-  const events = advanceDomination(dominationState, presences, now);
-  for (const event of events) {
-    if (event.kind === 'captured') {
-      addFeed(`${event.by === 0 ? 'AQUA' : 'CORAL'} CAPTURED ${event.zone}`, event.by === 0 ? 'aqua' : 'coral');
-    } else if (event.kind === 'neutralized') {
-      addFeed(`${event.by === 0 ? 'AQUA' : 'CORAL'} NEUTRALIZED ${event.zone}`, event.by === 0 ? 'aqua' : 'coral');
+  // Feed + audio for ownership changes live in updateDominationHud, which
+  // runs identically on host, solo and guest replicas.
+  advanceDomination(dominationState, presences, now);
+}
+
+const lastDominationOwners = new Map<string, Team | null>();
+
+function announceDominationChanges(zones: ReadonlyArray<{ id: string; owner: Team | null }>): void {
+  for (const zone of zones) {
+    const previous = lastDominationOwners.get(zone.id);
+    if (previous === zone.owner) continue;
+    const known = lastDominationOwners.has(zone.id);
+    lastDominationOwners.set(zone.id, zone.owner);
+    if (!known) continue; // First sample of a match: no announcement.
+    if (zone.owner === null) {
+      if (previous !== null && previous !== undefined) addFeed(`ZONE ${zone.id} NEUTRALIZED`, previous === 0 ? 'coral' : 'aqua');
+      audio.dominationCue(false);
+    } else {
+      addFeed(`${zone.owner === 0 ? 'AQUA' : 'CORAL'} CAPTURED ${zone.id}`, zone.owner === 0 ? 'aqua' : 'coral');
+      audio.dominationCue(zone.owner === player.team);
     }
   }
 }
@@ -22111,10 +22125,12 @@ function updateDominationHud(): void {
   const existing = document.getElementById('domination-zones');
   if (!display) {
     if (existing) existing.hidden = true;
+    lastDominationOwners.clear();
     return;
   }
   const strip = ensureDominationHud();
   strip.hidden = false;
+  announceDominationChanges(display.zones);
   for (const zone of display.zones) {
     const pip = strip.querySelector<HTMLElement>(`[data-zone="${zone.id}"]`);
     if (!pip) continue;
@@ -25900,6 +25916,29 @@ function updateMinimap(now: number): void {
       const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
       context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
       context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    }
+    // Owner 2026-08-30: Domination zones on the minimap - a ringed letter at
+    // each zone anchor, coloured by the owning squad, pulsing while contested.
+    const dominationMinimap = dominationDisplayState();
+    if (dominationMinimap) {
+      for (const zone of dominationMinimap.zones) {
+        const seed = TEST2_DOMINATION_ZONES.find((candidate) => candidate.id === zone.id);
+        if (!seed) continue;
+        const [zoneX, zoneY] = worldToMinimap(seed.centre[0], seed.centre[2], bounds, width, height);
+        const owner = zone.owner === 0 ? 'rgba(88, 227, 220, ' : zone.owner === 1 ? 'rgba(255, 118, 95, ' : 'rgba(222, 214, 196, ';
+        context.fillStyle = `${owner}${zone.contested ? '0.85' : '0.55'})`;
+        context.strokeStyle = `${owner}0.95)`;
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(zoneX, zoneY, 8, 0, Math.PI * 2);
+        context.fill();
+        context.stroke();
+        context.fillStyle = 'rgba(16, 20, 22, 0.95)';
+        context.font = '700 9px "IBM Plex Mono", monospace';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(zone.id, zoneX, zoneY + 0.5);
+      }
     }
     for (const cover of arena.physicalCover) {
       const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);

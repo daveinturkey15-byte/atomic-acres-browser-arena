@@ -21,6 +21,7 @@ import {
   type Builder,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { applyTest1Dressing, applyTest2Dressing, test1Materials, test2Materials } from './test-maps-art';
 
 export const TEST1_BOUNDS = Object.freeze({ minX: -26, maxX: 26, minZ: -19, maxZ: 19 });
 export const TEST2_BOUNDS = Object.freeze({ minX: -32, maxX: 32, minZ: -24, maxZ: 24 });
@@ -60,16 +61,19 @@ function perimeter(builder: Builder, name: string, bounds: { minX: number; maxX:
 
 export function buildTest1(scene: THREE.Scene): ArenaMap {
   const builder = makeBuilder(scene, 'Test1 arena');
-  const hardpan = standard(0xb59a6e, 0.98, 0.02);
-  const plywood = standard(0xc4a069, 0.92, 0.02);
-  const plywoodDark = standard(0x8a6e44, 0.94, 0.02);
-  const sandbag = standard(0x9a8a5e, 0.99, 0.0);
-  const containerRed = standard(0x8a3c2c, 0.72, 0.32);
-  const containerBlue = standard(0x3c5a74, 0.72, 0.32);
-  const containerGreen = standard(0x53644a, 0.74, 0.3);
-  const cinder = standard(0x9c9488, 0.95, 0.04);
+  // Owner 2026-08-30: all surfaces carry painted-in-code canvas textures
+  // (test-maps-art.ts); the flat colours only survive in headless audits.
+  const materials = test1Materials();
+  const hardpan = materials.hardpan;
+  const plywood = materials.plywood;
+  const plywoodDark = materials.plywoodDark;
+  const sandbag = materials.sandbag;
+  const containerRed = materials.containerRed;
+  const containerBlue = materials.containerBlue;
+  const containerGreen = materials.containerGreen;
+  const cinder = materials.cinder;
   const steel = standard(0x5c666c, 0.6, 0.6);
-  const canvas = standard(0x6f7a52, 0.96, 0.0);
+  const canvas = materials.tarp;
 
   ground(builder, 'test1 hardpan', 54, 40, hardpan);
   perimeter(builder, 'test1 fence', TEST1_BOUNDS, 2.6, plywoodDark);
@@ -150,6 +154,7 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
   box(builder, 'test1 drum pair north', [7, 0.6, -8], [1.4, 1.2, 0.9], steel);
   box(builder, 'test1 drum pair south', [-7, 0.6, 8], [1.4, 1.2, 0.9], steel);
 
+  applyTest1Dressing(builder.root, materials);
   batchPresentationOnlyBoxes(builder.root, 'test1-presentation');
 
   return {
@@ -182,27 +187,43 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
 
 export function buildTest2(scene: THREE.Scene): ArenaMap {
   const builder = makeBuilder(scene, 'Test2 arena');
-  const travertine = standard(0xd8cbb4, 0.9, 0.03);
-  const stucco = standard(0xe8e0d0, 0.92, 0.02);
-  const stone = standard(0xb0a692, 0.94, 0.03);
-  const hedge = standard(0x3f5c34, 0.98, 0.0);
+  // Owner 2026-08-30: painted-in-code surfaces (test-maps-art.ts) - court
+  // markings, travertine pavers, hedge foliage, pool caustic floor.
+  const materials = test2Materials();
+  const travertine = materials.travertine;
+  const stucco = materials.stucco;
+  const stone = materials.stone;
+  const hedge = materials.hedge;
   const poolWater = new THREE.MeshStandardMaterial({
     color: 0x2e9cb0, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82,
   });
-  const poolTile = standard(0x7fc4cf, 0.4, 0.05);
-  const court = standard(0x87584a, 0.92, 0.02);
+  const poolTile = materials.poolTile;
+  const court = materials.court;
   const glass = new THREE.MeshStandardMaterial({
     color: 0xbfd8de, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.4,
   });
-  const timber = standard(0x7a5c3c, 0.88, 0.04);
+  const timber = materials.timber;
 
-  ground(builder, 'test2 terrace', 66, 50, travertine);
+  // The terrace ground is four slabs around a REAL pool cutout (x -7.2..7.2,
+  // z -18.2..-9.8) - a one-piece slab buried the pool entirely (measured on
+  // the first art pass: the water sheet sat under the floor).
+  box(builder, 'test2 terrace north', [0, -0.5, -21.6], [66, 1, 6.8], travertine, { cast: false });
+  box(builder, 'test2 terrace south', [0, -0.5, 7.6], [66, 1, 34.8], travertine, { cast: false });
+  box(builder, 'test2 terrace west', [-20.1, -0.5, -14], [25.8, 1, 8.4], travertine, { cast: false });
+  box(builder, 'test2 terrace east', [20.1, -0.5, -14], [25.8, 1, 8.4], travertine, { cast: false });
   perimeter(builder, 'test2 estate wall', TEST2_BOUNDS, 3, stucco);
 
-  // North lane: pool deck. A shallow walkable basin (floor -0.55 with a solid
-  // basin slab), raised coping lip, pool houses at each end.
-  box(builder, 'test2 pool basin floor', [0, -0.85, -14], [14, 0.6, 8], poolTile);
-  box(builder, 'test2 pool water sheet', [0, -0.62, -14], [13.6, 0.06, 7.6], poolWater, { solid: false, shots: false, cast: false });
+  // North lane: pool deck. A genuinely sunken walkable basin: floor top at
+  // -0.55, tiled pit walls up to deck level, water sheet at -0.35, and two
+  // 0.28 m exit steps in the south-east corner (jump also clears the 0.55 rim).
+  box(builder, 'test2 pool basin floor', [0, -0.85, -14], [14.4, 0.6, 8.4], poolTile);
+  box(builder, 'test2 pool wall north', [0, -0.275, -17.9], [14.4, 0.55, 0.6], poolTile);
+  box(builder, 'test2 pool wall south', [0, -0.275, -10.1], [14.4, 0.55, 0.6], poolTile);
+  box(builder, 'test2 pool wall west', [-6.9, -0.275, -14], [0.6, 0.55, 8.4], poolTile);
+  box(builder, 'test2 pool wall east', [6.9, -0.275, -14], [0.6, 0.55, 8.4], poolTile);
+  box(builder, 'test2 pool step low', [5.4, -0.42, -11.2], [2.2, 0.26, 1.1], poolTile);
+  box(builder, 'test2 pool step high', [5.4, -0.14, -10.6], [2.2, 0.28, 0.9], poolTile);
+  box(builder, 'test2 pool water sheet', [0, -0.35, -14], [14, 0.05, 8], poolWater, { solid: false, shots: false, cast: false });
   box(builder, 'test2 pool coping north', [0, 0.15, -18.2], [15, 0.3, 0.6], stone);
   box(builder, 'test2 pool coping south', [0, 0.15, -9.8], [15, 0.3, 0.6], stone);
   box(builder, 'test2 pool coping west', [-7.2, 0.15, -14], [0.6, 0.3, 8.4], stone);
@@ -258,6 +279,7 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     box(builder, `test2-zone-flag-banner-${zone.id}`, [zoneX + 0.65, 3.55, zoneZ], [1.3, 0.8, 0.06], standard(0xcccccc, 0.85, 0.02), { solid: false, shots: false });
   }
 
+  applyTest2Dressing(builder.root, materials);
   batchPresentationOnlyBoxes(builder.root, 'test2-presentation');
 
   return {
