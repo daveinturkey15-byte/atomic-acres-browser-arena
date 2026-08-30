@@ -41,10 +41,21 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('const targetHitLifeId = targetHit.lifeId;');
     expect(update).toContain('bolt.targetId = targetHitId;');
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
-    expect(update).toContain('if (targetHitId === player.id) {');
-    expect(update).toContain("'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
-    expect(update).toContain("addFeed('STUCK', 'coral');");
-    expect(update).toContain("else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');");
+    // Re-pinned 2026-08-30 (owner: "it needs to say STUCK on both peoples
+    // screen when it actually sticks"): the victim/attacker branch moved into
+    // the shared announceStickyAttachment(), which ALSO tells the remote peer
+    // at attach time. The stick-to-current-life invariant is unchanged.
+    expect(update).toContain('announceStickyAttachment(');
+    expect(update).toContain("'explosive-crossbow', bolt.ownerId, targetHitId, targetHitLifeId,");
+    // The victim/attacker feeds now live in the ONE shared announcer, and are
+    // asserted there instead - including the part that never existed before:
+    // it also tells the remote peer at attach time.
+    const announceStart = source.indexOf('function announceStickyAttachment(');
+    const announce = source.slice(announceStart, source.indexOf('function presentStickyVictimUrgentAlert(', announceStart));
+    expect(announce).toContain("addFeed('STUCK', 'coral');");
+    expect(announce).toContain("addFeed('STUCK', 'gold');");
+    expect(announce).toContain("type: 'sticky-attached',");
+    expect(announce).toContain('announcedStickyAttachNonces');
     expect(update).toContain('explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId)');
     expect(update).toContain('let targetHitIndex = -1;');
     expect(update).not.toContain('let targetHit:');

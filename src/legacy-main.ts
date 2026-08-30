@@ -5229,6 +5229,53 @@ function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): v
   stickyVictimUrgentAlertController.reset(targetLifeId);
 }
 
+/**
+ * Owner 2026-08-30 ("it needs to say STUCK on both peoples screen when it
+ * actually sticks"). ONE place decides what a sticky attach shows and who is
+ * told, so the crossbolt and the Semtex can never drift apart again - they
+ * had, and neither announced the attach to the remote peer at all: `stuck`
+ * only ever rode a detonation hit, seconds later.
+ *
+ * Presentation/feed only. The blast keeps travelling the existing
+ * authoritative hit path; nothing here grants damage or authority.
+ */
+const announcedStickyAttachNonces = new Set<number>();
+
+function announceStickyAttachment(
+  source: 'semtex' | 'explosive-crossbow',
+  ownerId: string,
+  targetId: string,
+  targetLifeId: number,
+  actionNonce: number,
+  now: number,
+  broadcast: boolean,
+): void {
+  if (announcedStickyAttachNonces.has(actionNonce)) return;
+  announcedStickyAttachNonces.add(actionNonce);
+  while (announcedStickyAttachNonces.size > 256) {
+    announcedStickyAttachNonces.delete(announcedStickyAttachNonces.values().next().value!);
+  }
+  if (targetId === player.id) {
+    presentStickyVictimUrgentAlert(source, targetId, targetLifeId, actionNonce, now);
+    addFeed('STUCK', 'coral');
+  } else if (ownerId === player.id) {
+    addFeed('STUCK', 'gold');
+  }
+  // Only the machine that actually simulated the attach may announce it to
+  // peers; a replica re-broadcasting would loop.
+  if (broadcast && network.role !== 'offline' && targetId !== ownerId) {
+    network.send({
+      type: 'sticky-attached',
+      by: ownerId,
+      target: targetId,
+      targetLifeId,
+      source: source === 'semtex' ? 'grenade' : 'explosive-crossbow',
+      actionNonce,
+      nonce: randomNonce(),
+    });
+  }
+}
+
 function presentStickyVictimUrgentAlert(
   source: StickyAttachmentSource,
   targetId: string,
@@ -11582,6 +11629,17 @@ function onNetworkMessage(message: GameMessage): void {
       });
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
+    return;
+  }
+  if (message.type === 'sticky-attached') {
+    // Feed/alert only - never damage. Relayed once by the host so the third
+    // party in a lobby also sees it, and deduped by actionNonce on arrival.
+    if (network.role === 'host') network.send(message);
+    announceStickyAttachment(
+      message.source === 'grenade' ? 'semtex' : 'explosive-crossbow',
+      message.by, message.target, message.targetLifeId,
+      message.actionNonce, performance.now(), false,
+    );
     return;
   }
   if (message.type === 'railgun-state') {
@@ -20495,13 +20553,10 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitId === player.id) {
-          presentStickyVictimUrgentAlert(
-            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
-          );
-          addFeed('STUCK', 'coral');
-        }
-        else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
+        announceStickyAttachment(
+          'explosive-crossbow', bolt.ownerId, targetHitId, targetHitLifeId,
+          bolt.actionNonce, now, bolt.authority,
+        );
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
@@ -21315,11 +21370,10 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetId === player.id) {
-        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
-        addFeed('STUCK', 'coral');
-      }
-      else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
+      announceStickyAttachment(
+        'semtex', grenade.ownerKind === 'player' ? player.id : grenade.ownerId,
+        targetId, targetLifeId, grenade.actionNonce, now, network.role !== 'client',
+      );
     }
   }
   audio.coverImpact(position.distanceTo(player.position));

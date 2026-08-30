@@ -95,23 +95,57 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0.82, '#a9cfe8'],
     [1, '#dceaf2'],
   ] as const),
-  // Owner 2026-08-30: Test1 - hard clear late-morning over dust; pale zenith
-  // into a bleached warm horizon.
+  // Owner 2026-08-30 (v2): Test1 - hard clear mid-morning over a dusty range.
+  //
+  // Authored around the TRUE horizon at offset 0.5, and with the lower half
+  // authored as ground rather than as more sky. Two reasons, both structural:
+  //
+  // 1. This texture is an equirectangular `scene.background`, so its vertical
+  //    axis is the polar angle: 0 = zenith, 0.5 = horizon, 1 = nadir. The v1
+  //    stops ran their bleached band from 0.72 to 1.0, i.e. entirely BELOW the
+  //    horizon where the terrain covers it, and left the player's actual sky
+  //    band (roughly 0.31-0.50 for a level 70-degree camera) sitting on the
+  //    mid-gradient. The same mistake is recorded for jungle-golden-hour at
+  //    SKY_BACKDROP_CLOUDS below, diagnosed there from the opposite direction.
+  // 2. arena-environment-ibl.ts PMREMs this exact texture into
+  //    scene.environment, so the lower hemisphere IS the arena's ground-bounce
+  //    irradiance band and the upper hemisphere IS its sky-fill band. Painting
+  //    both halves as sky gave every downward-facing normal - soffits, awning
+  //    undersides, container overhangs, the tower deck's underside - a bright
+  //    cream skylight it can never physically receive. Authoring the lower half
+  //    as pale hardpan (test-maps-art.ts hardpan base 0xb59a6e) under this
+  //    arena's own warm key is what turns one flat ambient constant into the
+  //    two-band, normal-gated fill the upstream extraction calls for, using the
+  //    irradiance convolution PMREM already runs instead of a shader patch.
   'range-midmorning': Object.freeze([
-    [0, '#6f9cc8'],
-    [0.4, '#8fb4d4'],
-    [0.72, '#c3d3d8'],
-    [0.9, '#e8ddc2'],
-    [1, '#f4e3ba'],
+    [0, '#3f6da6'],
+    [0.14, '#5182b5'],
+    [0.28, '#77a0c5'],
+    [0.38, '#a3bcc9'],
+    [0.45, '#ccc9b6'],
+    [0.5, '#e5d7b8'],
+    [0.53, '#d6c092'],
+    [0.7, '#b39a72'],
+    [1, '#7d6c4e'],
   ] as const),
-  // Owner 2026-08-30: Test2 - late-afternoon golden hour over the hills.
+  // Owner 2026-08-30 (v2): Test2 - late golden hour over the hillside estate.
+  // Same horizon-at-0.5 and ground-half discipline as range-midmorning above;
+  // the lower half is lit travertine (test-maps-art.ts travertine base
+  // 0xd8cbb4) so the warm bounce that reads on balustrade undersides, coping
+  // and the pool-house eaves comes from the environment rather than from
+  // tinting the flat ambient warm - which would also have warmed the shaded
+  // side of every wall, the specific failure the extraction warns about.
   'estate-golden-hour': Object.freeze([
-    [0, '#3e6da8'],
-    [0.35, '#6f8fb8'],
-    [0.6, '#b7a293'],
-    [0.8, '#e8b276'],
-    [0.93, '#f7c877'],
-    [1, '#ffe3a1'],
+    [0, '#264f8e'],
+    [0.14, '#3a68a0'],
+    [0.28, '#6b85a8'],
+    [0.36, '#a1929e'],
+    [0.43, '#d5a37e'],
+    [0.47, '#f3b877'],
+    [0.5, '#ffcf90'],
+    [0.53, '#e8c294'],
+    [0.7, '#c2a87f'],
+    [1, '#8a7657'],
   ] as const),
 });
 
@@ -167,10 +201,16 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
   }),
   // Owner 2026-08-30: Test1 clear (brief: no clouds); Test2 sparse warm wisps.
   'range-midmorning': null,
+  // v2: the band was 0.16-0.50, so more than half of it sat above the visible
+  // sky band (0.31-0.50 for a level camera) and the rest ran straight into the
+  // horizon line. Pulled to 0.24-0.46 so the deck is where a player actually
+  // looks, and re-coloured for a low key: warm lit tops, cool violet-grey
+  // undersides rather than the previous grey-brown, so the cloud deck carries
+  // the same warm-key/cool-sky separation as the surfaces below it.
   'estate-golden-hour': Object.freeze({
-    count: 22, bandTop: 0.16, bandBottom: 0.5,
-    rgb: [255, 214, 168] as [number, number, number], shadowRgb: [96, 76, 96] as [number, number, number],
-    alpha: 0.44, scale: 0.74,
+    count: 20, bandTop: 0.24, bandBottom: 0.46,
+    rgb: [255, 208, 158] as [number, number, number], shadowRgb: [92, 88, 118] as [number, number, number],
+    alpha: 0.42, scale: 0.7,
   }),
 });
 
@@ -183,8 +223,42 @@ function skyRandom(seed: number): () => number {
 }
 
 /**
- * Per-preset sun disc baked into the backdrop. x is a horizontal fraction of the
- * texture width, y a vertical fraction (0 = zenith, 1 = horizon).
+ * Circumsolar aureole authoring (owner 2026-08-30, from the upstream technique
+ * extraction's "analytic circumsolar aureole" item).
+ *
+ * The legacy `glowRadius` glow is a fixed-alpha two-stop radial blob whose size
+ * is an arbitrary pixel count: it has no relationship to the arena's aerosol
+ * load, and its 0.85 -> 0.32 -> 0 ramp piles everything from a few degrees out
+ * to the cone edge onto one value, which is exactly the flat plateau a low sun
+ * must not have. Presets that declare an `aureole` instead get the halo the
+ * physics actually produces: the forward peak of Mie scattering, sampled as the
+ * phase function's EXCESS over its own value at the cutoff so the term reaches
+ * zero continuously at the cone edge instead of leaving a visible ring.
+ *
+ * - `reachDegrees` is a real angular radius. On a 2:1 equirectangular texture
+ *   both axes carry the same degrees-per-pixel (width/360 == height/180), so a
+ *   circle is correct to within the cos(latitude) azimuth stretch, ~5% for a
+ *   sun 18 degrees up.
+ * - `strength` scales with aerosol optical depth, i.e. with the arena's own
+ *   `atmosphere.dust`.
+ * - `anisotropy` is the Cornette-Shanks g: coarse dust is more forward-peaked
+ *   (higher g, tighter halo) than fine haze.
+ * - `coreDegrees` replaces the arbitrary `coreRadius`. The core is deliberately
+ *   kept OUT of the aureole - it is the one part of the sky that is supposed to
+ *   clip, and it must stay a hard-edged disc rather than the top of a ramp.
+ */
+export type SkyBackdropAureole = Readonly<{
+  reachDegrees: number;
+  coreDegrees: number;
+  strength: number;
+  anisotropy: number;
+}>;
+
+/**
+ * Per-preset sun disc baked into the backdrop. x is a horizontal fraction of
+ * the texture width; y is a vertical fraction where 0 = zenith, 0.5 = the
+ * horizon and 1 = nadir (the equirectangular polar axis - a sun authored above
+ * 0.5 is below the horizon and cannot be seen at all).
  */
 export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   x: number;
@@ -193,6 +267,7 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   glowRgb: [number, number, number];
   coreRadius: number;
   glowRadius: number;
+  aureole?: SkyBackdropAureole;
 } | null>>> = Object.freeze({
   'sunset-farmland': Object.freeze({ x: 0.3, y: 0.5, coreRgb: [255, 236, 190] as [number, number, number], glowRgb: [255, 158, 64] as [number, number, number], coreRadius: 18, glowRadius: 92 }),
   'industrial-night': null,
@@ -203,10 +278,83 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
   'jungle-golden-hour': Object.freeze({ x: 0.62, y: 0.24, coreRgb: [255, 253, 245] as [number, number, number], glowRgb: [214, 234, 250] as [number, number, number], coreRadius: 13, glowRadius: 66 }),
   // High and tight: midday sun over water is small, white and fierce.
   'open-ocean-day': Object.freeze({ x: 0.38, y: 0.22, coreRgb: [255, 255, 250] as [number, number, number], glowRgb: [214, 236, 255] as [number, number, number], coreRadius: 11, glowRadius: 58 }),
-  // Owner 2026-08-30: Test1 high hard sun; Test2 low golden sun.
-  'range-midmorning': Object.freeze({ x: 0.56, y: 0.2, coreRgb: [255, 253, 244] as [number, number, number], glowRgb: [236, 236, 214] as [number, number, number], coreRadius: 12, glowRadius: 62 }),
-  'estate-golden-hour': Object.freeze({ x: 0.3, y: 0.62, coreRgb: [255, 238, 196] as [number, number, number], glowRgb: [255, 178, 92] as [number, number, number], coreRadius: 17, glowRadius: 88 }),
+  // Owner 2026-08-30 (v2): both Test arenas' discs are placed AT the key light
+  // rather than by eye, because arena-environment-ibl.ts bakes this texture
+  // into scene.environment - a disc that disagrees with the directional light
+  // puts the environment's brightest lobe on the opposite side of the sky from
+  // the one casting the shadows.
+  //
+  // Derivation. Both arenas take blender-lighting.ts' non-Atomic sunPosition
+  // [-62, 25, 38] (arenaLightingProfile has no test1/test2 entry), so the key
+  // direction is (-0.7806, 0.3148, 0.4784).
+  //   x = atan2(z, x) / 2pi + 0.5 = 2.5923 / 6.2832 + 0.5 = 0.913
+  //   y = 1 - (asin(0.3148) / pi + 0.5)                   = 0.398  (18.4 deg up)
+  // v1 had range-midmorning at y 0.20 (a 54-degree sun the shadows never
+  // matched) and estate-golden-hour at y 0.62, which is 21.6 degrees BELOW the
+  // horizon: its disc was invisible in game and its whole glow was baked into
+  // the ground half of the IBL. See followUps - a genuinely mid-morning Test1
+  // needs a per-arena sunPosition in blender-lighting.ts, which this pass does
+  // not own; the disc is placed where the light actually is.
+  'range-midmorning': Object.freeze({
+    x: 0.913, y: 0.398,
+    coreRgb: [255, 252, 240] as [number, number, number], glowRgb: [252, 234, 196] as [number, number, number],
+    coreRadius: 12, glowRadius: 20,
+    // dust 0.22: a dusty range has a bright, coarse-particle halo (high g,
+    // tight forward peak) rather than a wide soft one.
+    aureole: Object.freeze({ reachDegrees: 20, coreDegrees: 4, strength: 0.66, anisotropy: 0.8 }),
+  }),
+  'estate-golden-hour': Object.freeze({
+    x: 0.913, y: 0.398,
+    coreRgb: [255, 242, 208] as [number, number, number], glowRgb: [255, 190, 116] as [number, number, number],
+    coreRadius: 17, glowRadius: 19,
+    // dust 0.08: less aerosol, so a dimmer halo, but fine haze scatters over a
+    // broader lobe (lower g) and the low warm key makes it read amber.
+    aureole: Object.freeze({ reachDegrees: 22, coreDegrees: 5.2, strength: 0.52, anisotropy: 0.7 }),
+  }),
 });
+
+/** Cornette-Shanks phase function; the analytic stand-in for the Mie forward lobe. */
+function cornetteShanksPhase(cosTheta: number, anisotropy: number): number {
+  const g2 = anisotropy * anisotropy;
+  const denominator = Math.pow(Math.max(1e-6, 1 + g2 - 2 * anisotropy * cosTheta), 1.5);
+  return ((1 - g2) * (1 + cosTheta * cosTheta)) / (2 * (2 + g2) * denominator);
+}
+
+/** Stops across the aureole cone. Eight resolves the near-sun knee without banding. */
+const AUREOLE_GRADIENT_STOPS = 8;
+
+/**
+ * Draws the circumsolar halo as the phase function's excess over its value at
+ * the cone edge, so the term is continuous where it ends. Deterministic: pure
+ * arithmetic over the authored constants, no RNG.
+ */
+function paintAureole(
+  context: CanvasRenderingContext2D,
+  aureole: SkyBackdropAureole,
+  rgb: readonly [number, number, number],
+  cx: number,
+  cy: number,
+  pixelsPerDegree: number,
+): void {
+  const radius = aureole.reachDegrees * pixelsPerDegree;
+  if (radius <= 0) return;
+  const reachRadians = (aureole.reachDegrees * Math.PI) / 180;
+  const peak = cornetteShanksPhase(1, aureole.anisotropy);
+  const edge = cornetteShanksPhase(Math.cos(reachRadians), aureole.anisotropy);
+  const span = Math.max(peak - edge, 1e-6);
+  const [r, g, b] = rgb;
+  const gradient = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  for (let stop = 0; stop < AUREOLE_GRADIENT_STOPS; stop += 1) {
+    const offset = stop / (AUREOLE_GRADIENT_STOPS - 1);
+    const excess = (cornetteShanksPhase(Math.cos(offset * reachRadians), aureole.anisotropy) - edge) / span;
+    const alpha = aureole.strength * Math.max(0, excess);
+    gradient.addColorStop(offset, `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(4)})`);
+  }
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.arc(cx, cy, radius, 0, Math.PI * 2);
+  context.fill();
+}
 
 function paintSun(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, width: number, height: number): void {
   const sun = SKY_BACKDROP_SUN[preset];
@@ -214,17 +362,27 @@ function paintSun(context: CanvasRenderingContext2D, preset: SkyBackdropPreset, 
   const cx = sun.x * width;
   const cy = sun.y * height;
   const resolutionScale = width / 512;
-  const glowRadius = sun.glowRadius * resolutionScale;
-  const coreRadius = sun.coreRadius * resolutionScale;
+  // An equirectangular panorama spans 360 degrees of azimuth across its width
+  // and 180 of polar angle down its height, so a 2:1 texture has one
+  // degrees-per-pixel for both axes.
+  const pixelsPerDegree = width / 360;
   const [gr, gg, gb] = sun.glowRgb;
-  const glow = context.createRadialGradient(cx, cy, 0, cx, cy, glowRadius);
-  glow.addColorStop(0, `rgba(${gr}, ${gg}, ${gb}, 0.85)`);
-  glow.addColorStop(0.4, `rgba(${gr}, ${gg}, ${gb}, 0.32)`);
-  glow.addColorStop(1, `rgba(${gr}, ${gg}, ${gb}, 0)`);
-  context.fillStyle = glow;
-  context.beginPath();
-  context.arc(cx, cy, glowRadius, 0, Math.PI * 2);
-  context.fill();
+  if (sun.aureole) {
+    paintAureole(context, sun.aureole, sun.glowRgb, cx, cy, pixelsPerDegree);
+  } else {
+    const glowRadius = sun.glowRadius * resolutionScale;
+    const glow = context.createRadialGradient(cx, cy, 0, cx, cy, glowRadius);
+    glow.addColorStop(0, `rgba(${gr}, ${gg}, ${gb}, 0.85)`);
+    glow.addColorStop(0.4, `rgba(${gr}, ${gg}, ${gb}, 0.32)`);
+    glow.addColorStop(1, `rgba(${gr}, ${gg}, ${gb}, 0)`);
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(cx, cy, glowRadius, 0, Math.PI * 2);
+    context.fill();
+  }
+  const coreRadius = sun.aureole
+    ? sun.aureole.coreDegrees * pixelsPerDegree
+    : sun.coreRadius * resolutionScale;
   const [cr, cg, cb] = sun.coreRgb;
   const core = context.createRadialGradient(cx, cy, 0, cx, cy, coreRadius);
   core.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 1)`);
@@ -389,8 +547,7 @@ export function skyBackdropPreset(preset: string): SkyBackdropPreset {
   return preset === 'sunset-farmland' || preset === 'industrial-night'
     || preset === 'airport-dawn' || preset === 'indoor-range'
     || preset === 'jungle-golden-hour' || preset === 'open-ocean-day'
-    // Owner 2026-08-30: Test1/Test2 daylight presets, backed by the terminal
-    // generated sky (clear-day dome fits both moods; bespoke skies queued).
+    // Owner 2026-08-30: Test1/Test2 daylight presets, both authored procedural.
     || preset === 'range-midmorning' || preset === 'estate-golden-hour'
     ? preset
     : 'airport-dawn';
@@ -400,7 +557,17 @@ export function skyBackdropAssetForPreset(preset: string): string | null {
   const resolved = skyBackdropPreset(preset);
   if (resolved === 'sunset-farmland') return ATOMIC_ACRES_GENERATED_SKY_ASSET_URL;
   if (resolved === 'industrial-night') return RUSTWORKS_GENERATED_SKY_ASSET_URL;
-  if (resolved === 'airport-dawn' || resolved === 'range-midmorning' || resolved === 'estate-golden-hour') return TERMINAL_GENERATED_SKY_ASSET_URL;
+  if (resolved === 'airport-dawn') return TERMINAL_GENERATED_SKY_ASSET_URL;
+  // Owner 2026-08-30 (v2): range-midmorning and estate-golden-hour no longer
+  // substitute the terminal airport-dawn panorama. The substitution meant the
+  // Test1/Test2 procedural presets were authored, applied, and then REPLACED a
+  // few frames later by one shared clear-blue dawn dome - so neither arena's
+  // authored time of day ever reached the screen, and (because
+  // arena-environment-ibl.ts PMREMs scene.background) neither arena's ambient
+  // or IBL matched its own sun either. High Seas already ships a fully
+  // procedural sky this way (open-ocean-day resolves to null here). A bespoke
+  // generated panorama for each may still land later; until it exists, the
+  // authored preset is the better answer than another arena's.
   return null;
 }
 

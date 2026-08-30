@@ -38,8 +38,18 @@ describe('Semtex live-stick runtime integration', () => {
     const armStart = source.indexOf('function armImpactGrenade(');
     const armEnd = source.indexOf('\nfunction updateGrenades(', armStart);
     const arm = source.slice(armStart, armEnd);
-    expect(arm).toContain('if (targetId === player.id) {');
-    expect(arm).toContain("presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now)");
+    // Re-pinned 2026-08-30 (owner: STUCK must show on BOTH screens): the
+    // victim/attacker branch moved into the shared announceStickyAttachment(),
+    // which also tells the remote peer at attach time.
+    expect(arm).toContain('announceStickyAttachment(');
+    expect(arm).toContain("'semtex', grenade.ownerKind === 'player' ? player.id : grenade.ownerId,");
+    // The urgent-alert call itself now lives in the shared announcer, asserted
+    // there so both sticky weapons are covered by ONE pin instead of two that
+    // could drift apart (they had).
+    const announceStart = source.indexOf('function announceStickyAttachment(');
+    const announce = source.slice(announceStart, source.indexOf('function presentStickyVictimUrgentAlert(', announceStart));
+    expect(announce).toContain('presentStickyVictimUrgentAlert(source, targetId, targetLifeId, actionNonce, now)');
+    expect(announce).toContain("type: 'sticky-attached',");
 
     const alertStart = source.indexOf('function presentStickyVictimUrgentAlert(');
     const alertEnd = source.indexOf('\nconst hostTriggerAuthorities', alertStart);

@@ -614,11 +614,38 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
+/**
+ * Owner 2026-08-30 ("it needs to say STUCK on both peoples screen when it
+ * actually sticks, i thought we had sorted that in a previous build").
+ *
+ * It was never sorted: `stuck: true` only ever rode a HitMessage, and a hit is
+ * only produced when the ordnance DETONATES. The machine that simulates the
+ * stick shows STUCK locally at attach; the other peer sees nothing until the
+ * blast, which for a timed sticky is seconds later - or never, if it is
+ * defused by the victim dying to something else first. This message announces
+ * the ATTACH itself, so both the attacker and the victim are told at the
+ * moment it lands. It carries no damage and no authority: it is a feed/alert
+ * cue only, and the blast still travels the existing authoritative hit path.
+ */
+export type StickyAttachedMessage = {
+  type: 'sticky-attached';
+  /** Owner of the ordnance. */
+  by: string;
+  /** Combatant it attached to. */
+  target: string;
+  targetLifeId: number;
+  source: 'grenade' | 'explosive-crossbow';
+  /** Correlates with the eventual detonation hit, and dedupes replays. */
+  actionNonce: number;
+  nonce: number;
+};
+
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | EmoteMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
+  | StickyAttachedMessage
   // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
   | HostSuccessionProtocolMessage;
 
@@ -1191,6 +1218,14 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'railgun-shot-result':
     case 'railgun-state':
       return isRailgunProtocolMessage(msg, MULTIPLAYER_PROTOCOL_VERSION);
+    case 'sticky-attached':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
+        && msg.by !== msg.target
+        && Number.isSafeInteger(msg.targetLifeId) && Number(msg.targetLifeId) >= 0
+        && (msg.source === 'grenade' || msg.source === 'explosive-crossbow')
+        && Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'lobby-config':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isPrivateMatchConfig(msg.config) && Number.isFinite(msg.nonce);
@@ -1322,6 +1357,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'railgun-shot-request':
     case 'railgun-shot-result':
     case 'railgun-state':
+    case 'sticky-attached':
     case 'lobby-config':
     case 'lobby-balance':
     case 'lobby-state':
