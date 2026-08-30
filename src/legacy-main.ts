@@ -6749,8 +6749,26 @@ function requirePlayerName(): string | null {
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  clientWorldRepairAdmission = null;
-  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  // Owner-facing correctness, found by the cross-browser gate 2026-08-30:
+  // showFatalError is reachable DURING module evaluation - the WebGPU
+  // requirement path calls it from the top-level bootstrap, long before the
+  // client world-repair state below it is initialised. Assigning a module
+  // `let` from inside its temporal dead zone throws a ReferenceError, so the
+  // player saw "Cannot access 'clientWorldRepairAdmission' before
+  // initialization" INSTEAD of "This game needs WebGPU..." - the error handler
+  // destroyed the very message it existed to deliver, in the one situation
+  // where a clear message matters most.
+  //
+  // This function's contract is that it works at ANY point in the lifecycle,
+  // so the session-state reset is now best-effort and can never mask the real
+  // failure. Ordering is not something a 33k-line module can be trusted to
+  // preserve; not throwing is.
+  try {
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
+  } catch {
+    // Pre-initialisation call: there is no session state to reset yet.
+  }
   setBootstrapStage('failed');
   bootstrapError = message;
   gameStarted = false;
