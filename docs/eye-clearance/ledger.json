@@ -2,13 +2,29 @@
  "capturedAt": "2026-08-29",
  "probeM": 0.15,
  "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality) then sweep-eye-clearance-live.mjs (analytic eye seats vs canonical shot surfaces) then scripts/qa/verify-eye-clearance-runtime.mjs (teleports the REAL player to every flagged spot, matching stance, and re-probes from the actual camera seat - i.e. after src/camera-eye-clearance.ts resolveEyeClearance runs)",
+ "roster": "All three stages derive the arena roster from SELECTABLE_ARENAS in src/map-selection.ts - stage 1 imports it, stages 2 and 3 scrape it through scripts/qa/eye-clearance-roster.mjs (floor of 7, so a scrape that stops matching throws instead of yielding an empty roster). `ceilings` must therefore carry exactly one entry per selectable arena, no more and no fewer: scripts/qa/eye-clearance-sweep-contract.test.mjs FAILS when the roster and this ledger disagree, which is what let the five-id ceiling set outlive a seven-arena game unnoticed.",
  "ceilings": {
   "atomic-acres": 15,
   "rustworks-1v1": 0,
   "skyline-terminal": 3,
   "gun-range": 2,
-  "high-seas": 2
+  "high-seas": 2,
+  "test1": -1,
+  "test2": -1
  },
+ "unmeasuredCeiling": -1,
+ "unmeasured": [
+  {
+   "arena": "test1",
+   "since": "2026-08-31",
+   "note": "Never measured by stage 2. The live sweep hardcoded a five-arena roster, so test1 was never opened, never probed, and never asked the ledger for a ceiling - the missing-ceiling guard could not fire for an arena that never reached the loop. Entered at the -1 UNMEASURED sentinel, which is below the smallest possible measurement, so the ratchet is RED for test1 until someone runs the sweep with a browser and writes down the number it actually finds. A guessed ceiling here would pre-forgive whatever test1 turns out to do."
+  },
+  {
+   "arena": "test2",
+   "since": "2026-08-31",
+   "note": "Same as test1. Both were rebuilt at full scale on 2026-08-30 (64 x 46 m and 76 x 58 m, 32852f89) and both author real ground/terrace colliders below y = 0, the geometry class that broke stage 1's legality probe - so their violation counts are exactly the numbers nobody should guess. -1 until measured."
+  }
+ ],
  "accepted": [
   {
    "arena": "gun-range",
@@ -42,7 +58,9 @@
    "skyline-terminal": "3 (airstair, 0.069 -> 0.136 runtime)",
    "rustworks-1v1": "0",
    "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
-   "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)"
+   "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
+   "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
+   "test2": "UNMEASURED (2026-08-31) - as test1"
   },
   "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
  }

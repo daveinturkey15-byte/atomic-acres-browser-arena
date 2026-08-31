@@ -22,6 +22,14 @@ const groups = [
   { name: 'pass72-corrections', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass72-lobby-squad-reset.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass73-gameplay-regressions', default: false, timeoutMs: 600_000, args: ['tests/e2e/pass73-gameplay-regressions.spec.ts', 'tests/e2e/pass73-network-reveal-authority.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass74-chopper-hud', default: false, timeoutMs: 240_000, args: ['tests/e2e/pass74-chopper-hud.spec.ts', '--project=chromium', '--workers=1'] },
+  // Boot gate for every arena the game can name. Deliberately in the DEFAULT
+  // set: it was authored after a boot incident and then executed by nothing -
+  // no npm script, no group here, neither workflow - for as long as it existed.
+  // Opt-in was how it stayed dark, so it runs whenever the bounded suite runs
+  // without an explicit selection. The per-arena test allows 240 s (SwiftShader
+  // boot x 8 arenas); the group ceiling is the worst case plus headroom, so a
+  // slow-but-passing run is never killed and reported as a boot failure.
+  { name: 'pass74-arena-boot-smoke', timeoutMs: 2_100_000, args: ['tests/e2e/pass74-arena-boot-smoke.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass74-selector-layout', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass66-field-kit-killstreak-menu.spec.ts', '--project=chromium', '--workers=1', '--grep', 'previews the equipped streak on hover/focus without gameplay render ownership|uses poster-only demo mode for reduced motion and stacks cleanly at narrow width'] },
   { name: 'pass64-hud-contracts', default: false, timeoutMs: 900_000, args: ['tests/e2e/pass64-hud-menu.spec.ts', 'tests/e2e/pass65-menu-lifecycle.spec.ts', '--project=chromium', '--workers=1'] },
   { name: 'pass64-renderer-foundation', default: false, timeoutMs: 420_000, args: ['tests/e2e/pass64-renderer-foundation.spec.ts', '--project=chromium', '--workers=1'] },

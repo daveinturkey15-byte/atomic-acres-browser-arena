@@ -45,6 +45,8 @@ const list = (value) => value.split(',').map((entry) => entry.trim()).filter(Boo
 // Owner 2026-08-30: same fix as verify-cross-browser-matrix.mjs. A hardcoded
 // arena list here meant test1/test2 were never opened in any browser by the
 // gate; deriving it from the source roster makes new arenas covered by default.
+const MINIMUM_SELECTABLE_ARENAS = 7;
+
 function selectableArenaIds() {
   const source = readFileSync(resolve(HERE, '../../src/map-selection.ts'), 'utf8');
   const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
@@ -55,7 +57,14 @@ function selectableArenaIds() {
     const end = i + 1 < found.length ? found[i + 1].index : body.length;
     if (!/selectable:\s*false/.test(body.slice(start, end))) ids.push(found[i][1]);
   }
-  if (ids.length === 0) throw new Error('cross-browser gate: could not derive any selectable arena from src/map-selection.ts');
+  // Floor, not just a non-empty check. A regex that PARTIALLY stops matching -
+  // say the entry shape changes for newly added arenas only - yields a SHORT
+  // roster, which an `ids.length === 0` guard waves straight through while the
+  // gate quietly stops covering the newest maps. That is the exact failure this
+  // derivation exists to prevent, so the floor tracks the real roster size.
+  if (ids.length < MINIMUM_SELECTABLE_ARENAS) {
+    throw new Error(`cross-browser gate: derived only ${ids.length} selectable arenas from src/map-selection.ts (expected at least ${MINIMUM_SELECTABLE_ARENAS}); the scrape is stale`);
+  }
   return ids;
 }
 

@@ -6,12 +6,18 @@
 // within PROBE_M of the real camera.
 import { chromium } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { resolveArenaRoster } from './eye-clearance-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const BASE = arg('--url', 'http://127.0.0.1:41975');
 const PROBE_M = Number(arg('--probe', '0.15'));
-const ARENAS = ['atomic-acres', 'skyline-terminal', 'gun-range', 'high-seas'];
+// Owner 2026-08-31: this was a hand-written FOUR-id list - narrower even than
+// the five the live sweep measured, silently dropping rustworks-1v1 on top of
+// test1/test2. Derived from the same source as the other two stages now.
+const ROSTER = resolveArenaRoster(arg('--arenas', null));
+const ARENAS = ROSTER.ids;
+console.log(`[eye-clearance] runtime verifier roster (${ARENAS.length}): ${ARENAS.join(', ')}`);
 
 const browser = await chromium.launch({
   headless: false, channel: 'chrome',
@@ -24,12 +30,19 @@ const session = await page.context().newCDPSession(page);
 await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
 
 const summary = [];
+const missingSweep = [];
 for (const arena of ARENAS) {
   let violations;
   try {
     violations = JSON.parse(readFileSync(`artifacts/qa/eye-clearance/${arena}-violations.json`, 'utf8')).violations;
-  } catch { continue; }
-  if (!violations.length) continue;
+  } catch {
+    // A missing stage-2 artifact is NOT "nothing to verify". It means the live
+    // sweep never covered this arena, which is exactly the hole this file was
+    // on the wrong side of until 2026-08-31. Recorded and reported, not skipped.
+    missingSweep.push(arena);
+    continue;
+  }
+  if (!violations.length) { summary.push({ arena, sweep: 0, remaining: 0 }); continue; }
   await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=eyeverify&previewTime=0`,
     { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
@@ -100,3 +113,12 @@ for (const arena of ARENAS) {
 }
 console.log('SUMMARY', JSON.stringify(summary));
 await browser.close();
+
+if (missingSweep.length > 0) {
+  console.error(
+    `[eye-clearance] no stage-2 violations artifact for ${missingSweep.join(', ')} - `
+    + 'run scripts/qa/sweep-eye-clearance-live.mjs over the full roster first. '
+    + 'An unswept arena is uncovered, not clean.',
+  );
+  process.exit(1);
+}

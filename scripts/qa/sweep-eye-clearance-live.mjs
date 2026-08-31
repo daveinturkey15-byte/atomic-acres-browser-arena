@@ -14,13 +14,27 @@
 
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readLedger, resolveArenaRoster, UNMEASURED_CEILING } from './eye-clearance-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const BASE = arg('--url', 'http://127.0.0.1:41975');
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,high-seas')
-  .split(',').map((entry) => entry.trim()).filter(Boolean);
+// Owner 2026-08-31: this used to be a hand-written five-id default while stage 1
+// already generated spots for all seven selectable arenas, so the pipeline
+// measured five and printed a green ratchet over a roster it had not covered.
+// Derived now, with a floor, and a narrowed --arenas may not produce a verdict.
+const ROSTER = resolveArenaRoster(arg('--arenas', null));
+const ARENAS = ROSTER.ids;
 const PROBE_M = Number(arg('--probe', '0.15'));
+
+if (argv.includes('--check') && ROSTER.narrowed) {
+  console.error(
+    `[eye-clearance] --check refuses a narrowed roster: asked for ${ARENAS.join(', ')} `
+    + `but the selectable roster is ${ROSTER.full.join(', ')}. A ratchet verdict must cover everything.`,
+  );
+  process.exit(1);
+}
+console.log(`[eye-clearance] live sweep roster (${ARENAS.length}): ${ARENAS.join(', ')}`);
 
 const browser = await chromium.launch({
   headless: false,
@@ -118,11 +132,32 @@ await browser.close();
 // Ratchet: measured violation counts may only hold or shrink against the committed
 // ledger. Growth is a regression in collider/visual agreement and fails loudly.
 if (argv.includes('--check')) {
-  const ledger = JSON.parse(readFileSync('docs/eye-clearance/ledger.json', 'utf8'));
+  const ledger = readLedger();
   let failed = false;
+
+  // A ratchet that only inspects the rows it happened to measure can never
+  // notice the rows it skipped. Coverage is checked against the roster first.
+  const measured = new Set(summary.map((row) => row.arena));
+  for (const arena of ROSTER.full) {
+    if (!measured.has(arena)) {
+      console.error(`[eye-clearance] ${arena} is selectable but was never measured - no verdict is possible`);
+      failed = true;
+    }
+  }
+
   for (const row of summary) {
     const ceiling = ledger.ceilings[row.arena];
     if (ceiling === undefined) { console.error(`[eye-clearance] no ceiling for ${row.arena}`); failed = true; continue; }
+    if (ceiling <= UNMEASURED_CEILING) {
+      console.error(
+        `[eye-clearance] ${row.arena}: measured ${row.violations} violations against the UNMEASURED sentinel `
+        + `(${ceiling}). This arena has never had a real baseline. Record ${row.violations} in `
+        + 'docs/eye-clearance/ledger.json with a dated note, and triage those rows - do not raise the '
+        + 'ceiling past what was measured.',
+      );
+      failed = true;
+      continue;
+    }
     if (row.violations > ceiling) {
       console.error(`[eye-clearance] ${row.arena}: ${row.violations} violations > ceiling ${ceiling} - REGRESSED`);
       failed = true;

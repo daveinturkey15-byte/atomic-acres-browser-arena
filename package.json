@@ -158,6 +158,7 @@
     "qa:pass65:production-assets": "node .agents/skills/atomic-acres-production-asset-governance/scripts/verify-production-assets.mjs",
     "qa:pass65:operator-assets": "node scripts/qa/verify-pass65-operator-production.mjs",
     "qa:pass64:renderer": "playwright test tests/e2e/pass64-renderer-foundation.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass74:arena-boot-smoke": "playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
@@ -187,7 +188,9 @@
     "qa:release-topology": "node scripts/qa/verify-release-topology-browser.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
     "deploy:ci": "gh-pages -d dist",
-    "qa:eye-clearance": "npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/sweep-eye-clearance-live.mjs --check"
+    "qa:eye-clearance:contract": "node --test scripts/qa/eye-clearance-sweep-contract.test.mjs",
+    "qa:eye-clearance": "npm run qa:eye-clearance:contract && npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/sweep-eye-clearance-live.mjs --check",
+    "qa:eye-clearance:runtime": "node scripts/qa/verify-eye-clearance-runtime.mjs"
   },
   "overrides": {
     "postcss": "8.5.23",

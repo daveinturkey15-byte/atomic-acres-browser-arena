@@ -3,7 +3,18 @@
 //
 // Pins the things that keep the instrument trustworthy:
 //   1. The viewpoint catalog never drifts from the AUTHORED review cameras in
-//      src/rendering/arenas/*.ts (both directions: missing and stale).
+//      src/rendering/arenas/*.ts (both directions: missing and stale). The
+//      arena roster is GLOBBED off disk and cross-checked against
+//      ARENA_VISUAL_REGISTRY; it is never a literal in this file.
+//
+//      Until 2026-08-31 it was a literal in this file: a hand-written
+//      six-entry ARENA_SOURCES map. Both sides of the completeness assertion
+//      then descended from that one decision, so `assert.deepEqual(authored,
+//      CATALOG_ARENAS)` compared the six-arena choice with itself and could
+//      never fail. Test1 and Test2 had authored reviewCameras that no stage of
+//      this instrument had ever rendered or compared. Any roster this file
+//      needs must be OBSERVED - from the filesystem, or from the registry the
+//      game itself loads arenas through - never typed here.
 //   2. The capture script keeps its environment proofs: installed-Chrome
 //      headless WebGPU route, adapter/device/vendor validation, game-loop
 //      commit proof before every screenshot, manifest provenance.
@@ -12,40 +23,106 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS, CATALOG_VIEWPOINT_COUNT } from './viewpoint-catalog.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..', '..');
-const ARENA_SOURCES = {
-  'atomic-acres': 'src/rendering/arenas/atomic-acres.ts',
-  farcrysis: 'src/rendering/arenas/farcrysis.ts',
-  'gun-range': 'src/rendering/arenas/gun-range.ts',
-  'high-seas': 'src/rendering/arenas/high-seas.ts',
-  'rustworks-1v1': 'src/rendering/arenas/rustworks-1v1.ts',
-  'skyline-terminal': 'src/rendering/arenas/skyline-terminal.ts',
+const ARENAS_DIR = 'src/rendering/arenas';
+const ARENA_REGISTRY_SOURCE = 'src/rendering/arena-visual-stream.ts';
+
+// Modules that live in ARENAS_DIR and are legitimately not arenas. Everything
+// else that carries no definition is a FAILURE rather than a silent skip -
+// otherwise the glob reintroduces the omission it exists to prevent.
+const NON_ARENA_MODULES = new Set(['shared.ts']);
+const isColocatedUnitTest = (file) => file.endsWith('.test.ts');
+
+const stripComments = (text) => text
+  .replace(/\/\*[\s\S]*?\*\//gu, '')
+  .replace(/\/\/[^\n]*/gu, '');
+
+// Derivation 1: glob the arena directory. Returns { arenaId -> relative path }
+// keyed by the id the module DECLARES, not by its filename, so a module whose
+// filename and identity disagree cannot masquerade as the arena it is named
+// after.
+const arenaSourcesFromDisk = () => {
+  const files = readdirSync(resolve(ROOT, ARENAS_DIR))
+    .filter((file) => file.endsWith('.ts'))
+    .sort();
+  assert.ok(files.length > 0, `${ARENAS_DIR} must contain arena modules`);
+  const sources = {};
+  for (const file of files) {
+    const relPath = `${ARENAS_DIR}/${file}`;
+    const source = readFileSync(resolve(ROOT, relPath), 'utf8');
+    const declaration = /createProceduralArenaVisualDefinition\(\{\s*id:\s*'([a-z0-9-]+)'/u
+      .exec(stripComments(source));
+    if (!declaration) {
+      assert.ok(NON_ARENA_MODULES.has(file) || isColocatedUnitTest(file),
+        `${relPath} sits in ${ARENAS_DIR} but this instrument cannot read an arena definition from it. `
+        + 'If it is a new arena authored in a shape the derivation does not recognise, widen the derivation - '
+        + 'if it is a helper, name it in NON_ARENA_MODULES. Do not leave it silently uncovered.');
+      continue;
+    }
+    const arenaId = declaration[1];
+    assert.equal(sources[arenaId], undefined,
+      `'${arenaId}' is declared by two modules (${sources[arenaId]} and ${relPath})`);
+    sources[arenaId] = relPath;
+  }
+  return sources;
 };
 
-const authoredCameraIds = () => {
+// Derivation 2, independent of the filesystem walk AND of the catalog: the
+// registry the running game actually loads arenas through. Disagreement means
+// either an arena module the game cannot reach, or a registry entry with no
+// module behind it - both of which make a "complete" sweep a lie.
+const registryArenaIds = () => {
+  const source = readFileSync(resolve(ROOT, ARENA_REGISTRY_SOURCE), 'utf8');
+  const start = source.indexOf('export const ARENA_VISUAL_REGISTRY');
+  assert.notEqual(start, -1, `${ARENA_REGISTRY_SOURCE} must export ARENA_VISUAL_REGISTRY`);
+  const end = source.indexOf('\n});', start);
+  assert.notEqual(end, -1, 'ARENA_VISUAL_REGISTRY must close at column 0');
+  const block = stripComments(source.slice(start, end));
+  const entries = [...block.matchAll(/'([a-z0-9-]+)':\s*\(\)\s*=>\s*import\('\.\/arenas\/([a-z0-9-]+)'\)/gu)];
+  assert.ok(entries.length > 0, 'read no arena entries out of ARENA_VISUAL_REGISTRY');
+  for (const [, arenaId, modulePath] of entries) {
+    assert.equal(modulePath, arenaId,
+      `ARENA_VISUAL_REGISTRY maps '${arenaId}' at ./arenas/${modulePath}; the derivation assumes they match`);
+  }
+  return entries.map(([, arenaId]) => arenaId);
+};
+
+const authoredCameraIds = (sources) => {
   const found = {};
-  for (const [arenaId, relPath] of Object.entries(ARENA_SOURCES)) {
+  for (const [arenaId, relPath] of Object.entries(sources)) {
     const source = readFileSync(resolve(ROOT, relPath), 'utf8');
     const blockStart = source.indexOf('reviewCameras: [');
+    assert.notEqual(blockStart, -1, `${relPath} must declare reviewCameras`);
     // Scan to the TWO-SPACE-indented closer: the first ']' belongs to a
     // nested position array, not the reviewCameras list.
     const blockEnd = source.indexOf('\n  ],', blockStart);
-    assert.notEqual(blockStart, -1, `${relPath} must declare reviewCameras`);
-    const block = source.slice(blockStart, blockEnd);
-    found[arenaId] = [...block.matchAll(/camera\('([a-z0-9-]+)'/g)].map((m) => m[1]);
+    assert.notEqual(blockEnd, -1, `${relPath} reviewCameras is not closed at two-space indent`);
+    const block = stripComments(source.slice(blockStart, blockEnd));
+    const ids = [...block.matchAll(/camera\('([a-z0-9-]+)'/gu)].map((match) => match[1]);
+    assert.ok(ids.length > 0, `${relPath} declares reviewCameras but the derivation read none out of it`);
+    found[arenaId] = ids;
   }
   return found;
 };
 
+test('the arena roster is observed, and two independent observations agree', () => {
+  const derived = Object.keys(arenaSourcesFromDisk()).sort();
+  assert.deepEqual(derived, [...registryArenaIds()].sort(),
+    'the arena modules on disk and ARENA_VISUAL_REGISTRY must name the same arenas');
+  assert.deepEqual([...CATALOG_ARENAS].sort(), derived,
+    'VIEWPOINT_CATALOG must cover exactly the arenas that exist - an arena missing here is never captured, '
+    + 'never diffed, and reports no regression because nothing looked at it');
+});
+
 test('catalog covers every authored review camera', () => {
-  const authored = authoredCameraIds();
-  assert.deepEqual(Object.keys(authored).sort(), [...CATALOG_ARENAS].sort(),
-    'catalog arenas must equal the arenas that author reviewCameras');
+  const authored = authoredCameraIds(arenaSourcesFromDisk());
   for (const [arenaId, ids] of Object.entries(authored)) {
+    assert.ok(VIEWPOINT_CATALOG[arenaId],
+      `arena '${arenaId}' authors review cameras and has no VIEWPOINT_CATALOG entry at all`);
     for (const id of ids) {
       assert.ok(VIEWPOINT_CATALOG[arenaId].includes(id),
         `authored camera '${id}' (${arenaId}) is missing from VIEWPOINT_CATALOG - the regression sweep would silently skip it`);
@@ -54,15 +131,28 @@ test('catalog covers every authored review camera', () => {
 });
 
 test('catalog has no stale entries', () => {
-  const authored = authoredCameraIds();
+  const sources = arenaSourcesFromDisk();
+  const authored = authoredCameraIds(sources);
   for (const [arenaId, ids] of Object.entries(VIEWPOINT_CATALOG)) {
     for (const id of ids) {
-      assert.ok(authored[arenaId].includes(id),
-        `catalog entry '${arenaId}/${id}' no longer exists in ${ARENA_SOURCES[arenaId]} - remove it or fix the id`);
+      assert.ok(authored[arenaId]?.includes(id),
+        `catalog entry '${arenaId}/${id}' no longer exists in ${sources[arenaId] ?? `${ARENAS_DIR}/${arenaId}.ts`} - remove it or fix the id`);
     }
   }
   assert.equal(CATALOG_VIEWPOINT_COUNT,
     CATALOG_ARENAS.reduce((sum, arena) => sum + VIEWPOINT_CATALOG[arena].length, 0));
+});
+
+test('the roster derivation actually fails when an arena is dropped', () => {
+  // The defect this file shipped for a day and a half was an assertion that
+  // could not fail. Prove the replacement can: run the catalog comparison
+  // against a roster with one arena removed and require it to throw.
+  const derived = Object.keys(arenaSourcesFromDisk()).sort();
+  assert.ok(derived.length > 1, 'need more than one arena for this proof to mean anything');
+  assert.throws(
+    () => assert.deepEqual([...CATALOG_ARENAS].sort(), derived.slice(1)),
+    'dropping an arena from the derived roster must be detectable by the comparison test 1 performs',
+  );
 });
 
 test('capture script keeps its environment proofs', () => {

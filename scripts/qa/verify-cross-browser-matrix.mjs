@@ -54,6 +54,8 @@ import { startStableDevProxy } from './stable-dev-proxy.mjs';
 // so out loud instead of passing quietly.
 const MAP_SELECTION_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/map-selection.ts');
 
+const MINIMUM_SELECTABLE_ARENAS = 7;
+
 function selectableArenaIds() {
   const source = readFileSync(MAP_SELECTION_PATH, 'utf8');
   const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
@@ -67,7 +69,14 @@ function selectableArenaIds() {
     const end = i + 1 < found.length ? found[i + 1].index : body.length;
     if (!/selectable:\s*false/.test(body.slice(start, end))) ids.push(found[i][1]);
   }
-  if (ids.length === 0) throw new Error('cross-browser matrix: could not derive any selectable arena from src/map-selection.ts');
+  // Floor, not just a non-empty check. A regex that PARTIALLY stops matching -
+  // say the entry shape changes for newly added arenas only - yields a SHORT
+  // roster, which an `ids.length === 0` guard waves straight through while the
+  // gate quietly stops covering the newest maps. That is the exact failure this
+  // derivation exists to prevent, so the floor tracks the real roster size.
+  if (ids.length < MINIMUM_SELECTABLE_ARENAS) {
+    throw new Error(`cross-browser matrix: derived only ${ids.length} selectable arenas from src/map-selection.ts (expected at least ${MINIMUM_SELECTABLE_ARENAS}); the scrape is stale`);
+  }
   return ids;
 }
 

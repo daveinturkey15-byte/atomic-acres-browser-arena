@@ -8,8 +8,20 @@
 // instrument stands on.
 //
 // This file must never drift from the authored definitions:
-// scripts/qa/arena-viewpoint-regression.test.mjs scans the arena sources and
-// fails if any authored camera id is missing here or any entry here is stale.
+// scripts/qa/arena-viewpoint-regression.test.mjs GLOBS src/rendering/arenas/,
+// derives the arena roster from the modules it finds there, cross-checks that
+// roster against ARENA_VISUAL_REGISTRY in src/rendering/arena-visual-stream.ts,
+// and fails if any authored camera id is missing here or any entry here is
+// stale.
+//
+// It did not always do that. Until 2026-08-31 the contract test held its own
+// hand-written six-file `ARENA_SOURCES` map, so both sides of the completeness
+// assertion descended from one six-arena decision and could never disagree.
+// Test1 and Test2 had authored `reviewCameras` for a day and a half and no
+// stage of this instrument - catalog, capture or diff - had ever seen them.
+// The roster below is therefore a REVIEWED literal that a derivation checks,
+// not a literal that checks itself; adding an arena module to
+// src/rendering/arenas/ now fails this instrument until its cameras land here.
 
 export const VIEWPOINT_CATALOG = Object.freeze({
   'atomic-acres': Object.freeze([
@@ -66,6 +78,23 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'terminal-boarding-open',
     'terminal-port-wing-authority',
     'terminal-starboard-wing-authority',
+  ]),
+  // Owner 2026-08-30 arenas (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
+  // Absent from this catalog until 2026-08-31 - see the header note. Both
+  // carry an into-sun probe authored against the sky/lighting pass that
+  // changed the sun disc, the aureole and the backlit rims, which is exactly
+  // the half of each rig that nothing was rendering or comparing.
+  test1: Object.freeze([
+    'test1-tower-overview',
+    'test1-firing-line',
+    'test1-container-occlusion',
+    'test1-into-sun-hardpan',
+  ]),
+  test2: Object.freeze([
+    'test2-estate-overview',
+    'test2-pool-lane',
+    'test2-garden-occlusion',
+    'test2-into-sun-terrace',
   ]),
 });
 
