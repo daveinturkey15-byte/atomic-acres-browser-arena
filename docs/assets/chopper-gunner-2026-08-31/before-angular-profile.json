@@ -1,0 +1,2099 @@
+[
+  {
+    "viewport": "owner-2560x1440",
+    "possessed": true,
+    "shot": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\docs\\assets\\chopper-gunner-2026-08-31\\measure6-owner-2560x1440.png",
+    "measure": {
+      "camera": null,
+      "possession": "chopper-gunner",
+      "gunnerHudHidden": false,
+      "firstPersonSightline": {
+        "entityId": "ks-1-chopper-1",
+        "presentationSource": "project-original-blender-glb",
+        "visibleMeshNames": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_GunnerViewBarrel_0_LOD0",
+          "Chopper_GunnerViewBarrel_1_LOD0",
+          "Chopper_GunnerViewReceiver_LOD0",
+          "Chopper_GunnerViewStatus_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideSightline": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideCockpit": [],
+        "dashboardVisible": true,
+        "displaysVisible": true,
+        "hudVisible": false,
+        "centreSightlineClear": true,
+        "weaponVisible": true,
+        "overlayLayerExclusive": true,
+        "alignment": {
+          "cameraWorldPosition": [
+            5.0549021238930205,
+            18.26971828871254,
+            -20.56331852752364
+          ],
+          "cameraPivotWorldPosition": [
+            4.821928041478425,
+            18.349718288712538,
+            -20.40800247258058
+          ],
+          "cockpitWorldPosition": [
+            4.6355510931822925,
+            17.866355876521325,
+            -20.283751173716492
+          ],
+          "parentName": "Pass65Chopper_LOD0",
+          "parentWorldScale": [
+            0.5894663614724457,
+            0.5894663614724457,
+            0.5894663614724458
+          ],
+          "pivotErrorM": 3.66205343881779e-15,
+          "dashboardCameraSpacePosition": [
+            -2.4980018054066022e-15,
+            -0.332626450395594,
+            0.503997214548733
+          ],
+          "hudCameraSpacePosition": [
+            -3.434752482434078e-15,
+            0.021053384933715336,
+            -0.16799442909747164
+          ],
+          "weaponCameraSpacePosition": [
+            -2.4980018054066022e-15,
+            -0.40336241219121405,
+            0.503997214548733
+          ],
+          "framing": {
+            "measuredMeshes": 24,
+            "meshesBehindEye": 3,
+            "nearestDepthM": 0.027,
+            "farthestDepthM": 0.801,
+            "leftEdgeDeg": -83.854,
+            "rightEdgeDeg": 83.854,
+            "topEdgeDeg": 75.166,
+            "bottomEdgeDeg": -87.708,
+            "apertureTopDeg": 9,
+            "structureClearsAboveDeg": 12,
+            "apertureLeftDeg": -26,
+            "apertureRightDeg": 26,
+            "structureClearsLeftOfDeg": -30,
+            "structureClearsRightOfDeg": 30,
+            "centreColumnProfile": [
+              [
+                -80,
+                0.4996,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -79,
+                0.5024,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -78,
+                0.5053,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -77,
+                0.5085,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -76,
+                0.5118,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -75,
+                0.5153,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -74,
+                0.5191,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -73,
+                0.523,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -72,
+                0.5272,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -71,
+                0.5316,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -70,
+                0.5362,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -69,
+                0.5411,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -68,
+                0.5463,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -67,
+                0.5548,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -66,
+                0.5678,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -55,
+                0.3953,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -50,
+                0.3538,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -49,
+                0.3327,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -48,
+                0.335,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -47,
+                0.3604,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -46,
+                0.3538,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -45,
+                0.3206,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -44,
+                0.3417,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -43,
+                0.3361,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -42,
+                0.3308,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -41,
+                0.3331,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -40,
+                0.3293,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -39,
+                0.3272,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -38,
+                0.3279,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -37,
+                0.3323,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -36,
+                0.4056,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -35,
+                0.4152,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -34,
+                0.4253,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -33,
+                0.2557,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -32,
+                0.2527,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -31,
+                0.2502,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -30,
+                0.2491,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -29,
+                0.2473,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -28,
+                0.245,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -27,
+                0.2717,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -26,
+                0.5355,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -25,
+                0.2576,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -24,
+                0.2555,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                9,
+                0.7714,
+                "Chopper_InnerWindscreenHeaderGlow_LOD0"
+              ],
+              [
+                10,
+                0.7801,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                11,
+                0.7757,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                12,
+                0.7826,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "centreRowProfile": [
+              [
+                -30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "meshFootprints": [
+              {
+                "name": "Cube041_instance_0",
+                "minAzimuthDeg": -43.81,
+                "maxAzimuthDeg": -27.15,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-green",
+                "minAzimuthDeg": -12.18,
+                "maxAzimuthDeg": 12.18,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-tactical-0",
+                "minAzimuthDeg": 27.15,
+                "maxAzimuthDeg": 43.81,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "Chopper_InnerWindscreenHeaderGlow_LOD0",
+                "minAzimuthDeg": -18.12,
+                "maxAzimuthDeg": 18.12,
+                "minElevationDeg": 8.88,
+                "maxElevationDeg": 10.05,
+                "nearestDepthM": 0.7565
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-1",
+                "minAzimuthDeg": -43.02,
+                "maxAzimuthDeg": 46.63,
+                "minElevationDeg": -51.95,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-2",
+                "minAzimuthDeg": -5.79,
+                "maxAzimuthDeg": 46.4,
+                "minElevationDeg": -49.47,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.2178
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-3",
+                "minAzimuthDeg": -49.82,
+                "maxAzimuthDeg": 49.82,
+                "minElevationDeg": -52.01,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-4",
+                "minAzimuthDeg": -59.05,
+                "maxAzimuthDeg": 59.05,
+                "minElevationDeg": -61.81,
+                "maxElevationDeg": -26.93,
+                "nearestDepthM": 0.2361
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-5",
+                "minAzimuthDeg": -40.07,
+                "maxAzimuthDeg": 40.07,
+                "minElevationDeg": -49.3,
+                "maxElevationDeg": -22.73,
+                "nearestDepthM": 0.5571
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-6",
+                "minAzimuthDeg": -57.29,
+                "maxAzimuthDeg": 57.29,
+                "minElevationDeg": -55.88,
+                "maxElevationDeg": -26.49,
+                "nearestDepthM": 0.2234
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-7",
+                "minAzimuthDeg": -63.32,
+                "maxAzimuthDeg": 63.32,
+                "minElevationDeg": -63.05,
+                "maxElevationDeg": -27.83,
+                "nearestDepthM": 0.2281
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-8",
+                "minAzimuthDeg": -44.8,
+                "maxAzimuthDeg": 44.8,
+                "minElevationDeg": -49.96,
+                "maxElevationDeg": -35.71,
+                "nearestDepthM": 0.2523
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-9",
+                "minAzimuthDeg": -45.4,
+                "maxAzimuthDeg": 41.53,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-10",
+                "minAzimuthDeg": -41.53,
+                "maxAzimuthDeg": 45.4,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-11",
+                "minAzimuthDeg": -40.81,
+                "maxAzimuthDeg": 41.35,
+                "minElevationDeg": -45.26,
+                "maxElevationDeg": -44.56,
+                "nearestDepthM": 0.2249
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-12",
+                "minAzimuthDeg": -57.6,
+                "maxAzimuthDeg": 41.05,
+                "minElevationDeg": -51.08,
+                "maxElevationDeg": -48.11,
+                "nearestDepthM": 0.2248
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-13",
+                "minAzimuthDeg": -48.76,
+                "maxAzimuthDeg": 48.76,
+                "minElevationDeg": -32.94,
+                "maxElevationDeg": -29.46,
+                "nearestDepthM": 0.2222
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-16",
+                "minAzimuthDeg": -77.96,
+                "maxAzimuthDeg": 77.96,
+                "minElevationDeg": -77.43,
+                "maxElevationDeg": 58.25,
+                "nearestDepthM": 0.0819
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-17",
+                "minAzimuthDeg": -83.85,
+                "maxAzimuthDeg": 83.85,
+                "minElevationDeg": -83.65,
+                "maxElevationDeg": 75.17,
+                "nearestDepthM": 0.0452
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-18",
+                "minAzimuthDeg": -39.65,
+                "maxAzimuthDeg": 39.65,
+                "minElevationDeg": -69.84,
+                "maxElevationDeg": -56.96,
+                "nearestDepthM": 0.2632
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-19",
+                "minAzimuthDeg": -82.46,
+                "maxAzimuthDeg": 82.46,
+                "minElevationDeg": -87.71,
+                "maxElevationDeg": -75.67,
+                "nearestDepthM": 0.0265
+              }
+            ]
+          }
+        }
+      },
+      "settingsFov": null,
+      "settingsKeys": [
+        "requested",
+        "graphics",
+        "displayedGraphicsPreset",
+        "liveApplication",
+        "accessibility",
+        "playerProfile",
+        "advancedGraphicsRegistry"
+      ],
+      "snapshotTopKeys": [
+        "swim",
+        "bootstrap",
+        "gameStarted",
+        "frameCount",
+        "presentationScheduling",
+        "deterministicReview",
+        "gameMode",
+        "matchPhase",
+        "matchEndReason",
+        "matchClock",
+        "testBayDoor",
+        "privateMatch",
+        "stateAdmissionDrops",
+        "matchAdmissionPark",
+        "clientWorldRepairFailures",
+        "clientWorldRepair",
+        "fireBlock",
+        "hostMatchRecoveryCheckpoint",
+        "textChat",
+        "railgun",
+        "timedMapWeapons",
+        "dmrThermal",
+        "flashAuthority",
+        "stickyAuthority",
+        "lastCompletedMultiplayerDiagnostic",
+        "matchDiagnosticsUpload",
+        "scores",
+        "arenaSelection",
+        "interactiveWorld",
+        "ballistics",
+        "rangePractice",
+        "leaderboard",
+        "random",
+        "aimAlignment",
+        "lastPrincipalShotAlignment",
+        "operatorAsset",
+        "player",
+        "spawnSelection",
+        "bots",
+        "botEscalation",
+        "remotes",
+        "networkSync",
+        "networkLifecycle",
+        "remoteHitAdmission",
+        "remotePlayers",
+        "retainedRemotePlayers",
+        "grenades",
+        "remotePresentation",
+        "botGrenades",
+        "corpses",
+        "grenadeVisual",
+        "grenadeExplosion",
+        "grenadeFirstAction",
+        "grenadeFirstActions",
+        "audio",
+        "settings",
+        "sensory",
+        "killstreak",
+        "killstreakControlAdmission",
+        "adrenalineRuntime",
+        "killstreakPresentation",
+        "supportVehiclePresentation",
+        "supportDamageFeedback",
+        "fieldSupport",
+        "remoteSupportAuthority",
+        "overdrive",
+        "deathDropPresentation",
+        "deathDrops",
+        "crossbowGlassAuthority",
+        "breakableWindows",
+        "windowGlassDebrisPool",
+        "persistentWindowDebris",
+        "physicalCover",
+        "minimap",
+        "spawnSafety",
+        "houseNavigation",
+        "activeImpactParticles",
+        "activeImpactMarks",
+        "activeTracers",
+        "originalArtLoaded",
+        "arenaZone",
+        "worldIdentity",
+        "worldIdentityPresentation",
+        "neighbourhoodLife",
+        "arenaStoryReady",
+        "interiorTelemetry",
+        "weaponReady",
+        "weaponPresentation",
+        "railgunScope",
+        "sniperScope",
+        "weaponActionHistory",
+        "menuVisible",
+        "menuLifecycle",
+        "menuCamera",
+        "menuPreview",
+        "render"
+      ]
+    }
+  },
+  {
+    "viewport": "ultrawide-3440x1440",
+    "possessed": true,
+    "shot": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\docs\\assets\\chopper-gunner-2026-08-31\\measure6-ultrawide-3440x1440.png",
+    "measure": {
+      "camera": null,
+      "possession": "chopper-gunner",
+      "gunnerHudHidden": false,
+      "firstPersonSightline": {
+        "entityId": "ks-1-chopper-1",
+        "presentationSource": "project-original-blender-glb",
+        "visibleMeshNames": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_GunnerViewBarrel_0_LOD0",
+          "Chopper_GunnerViewBarrel_1_LOD0",
+          "Chopper_GunnerViewReceiver_LOD0",
+          "Chopper_GunnerViewStatus_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideSightline": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideCockpit": [],
+        "dashboardVisible": true,
+        "displaysVisible": true,
+        "hudVisible": false,
+        "centreSightlineClear": true,
+        "weaponVisible": true,
+        "overlayLayerExclusive": true,
+        "alignment": {
+          "cameraWorldPosition": [
+            5.698535877693148,
+            18.280566104815904,
+            -20.464630286730632
+          ],
+          "cameraPivotWorldPosition": [
+            5.454586541924583,
+            18.360566104815906,
+            -20.602066532234048
+          ],
+          "cockpitWorldPosition": [
+            5.25942950012754,
+            17.877203692624686,
+            -20.712014161415485
+          ],
+          "parentName": "Pass65Chopper_LOD0",
+          "parentWorldScale": [
+            0.5894663614724458,
+            0.5894663614724458,
+            0.5894663614724457
+          ],
+          "pivotErrorM": 3.66205343881779e-15,
+          "dashboardCameraSpacePosition": [
+            -3.4416913763379853e-15,
+            -0.3326264503955976,
+            0.5039972145487329
+          ],
+          "hudCameraSpacePosition": [
+            -3.6637359812630166e-15,
+            0.021053384933711783,
+            -0.16799442909747145
+          ],
+          "weaponCameraSpacePosition": [
+            -3.4416913763379853e-15,
+            -0.4033624121912176,
+            0.5039972145487329
+          ],
+          "framing": {
+            "measuredMeshes": 24,
+            "meshesBehindEye": 3,
+            "nearestDepthM": 0.027,
+            "farthestDepthM": 0.801,
+            "leftEdgeDeg": -83.854,
+            "rightEdgeDeg": 83.854,
+            "topEdgeDeg": 75.166,
+            "bottomEdgeDeg": -87.708,
+            "apertureTopDeg": 9,
+            "structureClearsAboveDeg": 12,
+            "apertureLeftDeg": -26,
+            "apertureRightDeg": 26,
+            "structureClearsLeftOfDeg": -30,
+            "structureClearsRightOfDeg": 30,
+            "centreColumnProfile": [
+              [
+                -80,
+                0.4996,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -79,
+                0.5024,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -78,
+                0.5053,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -77,
+                0.5085,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -76,
+                0.5118,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -75,
+                0.5153,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -74,
+                0.5191,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -73,
+                0.523,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -72,
+                0.5272,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -71,
+                0.5316,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -70,
+                0.5362,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -69,
+                0.5411,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -68,
+                0.5463,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -67,
+                0.5548,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -66,
+                0.5678,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -55,
+                0.3953,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -50,
+                0.3538,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -49,
+                0.3327,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -48,
+                0.335,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -47,
+                0.3604,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -46,
+                0.3538,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -45,
+                0.3206,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -44,
+                0.3417,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -43,
+                0.3361,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -42,
+                0.3308,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -41,
+                0.3331,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -40,
+                0.3293,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -39,
+                0.3272,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -38,
+                0.3279,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -37,
+                0.3323,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -36,
+                0.4056,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -35,
+                0.4152,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -34,
+                0.4253,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -33,
+                0.2557,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -32,
+                0.2527,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -31,
+                0.2502,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -30,
+                0.2491,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -29,
+                0.2473,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -28,
+                0.245,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -27,
+                0.2717,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -26,
+                0.5355,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -25,
+                0.2576,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -24,
+                0.2555,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                9,
+                0.7714,
+                "Chopper_InnerWindscreenHeaderGlow_LOD0"
+              ],
+              [
+                10,
+                0.7801,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                11,
+                0.7757,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                12,
+                0.7826,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "centreRowProfile": [
+              [
+                -30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "meshFootprints": [
+              {
+                "name": "Cube041_instance_0",
+                "minAzimuthDeg": -43.81,
+                "maxAzimuthDeg": -27.15,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-green",
+                "minAzimuthDeg": -12.18,
+                "maxAzimuthDeg": 12.18,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-tactical-0",
+                "minAzimuthDeg": 27.15,
+                "maxAzimuthDeg": 43.81,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "Chopper_InnerWindscreenHeaderGlow_LOD0",
+                "minAzimuthDeg": -18.12,
+                "maxAzimuthDeg": 18.12,
+                "minElevationDeg": 8.88,
+                "maxElevationDeg": 10.05,
+                "nearestDepthM": 0.7565
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-1",
+                "minAzimuthDeg": -43.02,
+                "maxAzimuthDeg": 46.63,
+                "minElevationDeg": -51.95,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-2",
+                "minAzimuthDeg": -5.79,
+                "maxAzimuthDeg": 46.4,
+                "minElevationDeg": -49.47,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.2178
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-3",
+                "minAzimuthDeg": -49.82,
+                "maxAzimuthDeg": 49.82,
+                "minElevationDeg": -52.01,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-4",
+                "minAzimuthDeg": -59.05,
+                "maxAzimuthDeg": 59.05,
+                "minElevationDeg": -61.81,
+                "maxElevationDeg": -26.93,
+                "nearestDepthM": 0.2361
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-5",
+                "minAzimuthDeg": -40.07,
+                "maxAzimuthDeg": 40.07,
+                "minElevationDeg": -49.3,
+                "maxElevationDeg": -22.73,
+                "nearestDepthM": 0.5571
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-6",
+                "minAzimuthDeg": -57.29,
+                "maxAzimuthDeg": 57.29,
+                "minElevationDeg": -55.88,
+                "maxElevationDeg": -26.49,
+                "nearestDepthM": 0.2234
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-7",
+                "minAzimuthDeg": -63.32,
+                "maxAzimuthDeg": 63.32,
+                "minElevationDeg": -63.05,
+                "maxElevationDeg": -27.83,
+                "nearestDepthM": 0.2281
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-8",
+                "minAzimuthDeg": -44.8,
+                "maxAzimuthDeg": 44.8,
+                "minElevationDeg": -49.96,
+                "maxElevationDeg": -35.71,
+                "nearestDepthM": 0.2523
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-9",
+                "minAzimuthDeg": -45.4,
+                "maxAzimuthDeg": 41.53,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-10",
+                "minAzimuthDeg": -41.53,
+                "maxAzimuthDeg": 45.4,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-11",
+                "minAzimuthDeg": -40.81,
+                "maxAzimuthDeg": 41.35,
+                "minElevationDeg": -45.26,
+                "maxElevationDeg": -44.56,
+                "nearestDepthM": 0.2249
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-12",
+                "minAzimuthDeg": -57.6,
+                "maxAzimuthDeg": 41.05,
+                "minElevationDeg": -51.08,
+                "maxElevationDeg": -48.11,
+                "nearestDepthM": 0.2248
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-13",
+                "minAzimuthDeg": -48.76,
+                "maxAzimuthDeg": 48.76,
+                "minElevationDeg": -32.94,
+                "maxElevationDeg": -29.46,
+                "nearestDepthM": 0.2222
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-16",
+                "minAzimuthDeg": -77.96,
+                "maxAzimuthDeg": 77.96,
+                "minElevationDeg": -77.43,
+                "maxElevationDeg": 58.25,
+                "nearestDepthM": 0.0819
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-17",
+                "minAzimuthDeg": -83.85,
+                "maxAzimuthDeg": 83.85,
+                "minElevationDeg": -83.65,
+                "maxElevationDeg": 75.17,
+                "nearestDepthM": 0.0452
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-18",
+                "minAzimuthDeg": -39.65,
+                "maxAzimuthDeg": 39.65,
+                "minElevationDeg": -69.84,
+                "maxElevationDeg": -56.96,
+                "nearestDepthM": 0.2632
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-19",
+                "minAzimuthDeg": -82.46,
+                "maxAzimuthDeg": 82.46,
+                "minElevationDeg": -87.71,
+                "maxElevationDeg": -75.67,
+                "nearestDepthM": 0.0265
+              }
+            ]
+          }
+        }
+      },
+      "settingsFov": null,
+      "settingsKeys": [
+        "requested",
+        "graphics",
+        "displayedGraphicsPreset",
+        "liveApplication",
+        "accessibility",
+        "playerProfile",
+        "advancedGraphicsRegistry"
+      ],
+      "snapshotTopKeys": [
+        "swim",
+        "bootstrap",
+        "gameStarted",
+        "frameCount",
+        "presentationScheduling",
+        "deterministicReview",
+        "gameMode",
+        "matchPhase",
+        "matchEndReason",
+        "matchClock",
+        "testBayDoor",
+        "privateMatch",
+        "stateAdmissionDrops",
+        "matchAdmissionPark",
+        "clientWorldRepairFailures",
+        "clientWorldRepair",
+        "fireBlock",
+        "hostMatchRecoveryCheckpoint",
+        "textChat",
+        "railgun",
+        "timedMapWeapons",
+        "dmrThermal",
+        "flashAuthority",
+        "stickyAuthority",
+        "lastCompletedMultiplayerDiagnostic",
+        "matchDiagnosticsUpload",
+        "scores",
+        "arenaSelection",
+        "interactiveWorld",
+        "ballistics",
+        "rangePractice",
+        "leaderboard",
+        "random",
+        "aimAlignment",
+        "lastPrincipalShotAlignment",
+        "operatorAsset",
+        "player",
+        "spawnSelection",
+        "bots",
+        "botEscalation",
+        "remotes",
+        "networkSync",
+        "networkLifecycle",
+        "remoteHitAdmission",
+        "remotePlayers",
+        "retainedRemotePlayers",
+        "grenades",
+        "remotePresentation",
+        "botGrenades",
+        "corpses",
+        "grenadeVisual",
+        "grenadeExplosion",
+        "grenadeFirstAction",
+        "grenadeFirstActions",
+        "audio",
+        "settings",
+        "sensory",
+        "killstreak",
+        "killstreakControlAdmission",
+        "adrenalineRuntime",
+        "killstreakPresentation",
+        "supportVehiclePresentation",
+        "supportDamageFeedback",
+        "fieldSupport",
+        "remoteSupportAuthority",
+        "overdrive",
+        "deathDropPresentation",
+        "deathDrops",
+        "crossbowGlassAuthority",
+        "breakableWindows",
+        "windowGlassDebrisPool",
+        "persistentWindowDebris",
+        "physicalCover",
+        "minimap",
+        "spawnSafety",
+        "houseNavigation",
+        "activeImpactParticles",
+        "activeImpactMarks",
+        "activeTracers",
+        "originalArtLoaded",
+        "arenaZone",
+        "worldIdentity",
+        "worldIdentityPresentation",
+        "neighbourhoodLife",
+        "arenaStoryReady",
+        "interiorTelemetry",
+        "weaponReady",
+        "weaponPresentation",
+        "railgunScope",
+        "sniperScope",
+        "weaponActionHistory",
+        "menuVisible",
+        "menuLifecycle",
+        "menuCamera",
+        "menuPreview",
+        "render"
+      ]
+    }
+  },
+  {
+    "viewport": "desktop-1920x1080",
+    "possessed": true,
+    "shot": "C:\\Users\\david\\projects\\atomic-acres-gauntlet\\docs\\assets\\chopper-gunner-2026-08-31\\measure6-desktop-1920x1080.png",
+    "measure": {
+      "camera": null,
+      "possession": "chopper-gunner",
+      "gunnerHudHidden": false,
+      "firstPersonSightline": {
+        "entityId": "ks-1-chopper-1",
+        "presentationSource": "project-original-blender-glb",
+        "visibleMeshNames": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_GunnerViewBarrel_0_LOD0",
+          "Chopper_GunnerViewBarrel_1_LOD0",
+          "Chopper_GunnerViewReceiver_LOD0",
+          "Chopper_GunnerViewStatus_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideSightline": [
+          "Chopper_CyclicTrigger_LOD0",
+          "Chopper_InnerWindscreenHeaderGlow_LOD0",
+          "Cube041_instance_0",
+          "chopper-cockpit-display-green",
+          "chopper-cockpit-display-tactical-0",
+          "pass65-chopper-cockpit-static-batch-1",
+          "pass65-chopper-cockpit-static-batch-10",
+          "pass65-chopper-cockpit-static-batch-11",
+          "pass65-chopper-cockpit-static-batch-12",
+          "pass65-chopper-cockpit-static-batch-13",
+          "pass65-chopper-cockpit-static-batch-14",
+          "pass65-chopper-cockpit-static-batch-15",
+          "pass65-chopper-cockpit-static-batch-16",
+          "pass65-chopper-cockpit-static-batch-17",
+          "pass65-chopper-cockpit-static-batch-18",
+          "pass65-chopper-cockpit-static-batch-19",
+          "pass65-chopper-cockpit-static-batch-2",
+          "pass65-chopper-cockpit-static-batch-3",
+          "pass65-chopper-cockpit-static-batch-4",
+          "pass65-chopper-cockpit-static-batch-5",
+          "pass65-chopper-cockpit-static-batch-6",
+          "pass65-chopper-cockpit-static-batch-7",
+          "pass65-chopper-cockpit-static-batch-8",
+          "pass65-chopper-cockpit-static-batch-9"
+        ],
+        "visibleOutsideCockpit": [],
+        "dashboardVisible": true,
+        "displaysVisible": true,
+        "hudVisible": false,
+        "centreSightlineClear": true,
+        "weaponVisible": true,
+        "overlayLayerExclusive": true,
+        "alignment": {
+          "cameraWorldPosition": [
+            5.011841648197574,
+            18.2687202233925,
+            -20.573913844186517
+          ],
+          "cameraPivotWorldPosition": [
+            4.778867565782978,
+            18.348720223392494,
+            -20.418597789243453
+          ],
+          "cockpitWorldPosition": [
+            4.592490617486846,
+            17.865357811201285,
+            -20.294346490379365
+          ],
+          "parentName": "Pass65Chopper_LOD0",
+          "parentWorldScale": [
+            0.5894663614724456,
+            0.5894663614724458,
+            0.5894663614724457
+          ],
+          "pivotErrorM": 3.552713678800501e-15,
+          "dashboardCameraSpacePosition": [
+            4.163336342344337e-16,
+            -0.332626450395594,
+            0.5039972145487349
+          ],
+          "hudCameraSpacePosition": [
+            -4.787836793695988e-16,
+            0.021053384933715336,
+            -0.1679944290974697
+          ],
+          "weaponCameraSpacePosition": [
+            4.163336342344337e-16,
+            -0.40336241219121405,
+            0.5039972145487349
+          ],
+          "framing": {
+            "measuredMeshes": 24,
+            "meshesBehindEye": 3,
+            "nearestDepthM": 0.027,
+            "farthestDepthM": 0.801,
+            "leftEdgeDeg": -83.854,
+            "rightEdgeDeg": 83.854,
+            "topEdgeDeg": 75.166,
+            "bottomEdgeDeg": -87.708,
+            "apertureTopDeg": 9,
+            "structureClearsAboveDeg": 12,
+            "apertureLeftDeg": -26,
+            "apertureRightDeg": 26,
+            "structureClearsLeftOfDeg": -30,
+            "structureClearsRightOfDeg": 30,
+            "centreColumnProfile": [
+              [
+                -80,
+                0.4996,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -79,
+                0.5024,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -78,
+                0.5053,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -77,
+                0.5085,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -76,
+                0.5118,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -75,
+                0.5153,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -74,
+                0.5191,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -73,
+                0.523,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -72,
+                0.5272,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -71,
+                0.5316,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -70,
+                0.5362,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -69,
+                0.5411,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -68,
+                0.5463,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -67,
+                0.5548,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -66,
+                0.5678,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -55,
+                0.3953,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -50,
+                0.3538,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -49,
+                0.3327,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -48,
+                0.335,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -47,
+                0.3604,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -46,
+                0.3538,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -45,
+                0.3206,
+                "pass65-chopper-cockpit-static-batch-3"
+              ],
+              [
+                -44,
+                0.3417,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -43,
+                0.3361,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -42,
+                0.3308,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -41,
+                0.3331,
+                "chopper-cockpit-display-green"
+              ],
+              [
+                -40,
+                0.3293,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -39,
+                0.3272,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -38,
+                0.3279,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -37,
+                0.3323,
+                "pass65-chopper-cockpit-static-batch-8"
+              ],
+              [
+                -36,
+                0.4056,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -35,
+                0.4152,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -34,
+                0.4253,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -33,
+                0.2557,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -32,
+                0.2527,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -31,
+                0.2502,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -30,
+                0.2491,
+                "pass65-chopper-cockpit-static-batch-7"
+              ],
+              [
+                -29,
+                0.2473,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -28,
+                0.245,
+                "pass65-chopper-cockpit-static-batch-1"
+              ],
+              [
+                -27,
+                0.2717,
+                "pass65-chopper-cockpit-static-batch-6"
+              ],
+              [
+                -26,
+                0.5355,
+                "pass65-chopper-cockpit-static-batch-5"
+              ],
+              [
+                -25,
+                0.2576,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                -24,
+                0.2555,
+                "pass65-chopper-cockpit-static-batch-2"
+              ],
+              [
+                9,
+                0.7714,
+                "Chopper_InnerWindscreenHeaderGlow_LOD0"
+              ],
+              [
+                10,
+                0.7801,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                11,
+                0.7757,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                12,
+                0.7826,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "centreRowProfile": [
+              [
+                -30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                -26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                26,
+                0.6466,
+                "pass65-chopper-cockpit-static-batch-16"
+              ],
+              [
+                27,
+                0.6378,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                28,
+                0.6301,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                29,
+                0.627,
+                "pass65-chopper-cockpit-static-batch-17"
+              ],
+              [
+                30,
+                0.6323,
+                "pass65-chopper-cockpit-static-batch-17"
+              ]
+            ],
+            "meshFootprints": [
+              {
+                "name": "Cube041_instance_0",
+                "minAzimuthDeg": -43.81,
+                "maxAzimuthDeg": -27.15,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-green",
+                "minAzimuthDeg": -12.18,
+                "maxAzimuthDeg": 12.18,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "chopper-cockpit-display-tactical-0",
+                "minAzimuthDeg": 27.15,
+                "maxAzimuthDeg": 43.81,
+                "minElevationDeg": -48.98,
+                "maxElevationDeg": -40.72,
+                "nearestDepthM": 0.2458
+              },
+              {
+                "name": "Chopper_InnerWindscreenHeaderGlow_LOD0",
+                "minAzimuthDeg": -18.12,
+                "maxAzimuthDeg": 18.12,
+                "minElevationDeg": 8.88,
+                "maxElevationDeg": 10.05,
+                "nearestDepthM": 0.7565
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-1",
+                "minAzimuthDeg": -43.02,
+                "maxAzimuthDeg": 46.63,
+                "minElevationDeg": -51.95,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-2",
+                "minAzimuthDeg": -5.79,
+                "maxAzimuthDeg": 46.4,
+                "minElevationDeg": -49.47,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.2178
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-3",
+                "minAzimuthDeg": -49.82,
+                "maxAzimuthDeg": 49.82,
+                "minElevationDeg": -52.01,
+                "maxElevationDeg": -22.86,
+                "nearestDepthM": 0.216
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-4",
+                "minAzimuthDeg": -59.05,
+                "maxAzimuthDeg": 59.05,
+                "minElevationDeg": -61.81,
+                "maxElevationDeg": -26.93,
+                "nearestDepthM": 0.2361
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-5",
+                "minAzimuthDeg": -40.07,
+                "maxAzimuthDeg": 40.07,
+                "minElevationDeg": -49.3,
+                "maxElevationDeg": -22.73,
+                "nearestDepthM": 0.5571
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-6",
+                "minAzimuthDeg": -57.29,
+                "maxAzimuthDeg": 57.29,
+                "minElevationDeg": -55.88,
+                "maxElevationDeg": -26.49,
+                "nearestDepthM": 0.2234
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-7",
+                "minAzimuthDeg": -63.32,
+                "maxAzimuthDeg": 63.32,
+                "minElevationDeg": -63.05,
+                "maxElevationDeg": -27.83,
+                "nearestDepthM": 0.2281
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-8",
+                "minAzimuthDeg": -44.8,
+                "maxAzimuthDeg": 44.8,
+                "minElevationDeg": -49.96,
+                "maxElevationDeg": -35.71,
+                "nearestDepthM": 0.2523
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-9",
+                "minAzimuthDeg": -45.4,
+                "maxAzimuthDeg": 41.53,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-10",
+                "minAzimuthDeg": -41.53,
+                "maxAzimuthDeg": 45.4,
+                "minElevationDeg": -53.14,
+                "maxElevationDeg": -51.11,
+                "nearestDepthM": 0.2293
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-11",
+                "minAzimuthDeg": -40.81,
+                "maxAzimuthDeg": 41.35,
+                "minElevationDeg": -45.26,
+                "maxElevationDeg": -44.56,
+                "nearestDepthM": 0.2249
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-12",
+                "minAzimuthDeg": -57.6,
+                "maxAzimuthDeg": 41.05,
+                "minElevationDeg": -51.08,
+                "maxElevationDeg": -48.11,
+                "nearestDepthM": 0.2248
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-13",
+                "minAzimuthDeg": -48.76,
+                "maxAzimuthDeg": 48.76,
+                "minElevationDeg": -32.94,
+                "maxElevationDeg": -29.46,
+                "nearestDepthM": 0.2222
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-16",
+                "minAzimuthDeg": -77.96,
+                "maxAzimuthDeg": 77.96,
+                "minElevationDeg": -77.43,
+                "maxElevationDeg": 58.25,
+                "nearestDepthM": 0.0819
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-17",
+                "minAzimuthDeg": -83.85,
+                "maxAzimuthDeg": 83.85,
+                "minElevationDeg": -83.65,
+                "maxElevationDeg": 75.17,
+                "nearestDepthM": 0.0452
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-18",
+                "minAzimuthDeg": -39.65,
+                "maxAzimuthDeg": 39.65,
+                "minElevationDeg": -69.84,
+                "maxElevationDeg": -56.96,
+                "nearestDepthM": 0.2632
+              },
+              {
+                "name": "pass65-chopper-cockpit-static-batch-19",
+                "minAzimuthDeg": -82.46,
+                "maxAzimuthDeg": 82.46,
+                "minElevationDeg": -87.71,
+                "maxElevationDeg": -75.67,
+                "nearestDepthM": 0.0265
+              }
+            ]
+          }
+        }
+      },
+      "settingsFov": null,
+      "settingsKeys": [
+        "requested",
+        "graphics",
+        "displayedGraphicsPreset",
+        "liveApplication",
+        "accessibility",
+        "playerProfile",
+        "advancedGraphicsRegistry"
+      ],
+      "snapshotTopKeys": [
+        "swim",
+        "bootstrap",
+        "gameStarted",
+        "frameCount",
+        "presentationScheduling",
+        "deterministicReview",
+        "gameMode",
+        "matchPhase",
+        "matchEndReason",
+        "matchClock",
+        "testBayDoor",
+        "privateMatch",
+        "stateAdmissionDrops",
+        "matchAdmissionPark",
+        "clientWorldRepairFailures",
+        "clientWorldRepair",
+        "fireBlock",
+        "hostMatchRecoveryCheckpoint",
+        "textChat",
+        "railgun",
+        "timedMapWeapons",
+        "dmrThermal",
+        "flashAuthority",
+        "stickyAuthority",
+        "lastCompletedMultiplayerDiagnostic",
+        "matchDiagnosticsUpload",
+        "scores",
+        "arenaSelection",
+        "interactiveWorld",
+        "ballistics",
+        "rangePractice",
+        "leaderboard",
+        "random",
+        "aimAlignment",
+        "lastPrincipalShotAlignment",
+        "operatorAsset",
+        "player",
+        "spawnSelection",
+        "bots",
+        "botEscalation",
+        "remotes",
+        "networkSync",
+        "networkLifecycle",
+        "remoteHitAdmission",
+        "remotePlayers",
+        "retainedRemotePlayers",
+        "grenades",
+        "remotePresentation",
+        "botGrenades",
+        "corpses",
+        "grenadeVisual",
+        "grenadeExplosion",
+        "grenadeFirstAction",
+        "grenadeFirstActions",
+        "audio",
+        "settings",
+        "sensory",
+        "killstreak",
+        "killstreakControlAdmission",
+        "adrenalineRuntime",
+        "killstreakPresentation",
+        "supportVehiclePresentation",
+        "supportDamageFeedback",
+        "fieldSupport",
+        "remoteSupportAuthority",
+        "overdrive",
+        "deathDropPresentation",
+        "deathDrops",
+        "crossbowGlassAuthority",
+        "breakableWindows",
+        "windowGlassDebrisPool",
+        "persistentWindowDebris",
+        "physicalCover",
+        "minimap",
+        "spawnSafety",
+        "houseNavigation",
+        "activeImpactParticles",
+        "activeImpactMarks",
+        "activeTracers",
+        "originalArtLoaded",
+        "arenaZone",
+        "worldIdentity",
+        "worldIdentityPresentation",
+        "neighbourhoodLife",
+        "arenaStoryReady",
+        "interiorTelemetry",
+        "weaponReady",
+        "weaponPresentation",
+        "railgunScope",
+        "sniperScope",
+        "weaponActionHistory",
+        "menuVisible",
+        "menuLifecycle",
+        "menuCamera",
+        "menuPreview",
+        "render"
+      ]
+    }
+  }
+]

@@ -3,15 +3,16 @@
 // and we dump every console error / transition field to find WHY the lobby's
 // arena synchronization never completes.
 import { chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:41953/';
 const ARENA = process.argv[3] ?? 'rustworks-1v1';
 const PEER_PORT = 9341;
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

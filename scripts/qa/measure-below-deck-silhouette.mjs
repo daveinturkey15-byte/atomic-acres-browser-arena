@@ -17,6 +17,7 @@ import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback; };
@@ -108,8 +109,9 @@ async function silhouetteContrast(withBot, withoutBot) {
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
-  headless: false, channel: 'chrome',
-  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-features=CalculateNativeWinOcclusion', '--disable-background-timer-throttling'],
+  headless: true, channel: 'chrome',
+  args: [...SILENT_ARGS,
+      '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--disable-features=CalculateNativeWinOcclusion', '--disable-background-timer-throttling'],
 });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const session = await page.context().newCDPSession(page);

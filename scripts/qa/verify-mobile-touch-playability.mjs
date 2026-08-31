@@ -34,6 +34,7 @@ import { chromium } from '@playwright/test';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { startStableDevProxy } from './stable-dev-proxy.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -65,7 +66,8 @@ const proxy = await startStableDevProxy({ target: new URL(BASE) });
 const browser = await chromium.launch({
   headless: !HEADED,
   channel: 'chrome',
-  args: ['--mute-audio', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
+  args: [...OFFSCREEN_ARGS,
+      '--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });
 
 /** Rectangles a finger has to hit, read from the live overlay. */

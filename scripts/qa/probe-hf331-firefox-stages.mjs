@@ -27,6 +27,7 @@
 // and Playwright puts no timeout on evaluate. A run that hangs teaches nothing, so
 // each stage here fails loudly instead.
 import { firefox, chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const BASE = process.argv.includes('--url')
   ? process.argv[process.argv.indexOf('--url') + 1] : 'http://127.0.0.1:41874';
@@ -38,7 +39,14 @@ const deadline = (promise, ms, label) => Promise.race([
   new Promise((_, reject) => setTimeout(() => reject(new Error(`STAGE TIMEOUT: ${label} exceeded ${ms}ms`)), ms)),
 ]);
 
-const browser = await WHICH.launch({ headless: false });
+// Headless: this probe only times the boot stages and reads them back over the
+// automation channel - it never needs a window, and Firefox cannot be parked
+// off-screen anyway (it has no --window-position). SILENT_ARGS is inert for the
+// Firefox path and mutes the Chromium one.
+const browser = await WHICH.launch({
+  headless: true,
+  args: NAME === 'chromium' ? [...SILENT_ARGS] : [],
+});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.log(`  [pageerror] ${String(e).slice(0, 160)}`));
 page.on('console', (m) => { if (m.type() === 'error') console.log(`  [console] ${m.text().slice(0, 160)}`); });

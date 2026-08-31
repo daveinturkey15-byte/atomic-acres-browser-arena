@@ -3,6 +3,7 @@
 // (without --use-angle=d3d11/--enable-unsafe-webgpu the page silently falls
 // back to webgl2 and the measurement answers the wrong question).
 import { chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
@@ -13,10 +14,29 @@ const LABEL = arg('--label', 'run');
 // so two builds are measured on the SAME view, not whichever spawn came up.
 const POSE = arg('--pose', null);
 
+// FRAME-PACING LANE, RUN HEADLESS ON PURPOSE - do not "hide" this by parking
+// it off-screen instead.
+//
+// Owner 2026-08-31: QA browsers may not appear on his screen while he works.
+// For a lane that measures pacing there are two ways to honour that and only
+// one of them is honest:
+//
+//   HEADED, parked at -32000,-32000  - the window can stop being composited,
+//     and an uncomposited window free-runs requestAnimationFrame instead of
+//     tracking vsync. The number stays plausible and becomes meaningless.
+//   HEADLESS (this)                  - measured on this machine 2026-08-31:
+//     installed Chrome via channel:'chrome' gets a real hardware WebGPU
+//     device (nvidia / blackwell), renders real frames, and paces rAF at
+//     60.4 Hz over a 2 s window - vsync-correct, not free-running.
+//
+// So headless is both the invisible option AND the trustworthy one here. If
+// this lane ever has to go headed again, it must NOT be parked off-screen:
+// mark it DECLARED VISIBLE LANE and say why, the way the installed-browser
+// lanes do. See scripts/qa/browser-visibility-contract.test.mjs.
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

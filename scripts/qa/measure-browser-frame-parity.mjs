@@ -20,6 +20,20 @@
 // Lane discipline:     scripts/qa/installed-browser-lanes.mjs
 // Write-up:            docs/LANE_Q_CROSS_BROWSER_AND_MOBILE_AUDIT_2026-08-23.md
 // =====================================================================
+// --------------------------------------------------------------------------
+// DECLARED VISIBLE LANE, muted. This is the Chrome-vs-Firefox frame-parity
+// measurement, and it is deliberately NOT parked off-screen. A window at
+// -32000,-32000 can stop being composited, and an uncomposited window free-runs
+// requestAnimationFrame instead of tracking vsync - so parking this lane would
+// not hide a measurement, it would silently replace it with a flattering,
+// meaningless number. Firefox has no --window-position either, so there is no
+// off-screen presentation available on the Firefox half at all.
+//
+// It is also pinned headed by measure-browser-frame-parity.test.mjs. Both
+// halves of the owner's rule that CAN be honoured here are: it mutes, and it
+// says out loud why it is visible. See scripts/qa/browser-visibility-contract.test.mjs.
+// --------------------------------------------------------------------------
+
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {

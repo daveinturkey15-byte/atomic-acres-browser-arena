@@ -50,6 +50,8 @@ import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
 import { sharedWaterBodyForArena } from '../water/water-authoring';
 import {
   applyArenaEnvironmentIbl,
+  observeArenaEnvironment,
+  type ArenaEnvironmentObservation,
   type ArenaIblState,
 } from './arena-environment-ibl';
 // HF-364: the screen-space raymarched stack (volumetric shafts, SSR, SSGI,
@@ -189,6 +191,25 @@ export type Pass64TslSceneSystems = Readonly<{
    */
   precompileExactScenePass(root: THREE.Object3D): Promise<void>;
   applyDefinition(definition: ArenaVisualDefinition): Promise<void>;
+  /**
+   * Generates (or refreshes) the arena's PMREM environment against whatever sky
+   * backdrop is mounted right now, and binds it to `scene.environment`.
+   *
+   * This exists as its own entry point because the first arena of every page
+   * load does not go through `applyDefinition` at all - it is the arena that
+   * CONSTRUCTS this object, so the `else` branch in legacy-main ran the
+   * constructor and the only PMREM call site sat inside `applyDefinition`.
+   * The result was `scene.environment === null` for the whole of map 1 on every
+   * session, and non-null from map 2 onward: the same build lighting the map
+   * every player actually plays differently from the one they switch to.
+   *
+   * The caller drives it AFTER `waitForSkyBackdropAdmission`, so the
+   * environment is convolved from the arena's admitted sky rather than from
+   * the procedural placeholder that goes in synchronously ahead of it.
+   */
+  applyArenaEnvironment(): Promise<void>;
+  /** The live `scene.environment` receipt, read off the scene, for the first-arena gate. */
+  observeArenaEnvironment(): ArenaEnvironmentObservation;
   /** Applies values backed by existing uniforms/scene nodes; target topology is unchanged. */
   applyGraphics(graphics: Pass65TslGraphicsOptions): Promise<void>;
   setReviewCamera(camera: ArenaReviewCamera): void;
@@ -1144,7 +1165,39 @@ export function createPass64TslSceneSystems(
     budgetEnvironmentIntensity: 0,
     arenaEnvironmentScale: 0,
     reflectionScale: 0,
+    sourceTexture: null,
+    generatedCubeSize: 0,
   };
+  /**
+   * The program's ONLY environment-generation site, shared by all three drivers
+   * (definition commit, explicit bootstrap, graphics change) so none of them can
+   * drift apart again. It is guarded on `scene.background` rather than on
+   * `activeIblState.environmentTexture`: the old guard meant a settings change
+   * could never bootstrap an environment that did not already exist, which is
+   * both how `reflectionQuality: off -> high` failed to come back and why a
+   * settings change could not rescue the null first arena.
+   */
+  const canSyncArenaEnvironmentIbl = (): boolean => Boolean(renderer && scene.background);
+  const syncArenaEnvironmentIbl = async (): Promise<void> => {
+    if (!renderer) return;
+    activeIblState = await applyArenaEnvironmentIbl(
+      renderer,
+      scene,
+      activeDefinition.id,
+      activeGraphics.reflectionQuality,
+      activeGraphics.environmentIntensity,
+      activeGraphics.reflectionScale,
+      activeIblState,
+    );
+  };
+  const arenaEnvironmentObservation = (): ArenaEnvironmentObservation => observeArenaEnvironment(
+    scene,
+    activeDefinition.id,
+    activeGraphics.reflectionQuality,
+    activeGraphics.environmentIntensity,
+    activeGraphics.reflectionScale,
+    activeIblState,
+  );
   const root = new THREE.Group();
   root.name = 'Pass 64 WebGPU TSL presentation systems';
   root.userData.pass64TslPresentation = true;
@@ -1240,6 +1293,12 @@ export function createPass64TslSceneSystems(
       }),
       linearSourceStages: hdr.linearSourceStages,
       exactScenePassPrecompile: lastPrecompile,
+      // Observed, not requested: read straight off `scene.environment` and
+      // `scene.environmentIntensity`. The environmentIntensity control used to
+      // publish nothing a probe could read, so its only "evidence" was a grep
+      // for a symbol in a source file - and that grep passed for months against
+      // a call site the first arena of every session never reached.
+      arenaEnvironment: arenaEnvironmentObservation(),
     };
   };
   publishActualGraphics();
@@ -1304,44 +1363,35 @@ export function createPass64TslSceneSystems(
       delete root.userData.tslReviewCameraId;
       applyArenaSystemLayout(root, nextDefinition, nextDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyDefinition(nextDefinition);
-      
-      // Apply arena environment IBL (PMREM from sky backdrop) on WebGPU path
-      if (renderer) {
-        activeIblState = await applyArenaEnvironmentIbl(
-          renderer,
-          scene,
-          nextDefinition.id,
-          nextDefinition.atmosphere.preset,
-          activeGraphics.reflectionQuality,
-          activeGraphics.environmentIntensity,
-          activeGraphics.reflectionScale,
-          activeIblState,
-        );
-      }
-      
+      // Arena environment IBL (PMREM from the sky backdrop) on the WebGPU path.
+      // The caller drives `applyArenaEnvironment()` again once the generated sky
+      // has been admitted; that call regenerates only if the backdrop texture
+      // actually changed underneath this one.
+      //
+      // The guard is checked HERE and not merely inside the helper: `await` on
+      // an already-resolved promise still defers the publish below by a
+      // microtask, and on the backends with no WebGPU renderer there is no
+      // environment work to wait for. Publishing the receipt in the same tick
+      // is the contract those callers are written against.
+      if (canSyncArenaEnvironmentIbl()) await syncArenaEnvironmentIbl();
       publishActualGraphics();
     },
+    applyArenaEnvironment: async () => {
+      await syncArenaEnvironmentIbl();
+      publishActualGraphics();
+    },
+    observeArenaEnvironment: arenaEnvironmentObservation,
     applyGraphics: async (nextGraphics) => {
       activeGraphics = nextGraphics;
       requestedScreenSpace = nextGraphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
       adaptedScreenSpace = requestedScreenSpace;
       applyArenaSystemLayout(root, activeDefinition, activeDefinition.reviewCameras[0]?.seed ?? 6401, activeGraphics);
       hdr.applyGraphics(activeGraphics);
-      
-      // Update IBL intensity when reflection settings change (same arena, no regeneration needed)
-      if (renderer && activeIblState.environmentTexture) {
-        activeIblState = await applyArenaEnvironmentIbl(
-          renderer,
-          scene,
-          activeDefinition.id,
-          activeDefinition.atmosphere.preset,
-          activeGraphics.reflectionQuality,
-          activeGraphics.environmentIntensity,
-          activeGraphics.reflectionScale,
-          activeIblState,
-        );
-      }
-      
+      // Reflection settings changed: same arena, so this is an intensity update
+      // unless the quality tier moved the PMREM resolution (or the player turned
+      // reflections back on after turning them off, which the old
+      // environmentTexture guard made unrecoverable).
+      if (canSyncArenaEnvironmentIbl()) await syncArenaEnvironmentIbl();
       publishActualGraphics();
     },
     setReviewCamera: (reviewCamera) => {

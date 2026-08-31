@@ -43,8 +43,13 @@ const report = await new Promise((resolveReport) => {
 
   const url = `${BASE}/qa-webgpu-fence-probe.html?endpoint=http://127.0.0.1:${PORT}/report`;
   const profile = mkdtempSync(join(tmpdir(), `fence-${BROWSER}-`));
+  // DECLARED VISIBLE LANE, muted. This probe times GPU fence completion against
+  // the real presentation path, so it is deliberately not parked off-screen: an
+  // uncomposited window stops presenting and the fence timings it reports would
+  // be measuring nothing. Muting is the half that costs the measurement nothing.
+  // See scripts/qa/browser-visibility-contract.test.mjs.
   if (BROWSER === 'firefox') spawn(executable, ['-no-remote', '-profile', profile, '-new-window', url], { stdio: 'ignore' });
-  else spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run', '--new-window', url], { stdio: 'ignore' });
+  else spawn(executable, [`--user-data-dir=${profile}`, '--mute-audio', '--no-first-run', '--new-window', url], { stdio: 'ignore' });
 });
 
 // Kill ONLY windows we opened: match the temp profile in the command line so a

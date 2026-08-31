@@ -7,6 +7,7 @@
 // deploy as a cold visitor, and REPORT THE BACKEND alongside the verdict.
 
 import { chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
@@ -15,11 +16,11 @@ const CARD = arg('--card', 'pass81');
 const ARENA = arg('--arena', 'atomic-acres');
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: arg('--browser-channel', 'chrome'),
   // Anti-throttling only by default. --extra-flag adds one Chrome flag per use, so the
   // masking flag can be bisected: the harness set ran green while default Chrome failed.
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     ...argv.flatMap((value, index) => (argv[index - 1] === '--extra-flag' ? [value] : [])),
     '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',

@@ -31,6 +31,15 @@
 //
 // Usage: node scripts/qa/run-hf331-installed-browser-fps.mjs
 //        [--arena atomic-acres] [--sample-ms 12000] [--browsers firefox,chrome]
+// --------------------------------------------------------------------------
+// DECLARED VISIBLE LANE, muted. Installed-browser fps against the real
+// compositor; it takes the foreground deliberately, because the renderer
+// refuses to author frames without document focus. An off-screen window would
+// free-run requestAnimationFrame and report fiction, so this one stays visible
+// and says so. The Chromium spawns mute; Firefox has no --mute-audio flag.
+// See scripts/qa/browser-visibility-contract.test.mjs.
+// --------------------------------------------------------------------------
+
 import { createServer } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -67,7 +76,7 @@ const BROWSERS = {
     ],
     launch: (executable, url) => {
       const profile = mkdtempSync(join(tmpdir(), 'hf331-chrome-'));
-      return spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run', '--new-window', url], { stdio: 'ignore', windowsHide: false });
+      return spawn(executable, [`--user-data-dir=${profile}`, '--mute-audio', '--no-first-run', '--new-window', url], { stdio: 'ignore', windowsHide: false });
     },
   },
   edge: {
@@ -75,7 +84,7 @@ const BROWSERS = {
       'C:/Program Files/Microsoft/Edge/Application/msedge.exe'],
     launch: (executable, url) => {
       const profile = mkdtempSync(join(tmpdir(), 'hf331-edge-'));
-      return spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run', '--new-window', url], { stdio: 'ignore', windowsHide: false });
+      return spawn(executable, [`--user-data-dir=${profile}`, '--mute-audio', '--no-first-run', '--new-window', url], { stdio: 'ignore', windowsHide: false });
     },
   },
 };

@@ -52,12 +52,36 @@ describe('presentation prewarm startup contract', () => {
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 
-  it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
+  it('keeps cold work one-deep and bounds warmed live work to a NAMED, SMALL completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
-    expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
+    // Re-pinned 2026-08-31. This asserted the literal "mode === 'warmed-live' ? 2 : 1".
+    // That 2-deep frontier turned out to BE the owner's frame-rate problem: with a
+    // 20-45 ms completion fence, a 2-deep cap bounds PRESENTED frames at roughly
+    // 20-54 fps no matter how cheap the frame is - measured 54.3 presented/s while
+    // the RTX 5080 sat at 14% utilisation. So the number moved deliberately, and
+    // pinning the number again would just re-break the same way next time it is tuned.
+    //
+    // What must NOT change is the SHAPE: cold work stays one-deep, warmed-live is
+    // bounded rather than unbounded, and the bound is a named constant somebody can
+    // find. So this now pins the invariant and a sane ceiling instead of a magic value.
+    expect(source).toContain("mode === 'warmed-live' ? WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS : 1");
+    const declared = /export const WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS = (\d+);/u.exec(source);
+    expect(declared, 'the warmed-live frontier must be a findable named constant').not.toBeNull();
+    const frontier = Number(declared![1]);
+    expect(frontier, 'warmed-live must stay bounded, not unbounded').toBeGreaterThanOrEqual(2);
+    expect(frontier, 'an unbounded-in-practice frontier defeats the backpressure this exists for').toBeLessThanOrEqual(4);
     expect(source).toContain('Forced WebGPU submission requires an idle completion frontier');
     expect(source).toContain('await this.waitForSubmittedWork(12_000);');
-    expect(source).toContain('completionProbeTargetSequence: this.completionProbeTargetSequence');
+    // Re-pinned 2026-08-31. Was a single shared probe with
+    // "if (this.completionProbe) return this.completionProbe;", so the completion
+    // frontier could only advance ONE sequence per resolved promise - the second
+    // half of the presented-frame ceiling. It is now a probe PER SUBMISSION.
+    // Pin the shape that matters (per-sequence, and the telemetry reports the
+    // oldest outstanding one) rather than the old field name.
+    expect(source).toContain('private readonly completionProbes = new Map<number, Promise<void>>();');
+    expect(source).toContain('completionProbeTargetSequence: this.oldestOutstandingProbeSequence()');
+    expect(source, 'the single-probe early return is what bounded the frontier; it must not come back')
+      .not.toContain('if (this.completionProbe) return this.completionProbe;');
     expect(source).toContain('submissionPacing: this.submissionPacing.summary()');
     expect(source).toContain('completionPacing: this.completionPacing.summary()');
     expect(source).toContain('maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs)');
@@ -245,7 +269,12 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(arenaVisualConfiguration.match(/invalidateBrowserWeaponGpuReadinessForPipelineChange\(\)/g)).toHaveLength(1);
     expect(arenaVisualConfiguration.indexOf('invalidateBrowserWeaponGpuReadinessForPipelineChange()'))
-      .toBeLessThan(arenaVisualConfiguration.indexOf('if (pass64TslSystems) pass64TslSystems.applyDefinition'));
+      // Re-pinned 2026-08-31: the branch this named is the one that CAUSED the
+      // first-arena environment bug - applyDefinition was called unawaited, and
+      // the else path that constructs the systems had no IBL wiring at all, so
+      // map 1 of every session rendered with scene.environment null. It is now
+      // awaited. Pin the ordering against the awaited form.
+      .toBeLessThan(arenaVisualConfiguration.indexOf('if (pass64TslSystems) await pass64TslSystems.applyDefinition'));
     expect(arenaDeployment.indexOf('respawn(false);'))
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(source).toContain("setBootstrapStage('prewarming-overdrive')");
@@ -615,7 +644,13 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(presentationEpochReset).toContain('lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
-    expect(source).toContain("source: 'webgpu-submission' as const");
+    // Re-pinned 2026-08-31: 'webgpu-submission' -> 'webgpu-presented'. The HUD was
+    // reporting a median of SUBMISSION gaps, so it read 60 while the owner was
+    // actually seeing ~50, and 60 while he was seeing ~20 - submitWebGpuFrame
+    // returns false when the in-flight cap is hit but the frame counter still
+    // increments, so roughly half the rAF ticks put no new image on screen. The
+    // readout now counts frames actually submitted AND completed.
+    expect(source).toContain("source: 'webgpu-presented' as const");
     expect(source).toContain('document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;');
     // 2026-08-30 re-pin: 1s tripped the on-screen error box on transient
     // compositor hitches; 3s is a real stall. The eager scheduler-gap reset

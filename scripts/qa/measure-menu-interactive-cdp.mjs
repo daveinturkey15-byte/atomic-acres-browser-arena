@@ -9,6 +9,7 @@
 // disabled on purpose, and a later module enables them. This measures the gap.
 
 import { chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -18,9 +19,9 @@ const arg = (name, fallback) => {
 const BASE = arg('--url', 'https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/channels/pass80');
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',

@@ -26,6 +26,7 @@ import {
   supportVehicleStableAirframeBounds,
   FIRST_PERSON_COCKPIT_VIEW_LIFT_M,
   FIRST_PERSON_COCKPIT_VIEW_PULL_M,
+  POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_SWARM_GUN_PROFILE_ID, PILOTED_DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
@@ -1117,6 +1118,29 @@ describe('killstreak presentation', () => {
     expect(FIRST_PERSON_COCKPIT_VIEW_LIFT_M).toBeGreaterThan(0.05);
     expect(FIRST_PERSON_COCKPIT_VIEW_PULL_M).toBeGreaterThan(0.05);
     expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(liftedTarget)).toBeLessThan(1e-6);
+    // Owner 2026-08-31: "the cockpit not stopping midscreen". Canopy framing
+    // that ENDS inside the viewport is not drawn at all. The rails top out far
+    // below the vertical half-FOV, so they are withheld, they are named in the
+    // telemetry, and nothing is left crossing the sight picture: no cockpit
+    // structure reaches the sight line, and the centre column above the eye is
+    // clear. The vertical half-FOV does not move with the aspect ratio, so
+    // this holds at 16:9, at 21:9, and everywhere between.
+    const railLeft = chopper.getObjectByName('chopper-cockpit-rail-left') as THREE.Mesh;
+    const railRight = chopper.getObjectByName('chopper-cockpit-rail-right') as THREE.Mesh;
+    expect(railLeft.userData.chopperCanopyFrameMember).toBe(true);
+    expect(railLeft.visible).toBe(false);
+    expect(railRight.visible).toBe(false);
+    const possessedAlignment = presentation.telemetry().firstPersonSightline!.alignment!;
+    expect(possessedAlignment.framingSuppressedMembers)
+      .toEqual(['chopper-cockpit-rail-left', 'chopper-cockpit-rail-right']);
+    expect(possessedAlignment.framing!.topEdgeDeg!)
+      .toBeLessThan(POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG);
+    // The tallest surviving corner grazes the sight line (a fraction of a
+    // degree of dashboard edge); the ray ladder confirms nothing actually
+    // draws above it, which is the property that matters.
+    expect(possessedAlignment.framing!.topEdgeDeg!).toBeLessThan(1);
+    expect(possessedAlignment.framing!.apertureTopDeg).toBeNull();
+    expect(possessedAlignment.framing!.structureClearsAboveDeg).toBeNull();
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
@@ -1126,6 +1150,10 @@ describe('killstreak presentation', () => {
     expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(false);
     expect(cockpitHud.layers.mask).toBe(cockpitHudBaseLayerMask);
     expect(hudMaterial.depthWrite).toBe(hudBaseDepthWrite);
+    // Leaving possession clears the framing decision so the next one derives
+    // it again rather than inheriting a stale suppression.
+    expect(railLeft.userData.cockpitFramingSuppressed).toBe(false);
+    expect(railRight.userData.cockpitFramingSuppressed).toBe(false);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     expect(carePackage.getObjectByName('care-package-crate')!.userData)

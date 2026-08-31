@@ -2,15 +2,16 @@
 // dumps console output + lifecycle markers so a silent production-boot crash
 // is visible. Not part of the QA contract; diagnostic only.
 import { chromium } from '@playwright/test';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:41947';
 const ARENA = process.argv[3] ?? 'atomic-acres';
 const TIMEOUT = Number(process.argv[4] ?? '240000');
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',

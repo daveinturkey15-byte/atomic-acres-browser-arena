@@ -1,7 +1,19 @@
 # The first arena of every session renders without environment lighting
 
-**Status: diagnosed, reproduced, NOT fixed — needs an owner decision, because the fix
-changes how eight approved arenas look.**
+**Status: FIXED 2026-08-31, owner-authorised, measured.** Evidence and the probes that
+produced it: `docs/assets/ibl-fix-2026-08-31/`.
+
+> **The diagnosis below found one of two defects.** Skipping the bootstrap was real and is
+> fixed. But the environment was *also* inert on the arenas where it WAS bound: this module
+> built its PMREM with `THREE.PMREMGenerator` — the **WebGL** implementation — against a
+> `WebGPURenderer`. That cast does not throw and does not warn; it returns a texture that
+> carries no light. Measured on the live build: with that texture bound, driving
+> `scene.environmentIntensity` to 20 moved the mean frame luminance by **0.0000**, while
+> binding a plain equirect texture at the arena's authored 0.22 moved it by **+7.8%**.
+> `three/webgpu` exports its own `PMREMGenerator` built against the Renderer API, and that
+> is the one this module now uses. So the "non-null after a map switch" state in the
+> measurements below was non-null and still contributing nothing — map 2 was not the
+> correct case, it was a second broken case that merely looked healthier from telemetry.
 
 Found 2026-08-31 while diagnosing why Test1/Test2 looked underlit.
 
@@ -79,7 +91,39 @@ measurement that followed from it). Switching the environment on while leaving t
 bakes a wrong premise in permanently. **The switch-on and the metalness revisit have to be
 one change, with fresh measurements.**
 
-## The fix, when approved
+## What was actually landed (2026-08-31)
+
+1. `three/webgpu`'s `PMREMGenerator` replaces `THREE.PMREMGenerator`. Pinned in
+   `arena-environment-ibl.test.ts` in source, because the failure is invisible at runtime.
+2. `createPass64TslSceneSystems` exposes `applyArenaEnvironment()`, sharing the single
+   generation site with `applyDefinition`. `legacy-main.ts` awaits it after
+   `waitForSkyBackdropAdmission`, so BOTH paths convolve the arena's **admitted** sky
+   rather than the procedural placeholder that goes in synchronously ahead of it (verified:
+   atomic-acres reports `sourceTextureName: pass66-generated-sky-backdrop-sunset-farmland`).
+3. `applyDefinition` is now awaited at the call site.
+4. `applyArenaEnvironmentIbl` no longer calls `applySkyBackdrop` itself — doing so bumped
+   the backdrop application counter and invalidated the admission the caller was awaiting.
+5. `assertArenaEnvironmentLive` runs on every arena commit and fails closed on
+   null-environment, wrong-texture, and intensity != budget x arenaScale x reflectionScale.
+6. The `environmentIntensity` registry row's evidence is now that live observation instead
+   of a grep for a source symbol.
+
+Measured, fresh page, first arena, at the arenas' own authored review cameras (full numbers
+in `docs/assets/ibl-fix-2026-08-31/first-arena-environment-report.json`):
+
+| Arena | mean luminance | pixels moved | clipped pixels | crushed (<0.005 linear Y) |
+|---|---|---|---|---|
+| atomic-acres | +4.24% .. +6.03% | 26% | 0% -> 0% | 1.34% -> 0.13% |
+| high-seas | +4.78% .. +14.86% | 39-72% | 0% -> 0% | 7.0% -> 1.7% |
+| test2 | +7.04% .. +8.90% | 44-63% | 0% -> 0% | 3.67% -> 2.07% |
+| test1 | +4.38% .. +5.63% | 38-42% | 0% -> 0% | 16.72% -> 7.24% |
+
+Nothing blows out — the p99 highlight moves by at most 0.02 on any frame — and the crushed
+fraction falls everywhere. The container yard and the galvanised roofs, whose `metalness: 0`
+the 2026-08-30 art pass justified with the (now retired) permanently-null premise, get
+brighter shadow sides, not darker ones.
+
+## The fix, as originally scoped
 
 Roughly 3–6 lines. Give the object returned by `createPass64TslSceneSystems` an explicit
 async environment bootstrap that shares `applyDefinition`'s call at

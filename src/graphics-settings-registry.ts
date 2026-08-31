@@ -127,10 +127,36 @@ export type GraphicsRuntimeConsumer =
   | 'rain-presentation'
   | 'ambient-particles';
 
+/**
+ * WHAT THESE FIELDS ACTUALLY PROVE.
+ *
+ * `path` + `symbol` are a SOURCE-SHAPE trace: the registry test greps the file
+ * and asserts the symbol is present. That proves the code EXISTS. It does not
+ * prove the code RAN, and on 2026-08-31 the difference cost eight arenas their
+ * environment lighting: the environmentIntensity row pointed at a real symbol
+ * in a real file inside a function the first arena of every page load never
+ * reached, and nine unit tests passed over the top of it for weeks
+ * (docs/IBL_FIRST_ARENA_BUG_2026-08-31.md).
+ *
+ * `telemetryPath` names where the value surfaces for a probe. `liveObservation`
+ * is the stronger claim and the only one that may be described as runtime
+ * evidence: the name of an assertion that reads the LIVE object graph and fails
+ * closed. A row without it is making the weaker claim, and now says so.
+ */
 export type GraphicsRuntimeEvidence = Readonly<{
+  /** File the symbol must appear in. Source shape only - grep, not execution. */
   path: string;
+  /** Symbol the registry test greps for. Proves the code exists, not that it ran. */
   symbol: string;
+  /** Where the value surfaces for a probe to read. */
   telemetryPath: string;
+  /**
+   * Optional: the live, fail-closed assertion that OBSERVES this control's
+   * effect on the running scene. Present only where such a gate genuinely
+   * exists, because a claim of runtime evidence that is really a grep is worse
+   * than an honest grep.
+   */
+  liveObservation?: string;
 }>;
 
 export type GraphicsSelectOption = Readonly<{ value: string; label: string }>;
@@ -502,11 +528,20 @@ const runtimeEvidence = (
   path: string,
   symbol: string,
   telemetryPath: string,
-): readonly GraphicsRuntimeEvidence[] => Object.freeze([Object.freeze({ path, symbol, telemetryPath })]);
+  liveObservation?: string,
+): readonly GraphicsRuntimeEvidence[] => Object.freeze([Object.freeze(
+  liveObservation ? { path, symbol, telemetryPath, liveObservation } : { path, symbol, telemetryPath },
+)]);
 
 /**
- * Fail-closed source and telemetry trace for every player-visible control.
+ * SOURCE-SHAPE and telemetry trace for every player-visible control, plus a
+ * live observation wherever one exists.
+ *
  * Registry tests verify every path/symbol and reject missing or extra keys.
+ * That is a real check and it catches a real class of drift - a control whose
+ * consumer was deleted or renamed. It is NOT proof that the consumer executes,
+ * and this table no longer describes itself as though it were. Only a row
+ * carrying `liveObservation` claims that.
  */
 export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvancedKey, readonly GraphicsRuntimeEvidence[]>> = Object.freeze({
   renderScale: runtimeEvidence('src/pass65-settings.ts', 'resolveActiveGraphicsConfig', 'render.pixelRatio + render.adaptive.pixelRatioCap'),
@@ -536,8 +571,29 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   depthOfFieldStrength: runtimeEvidence('src/rendering/screen-space-post-profile.ts', 'assertDepthOfFieldCombatSafety', 'settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale'),
   motionBlur: runtimeEvidence('src/rendering/screen-space-post.ts', 'motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))', 'render.atomicSignal.advancedGraphics.screenSpace.motionBlur'),
   spatialUpscaling: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'display-fsr1-easu-rcas-upscale', 'settings.graphics.spatialUpscaling + grade chain stage receipt'),
-  reflectionQuality: runtimeEvidence('src/graphics-refinement.ts', 'effectivePbrRoughness', 'render.graphicsRefinement.reflectionScale'),
-  environmentIntensity: runtimeEvidence('src/rendering/arena-environment-ibl.ts', 'scene.environmentIntensity', 'settings.graphics.environmentIntensity + scene.environmentIntensity product'),
+  // The receipt publishes BOTH numbers side by side - `resolutionTier` (what the
+  // setting asked for) and `generatedCubeSize` (what the generator produced) -
+  // because on the WebGPU route they are not the same thing: the equirect PMREM
+  // path derives its cube size from the source panorama and takes no size
+  // option, so the Ultra/High/Low steps do not currently change it. Publishing
+  // the requested tier alone would be the same shape of claim the
+  // environmentIntensity row below was making until 2026-08-31.
+  reflectionQuality: runtimeEvidence(
+    'src/graphics-refinement.ts', 'effectivePbrRoughness',
+    'render.atomicSignal.advancedGraphics.arenaEnvironment.resolutionTier (requested) vs .generatedCubeSize (produced) + render.graphicsRefinement.reflectionScale',
+  ),
+  // THE ROW THAT LIED. It used to grep arena-environment-ibl.ts for the string
+  // "scene.environmentIntensity" and call the hit runtime evidence. The string
+  // was there; the assignment never ran on the first arena of any session, and
+  // scene.environmentIntensity sat at its pristine 1 while this row reported
+  // healthy. The evidence is now an observation: the gate reads
+  // scene.environment and scene.environmentIntensity off the live scene and
+  // fails the arena commit closed when the product does not match.
+  environmentIntensity: runtimeEvidence(
+    'src/rendering/arena-environment-ibl.ts', 'assertArenaEnvironmentLive',
+    'render.atomicSignal.advancedGraphics.arenaEnvironment.environmentIntensity vs .expectedEnvironmentIntensity',
+    'assertArenaEnvironmentLive (src/rendering/arena-environment-ibl.ts) - observed scene.environmentIntensity === budget x arenaEnvironmentScale x reflectionScale on every arena commit',
+  ),
   volumetricQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'const volumetricScale = THREE.MathUtils.clamp', 'render.atomicSignal.advancedGraphics.volumetricScale'),
   smokeQuality: runtimeEvidence('src/legacy-main.ts', 'smokeVolumePresentationPool.setQualityScale(graphicsRuntime.smokeScale)', 'settings.graphics.smokeScale + smoke presentation telemetry'),
   particleQuality: runtimeEvidence('src/legacy-main.ts', 'budget.particleDensityScale * graphicsRuntime.particleScale', 'settings.graphics.particleScale + render.graphicsRefinement.budget'),
@@ -870,8 +926,16 @@ export function validateAdvancedGraphicsRegistry(): readonly string[] {
       || !['live', 'pipeline-rebuild', 'arena-reload'].includes(definition.applyMode)) {
       issues.push(`incomplete-control:${definition.key}`);
     }
-    if ((ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key]?.length ?? 0) === 0) {
+    const probes = ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key] ?? [];
+    if (probes.length === 0) {
       issues.push(`missing-runtime-evidence:${definition.key}`);
+    }
+    // A live observation has to name something; an empty string would let a row
+    // claim the strong form of evidence while carrying the weak one.
+    for (const probe of probes) {
+      if (probe.liveObservation !== undefined && probe.liveObservation.trim().length < 24) {
+        issues.push(`empty-live-observation:${definition.key}`);
+      }
     }
   }
   return Object.freeze(issues);

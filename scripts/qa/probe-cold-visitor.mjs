@@ -6,6 +6,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
@@ -15,8 +16,9 @@ const OUT = resolve('artifacts/qa/cold-visitor');
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
-  headless: false, channel: 'chrome',
-  args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
+  headless: true, channel: 'chrome',
+  args: [...SILENT_ARGS,
+      '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion'],
 });

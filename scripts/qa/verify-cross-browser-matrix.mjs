@@ -36,6 +36,15 @@
 //     [--timeout 900000] [--render quality] [--renderer <backend>]
 //     [--min-median-fps 0] [--require chrome,edge] [--headed]
 //     [--out artifacts/qa/cross-browser-matrix.json]
+// --------------------------------------------------------------------------
+// DECLARED VISIBLE LANE, muted. The installed-browser half of this matrix
+// measures real presentation across engines and wins the foreground on purpose
+// (see installed-browser-lanes.mjs, which supplies the argv and the mute).
+// Off-screen parking would de-composite the window and make the frame numbers
+// meaningless, so this lane is declared rather than hidden.
+// See scripts/qa/browser-visibility-contract.test.mjs.
+// --------------------------------------------------------------------------
+
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';

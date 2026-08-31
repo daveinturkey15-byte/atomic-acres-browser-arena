@@ -57,7 +57,16 @@ const SETTLE_MS = Number(readArg('--settle-ms', '6000'));
 
 async function measure(name, launcher, query) {
   const url = `${BASE}/?${query}`;
-  const browser = await launcher.launch({ headless: HEADLESS });
+  // DECLARED VISIBLE LANE, muted. This measures the installed-Firefox fps gap
+  // against the real compositor, so it is not parked off-screen: an
+  // uncomposited window free-runs rAF and the gap it reports becomes fiction.
+  // Firefox has no --window-position and no --mute-audio, so the Chromium side
+  // carries the mute and the Firefox side stays as it is.
+  // See scripts/qa/browser-visibility-contract.test.mjs.
+  const browser = await launcher.launch({
+    headless: HEADLESS,
+    args: launcher === chromium ? ['--mute-audio'] : [],
+  });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 200)); });

@@ -27,7 +27,25 @@ const LOCAL_APP_DATA = process.env.LOCALAPPDATA ?? 'C:/Users/Default/AppData/Loc
 const PROGRAM_FILES = process.env.ProgramFiles ?? 'C:/Program Files';
 const PROGRAM_FILES_X86 = process.env['ProgramFiles(x86)'] ?? 'C:/Program Files (x86)';
 
+// PRESENTATION LANE - THIS ONE IS DELIBERATELY VISIBLE. Read before "fixing" it.
+//
+// Every other browser this repo launches is now either headless or parked at
+// -32000,-32000 so it cannot appear on the owner's screen. These lanes are the
+// declared exception, and the exception is load-bearing: they measure what the
+// real compositor actually presents (refresh ceiling, frame parity, the HF-331
+// fps gap), and they call foregroundWindow() precisely because an unfocused or
+// occluded window is throttled and reads as a wedged browser.
+//
+// A window parked off-screen can stop being composited, and an uncomposited
+// window's requestAnimationFrame FREE-RUNS instead of tracking vsync - so
+// parking these would not hide a measurement, it would silently replace it with
+// a meaningless number that looks better than the truth. If that trade is ever
+// worth making, delete the lane instead of blinding it.
+//
+// What IS safe to fix, and is fixed: they used to make noise. They mute now.
+// browser-visibility-contract.test.mjs holds both halves of that rule.
 const CHROMIUM_PRESENTATION_ARGS = [
+  '--mute-audio',
   '--no-first-run',
   '--no-default-browser-check',
   '--disable-features=CalculateNativeWinOcclusion',
@@ -63,6 +81,9 @@ const chromiumArgs = ({ profile, url, uncap }) => [
  * refresh-rate cap and not a performance ceiling.
  */
 const firefoxPrefs = ({ uncap }) => [
+  // Firefox has no --mute-audio; this is the pref equivalent, and it is the
+  // Firefox half of the owner's "QA must stay silent" rule.
+  'user_pref("media.volume_scale", "0.0");',
   'user_pref("widget.windows.window_occlusion_tracking.enabled", false);',
   'user_pref("browser.shell.checkDefaultBrowser", false);',
   'user_pref("browser.startup.homepage_override.mstone", "ignore");',

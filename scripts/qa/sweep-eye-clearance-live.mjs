@@ -15,6 +15,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readLedger, resolveArenaRoster, UNMEASURED_CEILING } from './eye-clearance-roster.mjs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
@@ -42,9 +43,9 @@ if (argv.includes('--check') && ROSTER.narrowed) {
 console.log(`[eye-clearance] live sweep roster (${ARENAS.length}): ${ARENAS.join(', ')}`);
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',

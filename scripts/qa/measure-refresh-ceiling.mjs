@@ -40,6 +40,15 @@
 //   node scripts/qa/measure-refresh-ceiling.mjs [--browsers chrome,edge,firefox,opera]
 //     [--sample-ms 4000] [--passes 24] [--uncap] [--no-foreground]
 //     [--out artifacts/qa/browser-refresh-ceiling.json]
+// --------------------------------------------------------------------------
+// DECLARED VISIBLE LANE, muted. This measures the display refresh ceiling, so
+// the real compositor is the instrument - it calls foregroundWindow() on
+// purpose because an unfocused or occluded window is throttled and reads as a
+// wedged browser. Parking it off-screen would break the measurement rather
+// than hide it. Muting is free and is applied via installed-browser-lanes.mjs.
+// See scripts/qa/browser-visibility-contract.test.mjs.
+// --------------------------------------------------------------------------
+
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';

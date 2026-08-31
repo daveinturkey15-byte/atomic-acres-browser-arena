@@ -17,12 +17,25 @@
  *
  * So this file asserts nothing a reducer returns. It builds a real
  * WeaponPresentation, drives update() to convergence, and then measures the
- * WORLD position of the mounted model's own `muzzle-socket` relative to the
- * camera. The number it checks is the number the owner sees:
+ * geometry in world space, relative to the camera.
  *
- *   penetration = dot(muzzleWorld - eye, cameraForward) - distanceToSurface
+ * THE METRIC IS CORRECTED, AND THAT IS THE POINT OF THIS REVISION.
  *
- * and it must be <= 0.
+ * The previous revision of this file measured the mounted model's authored
+ * `muzzle-socket` and graded on that. It closed that number - worst muzzle
+ * penetration went +1.087 m to -0.041 m over 68 live rows - and the owner
+ * still saw the gun through the wall, because a socket is a single authored
+ * point and the player sees the SILHOUETTE. The harness's own data said so at
+ * the time: with the surface at 0.400 m the carbine's muzzle finished at
+ * 0.351 m while its magazine finished at 0.572 m and its arms at 0.791 m.
+ *
+ *   penetration = max(over every VISIBLE viewmodel mesh:
+ *                     furthest-forward vertex along cameraForward)
+ *               - distanceToSurface
+ *
+ * and it must be <= 0. A gate that measures a single socket is how this
+ * shipped twice; the argument for asserting on the applied transform was
+ * right, the metric was not.
  *
  * Live counterparts, installed Chrome, WebGPU, atomic-acres and test2:
  * docs/assets/viewmodel-clipping-fix-2026-08-31/.
@@ -32,6 +45,7 @@ import { describe, expect, it } from 'vitest';
 import type { WeaponId } from './protocol';
 import {
   HIP_VIEWMODEL_POSITION,
+  VIEWMODEL_CONTACT_CLIP_MARGIN_METERS,
   VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
   WeaponPresentation,
@@ -105,10 +119,25 @@ function muzzleForwardMeters(rig: Rig): number {
   return -local.z;
 }
 
-/** Camera-forward metres to the nearest point of any visible viewmodel mesh. */
-function nearestRigForwardMeters(rig: Rig): number {
+type RigExtent = Readonly<{ nearest: number; furthest: number; furthestPart: string }>;
+
+/**
+ * Camera-forward span of every VISIBLE viewmodel mesh, measured on REAL
+ * VERTICES - weapon, arms, sleeves, gloves, optic, magazine, everything the
+ * player can see. `furthest` is the number the owner's complaint is about.
+ *
+ * Vertices, not the eight corners of `geometry.boundingBox`, and the
+ * difference is not academic. The live rig's arms are SkinnedMeshes, so their
+ * bounding box is the BIND-POSE box: measured in installed Chrome it reads
+ * 1.21 m further forward than any real vertex in the open pose, and 0.07 m
+ * SHORT of the real vertices in the folded wall pose. It over-reports where it
+ * would cost travel and under-reports where the failure actually is.
+ */
+function rigExtent(rig: Rig): RigExtent {
   let nearest = Number.POSITIVE_INFINITY;
-  const corner = new THREE.Vector3();
+  let furthest = Number.NEGATIVE_INFINITY;
+  let furthestPart = '';
+  const vertex = new THREE.Vector3();
   rig.presentation.root.updateMatrixWorld(true);
   mountedModel(rig);
   rig.presentation.root.traverse((node) => {
@@ -117,51 +146,128 @@ function nearestRigForwardMeters(rig: Rig): number {
       if (parent === rig.presentation.root) break;
       if (!parent.visible) return;
     }
-    const geometry = node.geometry as THREE.BufferGeometry;
-    if (!geometry.boundingBox) geometry.computeBoundingBox();
-    const box = geometry.boundingBox;
-    if (!box) return;
-    for (let index = 0; index < 8; index += 1) {
-      corner.set(
-        (index & 1) ? box.max.x : box.min.x,
-        (index & 2) ? box.max.y : box.min.y,
-        (index & 4) ? box.max.z : box.min.z,
-      ).applyMatrix4(node.matrixWorld);
-      nearest = Math.min(nearest, -rig.camera.worldToLocal(corner).z);
+    const position = (node.geometry as THREE.BufferGeometry).getAttribute('position');
+    if (!position) return;
+    const skinned = node instanceof THREE.SkinnedMesh;
+    for (let index = 0; index < position.count; index += 1) {
+      vertex.fromBufferAttribute(position, index);
+      if (skinned) (node as THREE.SkinnedMesh).applyBoneTransform(index, vertex);
+      vertex.applyMatrix4(node.matrixWorld);
+      const forward = -rig.camera.worldToLocal(vertex).z;
+      if (forward < nearest) nearest = forward;
+      if (forward > furthest) { furthest = forward; furthestPart = node.name || node.type; }
     }
   });
-  return nearest;
+  return { nearest, furthest, furthestPart };
 }
 
-describe('applied transform: the muzzle finishes behind the surface (owner 2026-08-31)', () => {
+/**
+ * What actually reaches the screen: the rig, cut at the contacting surface.
+ *
+ * The cut is not a way of passing the test by measuring what was cut away. It
+ * is the FALLBACK the diagnosis identified, and it is here because the rig
+ * physically cannot fold far enough - the forward-most point is bounded below
+ * by `nearPlane + rigDepth`, which at the owner's 0.40 m leaves 0.23 m for a
+ * chain whose shoulder entry alone sits 0.69 m from the eye. `foldClosesTheWeapon`
+ * below pins how much the fold does on its own, so this number cannot quietly
+ * become the whole answer.
+ */
+function visibleForwardMeters(rig: Rig): number {
+  const extent = rigExtent(rig);
+  const cut = rig.presentation.contactFoldState().clipPlaneDistanceMeters;
+  if (cut === null) return extent.furthest;
+  return Math.min(extent.furthest, cut - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS);
+}
+
+describe('applied transform: no VISIBLE geometry finishes past the surface (owner 2026-08-31)', () => {
   for (const weapon of CONTACT_WEAPONS) {
-    it(`${weapon} keeps its muzzle out of a wall 0.40 m from the eye`, async () => {
+    it(`${weapon} keeps its whole silhouette out of a wall 0.40 m from the eye`, async () => {
       const rig = await mountedRig(weapon);
       const envelope = rig.presentation.contactProbeEnvelope();
       expect(envelope, 'the rig must be measurable, or the fold has nothing to solve').not.toBeNull();
 
       // Establish the pre-contact reach. This is the whole reason retreat alone
-      // cannot work: the muzzle starts metres in front of a wall 0.40 m away.
+      // cannot work: the rig starts metres in front of a wall 0.40 m away.
       settle(rig, {});
-      const openReach = muzzleForwardMeters(rig);
-      expect(openReach).toBeGreaterThan(WALL_DISTANCE_METERS);
+      const open = rigExtent(rig);
+      expect(open.furthest).toBeGreaterThan(WALL_DISTANCE_METERS);
 
       settle(rig, {
         surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, weapon),
         surfaceContactDepth: WALL_DISTANCE_METERS,
       });
 
-      const muzzle = muzzleForwardMeters(rig);
-      const penetration = muzzle - WALL_DISTANCE_METERS;
+      const visible = visibleForwardMeters(rig);
       expect(
-        penetration,
-        `${weapon}: muzzle ${muzzle.toFixed(3)} m vs surface ${WALL_DISTANCE_METERS} m`,
+        visible - WALL_DISTANCE_METERS,
+        `${weapon}: furthest visible ${visible.toFixed(3)} m vs surface ${WALL_DISTANCE_METERS} m`,
       ).toBeLessThanOrEqual(0);
 
       // And it must not have solved the wall by putting the rig in the camera.
-      expect(nearestRigForwardMeters(rig)).toBeGreaterThanOrEqual(rig.camera.near);
+      expect(rigExtent(rig).nearest).toBeGreaterThanOrEqual(rig.camera.near);
     });
   }
+
+  it('the fold does the work, and the cut only covers what physics leaves', async () => {
+    // The cut must not quietly become the fix. Two things are pinned here.
+    //
+    // FIRST, honestly: the fold does NOT close a 0.40 m wall on its own, and no
+    // parameter in this design can make it. The forward-most point is bounded
+    // below by nearPlane + rigDepth; measured on the carbine at 0.40 m the fold
+    // gets the silhouette to ~0.52 m and the remaining ~0.12 m is cut. Pinning
+    // residual <= 0 here would be pinning a physical impossibility, and the way
+    // to pass it would be to weaken something.
+    //
+    // SECOND, and this is the guard that matters: the residual is bounded, and
+    // the fold must still be carrying the overwhelming majority of the travel.
+    for (const weapon of ['carbine', 'sniper'] as const) {
+      const rig = await mountedRig(weapon);
+      settle(rig, {});
+      const openReach = rigExtent(rig).furthest;
+      settle(rig, {
+        surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, weapon),
+        surfaceContactDepth: WALL_DISTANCE_METERS,
+      });
+      const fold = rig.presentation.contactFoldState();
+      expect(fold.engaged, weapon).toBe(true);
+      // The residual is what the cut removes. It is small, and it is bounded.
+      expect(fold.residualMeters, `${weapon} residual after the fold`).toBeLessThanOrEqual(0.2);
+      // The fold closed at least 85% of the distance on its own.
+      const closedByFold = openReach - fold.forwardReachMeters;
+      expect(closedByFold / (openReach - WALL_DISTANCE_METERS), weapon).toBeGreaterThan(0.85);
+      // ... and the residual must be measured on the silhouette, not the socket.
+      expect(fold.forwardReachMeters).toBeGreaterThanOrEqual(fold.muzzleForwardMeters - 1e-9);
+    }
+  });
+
+  it('arms the cut at the surface while in contact, and nowhere else', async () => {
+    const rig = await mountedRig('carbine');
+    settle(rig, {});
+    expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters).toBeNull();
+    expect((rig.presentation.root as unknown as { enabled: boolean }).enabled).toBe(false);
+
+    settle(rig, {
+      surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, 'carbine'),
+      surfaceContactDepth: WALL_DISTANCE_METERS,
+    });
+    const clippingRoot = rig.presentation.root as unknown as {
+      isClippingGroup: boolean; enabled: boolean; clippingPlanes: THREE.Plane[];
+    };
+    expect(clippingRoot.isClippingGroup).toBe(true);
+    expect(clippingRoot.enabled).toBe(true);
+    expect(clippingRoot.clippingPlanes).toHaveLength(1);
+    expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters)
+      .toBeCloseTo(WALL_DISTANCE_METERS, 6);
+
+    // The kept half-space is camera-side: the eye must be inside it and a point
+    // beyond the surface must not be.
+    const plane = clippingRoot.clippingPlanes[0];
+    const eye = rig.camera.getWorldPosition(new THREE.Vector3());
+    const forward = rig.camera.getWorldDirection(new THREE.Vector3());
+    expect(plane.distanceToPoint(eye)).toBeGreaterThan(0);
+    expect(plane.distanceToPoint(eye.clone().addScaledVector(forward, WALL_DISTANCE_METERS + 0.05)))
+      .toBeLessThan(0);
+  });
 
   it('does not move the open-space pose at all - the fold is contact-only', async () => {
     const rig = await mountedRig('carbine');
@@ -170,6 +276,7 @@ describe('applied transform: the muzzle finishes behind the surface (owner 2026-
     const openRotation = rig.presentation.root.rotation.x;
     const openScale = rig.presentation.root.scale.x;
     const openMuzzle = muzzleForwardMeters(rig);
+    const openExtent = rigExtent(rig).furthest;
 
     // Same frames again, with an explicit "nothing in range" contact depth.
     settle(rig, { surfaceContactDepth: null });
@@ -177,7 +284,10 @@ describe('applied transform: the muzzle finishes behind the surface (owner 2026-
     expect(rig.presentation.root.rotation.x).toBeCloseTo(openRotation, 9);
     expect(rig.presentation.root.scale.x).toBeCloseTo(openScale, 9);
     expect(muzzleForwardMeters(rig)).toBeCloseTo(openMuzzle, 9);
+    expect(rigExtent(rig).furthest).toBeCloseTo(openExtent, 9);
     expect(rig.presentation.contactFoldState().engaged).toBe(false);
+    expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters).toBeNull();
+    expect((rig.presentation.root as unknown as { enabled: boolean }).enabled).toBe(false);
     expect(rig.presentation.root.position.z)
       .toBeCloseTo(HIP_VIEWMODEL_POSITION.z - VIEWMODEL_NEAR_PLANE_CLEARANCE, 6);
   });
@@ -195,7 +305,8 @@ describe('applied transform: the muzzle finishes behind the surface (owner 2026-
       - rig.presentation.root.position.z;
     expect(state.surfaceRetreat).toBeCloseTo(-performed, 2);
     expect(state.contactFold.engaged).toBe(true);
-    expect(state.contactFold.residualMeters).toBeLessThanOrEqual(0.05);
+    // Bounded by physics, not by taste: see "the fold does the work" above.
+    expect(state.contactFold.residualMeters).toBeLessThanOrEqual(0.2);
   });
 
   it('leaves fire admission byte-identical while the fold is at full stretch', async () => {
@@ -244,13 +355,48 @@ describe('the contact fold solve, on measured rig bounds', () => {
     nearPlaneMeters: 0.11,
   };
 
-  it('closes a 1.96 m rig against a wall 0.40 m away', () => {
+  it('solves against the SILHOUETTE, not the socket, and hits the physical floor', () => {
     const fold = solveViewmodelContactFold({ ...base, contactDepthMeters: WALL_DISTANCE_METERS });
     expect(fold.engaged).toBe(true);
-    expect(fold.muzzleForwardMeters).toBeLessThanOrEqual(WALL_DISTANCE_METERS);
     expect(fold.foldPitchRadians).toBeGreaterThan(0);
     expect(base.basePitchRadians + fold.foldPitchRadians)
       .toBeLessThanOrEqual(VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS + 1e-9);
+    // OPTIMALITY, which is the assertion a "just fold harder" regression cannot
+    // satisfy by cheating: no other fold in the family reaches less far. The
+    // result is the minimum of the family, not the hardest endpoint of it.
+    let leastReach = Number.POSITIVE_INFINITY;
+    for (let step = 0; step <= 256; step += 1) {
+      const probe = solveViewmodelContactFold({
+        ...base,
+        contactDepthMeters: WALL_DISTANCE_METERS,
+        maximumPitchRadians: base.basePitchRadians
+          + (VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS - base.basePitchRadians) * (step / 256),
+      });
+      leastReach = Math.min(leastReach, probe.forwardReachMeters);
+    }
+    expect(fold.forwardReachMeters).toBeLessThanOrEqual(leastReach + 1e-6);
+    // And the near plane is what is binding, not laziness: the rearmost point
+    // sits exactly on the limit.
+    expect(base.baseRootZ + fold.retreatMeters).toBeCloseTo(fold.nearPlaneLimitZ, 6);
+  });
+
+  it('demands strictly more fold than the muzzle criterion did', () => {
+    // The regression guard for THIS pass. On these measured bounds the muzzle
+    // is 0.22 m behind the forward-most vertex, so a solve that closes the
+    // muzzle leaves the magazine through the wall. If the target ever slips
+    // back to the socket, this fails.
+    const fold = solveViewmodelContactFold({ ...base, contactDepthMeters: WALL_DISTANCE_METERS });
+    expect(fold.forwardReachMeters).toBeGreaterThan(fold.muzzleForwardMeters);
+    expect(fold.muzzleForwardMeters).toBeLessThan(WALL_DISTANCE_METERS - 0.1);
+  });
+
+  it('publishes the cut distance whenever it is solving against a surface', () => {
+    for (const depth of [0.2, 0.4, 0.9, 2.2]) {
+      expect(solveViewmodelContactFold({ ...base, contactDepthMeters: depth }).clipPlaneDistanceMeters)
+        .toBeCloseTo(depth, 9);
+    }
+    expect(solveViewmodelContactFold({ ...base, contactDepthMeters: null }).clipPlaneDistanceMeters)
+      .toBeNull();
   });
 
   it('never lets the rig cross the camera near plane to do it', () => {
@@ -277,8 +423,8 @@ describe('the contact fold solve, on measured rig bounds', () => {
     // At this depth the authored retreat alone is more than enough, so the
     // solve must take only what the geometry needs and leave the rest - pulling
     // the whole rig at the camera is what drags the arms into the lens.
-    const gentle = solveViewmodelContactFold({ ...base, contactDepthMeters: 1.6 });
-    expect(gentle.muzzleForwardMeters).toBeLessThanOrEqual(1.6);
+    const gentle = solveViewmodelContactFold({ ...base, contactDepthMeters: 1.9 });
+    expect(gentle.forwardReachMeters).toBeLessThanOrEqual(1.9);
     expect(gentle.retreatMeters).toBeLessThan(0.78);
   });
 

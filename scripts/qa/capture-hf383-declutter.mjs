@@ -4,15 +4,16 @@
 // covering the decluttered street centre.
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:41977';
 const OUT = 'artifacts/hf383-frames';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

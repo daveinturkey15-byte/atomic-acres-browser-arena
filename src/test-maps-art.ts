@@ -121,15 +121,22 @@ const SAMPLE: { albedo: [number, number, number]; height: number; roughness: num
 /**
  * AO IS BAKED AS sqrt(ao), NOT ao.
  *
- * `aoMap` multiplies the INDIRECT term only, and indirect is the entire
- * lighting budget of every shadowed pixel — these arenas have no
- * `scene.environment` (measured 2026-08-30: null on all eight arenas on the
- * WebGPU route), so a shadowed surface is lit by the flat ambient, the global
- * hemisphere and the 0.22 shadow-side fill and nothing else. An authored AO
- * floor of 0.28 (hedge) or 0.10 (travertine joints) therefore removes 72-90%
- * of ALL the light a crevice will ever receive, which is why the crevices
- * measured at linear luma 0.0005 while the same material's open face measured
- * 0.12 on the same frame.
+ * `aoMap` multiplies the INDIRECT term only, and indirect is most of the
+ * lighting budget of every shadowed pixel: the flat ambient, the global
+ * hemisphere, the 0.22 shadow-side fill and - since 2026-08-31 - the arena
+ * environment. An authored AO floor of 0.28 (hedge) or 0.10 (travertine
+ * joints) therefore removes 72-90% of nearly all the light a crevice will ever
+ * receive, which is why the crevices measured at linear luma 0.0005 while the
+ * same material's open face measured 0.12 on the same frame.
+ *
+ * The 2026-08-30 wording said these arenas have NO `scene.environment` at all.
+ * That was true of the first arena of every page load and false from the
+ * second onward, and the difference was a bug, not a policy - it is fixed
+ * (docs/IBL_FIRST_ARENA_BUG_2026-08-31.md). The sqrt rule is unaffected: it
+ * was never about how much indirect there is, only about a multiplier that can
+ * drive whatever indirect exists to zero. Restoring the environment makes the
+ * rule matter MORE, because there is now more indirect light for a floor of
+ * 0.10 to delete.
  *
  * Upstream states the rule outright (UPSTREAM_TECHNIQUE_EXTRACTION, "Two-band
  * normal-gated bounce fill", citing materialpatch.js:49-58): the fill bands are
@@ -754,14 +761,25 @@ export function test1Materials(): Test1Materials {
   // METALNESS 0, not 0.55 (extraction doc, "Metalness discipline: bare metal is
   // 1, every oxide/paint/dirt layer on top of it is 0"). A painted container is
   // a dielectric coat over steel and never shows the steel; upstream's rule
-  // says so directly. Here it is not even a stylistic call. Metalness scales
-  // diffuse by (1 - metalness) and hands the energy to the specular
-  // environment term - and `scene.environment` is NULL on this route (measured
-  // 2026-08-30 on all eight arenas; the PMREM in arena-environment-ibl.ts is
-  // not reaching the scene), so 0.55 was deleting 55% of a container's response
-  // and getting nothing back. Combined with the dark v2 base that is the whole
-  // reason the container yard rendered as black boxes: measured 0.0011 linear
-  // Y on a container top in full sun, against 0.12 for the dust beside it.
+  // says so directly, and that rule is the whole reason for the 0 - it is a
+  // material fact, not a compensation.
+  //
+  // RE-DERIVED 2026-08-31, because the 2026-08-30 note reached the right value
+  // through a premise that has since been retired. It argued that
+  // `scene.environment` was permanently NULL, so metalness could only subtract
+  // (1 - metalness) of the diffuse and hand the energy to a specular term with
+  // nothing in it. The null environment was a BUG - the first arena of every
+  // page load skipped the only PMREM call site - and it is now fixed
+  // (docs/IBL_FIRST_ARENA_BUG_2026-08-31.md). A premise that no longer holds
+  // cannot be left propping up a number, even a correct one.
+  //
+  // The value HOLDS at 0 on the material rule alone, and the environment being
+  // live only strengthens it: a painted container should not gain a specular
+  // sky reflection, because paint is not metal. What the fix does change is the
+  // container's DIFFUSE response, which now receives environment irradiance -
+  // measured 2026-08-31 in docs/assets/ibl-fix-2026-08-31, and it moves in the
+  // brightening direction, so the 0.0011 linear-Y black-box failure this value
+  // was authored against cannot return through this route.
   //
   // The authored `roughness` is deliberately omitted: `surfaceStandardMaterial`
   // forces the scalar to 1 whenever a roughnessMap exists (surface-forge.ts),
@@ -788,10 +806,18 @@ export function test1Materials(): Test1Materials {
     containerGreen: container(0x7fae6c, 'test1-container-green'),
     // Galvanised roofing: the corrugated set de-rusted and tighter. Hot-dip
     // zinc weathers to a chalked oxide within a season, which is a dielectric
-    // (extraction: "every oxide layer on top of it is 0"), and with no
-    // scene.environment the old 0.7 was subtracting 70% of the roofs' only
-    // light source. These four roofs are the largest horizontals on the map and
-    // measured 0.0022 linear Y - the black slabs in the flyover.
+    // (extraction: "every oxide layer on top of it is 0"). These four roofs are
+    // the largest horizontals on the map and measured 0.0022 linear Y at the
+    // old 0.7 - the black slabs in the flyover.
+    //
+    // HELD at 0.08 on 2026-08-31 with the arena environment live. 0.08 is not a
+    // rounding of 0: chalked zinc is a thin oxide over a bright metal and keeps
+    // a trace of the sheet underneath, which is exactly what a small metalness
+    // buys now that there is a sky to reflect. Raising it further would trade
+    // diffuse for specular on a horizontal surface facing a sky dimmed to
+    // arenaEnvironmentScale('test1') = 0.16, i.e. it would DARKEN the roofs
+    // again - the same trade the 0.7 lost. Verified by measurement rather than
+    // reasoning: see docs/assets/ibl-fix-2026-08-31.
     steel: forgedMaterial(corrugated, 'test1-steel', { color: 0xd7dee2, metalness: 0.08, normalScale: 0.4, metresPerTile: 3.6 }),
     cinder: forgedMaterial(cinder, 'test1-cinder', { roughness: 0.95, normalScale: 1.15, metresPerTile: 1.6 }),
     tarp: forgedMaterial(tarp, 'test1-tarp', { roughness: 0.96, side: THREE.DoubleSide, metresPerTile: 2 }),
@@ -960,9 +986,11 @@ export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials)
   root.add(dressing);
 
   // Same metalness discipline as the containers above: a painted drum and a
-  // rusted drum are both a dielectric layer over the steel, and with
-  // scene.environment null the metal branch returns nothing to replace the
-  // diffuse it removes. Only genuinely bare, polished metal keeps any.
+  // rusted drum are both a dielectric layer over the steel. Only genuinely
+  // bare, polished metal keeps any - which is a statement about what the
+  // surface IS, and so survives the 2026-08-31 environment fix unchanged. The
+  // steel bands at 0.12 are the one part of this dressing set that is not fully
+  // coated, and they are the one part that gains a visible sky term.
   const steelDark = new THREE.MeshStandardMaterial({ color: 0x5d666b, roughness: 0.6, metalness: 0.12 });
   const drumOlive = new THREE.MeshStandardMaterial({ color: 0x6d7c50, roughness: 0.7, metalness: 0 });
   const drumRust = new THREE.MeshStandardMaterial({ color: 0x955c38, roughness: 0.8, metalness: 0 });
@@ -1198,6 +1226,15 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
   dressing.userData.presentationOnly = true;
   root.add(dressing);
 
+  // The one genuinely BARE metal in either test map (extraction: "bare metal is
+  // 1"), and therefore the one material whose look actually depended on there
+  // being an environment to reflect. Until 2026-08-31 there was none on the
+  // first arena of a session, so a polished 0.85 chrome rail returned 15% of a
+  // diffuse and nothing else - a flat grey stick. With the environment live it
+  // reflects the estate sky it was authored for. HELD at 0.85 rather than
+  // raised to a textbook 1: the rails are outdoor furniture with a handled,
+  // slightly hazed finish, and the last 0.15 of diffuse is what keeps them
+  // readable as silhouettes against a bright sky rather than mirroring it.
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd9dee2, roughness: 0.16, metalness: 0.85 });
   const canvasCream = new THREE.MeshStandardMaterial({ color: 0xefe6d2, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
   // Cool river gravel on the drive, for the same reason as `stone`: it is the

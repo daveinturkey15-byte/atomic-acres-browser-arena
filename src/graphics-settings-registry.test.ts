@@ -47,7 +47,11 @@ describe('Advanced Graphics canonical registry', () => {
     }
   });
 
-  it('fails closed unless every visible control probes a real runtime source and telemetry path', () => {
+  it('fails closed unless every visible control names a real source symbol and telemetry path', () => {
+    // This is a SOURCE-SHAPE check and nothing more: it greps the named file
+    // for the named symbol. It catches a deleted or renamed consumer. It does
+    // NOT prove the consumer executes - a distinction this suite learned the
+    // expensive way, see the live-observation test below.
     expect(Object.keys(ADVANCED_GRAPHICS_RUNTIME_EVIDENCE).sort())
       .toEqual(ADVANCED_GRAPHICS_CONTROLS.map(({ key }) => key).sort());
     for (const definition of ADVANCED_GRAPHICS_CONTROLS) {
@@ -57,6 +61,43 @@ describe('Advanced Graphics canonical registry', () => {
         expect(existsSync(probe.path), `${definition.key}: ${probe.path}`).toBe(true);
         expect(readFileSync(probe.path, 'utf8'), `${definition.key}: ${probe.symbol}`).toContain(probe.symbol);
         expect(probe.telemetryPath.length, definition.key).toBeGreaterThan(12);
+      }
+    }
+  });
+
+  /**
+   * The environment rows are the reason `liveObservation` exists.
+   *
+   * Until 2026-08-31 environmentIntensity's "runtime evidence" was a grep for
+   * the string `scene.environmentIntensity` inside arena-environment-ibl.ts.
+   * The string was there. The assignment ran on every arena EXCEPT the first
+   * one of each page load - which is the only arena most sessions ever see -
+   * because the sole call site sat inside `applyDefinition`, and the first
+   * arena is the one that constructs the systems object instead of applying a
+   * definition to it. Nine unit tests passed over a dead code path.
+   *
+   * A row may only claim a live observation if the named assertion is a real
+   * exported symbol that reads the scene. That is what this pins.
+   */
+  it('backs the environment-intensity row with a live observation, not a source grep', () => {
+    const iblSource = readFileSync('src/rendering/arena-environment-ibl.ts', 'utf8');
+    for (const key of ['environmentIntensity'] as const) {
+      const [probe] = ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[key];
+      expect(probe.liveObservation, key).toBeTruthy();
+      expect(probe.liveObservation, key).toContain('assertArenaEnvironmentLive');
+      // The gate has to exist as an export, and it has to read the scene rather
+      // than re-state its inputs.
+      expect(iblSource).toContain('export function assertArenaEnvironmentLive');
+      expect(iblSource).toContain('export function observeArenaEnvironment');
+      expect(iblSource).toContain('const environment = scene.environment;');
+      expect(iblSource).toContain('environmentIntensity: scene.environmentIntensity,');
+    }
+    // Every OTHER row is honest about being a source-shape trace: it must not
+    // silently acquire the strong claim without a gate behind it.
+    for (const definition of ADVANCED_GRAPHICS_CONTROLS) {
+      for (const probe of ADVANCED_GRAPHICS_RUNTIME_EVIDENCE[definition.key]) {
+        if (probe.liveObservation === undefined) continue;
+        expect(probe.liveObservation.length, definition.key).toBeGreaterThan(23);
       }
     }
   });

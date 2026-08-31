@@ -692,11 +692,47 @@ const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   ['MAT_Pass65Chopper_GreenDisplay', Object.freeze({ color: 0x020a05, emissive: 0x003b17 })],
 ]));
 
+/**
+ * Owner 2026-08-31, "ensure chopper gunner HUD is better". The DOM gunner HUD
+ * was retuned on 2026-08-30 onto a warm deck - bone values, muted telemetry,
+ * burnt orange for "act on me", green reserved for state - in
+ * src/ui/pass65-hud.css under `#gunner-cockpit-hud[data-support-kind=
+ * "chopper-gunner"]`. The 3D cockpit never got that pass. Its instrument and
+ * HUD materials still shipped the authored mint/cyan emissive at full
+ * strength and unmapped, which on screen is a row of white-hot slabs that
+ * outshines every readout a gunner acts on - the "mint cockpit" split that
+ * CSS comment names. Same language, same hierarchy, in the viewmodel:
+ * chrome is quiet and warm, state keeps the green, and nothing in here is
+ * allowed to compete with the DOM readouts for attention.
+ */
+const CHOPPER_COCKPIT_INSTRUMENT_MATERIALS = Object.freeze(new Map<string, Readonly<{
+  color: number;
+  emissive: number;
+  intensity: number;
+  roughness?: number;
+  metalness?: number;
+}>>([
+  // MFD readouts and the gunner weapon status plate: the values you read.
+  ['MAT_Pass65Chopper_HUDGreen', Object.freeze({ color: 0x0f0b07, emissive: 0xe8d6c1, intensity: 0.4 })],
+  // MFD labels and HUD frame ticks name things; they are one tier quieter.
+  ['MAT_Pass65Chopper_HUDCyan', Object.freeze({ color: 0x0c0a07, emissive: 0xb39d86, intensity: 0.22 })],
+  // Combiner glass is a surface, not a light source.
+  ['MAT_Pass65Chopper_HUDGlass', Object.freeze({ color: 0x05100f, emissive: 0x1c2a25, intensity: 0.16 })],
+  // Panel lamps, ammo bars, radar blips: chrome on the burnt-orange deck.
+  ['MAT_Pass65Chopper_CyanInstrument', Object.freeze({ color: 0x120a04, emissive: 0xb4531c, intensity: 0.24 })],
+  // Annunciators and switch lamps are STATE. Green lives here, and only here.
+  ['MAT_Pass65Chopper_GreenInstrument', Object.freeze({ color: 0x050d07, emissive: 0x7dffa6, intensity: 0.26 })],
+  // Trigger and armed marks: the act-on-me accent.
+  ['MAT_Pass65Chopper_Muzzle', Object.freeze({ color: 0x150a03, emissive: 0xff9d3f, intensity: 0.34 })],
+]));
+
 const CHOPPER_READABILITY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   emissive: number;
   intensity: number;
   minimumRoughness?: number;
   maximumMetalness?: number;
+  /** Optional albedo override, for deck surfaces the fill would wash out. */
+  color?: number;
 }>>([
   ['MAT_Pass65Chopper_Armor_PBR', Object.freeze({ emissive: 0x4d8a68, intensity: 0.7 })],
   ['MAT_Pass65Chopper_RearTailArmor_PBR', Object.freeze({
@@ -707,11 +743,27 @@ const CHOPPER_READABILITY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   })],
   ['MAT_Pass65Chopper_DarkArmor', Object.freeze({ emissive: 0x263f36, intensity: 0.45 })],
   ['MAT_Pass65Chopper_Gunmetal', Object.freeze({ emissive: 0x3f5054, intensity: 0.4 })],
-  ['MAT_Pass65Chopper_CockpitFrame', Object.freeze({ emissive: 0x2f6653, intensity: 0.55 })],
-  ['MAT_Pass65Chopper_CockpitInterior', Object.freeze({ emissive: 0x28513a, intensity: 0.45 })],
-  ['MAT_Pass65Chopper_PanelWear', Object.freeze({ emissive: 0x6b5723, intensity: 0.45 })],
+  // Owner 2026-08-31: the deck surfaces carried a green self-fill that, under
+  // a bright sky, washed the whole console to pale mint - the one colour the
+  // gunner HUD language explicitly reserves for nothing. Warm, dark and
+  // rough, so the retuned instrument marks are the brightest thing on it.
+  ['MAT_Pass65Chopper_CockpitFrame', Object.freeze({
+    emissive: 0x3b3025, intensity: 0.3, color: 0x211d17, minimumRoughness: 0.52, maximumMetalness: 0.42,
+  })],
+  ['MAT_Pass65Chopper_CockpitInterior', Object.freeze({
+    emissive: 0x342a1f, intensity: 0.26, color: 0x1a1712, minimumRoughness: 0.62, maximumMetalness: 0.26,
+  })],
+  ['MAT_Pass65Chopper_PanelWear', Object.freeze({
+    emissive: 0x4a3d28, intensity: 0.3, color: 0x2b261d, minimumRoughness: 0.5, maximumMetalness: 0.5,
+  })],
   ['MAT_Pass65Chopper_RescueAccent', Object.freeze({ emissive: 0xa63b0a, intensity: 0.6 })],
   ['MAT_Pass65Chopper_RotorBlade', Object.freeze({ emissive: 0x172424, intensity: 0.3 })],
+  ['MAT_Pass65Chopper_PanelSeam', Object.freeze({
+    emissive: 0x2c2318, intensity: 0.28, color: 0x14120e, minimumRoughness: 0.6, maximumMetalness: 0.42,
+  })],
+  ['MAT_Pass65Chopper_Seat', Object.freeze({
+    emissive: 0x241a12, intensity: 0.3, color: 0x171310, minimumRoughness: 0.72, maximumMetalness: 0.1,
+  })],
 ]));
 
 const CHOPPER_REAR_TAIL_SEMANTIC_NODES = Object.freeze([
@@ -768,6 +820,20 @@ export function applyAuthoredChopperReadability(root: THREE.Object3D): void {
       if (visited.has(entry) || !(entry instanceof THREE.MeshStandardMaterial)) continue;
       visited.add(entry);
       if (entry.userData.pass70ChopperReadabilityApplied === true) continue;
+      const instrument = CHOPPER_COCKPIT_INSTRUMENT_MATERIALS.get(entry.name);
+      if (instrument) {
+        entry.color.setHex(instrument.color);
+        entry.emissive.setHex(instrument.emissive);
+        entry.emissiveIntensity = instrument.intensity;
+        // The glare was unmapped emissive: it skipped tone mapping entirely,
+        // so every panel lamp clipped to white before the bloom pass saw it.
+        entry.toneMapped = true;
+        entry.roughness = Math.max(entry.roughness, instrument.roughness ?? 0.6);
+        entry.metalness = Math.min(entry.metalness, instrument.metalness ?? 0.1);
+        entry.userData.pass70ChopperReadabilityApplied = true;
+        entry.needsUpdate = true;
+        continue;
+      }
       const display = CHOPPER_DISPLAY_MATERIALS.get(entry.name);
       if (display) {
         entry.color.setHex(display.color);
@@ -788,6 +854,7 @@ export function applyAuthoredChopperReadability(root: THREE.Object3D): void {
       // Retaining it multiplies the bounded fill back to zero in WebGPU.
       if (entry.name === 'MAT_Pass65Chopper_Armor_PBR'
         || entry.name === CHOPPER_REAR_TAIL_MATERIAL_NAME) entry.emissiveMap = null;
+      if (readability.color !== undefined) entry.color.setHex(readability.color);
       entry.emissive.setHex(readability.emissive);
       entry.emissiveIntensity = readability.intensity;
       if (readability.minimumRoughness !== undefined) {
@@ -1394,6 +1461,7 @@ export async function optimizeAuthoredSupportLevel(
     ? await batchAuthoredSupportStaticMeshes(gunnerSightline, family, 'gunner-sightline')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
   await yieldPresentationCpuTask();
+  if (cockpit) markChopperCanopyFrameMembers(cockpit);
   const cockpitStats = cockpit
     ? await batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
@@ -1540,7 +1608,73 @@ type FirstPersonCockpitAlignmentTelemetry = Readonly<{
   dashboardCameraSpacePosition: readonly number[] | null;
   hudCameraSpacePosition: readonly number[] | null;
   weaponCameraSpacePosition: readonly number[] | null;
+  /** Canopy members withheld because they would end inside the viewport. */
+  framingSuppressedMembers: readonly string[];
+  framing: FirstPersonCockpitFramingTelemetry | null;
 }>;
+
+/**
+ * Owner 2026-08-31 ("the cockpit not stopping midscreen"): the possessed
+ * cockpit has to be measured as FRAMING, in angles the eye actually sees,
+ * not as viewmodel metres. Every value here is degrees off the view axis, so
+ * it can be compared directly against the camera's half-FOV at any aspect:
+ * the vertical half-FOV is aspect-independent, and the horizontal half-FOV
+ * widens with the aspect ratio. Structure whose angle is SMALLER than the
+ * half-FOV ends inside the viewport - that is the hard mid-screen cut.
+ */
+type FirstPersonCockpitFramingTelemetry = Readonly<{
+  /** Visible cockpit meshes measured (excludes the off-centre gun viewmodel). */
+  measuredMeshes: number;
+  /** Meshes wholly behind the eye plane: geometry the pull has thrown away. */
+  meshesBehindEye: number;
+  nearestDepthM: number | null;
+  farthestDepthM: number | null;
+  /** Signed angular silhouette, degrees, over every corner in front of the eye. */
+  leftEdgeDeg: number | null;
+  rightEdgeDeg: number | null;
+  topEdgeDeg: number | null;
+  bottomEdgeDeg: number | null;
+  /**
+   * Ray-sampled aperture along the centre column and centre row. These are
+   * the numbers that decide the complaint: `apertureTopDeg` is the elevation
+   * where cockpit structure first appears straight ahead going UP, and
+   * `structureClearsAboveDeg` is the elevation above which it is gone again.
+   * When the second is smaller than the camera's vertical half-FOV, sky
+   * reappears above the canopy - the hard mid-screen cut.
+   */
+  apertureTopDeg: number | null;
+  structureClearsAboveDeg: number | null;
+  apertureLeftDeg: number | null;
+  apertureRightDeg: number | null;
+  structureClearsLeftOfDeg: number | null;
+  structureClearsRightOfDeg: number | null;
+  /** Wall time of the one-shot sample, so its cost stays visible. */
+  sampleMs: number;
+}>;
+
+const COCKPIT_FRAMING_MINIMUM_DEPTH_M = 0.01;
+/**
+ * The camera's `fov` is the VERTICAL field of view, and three.js keeps it
+ * fixed while the aspect widens - so a viewmodel member measured against the
+ * vertical half-FOV is measured against every aspect at once. The game's
+ * preferred FOV is 76 degrees (src/legacy-main.ts PerspectiveCamera), so the
+ * top of the viewport sits 38 degrees above the sight line. Cockpit framing
+ * that tops out BELOW this ends inside the viewport with sky above it: that
+ * is the hard mid-screen cut, and it is a cut at 16:9, at 21:9 and at every
+ * aspect in between.
+ */
+export const POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG = 38;
+/** Authored inner-windscreen members of the possessed cockpit viewmodel. */
+const CHOPPER_CANOPY_FRAME_NODE_PREFIX = 'Chopper_InnerWindscreen';
+/**
+ * Angular ladder for the aperture sample. One degree out to 45 keeps the
+ * one-shot cost in single-digit milliseconds on the frame the possession
+ * camera cuts, while still covering the whole vertical half-FOV (38 deg) and
+ * enough of the horizontal one to see whether the aperture is clear.
+ */
+const COCKPIT_FRAMING_SAMPLE_STEP_DEG = 1;
+const COCKPIT_FRAMING_SAMPLE_LIMIT_DEG = 45;
+const COCKPIT_FRAMING_RAY_RANGE_M = 4;
 
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
@@ -1671,6 +1805,263 @@ function isGunnerCockpitNode(root: THREE.Object3D, node: THREE.Object3D): boolea
     cursor = cursor.parent;
   }
   return false;
+}
+
+const COCKPIT_FRAMING_CORNER_SCRATCH = new THREE.Vector3();
+
+/**
+ * Tag the authored canopy frame so the possessed view can decide about it
+ * per member. Without the batch boundary these merge into the shared
+ * `MAT_Pass65Chopper_CockpitFrame` / `CyanInstrument` batches alongside the
+ * MFD bezels and panel lamps, and no framing decision could reach the
+ * windscreen without taking the dashboard with it.
+ */
+function markChopperCanopyFrameMembers(cockpit: THREE.Object3D): void {
+  cockpit.traverse((node) => {
+    if (!node.name.startsWith(CHOPPER_CANOPY_FRAME_NODE_PREFIX)) return;
+    node.userData.chopperCanopyFrameMember = true;
+    node.userData.supportStaticBatchBoundary = true;
+  });
+}
+
+type CockpitMeshFootprint = Readonly<{
+  minAzimuthDeg: number;
+  maxAzimuthDeg: number;
+  minElevationDeg: number;
+  maxElevationDeg: number;
+  nearestDepthM: number;
+}>;
+
+/** Angular footprint of one mesh, in degrees off the view axis. */
+function cockpitMeshAngularFootprint(
+  node: THREE.Mesh,
+  cameraWorldPosition: THREE.Vector3,
+  inverseCameraQuaternion: THREE.Quaternion,
+): CockpitMeshFootprint | null {
+  const geometry = node.geometry;
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (!bounds) return null;
+  let minAzimuthDeg = Number.POSITIVE_INFINITY;
+  let maxAzimuthDeg = Number.NEGATIVE_INFINITY;
+  let minElevationDeg = Number.POSITIVE_INFINITY;
+  let maxElevationDeg = Number.NEGATIVE_INFINITY;
+  let nearestDepthM = Number.POSITIVE_INFINITY;
+  for (let corner = 0; corner < 8; corner += 1) {
+    COCKPIT_FRAMING_CORNER_SCRATCH.set(
+      (corner & 1) === 0 ? bounds.min.x : bounds.max.x,
+      (corner & 2) === 0 ? bounds.min.y : bounds.max.y,
+      (corner & 4) === 0 ? bounds.min.z : bounds.max.z,
+    ).applyMatrix4(node.matrixWorld).sub(cameraWorldPosition).applyQuaternion(inverseCameraQuaternion);
+    const depth = -COCKPIT_FRAMING_CORNER_SCRATCH.z;
+    if (!(depth > COCKPIT_FRAMING_MINIMUM_DEPTH_M)) continue;
+    const azimuthDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.x, depth));
+    const elevationDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.y, depth));
+    minAzimuthDeg = Math.min(minAzimuthDeg, azimuthDeg);
+    maxAzimuthDeg = Math.max(maxAzimuthDeg, azimuthDeg);
+    minElevationDeg = Math.min(minElevationDeg, elevationDeg);
+    maxElevationDeg = Math.max(maxElevationDeg, elevationDeg);
+    nearestDepthM = Math.min(nearestDepthM, depth);
+  }
+  if (nearestDepthM === Number.POSITIVE_INFINITY) return null;
+  return Object.freeze({
+    minAzimuthDeg, maxAzimuthDeg, minElevationDeg, maxElevationDeg, nearestDepthM,
+  });
+}
+
+/**
+ * Owner 2026-08-31: "the cockpit not stopping midscreen". Measured on the
+ * live build at 2560x1440, the authored inner windscreen drew a header bar
+ * 9-12 degrees above the sight line and two pillars crossing eye level at
+ * +/-27-30 degrees, inside a viewport that reaches 38 degrees up and 54
+ * degrees out (62 at 21:9). The frame therefore ENDED inside the picture,
+ * with open sky above the header and open world outside the pillars: a
+ * glowing chevron floating mid-screen rather than a cockpit.
+ *
+ * It cannot be fixed by moving the viewmodel. The frame sits 0.76 m from the
+ * eye and the console 0.23 m; the pull that would swing the header out past
+ * 38 degrees is about 0.4 m, which puts the whole console behind the eye. A
+ * uniform scale about the eye is a perspective no-op, so that lever does not
+ * exist either. So the rule is stated as framing and enforced per member:
+ * a canopy member may frame the view - run past the top of the viewport -
+ * or it may not be drawn at all. Nothing is allowed to stop mid-screen.
+ * Anything the rule keeps is genuinely off-screen framing at every aspect,
+ * because the vertical half-FOV does not move with the aspect ratio.
+ */
+function suppressCockpitFramingThatEndsOnScreen(
+  cockpit: THREE.Object3D,
+  cameraWorldPosition: THREE.Vector3,
+  inverseCameraQuaternion: THREE.Quaternion,
+): readonly string[] {
+  const suppressed: string[] = [];
+  cockpit.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    if (node.userData.chopperCanopyFrameMember !== true) return;
+    const footprint = cockpitMeshAngularFootprint(node, cameraWorldPosition, inverseCameraQuaternion);
+    const framesTheViewport = footprint !== null
+      && footprint.maxElevationDeg >= POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG;
+    node.userData.cockpitFramingSuppressed = !framesTheViewport;
+    if (framesTheViewport) return;
+    node.visible = false;
+    suppressed.push(node.name);
+  });
+  return Object.freeze(suppressed.sort());
+}
+const COCKPIT_FRAMING_HIT_SCRATCH: THREE.Intersection[] = [];
+
+function performanceNowMs(): number {
+  return typeof performance === 'object' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
+
+function cockpitSubtreeVisible(cockpit: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    if (cursor === cockpit) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+/**
+ * Measure the possessed cockpit as the eye sees it: every visible cockpit
+ * mesh corner is taken into camera space and reported as an angle off the
+ * view axis. Compare the result with the camera half-FOV to answer the only
+ * question the owner asked - does the cockpit end inside the viewport?
+ */
+function measureFirstPersonCockpitFraming(
+  cockpit: THREE.Object3D,
+  cameraWorldPosition: THREE.Vector3,
+  cameraWorldQuaternion: THREE.Quaternion,
+  inverseCameraQuaternion: THREE.Quaternion,
+): FirstPersonCockpitFramingTelemetry {
+  const sampleStartedAtMs = performanceNowMs();
+  const targets: THREE.Mesh[] = [];
+  let meshesBehindEye = 0;
+  let nearestDepthM = Number.POSITIVE_INFINITY;
+  let farthestDepthM = 0;
+  let leftEdgeDeg = Number.POSITIVE_INFINITY;
+  let rightEdgeDeg = Number.NEGATIVE_INFINITY;
+  let topEdgeDeg = Number.NEGATIVE_INFINITY;
+  let bottomEdgeDeg = Number.POSITIVE_INFINITY;
+  cockpit.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    // The gun viewmodel is deliberately off-centre furniture, not framing.
+    if (isGunnerWeaponViewNode(cockpit, node)) return;
+    if (!cockpitSubtreeVisible(cockpit, node)) return;
+    const geometry = node.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const bounds = geometry.boundingBox;
+    if (!bounds) return;
+    targets.push(node);
+    let anyCornerAhead = false;
+    for (let corner = 0; corner < 8; corner += 1) {
+      COCKPIT_FRAMING_CORNER_SCRATCH.set(
+        (corner & 1) === 0 ? bounds.min.x : bounds.max.x,
+        (corner & 2) === 0 ? bounds.min.y : bounds.max.y,
+        (corner & 4) === 0 ? bounds.min.z : bounds.max.z,
+      ).applyMatrix4(node.matrixWorld).sub(cameraWorldPosition).applyQuaternion(inverseCameraQuaternion);
+      const depth = -COCKPIT_FRAMING_CORNER_SCRATCH.z;
+      if (!(depth > COCKPIT_FRAMING_MINIMUM_DEPTH_M)) continue;
+      anyCornerAhead = true;
+      nearestDepthM = Math.min(nearestDepthM, depth);
+      farthestDepthM = Math.max(farthestDepthM, depth);
+      const azimuthDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.x, depth));
+      const elevationDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.y, depth));
+      leftEdgeDeg = Math.min(leftEdgeDeg, azimuthDeg);
+      rightEdgeDeg = Math.max(rightEdgeDeg, azimuthDeg);
+      topEdgeDeg = Math.max(topEdgeDeg, elevationDeg);
+      bottomEdgeDeg = Math.min(bottomEdgeDeg, elevationDeg);
+    }
+    if (!anyCornerAhead) meshesBehindEye += 1;
+  });
+  // Sample the aperture with real rays. Bounding-box corners cannot answer
+  // "does the canopy header cross the centre of the screen" - a bar spanning
+  // the view has its corners far off-axis - so walk an angular ladder out
+  // from the sight line and record where structure starts and stops.
+  const raycaster = new THREE.Raycaster();
+  raycaster.far = COCKPIT_FRAMING_RAY_RANGE_M;
+  raycaster.near = 0;
+  const direction = new THREE.Vector3();
+  const hitDistanceAt = (azimuthDeg: number, elevationDeg: number): number | null => {
+    if (targets.length === 0) return null;
+    const azimuth = THREE.MathUtils.degToRad(azimuthDeg);
+    const elevation = THREE.MathUtils.degToRad(elevationDeg);
+    direction.set(
+      Math.sin(azimuth) * Math.cos(elevation),
+      Math.sin(elevation),
+      -Math.cos(azimuth) * Math.cos(elevation),
+    ).applyQuaternion(cameraWorldQuaternion).normalize();
+    raycaster.set(cameraWorldPosition, direction);
+    // Presentation meshes deliberately null their own `raycast` (shared-asset
+    // and static-batch policy), so `intersectObjects` reports nothing. Call
+    // the prototype directly: this is a measurement, not a gameplay pick.
+    let nearest: number | null = null;
+    for (const target of targets) {
+      COCKPIT_FRAMING_HIT_SCRATCH.length = 0;
+      THREE.Mesh.prototype.raycast.call(target, raycaster, COCKPIT_FRAMING_HIT_SCRATCH);
+      for (const hit of COCKPIT_FRAMING_HIT_SCRATCH) {
+        if (nearest === null || hit.distance < nearest) nearest = hit.distance;
+      }
+    }
+    return nearest;
+  };
+  const hitsAt = (azimuthDeg: number, elevationDeg: number): boolean => (
+    hitDistanceAt(azimuthDeg, elevationDeg) !== null
+  );
+
+  const ladder = (
+    axis: 'elevation' | 'azimuth',
+    sign: 1 | -1,
+  ): Readonly<{ firstHitDeg: number | null; clearsBeyondDeg: number | null }> => {
+    let firstHitDeg: number | null = null;
+    let lastHitDeg: number | null = null;
+    for (
+      let offset = COCKPIT_FRAMING_SAMPLE_STEP_DEG;
+      offset <= COCKPIT_FRAMING_SAMPLE_LIMIT_DEG;
+      offset += COCKPIT_FRAMING_SAMPLE_STEP_DEG
+    ) {
+      const angle = sign * offset;
+      const hit = axis === 'elevation' ? hitsAt(0, angle) : hitsAt(angle, 0);
+      if (!hit) continue;
+      if (firstHitDeg === null) firstHitDeg = angle;
+      lastHitDeg = angle;
+    }
+    return Object.freeze({
+      firstHitDeg,
+      // Null means structure reaches the sample limit: it never runs out
+      // inside any plausible frustum, which is the framed state we want.
+      clearsBeyondDeg: lastHitDeg === null
+        || Math.abs(lastHitDeg) >= COCKPIT_FRAMING_SAMPLE_LIMIT_DEG - COCKPIT_FRAMING_SAMPLE_STEP_DEG
+        ? null
+        : lastHitDeg,
+    });
+  };
+  const above = ladder('elevation', 1);
+  const left = ladder('azimuth', -1);
+  const right = ladder('azimuth', 1);
+  const finite = (value: number | null): number | null => (
+    value !== null && Number.isFinite(value) ? Number(value.toFixed(3)) : null
+  );
+  return Object.freeze({
+    measuredMeshes: targets.length,
+    meshesBehindEye,
+    nearestDepthM: finite(nearestDepthM),
+    farthestDepthM: farthestDepthM === 0 ? null : finite(farthestDepthM),
+    leftEdgeDeg: finite(leftEdgeDeg),
+    rightEdgeDeg: finite(rightEdgeDeg),
+    topEdgeDeg: finite(topEdgeDeg),
+    bottomEdgeDeg: finite(bottomEdgeDeg),
+    apertureTopDeg: finite(above.firstHitDeg),
+    structureClearsAboveDeg: finite(above.clearsBeyondDeg),
+    apertureLeftDeg: finite(left.firstHitDeg),
+    apertureRightDeg: finite(right.firstHitDeg),
+    structureClearsLeftOfDeg: finite(left.clearsBeyondDeg),
+    structureClearsRightOfDeg: finite(right.clearsBeyondDeg),
+    sampleMs: Number((performanceNowMs() - sampleStartedAtMs).toFixed(2)),
+  });
 }
 
 function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
@@ -1890,7 +2281,8 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
       // centre. Retire the GLB combiner-glass/reticle subtree during
       // possession while retaining the off-centre gun receiver and authored
       // lower cockpit; two overlapping HUD lanes created the opaque block.
-      node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource;
+      node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource
+        && node.userData.cockpitFramingSuppressed !== true;
       if (gunnerCockpitNode) {
         // The complete cockpit is a first-person viewmodel. Keep optional
         // effects layers, but remove the ordinary world layer so both renderer
@@ -1904,6 +2296,9 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
         node.layers.mask = node.userData.supportBaseLayerMask;
       }
       node.userData.supportFirstPersonOverrideActive = false;
+      // The framing decision is per possession: re-derive it on the next one
+      // rather than carrying a stale suppression across entities.
+      node.userData.cockpitFramingSuppressed = false;
     } else if (firstPersonOnlyNode) {
       node.visible = false;
     }
@@ -2100,6 +2495,11 @@ function buildProceduralChopperFallback(): PresentedEntity {
   cockpitRailRight.name = 'chopper-cockpit-rail-right';
   cockpitRailRight.position.x = 0.47;
   cockpitRailRight.rotation.z = 0.18;
+  // Same framing contract as the authored inner windscreen: these rails may
+  // run past the top of the viewport or they are not drawn in the possessed
+  // view. See suppressCockpitFramingThatEndsOnScreen.
+  cockpitRailLeft.userData.chopperCanopyFrameMember = true;
+  cockpitRailRight.userData.chopperCanopyFrameMember = true;
   const displayMaterial = (colour: number) => new THREE.MeshStandardMaterial({
     color: colour,
     emissive: colour,
@@ -2571,6 +2971,7 @@ export class KillstreakPresentation {
   private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
   private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
   private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitInverseCameraQuaternionScratch = new THREE.Quaternion();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -3774,6 +4175,12 @@ export class KillstreakPresentation {
     cockpit.position.copy(desiredParentPosition).sub(pivotOffset);
     cockpit.updateMatrixWorld(true);
     if (this.firstPersonCockpitAlignment) return;
+    const framingSuppressedMembers = suppressCockpitFramingThatEndsOnScreen(
+      cockpit,
+      cameraWorldPosition,
+      this.firstPersonCockpitInverseCameraQuaternionScratch.copy(cameraWorldQuaternion).invert(),
+    );
+    cockpit.updateMatrixWorld(true);
     // Telemetry measures against the LIFTED target so the deliberate view
     // lift never reads as pivot error.
     const liftedCameraWorldPosition = cameraWorldPosition.clone()
@@ -3799,6 +4206,13 @@ export class KillstreakPresentation {
       dashboardCameraSpacePosition: cameraSpacePosition('chopper-cockpit-dashboard-3d'),
       hudCameraSpacePosition: cameraSpacePosition('chopper-cockpit-hud-glass'),
       weaponCameraSpacePosition: cameraSpacePosition('chopper-gunner-weapon-view'),
+      framingSuppressedMembers,
+      framing: measureFirstPersonCockpitFraming(
+        cockpit,
+        cameraWorldPosition,
+        cameraWorldQuaternion,
+        inverseCameraQuaternion,
+      ),
     });
   }
 

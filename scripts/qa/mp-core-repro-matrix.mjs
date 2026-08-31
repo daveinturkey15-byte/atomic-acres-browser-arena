@@ -41,6 +41,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -110,8 +111,8 @@ const peerProcess = await ensurePeerServer();
 // CDP focus emulation so an unfocused window cannot read like a wedged arena
 // (the verify-arena-boot-cdp.mjs lesson).
 const CHROME_ARGS = [
-  '--mute-audio',
-  '--use-angle=d3d11',
+  ...OFFSCREEN_ARGS,
+    '--use-angle=d3d11',
   '--enable-unsafe-webgpu',
   '--ignore-gpu-blocklist',
   '--disable-background-timer-throttling',

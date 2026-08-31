@@ -769,7 +769,7 @@ export function authoredNearPlaneContactRetreat(weapon: WeaponId, surfaceRetreat
 // single physical limit rather than a per-weapon guess.
 // ---------------------------------------------------------------------------
 
-export const VIEWMODEL_CONTACT_FOLD_CONTRACT = 'measured-viewmodel-contact-fold-v1';
+export const VIEWMODEL_CONTACT_FOLD_CONTRACT = 'measured-viewmodel-contact-fold-v2';
 /** Hard ceiling on total high-ready pitch. Beyond this the rig reads inside-out. */
 export const VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS = 1.5;
 /** Extra shrink at full fold, on top of the authored contact response scale. */
@@ -778,6 +778,66 @@ export const VIEWMODEL_CONTACT_FOLD_MINIMUM_SCALE = 0.72;
 export const VIEWMODEL_CONTACT_FOLD_MARGIN_METERS = 0.06;
 /** Bisection steps. The solve is nine transformed points per step. */
 const CONTACT_FOLD_SOLVE_STEPS = 14;
+/** Samples of the fold family walked when no fold can close the gap. */
+const CONTACT_FOLD_MINIMISER_SAMPLES = 32;
+
+/**
+ * THE CUT.
+ *
+ * Measured on 2026-08-31, and this is the honest finding of this pass: at the
+ * owner's failing distance the rig physically cannot fold far enough.
+ *
+ * The forward-most point the renderer can achieve is bounded from below by
+ *
+ *     forwardExtent >= nearPlane + depth(fold)
+ *
+ * because the rearmost point must stay in front of the near plane. With the
+ * eye 0.40 m off a wall the budget is 0.34 m of extent against a 0.11 m near
+ * plane, so the complete rig - weapon AND arms - would have to be no more than
+ * 0.23 m deep along the view axis. The measured chain is not: at full fold the
+ * shoulder entry alone sits 0.69 m from the eye and the sleeve reaches 0.86 m,
+ * and no pitch fixes that, because pitching about the root swings the arms'
+ * low-hanging geometry FORWARD (measured: the offending vertex is skinned to
+ * UpperArmR). More fold makes the arms worse, not better.
+ *
+ * So the fold does everything it can, and what still cannot move is CUT at the
+ * contacting surface instead of painted over it. The viewmodel draws on a
+ * depth-cleared overlay, which is exactly why geometry past the wall is
+ * visible in the first place; a clean cut at the wall plane is what the wall
+ * would have done if the overlay were not there.
+ *
+ * An arms TUCK was built and then removed on the evidence. Pulling the
+ * shoulder entry in along its own projection ray does shorten the chain's
+ * depth (measured: sleeve reach 0.86 m to 0.70 m), but it also drags the
+ * sleeve toward the lens, and the 2560x1440 frame showed a mint sleeve filling
+ * the lower third of the screen - visibly worse than the clipping it was meant
+ * to spare. It is not needed either: the shoulder entry is placed BELOW the
+ * frame by contract, so cutting the shoulder end of the chain costs nothing on
+ * screen. The cut is the whole fallback.
+ *
+ * The plane lives on the viewmodel root, which is marked as a clipping group.
+ * `ClippingGroup` is only exported from `three/webgpu`, so the flag set is
+ * duck-typed here rather than importing a second three entry point into a
+ * module that also runs headless. WebGPURenderer reads exactly these fields
+ * (`Renderer.js`: `object.isClippingGroup && object.enabled`).
+ */
+export const VIEWMODEL_CONTACT_CLIP_CONTRACT = 'viewmodel-contact-surface-clip-v1';
+/**
+ * The cut sits this far CAMERA-SIDE of the measured surface. The surface is
+ * sampled by a padded lattice whose reported distance is conservative to the
+ * millimetre, not to the centimetre, and a cut exactly on the plane z-fights
+ * the wall it is cutting against.
+ */
+export const VIEWMODEL_CONTACT_CLIP_MARGIN_METERS = 0.02;
+
+/** The viewmodel root, with the WebGPU clipping-group fields it publishes. */
+type ViewmodelClippingRoot = THREE.Group & {
+  isClippingGroup: boolean;
+  enabled: boolean;
+  clipIntersection: boolean;
+  clipShadows: boolean;
+  clippingPlanes: THREE.Plane[];
+};
 
 /** The rig's own bounds, in the viewmodel root's LOCAL frame. Measured, never authored. */
 export type ViewmodelRigBounds = Readonly<{
@@ -839,10 +899,21 @@ export type ViewmodelContactFold = Readonly<{
   nearPlaneLimitZ: number;
   /** Forward-most rig point after the solve, metres from the eye. */
   forwardReachMeters: number;
-  /** Muzzle after the solve, metres from the eye. */
+  /** Muzzle after the solve, metres from the eye. Telemetry, not the grade. */
   muzzleForwardMeters: number;
-  /** Metres of rig still past the surface. Zero is the acceptance condition. */
+  /**
+   * Metres of VISIBLE rig still past the surface once the fold has spent
+   * everything it has. Zero is the acceptance condition, and it is measured on
+   * `forwardReachMeters` - the silhouette - not on the muzzle socket.
+   */
   residualMeters: number;
+  /**
+   * Camera-forward metres at which the rig is CUT, or null when nothing is in
+   * contact. See `VIEWMODEL_CONTACT_CLIP_CONTRACT`: the fold cannot always
+   * close the gap, and what it cannot move is cut at the surface rather than
+   * painted over it.
+   */
+  clipPlaneDistanceMeters: number | null;
 }>;
 
 /**
@@ -860,6 +931,7 @@ const rigBoundsToRoot = new THREE.Matrix4();
 const rigBoundsMatrix = new THREE.Matrix4();
 const rigBoundsAccumulator = new THREE.Box3();
 const rigBoundsMesh = new THREE.Box3();
+const rigBoundsVertex = new THREE.Vector3();
 
 const CONTACT_FOLD_CLEAR: ViewmodelContactFold = Object.freeze({
   contract: VIEWMODEL_CONTACT_FOLD_CONTRACT,
@@ -871,6 +943,7 @@ const CONTACT_FOLD_CLEAR: ViewmodelContactFold = Object.freeze({
   forwardReachMeters: 0,
   muzzleForwardMeters: 0,
   residualMeters: 0,
+  clipPlaneDistanceMeters: null,
 });
 
 /**
@@ -886,17 +959,19 @@ function pitchedLocalZ(y: number, z: number, pitch: number, scale: number): numb
 
 /**
  * Depth span of the rig once pitched, in camera-space metres relative to the
- * root: `muzzle` is the barrel exit, `back` the rearmost bound corner (the
- * near-plane constraint), `front` the forward-most bound corner.
+ * root: `muzzle` is the barrel exit, `back` the rearmost hull point (the
+ * near-plane constraint), `front` the forward-most hull point.
  *
- * `front` is deliberately NOT the fold's target. The rig's bounds are an
- * axis-aligned box around a long thin object, so once the box is pitched its
- * bottom-front corner juts up to ~28 cm further forward than any real
- * geometry; targeting it demands an extreme fold that buys nothing on screen.
- * Measured on the mounted models, the muzzle IS the forward-most real point
- * (carbine bound reach 1.970 m against a muzzle at 1.958 m), so the muzzle -
- * which is also the owner-facing acceptance metric - is what the fold closes,
- * and `front` rides along as telemetry.
+ * `front` IS the fold's target, and correcting that is the point of this pass.
+ *
+ * The previous revision targeted `muzzle` on the grounds that a pitched
+ * axis-aligned box juts ~28 cm past any real geometry. That reasoning applied
+ * to a whole-rig AABB and stopped applying the moment `hullYZ` became a hull
+ * of real VERTICES: measured in installed Chrome on 2026-08-31, the carbine's
+ * furthest-forward vertex is its magazine, not its muzzle, and it finished
+ * 0.572 m from the eye against a surface at 0.400 m while the muzzle sat
+ * correctly at 0.351 m. The muzzle socket is one authored point; it is not the
+ * silhouette, and grading on it is how this shipped twice.
  */
 function rigDepthSpan(
   bounds: ViewmodelRigBounds,
@@ -964,7 +1039,11 @@ export function solveViewmodelContactFold(input: {
     // surface. Retreat as far as contact demands, never past the near plane,
     // and never forward of where the authored response already sits.
     const nearPlaneLimitZ = -input.nearPlaneMeters - span.back;
-    const demandedZ = -target - span.muzzle;
+    // THE CORRECTED TARGET. `span.front` is the forward-most VERTEX of every
+    // visible weapon mesh - magazine, stock, optic, muzzle device - not the
+    // authored muzzle socket. On the carbine those differ by 0.22 m, and that
+    // difference is exactly what the owner still saw through the wall.
+    const demandedZ = -target - span.front;
     // Retreat only as far as the geometry needs, never past the near plane,
     // and never past what the authored response already asked for. Folding is
     // preferred over retreating on purpose: retreat drags the arms toward the
@@ -975,6 +1054,7 @@ export function solveViewmodelContactFold(input: {
       : Math.min(nearPlaneLimitZ, input.authoredRootZ);
     const rootZ = Math.min(rootZCeiling, Math.max(input.baseRootZ, demandedZ));
     const muzzleForward = -(rootZ + span.muzzle);
+    const forwardReach = -(rootZ + span.front);
     return Object.freeze({
       contract: VIEWMODEL_CONTACT_FOLD_CONTRACT,
       // True for every result the solve actually produced. The renderer uses
@@ -986,9 +1066,17 @@ export function solveViewmodelContactFold(input: {
       foldPitchRadians: pitch - input.basePitchRadians,
       scale: scaleFactor,
       nearPlaneLimitZ,
-      forwardReachMeters: -(rootZ + span.front),
+      forwardReachMeters: forwardReach,
       muzzleForwardMeters: muzzleForward,
-      residualMeters: Math.max(0, muzzleForward - target),
+      // Graded on the SILHOUETTE, not on the socket.
+      residualMeters: Math.max(0, forwardReach - target),
+      // Everything past the contacting surface is inside it. The viewmodel
+      // draws on a depth-cleared overlay, so that geometry is not occluded by
+      // the wall - it is painted over it, which is what "the gun is clipping
+      // through the wall" looks like. When the fold cannot close the gap the
+      // renderer cuts the rig at the surface instead; see
+      // `contactClipPlaneDistanceMeters`.
+      clipPlaneDistanceMeters: depth,
     });
   };
 
@@ -1005,10 +1093,28 @@ export function solveViewmodelContactFold(input: {
   };
   // Stage one: close it with the fold, spending no more retreat than the
   // authored response already asked for. Stage two, only if that cannot close
-  // it: spend retreat up to the near plane as well. Even then a 2 m rig
-  // against a surface 0.40 m away may not close completely, so publish the
-  // residual rather than pretending - `residualMeters` is what the gate reads.
-  return bisect(false) ?? bisect(true) ?? evaluate(1, true);
+  // it: spend retreat up to the near plane as well.
+  const closed = bisect(false) ?? bisect(true);
+  if (closed) return closed;
+  // Stage three: it does not close, and no parameter in this design can make
+  // it. The forward-most point is bounded from below by
+  //
+  //     forwardReach >= nearPlane + (back(fold) - front(fold))
+  //
+  // because the rearmost point may not cross the near plane, and at the
+  // owner's 0.40 m that leaves 0.23 m of depth for a rig measured far deeper
+  // than that. So SEARCH for the least-bad fold instead of assuming the
+  // hardest one is it: maximum pitch minimises a long barrel's reach but not
+  // necessarily the whole hull's DEPTH, and depth is what is binding here.
+  // Measured on the carbine this recovers a few centimetres over evaluate(1),
+  // and it makes the result the minimum of the family rather than an endpoint,
+  // which is a property a gate can actually assert.
+  let best = evaluate(1, true);
+  for (let step = 0; step <= CONTACT_FOLD_MINIMISER_SAMPLES; step += 1) {
+    const candidate = evaluate(step / CONTACT_FOLD_MINIMISER_SAMPLES, true);
+    if (candidate.forwardReachMeters < best.forwardReachMeters - 1e-9) best = candidate;
+  }
+  return best;
 }
 
 /**
@@ -1619,6 +1725,17 @@ export class WeaponPresentation {
     'railgun',
   ]);
   readonly root = new THREE.Group();
+  /**
+   * The single camera-facing plane that cuts the rig at the contacting
+   * surface. Retained and mutated in place: a new Plane each frame would
+   * change the clipping context's cache key and recompile pipelines.
+   */
+  private readonly contactClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), Number.POSITIVE_INFINITY);
+  private readonly contactClipScratch = {
+    eye: new THREE.Vector3(),
+    forward: new THREE.Vector3(),
+    point: new THREE.Vector3(),
+  };
 
   private enforceNearPlaneClearance(activeModel: THREE.Object3D | undefined, arms: THREE.Object3D | undefined): void {
     const cameraNear = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0.08;
@@ -1878,6 +1995,16 @@ export class WeaponPresentation {
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
+    // The contact cut, declared once. `enabled` is false until the rig is
+    // genuinely in contact, so open ground renders through exactly the code
+    // path it always did - no plane, no clipping context, no cache-key change.
+    const clippingRoot = this.root as ViewmodelClippingRoot;
+    clippingRoot.isClippingGroup = true;
+    clippingRoot.enabled = false;
+    clippingRoot.clipIntersection = false;
+    clippingRoot.clipShadows = false;
+    clippingRoot.clippingPlanes = [this.contactClipPlane];
+    this.root.userData.viewmodelContactClipContract = VIEWMODEL_CONTACT_CLIP_CONTRACT;
     camera.add(this.root);
     this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, 3.2, 2);
     this.viewmodelFill.name = 'first-person-viewmodel-fill';
@@ -3277,6 +3404,36 @@ export class WeaponPresentation {
   }
 
   /**
+   * Places the contact cut and the arms tuck for this frame.
+   *
+   * Both are driven by ONE measured number - the distance to the contacting
+   * surface the fold already solved against - so they cannot disagree with the
+   * fold or with each other, and both are inert when nothing is in contact.
+   */
+  private applyViewmodelContactClip(): void {
+    const clippingRoot = this.root as ViewmodelClippingRoot;
+    const surfaceMeters = this.contactFold.clipPlaneDistanceMeters;
+    if (surfaceMeters === null || !Number.isFinite(surfaceMeters)) {
+      clippingRoot.enabled = false;
+      return;
+    }
+    const nearPlane = viewmodelCameraNearMeters(this.camera);
+    const cutMeters = Math.max(
+      nearPlane + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+      surfaceMeters - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS,
+    );
+    this.camera.updateWorldMatrix(true, false);
+    const scratch = this.contactClipScratch;
+    const eye = this.camera.getWorldPosition(scratch.eye);
+    const forward = this.camera.getWorldDirection(scratch.forward);
+    const point = scratch.point.copy(eye).addScaledVector(forward, cutMeters);
+    // Normal points back at the camera: the kept half-space is camera-side.
+    this.contactClipPlane.normal.copy(forward).multiplyScalar(-1);
+    this.contactClipPlane.constant = -this.contactClipPlane.normal.dot(point);
+    clippingRoot.enabled = true;
+  }
+
+  /**
    * The mounted weapon's own bounds, in the viewmodel root's LOCAL frame.
    *
    * Measured once per weapon off the real mesh, then cached: geometry does not
@@ -3307,15 +3464,31 @@ export class WeaponPresentation {
       if (!geometry) return;
       if (!geometry.boundingBox) geometry.computeBoundingBox();
       if (!geometry.boundingBox) return;
-      rigBoundsMesh.copy(geometry.boundingBox)
-        .applyMatrix4(rigBoundsMatrix.multiplyMatrices(toRoot, node.matrixWorld));
+      rigBoundsMatrix.multiplyMatrices(toRoot, node.matrixWorld);
+      rigBoundsMesh.copy(geometry.boundingBox).applyMatrix4(rigBoundsMatrix);
       bounds.union(rigBoundsMesh);
-      hullPoints.push(
-        [rigBoundsMesh.min.y, rigBoundsMesh.min.z],
-        [rigBoundsMesh.min.y, rigBoundsMesh.max.z],
-        [rigBoundsMesh.max.y, rigBoundsMesh.min.z],
-        [rigBoundsMesh.max.y, rigBoundsMesh.max.z],
-      );
+      // REAL VERTICES, not the eight corners of a box around them.
+      //
+      // The corners were the last authored-ish guess left in this path and
+      // they are measurably wrong in both directions: on the flamethrower the
+      // box corner sits 8.4 cm in front of any vertex (the fold would spend
+      // travel it does not need), and on a pitched mesh the corner can also
+      // fall SHORT. The hull is walked once per weapon and cached, so the cost
+      // is a few thousand transforms at first mount and nothing per frame.
+      const position = geometry.getAttribute('position');
+      if (position) {
+        for (let index = 0; index < position.count; index += 1) {
+          rigBoundsVertex.fromBufferAttribute(position, index).applyMatrix4(rigBoundsMatrix);
+          hullPoints.push([rigBoundsVertex.y, rigBoundsVertex.z]);
+        }
+      } else {
+        hullPoints.push(
+          [rigBoundsMesh.min.y, rigBoundsMesh.min.z],
+          [rigBoundsMesh.min.y, rigBoundsMesh.max.z],
+          [rigBoundsMesh.max.y, rigBoundsMesh.min.z],
+          [rigBoundsMesh.max.y, rigBoundsMesh.max.z],
+        );
+      }
       meshes += 1;
     });
     if (meshes === 0 || !Number.isFinite(bounds.min.z) || !Number.isFinite(bounds.max.z)) return null;
@@ -5497,6 +5670,7 @@ export class WeaponPresentation {
       baseScale: this.unsuppressedViewmodelScale(),
       nearPlaneMeters: viewmodelCameraNearMeters(this.camera) + VIEWMODEL_NEAR_PLANE_CLEARANCE,
     });
+    this.applyViewmodelContactClip();
     // Unmeasured rigs (headless, a model still loading, a weapon with no mesh)
     // keep the historical clamp exactly: this change only moves poses the
     // renderer can actually measure.

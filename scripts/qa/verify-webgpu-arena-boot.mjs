@@ -173,7 +173,12 @@ const report = await new Promise((resolveReport) => {
     }, 3_000);
     focusTimer = keepFocus;
   } else {
-    spawn(executable, [`--user-data-dir=${profile}`, '--no-first-run', '--new-window', url.toString()], { stdio: 'ignore' });
+    // DECLARED VISIBLE LANE, muted. This run reports fps from the real
+    // compositor and wins the foreground on purpose just below, because the
+    // renderer refuses to author frames without document focus. Parking it
+    // off-screen would not hide the measurement, it would break it.
+    // See scripts/qa/browser-visibility-contract.test.mjs.
+    spawn(executable, [`--user-data-dir=${profile}`, '--mute-audio', '--no-first-run', '--new-window', url.toString()], { stdio: 'ignore' });
   }
 
   if (BROWSER !== 'firefox') {

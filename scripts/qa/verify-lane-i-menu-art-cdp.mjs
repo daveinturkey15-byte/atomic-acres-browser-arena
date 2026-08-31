@@ -4,6 +4,7 @@
 // scripts/qa/verify-arena-boot-cdp.mjs (focus emulation, anti-throttle flags).
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -18,9 +19,9 @@ const DEPLOY = argv.includes('--deploy');
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', 
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',

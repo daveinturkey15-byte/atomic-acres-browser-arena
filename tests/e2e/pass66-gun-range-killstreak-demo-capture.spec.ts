@@ -30,6 +30,7 @@ import {
   killstreakDemoSourceClosureSha256,
 } from '../../scripts/qa/pass66-killstreak-demo-source-closure';
 import { probeH264Mp4 } from '../../scripts/qa/pass66-killstreak-demo-video-probe';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const repositoryRoot = process.cwd();
 const artifactRoot = resolve(repositoryRoot, 'artifacts/pass66/killstreak-demo-capture');
@@ -936,8 +937,8 @@ test('records one unique real-bay video after every canonical support passes F a
     headless: !headed,
     executablePath,
     args: [
-      '--mute-audio',
-      '--enable-gpu',
+      ...OFFSCREEN_ARGS,
+    '--enable-gpu',
       '--use-angle=d3d11',
       '--ignore-gpu-blocklist',
       '--disable-software-rasterizer',

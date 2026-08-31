@@ -45,6 +45,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -343,8 +344,8 @@ mkdirSync(resolve(SHOT_DIR), { recursive: true });
 const launchBrowser = () => chromium.launch({
     headless: false,
     channel: 'chrome',
-    args: ['--mute-audio', 
-      '--use-angle=d3d11',
+    args: [...OFFSCREEN_ARGS,
+    '--use-angle=d3d11',
       '--enable-unsafe-webgpu',
       '--ignore-gpu-blocklist',
       '--disable-background-timer-throttling',

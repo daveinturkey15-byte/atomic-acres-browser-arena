@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const renderMode = process.env.QA_RENDER_MODE ?? 'compat';
@@ -7,8 +8,8 @@ const connectionTimeoutMs = blenderRenderModes.includes(renderMode) ? 45_000 : 3
 const interactionTimeoutMs = process.env.QA_HEADED === '1' ? 30_000 : blenderRenderModes.includes(renderMode) ? 45_000 : renderMode === 'performance' ? 20_000 : 10_000;
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
 const chromiumArgs = [
-  '--mute-audio',
-  '--disable-background-timer-throttling',
+  ...OFFSCREEN_ARGS,
+    '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding',
   '--disable-backgrounding-occluded-windows',
   '--allow-loopback-in-peer-connection',

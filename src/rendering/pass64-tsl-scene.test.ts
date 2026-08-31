@@ -11,6 +11,7 @@ import {
 import { canonicalTslDescriptor, tslDescriptorSha256, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
 import { SCREEN_SPACE_POST_DISABLED } from './screen-space-post-profile';
 import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } from '../water-system';
+import { arenaEnvironmentScale } from '../graphics-refinement';
 
 describe('Pass 64 authored TSL pipeline set', () => {
   it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
@@ -364,6 +365,30 @@ describe('Pass 64 authored TSL pipeline set', () => {
       // construction so the zero state is provable rather than inferred from
       // an absent field - the same rule the screen-space block above follows.
       exactScenePassPrecompile: { durationMs: 0, runs: 0 },
+      // The live scene.environment receipt, published from construction for the
+      // same reason as the two blocks above: this test constructs WITHOUT a
+      // renderer, so there is no PMREM and the honest published state is
+      // `present: false` next to the intensity the arena SHOULD carry. That
+      // gap is exactly what shipped unnoticed on the first arena of every real
+      // session until 2026-08-31, and it is now a published number rather than
+      // an absent field nobody could probe.
+      arenaEnvironment: {
+        arenaId: 'rustworks-1v1',
+        reflectionQuality: 'high',
+        present: false,
+        environmentName: null,
+        environmentIntensity: 1,
+        expectedEnvironmentIntensity: arenaEnvironmentScale('rustworks-1v1'),
+        matchesIblState: false,
+        sourceTextureName: null,
+        // The tier the setting REQUESTED, next to the size the generator
+        // produced. Zero here because no renderer means no PMREM; in the live
+        // game they are published side by side because the WebGPU equirect
+        // path derives its cube size from the panorama and does not honour the
+        // requested tier - a gap that is now visible rather than implied.
+        resolutionTier: 128,
+        generatedCubeSize: 0,
+      },
       linearSourceStages: [
         'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
       ],

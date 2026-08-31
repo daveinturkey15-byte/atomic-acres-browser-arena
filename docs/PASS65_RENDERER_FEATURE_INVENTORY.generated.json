@@ -222,7 +222,7 @@
         {
           "path": "src/graphics-refinement.ts",
           "symbol": "effectivePbrRoughness",
-          "telemetryPath": "render.graphicsRefinement.reflectionScale"
+          "telemetryPath": "render.atomicSignal.advancedGraphics.arenaEnvironment.resolutionTier (requested) vs .generatedCubeSize (produced) + render.graphicsRefinement.reflectionScale"
         }
       ]
     },
@@ -234,8 +234,9 @@
       "runtimeEvidence": [
         {
           "path": "src/rendering/arena-environment-ibl.ts",
-          "symbol": "scene.environmentIntensity",
-          "telemetryPath": "settings.graphics.environmentIntensity + scene.environmentIntensity product"
+          "symbol": "assertArenaEnvironmentLive",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.arenaEnvironment.environmentIntensity vs .expectedEnvironmentIntensity",
+          "liveObservation": "assertArenaEnvironmentLive (src/rendering/arena-environment-ibl.ts) - observed scene.environmentIntensity === budget x arenaEnvironmentScale x reflectionScale on every arena commit"
         }
       ]
     },

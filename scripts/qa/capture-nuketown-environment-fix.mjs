@@ -28,6 +28,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { resolve } from 'node:path';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -76,10 +77,10 @@ const OWNED_ROOTS = [
 ];
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
   args: [
-    '--mute-audio',
+    ...SILENT_ARGS,
     // Uncapped presentation: with vsync on, every pacing sample reads 16.7 ms
     // and the frame-cost question cannot be answered at all.
     '--disable-gpu-vsync',

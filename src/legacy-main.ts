@@ -965,6 +965,11 @@ import {
   quantizePass73AdsRevealReadback,
 } from './pass73-ads-reveal-readback';
 import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
+// The first-arena environment gate. It reads scene.environment/
+// scene.environmentIntensity off the live scene rather than proving the code
+// exists, which is the difference between this and the evidence row that let
+// the null-environment defect hide behind nine passing unit tests.
+import { assertArenaEnvironmentLive } from './rendering/arena-environment-ibl';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -3994,7 +3999,13 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // definition is applied; the arena-bound catalog prewarm below proves the
     // same retained model identities before any viewmodel is visible.
     weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
-    if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
+    // AWAITED. `applyDefinition` is async - it regenerates the arena's PMREM
+    // environment - and firing it as a floating promise meant the commit could
+    // resolve before the environment landed (measured at t=20862 ms on a
+    // map switch, after the selection promise had already settled) and meant a
+    // rejection would surface as an unhandled rejection rather than a failed
+    // map commit.
+    if (pass64TslSystems) await pass64TslSystems.applyDefinition(module.definition);
     else {
       const tslGraphicsOptions = {
         principalSamples: (graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1) as 1 | 2 | 4,
@@ -4045,6 +4056,23 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // submission. Otherwise an async panorama decode can replace the background
     // after prewarm and leave its first GPU upload/binding in live gameplay.
     await waitForSkyBackdropAdmission(scene);
+    // THE FIRST ARENA'S ENVIRONMENT. Every arena reaches this line; only one of
+    // them reached `applyDefinition`, because the first arena of a page load is
+    // the one that CONSTRUCTS pass64TslSystems and therefore takes the `else`
+    // branch above. That is why `scene.environment` was null for the whole of
+    // map 1 of every session and non-null from map 2 onward - the same build
+    // lighting the map every player actually plays differently from the one
+    // they switch to (docs/IBL_FIRST_ARENA_BUG_2026-08-31.md).
+    //
+    // It also has to be HERE rather than beside the construction: the three
+    // arenas with generated skies mount a procedural gradient synchronously and
+    // swap in the real equirect .webp when it decodes. Convolving before the
+    // admission would pin every one of them to the placeholder sky.
+    await pass64TslSystems.applyArenaEnvironment();
+    // Fails closed on the exact defect above, on the real scene, on every
+    // commit. It would have failed on the first arena before this change, which
+    // is the point of landing it with the fix rather than after it.
+    assertArenaEnvironmentLive(pass64TslSystems.observeArenaEnvironment());
   }
   activeArenaReviewCameraId = null;
   activeArenaReviewFixedTimeMs = null;

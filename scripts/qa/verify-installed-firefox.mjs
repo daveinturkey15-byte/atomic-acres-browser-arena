@@ -18,6 +18,7 @@ import {
   hardwareAdapterVendor,
   nextOuterRectForContentViewport,
 } from './pass66-owned-browser-verifier-contract.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const root = path.resolve(process.cwd());
 const baseUrl = process.env.QA_BASE_URL ?? process.env.BASE_URL ?? '';
@@ -530,7 +531,8 @@ async function runChromeParityCycles(seed) {
   const browser = await chromium.launch({
     executablePath: chromeExecutable,
     headless: parityHeadless,
-    args: ['--mute-audio', '--enable-unsafe-webgpu'],
+    args: [...OFFSCREEN_ARGS,
+    '--enable-unsafe-webgpu'],
   });
   try {
     const context = await browser.newContext({
