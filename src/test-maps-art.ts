@@ -924,9 +924,16 @@ function clearancePredicate(
 /** No planting of this kind anywhere. Keeps the per-kind band table total. */
 const NO_BAND: readonly KeepOut[] = Object.freeze([]);
 
-/** Mirror a keep-out rect through the origin (the Test2 fairness involution). */
-function rotated(rect: KeepOut): KeepOut {
-  return [-rect[1], -rect[0], -rect[3], -rect[2]] as const;
+/**
+ * Mirror a keep-out rect across x = 0 - the Test2 fairness involution as of the
+ * 2026-08-31 rebuild (it used to be the 180-degree rotation; see the involution
+ * note at the top of src/test-maps.ts for why the evidence moved it). Kept
+ * beside its Test1 counterpart because it is the canonical way to author a
+ * paired keep-out on this map, and the next inside-the-boundary planting pass
+ * will need it.
+ */
+export function mirroredX(rect: KeepOut): KeepOut {
+  return [-rect[1], -rect[0], rect[2], rect[3]] as const;
 }
 
 /** Mirror a keep-out rect across z = 0 (the Test1 fairness involution). */
@@ -1193,92 +1200,47 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
 
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd9dee2, roughness: 0.16, metalness: 0.85 });
   const canvasCream = new THREE.MeshStandardMaterial({ color: 0xefe6d2, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
-  // Cool river gravel on the motor court, for the same reason as `stone`: it is
-  // the shaded half, lit by the 0x8fb2d8 fill, that separates it from the warm
+  // Cool river gravel on the drive, for the same reason as `stone`: it is the
+  // shaded half, lit by the 0x8fb2d8 fill, that separates it from the warm
   // travertine it abuts.
   const gravel = new THREE.MeshStandardMaterial({ color: 0x8f96a4, roughness: 1, metalness: 0 });
   const courtLine = new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.7, metalness: 0 });
   const glassBlue = new THREE.MeshStandardMaterial({ color: 0x9fc8d8, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.35 });
 
-  // The dry hillside the estate is cut into. The terrace slabs stop 1.5 m
-  // outside the estate wall; without this the ground simply ended there and
-  // the ridge ring rose out of a void. Named 'terrain' so the parity audit's
-  // walkable-surface rule excludes it explicitly rather than by a
-  // footprint-share accident.
+  // The dry hillside the estate is cut into.
   //
-  // IT IS A RING, NOT A SLAB. v2 laid one 176 x 156 m box spanning y -0.30 to
-  // 0.00 across the whole map, and src/test-maps.ts decomposes the terrace into
-  // ten bands around THREE cutouts precisely so the pool, the sunken parterre
-  // and the sunken court are not buried ("A one-piece slab buried all three -
-  // measured on the first art pass: the water sheet sat under the floor").
-  // This dressing box reintroduced exactly that: it is coplanar with the
-  // terrace tops so the terrace wins the depth test where they overlap, but in
-  // the three cutouts nothing contests it, and it capped all three at y = 0.
-  // That is what the flyover's three black rectangles were - not shadow, and
-  // not the surfaces underneath. The pool basin, the water sheet at y = -0.35,
-  // the court floor at -0.35 and the parterre at -0.55 were all under a lid,
-  // which is why the brief's headline element ("a turquoise pool throwing
-  // light") had no turquoise anywhere in frame.
+  // IT IS ONE SLAB, AND IT SITS BELOW EVERYTHING. The previous version was four
+  // bands hugging a rectangular terrace, because the map WAS a rectangle; the
+  // 2026-08-31 rebuild's outline is an irregular blob and roughly a quarter of
+  // the bounding box is deliberately not map, so band-fitting that outline is
+  // both fragile and pointless. Instead the terrain is a single box whose TOP
+  // is at -1.60 m: below the paving (-1.00 .. 0.00), below the sport court
+  // floor (-1.35 .. -0.35) and below the pool basin (-1.55 .. -0.55), so it can
+  // never cap a cutout the way the v2 lid capped the pool, the parterre and the
+  // court and left three black rectangles in the flyover. Where the map is, it
+  // is hidden under the paving; where the map is not, it reads as the hillside
+  // falling 1.6 m away below the retaining walls, which is what section 5.4 of
+  // the layout spec asks the south and west rims to read as. One draw call
+  // instead of four, and no band table to keep in sync with the outline.
   //
-  // Four bands outside the terrace footprint (x +/-39.5, z +/-30.5) restore the
-  // continuous ground without covering anything. Presentation-only and
-  // cast:false exactly as before; three extra draws against a 420 budget.
-  //
-  // The SURFACE changed with it. A dry hillside was wearing a clone of the
-  // clipped-box-hedge forge - 40-cell leaf clumps at a 5 m tile over an AO
-  // floor of 0.28 - which is both the wrong material and, at 0.010-0.065 linear
-  // Y after the tint, the darkest large surface in either arena. Stucco's
-  // trowel/grain field at 5 m reads as sun-baked soil and carries a value the
-  // ochre tint can actually multiply.
+  // The SURFACE is carried forward unchanged from the 2026-08-31 art pass: dry
+  // hillside grass at hue 45 deg (its own bin, clear of the travertine's), at
+  // linear Y 0.207, over stucco's trowel/grain field at a 5 m tile. A saturated
+  // ochre here reads as a Martian plate under this arena's golden key, and this
+  // band is the largest single area in any flyover frame.
   const hillside = materials.stucco.clone();
   hillside.name = 'test2-hillside';
-  // Grey-ochre, not orange. A saturated tint here reads as a Martian plate
-  // under this arena's golden key, and this band is the largest single area in
-  // any flyover frame, so its chroma dominates the whole arena's hue budget.
-  //
-  // ART PASS 2026-08-31: that is exactly the problem - 0x9c9a80 resolves at hue
-  // 31 deg under this key, i.e. the largest area in the flyover was sitting in
-  // the travertine's own bin and making it the dominant one. Taken to dry
-  // hillside grass rather than bare soil, which is what a Mediterranean estate
-  // is actually cut into: hue 45 deg, its own bin, and linear Y 0.219 -> 0.207
-  // so the value the last pass measured for this band is unchanged. 49 deg
-  // measured better still and read frankly green on the largest surface in the
-  // flyover; 41 deg cost 0.74 of the frame's hue perplexity. 45 holds both.
   hillside.color.setHex(0x8c9c6c);
   hillside.roughness = 1;
   hillside.userData.metresPerTile = 5;
-  // Half-extents of the terrace band decomposition in src/test-maps.ts (its
-  // aprons are 79 wide and reach z = +/-30.5), and of the ground the ridge
-  // ring's 78 m inner rim needs covered.
-  const TERRACE_HALF_X = 39.5;
-  const TERRACE_HALF_Z = 30.5;
-  const GROUND_HALF_X = 88;
-  const GROUND_HALF_Z = 78;
-  const endBand = (GROUND_HALF_Z - TERRACE_HALF_Z) / 2;
-  const sideBand = (GROUND_HALF_X - TERRACE_HALF_X) / 2;
-  for (const side of [-1, 1] as const) {
-    addBox(dressing, 'test2-hillside-terrain',
-      [0, -0.15, side * (TERRACE_HALF_Z + endBand)], [GROUND_HALF_X * 2, 0.3, endBand * 2], hillside, 0, false);
-    addBox(dressing, 'test2-hillside-terrain',
-      [side * (TERRACE_HALF_X + sideBand), -0.15, 0], [sideBand * 2, 0.3, TERRACE_HALF_Z * 2], hillside, 0, false);
-  }
+  addBox(dressing, 'test2-hillside-terrain', [0, -2.4, 0], [190, 1.6, 176], hillside, 0, false);
 
   // --- vegetation + ridgeline --------------------------------------------
-  // The estate palette: dark clipped cypress, olive broadleaf, box shrub, over
-  // a pale gravel litter. Shared by both passes so the two belts read as one
-  // planting scheme.
-  //
-  // ART PASS 2026-08-31: the canopies were failing the same key-multiply test
-  // as the hedge surface (see HEDGE_DEEP). Against a linear key of (1.000,
-  // 0.624, 0.287) a canopy needs linear g/r above 1.60 to read green at all;
-  // broadleaf 0x5d7440 was 1.60 exactly and resolved at hue 60 deg - the same
-  // yellow band as the travertine terrace it is meant to contrast with - and
-  // shrub 0x47653a at 76 deg was barely out of it. Conifer was green (86 deg)
-  // but at linear Y 0.033 carried no weight in any frame. Re-authored to
-  // 94 / 104 / 98 deg with the conifer lifted to 0.043, which is still the
-  // darkest mass on the hillside but is now a dark GREEN one. dryScrub goes the
-  // other way on purpose: it is dry grass, so it stays warm, but 35 deg put it
-  // inside the travertine's own bin, and 42 deg gives the hillside its own.
+  // ART PASS 2026-08-31: canopy hues carried forward. Against a linear key of
+  // (1.000, 0.624, 0.287) a canopy needs linear g/r above 1.60 to read green at
+  // all; these three sit at 94 / 104 / 98 deg with the conifer lifted to linear
+  // Y 0.043, and dryScrub stays warm at 42 deg so the hillside keeps its own
+  // hue bin rather than falling into the travertine's.
   const estatePalette = {
     trunk: 0x6b563c,
     broadleafCanopy: 0x4f8c3a,
@@ -1288,97 +1250,62 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
     litter: 0xa39a80,
   } as const;
 
-  // INSIDE the estate wall: a clipped border in the 0.6..4.6 m strip behind the
-  // wall, and nothing else. The three lanes carry their green as authored
-  // hedge blocks and planters in src/test-maps.ts — collided, shot-rated and
-  // symmetric — because a 5 m cypress standing in a lane would block sight
-  // while stopping no bullet, which is the one thing presentation art must
-  // never do. Cypress is admitted here (the border is behind the wall, out of
-  // every lane) and broadleaf is not: its 1.6 m canopy overhangs too far.
-  const test2Border: readonly KeepOut[] = [
-    [-37.4, -33.4, -28.4, 28.4], [33.4, 37.4, -28.4, 28.4],
-    [-37.4, 37.4, -28.4, -24.4], [-37.4, 37.4, 24.4, 28.4],
-  ];
-  const test2KeepOutHalf: readonly KeepOut[] = [
-    [-38, -28, -14, 14],          // west motor court and its spawn fan
-    [-30, 30, -27, -19.6],        // the north villa wing, veranda and its roof
-    [-35.5, -24.5, -21, -11],     // the outbuildings on the west diagonal
-    [24.5, 35.5, -21, -11],       // the outbuildings on the east diagonal
-  ];
-  const test2KeepOuts: readonly KeepOut[] = [
-    ...test2KeepOutHalf, ...test2KeepOutHalf.map(rotated),
-  ];
-  buildEnvironment(dressing, {
-    name: 'test2-border',
-    vegetation: {
-      seed: 0x7e5721,
-      namePrefix: 'test2-foliage-border',
-      area: { minX: -37.4, maxX: 37.4, minZ: -28.4, maxZ: 28.4 },
-      palette: estatePalette,
-      layers: [
-        // Cypress sentinels first: they own the largest clearance, so every
-        // later layer is spaced off them rather than the other way round.
-        { kind: 'conifer', count: 26, spacings: [4.6], scaleRange: [0.95, 1.3] },
-        { kind: 'shrub', count: 80, spacings: [2.4, 1.9] },
-      ],
-      allow: clearancePredicate(
-        { conifer: test2Border, shrub: test2Border, broadleaf: NO_BAND, 'dry-scrub': NO_BAND },
-        test2KeepOuts,
-      ),
-      lod: { nearBandM: 30 },
-    },
-  });
-
-  // OUTSIDE the wall: the hillside the estate is cut into, between the wall and
-  // the ridge's 78 m inner rim. Olive broadleaf, more cypress, thorn shrub and
-  // dry scrub, with no clearance question to answer.
+  // NOTHING IS PLANTED INSIDE THE MAP. The previous build ran a clipped border
+  // in the 0.6..4.6 m strip behind a rectangular estate wall; the rebuilt
+  // outline has no such strip - its boundary steps in and out eleven times and
+  // every metre inside it is a lane, a building or an approach. Rather than fit
+  // a keep-out table to an irregular blob and trust it, the inside belt is cut:
+  // all of this arena's green is now authored, collided and shot-rated in
+  // src/test-maps.ts (the drive island's planter ring, the two drive verges and
+  // the west apron's planter run), which is the only kind of foliage that can
+  // stand in a lane without being cover a bullet ignores.
+  //
+  // OUTSIDE the boundary: the hillside the estate is cut into, between the
+  // walls and the ridge's inner rim. Olive broadleaf, cypress, thorn shrub and
+  // dry scrub, with no clearance question to answer. The bands and the ridge
+  // radii below all moved outward with the map: gameplay now reaches
+  // hypot(50.8, 38.8) = 63.9 m at the boundary corners, against 48.4 m before.
   const test2Hillside: readonly KeepOut[] = [
-    [-64, -46, -56, 56], [46, 64, -56, 56],
-    [-64, 64, -56, -36], [-64, 64, 36, 56],
+    [-80, -58, -72, 72], [58, 80, -72, 72],
+    [-80, 80, -72, -48], [-80, 80, 48, 72],
   ];
   const environment = buildEnvironment(dressing, {
     name: 'test2-hillside',
     vegetation: {
       seed: 0x7e5723,
       namePrefix: 'test2-foliage-hillside',
-      area: { minX: -64, maxX: 64, minZ: -56, maxZ: 56 },
+      area: { minX: -80, maxX: 80, minZ: -72, maxZ: 72 },
       palette: estatePalette,
       layers: [
-        { kind: 'broadleaf', count: 44, spacings: [7.5] },
-        { kind: 'conifer', count: 40, spacings: [6, 5.4] },
-        { kind: 'shrub', count: 120, spacings: [3.4, 2.8, 2.4] },
-        { kind: 'dry-scrub', count: 200, spacings: [2.2, 1.8, 1.4, 1.3] },
+        { kind: 'broadleaf', count: 48, spacings: [7.5] },
+        { kind: 'conifer', count: 44, spacings: [6, 5.4] },
+        { kind: 'shrub', count: 130, spacings: [3.4, 2.8, 2.4] },
+        { kind: 'dry-scrub', count: 210, spacings: [2.2, 1.8, 1.4, 1.3] },
       ],
       allow: clearancePredicate(
         { broadleaf: test2Hillside, conifer: test2Hillside, shrub: test2Hillside, 'dry-scrub': test2Hillside },
         [],
       ),
-      lod: { nearBandM: 44 },
+      lod: { nearBandM: 52 },
     },
     ridge: {
       seed: 0x7e5722,
-      // Gameplay reaches hypot(38.4, 29.4) = 48.4 m at the wall corners.
-      arenaClearRadiusM: 50,
-      innerRadiusM: 78,
-      outerRadiusM: 196,
+      // Gameplay reaches hypot(50.8, 38.8) = 63.9 m at the boundary corners.
+      arenaClearRadiusM: 66,
+      innerRadiusM: 94,
+      outerRadiusM: 212,
       peakHeightM: 34,
       lobes: [2, 5, 11],
-      // ART PASS 2026-08-31: the ring is the SAME hillside the terrain band is,
-      // continued past the wall, and it was authored as a different and warmer
-      // material - 31 and 27 deg against the terrain's 45 - so the arena's
-      // largest two surfaces were both feeding the same dominant hue bin from
-      // different materials. Matched to the terrain (43 / 38 deg) at unchanged
-      // luminance (0.133 -> 0.136, 0.206 -> 0.210); it is one hillside, so it
-      // gets one colour.
+      // One hillside, one colour: the ring is the SAME hillside the terrain slab
+      // is, continued past the wall, matched at unchanged luminance (43 / 38 deg
+      // at 0.136 / 0.210 linear Y).
       nearColor: 0x74805a,
       farColor: 0x939a75,
       // Matched to the arena definition's fog colour (src/rendering/arenas/
-      // test2.ts) so the hillsides dissolve into the haze they sit in. The
-      // authored 0xe9c9a0 had drifted off that fog (0xe6cbab) and was the
-      // single brightest large surface in the flyover at hue 22 deg - i.e. the
-      // biggest single contributor to the dominant bin. It now tracks the fog,
-      // which this pass took to the lilac a golden-hour valley haze actually is
-      // when you look across it rather than into the sun.
+      // test2.ts) so the hillsides dissolve into the haze they sit in. A
+      // golden-hour haze is gold when you look INTO the sun and lilac when you
+      // look across the valley away from it; this fog is matched to the horizon
+      // band and not to the sun, so lilac is the honest half of that pair.
       hazeColor: 0xdcc4cd,
       hazeStrength: 0.74,
       name: 'test2-ridge-ring',
@@ -1386,106 +1313,103 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
   });
 
   // --- pool life ----------------------------------------------------------
-  // Umbrella canopies sit at 2.72 m, above the 2.6 m reachable ceiling; poles
-  // are 0.1 m. Both halves are 180-degree pairs of each other.
-  for (const side of [-1, 1] as const) {
-    for (const along of [-1, 1] as const) {
-      const ux = side * along * 11;
-      const uz = side * -10.4;
-      addCylinder(dressing, 'test2-umbrella-pole', [ux, 1.36, uz], 0.05, 0.05, 2.72, chrome, 8);
-      const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.8, 10), canvasCream);
-      canopy.name = 'test2-umbrella-canopy';
-      canopy.position.set(ux, 3.1, uz);
-      dressing.add(presentationMesh(canopy));
-    }
-    addCylinder(dressing, 'test2-pool-ladder-a', [side * 7.1, 0.35, side * -12.2], 0.04, 0.04, 1.3, chrome, 6);
-    addCylinder(dressing, 'test2-pool-ladder-b', [side * 7.1, 0.35, side * -11.6], 0.04, 0.04, 1.3, chrome, 6);
-    addBox(dressing, 'test2-towel-stack', [side * -9.4, 0.62, side * -11.2], [0.6, 0.4, 0.5], canvasCream, 0.3, false);
+  // Re-seated on the rebuilt pool (water x -10..+16, z -35..-25). Umbrella
+  // canopies sit at 3.10 m, above the 2.6 m reachable ceiling; poles are 0.1 m.
+  for (const [ux, uz] of [[-4, -32.5], [10, -32.5], [-4, -27.5], [10, -27.5]] as const) {
+    addCylinder(dressing, 'test2-umbrella-pole', [ux, 1.36, uz], 0.05, 0.05, 2.72, chrome, 8);
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.8, 10), canvasCream);
+    canopy.name = 'test2-umbrella-canopy';
+    canopy.position.set(ux, 3.1, uz);
+    dressing.add(presentationMesh(canopy));
+  }
+  for (const ladderX of [-6.4, 12.4]) {
+    addCylinder(dressing, 'test2-pool-ladder-a', [ladderX, 0.35, -25.9], 0.04, 0.04, 1.3, chrome, 6);
+    addCylinder(dressing, 'test2-pool-ladder-b', [ladderX + 0.6, 0.35, -25.9], 0.04, 0.04, 1.3, chrome, 6);
+  }
+  addBox(dressing, 'test2-towel-stack', [-9, 0.62, -23.4], [0.6, 0.4, 0.5], canvasCream, 0.3, false);
+  // Loungers on the deck between the coping and the planter run, jittered on
+  // the seeded stream so the deck does not read as a grid. Height 0.4 m.
+  for (let lounger = 0; lounger < 5; lounger += 1) {
+    const lx = -6 + lounger * 4.4 + rng() * 0.4;
+    addBox(dressing, 'test2-lounger', [lx, 0.3, -23.8], [0.8, 0.4, 2], materials.timber, 0.05 - rng() * 0.1, true);
   }
 
   // --- court markings -----------------------------------------------------
-  // Geometry, not texture: at the court surface's 5.9 mm/texel a 50 mm line
-  // is 8.5 texels across a 12 m court and blurs away by mip 2. Flush quads at
-  // 30 mm proud of the sunken floor stay crisp at every distance.
+  // Geometry, not texture: at the court surface's 5.9 mm/texel a 50 mm line is
+  // 8.5 texels across a 12 m court and blurs away by mip 2. Flush quads 30 mm
+  // proud of the sunken floor stay crisp at every distance. Re-centred on the
+  // rebuilt court (x -37..-19, z -33..-21, floor top -0.35).
   const courtY = -0.34;
+  const courtX = -28;
+  const courtZ = -27;
   for (const edge of [-1, 1] as const) {
-    addBox(dressing, 'test2-court-line-side', [edge * 6.6, courtY, 0], [0.08, 0.03, 9.4], courtLine, 0, false);
-    addBox(dressing, 'test2-court-line-end', [0, courtY, edge * 4.7], [13.2, 0.03, 0.08], courtLine, 0, false);
-    addBox(dressing, 'test2-court-line-key', [edge * 5.2, courtY, 0], [2.6, 0.03, 3.6], courtLine, 0, false);
+    addBox(dressing, 'test2-court-line-side', [courtX + edge * 8.4, courtY, courtZ], [0.08, 0.03, 11.4], courtLine, 0, false);
+    addBox(dressing, 'test2-court-line-end', [courtX, courtY, courtZ + edge * 5.7], [17, 0.03, 0.08], courtLine, 0, false);
+    addBox(dressing, 'test2-court-line-key', [courtX + edge * 6.6, courtY, courtZ], [3.2, 0.03, 4.4], courtLine, 0, false);
   }
-  addBox(dressing, 'test2-court-line-centre', [0, courtY, 0], [0.08, 0.03, 9.4], courtLine, 0, false);
-  const centreCircle = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.04, 6, 36), courtLine);
+  addBox(dressing, 'test2-court-line-centre', [courtX, courtY, courtZ], [0.08, 0.03, 11.4], courtLine, 0, false);
+  const centreCircle = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.04, 6, 36), courtLine);
   centreCircle.name = 'test2-court-line-circle';
-  centreCircle.position.set(0, courtY, 0);
+  centreCircle.position.set(courtX, courtY, courtZ);
   centreCircle.rotation.x = Math.PI / 2;
   dressing.add(presentationMesh(centreCircle, false));
   // Hoops: 0.11 m poles, backboards above the reachable ceiling.
   for (const hoopEnd of [-1, 1] as const) {
-    const hx = hoopEnd * 7.4;
-    addCylinder(dressing, 'test2-hoop-pole', [hx, 1.7, 0], 0.09, 0.11, 4, chrome, 8);
-    addBox(dressing, 'test2-hoop-board', [hx - hoopEnd * 0.5, 3.35, 0], [0.08, 1, 1.6], glassBlue, 0, false);
+    const hx = courtX + hoopEnd * 8;
+    addCylinder(dressing, 'test2-hoop-pole', [hx, 1.7, courtZ], 0.09, 0.11, 4, chrome, 8);
+    addBox(dressing, 'test2-hoop-board', [hx - hoopEnd * 0.5, 3.35, courtZ], [0.08, 1, 1.6], glassBlue, 0, false);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 6, 14), new THREE.MeshStandardMaterial({ color: 0xd4622c, roughness: 0.5, metalness: 0.5 }));
     ring.name = 'test2-hoop-ring';
-    ring.position.set(hx - hoopEnd * 0.85, 3.05, 0);
+    ring.position.set(hx - hoopEnd * 0.85, 3.05, courtZ);
     ring.rotation.x = Math.PI / 2;
     dressing.add(presentationMesh(ring, false));
   }
 
-  // --- garden dressing ----------------------------------------------------
-  // Gravel beds and parterre planting inside the sunken garden, plus urns on
-  // the motor courts. Everything under 0.9 m, all in 180-degree pairs.
-  for (const side of [-1, 1] as const) {
-    for (let bed = 0; bed < 4; bed += 1) {
-      // Parterre beds sit ON the sunken garden floor (top at -0.55), so they
-      // are 30 mm proud of it rather than floating at grade.
-      const bx = side * (-5.2 + bed * 3.5);
-      const bz = side * (11.6 + (bed % 2) * 4.6);
-      addBox(dressing, 'test2-parterre-bed', [bx, -0.52, bz], [3, 0.06, 3.4], gravel, 0, false);
-    }
-    for (const urnAlong of [-1, 1] as const) {
-      const ux = side * 30.5;
-      const uz = side * urnAlong * 3.4;
-      addCylinder(dressing, 'test2-urn', [ux, 0.42, uz], 0.4, 0.3, 0.84, materials.stone, 9);
-      const urnShrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 1), materials.hedge);
-      urnShrub.name = 'test2-urn-shrub';
-      urnShrub.position.set(ux, 1.1, uz);
-      dressing.add(presentationMesh(urnShrub));
-    }
-    // Villa wing detail. The wing wall runs z = side * (25.7 .. 26.3), and BOTH
-    // the pilasters and the window band are set 0.12 m proud of its inner face
-    // rather than standing clear of it: the ballistic census needs a quarter of
-    // a mesh's footprint covered by a registered shot surface, and 0.22 m of
-    // each 0.34 m pilaster (0.20 m of each 0.30 m window) lands inside the
-    // wall's. Standing them off the wall - which is what v1 did against the old
-    // perimeter - makes them ghost cover a round crosses silently.
-    for (let bay = -3; bay <= 3; bay += 1) {
-      addBox(dressing, 'test2-pilaster', [side * bay * 8.5, 2.1, side * 25.75], [0.9, 4.2, 0.34], materials.stucco);
-    }
-    // Window bays sit between the pilasters and clear of the authored glazed
-    // doors at |x| = 14 (test-maps.ts), so no two panes fight for the same face.
-    for (const windowX of [-21.25, -4.25, 4.25, 21.25]) {
-      addBox(dressing, 'test2-wing-window', [side * windowX, 2.2, side * 25.75], [2.6, 1.6, 0.3], glassBlue, 0, false);
-    }
-    addBox(dressing, 'test2-cornice', [0, 4.35, side * 26], [56, 0.4, 0.7], materials.stone, 0, false);
-    addBox(dressing, 'test2-cornice-end', [side * 38.2, 3.3, 0], [0.5, 0.35, 58], materials.stone, 0, false);
+  // --- drive dressing -----------------------------------------------------
+  // A gravel apron reading the paved circle onto the travertine, beds on the
+  // island, and urns flanking the fountain plinth. All of it is under 0.9 m or
+  // set on top of authored 1.9 m cover, so none of it is ever mistaken for
+  // cover a round would stop on.
+  addBox(dressing, 'test2-drive-gravel-ring', [2, 0.31, 24], [26, 0.04, 15], gravel, 0, false);
+  for (const [bx, bz] of [[-1.5, 23], [5.5, 23], [-1.5, 27], [5.5, 27]] as const) {
+    addBox(dressing, 'test2-drive-bed', [bx, 0.33, bz], [3, 0.06, 2.6], gravel, 0, false);
+  }
+  for (const urnZ of [23.4, 26.6]) {
+    addCylinder(dressing, 'test2-urn', [2, 0.72, urnZ], 0.4, 0.3, 0.84, materials.stone, 9);
+    const urnShrub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 1), materials.hedge);
+    urnShrub.name = 'test2-urn-shrub';
+    urnShrub.position.set(2, 1.4, urnZ);
+    dressing.add(presentationMesh(urnShrub));
   }
 
-  // Contact grounding under the estate's heavy masses.
+  // --- facade detail ------------------------------------------------------
+  // Pilasters and window bays on the house band's north face, and lintels on
+  // the garage's open west face. BOTH are set 0.12 m PROUD OF THE WALL'S INNER
+  // FACE rather than standing clear of it: the ballistic census needs a quarter
+  // of a mesh's footprint covered by a registered shot surface, and standing a
+  // pilaster off the wall makes it ghost cover a round crosses silently. The
+  // runs stop clear of the office window opening at x 20..24 and of the two
+  // door mouths at x -14..-11.5 and x 6..8.5, so no two faces fight.
+  for (const bayX of [-22, -18.5, -8, -4.5, 0, 3.5, 11.5, 16, 26]) {
+    addBox(dressing, 'test2-pilaster', [bayX, 1.7, -19.75], [0.9, 3.4, 0.34], materials.stucco);
+  }
+  for (const windowX of [-20.25, -6.25, 1.75, 13.75]) {
+    addBox(dressing, 'test2-wing-window', [windowX, 1.9, -19.75], [2.4, 1.6, 0.3], glassBlue, 0, false);
+  }
+  addBox(dressing, 'test2-cornice', [2, 3.55, -19.9], [52, 0.4, 0.7], materials.stone, 0, false);
+  for (const pierZ of [-10.5, -6.5, -2, 2, 6.5, 10.5]) {
+    addBox(dressing, 'test2-garage-lintel', [36.35, 3.7, pierZ], [0.5, 0.5, 3.4], materials.stone, 0, false);
+  }
+
+  // Contact grounding under the estate's heavy masses, matched to the rebuilt
+  // footprints: house band, north-east wing, laundry, gallery, garage, pool
+  // pavilion, carport, garden store and the gallery's service wing.
   for (const [gx, gz, gw, gd] of [
-    [0, -25.4, 56, 3.2], [0, 25.4, 56, 3.2],
-    [-24, -19, 10, 9], [24, 19, 10, 9], [24, -19, 10, 9], [-24, 19, 10, 9],
-    [-32, 0, 11, 15], [32, 0, 11, 15],
+    [2, -13, 52, 14], [22, -26, 12, 12], [-17.5, 10.5, 25, 11],
+    [22, 8, 20, 8], [43, -1, 14, 24], [-14.75, -29, 6.5, 6],
+    [-26, 22, 8, 8], [-34, -13, 8, 8], [28, 14, 8, 4],
   ] as const) {
     addBox(dressing, 'test2-contact-grime', [gx, 0.05, gz], [gw + 0.6, 0.1, gd + 0.6], gravel, 0, false);
-  }
-
-  // A few scattered loungers and planters, jittered on the seeded stream so
-  // the deck does not read as a grid. Height 0.4 m: dressing by measurement.
-  for (const side of [-1, 1] as const) {
-    for (let lounger = 0; lounger < 3; lounger += 1) {
-      const lx = side * (9.4 + lounger * 2.4 + rng() * 0.3);
-      addBox(dressing, 'test2-lounger', [lx, 0.3, side * -11.4], [0.8, 0.4, 2], materials.timber, side * 0.06, true);
-    }
   }
 
   return environment;

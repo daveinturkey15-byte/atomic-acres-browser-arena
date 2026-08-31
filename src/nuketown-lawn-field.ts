@@ -99,12 +99,23 @@ export function nuketownLawnPlacementAllowed(x: number, z: number): boolean {
   return grassPlacementAllowed(x, z, NUKETOWN_LAWN_KEEPOUTS);
 }
 
-/** Kept-lawn tint: cool suburban greens with mild sun-bleached clumping. */
+/**
+ * Kept-lawn tint: cool suburban greens with mild sun-bleached clumping.
+ *
+ * v2 2026-08-31 (zero-cost re-key, owner "grass ... still feel poor"). The
+ * measured problem in the evidence frames was not density - 24,732 tufts is a
+ * real field - it was VALUE SEPARATION: the blades were keyed brighter and
+ * yellower than the lawn plate they stand on, so they read as pale spikes
+ * scattered ON the ground instead of grass growing OUT of it, and every blade
+ * silhouetted individually. Pulling the base value down and the warm
+ * sun-bleach back seats them into the plate. Costs nothing: same tuft count,
+ * same draws, same triangles - only the instance tint constants moved.
+ */
 export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
-  rBase: 0.7, rWarm: 0.2,
-  gBase: 0.9, gWarm: 0.1,
-  bBase: 0.52, bWarm: -0.1,
-  valueBase: 0.9, valuePatch: 0.07, valueJitter: 0.04,
+  rBase: 0.63, rWarm: 0.18,
+  gBase: 0.88, gWarm: 0.09,
+  bBase: 0.5, bWarm: -0.09,
+  valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
 });
 
 /**
@@ -133,16 +144,21 @@ export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean)
     scaleRange: [0.68, 1.0],
     placementAllowed: nuketownLawnPlacementAllowed,
     material: {
-      color: 0x61a244,
-      roughness: 0.88,
+      // v2 2026-08-31: deeper blade green and a darker root so a tuft reads as
+      // one clump of grass rather than a fan of individually-lit spikes.
+      color: 0x5e9e41,
+      roughness: 0.89,
       metalness: 0.02,
       swayAmount: 0.045,
       windSpeed: 0.8,
-      sssColor: 0xa8cf56,
-      sssStrength: 0.3,
-      // Kept lawn, not jungle floor: light root shade so blades stay green
-      // against the bright Quality lawn plates instead of reading as stubble.
-      rootShade: [0.62, 0.7, 0.55],
+      sssColor: 0xa4cb55,
+      sssStrength: 0.29,
+      // Kept lawn, not jungle floor - but the old root shade was so light the
+      // blade base was brighter than the plate behind it, which is what made
+      // the field read as stubble sitting on top of the lawn. A first cut at
+      // 0.46/0.56/0.42 with valueBase 0.80 over-corrected - it came back dry
+      // and olive rather than kept - so this lands between the two.
+      rootShade: [0.56, 0.65, 0.5],
     },
     tint: NUKETOWN_LAWN_TINT,
   });

@@ -15,16 +15,19 @@
  *          at each end, the container yard
  *          with a real climb ladder onto a container roof, berms, and a fenced
  *          perimeter with a posted rhythm.
- *   Test2  76 x 58 m (was 64 x 48). Motor court and gatehouse at each end,
- *          two villa wings with a real facade and a VERANDA you can fight
- *          along, the pool terrace, a sunken sport court, garden terraces
- *          stepping down to a sunken parterre, and four outbuildings.
+ *   Test2  100 x 76 m. REBUILT 2026-08-31 against
+ *          docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md - see the Test2 section
+ *          below for what changed and why. The 76 x 58 estate this line used to
+ *          describe (motor courts, two villa wings, verandas, a central sunken
+ *          sport court, a sunken parterre, four diagonal outbuildings) is gone:
+ *          it was a rotationally symmetric walled slab, and the owner's report
+ *          was that it is "not the layout at all".
  *
- * Both new extents sit INSIDE the shadow volumes already authored for these
- * arenas in src/graphics-refinement.ts (test1 68 x 54, test2 80 x 64), so the
- * cascade still covers the whole playfield with margin and no table this pass
- * does not own had to move. See the report for the two knock-on values in
- * src/rendering/arenas/*.ts that now want a re-measure.
+ * Test1's extent still sits inside the shadow volume authored for it in
+ * src/graphics-refinement.ts (68 x 54). TEST2'S NO LONGER DOES: the old claim
+ * that "no table this pass does not own had to move" died with the rebuild, and
+ * the test2 shadow volume, fog near plane, killstreak flight radius and review
+ * cameras were all re-measured and re-pinned by the same pass (2026-08-31).
  *
  * THE FAIRNESS INVOLUTION
  * -----------------------
@@ -41,13 +44,24 @@
  *     neither (its five containers had no partners at all). The spawn sets are
  *     symmetric in x, so they map onto each other under the mirror AND under
  *     the rotation.
- *   Test2 — teams separate along X and the Domination anchors A(-20, -12) and
- *     C(+20, +12) are already exact 180-degree images of one another, so this
- *     map's involution is the ROTATION (x, z) -> (-x, -z), and it is honoured
- *     literally. The pool lane's 180-degree partner is the sunken garden
- *     parterre: identical footprint, identical walkable depth, differentiated
- *     only by dressing. That is what lets a pool and a garden coexist on a
- *     rotationally symmetric map.
+ *   Test2 — teams separate along X, and as of the 2026-08-31 rebuild this
+ *     map's involution is the X MIRROR (x, z) -> (-x, z). It used to be the
+ *     180-degree rotation, and that was wrong on the evidence: the archetype's
+ *     measured objective anchors are A(-34.6, -0.1) and C(+33.1, -0.9), which
+ *     are x-mirrors of one another and NOT 180-degree images (a rotation would
+ *     put A's partner at (+34.6, +0.1)). Every other paired feature agrees -
+ *     the two service buildings flank the drive from the same side, both upper
+ *     balconies look INTO the drive, and the two flank lanes differ in kind (a
+ *     pool terrace and a motor circle), so neither rotates into the other.
+ *
+ *     This is the same argument the Test1 paragraph above already makes, on the
+ *     other axis. Under the mirror the fairness obligations are: every spawn
+ *     point maps to a spawn point of the other team; every lane mouth is the
+ *     same distance from each spawn; each team has exactly one elevated room
+ *     per flank lane; and A maps to C exactly while B sits on x = 0. Holding
+ *     the rotation instead would have demanded the pool lane EQUAL the drive
+ *     lane, which is precisely the demand that produced the old build's
+ *     pool-and-its-180-degree-partner-parterre and its uniform open terrace.
  *
  * THE COVER RULE (owner: cover breaks BOTH stances or is jump-mountable)
  * ---------------------------------------------------------------------
@@ -74,13 +88,35 @@ import type { ArenaMap } from './map';
 import { applyTest1Dressing, applyTest2Dressing, test1Materials, test2Materials, worldTiled } from './test-maps-art';
 
 export const TEST1_BOUNDS = Object.freeze({ minX: -32, maxX: 32, minZ: -23, maxZ: 23 });
-export const TEST2_BOUNDS = Object.freeze({ minX: -38, maxX: 38, minZ: -29, maxZ: 29 });
+/**
+ * 100 x 76 m (Pass 79 rebuild, 2026-08-31). Derived, not guessed - see
+ * docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md section 1.3: the archetype's long
+ * axis measures 85-92 m off four independent architectural anchors, and this
+ * controller sprints at 8.7 m/s against the reference engine's derived
+ * 7.24 m/s, so a faithful metre-for-metre copy would be crossed 20% faster and
+ * would feel SMALLER than the map it copies. 85-92 x 1.20 = 102-110 m; 100 m is
+ * the conservative bottom of that band, and 100 / 76 = 1.316 reproduces the
+ * measured 1.311 aspect to within 0.4%.
+ *
+ * The old 76 x 58 = 4408 m2 was within 1% of Atomic Acres' 74 x 60 = 4440 m2 -
+ * the "big estate map" was the same size as the small street map, which is what
+ * the owner reported.
+ */
+export const TEST2_BOUNDS = Object.freeze({ minX: -50, maxX: 50, minZ: -38, maxZ: 38 });
 
-/** Domination anchors for Test2 (A pool deck, B court, C garden terrace). */
+/**
+ * Domination anchors for Test2 (A west end, B drive-lane mouth, C garage drive).
+ *
+ * B IS DELIBERATELY OFF-CENTRE at (0, +14) and must stay there. With A and C on
+ * the long axis at the two ends and B pulled into one flank, a team that owns B
+ * is committed to one side of the map, so the losing team's spawn stays anchored
+ * behind its own end instead of flipping through the middle. Moving B into the
+ * courtyard is the obvious "fix" and it would break spawn stability.
+ */
 export const TEST2_DOMINATION_ZONES = Object.freeze([
-  Object.freeze({ id: 'A' as const, centre: Object.freeze([-20, 0, -12] as const) }),
-  Object.freeze({ id: 'B' as const, centre: Object.freeze([0, 0, 0] as const) }),
-  Object.freeze({ id: 'C' as const, centre: Object.freeze([20, 0, 12] as const) }),
+  Object.freeze({ id: 'A' as const, centre: Object.freeze([-34, 0, -0.5] as const) }),
+  Object.freeze({ id: 'B' as const, centre: Object.freeze([0, 0, 14] as const) }),
+  Object.freeze({ id: 'C' as const, centre: Object.freeze([34, 0, -0.5] as const) }),
 ]);
 
 /**
@@ -343,13 +379,122 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
 }
 
 // ---------------------------------------------------------------------------
-// Test2 — the hillside estate
+// Test2 - the hillside estate, three-lane archetype (rebuild 2026-08-31)
+//
+// Contract: docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md. The owner's measured
+// complaint was three-fold - the map was the same size as the small street map,
+// it had ZERO reachable upper floors, and its two "villa wings" were 56 m solid
+// walls that collapsed three nominal lanes into one 76 m terrace. This rebuild
+// answers all three: 100 x 76 m, four reachable +3.40 m rooms on four
+// autostep-legal stairs, and a boundary that follows a BUILDING FOOTPRINT
+// instead of a rectangle, so roughly a quarter of the bounding box is simply
+// not map and the lanes are separated by architecture.
+//
+// ORIGINAL ART ONLY. Every mesh below is a `block()` wearing a surface forged
+// by test2Materials() in test-maps-art.ts. Nothing is sourced from any other
+// game; the reference informed topology (lane count, adjacency, where the
+// elevated vantages sit) and nothing else. The arena keeps its own name.
 // ---------------------------------------------------------------------------
+
+/**
+ * The playable BLOB, read off the spec's 2 m/cell top-down diagram (section 6)
+ * row by row: `[minZ, maxZ, minX, maxX]`, z ascending, each row's x extent the
+ * diagram's own contiguous span.
+ *
+ * This table is the map's outline. The paving is authored inside it, the
+ * boundary is generated around it, and the ~26% of the 100 x 76 bounding box it
+ * leaves out is where the arena's corners, dead ends and cover-by-architecture
+ * come from. The old build filled ~100% of its rectangle, which is exactly why
+ * it played as one open field.
+ */
+const TEST2_BLOB: ReadonlyArray<readonly [number, number, number, number]> = [
+  [-38, -36, -28, 34],
+  [-36, -34, -40, 28],
+  [-34, -20, -40, 32],
+  [-20, -14, -40, 42],
+  [-14, -10, -42, 50],
+  [-10, 4, -50, 50],
+  [4, 10, -42, 50],
+  [10, 16, -38, 42],
+  [16, 24, -34, 26],
+  [24, 30, -30, 22],
+  [30, 36, -22, 16],
+  [36, 38, -10, 10],
+];
+
+/**
+ * Paving: the blob minus the two sunken cutouts (sport court -0.35, pool basin
+ * -0.55). Authored as the COMPLEMENT rather than one slab with holes - the
+ * technique the first art pass had to learn when a one-piece slab buried the
+ * water sheet. `[name, minX, maxX, minZ, maxZ]`.
+ */
+const TEST2_PAVING: ReadonlyArray<readonly [string, number, number, number, number]> = [
+  ['north tip', -28, 34, -38, -36],
+  ['pool head', -40, 28, -36, -35],
+  ['pool head west', -40, -10, -35, -34],
+  ['pool head east', 16, 28, -35, -34],
+  ['court head west', -40, -10, -34, -33],
+  ['court head east', 16, 32, -34, -33],
+  ['court flank west', -40, -37, -33, -25],
+  ['court walk', -19, -10, -33, -25],
+  ['pool flank east', 16, 32, -33, -25],
+  ['court flank south', -40, -37, -25, -21],
+  ['pool deck', -19, 32, -25, -21],
+  ['lane sill', -40, 32, -21, -20],
+  ['house north band', -40, 42, -20, -14],
+  ['approach band', -42, 50, -14, -10],
+  ['long axis', -50, 50, -10, 4],
+  ['drive north band', -42, 50, 4, 10],
+  ['drive mid band', -38, 42, 10, 16],
+  ['drive band', -34, 26, 16, 24],
+  ['drive circle', -30, 22, 24, 30],
+  ['drive approach', -22, 16, 30, 36],
+  ['drive tip', -10, 10, 36, 38],
+];
+
+/** First-floor height. Four rooms sit here and nothing else is standable above it. */
+const UPPER_FLOOR_Y = 3.4;
+/**
+ * Floor slab thickness. The soffit therefore lands at 3.16 m: every interior
+ * beneath an upper room keeps 3.16 m of clear height against a 1.70 m standing
+ * eye and a 0.61 m prone eye, so no stair soffit, balcony underside or covered
+ * walk can produce an eye-clearance hazard by geometry alone.
+ */
+const UPPER_SLAB = 0.24;
+const UPPER_SOFFIT = UPPER_FLOOR_Y - UPPER_SLAB;
+/**
+ * The canonical stair module, built once and reused four times. 9 risers of
+ * 0.3778 m and 0.45 m treads: EVERY riser is under the 0.42 m autostep
+ * (CHARACTER_PHYSICS_CONFIG), so the player walks up with no jump and no
+ * timing, and 0.45 m clears the 0.22 m autostep minimum width with margin.
+ * Rise 3.40 m over a 4.05 m run is a 40 degree pitch, inside the 50 degree
+ * slope-climb limit, so a smooth-ramp fallback stays available.
+ */
+const STAIR_RISERS = 9;
+const STAIR_TREAD = 0.45;
+const STAIR_RUN = STAIR_RISERS * STAIR_TREAD;
+/**
+ * Balcony and window-slot rail. This is the ONE deliberate exception to the
+ * 0.9-1.8 m dead-band rule below, and the rule's own rationale is what licenses
+ * it: a dead-band piece is banned because it "hides a crouched player from
+ * nobody and cannot be climbed". On a +3.40 m floor both halves invert - the
+ * crouch eye sits at 1.16 m so a 1.05 m rail hides the body and clears the eye
+ * exactly (the classic head-glitch the spec's 3.5 asks for), and it MUST NOT be
+ * climbable or the upper room becomes a launch pad. Ground cover keeps the rule.
+ */
+const BALCONY_RAIL = 1.05;
+/** Upper-room walls: hard cover measured from the +3.40 floor, not from grade. */
+const UPPER_WALL = 1.9;
+/** Roof parapet top. Set so no upper room can see across the map into a second lane. */
+const PARAPET_TOP = 4.8;
 
 export function buildTest2(scene: THREE.Scene): ArenaMap {
   const builder = makeBuilder(scene, 'Test2 arena');
   const materials = test2Materials();
   const { travertine, stucco, stone, hedge, poolTile, court, timber } = materials;
+  // Carried forward unchanged from the 2026-08-30 art pass, which measured hue
+  // perplexity 5.61 against Farcrysis' 5.66 and a crushed fraction of 6.33%.
+  // The palette is not re-opened by this pass; only the geometry it dresses is.
   const poolWater = new THREE.MeshStandardMaterial({
     color: 0x2e9cb0, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82,
   });
@@ -357,139 +502,483 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     color: 0xbfd8de, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.4,
   });
 
-  // The terrace is a band decomposition around THREE cutouts - the pool, its
-  // 180-degree partner the sunken parterre, and the sunken court. A one-piece
-  // slab buried all three (measured on the first art pass: the water sheet sat
-  // under the floor), so the ground is authored as the complement instead.
-  const terraceSlabs: ReadonlyArray<readonly [string, number, number, number, number]> = [
-    ['north apron', 0, -25.35, 79, 10.3],
-    ['south apron', 0, 25.35, 79, 10.3],
-    ['pool west', -23.85, -15, 31.3, 10.4],
-    ['pool east', 23.85, -15, 31.3, 10.4],
-    ['garden west', -23.85, 15, 31.3, 10.4],
-    ['garden east', 23.85, 15, 31.3, 10.4],
-    ['pool inner walk', 0, -7.4, 79, 4.8],
-    ['garden inner walk', 0, 7.4, 79, 4.8],
-    ['court west', -24.25, 0, 30.5, 10],
-    ['court east', 24.25, 0, 30.5, 10],
-  ];
-  for (const [name, x, z, width, depth] of terraceSlabs) {
-    block(builder, `test2 terrace ${name}`, [x, -0.5, z], [width, 1, depth], travertine, { cast: false });
-  }
-  perimeter(builder, 'test2 estate wall', TEST2_BOUNDS, 3.4, stucco);
+  /**
+   * Axis-aligned rectangular prism from corner to corner. Every mass in this
+   * arena is authored as an EXTENT, not a centre and a size: the spec is a
+   * table of extents, walls have to meet exactly, and a stairwell hole has to
+   * line up with a stair tread to the centimetre. Centre/size arithmetic done
+   * by hand is where the old build's 0.5 m seams came from.
+   */
+  const rect = (
+    name: string,
+    x0: number, x1: number,
+    y0: number, y1: number,
+    z0: number, z1: number,
+    material: THREE.Material,
+    options: Parameters<typeof block>[5] = {},
+  ): THREE.Mesh => block(
+    builder, name,
+    [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2],
+    [x1 - x0, y1 - y0, z1 - z0],
+    material, options,
+  );
 
-  // --- centre: the sunken sport court -------------------------------------
-  // Sunk 0.35 m: below the autostep threshold on the way in, well under the
-  // jump apex on the way out, so the court reads as a pit without becoming a
-  // trap. Markings are flush geometry (see applyTest2Dressing for why).
-  block(builder, 'test2 court floor', [0, -0.85, 0], [18, 1, 10], court, { cast: false });
-  for (const side of [-1, 1] as const) {
-    for (const end of [-1, 1] as const) {
-      // Planters flanking the court: 1.9 m hard cover with a clipped box cap.
-      block(builder, `test2 planter ${side} ${end}`, [side * 10.5, HARD_COVER / 2, end * 7], [2.6, HARD_COVER, 2.6], stone);
-      block(builder, `test2 planter hedge ${side} ${end}`, [side * 10.5, 2.3, end * 7], [2.3, 0.8, 2.3], hedge, { solid: false, shots: true });
-      // Clipped hedge blocks on the outer court approaches.
-      block(builder, `test2 hedge block ${side} ${end}`, [side * 18, HARD_COVER / 2, end * 5.5], [5, HARD_COVER, 1.6], hedge);
-      // Terrace balustrade: 0.7 m, so it is a mountable step as well as
-      // kneeling cover - never a dead-band wall.
-      block(builder, `test2 balustrade ${side} ${end}`, [side * 26, MOUNT_LOW / 2, end * 8.7], [12, MOUNT_LOW, 0.5], stone);
-      // The garden terraces stepping down toward each sunken basin.
-      block(builder, `test2 terrace step ${side} ${end}`, [side * 14.25, 0.175, end * 19.2], [10.5, 0.35, 2.4], travertine);
+  /**
+   * One canonical stair run inside the given footprint, climbing to
+   * UPPER_FLOOR_Y along `direction`. The run must be exactly STAIR_RUN long on
+   * the climbing axis; the caller sizes the stairwell hole to match so the top
+   * riser lands flush against the floor slab it serves.
+   */
+  const stairRun = (
+    name: string,
+    x0: number, x1: number,
+    z0: number, z1: number,
+    direction: 'x+' | 'x-' | 'z+' | 'z-',
+    material: THREE.Material,
+  ): void => {
+    for (let step = 0; step < STAIR_RISERS; step += 1) {
+      const top = (UPPER_FLOOR_Y * (step + 1)) / STAIR_RISERS;
+      const near = step * STAIR_TREAD;
+      const far = (step + 1) * STAIR_TREAD;
+      if (direction === 'x+') rect(`${name} riser ${step}`, x0 + near, x0 + far, 0, top, z0, z1, material);
+      else if (direction === 'x-') rect(`${name} riser ${step}`, x1 - far, x1 - near, 0, top, z0, z1, material);
+      else if (direction === 'z+') rect(`${name} riser ${step}`, x0, x1, 0, top, z0 + near, z0 + far, material);
+      else rect(`${name} riser ${step}`, x0, x1, 0, top, z1 - far, z1 - near, material);
     }
-  }
+  };
 
-  // --- the two sunken basins ----------------------------------------------
-  // side = -1 is the POOL (north), side = +1 its exact 180-degree partner, the
-  // sunken parterre (south). Identical footprint, identical 0.55 m depth,
-  // identical exit steps; only the material and the dressing differ. That is
-  // what lets a pool lane and a garden lane coexist on a rotationally
-  // symmetric map without either team getting the easier half.
-  for (const side of [-1, 1] as const) {
-    const label = side < 0 ? 'pool' : 'parterre';
-    const surface = side < 0 ? poolTile : stone;
-    const centreZ = side * 15;
-    block(builder, `test2 ${label} basin floor`, [0, -1.05, centreZ], [16.4, 1, 10.4], surface, { cast: false });
-    block(builder, `test2 ${label} wall outer`, [0, -0.275, side * 20.05], [16.4, 0.55, 0.3], surface);
-    block(builder, `test2 ${label} wall inner`, [0, -0.275, side * 9.95], [16.4, 0.55, 0.3], surface);
-    for (const flank of [-1, 1] as const) {
-      block(builder, `test2 ${label} wall flank ${flank}`, [flank * 8.05, -0.275, centreZ], [0.3, 0.55, 10.4], surface);
-    }
-    // Two 0.27 m exit steps in one corner; the 0.55 m rim also clears a jump.
-    block(builder, `test2 ${label} step low`, [side * -5.4, -0.415, side * 11.4], [2.2, 0.27, 1.2], surface);
-    block(builder, `test2 ${label} step high`, [side * -5.4, -0.14, side * 10.6], [2.2, 0.28, 0.9], surface);
-    // Coping ring, 0.3 m: walkable over, and the visual lip the brief asks for.
-    block(builder, `test2 ${label} coping outer`, [0, 0.15, side * 20.5], [17.4, 0.3, 0.6], stone);
-    block(builder, `test2 ${label} coping inner`, [0, 0.15, side * 9.5], [17.4, 0.3, 0.6], stone);
-    for (const flank of [-1, 1] as const) {
-      block(builder, `test2 ${label} coping flank ${flank}`, [flank * 8.5, 0.15, centreZ], [0.6, 0.3, 10.4], stone);
-    }
-  }
-  // Presentation water only - the basin slab beneath it is the movement and
-  // shot authority (recorded as this arena's one visual/collider exception).
-  block(builder, 'test2 pool water sheet', [0, -0.35, -15], [15.7, 0.05, 9.7], poolWater, { solid: false, shots: false, cast: false });
-
-  // --- the villa wings and their verandas ---------------------------------
-  // The estate wraps the court: a wing on each long edge, 180-degree partners
-  // of one another, each with a colonnaded veranda you can fight along. The
-  // deck is 0.7 m (mountable at every balustrade gap), the balustrade tops out
-  // at 1.85 m absolute - hard cover from the court, a shooting parapet from
-  // the veranda - and the roof soffit sits at 3.6 m.
-  for (const side of [-1, 1] as const) {
-    block(builder, `test2 villa wing ${side}`, [0, 2.1, side * 26], [56, 4.2, 0.6], stucco);
-    block(builder, `test2 veranda deck ${side}`, [0, MOUNT_LOW / 2, side * 23], [50, MOUNT_LOW, 5.4], travertine);
-    block(builder, `test2 veranda roof ${side}`, [0, 3.75, side * 23], [51, 0.3, 5.8], stucco);
-    for (const columnX of [-24, -17, -10, -3, 3, 10, 17, 24]) {
-      block(builder, `test2 veranda column ${side} ${columnX}`, [columnX, 2.15, side * 20.6], [0.4, 2.9, 0.4], stucco);
-    }
-    // Balustrade only between the inner columns: the spans at |x| 17-24 stay
-    // open, so each veranda has three ways up (both flanks and the steps).
-    for (const balusterX of [-13.5, -6.5, 6.5, 13.5]) {
-      block(builder, `test2 veranda balustrade ${side} ${balusterX}`, [balusterX, 1.275, side * 20.5], [5.4, 1.15, 0.35], stone);
-    }
-    block(builder, `test2 grand step low ${side}`, [0, 0.175, side * 19.3], [6, 0.35, 1.2], stone);
-    block(builder, `test2 grand step high ${side}`, [0, MOUNT_LOW / 2, side * 20.2], [6, MOUNT_LOW, 0.8], stone);
-    // Glazed doors, recessed 0.2 m into the wing wall so the ballistic census
-    // sees them explained by the wall they are set into.
-    for (const glazingX of [-14, 14]) {
-      block(builder, `test2 villa glazing ${side} ${glazingX}`, [glazingX, 2, side * 25.65], [7, 2.6, 0.3], glass, { solid: false, shots: true });
-    }
+  // --- ground plane -------------------------------------------------------
+  for (const [name, x0, x1, z0, z1] of TEST2_PAVING) {
+    rect(`test2 paving ${name}`, x0, x1, -1, 0, z0, z1, travertine, { cast: false });
   }
 
-  // --- outbuildings, motor courts and gatehouses --------------------------
-  // Four outbuildings on the diagonals: pool houses at the pool's two ends,
-  // their 180-degree partners serving as the garden's garage/staff entry.
-  for (const side of [-1, 1] as const) {
-    for (const end of [-1, 1] as const) {
-      const px = side * 30;
-      const pz = end * 16;
-      block(builder, `test2 outbuilding rear ${side} ${end}`, [px, 1.7, pz + end * 3.9], [9, 3.4, 0.35], stucco);
-      block(builder, `test2 outbuilding outer ${side} ${end}`, [px + side * 4.3, 1.7, pz], [0.35, 3.4, 8], stucco);
-      block(builder, `test2 outbuilding inner ${side} ${end}`, [px - side * 4.3, 1.7, pz + end * 2.4], [0.35, 3.4, 3.2], stucco);
-      block(builder, `test2 outbuilding front ${side} ${end}`, [px + side * 2.6, 1.7, pz - end * 3.9], [3.8, 3.4, 0.35], stucco);
-      block(builder, `test2 outbuilding roof ${side} ${end}`, [px, 3.55, pz], [9.6, 0.3, 8.6], travertine);
+  // --- boundary -----------------------------------------------------------
+  // Generated from the blob, so the wall IS the outline and the two can never
+  // drift apart. Segments on the drive's far side (z >= 24) are 1.9 m parapets:
+  // the map is cut into a hillside and its south rim has to read as a drop, not
+  // as a fourth wall. 1.9 m is still hard cover and still far above the 0.82 m
+  // jump apex, so nothing leaves the map over it.
+  const boundaryHeight = (z0: number): number => (z0 >= 24 ? 1.9 : 3.4);
+  // Boundary masses start 2 m BELOW grade, not at it. The hillside dressing
+  // slab's top is at -1.60 m (test-maps-art.ts), so a wall footed at y = 0
+  // would show a 1.6 m strip of daylight under itself from every upper room
+  // that looks out over it.
+  const BOUNDARY_FOOT = -2;
+  {
+    const runs = (edge: 'min' | 'max'): void => {
+      let index = 0;
+      while (index < TEST2_BLOB.length) {
+        const value = edge === 'min' ? TEST2_BLOB[index][2] : TEST2_BLOB[index][3];
+        let end = index;
+        while (end + 1 < TEST2_BLOB.length && (edge === 'min' ? TEST2_BLOB[end + 1][2] : TEST2_BLOB[end + 1][3]) === value) end += 1;
+        const z0 = TEST2_BLOB[index][0];
+        const z1 = TEST2_BLOB[end][1];
+        const height = boundaryHeight(z0);
+        if (edge === 'min') rect(`test2 boundary west ${index}`, value - 0.8, value, BOUNDARY_FOOT, height, z0, z1, stucco);
+        else rect(`test2 boundary east ${index}`, value, value + 0.8, BOUNDARY_FOOT, height, z0, z1, stucco);
+        index = end + 1;
+      }
+    };
+    runs('min');
+    runs('max');
+    // Jogs: wherever the outline steps in or out, the cap across the step.
+    for (let index = 0; index + 1 < TEST2_BLOB.length; index += 1) {
+      const [, z, minA, maxA] = TEST2_BLOB[index];
+      const [, , minB, maxB] = TEST2_BLOB[index + 1];
+      const height = boundaryHeight(z);
+      if (minA !== minB) {
+        rect(`test2 boundary jog west ${index}`, Math.min(minA, minB) - 0.8, Math.max(minA, minB), BOUNDARY_FOOT, height, z - 0.8, z, stucco);
+      }
+      if (maxA !== maxB) {
+        rect(`test2 boundary jog east ${index}`, Math.min(maxA, maxB), Math.max(maxA, maxB) + 0.8, BOUNDARY_FOOT, height, z - 0.8, z, stucco);
+      }
     }
-    // Motor court: gatehouse, a hard-cover fountain wall, and a glazed
-    // orangery. The orangery replaces v1's parked cars, which both briefs
-    // forbid; it keeps the RAY TRACED preset a smooth surface at each end.
-    block(builder, `test2 gatehouse ${side}`, [side * 35, 1.7, side * -9], [4.5, 3.4, 6], stucco);
-    block(builder, `test2 motor wall ${side}`, [side * 31, HARD_COVER / 2, side * 3], [1.2, HARD_COVER, 9], stone);
-    block(builder, `test2 orangery ${side}`, [side * 30.5, 1.3, side * -5], [2.4, 2.6, 5.2], glass);
-    // Veranda seating: 0.4 m, dressing height by measurement.
-    block(builder, `test2 veranda bench ${side}`, [side * 20, 0.9, side * 22.4], [3.4, 0.4, 0.9], timber, { solid: false, shots: true });
+    rect('test2 boundary cap north', -28.8, 34.8, BOUNDARY_FOOT, 3.4, -38.8, -38, stucco);
+    rect('test2 boundary cap south', -10.8, 10.8, BOUNDARY_FOOT, 1.9, 38, 38.8, stucco);
   }
+
+  // =========================================================================
+  // NORTH LANE - the pool terrace. The map's one long lane, and the only one
+  // allowed to hold a 45 m+ line (spec 3.2).
+  // =========================================================================
+
+  // N1 sport court, sunk 0.35 m: one riser, walked in and out on the 0.42 m
+  // autostep, so it reads as a pit without becoming a trap. Deliberately BARE -
+  // this is the map's "cross it and pray" pocket and filling it to be fair
+  // would remove the tension the flank charges for (spec 7.7).
+  rect('test2 court floor', -37, -19, -1.35, -0.35, -33, -21, court, { cast: false });
+  rect('test2 court kerb north', -36, -30, -0.35, 0.35, -32.6, -32, stone);
+  rect('test2 court kerb south', -26, -20, -0.35, 0.35, -22, -21.4, stone);
+  rect('test2 court equipment box', -36.4, -34.4, -0.35, 1.55, -24.5, -22.5, stucco);
+  // Groundskeeper's store on the court's south-east corner, standing on grade
+  // rather than on the sunken floor so its 3.0 m mass actually breaks a line.
+  // It is here by measurement: without it the north lane and the west approach
+  // joined into one 72.8 m corner-to-corner diagonal. It sits clear of the
+  // court-to-pool line at z -27 and clear of the pool deck's own 45 m lane, so
+  // the one long lane spec 3.2 asks for survives intact.
+  rect('test2 court store base', -22.4, -19, 0, 0.7, -25.4, -21, stone);
+  rect('test2 court store body', -22.4, -19, 0.7, 3, -25.4, -21, stucco);
+  rect('test2 court store roof', -22.7, -18.7, 3, 3.3, -25.7, -20.7, travertine);
+
+  // N5 bar pavilion, seated in the 6 m gap between the sport court and the pool.
+  // Enclosed, one 2 m mouth, roof at 3.4 m and NOT reachable. Walk past it on
+  // either side: 3 m of coping walk to the north, 5 m of pool deck to the south.
+  //
+  // DEVIATION, twice over. The spec's own section 2 seats this at x -13..-5,
+  // which lies INSIDE its own pool water rect (x -14..+16) - the two callouts
+  // overlap and both cannot be built. It is resolved by moving the pavilion
+  // rather than the pool, and by moving it into the lane rather than to the
+  // pool's far end: mid-lane is the only place a 6 x 6 m mass does any work
+  // here, and without it the north lane measured a 72.8 m corner-to-corner
+  // line, which is the old build's defect wearing a new footprint.
+  rect('test2 pavilion wall north', -18, -11.5, 0, 3.4, -32, -31.6, stucco);
+  rect('test2 pavilion wall west', -18, -17.6, 0, 3.4, -32, -26, stucco);
+  rect('test2 pavilion wall east', -11.9, -11.5, 0, 3.4, -32, -26, stucco);
+  rect('test2 pavilion wall south west', -18, -16, 0, 3.4, -26.4, -26, stucco);
+  rect('test2 pavilion wall south east', -14, -11.5, 0, 3.4, -26.4, -26, stucco);
+  rect('test2 pavilion roof', -18.3, -11.2, 3.4, 3.7, -32.3, -25.7, travertine);
+  rect('test2 pavilion bar', -17, -13, 0, 1.9, -31, -30.4, stone);
+
+  // N3 pool. Presentation water over a SOLID basin slab - this arena's one
+  // authored visual/collider exception, reused verbatim from the old build.
+  rect('test2 pool basin floor', -10, 16, -1.55, -0.55, -35, -25, poolTile, { cast: false });
+  rect('test2 pool basin wall north', -10, 16, -0.55, 0, -35, -34.7, poolTile);
+  rect('test2 pool basin wall south', -10, 16, -0.55, 0, -25.3, -25, poolTile);
+  rect('test2 pool basin wall west', -10, -9.7, -0.55, 0, -35, -25, poolTile);
+  rect('test2 pool basin wall east', 15.7, 16, -0.55, 0, -35, -25, poolTile);
+  // Two exit-step pairs, SW and NE, each 0.27 / 0.28 m; the 0.55 m rim also
+  // clears a jump, so nobody is ever trapped in the basin.
+  rect('test2 pool step sw low', -9, -6.8, -1.55, -0.28, -26.8, -26, poolTile);
+  rect('test2 pool step sw high', -9, -6.8, -1.55, 0, -26, -25.2, poolTile);
+  rect('test2 pool step ne high', 10, 12.2, -1.55, 0, -34.4, -33.6, poolTile);
+  rect('test2 pool step ne low', 10, 12.2, -1.55, -0.28, -33.6, -32.8, poolTile);
+  rect('test2 pool coping south', -10.6, 16.6, 0, 0.3, -25, -24.4, stone);
+  rect('test2 pool coping west', -10.6, -10, 0, 0.3, -35, -25, stone);
+  rect('test2 pool coping east', 16, 16.6, 0, 0.3, -35, -25, stone);
+  rect('test2 pool water sheet', -9.8, 15.8, -0.4, -0.35, -34.8, -25.2, poolWater, { solid: false, shots: false, cast: false });
+
+  // N4 pool deck. The long planter box run is both kneeling cover you shoot
+  // over and a mountable step - never a dead-band wall.
+  rect('test2 deck planter run', -8, 14, 0, 0.7, -22.9, -22.1, stone);
+  rect('test2 deck cabana pier west', -3.3, -2.7, 0, 1.9, -24.6, -24, stucco);
+  rect('test2 deck cabana pier east', 7.7, 8.3, 0, 1.9, -24.6, -24, stucco);
+
+  // Flank route 3 - THE LEDGE. A continuous 0.70 m mountable ledge from the
+  // garage end, north up the wing's east flank, then west along the pool's
+  // north coping, arriving in the pool lane BEHIND anyone watching the covered
+  // walk. DEVIATION: the spec runs it across the pool deck screened by the
+  // planter box; a 4 m deck cannot carry a screened ledge (a 0.70 m walk behind
+  // a 0.70 m screen just stands you up), so it is authored on the map's north
+  // rim instead, where the wing and the pool screen it for their full length.
+  rect('test2 ledge east flank', 28.4, 31.6, 0, 0.7, -33.6, -20.4, stone);
+  rect('test2 ledge north rim', -10.6, 28.4, 0, 0.7, -35.6, -35, stone);
+
+  // N6/N7 north-east wing: a colonnaded ground floor closing the pool lane's
+  // east end, two enclosed rooms behind it, and U1 above.
+  rect('test2 wing wall north', 16, 28, 0, UPPER_SOFFIT, -32, -31.6, stucco);
+  rect('test2 wing wall east', 27.6, 28, 0, UPPER_SOFFIT, -32, -20, stucco);
+  rect('test2 wing wall west', 16, 16.4, 0, UPPER_SOFFIT, -32, -26, stucco);
+  rect('test2 wing wall south west', 16, 20, 0, UPPER_SOFFIT, -26.4, -26, stucco);
+  rect('test2 wing wall south east', 22.4, 28, 0, UPPER_SOFFIT, -26.4, -26, stucco);
+  rect('test2 wing room divider', 22, 22.4, 0, UPPER_SOFFIT, -31.6, -28.6, stucco);
+  rect('test2 wing counter', 17, 20, 0, 1.9, -30, -29.4, stone);
+  // Recessed glazing: set INTO the north wall's own thickness so the ballistic
+  // census sees it explained by the wall it is fitted to, which is the pattern
+  // every window on this map repeats.
+  rect('test2 wing glazing north', 17.5, 21, 0.7, 2.6, -31.9, -31.7, glass, { solid: false, shots: true });
+  // Six colonnade piers - the pool lane's only broken ground.
+  for (const pierX of [17.5, 22, 26.5]) {
+    for (const pierZ of [-25.2, -21.2]) {
+      rect(`test2 walk pier ${pierX} ${pierZ}`, pierX - 0.3, pierX + 0.3, 0, UPPER_SOFFIT, pierZ - 0.3, pierZ + 0.3, stucco);
+    }
+  }
+  // U1 floor, holed for the back stair. That stair is the counter-route the
+  // spec demands for the map's strongest position: it is entered from the
+  // covered walk, i.e. from the pool lane BOTH teams push, not from the team-1
+  // spawn.
+  rect('test2 wing floor landing', 22.05, 28, UPPER_SOFFIT, UPPER_FLOOR_Y, -32, -29.5, travertine);
+  rect('test2 wing floor main', 16, 28, UPPER_SOFFIT, UPPER_FLOOR_Y, -29.5, -20, travertine);
+  stairRun('test2 wing stair', 18, 18 + STAIR_RUN, -31.8, -30, 'x+', stone);
+  rect('test2 wing upper wall north', 16, 28, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -32, -31.6, stucco);
+  rect('test2 wing upper wall east', 27.6, 28, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -32, -20, stucco);
+  rect('test2 wing balcony rail west', 16, 16.4, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, -29.5, -20, stone);
+  rect('test2 wing balcony rail south', 16, 28, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, -20.4, -20, stone);
+  rect('test2 wing stairwell rail', 16, 22.05, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, -29.9, -29.5, stone);
+
+  // =========================================================================
+  // CENTRE LANE - the house. Short range, four mouths, always contested.
+  // =========================================================================
+
+  // C4 north house band: the mansion's north range. Its ground floor is the
+  // corridor spine that connects C1 to C2 to C3, and it is also the mass that
+  // guarantees no sightline sees two lanes at once (spec 3.2). Its roof
+  // parapet tops out at 4.80 m for exactly that reason: measured, a shooter in
+  // U1 (eye 5.10 m) sighting the west spawn apron crosses this face at 4.28 m.
+  for (const [x0, x1] of [[-24, -14], [-11.5, 6], [8.5, 20], [24, 28]] as const) {
+    rect(`test2 house north wall ${x0}`, x0, x1, 0, 3.4, -20, -19.6, stucco);
+  }
+  // The office window: the lane change the reference's own tips call out. A
+  // 0.70 m sill mounted from a 0.35 + 0.35 step outside, a 2.0 m opening above
+  // it, and a 0.70 m drop into the room - in from the pool lane, out over the
+  // sill, without re-entering the courtyard mouths.
+  rect('test2 house office sill', 20, 24, 0, 0.7, -20, -19.6, stone);
+  rect('test2 house office lintel', 20, 24, 2.7, 3.4, -20, -19.6, stucco);
+  rect('test2 house office step low', 20, 24, 0, 0.35, -21.3, -20.7, stone);
+  rect('test2 house office step high', 20, 24, 0, 0.7, -20.7, -20, stone);
+  for (const [x0, x1] of [[-24, -20], [-17, -2], [4, 16], [19, 28]] as const) {
+    rect(`test2 house south wall ${x0}`, x0, x1, 0, 3.4, -6.4, -6, stucco);
+  }
+  rect('test2 house wall west', -24, -23.6, 0, 3.4, -20, -6, stucco);
+  rect('test2 house wall east', 27.6, 28, 0, 3.4, -20, -6, stucco);
+  // Two cross walls with OFFSET door mouths: a 52 m interior hall would have
+  // been a longer sightline than anything outdoors on the map.
+  rect('test2 house cross west a', -10.2, -9.8, 0, 3.4, -20, -14, stucco);
+  rect('test2 house cross west b', -10.2, -9.8, 0, 3.4, -11.5, -6, stucco);
+  rect('test2 house cross east a', 13.8, 14.2, 0, 3.4, -20, -18, stucco);
+  rect('test2 house cross east b', 13.8, 14.2, 0, 3.4, -15.5, -6, stucco);
+  // Blind screens two metres inside each north door. Without them the two north
+  // doors, the courtyard's north mouth and the courtyard's south mouth line up
+  // well enough for a straight ray, and the pool deck could see the circular
+  // drive 52 m away through the house - measured, and exactly what spec 3.2
+  // forbids ("no sightline may see two lanes at once"). They also turn the
+  // corridor spine into a dogleg, which is what a house corridor is.
+  rect('test2 house door screen west', -16, -10, 0, 3.4, -17.5, -17.1, stucco);
+  rect('test2 house door screen east', 4, 10.5, 0, 3.4, -17.5, -17.1, stucco);
+  rect('test2 house spine counter', -6, -2, 0, 1.9, -12.6, -12, stone);
+  rect('test2 house office counter', 17, 21, 0, 1.9, -12, -11.4, stone);
+  // U2 upper landing: sees the pool deck through two window slots and nothing
+  // else. Its stair comes off the house spine.
+  rect('test2 house upper floor landing', -15.95, -4, UPPER_SOFFIT, UPPER_FLOOR_Y, -19.6, -17.8, travertine);
+  rect('test2 house upper floor main', -20, -4, UPPER_SOFFIT, UPPER_FLOOR_Y, -17.8, -12, travertine);
+  stairRun('test2 house stair', -20, -20 + STAIR_RUN, -19.6, -17.8, 'x+', stone);
+  for (const [x0, x1] of [[-15.95, -13], [-11, -8], [-6, -4]] as const) {
+    rect(`test2 house upper north wall ${x0}`, x0, x1, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -19.6, -19.2, stucco);
+  }
+  for (const [x0, x1] of [[-13, -11], [-8, -6]] as const) {
+    rect(`test2 house window slot ${x0}`, x0, x1, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, -19.6, -19.2, stone);
+  }
+  rect('test2 house upper wall west', -20, -19.6, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -17.8, -12, stucco);
+  rect('test2 house upper wall south', -20, -4, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -12.4, -12, stucco);
+  rect('test2 house upper wall east', -4.4, -4, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, -19.6, -12, stucco);
+  rect('test2 house stairwell rail', -20, -15.95, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, -17.8, -17.4, stone);
+  // Roof, authored as the complement of the U2 footprint, then the parapet.
+  rect('test2 house roof west', -24, -20, 3.4, 3.7, -20, -6, travertine);
+  rect('test2 house roof south', -20, -4, 3.4, 3.7, -12, -6, travertine);
+  rect('test2 house roof east', -4, 28, 3.4, 3.7, -20, -6, travertine);
+  rect('test2 house parapet west', -24, -23.6, 3.7, PARAPET_TOP, -20, -6, stone);
+  rect('test2 house parapet east', 27.6, 28, 3.7, PARAPET_TOP, -20, -6, stone);
+  rect('test2 house parapet south', -24, 28, 3.7, PARAPET_TOP, -6.4, -6, stone);
+  rect('test2 house parapet north west', -24, -20, 3.7, PARAPET_TOP, -20, -19.6, stone);
+  rect('test2 house parapet north east', -4, 28, 3.7, PARAPET_TOP, -20, -19.6, stone);
+
+  // C1 living room: team-0 side of the courtyard. Three mouths - west to the
+  // apron, east to the courtyard, north to the house spine - and a vantage
+  // window over the drive lane on its south wall.
+  // The west mouth is at the room's NORTH-WEST corner, not on its centre line.
+  // Centred, it lined up with the courtyard's west and east mouths and the
+  // kitchen divider's mouth, and the measured result was a 76.2 m line running
+  // from the west spawn apron clean through the house into the kitchen's east
+  // room - the same single-long-line defect the whole rebuild exists to remove,
+  // and a spawn-visibility break as well (spec 4.3).
+  rect('test2 living wall west', -24, -23.6, 0, 3.4, -3, 4, stucco);
+  for (const [x0, x1] of [[-24, -18], [-14, -8]] as const) {
+    rect(`test2 living wall south ${x0}`, x0, x1, 0, 3.4, 3.6, 4, stucco);
+  }
+  rect('test2 living window sill', -18, -14, 0, 0.7, 3.6, 4, stone);
+  rect('test2 living window lintel', -18, -14, 1.9, 3.4, 3.6, 4, stucco);
+  // Glazed door recessed INTO the south wall's own 0.4 m thickness, so the
+  // ballistic census sees it explained by the wall it is fitted to and the
+  // movement census sees a collider under it. This is also RAY TRACED coverage:
+  // the preset needs smooth surfaces to reflect on, and the demolished villa
+  // wings took the old build's glazing with them.
+  rect('test2 living glazing south', -23, -19, 0.7, 2.6, 3.75, 3.85, glass, { solid: false, shots: true });
+  rect('test2 living sofa run', -22, -18, 0, 0.7, -1.4, -0.6, timber);
+  // Chimney breast, standing across the room rather than against its north
+  // wall: hard cover at 1.9 m that a shooter in the west mouth has to lean
+  // around before the courtyard's west mouth opens up.
+  rect('test2 living chimney breast', -14.6, -12.6, 0, 1.9, -3, 1, stone);
+  rect('test2 living roof', -24, -7, 3.4, 3.7, -6, 4, travertine);
+  rect('test2 living parapet west', -24, -23.6, 3.7, PARAPET_TOP, -6, 4, stone);
+  rect('test2 living parapet south', -24, -7, 3.7, PARAPET_TOP, 3.6, 4, stone);
+
+  // C2 the central courtyard - the heart. 16 x 10 m, open to sky, enclosed on
+  // four sides, FOUR mouths, four full-height colonnade piers on a 9 m grid and
+  // a 0.70 m fountain kerb to mount. Everything here is short range.
+  for (const [z0, z1] of [[-6, -2], [2, 4]] as const) {
+    rect(`test2 courtyard wall west ${z0}`, -7, -6.6, 0, PARAPET_TOP, z0, z1, stucco);
+    rect(`test2 courtyard wall east ${z0}`, 10, 10.4, 0, PARAPET_TOP, z0, z1, stucco);
+  }
+  for (const [x0, x1] of [[-6.6, -2], [4, 10]] as const) {
+    rect(`test2 courtyard wall south ${x0}`, x0, x1, 0, PARAPET_TOP, 4, 4.4, stucco);
+  }
+  for (const pierX of [-2.5, 6.5]) {
+    for (const pierZ of [-3.5, 1.5]) {
+      rect(`test2 courtyard pier ${pierX} ${pierZ}`, pierX - 0.35, pierX + 0.35, 0, 3.4, pierZ - 0.35, pierZ + 0.35, stone);
+    }
+  }
+  rect('test2 courtyard fountain kerb', 0.1, 3.3, 0, 0.7, -2.4, 0.4, stone);
+
+  // C3 kitchen and dining: team-1 side of the courtyard, two connected rooms.
+  rect('test2 kitchen wall east', 27.6, 28, 0, 3.4, -6, 4, stucco);
+  for (const [x0, x1] of [[10.4, 21], [24, 28]] as const) {
+    rect(`test2 kitchen wall south ${x0}`, x0, x1, 0, 3.4, 3.6, 4, stucco);
+  }
+  for (const [z0, z1] of [[-6, 0], [2.5, 4]] as const) {
+    rect(`test2 kitchen divider ${z0}`, 19, 19.4, 0, 3.4, z0, z1, stucco);
+  }
+  rect('test2 kitchen glazing south', 12.5, 18, 0.7, 2.6, 3.75, 3.85, glass, { solid: false, shots: true });
+  rect('test2 kitchen counter run', 12, 16, 0, 1.9, -2, -1.2, stone);
+  rect('test2 kitchen island', 21, 25, 0, 0.7, -1.4, -0.2, stone);
+  rect('test2 kitchen roof', 10.4, 28, 3.4, 3.7, -6, 4, travertine);
+  rect('test2 kitchen parapet east', 27.6, 28, 3.7, PARAPET_TOP, -6, 4, stone);
+  rect('test2 kitchen parapet south', 10.4, 28, 3.7, PARAPET_TOP, 3.6, 4, stone);
+
+  // =========================================================================
+  // SOUTH LANE - the circular drive. Medium range, a circular island of cover,
+  // one elevated room firing across it from each end.
+  // =========================================================================
+
+  // S1 laundry block, team-0 side, with U3 and its balcony above. DEVIATION:
+  // the spec's footprint starts at x -26; it is carried west to x -30 so the
+  // west approach cannot hold a straight pool-deck-to-drive line, which spec
+  // 3.2 forbids outright. Measured before the change: 46 m, seeing both lanes.
+  for (const [x0, x1] of [[-30, -26], [-23.5, -12], [-9.5, -5]] as const) {
+    rect(`test2 laundry wall north ${x0}`, x0, x1, 0, 3.4, 5, 5.4, stucco);
+  }
+  for (const [z0, z1] of [[5, 8], [10.5, 16]] as const) {
+    rect(`test2 laundry wall west ${z0}`, -30, -29.6, 0, 3.4, z0, z1, stucco);
+  }
+  for (const [x0, x1] of [[-30, -18], [-15, -5]] as const) {
+    rect(`test2 laundry wall south ${x0}`, x0, x1, 0, 3.4, 15.6, 16, stucco);
+  }
+  for (const [z0, z1] of [[5, 8], [11, 16]] as const) {
+    rect(`test2 laundry wall east ${z0}`, -5.4, -5, 0, 3.4, z0, z1, stucco);
+  }
+  for (const [z0, z1] of [[5, 11], [13.5, 16]] as const) {
+    rect(`test2 laundry cross ${z0}`, -18, -17.6, 0, 3.4, z0, z1, stucco);
+  }
+  rect('test2 laundry bench', -27, -23, 0, 1.9, 8, 8.6, stone);
+  rect('test2 laundry floor west', -30, -10.5, UPPER_SOFFIT, UPPER_FLOOR_Y, 5, 16, travertine);
+  rect('test2 laundry floor south', -10.5, -5, UPPER_SOFFIT, UPPER_FLOOR_Y, 5, 7.35, travertine);
+  rect('test2 laundry floor north', -10.5, -5, UPPER_SOFFIT, UPPER_FLOOR_Y, 11.4, 16, travertine);
+  stairRun('test2 laundry stair', -9.6, -7.8, 11.4 - STAIR_RUN, 11.4, 'z-', stone);
+  rect('test2 laundry upper wall north', -30, -5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 5, 5.4, stucco);
+  rect('test2 laundry upper wall west', -30, -29.6, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 5, 16, stucco);
+  rect('test2 laundry upper wall east a', -5.4, -5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 5, 7.35, stucco);
+  rect('test2 laundry upper wall east b', -5.4, -5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 11.4, 16, stucco);
+  rect('test2 laundry balcony rail', -30, -5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 15.6, 16, stone);
+  rect('test2 laundry stairwell rail west', -10.9, -10.5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 7.35, 11.4, stone);
+  rect('test2 laundry stairwell rail north', -10.5, -5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 11.4, 11.8, stone);
+
+  // S4 gallery, team-1 side, with U4 above. Carried east to x +32 for the same
+  // reason S1 was carried west - the east approach must not hold a two-lane
+  // line either. Opens both to the kitchen rooms and to the drive.
+  for (const [x0, x1] of [[12, 21], [24, 32]] as const) {
+    rect(`test2 gallery wall north ${x0}`, x0, x1, 0, 3.4, 4, 4.4, stucco);
+  }
+  for (const [z0, z1] of [[4, 9.5]] as const) {
+    rect(`test2 gallery wall west ${z0}`, 12, 12.4, 0, 3.4, z0, z1, stucco);
+  }
+  for (const [x0, x1] of [[12, 20], [23, 32]] as const) {
+    rect(`test2 gallery wall south ${x0}`, x0, x1, 0, 3.4, 11.6, 12, stucco);
+  }
+  rect('test2 gallery wall east', 31.6, 32, 0, 3.4, 4, 12, stucco);
+  rect('test2 gallery glazing north', 14, 19.5, 0.7, 2.6, 4.15, 4.25, glass, { solid: false, shots: true });
+  rect('test2 gallery sculpture', 20, 22, 0, 1.9, 7, 9, stone);
+  // Service wing on the gallery's south-east corner. Same reason as the drive
+  // verges: without it the band at z 13-15 ran open from the S1/S4 passage to
+  // the east boundary, 47 m, which is a third long lane the map is not allowed.
+  rect('test2 gallery service north', 24, 32, 0, 3.4, 12, 12.4, stucco);
+  rect('test2 gallery service east', 31.6, 32, 0, 3.4, 12, 16, stucco);
+  rect('test2 gallery service south', 24, 32, 0, 3.4, 15.6, 16, stucco);
+  rect('test2 gallery service west', 24, 24.4, 0, 3.4, 12, 16, stucco);
+  rect('test2 gallery service roof', 23.7, 32.3, 3.4, 3.7, 11.7, 16.3, travertine);
+  rect('test2 gallery floor east', 17.5, 32, UPPER_SOFFIT, UPPER_FLOOR_Y, 4, 12, travertine);
+  rect('test2 gallery floor north', 12, 17.5, UPPER_SOFFIT, UPPER_FLOOR_Y, 4, 4.6, travertine);
+  rect('test2 gallery floor south', 12, 17.5, UPPER_SOFFIT, UPPER_FLOOR_Y, 9.45, 12, travertine);
+  stairRun('test2 gallery stair', 13.5, 15.3, 5.4, 5.4 + STAIR_RUN, 'z+', stone);
+  rect('test2 gallery upper wall north', 12, 32, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 4, 4.4, stucco);
+  rect('test2 gallery upper wall east', 31.6, 32, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 4, 12, stucco);
+  rect('test2 gallery upper wall west a', 12, 12.4, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 4, 4.6, stucco);
+  rect('test2 gallery upper wall west b', 12, 12.4, UPPER_FLOOR_Y, UPPER_FLOOR_Y + UPPER_WALL, 9.45, 12, stucco);
+  rect('test2 gallery balcony rail', 12, 32, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 11.6, 12, stone);
+  rect('test2 gallery stairwell rail east', 17.5, 17.9, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 4.6, 9.45, stone);
+  rect('test2 gallery stairwell rail north', 12, 17.5, UPPER_FLOOR_Y, UPPER_FLOOR_Y + BALCONY_RAIL, 4.2, 4.6, stone);
+
+  // S3 drive island: the only cover in the middle of the drive lane, and it
+  // must be circumnavigable. The kerb is 0.30 m so it is walked onto, and the
+  // planters and fountain plinth clear the standing eye.
+  rect('test2 drive island kerb', -4, 8, -0.3, 0.3, 21, 29, stone, { cast: false });
+  for (const [px, pz] of [[-3, 22], [2, 21.6], [7, 22], [-3, 28], [2, 28.4], [7, 28]] as const) {
+    rect(`test2 drive planter ${px} ${pz}`, px - 0.8, px + 0.8, 0.3, 2.2, pz - 0.8, pz + 0.8, hedge);
+  }
+  rect('test2 drive fountain plinth', 0.5, 3.5, 0.3, 2.2, 24, 26, stone);
+  // The drive lane's two verge masses. NOT in the spec's callout list, and
+  // they are here for a measured reason: the diagram's own drive band is 60 m
+  // wide (x -34..+26) and, left open, it held a 74.7 m ground-to-ground line -
+  // a second 45 m+ lane, which spec 3.2 allows exactly one of, and it is the
+  // pool terrace. A carport at the circle's west mouth and a planted verge at
+  // its east mouth cut it with architecture rather than prop clutter, and the
+  // carport is also what U3's balcony is given to overlook.
+  rect('test2 carport wall north', -30, -22, 0, 3.4, 18, 18.4, stucco);
+  rect('test2 carport wall west', -30, -29.6, 0, 3.4, 18, 26, stucco);
+  rect('test2 carport wall south', -30, -22, 0, 3.4, 25.6, 26, stucco);
+  rect('test2 carport pier east', -22.4, -22, 0, 3.4, 18, 21, stucco);
+  rect('test2 carport pier east b', -22.4, -22, 0, 3.4, 23, 26, stucco);
+  rect('test2 carport roof', -30.3, -21.7, 3.4, 3.7, 17.7, 26.3, travertine);
+  for (const [px, pz] of [[16.5, 18.5], [19.5, 18.5]] as const) {
+    rect(`test2 drive verge ${px}`, px - 1.5, px + 1.5, 0, 1.9, pz - 1.5, pz + 1.5, hedge);
+  }
+  rect('test2 drive approach kerb west', -14, -6, 0, 0.7, 32, 32.8, stone);
+  rect('test2 drive approach kerb east', 4, 12, 0, 0.7, 32, 32.8, stone);
+
+  // =========================================================================
+  // THE TWO ENDS
+  // =========================================================================
+
+  // E1 west spawn apron. Open unpaved end, two mountable garden walls and a
+  // planter run screening it from the approach. No elevated room sees into it
+  // (measured: U1's line into this apron crosses the house parapet at 4.28 m
+  // against a 4.80 m top).
+  rect('test2 apron garden wall north', -44, -40.5, 0, 0.7, -7.4, -6.8, stone);
+  rect('test2 apron garden wall south', -44, -40.5, 0, 0.7, 1.4, 2, stone);
+  rect('test2 apron planter run', -40.4, -39.6, 0, 0.7, -6, 1, hedge);
+
+  // The garden store in the west approach. It is not in the reference's own
+  // callout list; it is here because without it the west approach holds a 46 m
+  // line that sees the pool deck AND the circular drive, which spec 3.2 bans.
+  rect('test2 store wall north', -38, -30, 0, 3.4, -17, -16.6, stucco);
+  rect('test2 store wall south', -38, -30, 0, 3.4, -9.4, -9, stucco);
+  rect('test2 store wall west', -38, -37.6, 0, 3.4, -17, -9, stucco);
+  rect('test2 store wall east a', -30.4, -30, 0, 3.4, -17, -14, stucco);
+  rect('test2 store wall east b', -30.4, -30, 0, 3.4, -11.5, -9, stucco);
+  rect('test2 store roof', -38.3, -29.7, 3.4, 3.7, -17.3, -8.7, travertine);
+  rect('test2 store rack', -36, -33, 0, 1.9, -14, -13.4, stone);
+
+  // E2 east spawn: a long covered garage block, open along its west face, with
+  // bay piers as hard cover and a 0.70 m kerb line to step up onto. Its roof is
+  // at 4.0 m and is not reachable.
+  rect('test2 garage wall north', 36, 50, 0, 4, -13.4, -13, stucco);
+  rect('test2 garage wall south', 36, 50, 0, 4, 11, 11.4, stucco);
+  rect('test2 garage wall east', 49.6, 50, 0, 4, -13, 11, stucco);
+  rect('test2 garage roof', 35.6, 50, 4, 4.3, -13.4, 11.4, travertine);
+  for (const pierZ of [-12, -8, -4, 0, 4, 8]) {
+    rect(`test2 garage pier ${pierZ}`, 36, 36.6, 0, 4, pierZ - 0.35, pierZ + 0.35, stucco);
+  }
+  rect('test2 garage kerb', 37.4, 38.2, 0, 0.7, -12, 10, stone);
+  rect('test2 garage bench', 44, 48, 0, 1.9, 9.4, 10, stone);
 
   // Domination flag poles at the zone anchors (presentation; banners tinted by
-  // the mode presentation at runtime via these exact names). Zone B stands on
-  // the sunken court floor, so its plinth is dropped to meet it.
+  // the mode presentation at runtime via these exact names). All three anchors
+  // now stand on flat paving, so the old zone-B plinth drop is gone.
   for (const zone of TEST2_DOMINATION_ZONES) {
     const [zoneX, , zoneZ] = zone.centre;
-    const groundY = zone.id === 'B' ? -0.35 : 0;
-    block(builder, `test2 zone plinth ${zone.id}`, [zoneX, groundY + 0.12, zoneZ], [1.6, 0.24, 1.6], stone);
+    block(builder, `test2 zone plinth ${zone.id}`, [zoneX, 0.12, zoneZ], [1.6, 0.24, 1.6], stone);
     // One material per zone: the runtime recolours these by name, and keeping
     // them distinct also keeps them out of the merged presentation batch,
     // whose shell-scale AABB would otherwise have to be triaged.
-    block(builder, `test2-zone-flag-pole-${zone.id}`, [zoneX, groundY + 2.1, zoneZ], [0.12, 4, 0.12], standard(0x8b949c, 0.5, 0.7), { solid: false, shots: false });
-    block(builder, `test2-zone-flag-banner-${zone.id}`, [zoneX + 0.65, groundY + 3.55, zoneZ], [1.3, 0.8, 0.06], standard(0xcccccc, 0.85, 0.02), { solid: false, shots: false });
+    block(builder, `test2-zone-flag-pole-${zone.id}`, [zoneX, 2.1, zoneZ], [0.12, 4, 0.12], standard(0x8b949c, 0.5, 0.7), { solid: false, shots: false });
+    block(builder, `test2-zone-flag-banner-${zone.id}`, [zoneX + 0.65, 3.55, zoneZ], [1.3, 0.8, 0.06], standard(0xcccccc, 0.85, 0.02), { solid: false, shots: false });
   }
 
   applyTest2Dressing(builder.root, materials);
@@ -503,23 +992,30 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
-    // Exact 180-degree images of one another, on the motor court at each end.
+    // Exact X MIRRORS of one another (see the file header): six points spread
+    // across 12 m of z at each end, so one grenade cannot cover a spawn.
     spawns: spawnRecord(
-      [[-36, -10], [-36, -3], [-36, 4], [-34, -7], [-34, 0], [-31, -10]],
-      [[36, 10], [36, 3], [36, -4], [34, 7], [34, 0], [31, 10]],
+      [[-47, -8], [-47, -2], [-47, 2], [-45, -5], [-45, 0], [-43, -7]],
+      [[47, -8], [47, -2], [47, 2], [45, -5], [45, 0], [43, -7]],
     ),
+    // Ten at grade and FOUR on the +3.40 m floors. The old comment kept every
+    // anchor at grade because the only raised surface was a 0.70 m deck a bot
+    // had to jump onto; with four stairs and four upper rooms, bots that never
+    // go upstairs simply do not defend the map's power positions.
     patrolPoints: [
-      // All at grade: a point on the 0.7 m veranda deck is reachable but makes
-      // the bot pay a jump to stand on its own patrol anchor.
-      [-29, -6], [29, 6], [-20, -12], [20, 12], [0, -15], [0, 15],
-      [-14, 0], [14, 0], [-22, -18], [22, 18], [24, -11], [-24, 11],
-    ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
+      [-44, 0, -3], [-30, 0, -26], [0, 0, -23], [24, 0, -22],
+      [2, 0, -1], [-16, 0, -1], [22, 0, -1], [2, 0, 24],
+      [44, 0, 0], [-16, 0, 12],
+      [22, UPPER_FLOOR_Y, -25], [-12, UPPER_FLOOR_Y, -15],
+      [-16, UPPER_FLOOR_Y, 11], [24, UPPER_FLOOR_Y, 8],
+    ].map(([x, y, z]) => new THREE.Vector3(x, y, z)),
     targets: [],
     houses: [],
     breakableWindows: [],
     physicalCover: [],
     bounds: { ...TEST2_BOUNDS },
     houseTelemetry: emptyTelemetry(),
+    // Lowest standable surface is the pool basin at -0.55 m; unchanged.
     physicsSafetyFloorY: -1.2,
   };
 }

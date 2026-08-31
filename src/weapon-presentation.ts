@@ -32,6 +32,7 @@ import {
   advanceAdsBlend,
   advanceWeaponHeat,
   fireCycleAt,
+  VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
   VIEWMODEL_EQUIP_SETTLED_SECONDS,
   VIEWMODEL_LAND_DIP_SETTLE_SECONDS,
   viewmodelContactResponse,
@@ -39,6 +40,7 @@ import {
   viewmodelLandDropMetersAt,
   viewmodelSprintPoseEase,
   viewmodelFireAdmissionFromResponse,
+  type ViewmodelContactEnvelope,
   type ViewmodelContactResponse,
   type ViewmodelFireAdmission,
 } from './weapon-presentation-state';
@@ -113,6 +115,12 @@ export type WeaponPose = {
   lateralSpeed: number;
   /** Presentation-only camera-space retreat from nearby walls/floor. */
   surfaceRetreat?: number;
+  /**
+   * Presentation-only metres from the eye to the nearest obstruction inside
+   * the MEASURED rig envelope. Drives the contact fold and nothing else; the
+   * HF-343 fire gate keeps consuming `surfaceRetreat` unchanged.
+   */
+  surfaceContactDepth?: number | null;
   /** Presentation-only vertical clearance from nearby floor geometry. */
   surfaceLift?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
@@ -730,6 +738,277 @@ export function authoredNearPlaneContactRetreat(weapon: WeaponId, surfaceRetreat
     1,
   );
   return FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT[weapon] * contactBlend;
+}
+
+// ---------------------------------------------------------------------------
+// MEASURED CONTACT FOLD
+//
+// Owner, across several passes and again this morning: "the gun clipping is
+// still happening everywhere". Every previous fix went green and did not work,
+// because every previous gate asserted on a pure REDUCER while the renderer
+// applied something else. Measured at HEAD, eye 0.40 m from a wall: the
+// reducer asked for 0.78 m of retreat, the renderer performed 0.28 m (the
+// VIEWMODEL_NEAR_PLANE_SAFE_RETREAT clamp, minus the authored contact retreat
+// on top), and the carbine muzzle finished 0.889 m PAST the wall. The sniper -
+// the longer gun - travelled LESS (0.14 m) and finished 0.937 m through.
+//
+// Retreat alone cannot fix that. A rig whose muzzle sits ~1.96 m in front of
+// the eye needs ~1.6 m of translation to clear a wall 0.40 m away, which puts
+// the whole weapon behind the camera. What DOES fix it is what shipped
+// first-person games do at muzzle-contact range: fold the weapon up so its
+// forward reach collapses, retreat what is left, and shrink slightly. Forward
+// reach under a pitch of t is dominated by cos(t): at 0.82 rad (the authored
+// ceiling) a 0.88 m barrel still reaches 0.60 m forward of the root; at
+// 1.40 rad it reaches 0.03 m.
+//
+// So the fold is SOLVED, not authored. Given the rig's measured root-local
+// bounds and the measured distance to the surface, find the smallest fold that
+// puts the forward-most rig point at or behind the surface while keeping the
+// nearest rig point in front of the camera near plane. One authored bound
+// remains - how far a rig may fold before it reads as inside-out - and it is a
+// single physical limit rather than a per-weapon guess.
+// ---------------------------------------------------------------------------
+
+export const VIEWMODEL_CONTACT_FOLD_CONTRACT = 'measured-viewmodel-contact-fold-v1';
+/** Hard ceiling on total high-ready pitch. Beyond this the rig reads inside-out. */
+export const VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS = 1.5;
+/** Extra shrink at full fold, on top of the authored contact response scale. */
+export const VIEWMODEL_CONTACT_FOLD_MINIMUM_SCALE = 0.72;
+/** Stand-off kept between the forward-most rig point and the contact surface. */
+export const VIEWMODEL_CONTACT_FOLD_MARGIN_METERS = 0.06;
+/** Bisection steps. The solve is nine transformed points per step. */
+const CONTACT_FOLD_SOLVE_STEPS = 14;
+
+/** The rig's own bounds, in the viewmodel root's LOCAL frame. Measured, never authored. */
+export type ViewmodelRigBounds = Readonly<{
+  minX: number; maxX: number;
+  minY: number; maxY: number;
+  minZ: number; maxZ: number;
+  /** Root-local muzzle point: the authored socket where the model has one. */
+  muzzleX: number; muzzleY: number; muzzleZ: number;
+  /**
+   * Convex hull, in the root-local (y, z) plane, of every PER-MESH bound
+   * corner. The fold pitches about X, so depth under a fold is a support
+   * query in exactly this plane and only hull points can ever answer it.
+   *
+   * One whole-rig AABB is not good enough here and the difference is the fix.
+   * Measured on the carbine: the rig box spans y -0.430..0.355 and
+   * z -0.894..0.713, so its rear-top corner is (0.355, 0.713) - the height of
+   * the optic at the depth of the stock butt, where the weapon has no material
+   * at all. Pitched to the stow angle that corner sits 7 cm further back than
+   * any real geometry, and since the near plane is measured off the rearmost
+   * point, that phantom corner alone cost ~7 cm of retreat. Per-mesh corners
+   * keep the optic's height with the optic's depth.
+   */
+  hullYZ: readonly (readonly [number, number])[];
+  /** Meshes the bounds were taken from. Zero means "no measurement, fall back". */
+  meshes: number;
+}>;
+
+/** Monotone-chain convex hull. Small inputs (tens of points), run once per weapon. */
+function convexHullYZ(points: readonly (readonly [number, number])[]): (readonly [number, number])[] {
+  if (points.length <= 3) return [...points];
+  const sorted = [...points].sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+  const cross = (
+    o: readonly [number, number],
+    a: readonly [number, number],
+    b: readonly [number, number],
+  ): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const build = (input: readonly (readonly [number, number])[]): (readonly [number, number])[] => {
+    const chain: (readonly [number, number])[] = [];
+    for (const point of input) {
+      while (chain.length >= 2 && cross(chain[chain.length - 2], chain[chain.length - 1], point) <= 0) chain.pop();
+      chain.push(point);
+    }
+    chain.pop();
+    return chain;
+  };
+  return [...build(sorted), ...build([...sorted].reverse())];
+}
+
+export type ViewmodelContactFold = Readonly<{
+  contract: typeof VIEWMODEL_CONTACT_FOLD_CONTRACT;
+  engaged: boolean;
+  /** Camera-space metres of retreat the renderer will actually perform. */
+  retreatMeters: number;
+  /** Extra high-ready pitch beyond the authored contact response, radians. */
+  foldPitchRadians: number;
+  /** Extra uniform scale factor beyond the authored contact response. */
+  scale: number;
+  /** Closest root z the camera near plane allows, given the folded rig. */
+  nearPlaneLimitZ: number;
+  /** Forward-most rig point after the solve, metres from the eye. */
+  forwardReachMeters: number;
+  /** Muzzle after the solve, metres from the eye. */
+  muzzleForwardMeters: number;
+  /** Metres of rig still past the surface. Zero is the acceptance condition. */
+  residualMeters: number;
+}>;
+
+/**
+ * The camera's near plane where the camera has one. A viewmodel is always
+ * mounted on a perspective camera in the live runtime; headless tests hand in
+ * a bare Camera, and a conservative default keeps the solve honest there.
+ */
+function viewmodelCameraNearMeters(camera: THREE.Camera): number {
+  const near = (camera as THREE.PerspectiveCamera).near;
+  return Number.isFinite(near) && near > 0 ? near : 0.05;
+}
+
+// Retained scratch for the once-per-weapon bounds measurement.
+const rigBoundsToRoot = new THREE.Matrix4();
+const rigBoundsMatrix = new THREE.Matrix4();
+const rigBoundsAccumulator = new THREE.Box3();
+const rigBoundsMesh = new THREE.Box3();
+
+const CONTACT_FOLD_CLEAR: ViewmodelContactFold = Object.freeze({
+  contract: VIEWMODEL_CONTACT_FOLD_CONTRACT,
+  engaged: false,
+  retreatMeters: 0,
+  foldPitchRadians: 0,
+  scale: 1,
+  nearPlaneLimitZ: Number.POSITIVE_INFINITY,
+  forwardReachMeters: 0,
+  muzzleForwardMeters: 0,
+  residualMeters: 0,
+});
+
+/**
+ * Camera-space Z of a root-local point once the root has been pitched about X
+ * by `pitch` and uniformly scaled. Yaw and roll are deliberately excluded: the
+ * contact response drives them to at most ~0.18 rad, they shorten the forward
+ * reach rather than lengthen it, and leaving them out keeps the solve
+ * conservative instead of optimistic.
+ */
+function pitchedLocalZ(y: number, z: number, pitch: number, scale: number): number {
+  return (y * Math.sin(pitch) + z * Math.cos(pitch)) * scale;
+}
+
+/**
+ * Depth span of the rig once pitched, in camera-space metres relative to the
+ * root: `muzzle` is the barrel exit, `back` the rearmost bound corner (the
+ * near-plane constraint), `front` the forward-most bound corner.
+ *
+ * `front` is deliberately NOT the fold's target. The rig's bounds are an
+ * axis-aligned box around a long thin object, so once the box is pitched its
+ * bottom-front corner juts up to ~28 cm further forward than any real
+ * geometry; targeting it demands an extreme fold that buys nothing on screen.
+ * Measured on the mounted models, the muzzle IS the forward-most real point
+ * (carbine bound reach 1.970 m against a muzzle at 1.958 m), so the muzzle -
+ * which is also the owner-facing acceptance metric - is what the fold closes,
+ * and `front` rides along as telemetry.
+ */
+function rigDepthSpan(
+  bounds: ViewmodelRigBounds,
+  pitch: number,
+  scale: number,
+): { front: number; back: number; muzzle: number } {
+  const sin = Math.sin(pitch);
+  const cos = Math.cos(pitch);
+  let front = Number.POSITIVE_INFINITY;
+  let back = Number.NEGATIVE_INFINITY;
+  for (const point of bounds.hullYZ) {
+    const rotated = (point[0] * sin + point[1] * cos) * scale;
+    if (rotated < front) front = rotated;
+    if (rotated > back) back = rotated;
+  }
+  const muzzle = pitchedLocalZ(bounds.muzzleY, bounds.muzzleZ, pitch, scale);
+  return { front: Math.min(front, muzzle), back: Math.max(back, muzzle), muzzle };
+}
+
+/**
+ * Solves the fold. Pure: everything it needs is an argument, so the gate can
+ * assert on the transform the renderer applies rather than on a reducer's
+ * return value - which is precisely the gap five defects hid in.
+ *
+ * Returns an unengaged result when there is nothing to solve against - no
+ * measured rig, or no obstruction inside the envelope - and the renderer then
+ * keeps its historical unmeasured behaviour exactly.
+ */
+export function solveViewmodelContactFold(input: {
+  bounds: ViewmodelRigBounds | null;
+  /** Measured metres from the eye to the surface, or null when clear. */
+  contactDepthMeters: number | null;
+  /** Root z with the authored contact retreat already subtracted, no fold. */
+  baseRootZ: number;
+  /** Root z the authored response alone would reach (base + authored retreat). */
+  authoredRootZ: number;
+  /** Authored contact-response pitch already going into the root rotation. */
+  basePitchRadians: number;
+  /** Root uniform scale the authored response already produces. */
+  baseScale: number;
+  /** camera.near plus the viewmodel's near-plane clearance. */
+  nearPlaneMeters: number;
+  maximumPitchRadians?: number;
+  marginMeters?: number;
+}): ViewmodelContactFold {
+  const { bounds } = input;
+  const depth = input.contactDepthMeters;
+  if (!bounds || bounds.meshes <= 0 || depth === null || !Number.isFinite(depth)) return CONTACT_FOLD_CLEAR;
+  const maximumPitch = Math.max(
+    input.basePitchRadians,
+    input.maximumPitchRadians ?? VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS,
+  );
+  const margin = input.marginMeters ?? VIEWMODEL_CONTACT_FOLD_MARGIN_METERS;
+  const target = Math.max(0, depth - margin);
+  const baseScale = Math.max(1e-4, input.baseScale);
+
+  // What the pose does with no fold at all. If that is already clear, the
+  // authored response is untouched and this frame costs one evaluation.
+  const evaluate = (fold: number, allowExtraRetreat = false): ViewmodelContactFold => {
+    const pitch = input.basePitchRadians + fold * (maximumPitch - input.basePitchRadians);
+    const scaleFactor = 1 - fold * (1 - VIEWMODEL_CONTACT_FOLD_MINIMUM_SCALE);
+    const span = rigDepthSpan(bounds, pitch, baseScale * scaleFactor);
+    // rootZ <= -(near) - back keeps the nearest rig point in front of the near
+    // plane; rootZ >= -target - front puts the forward-most point behind the
+    // surface. Retreat as far as contact demands, never past the near plane,
+    // and never forward of where the authored response already sits.
+    const nearPlaneLimitZ = -input.nearPlaneMeters - span.back;
+    const demandedZ = -target - span.muzzle;
+    // Retreat only as far as the geometry needs, never past the near plane,
+    // and never past what the authored response already asked for. Folding is
+    // preferred over retreating on purpose: retreat drags the arms toward the
+    // lens (the reason a blanket 0.28 m cap was here in the first place),
+    // while folding shortens the rig's reach without moving it at the camera.
+    const rootZCeiling = allowExtraRetreat
+      ? nearPlaneLimitZ
+      : Math.min(nearPlaneLimitZ, input.authoredRootZ);
+    const rootZ = Math.min(rootZCeiling, Math.max(input.baseRootZ, demandedZ));
+    const muzzleForward = -(rootZ + span.muzzle);
+    return Object.freeze({
+      contract: VIEWMODEL_CONTACT_FOLD_CONTRACT,
+      // True for every result the solve actually produced. The renderer uses
+      // it to choose between the solved translation and the historical
+      // unmeasured clamp, so it must NOT flicker with how much retreat this
+      // particular frame needed.
+      engaged: true,
+      retreatMeters: Math.max(0, rootZ - input.baseRootZ),
+      foldPitchRadians: pitch - input.basePitchRadians,
+      scale: scaleFactor,
+      nearPlaneLimitZ,
+      forwardReachMeters: -(rootZ + span.front),
+      muzzleForwardMeters: muzzleForward,
+      residualMeters: Math.max(0, muzzleForward - target),
+    });
+  };
+
+  const bisect = (allowExtraRetreat: boolean): ViewmodelContactFold | null => {
+    if (evaluate(0, allowExtraRetreat).residualMeters <= 0) return evaluate(0, allowExtraRetreat);
+    if (evaluate(1, allowExtraRetreat).residualMeters > 0) return null;
+    let low = 0;
+    let high = 1;
+    for (let step = 0; step < CONTACT_FOLD_SOLVE_STEPS; step += 1) {
+      const mid = (low + high) / 2;
+      if (evaluate(mid, allowExtraRetreat).residualMeters > 0) low = mid; else high = mid;
+    }
+    return evaluate(high, allowExtraRetreat);
+  };
+  // Stage one: close it with the fold, spending no more retreat than the
+  // authored response already asked for. Stage two, only if that cannot close
+  // it: spend retreat up to the near plane as well. Even then a 2 m rig
+  // against a surface 0.40 m away may not close completely, so publish the
+  // residual rather than pretending - `residualMeters` is what the gate reads.
+  return bisect(false) ?? bisect(true) ?? evaluate(1, true);
 }
 
 /**
@@ -1569,6 +1848,9 @@ export class WeaponPresentation {
   private surfaceLift = 0;
   private prone = false;
   private contactResponse: ViewmodelContactResponse = viewmodelContactResponse('carbine', 0, 0, false, 0);
+  /** Measured root-local bounds per weapon. Populated on first mount, then reused. */
+  private readonly rigBounds = new Map<WeaponId, ViewmodelRigBounds>();
+  private contactFold: ViewmodelContactFold = CONTACT_FOLD_CLEAR;
   private fullscreenPresentationSuppressed = false;
   private readonly minigunSpool = createMinigunSpoolState();
   private actionContract: CharacterActionContract = characterActionContract({
@@ -2994,6 +3276,98 @@ export class WeaponPresentation {
     });
   }
 
+  /**
+   * The mounted weapon's own bounds, in the viewmodel root's LOCAL frame.
+   *
+   * Measured once per weapon off the real mesh, then cached: geometry does not
+   * change, and the contact fold must never be handed an authored guess again.
+   * The ARMS are excluded on purpose - their batched sleeve mesh carries a
+   * bounding box roughly a metre looser than the anatomy it covers (measured
+   * 2.11 m of forward reach against a 1.47 m weapon), so folding against it
+   * would fold the rig in open ground. The hands sit on the weapon, so the
+   * weapon's own span still covers the volume the lattice has to sample.
+   */
+  private measureRigBounds(): ViewmodelRigBounds | null {
+    const cached = this.rigBounds.get(this.active);
+    if (cached) return cached;
+    const model = this.models.get(this.active);
+    if (!model || !this.modelIsGpuReady(model)) return null;
+    this.root.updateWorldMatrix(true, false);
+    model.updateMatrixWorld(true);
+    const toRoot = rigBoundsToRoot.copy(this.root.matrixWorld).invert();
+    const bounds = rigBoundsAccumulator.makeEmpty();
+    const hullPoints: (readonly [number, number])[] = [];
+    let meshes = 0;
+    model.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.visible) return;
+      for (let parent: THREE.Object3D | null = node.parent; parent && parent !== model; parent = parent.parent) {
+        if (!parent.visible) return;
+      }
+      const geometry = node.geometry as THREE.BufferGeometry | undefined;
+      if (!geometry) return;
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      if (!geometry.boundingBox) return;
+      rigBoundsMesh.copy(geometry.boundingBox)
+        .applyMatrix4(rigBoundsMatrix.multiplyMatrices(toRoot, node.matrixWorld));
+      bounds.union(rigBoundsMesh);
+      hullPoints.push(
+        [rigBoundsMesh.min.y, rigBoundsMesh.min.z],
+        [rigBoundsMesh.min.y, rigBoundsMesh.max.z],
+        [rigBoundsMesh.max.y, rigBoundsMesh.min.z],
+        [rigBoundsMesh.max.y, rigBoundsMesh.max.z],
+      );
+      meshes += 1;
+    });
+    if (meshes === 0 || !Number.isFinite(bounds.min.z) || !Number.isFinite(bounds.max.z)) return null;
+    const muzzle = this.socketLocalPosition(model, 'muzzle-socket');
+    const measured: ViewmodelRigBounds = Object.freeze({
+      minX: bounds.min.x, maxX: bounds.max.x,
+      minY: bounds.min.y, maxY: bounds.max.y,
+      minZ: bounds.min.z, maxZ: bounds.max.z,
+      hullYZ: Object.freeze(convexHullYZ(hullPoints)),
+      // No authored socket: the forward-most bound corner is the muzzle for
+      // fold purposes, which is conservative rather than optimistic.
+      muzzleX: muzzle?.x ?? (bounds.min.x + bounds.max.x) / 2,
+      muzzleY: muzzle?.y ?? (bounds.min.y + bounds.max.y) / 2,
+      muzzleZ: muzzle?.z ?? bounds.min.z,
+      meshes,
+    });
+    this.rigBounds.set(this.active, measured);
+    return measured;
+  }
+
+  /**
+   * The rig's camera-space envelope at the NEUTRAL pose - no contact retreat,
+   * no fold, no recoil. The contact lattice is placed with this, so a longer
+   * weapon gets a longer probe over the volume it really occupies. Taking it
+   * at the neutral pose is what stops the obvious feedback loop: a folded rig
+   * is shorter, a shorter rig probes less, and the fold would chatter.
+   */
+  contactProbeEnvelope(): ViewmodelContactEnvelope | null {
+    const bounds = this.measureRigBounds();
+    if (!bounds) return null;
+    const scale = THREE.MathUtils.lerp(HIP_VIEWMODEL_SCALE, ADS_VIEWMODEL_SCALE, this.adsBlend)
+      * viewmodelScreenScale(this.camera);
+    const x = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.x, ADS_VIEWMODEL_BASE_POSITION.x, this.adsBlend);
+    const y = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
+    const z = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend)
+      - VIEWMODEL_NEAR_PLANE_CLEARANCE;
+    return Object.freeze({
+      contract: VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
+      weapon: this.active,
+      minX: x + bounds.minX * scale,
+      maxX: x + bounds.maxX * scale,
+      minY: y + bounds.minY * scale,
+      maxY: y + bounds.maxY * scale,
+      forwardReachMeters: -(z + bounds.minZ * scale),
+    });
+  }
+
+  /** The fold the renderer applied on the last update. Read-only telemetry. */
+  contactFoldState(): ViewmodelContactFold {
+    return this.contactFold;
+  }
+
   private socketLocalPosition(model: THREE.Object3D, name: string): THREE.Vector3 | null {
     const socket = model.getObjectByName(name);
     if (!socket) return null;
@@ -3969,10 +4343,19 @@ export class WeaponPresentation {
       // now reports the APPLIED translation; the uncapped demand stays available
       // as requestedSurfaceRetreat. Fire admission and the contact fold keep
       // consuming the demand, so combat safety is unchanged.
-      surfaceRetreat: Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
+      surfaceRetreat: this.contactFold.engaged
+        ? this.contactFold.retreatMeters
+        : Math.min(this.surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT),
       requestedSurfaceRetreat: this.surfaceRetreat,
-      surfaceRetreatCapMeters: VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
-      surfaceRetreatCapped: this.surfaceRetreat > VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      surfaceRetreatCapMeters: this.contactFold.engaged
+        ? this.contactFold.retreatMeters
+        : VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      surfaceRetreatCapped: this.contactFold.engaged
+        ? this.contactFold.retreatMeters < this.surfaceRetreat
+        : this.surfaceRetreat > VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+      // The solved fold, so an instrument can read what the renderer did to
+      // the transform rather than what a reducer asked for.
+      contactFold: this.contactFold,
       surfaceLift: this.surfaceLift,
       contactResponse: this.contactResponse,
       // HF-343: typed fire admission so the browser evidence gate and the
@@ -5091,16 +5474,47 @@ export class WeaponPresentation {
     // and mouse sway collapse as the blend completes, so the sight settles on the
     // crosshair with a clear, unobstructed picture instead of drifting around it.
     const aimSteady = 1 - this.adsBlend * 0.86;
-    const surfaceRetreatClamped = Math.min(pose.surfaceRetreat ?? 0, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
-    const authoredContactRetreat = authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped);
+    // THE APPLIED RETREAT. This used to be min(demand, 0.28) - a blanket cap
+    // that no unit test could see, because every unit test asserted on the
+    // reducers, which return the uncapped demand. Measured at HEAD with the
+    // eye 0.40 m from a wall: reducers 0.78 m, renderer 0.28 m, carbine muzzle
+    // 0.889 m through the wall; the longer sniper travelled 0.14 m and
+    // finished further through. Near-plane safety is now solved against the
+    // rig's MEASURED bounds instead, so the retreat is whatever the geometry
+    // genuinely needs and the fold covers what retreat physically cannot.
+    const surfaceRetreatDemand = Math.max(0, pose.surfaceRetreat ?? 0);
+    const authoredContactRetreat = authoredNearPlaneContactRetreat(this.active, surfaceRetreatDemand);
     const adsSightPictureRetreat = this.adsBlend * (FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT[this.active] ?? 0);
+    // Root z with no contact retreat at all: the origin the solve measures from.
+    const contactFoldBaseZ = viewmodelBaseZ + adsZ - adsSightPictureRetreat
+      - VIEWMODEL_NEAR_PLANE_CLEARANCE - authoredContactRetreat;
+    this.contactFold = solveViewmodelContactFold({
+      bounds: this.measureRigBounds(),
+      contactDepthMeters: pose.surfaceContactDepth ?? null,
+      baseRootZ: contactFoldBaseZ,
+      authoredRootZ: contactFoldBaseZ + surfaceRetreatDemand,
+      basePitchRadians: this.contactResponse.pitchRadians,
+      baseScale: this.unsuppressedViewmodelScale(),
+      nearPlaneMeters: viewmodelCameraNearMeters(this.camera) + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+    });
+    // Unmeasured rigs (headless, a model still loading, a weapon with no mesh)
+    // keep the historical clamp exactly: this change only moves poses the
+    // renderer can actually measure.
+    const surfaceRetreatClamped = this.contactFold.engaged
+      ? this.contactFold.retreatMeters
+      : Math.min(surfaceRetreatDemand, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
     // The fire kick plus a full surface retreat can push the viewmodel behind
     // the near plane while prone against a wall; the weapon must stay at least
     // as far from the camera as its near-plane-clear hip position, and the
     // recoil pitch swings the stock back toward the camera, so the cap carries
-    // an extra stock-swing allowance during the fire kick.
-    const fireNearPlaneCapZ = viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
-      - (presentationKick > 0.05 ? 0.1 : 0);
+    // an extra stock-swing allowance during the fire kick. The solved
+    // near-plane limit is the measured form of the same rule and wins whenever
+    // the rig has been measured.
+    const fireNearPlaneCapZ = Math.min(
+      this.contactFold.nearPlaneLimitZ + authoredContactRetreat,
+      viewmodelBaseZ + surfaceRetreatClamped - adsSightPictureRetreat
+        - (presentationKick > 0.05 ? 0.1 : 0),
+    );
     // Floor contact must survive the complete action envelope, not only the
     // idle mesh. Counter the authored downward recoil translation and raise a
     // detached magazine by a bounded fraction while it is below the receiver;
@@ -5142,10 +5556,18 @@ export class WeaponPresentation {
       ) - authoredContactRetreat,
     );
     this.root.position.lerp(targetPosition, smoothing(18));
+    // Shrinking the rig buys forward clearance that translation cannot. Applied
+    // here so it composes with the per-frame setScalar and the melee lift
+    // instead of racing them.
+    if (this.contactFold.scale !== 1) this.root.scale.multiplyScalar(this.contactFold.scale);
     this.root.rotation.x = THREE.MathUtils.lerp(
       this.root.rotation.x,
       presentationKick * profile.recoilRotation * 1.15 - this.swayY * aimSteady
         - grenadeArc * 0.42 + reloadStage.pitch + this.contactResponse.pitchRadians
+        // The solved fold. Kept as its own term rather than folded into
+        // contactResponse: the HF-343 fire admission reads that record, and
+        // presentation must not be able to move what the trigger sees.
+        + this.contactFold.foldPitchRadians
         + this.stancePose.pitchRadians * stanceHip,
       smoothing(22),
     );

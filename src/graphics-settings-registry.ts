@@ -199,7 +199,7 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
   }),
   control({
     key: 'frameRateLimit', id: 'graphics-frame-rate-limit', category: 'display', label: 'Maximum FPS',
-    description: 'Bounds presentation work without changing the fixed-step simulation. The final slider position is uncapped. UNCAPPED means the game imposes no limit - your real ceiling is then the browser’s vsync, which paces frames to your monitor’s refresh. A page cannot switch vsync off itself; launch Chrome with --disable-gpu-vsync --disable-frame-rate-limit (tools/play-atomic-acres-no-vsync.cmd does exactly that) to run above it.',
+    description: 'Bounds presentation work without changing the fixed-step simulation. The final slider position is uncapped. UNCAPPED means the game imposes no limit - your real ceiling is then your monitor’s refresh rate, because the browser paces frames to it. Two things raise that ceiling, and the FPS readout tells you which one you need: if the display-refresh notice appears, raise the refresh in Windows Settings › System › Display › Advanced display. To go above the refresh entirely, a page cannot switch vsync off itself - run tools/play-atomic-acres-no-vsync.cmd, which launches a separate Chrome with --disable-gpu-vsync --disable-frame-rate-limit and leaves your normal profile untouched. Measured on the owner’s RTX 5080 at 1440p: 52 presented frames per second vsynced against 63-78 uncapped.',
     kind: 'range', minimum: 30, maximum: 361, step: 1, unit: 'fps', unlimitedSentinel: 361,
     applyMode: 'live', runtimeConsumer: 'frame-scheduler',
   }),

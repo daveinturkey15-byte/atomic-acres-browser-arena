@@ -862,12 +862,24 @@ for index, (x, z) in enumerate(((-18, -16), (18, 16), (-26, -2), (26, 2), (-30, 
     add_cylinder(f"BLD_PROP_lamp_{index}", [x, 2.8, z], 0.11, 5.6, M["metal"], 10)
     add_box(f"BLD_PROP_lamp_arm_{index}", [x + (0.55 if x < 0 else -0.55), 5.45, z], [1.25, 0.12, 0.12], M["metal"], 0.025)
     add_uv_sphere(f"BLD_PROP_lamp_glow_{index}", [x + (1.05 if x < 0 else -1.05), 5.28, z], [0.22, 0.18, 0.22], M["emissive_amber"])
-# v3 (owner HITL 2026-08-29): trees re-seated for the house-per-end anatomy;
-# mirrors the map.ts substantial list exactly.
-for index, (x, z, scale) in enumerate(((-9, -28.5, 1.0), (9, 28.5, 1.0), (-33.5, -26, 0.9), (33.5, 26, 0.9), (-13, 27.5, 0.85), (13, -27.5, 0.85), (-34.5, 10, 0.9), (34.5, -10, 0.9))):
-    add_cylinder(f"BLD_PROP_tree_trunk_{index}", [x, 2.0 * scale, z], 0.34 * scale, 4.0 * scale, M["timber"], 10)
-    for cluster, (ox, oy, oz) in enumerate(((0, 5.2, 0), (-0.9, 4.8, 0.4), (0.9, 4.9, -0.4), (0, 6.0, 0.25))):
-        add_uv_sphere(f"BLD_PROP_tree_crown_{index}_{cluster}", [x + ox * scale, oy * scale, z + oz * scale], [1.45 * scale, 1.15 * scale, 1.3 * scale], M["foliage"])
+# TREES ARE NOT AUTHORED HERE ANY MORE (owner 2026-08-31: "trees ... still feel
+# poor on nuketown"). This block used to bake, for each of the eight authored
+# yard positions, ONE cylinder trunk plus FOUR identical UV spheres in the flat
+# MAT_foliage_military material - eight trees that differed only by three scale
+# values and batched into a single draw. Because resolveRenderProfile('')
+# returns 'blender', that sphere-on-a-stick WAS the tree on the route the owner
+# plays; the rich procedural tree in src/environment-assets.ts never ran there.
+# A tint cannot rescue it - MAT_foliage_military is 0x405D3D and material.color
+# multiplies - so the nodes are gone from the source instead.
+#
+# The replacement is planted at the SAME eight authored positions by
+# buildNuketownYardVegetation() in src/nuketown-forest-surround.ts, called from
+# addNeighbourhoodLife (pass31-neighbourhood-life), which is a SIBLING of the
+# arena root and therefore renders on EVERY profile - Quality included. The
+# quality-composition parity gate audits exactly that union (shipped GLB meshes
+# + the environment-assets sibling group), so the eight
+# `authored-tree-trunk-collider-*` colliders keep a visible owner.
+_AUTHORED_YARD_TREES = ((-9, -28.5, 1.0), (9, 28.5, 1.0), (-33.5, -26, 0.9), (33.5, 26, 0.9), (-13, 27.5, 0.85), (13, -27.5, 0.85), (-34.5, 10, 0.9), (34.5, -10, 0.9))
 # v3: the irrigation terminals were deleted from the arena entirely
 # (DECLUTTER 2026-08-29); their quality twins go with them.
 # v3.1: the rear-strip concrete planters carry real colliders, so the Quality

@@ -216,7 +216,15 @@ describe('Quality Graphics environment asset', () => {
     // REDESIGN 2026-08-29 wave 2: -88 = the two retired (+/-22) yard-fence
     // side runs (44 beveled tris each); the cultivation cluster re-seat is
     // pure translation and adds nothing.
-    expect(provenance.runtimeAudit.triangles).toBe(36_712); // v4: the enterable bus hull
+    // Re-pinned 2026-08-31: 36_712 -> 32_236, exactly -4_476. The eight yard
+    // "trees" in the Blender source were one cylinder trunk plus four identical
+    // UV spheres each, in a single flat material, batched into ONE draw - the
+    // owner called them out as poor and they were the only tree in the playfield.
+    // Deleted from the source and re-baked; real vegetation is now planted at the
+    // same eight authored positions by buildNuketownYardVegetation() in pass31,
+    // which renders on EVERY profile (the old procedural trees only existed on
+    // ?render=performance, so he never saw them). Exact equality, as ever.
+    expect(provenance.runtimeAudit.triangles).toBe(32_236); // v5: sphere-trees removed
     expect(provenance.runtimeAudit.auditedHouseApertures).toBe(16);
     expect(provenance.runtimeAudit.apertureAuditSamples).toBe(144);
   });

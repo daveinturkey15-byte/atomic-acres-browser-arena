@@ -18,7 +18,7 @@ const MINIMUM_HEIGHT_M = 1.05;
 /** Dressing thinner than this reads as clip-forgivable (wires, stems). */
 const MINIMUM_THICKNESS_M = 0.16;
 /** Safety valve: a pathological root cannot flood the per-frame probe list. */
-const MAXIMUM_BOXES = 420;
+const MAXIMUM_BOXES = 1_200;
 
 const scratchBox = new THREE.Box3();
 
@@ -29,11 +29,19 @@ export function collectPresentationObstructionBoxes(roots: ReadonlyArray<THREE.O
     root.updateMatrixWorld(true);
     root.traverse((node) => {
       if (boxes.length >= MAXIMUM_BOXES) return;
-      if (!(node instanceof THREE.Mesh) || !node.visible) return;
-      // Batched sources stay hidden but their merged batch mesh would produce
-      // one giant AABB; skip anything merged and anything instanced (tufts,
-      // shrubs - individually thin).
-      if (node.userData.staticBatchRendered === true) return;
+      if (!(node instanceof THREE.Mesh)) return;
+      // A merged batch mesh carries `sourceMeshes` and would contribute ONE
+      // enormous AABB spanning everything it merged; skip it.
+      const mergedBatch = node.userData.staticBatchRendered === true
+        && typeof node.userData.sourceMeshes === 'number';
+      if (mergedBatch) return;
+      // Measured 2026-08-31: batching hides its SOURCE meshes
+      // (mesh.visible = false, staticBatchRendered = true) and draws the merge
+      // instead - so an invisibility test alone discarded the entire batched
+      // art layer, which on atomic-acres is most of the dressing there is. A
+      // batched source is on screen; it just is not the object drawing it.
+      const batchedSource = node.userData.staticBatchRendered === true;
+      if (!node.visible && !batchedSource) return;
       if ((node as THREE.InstancedMesh).isInstancedMesh) return;
       const geometry = node.geometry as THREE.BufferGeometry | undefined;
       if (!geometry) return;

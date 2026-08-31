@@ -16,7 +16,7 @@ import {
 } from './art-kit';
 import { arenaAnimationAt } from './arena-storytelling';
 import { authoredLargeCoverIdAt } from './map';
-import { buildNuketownForestSurround } from './nuketown-forest-surround';
+import { buildNuketownForestSurround, buildNuketownYardVegetation } from './nuketown-forest-surround';
 import { buildNuketownLawnField } from './nuketown-lawn-field';
 import { buildNuketownMountainBackdrop } from './nuketown-mountain-backdrop';
 
@@ -389,6 +389,15 @@ export function addNeighbourhoodLife(root: THREE.Object3D, reduced: boolean): TH
   // DECLUTTER 2026-08-29: the corner earth banks became a real instanced
   // forest ring between the fence and the foothills.
   const forest = buildNuketownForestSurround(group);
+  // Owner 2026-08-31: "trees ... still feel poor on nuketown". The eight yard
+  // trees the Quality profile used to draw were a cylinder plus four identical
+  // UV spheres baked into the arena GLB; those nodes are deleted from the
+  // Blender source and re-baked, and the real trees are planted here instead -
+  // in this group, because it is the only layer that renders on EVERY profile.
+  // It also answers "you cannot walk up to a tree": until now the only
+  // vegetation inside the fence was grass.
+  const yardVegetation = buildNuketownYardVegetation(group);
+  group.userData.nuketownYardVegetationStats = yardVegetation.stats;
   group.userData.nuketownForestStats = forest.stats;
   group.userData.nuketownLawnStats = lawn.stats;
   group.userData.nuketownBackdropStats = backdrop.stats;

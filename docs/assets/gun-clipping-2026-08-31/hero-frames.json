@@ -1,0 +1,582 @@
+[
+  {
+    "name": "hero-1-post-carbine-100cm",
+    "weapon": "carbine",
+    "stance": "stand",
+    "requestedPose": [
+      -34.5,
+      1.7,
+      11.31,
+      0,
+      0
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -34.5,
+        1.7001000428199768,
+        11.3100004196167
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.584,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.858
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.858
+        }
+      ],
+      "nearestForwardMeters": 0.858,
+      "nearestColliderBounds": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0.7487179487179486,
+        "highReadyBlend": 0.7487179487179486,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0.011646723646723646,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000105704,
+    "rootRotX": 0.6139487179486061,
+    "muzzleWorld": [
+      -34.2137182468721,
+      1.7691890449397834,
+      9.894748995369444
+    ],
+    "muzzleCam": [
+      0.28628175312790205,
+      -0.07091099788019362,
+      -1.4152514242472556
+    ],
+    "lowestWeaponWorldY": 0.8001595596509797
+  },
+  {
+    "name": "hero-2-post-carbine-070cm",
+    "weapon": "carbine",
+    "stance": "stand",
+    "requestedPose": [
+      -34.5,
+      1.7,
+      11.01,
+      0,
+      0
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -34.499996185302734,
+        1.700099446773529,
+        11.009989738464355
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.558
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.558
+        }
+      ],
+      "nearestForwardMeters": 0.558,
+      "nearestColliderBounds": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000004,
+    "rootRotX": 0.8199999999999621,
+    "muzzleWorld": [
+      -34.188793472326644,
+      1.8029238602921134,
+      9.721018418721735
+    ],
+    "muzzleCam": [
+      0.31120271297609037,
+      -0.037175586481415834,
+      -1.28897131974262
+    ],
+    "lowestWeaponWorldY": 0.7561336511555656
+  },
+  {
+    "name": "hero-3-post-sniper-100cm",
+    "weapon": "sniper",
+    "stance": "stand",
+    "requestedPose": [
+      -34.5,
+      1.7,
+      11.31,
+      0,
+      0
+    ],
+    "diag": {
+      "weapon": "sniper",
+      "stance": "stand",
+      "position": [
+        -34.5,
+        1.7001000428199768,
+        11.3100004196167
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.702,
+      "probeLengthMeters": 1.95,
+      "probePaddingMeters": 0.182,
+      "retreat": 0.885,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.822
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.822
+        }
+      ],
+      "nearestForwardMeters": 0.822,
+      "nearestColliderBounds": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "sniper",
+        "obstructionBlend": 0.903061224489796,
+        "highReadyBlend": 0.903061224489796,
+        "fireBlocked": true,
+        "blockReason": "high-ready",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.9999999999999997,
+    "rootRotX": 0.8669387755102212,
+    "muzzleWorld": [
+      -34.123963786272256,
+      1.9465867605817624,
+      9.847671350308037
+    ],
+    "muzzleCam": [
+      0.376036213727744,
+      0.10648671776178542,
+      -1.4623290693086624
+    ],
+    "lowestWeaponWorldY": 0.611757380021511
+  },
+  {
+    "name": "hero-4-prone-floor-carbine",
+    "weapon": "carbine",
+    "stance": "prone",
+    "requestedPose": [
+      -27,
+      0.64,
+      20,
+      4.712,
+      -1.2
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "prone",
+      "position": [
+        -27,
+        0.634990017414093,
+        20
+      ],
+      "yawRadians": 4.712,
+      "pitchRadians": -1.2,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.74,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0.9420289855072463,
+        "highReadyBlend": 0.9420289855072463,
+        "fireBlocked": true,
+        "blockReason": "high-ready",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000004,
+    "rootRotX": 0.7724637681159133,
+    "muzzleWorld": [
+      -26.089893057920236,
+      -0.2861951571304796,
+      20.30617583947772
+    ],
+    "muzzleCam": [
+      0.30582180257512803,
+      0.4638375038167055,
+      -1.31889349854249
+    ],
+    "lowestWeaponWorldY": -0.5150685456805022
+  },
+  {
+    "name": "hero-5-stand-floor-carbine",
+    "weapon": "carbine",
+    "stance": "stand",
+    "requestedPose": [
+      -27,
+      1.7,
+      20,
+      4.712,
+      -1.2
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -27.0000057220459,
+        1.7000975394248963,
+        19.99997901916504
+      ],
+      "yawRadians": 4.712,
+      "pitchRadians": -1.2,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.139999999999998,
+    "rootRotX": 4.8957207169058756e-18,
+    "muzzleWorld": [
+      -26.61083946098424,
+      -0.109328240677394,
+      20.191444164022542
+    ],
+    "muzzleCam": [
+      0.19131375233449432,
+      -0.34360199467398544,
+      -1.95798541107823
+    ],
+    "lowestWeaponWorldY": -0.23502406347833166
+  },
+  {
+    "name": "hero-6-post-contact-carbine",
+    "weapon": "carbine",
+    "stance": "stand",
+    "requestedPose": [
+      -34.5,
+      1.7,
+      14,
+      0,
+      0
+    ],
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -34.500003814697266,
+        1.7051914715766907,
+        10.711099624633789
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000004,
+    "rootRotX": 0.8199999999999994,
+    "muzzleWorld": [
+      -34.188095853059494,
+      1.7970479483481476,
+      9.422128304870181
+    ],
+    "muzzleCam": [
+      0.3036033126649045,
+      -0.04814450820078564,
+      -1.2889713197636077
+    ],
+    "lowestWeaponWorldY": 0.7502577139135232
+  }
+]

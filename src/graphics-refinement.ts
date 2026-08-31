@@ -32,9 +32,18 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // HF-359 (Pass 74): ported from the Pass 69 hidden lane (64x64 island).
   'farcrysis': Object.freeze({ halfWidth: 44, halfHeight: 44, near: 4, far: 150 }),
   'high-seas': Object.freeze({ halfWidth: 32, halfHeight: 58, near: 4, far: 190 }),
-  // Test1: 52x38 range ground. Test2: 64x48 hillside estate.
+  // Test1: 64x46 range ground.
   'test1': Object.freeze({ halfWidth: 34, halfHeight: 27, near: 4, far: 176 }),
-  'test2': Object.freeze({ halfWidth: 40, halfHeight: 32, near: 4, far: 182 }),
+  // Test2 RE-PINNED 2026-08-31: the arena was rebuilt from 76 x 58 m to
+  // 100 x 76 m (docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md section 1.3), so the
+  // authored 80 x 64 volume no longer covered the playfield - a 10 m band down
+  // each long edge and a 6 m band at each end fell outside the cascade. 54 x 42
+  // half-extents cover 108 x 84, i.e. the new bounds plus a 4 m margin, the same
+  // margin the old pin carried. `far` follows the same rule it always did (the
+  // volume's own depth plus the sun's standoff) and rises 182 -> 196 with the
+  // longer diagonal (125.7 m against 95.6 m). The map's tallest authored mass
+  // is the 4.8 m house parapet, so nothing needs more depth than that.
+  'test2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -49,6 +58,10 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   'farcrysis': 0.18,
   'high-seas': 0.2,
   // Test1 dusty matte plywood/sandbag range; Test2 reflective travertine and pool.
+  // Test2 re-checked against the 2026-08-31 rebuild and HELD at 0.22: the
+  // rebuild changed the arena's extent and its verticality, not its surface
+  // mix - travertine paving, stucco walls, a stone kerb vocabulary and one
+  // pool, in the same proportions the 0.22 was fitted to.
   'test1': 0.16,
   'test2': 0.22,
 });

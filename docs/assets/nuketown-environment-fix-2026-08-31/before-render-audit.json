@@ -1,0 +1,44 @@
+{
+  "renderAuditDraws": 139,
+  "renderAuditTriangles": 89060,
+  "visibleSceneDraws": 139,
+  "visibleSceneTriangles": 527566,
+  "byName": [
+    {
+      "name": "BLD_BATCH_MAT_foliage_military",
+      "triangles": 6384
+    },
+    {
+      "name": "forest-broadleaf-canopies",
+      "triangles": 160
+    },
+    {
+      "name": "forest-broadleaf-trunks",
+      "triangles": 28
+    },
+    {
+      "name": "forest-conifers",
+      "triangles": 60
+    },
+    {
+      "name": "forest-understory",
+      "triangles": 20
+    },
+    {
+      "name": "nuketown-lawn-region-0",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-1",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-2",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-3",
+      "triangles": 15
+    }
+  ]
+}

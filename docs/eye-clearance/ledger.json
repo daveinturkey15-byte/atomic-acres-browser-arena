@@ -27,7 +27,7 @@
     },
     {
       "arena": "high-seas",
-      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (\u00b10.90, 22.15)",
+      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (±0.90, 22.15)",
       "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
     },
     {
@@ -49,7 +49,7 @@
       "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
-      "test2": "UNMEASURED (2026-08-31) - as test1"
+      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)"
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },
@@ -64,7 +64,7 @@
       "arena": "test2",
       "at": "2026-08-31",
       "violations": 0,
-      "note": "First real measurement. 3665 legal hug spots, 25655 traces, ZERO violations. Note stage 1 reports 24 colliders with no legal adjacent stance, all veranda balustrade: the sweep evaluates hug candidates against a hardcoded ground plane of 0 while that deck sits at 0.7, so it is asking whether a player can stand beside a balustrade from the wrong elevation. Instrument limitation, not a map defect; tracked as the per-candidate standing-surface follow-up."
+      "note": "RE-MEASURED after the 100 x 76 m layout rebuild (was 76 x 58 m). 3467 legal hug spots, 24269 traces, ZERO violations across all three stances; stage 3 teleported the real player to every flagged spot and had none to check. The ceiling stays at 0 - it is not re-pinned, because the measurement did not move off it. The SPOT COUNT moved (3665 -> 3467) and that is expected: the bounds changed, the thinning stride went 4 -> 5 with the larger collider set, and 21 paving slabs replaced 10 terrace bands. The rebuild also cut colliders-with-no-legal-adjacent-stance from 24 to 9; the 24 were all veranda balustrade, and the veranda is demolished. The 9 that remain are the same instrument limitation the old note recorded - the sweep evaluates hug candidates against a hardcoded ground plane of 0, so it asks whether a player can stand beside a +3.40 m upper-room wall from grade. Tracked as the per-candidate standing-surface follow-up, not a map defect."
     }
   ],
   "openRegressions": [

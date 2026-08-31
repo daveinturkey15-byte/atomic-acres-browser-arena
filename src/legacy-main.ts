@@ -481,7 +481,7 @@ import {
   type DirectionalDamageState,
   type LowHealthFeedbackState,
 } from './sensory-feedback';
-import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
+import { FramePacingSampler, cadenceWithNoProgressAge, presentationIsDisplayLimited } from './frame-pacing';
 import { advanceLocalHealthRegen } from './local-health-regen';
 import {
   addCameraShakeImpulse,
@@ -1700,6 +1700,7 @@ let hudSway: HudSwayState = createHudSwayState();
 let hudSwayReleased = false;
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
+const fpsCounterLabel = element<HTMLElement>('#fps-counter span');
 const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
@@ -5568,6 +5569,13 @@ let activeMatchAdmissionRun: Readonly<{
   promise: Promise<MatchAdmissionResult>;
 }> | null = null;
 let refreshWarningUntil = 0;
+/**
+ * Armed at match start, spent the first time presentation is actually judged
+ * display-limited. A window measured from the DEPLOY call was unreachable: the
+ * arena can take longer to load than the window lasted, so the notice expired
+ * before there was a presented frame to evaluate.
+ */
+let refreshWarningPending = false;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let privateMatchMode: MatchMode = 'ffa';
 // HF-360: locally persisted operator-skin choice; validated on read so a
@@ -10737,11 +10745,25 @@ let presentationObstructionKey = '';
 const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
 
 function activePresentationObstructionBoxes(): readonly Box2[] {
+  // Measured 2026-08-31 on atomic-acres: this fed the fold ZERO boxes against
+  // 2746 visible meshes. 'test1-dressing'/'test2-dressing' are names that only
+  // exist in src/test-maps-art.ts, and neighbourhoodLifeRoot is the Nuketown
+  // life layer - so on the owner's main map the dressing fold was inert and
+  // the gun rendered straight through every prop. The arena's own ART root is
+  // where atomic-acres keeps its dressing, so it goes in the list.
   const dressingRoot = arena.root.getObjectByName('test1-dressing') ?? arena.root.getObjectByName('test2-dressing');
-  const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}`;
+  const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}:${arenaArtRoot?.uuid ?? ''}`;
   if (key !== presentationObstructionKey) {
     presentationObstructionKey = key;
-    presentationObstructionBoxes = collectPresentationObstructionBoxes([neighbourhoodLifeRoot, dressingRoot]);
+    presentationObstructionBoxes = collectPresentationObstructionBoxes([
+      neighbourhoodLifeRoot,
+      dressingRoot,
+      arenaArtRoot,
+      // The arena's own root last: its props are the dressing the owner walks
+      // into, and anything in it that is also a movement collider simply folds
+      // the weapon the same way the collider already did.
+      arena.root,
+    ]);
   }
   return presentationObstructionBoxes;
 }
@@ -10761,6 +10783,11 @@ function currentViewmodelObstructionInput(): ViewmodelObstructionPoseInput {
     // fire-admission gate (which recomputes with colliders alone) is untouched -
     // decoration may bend the gun, never refuse the trigger.
     dressingBoxes: activePresentationObstructionBoxes(),
+    // The MEASURED rig envelope. Presentation-only: the pose fold probes the
+    // volume the weapon is actually in and as far as it actually reaches,
+    // while the HF-343 fire gate keeps sampling the authored profile through
+    // nearestViewmodelForwardObstructionMeters, whose numbers never move.
+    envelope: weaponView.contactProbeEnvelope(),
     grounded: playerGrounded,
     prone: player.stance === 'prone',
     stanceEyeHeightMeters: stanceEyeHeight(player.stance),
@@ -10836,6 +10863,14 @@ function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
     nearestForwardMeters: nearestForward === null ? null : Math.round(nearestForward * 1000) / 1000,
     nearestColliderBounds: nearestBox ?? null,
     fireAdmission: admission,
+    // Presentation-only observability. These are the numbers the 2026-08-31
+    // clipping diagnosis had to reconstruct by hand: what the fold actually
+    // measured, how much dressing it can see, and what the renderer did to the
+    // transform as a result.
+    dressingBoxCount: activePresentationObstructionBoxes().length,
+    contactDepthMeters: pose.contactDepthMeters,
+    contactEnvelope: weaponView.contactProbeEnvelope(),
+    contactFold: weaponView.contactFoldState(),
   };
 }
 
@@ -16183,7 +16218,10 @@ async function startGame(
     target.respawnAt = 0;
     target.root.visible = true;
   }
-  refreshWarningUntil = performance.now() + 6_000;
+  // Arm the display-refresh notice for this match. It is spent on the first
+  // display-limited reading and then never nags again.
+  refreshWarningPending = true;
+  refreshWarningUntil = 0;
   weaponView.setPresentationVisible(true);
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
@@ -25280,6 +25318,7 @@ function updatePhysics(dt: number): void {
     reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
     surfaceRetreat: viewmodelObstruction.retreat,
     surfaceLift: viewmodelObstruction.lift,
+    surfaceContactDepth: viewmodelObstruction.contactDepthMeters,
     triggerHeld,
   });
   audio.minigunDrive(
@@ -28657,29 +28696,52 @@ window.addEventListener('beforeunload', () => {
 
 function effectiveFramePacing(now = performance.now()) {
   const callback = framePacing.summary();
+  // rateHz, never cadenceHz: a median gap reports the rate INSIDE a burst, so
+  // "two frames back to back then a refusal" reads as 125 fps while 42 frames
+  // are presenting. Every published cadence here is frames over elapsed time.
   if (renderRuntime.backend !== 'webgpu') {
     return Object.freeze({
       ...callback,
       source: 'animation-frame' as const,
-      callbackCadenceHz: callback.cadenceHz,
-      completedCadenceHz: callback.cadenceHz,
+      cadenceHz: callback.rateHz,
+      callbackCadenceHz: callback.rateHz,
+      callbackRefreshHz: callback.p05Ms > 0 ? 1_000 / callback.p05Ms : 0,
+      submittedCadenceHz: callback.rateHz,
+      completedCadenceHz: callback.rateHz,
+      displayLimited: false,
     });
   }
   const progress = renderRuntime.presentationTelemetry(now).progress;
   const submittedCadenceHz = cadenceWithNoProgressAge(
-    progress.submissionPacing.cadenceHz,
+    progress.submissionPacing.rateHz,
     progress.currentSubmissionGapMs,
   );
+  // PRESENTED frames: the completion frontier is the only counter that moves
+  // when the GPU actually finished a frame. Submissions overcount (they include
+  // work still queued) and requestAnimationFrame callbacks overcount by far
+  // more (they keep firing through every refused submission).
   const completedCadenceHz = cadenceWithNoProgressAge(
-    progress.completionPacing.cadenceHz,
+    progress.completionPacing.rateHz,
     progress.currentCompletionGapMs,
   );
+  const callbackCadenceHz = callback.rateHz;
+  // The refresh CEILING: the fastest callbacks in the window. Nothing presents
+  // faster than the display refresh, so this stays put when the renderer
+  // hitches while callbackCadenceHz falls with it.
+  const callbackRefreshHz = callback.p05Ms > 0 ? 1_000 / callback.p05Ms : 0;
   return Object.freeze({
-    ...progress.submissionPacing,
-    cadenceHz: submittedCadenceHz,
-    source: 'webgpu-submission' as const,
-    callbackCadenceHz: callback.cadenceHz,
+    ...progress.completionPacing,
+    cadenceHz: completedCadenceHz,
+    source: 'webgpu-presented' as const,
+    callbackCadenceHz,
+    callbackRefreshHz,
+    submittedCadenceHz,
     completedCadenceHz,
+    displayLimited: presentationIsDisplayLimited({
+      sampleCount: progress.completionPacing.sampleCount,
+      presentedCadenceHz: completedCadenceHz,
+      callbackRefreshHz,
+    }),
     progressWindow: Object.freeze({
       elapsedMs: progress.elapsedMs,
       submissionAdvances: progress.submissionAdvances,
@@ -28958,14 +29020,41 @@ function frame(now: number, scheduleNext = true): void {
       // Keep it on the four-Hz display cadence so uncapped WebGPU does not
       // manufacture sustained allocation/GC pressure merely to repaint text.
       const pacing = effectiveFramePacing(now);
+      // PRESENTED frames. pacing.cadenceHz is now the completion-frontier rate,
+      // so this reads what the owner is looking at instead of the median gap
+      // between SUBMISSIONS - which read 60 while he was watching 20, because a
+      // burst of two admitted frames followed by a refusal has an 8 ms median.
       const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;
       fpsCounterValue.textContent = fps === null ? '--' : String(fps);
       fpsCounter.dataset.pacing = fps === null ? 'warming' : fps >= 55 ? 'smooth' : fps >= 40 ? 'strained' : 'slow';
+      // When the frame loop is running materially faster than the GPU is
+      // presenting, THAT divergence is the interesting number - it is the
+      // signature of refused submissions, and hiding it is what let this ship.
+      const callbackHz = Math.round(pacing.callbackCadenceHz);
+      const divergent = fps !== null && callbackHz >= fps + Math.max(8, fps * 0.15);
+      fpsCounterLabel.textContent = divergent ? `FPS · ${callbackHz} LOOP` : 'FPS';
+      fpsCounter.dataset.divergent = divergent ? 'true' : 'false';
       const refreshWarning = element<HTMLElement>('#refresh-warning');
-      refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
-      if (pacing.displayLimited) {
-        refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
+      // Arm once per match, on the first display-limited reading taken over a
+      // FULL pacing window. A partial window arms during arena warm-up, when
+      // the frame loop is still ramping through 23-29 Hz, and the notice then
+      // announces a refresh rate the monitor does not have.
+      if (pacing.displayLimited && refreshWarningPending && pacing.sampleCount >= 180) {
+        refreshWarningPending = false;
+        refreshWarningUntil = now + 12_000;
+        // Say the actual refresh, and say what to do about it. The old copy
+        // asserted "30 HZ DISPLAY LIMIT" and could never fire at the 59 Hz the
+        // owner's 180 Hz panel is actually set to in Windows.
+        refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.callbackRefreshHz)} HZ DISPLAY REFRESH`;
+        refreshWarning.querySelector('span')!.textContent =
+          'Your monitor is presenting at its refresh rate, not the game’s limit. '
+          + 'Raise it in Windows Settings › System › Display › Advanced display, '
+          + 'or run tools/play-atomic-acres-no-vsync.cmd to render above the refresh.';
       }
+      // Held for the whole window once armed. Toggling it off the instant the
+      // presented estimate wobbles made the one surface that explains the frame
+      // rate flicker in and out while the player was trying to read it.
+      refreshWarning.hidden = now >= refreshWarningUntil;
       lastFpsHudAt = now;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
@@ -30095,6 +30184,7 @@ const debugWindow = window as Window & {
     sampleSimulationGate: () => Record<string, unknown>;
     sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
+    samplePresentationCounters: () => ReturnType<typeof renderRuntime.presentationCounters>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     sampleActiveWeaponReadiness: () => ReturnType<typeof weaponView.activeWeaponReadiness>;
@@ -31364,6 +31454,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   }),
   sampleFireAdmissionDiagnostics,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
+  // The sort-free presented-frame counters. scripts/qa/measure-presented-frames.mjs
+  // polls this above the frame rate; presentationTelemetry() sorts two pacing
+  // windows per call and cannot be sampled that fast without becoming the cost.
+  samplePresentationCounters: () => renderRuntime.presentationCounters(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
   sampleActiveWeaponReadiness: () => weaponView.activeWeaponReadiness(),

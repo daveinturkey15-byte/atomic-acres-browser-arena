@@ -72,7 +72,11 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   // Open range ground: no authored recovery portals — the collider set alone
   // is enough over a flat 52x38 field.
   'test1': definition('test1', 40, []),
-  'test2': definition('test2', 45, [
+  // RE-PINNED 2026-08-31 with the 100 x 76 m rebuild: the arena's half-diagonal
+  // is now hypot(50, 38) = 62.8 m, so a 45 m radius left the four corners of
+  // the map outside the support aircraft's navigable disc. 63 m is the measured
+  // half-diagonal rounded up.
+  'test2': definition('test2', 63, [
     { id: 'estate-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
 });

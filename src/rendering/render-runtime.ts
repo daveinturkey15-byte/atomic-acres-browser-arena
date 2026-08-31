@@ -89,7 +89,10 @@ export type PresentationFreshnessTelemetry = Readonly<{
   submissionMode: 'synchronous' | WebGpuSubmissionMode;
   maximumInFlightSubmissions: number;
   inFlightSubmissions: number;
+  /** Oldest submission still awaiting its completion observer. */
   completionProbeTargetSequence: number | null;
+  /** Completion observers currently in flight - one per unretired submission. */
+  outstandingCompletionProbes: number;
   completionProbeCount: number;
   submissionSequence: number;
   completedSequence: number;
@@ -103,6 +106,28 @@ export type PresentationFreshnessTelemetry = Readonly<{
   backpressureActive: boolean;
   skippedSubmissions: number;
   progress: PresentationProgressTelemetry;
+}>;
+
+/**
+ * The cheap presented-frame counter surface. Deliberately allocation-light and
+ * sort-free: a presented-frame sampler polls it faster than the frame rate it
+ * is measuring.
+ */
+export type PresentationCounters = Readonly<{
+  submissionSequence: number;
+  completedSequence: number;
+  inFlightSubmissions: number;
+  maximumInFlightSubmissions: number;
+  skippedSubmissions: number;
+  starvationRecoveries: number;
+  consecutiveRefusedSubmissions: number;
+  outstandingCompletionProbes: number;
+  lastSubmittedAt: number | null;
+  /** Exact clock stamp of the most recently GPU-confirmed (presented) frame. */
+  lastCompletedAt: number | null;
+  lastCompletionLatencyMs: number | null;
+  calls: number;
+  triangles: number;
 }>;
 
 export type PresentationProgressTelemetry = Readonly<{
@@ -269,13 +294,15 @@ function emptyFramePacingSummary(reason: string): FramePacingSummary {
   return {
     ready: false,
     sampleCount: 0,
+    rateHz: 0,
     cadenceHz: 0,
+    meanMs: 0,
+    p05Ms: 0,
     medianMs: 0,
     p95Ms: 0,
     p99Ms: 0,
     maxMs: 0,
     longFrames: { over20Ms: 0, over33Ms: 0, over50Ms: 0, over100Ms: 0 },
-    displayLimited: false,
     lastResetReason: reason,
   };
 }
@@ -364,9 +391,67 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
-export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 | 3 {
-  if (mode === 'input-response') return 3;
-  return mode === 'warmed-live' ? 2 : 1;
+/**
+ * How deep the warmed live queue may run before admission refuses a frame.
+ *
+ * MEASURED, not chosen. Presentation is bounded by depth / completion-fence
+ * latency, and the fence on this hardware resolves in 18-46 ms while the frame
+ * itself costs the GPU almost nothing (14-18% utilisation across every soak).
+ * A depth of two therefore capped presentation at ~50 fps no matter how cheap
+ * the frame was: 107.9 requestAnimationFrame callbacks per second against 50.9
+ * presented frames, with 52.8% of submissions refused. Reproduce with
+ * `node scripts/qa/measure-presented-frames.mjs --no-vsync`.
+ */
+export const WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS = 3;
+
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): number {
+  // An input-response frame is allowed exactly one slot beyond the warmed live
+  // frontier so a shot or a turn is never the frame that admission refuses.
+  if (mode === 'input-response') return WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS + 1;
+  return mode === 'warmed-live' ? WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS : 1;
+}
+
+/**
+ * The relief valve for the presentation collapse.
+ *
+ * THE COLLAPSE. Completion latency walks from ~5 ms to ~48 ms in about three
+ * seconds and never recovers: admission refuses frames, the starved GPU drops
+ * to 700-780 MHz, the low clocks keep the fence slow, and the slow fence keeps
+ * refusing. It is hysteresis, and nothing in the loop breaks it - the match
+ * finishes pinned near 20 fps with the GPU at 14% utilisation.
+ *
+ * Backpressure is right when the GPU is genuinely saturated and wrong when it
+ * is asleep, and a page cannot read GPU utilisation. Draw calls and triangles
+ * are the available proxy for frame cost: below these ceilings no frame can
+ * plausibly be occupying a discrete GPU for a quarter of a second, so a long
+ * refusal streak is starvation rather than saturation, and admitting one frame
+ * both re-feeds the GPU and re-opens the observation window.
+ *
+ * It admits ONE frame and resets the streak, so it is a bounded floor of one
+ * frame per `refusalStreakThreshold` refused attempts - never an override of
+ * backpressure for a device that is really wedged.
+ */
+export function shouldRecoverStarvedPresentation(input: Readonly<{
+  consecutiveRefusedSubmissions: number;
+  refusalStreakThreshold: number;
+  inFlightSubmissions: number;
+  maximumInFlightSubmissions: number;
+  drawCalls: number;
+  triangles: number;
+  trivialDrawCallCeiling: number;
+  trivialTriangleCeiling: number;
+}>): boolean {
+  if (input.refusalStreakThreshold <= 0) return false;
+  if (input.consecutiveRefusedSubmissions < input.refusalStreakThreshold) return false;
+  // Pinned AT the bound, not merely near it: this is the queue-depth clause of
+  // backpressure refusing, which is the clause that starves the GPU.
+  if (input.inFlightSubmissions < input.maximumInFlightSubmissions) return false;
+  // An unknown frame cost is not a cheap frame. Three's WebGPU backend reports
+  // `drawCalls`, and a snapshot taken from the wrong field yields undefined -
+  // which must keep backpressure, never open the valve.
+  if (!Number.isFinite(input.drawCalls) || !Number.isFinite(input.triangles)) return false;
+  return input.drawCalls <= input.trivialDrawCallCeiling
+    && input.triangles <= input.trivialTriangleCeiling;
 }
 
 export function pendingCompletionStartAfterProgress(input: Readonly<{
@@ -650,6 +735,28 @@ export class LegacyWebGlRenderRuntime {
     };
   }
 
+  /**
+   * WebGL presents synchronously inside the draw call, so submitted, completed
+   * and presented are the same event and nothing is ever refused.
+   */
+  presentationCounters(): PresentationCounters {
+    return {
+      submissionSequence: 0,
+      completedSequence: 0,
+      inFlightSubmissions: 0,
+      maximumInFlightSubmissions: 0,
+      skippedSubmissions: 0,
+      starvationRecoveries: 0,
+      consecutiveRefusedSubmissions: 0,
+      outstandingCompletionProbes: 0,
+      lastSubmittedAt: null,
+      lastCompletedAt: null,
+      lastCompletionLatencyMs: null,
+      calls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
+    };
+  }
+
   presentationTelemetry(now = performance.now()): PresentationFreshnessTelemetry {
     const lost = this.renderer.getContext().isContextLost();
     const pacing = emptyFramePacingSummary('synchronous WebGL presentation');
@@ -659,6 +766,7 @@ export class LegacyWebGlRenderRuntime {
       maximumInFlightSubmissions: 0,
       inFlightSubmissions: 0,
       completionProbeTargetSequence: null,
+      outstandingCompletionProbes: 0,
       completionProbeCount: 0,
       submissionSequence: 0,
       completedSequence: 0,
@@ -937,8 +1045,11 @@ export class WebGpuRenderRuntime {
   private lastSubmittedAt: number | null = null;
   private lastCompletedAt: number | null = null;
   private pendingCompletionStartedAt: number | null = null;
-  private completionProbe: Promise<void> | null = null;
-  private completionProbeTargetSequence: number | null = null;
+  /**
+   * One outstanding completion observer per submission, keyed by the sequence
+   * it proves. Several may be in flight; they settle in submission order.
+   */
+  private readonly completionProbes = new Map<number, Promise<void>>();
   private completionProbeCount = 0;
   private submissionMode: WebGpuSubmissionMode = 'serialized';
   private presentationPrewarmBatch: Promise<void> | null = null;
@@ -958,6 +1069,12 @@ export class WebGpuRenderRuntime {
     this.lastFailure = `WebGPU uncaptured error: ${message}`;
   };
   private skippedSubmissions = 0;
+  /**
+   * Refusals since the last admitted frame. A streak is the only in-page
+   * evidence that admission - not GPU cost - is what stopped presenting.
+   */
+  private consecutiveRefusedSubmissions = 0;
+  private starvationRecoveries = 0;
   private readonly submissionPacing = new FramePacingSampler();
   private readonly completionPacing = new FramePacingSampler();
   private progressWindowStartedAt = 0;
@@ -987,7 +1104,6 @@ export class WebGpuRenderRuntime {
     contextId: number | null;
     lightsNodeId: number | null;
   }>> = [];
-  private nextCompletionProbeAt = 0;
   private readonly tslDiagnostics: TslNodeBuildDiagnosticsHandle;
   /**
    * Polite attempts to acquire real focus before cold prewarm settles for a
@@ -996,8 +1112,24 @@ export class WebGpuRenderRuntime {
    */
   private static readonly PREWARM_FOCUS_ATTEMPTS = 3;
 
-  private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
+  /**
+   * Refusals in a row before starvation relief admits one frame. At the
+   * ~110 admission attempts per second this frame loop makes, eight refusals is
+   * about 70 ms of no presentation - long enough that it is not a single
+   * expensive frame, short enough that the relief valve keeps a floor well
+   * above the ~20 fps the collapse pinned the owner at.
+   */
+  private static readonly STARVATION_REFUSAL_STREAK = 8;
+  /**
+   * "This frame cannot be what is keeping the GPU busy." A live Atomic Acres
+   * frame measures ~181 draw calls and ~528k triangles at 1440p (measured by
+   * scripts/qa/measure-presented-frames.mjs); these ceilings sit an order of
+   * magnitude above that, so genuine GPU saturation still keeps its
+   * backpressure while a starved-but-cheap frame gets relief.
+   */
+  private static readonly STARVATION_TRIVIAL_DRAW_CALLS = 6_000;
+  private static readonly STARVATION_TRIVIAL_TRIANGLES = 12_000_000;
   // Cold compilation, prewarm, transitions and explicit renderer mutations
   // remain one-deep. Only the already-fenced, warmed live path may keep two
   // submissions in flight; that is the smallest frontier which avoids making
@@ -1210,6 +1342,37 @@ export class WebGpuRenderRuntime {
     };
   }
 
+  /**
+   * The presented-frame counters ONLY, with no pacing-window sort.
+   *
+   * WHY THIS EXISTS: `presentationTelemetry()` sorts two 180-sample windows on
+   * every call, so it is a four-Hz surface. A presented-frame instrument has to
+   * sample faster than the frames it is counting, and it must not become the
+   * cost it is measuring. These fields are plain reads.
+   *
+   * `lastCompletedAt` is the exact clock stamp of the frame the GPU most
+   * recently confirmed, so a sampler polling faster than the presentation rate
+   * reconstructs an exact presented-frame interval series from it - it never
+   * has to time a requestAnimationFrame callback and call that a frame.
+   */
+  presentationCounters(): PresentationCounters {
+    return {
+      submissionSequence: this.submissionSequence,
+      completedSequence: this.completedSequence,
+      inFlightSubmissions: Math.max(0, this.submissionSequence - this.completedSequence),
+      maximumInFlightSubmissions: maximumInFlightWebGpuSubmissions(this.submissionMode),
+      skippedSubmissions: this.skippedSubmissions,
+      starvationRecoveries: this.starvationRecoveries,
+      consecutiveRefusedSubmissions: this.consecutiveRefusedSubmissions,
+      outstandingCompletionProbes: this.outstandingCompletionProbeCount(),
+      lastSubmittedAt: this.lastSubmittedAt,
+      lastCompletedAt: this.lastCompletedAt,
+      lastCompletionLatencyMs: this.lastCompletionLatencyMs,
+      calls: this.lastSubmittedRenderInfo.calls,
+      triangles: this.lastSubmittedRenderInfo.triangles,
+    };
+  }
+
   presentationTelemetry(now = this.clock()): PresentationFreshnessTelemetry {
     const pendingForMs = this.pendingCompletionStartedAt === null
       ? 0
@@ -1243,7 +1406,8 @@ export class WebGpuRenderRuntime {
       submissionMode: this.submissionMode,
       maximumInFlightSubmissions,
       inFlightSubmissions,
-      completionProbeTargetSequence: this.completionProbeTargetSequence,
+      completionProbeTargetSequence: this.oldestOutstandingProbeSequence(),
+      outstandingCompletionProbes: this.completionProbes.size,
       completionProbeCount: this.completionProbeCount,
       submissionSequence: this.submissionSequence,
       completedSequence: this.completedSequence,
@@ -1305,22 +1469,46 @@ export class WebGpuRenderRuntime {
     this.progressMaximumCompletionLatencyMs = 0;
   }
 
-  private scheduleCompletionProbe(now: number, force = false): Promise<void> | null {
-    if (this.completionProbe) return this.completionProbe;
-    if (!force && now < this.nextCompletionProbeAt) return null;
+  private outstandingCompletionProbeCount(): number {
+    return this.completionProbes.size;
+  }
+
+  private oldestOutstandingProbeSequence(): number | null {
+    let oldest: number | null = null;
+    for (const sequence of this.completionProbes.keys()) {
+      if (oldest === null || sequence < oldest) oldest = sequence;
+    }
+    return oldest;
+  }
+
+  /**
+   * Observe ONE submission's retirement.
+   *
+   * WHY PER SUBMISSION. This used to keep a single mutable probe: while it was
+   * outstanding, no second observer could be attached, so the completion
+   * frontier could advance at most one probe-resolution at a time. Combined
+   * with a queue-depth bound, that made the fence the frame timer - and an
+   * `onSubmittedWorkDone` round trip costs 18-46 ms on this hardware whether
+   * the frame drew 181 calls or nothing at all. Presentation was therefore
+   * pinned near 50 fps with the GPU at 14% utilisation.
+   *
+   * `onSubmittedWorkDone()` resolves once everything submitted before the call
+   * has retired, so a probe attached after submission N proves the frontier has
+   * reached at least N. Attaching one per submission lets those observations
+   * pipeline: several can be in flight, they settle in order, and the frontier
+   * advances with each one instead of waiting for a fresh round trip.
+   */
+  private attachCompletionProbe(sequence: number, startedAt: number): Promise<void> | null {
+    if (sequence <= this.completedSequence) return Promise.resolve();
+    const existing = this.completionProbes.get(sequence);
+    if (existing) return existing;
     const queue = this.device.queue;
     if (!queue?.onSubmittedWorkDone) return null;
-    const sequence = this.submissionSequence;
-    if (sequence <= this.completedSequence) return Promise.resolve();
-    const startedAt = now;
     this.pendingCompletionStartedAt ??= startedAt;
-    this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
-    this.completionProbeTargetSequence = sequence;
     this.completionProbeCount += 1;
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
         const completedAt = this.clock();
-        const latencyStartedAt = Math.max(startedAt, this.pendingCompletionStartedAt ?? startedAt);
         const priorCompletedSequence = this.completedSequence;
         this.completedSequence = Math.max(this.completedSequence, sequence);
         if (this.completedSequence > priorCompletedSequence) {
@@ -1328,6 +1516,22 @@ export class WebGpuRenderRuntime {
           this.progressMaximumCompletionGapMs = Math.max(this.progressMaximumCompletionGapMs, completionGapMs);
           this.completionPacing.record(completionGapMs / Math.max(1, this.completedSequence - priorCompletedSequence));
           this.progressLastCompletionAt = completedAt;
+          this.lastCompletedAt = completedAt;
+          // This probe's OWN submission stamp, so the reported latency is the
+          // real queue residency of THIS frame. Pipelined observers each carry
+          // their own start; a single shared pending age would report one
+          // number for frames with genuinely different residencies.
+          //
+          // The floor is the current observation epoch: a tab that was hidden,
+          // unfocused or paused between submit and retire must not charge that
+          // wall-clock time to the device. In steady play the frame's own stamp
+          // is the later of the two, so this clamp is inert.
+          const latencyStartedAt = Math.max(startedAt, this.pendingCompletionStartedAt ?? startedAt);
+          this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
+          this.progressMaximumCompletionLatencyMs = Math.max(
+            this.progressMaximumCompletionLatencyMs,
+            this.lastCompletionLatencyMs,
+          );
         }
         if (this.pendingCompletionStartedAt !== null) {
           this.progressMaximumPendingForMs = Math.max(
@@ -1335,12 +1539,6 @@ export class WebGpuRenderRuntime {
             completedAt - this.pendingCompletionStartedAt,
           );
         }
-        this.lastCompletedAt = completedAt;
-        this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
-        this.progressMaximumCompletionLatencyMs = Math.max(
-          this.progressMaximumCompletionLatencyMs,
-          this.lastCompletionLatencyMs,
-        );
         // A continuously busy queue is healthy when its completion frontier is
         // advancing. Measure pending age from the latest progress, not from the
         // moment any backlog first appeared, or long play is misclassified as
@@ -1356,14 +1554,20 @@ export class WebGpuRenderRuntime {
         this.lastFailure = error instanceof Error ? error.message : String(error);
       })
       .finally(() => {
-        if (this.completionProbe === probe) {
-          this.completionProbe = null;
-          this.completionProbeTargetSequence = null;
-          if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
-        }
+        this.completionProbes.delete(sequence);
+        if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
       });
-    this.completionProbe = probe;
+    this.completionProbes.set(sequence, probe);
     return probe;
+  }
+
+  /**
+   * Observe the CURRENT frontier. Used by the drain paths and by admission when
+   * it refuses, where the caller wants "tell me when everything submitted so
+   * far has retired", not a specific frame.
+   */
+  private scheduleCompletionProbe(now: number): Promise<void> | null {
+    return this.attachCompletionProbe(this.submissionSequence, now);
   }
 
   assertCandidateReady(): void {
@@ -1671,10 +1875,31 @@ export class WebGpuRenderRuntime {
           admissionCheckedAt - this.pendingCompletionStartedAt,
         );
       }
-      this.scheduleCompletionProbe(admissionCheckedAt, true);
-      this.skippedSubmissions += 1;
-      return false;
+      this.scheduleCompletionProbe(admissionCheckedAt);
+      this.consecutiveRefusedSubmissions += 1;
+      if (!shouldRecoverStarvedPresentation({
+        consecutiveRefusedSubmissions: this.consecutiveRefusedSubmissions,
+        refusalStreakThreshold: WebGpuRenderRuntime.STARVATION_REFUSAL_STREAK,
+        inFlightSubmissions,
+        maximumInFlightSubmissions,
+        drawCalls: this.lastSubmittedRenderInfo.calls,
+        triangles: this.lastSubmittedRenderInfo.triangles,
+        trivialDrawCallCeiling: WebGpuRenderRuntime.STARVATION_TRIVIAL_DRAW_CALLS,
+        trivialTriangleCeiling: WebGpuRenderRuntime.STARVATION_TRIVIAL_TRIANGLES,
+      })) {
+        this.skippedSubmissions += 1;
+        return false;
+      }
+      // Break the hysteresis: admit this one frame, and start a fresh
+      // observation epoch so the pending-age clause judges the recovered queue
+      // rather than the age that starved it. The stall guard is not disarmed -
+      // it simply gets a new window, and fires again in
+      // SUBMISSION_BACKPRESSURE_MS if the device really has stopped retiring.
+      this.starvationRecoveries += 1;
+      this.resetPresentationProgressWindow(admissionCheckedAt);
+      if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = admissionCheckedAt;
     }
+    this.consecutiveRefusedSubmissions = 0;
     this.renderer.info.reset();
     // Stage 12 advances on a profile-quantised clock, and the profile's bloom
     // tuning is re-asserted here so a graphics-settings write cannot silently
@@ -1695,10 +1920,10 @@ export class WebGpuRenderRuntime {
     this.submissionPacing.record(submissionGapMs);
     this.progressLastSubmissionAt = submittedAt;
     this.lastSubmittedAt = submittedAt;
-    // Attach one observer to the current completion frontier. A warmed live
-    // frame may join behind that target, but never creates a second mutable
-    // probe; the next observer is attached only after this frontier retires.
-    this.scheduleCompletionProbe(submittedAt, true);
+    // Observe THIS frame's retirement. Every admitted frame gets its own
+    // observer so the completion frontier advances per frame instead of once
+    // per queue round trip.
+    this.attachCompletionProbe(this.submissionSequence, submittedAt);
     return true;
   }
 
@@ -1732,7 +1957,7 @@ export class WebGpuRenderRuntime {
     await awaitSubmissionCompletionTarget({
       targetSequence,
       completedSequence: () => this.completedSequence,
-      createProbe: () => this.scheduleCompletionProbe(this.clock(), true),
+      createProbe: () => this.scheduleCompletionProbe(this.clock()),
       failure: () => this.lastFailure,
       timeoutMs,
       // What the player sees when a deployment bounces. The frontier state is

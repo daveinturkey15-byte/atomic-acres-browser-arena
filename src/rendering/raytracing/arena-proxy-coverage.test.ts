@@ -84,7 +84,18 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // Owner 2026-08-30: measured on the authored builds - test1 tower glazing
   // (extraction admits the large north pane), test2 pool water + car glass.
   test1: { meshes: 1, footprintM2: 3 },
-  test2: { meshes: 3, footprintM2: 120 },
+  // TEST2 RE-PINNED UPWARD 2026-08-31, because the layout rebuild
+  // (docs/TEST2_RAID_LAYOUT_SPEC_2026-08-31.md) demolished the villa wings and
+  // the motor-court orangeries and took their glazing with them: the rebuild
+  // first measured 2 meshes against this floor of 3, i.e. the preset lost half
+  // its reflective coverage on this arena. The fix was to author the windows
+  // back - a glazed door recessed into the living room's south wall, one into
+  // the kitchen's, and one into the gallery's north wall, each set inside its
+  // wall's own thickness so the ballistic and movement censuses still explain
+  // it. Re-measured at 5 meshes / 280.9 m2, and the floor is raised to the new
+  // measurement rather than left at the old one, so this coverage cannot be
+  // silently spent later.
+  test2: { meshes: 5, footprintM2: 280 },
 };
 
 type Coverage = {

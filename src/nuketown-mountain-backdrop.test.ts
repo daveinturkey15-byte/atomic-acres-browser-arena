@@ -94,7 +94,21 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
         expect(node.castShadow).toBe(false);
         expect(node.userData.blocksShots).toBe(false);
         const materials = Array.isArray(node.material) ? node.material : [node.material];
-        for (const material of materials) expect(material.fog).not.toBe(false);
+        // Re-pinned 2026-08-31. The three RINGS now carry fog:false deliberately,
+        // and the reason is the whole point of the pass: this arena's fog is
+        // 0xb1c0be (rel. luminance 0.73) against a sunset sky measuring 85-155,
+        // so at the ridge's 96-132 m the fog factor 0.58-0.82 put a FLOOR under
+        // the massif ABOVE the sky. No albedo could read as a silhouette while
+        // scene fog was hazing it toward something brighter than the sky behind
+        // it. The rings now bake their own radial haze toward a dusk horizon
+        // instead. Measured ridge/sky luminance: 0.945 -> 0.651 at eye level,
+        // 0.947 -> 0.430 at the north ridge meter, with the sky unchanged.
+        // The SKIRT keeps scene fog, because the skirt is ground.
+        const ringLike = /ridge|foothills|far-range/u.test(node.name);
+        for (const material of materials) {
+          if (ringLike) expect(material.fog).toBe(false);
+          else expect(material.fog).not.toBe(false);
+        }
       }
     });
   });

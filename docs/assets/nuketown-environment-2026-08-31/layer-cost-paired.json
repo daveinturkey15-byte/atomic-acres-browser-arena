@@ -1,0 +1,46 @@
+{
+  "viewport": "1920x1080",
+  "pose": "street axis west spawn looking east, fov 70",
+  "on": [
+    {
+      "meanMs": 9.207,
+      "medianMs": 9.1
+    },
+    {
+      "meanMs": 8.597,
+      "medianMs": 8.6
+    },
+    {
+      "meanMs": 8.223,
+      "medianMs": 8.1
+    },
+    {
+      "meanMs": 7.542,
+      "medianMs": 7.9
+    }
+  ],
+  "off": [
+    {
+      "meanMs": 8.83,
+      "medianMs": 8.7
+    },
+    {
+      "meanMs": 8.205,
+      "medianMs": 8.2
+    },
+    {
+      "meanMs": 7.756,
+      "medianMs": 7.5
+    },
+    {
+      "meanMs": 7.343,
+      "medianMs": 7.3
+    }
+  ],
+  "onMeanMs": 8.392,
+  "offMeanMs": 8.034,
+  "onMedianMs": 8.425,
+  "offMedianMs": 7.925,
+  "deltaMeanMs": 0.358,
+  "deltaMedianMs": 0.5
+}

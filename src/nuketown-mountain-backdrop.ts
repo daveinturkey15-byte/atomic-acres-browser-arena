@@ -19,9 +19,41 @@
  *     sightline test inside the arena can ever intersect it;
  *   - everything stays inside the arena camera's 180 m far plane from every
  *     reachable camera position (max radial + arena corner < 180);
- *   - no colliders, no raycast surfaces, no shadow passes; fog stays ON so
- *     the arena's authored fog (0xb1c0be, near 58 / far 148 — see
- *     src/rendering/arenas/atomic-acres.ts) does the distance grading.
+ *   - no colliders, no raycast surfaces, no shadow passes.
+ *
+ * v4 2026-08-31 — "the mountains are inverted". Two measured causes, both
+ * fixed here:
+ *
+ *   (a) THE VERTEX COLOURS WERE BEING DELETED AT RUNTIME. legacy-main's
+ *       `batchPresentationRootOnce(neighbourhoodLifeRoot, 'palette-lit')`
+ *       runs a SECOND static batch over the whole pass31 group long after
+ *       this module has added itself to it. In 'palette-lit' mode
+ *       art-kit.ts::batchStaticMeshes keys the batch on the material's
+ *       `color` — 0xffffff for a vertexColors material — builds a fresh
+ *       flat-white MeshLambertMaterial, and DELETES every attribute outside
+ *       {position, normal}. The whole altitude/haze palette authored below
+ *       was thrown away every single run and the massif was drawn as one
+ *       merged, flat, pure-white Lambert batch. That is the paper-snowdrift
+ *       look, and no amount of colour authoring could have survived it.
+ *       Fix: `group.userData.dynamic = true`, the repo-standard opt-out that
+ *       `batchStaticMeshes` honours (it is what rain-presentation and the
+ *       flower beds already use). Costs 4 draws of a 560 budget.
+ *   (b) THE RIDGE WAS FOGGED BRIGHTER THAN THE SKY. This arena's authored
+ *       fog is 0xb1c0be (a pale grey-green, relative luminance 0.73) while
+ *       its sunset sky measures 85-95/255 at the horizon. At the ridge's
+ *       96-132 m the linear fog factor is 0.58-0.82, so runtime fog alone
+ *       put a FLOOR under the ridge well above the sky behind it: even a
+ *       black ridge could not read as a silhouette. Distant backdrops are
+ *       painted, not lit and not fogged — so the three ridge rings now use
+ *       an unlit MeshBasicMaterial with `fog = false` and carry their own
+ *       baked terms: a directional shading term from the arena sun so the
+ *       facets keep their form, and a radial haze term (kit-style, ported
+ *       from environment-kit.ts::buildRidgeRing) that grades the far rows
+ *       toward a dusk horizon colour. The snow lerp is GONE — a snowline
+ *       that lerps crests 85% toward 0xdde4e6 is the single brightest thing
+ *       that can be put on a horizon.
+ *       The ground skirt keeps `fog = true` and stays lit: it is ground
+ *       continuing out of the arena, and the arena's fog is correct for it.
  *
  * Original geometry only (repo sourcePolicy): every vertex is computed here
  * from a fixed-seed mulberry32 stream — deterministic on every peer.
@@ -41,7 +73,18 @@ export const NUKETOWN_BACKDROP_MAX_HEIGHT_M = 34;
 export const NUKETOWN_BACKDROP_SKIRT_Y_M = -0.42;
 
 const SEED = 0x0a82_5c17;
-const SNOW_COLOR = new THREE.Color(0xdde4e6);
+/**
+ * Dusk horizon haze. Deliberately NOT the arena's fog colour: 0xb1c0be is
+ * brighter than this arena's sky and hazing toward it is what inverted the
+ * ridge in the first place. This is the blue-violet a sunset horizon actually
+ * washes distant land toward, and it sits BELOW the measured sky luminance so
+ * the far rows recede instead of glowing.
+ */
+const HAZE_COLOR = new THREE.Color(0x47526f);
+/** Direction the arena's key light comes FROM (atomic-acres sun at -48/42/30). */
+const SUN_DIRECTION = new THREE.Vector3(-48, 42, 30).normalize();
+/** Measurement switch — see the v4 note in the file header. */
+const RIDGE_FOG = false;
 
 export interface NuketownBackdropStats {
   meshes: number;
@@ -79,8 +122,14 @@ type RidgeRingSpec = Readonly<{
   crestColor: number;
   /** Decorrelates the sine octaves between rings. */
   phase: number;
-  /** Altitude fraction above which the crest lerps toward snow; omit = none. */
-  snowline?: number;
+  /**
+   * How far this ring's far side washes into HAZE_COLOR, 0..1. Ported from
+   * environment-kit.ts::buildRidgeRing, which is the reference implementation
+   * the owner's kit ridge (measured ridge/sky 0.10) gets its depth from.
+   */
+  haze: number;
+  /** Baked sun term: 0 = flat paint, 1 = full swing between lit and shaded. */
+  shadeStrength: number;
 }>;
 
 /**
@@ -145,17 +194,36 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     for (let row = 0; row < rows; row += 1) {
       const [radius, y, altitude] = ringRows[row];
       positions.push(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-      // Altitude banding: scrub foot -> sage rock -> pale crest, scaled by
+      // Altitude banding: scrub foot -> sage rock -> cool crest, scaled by
       // how tall this segment actually is so low saddles stay scrubby.
       const t = altitude * Math.min(1, height / spec.heightMax);
       if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
       else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
-      // v3: crests above the snowline blend toward cold rock-snow, scaled by
-      // how far past the line this vertex sits - only the tall peaks cap.
-      if (spec.snowline !== undefined && t > spec.snowline) {
-        vertexColor.lerp(SNOW_COLOR, Math.min(1, (t - spec.snowline) / (1 - spec.snowline)) * 0.85);
-      }
-      const tone = 0.92 + jitterA * 0.16;
+      // v4: NO snow lerp. The old snowline pulled crests 85% toward 0xdde4e6,
+      // which is brighter than this arena's entire sky.
+      //
+      // Radial haze (kit port): the further out the vertex, the more it washes
+      // into the dusk horizon. `smoothstep` over the ring's own radial band
+      // keeps the near foot crisp and the far rim soft, exactly as
+      // environment-kit's ridge does across its band parameter.
+      const radialT = THREE.MathUtils.clamp(
+        (radius - spec.innerRadius) / Math.max(1e-3, spec.outerRadius - spec.innerRadius), 0, 1,
+      );
+      vertexColor.lerp(HAZE_COLOR, spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95));
+      // Baked directional shading. The ring materials are unlit (see the v4
+      // note in the file header), so the sun has to be painted in or the
+      // massif reads as one flat cut-out. Slope normal is approximated from
+      // the row's rise over its radial run, which is all a ridge silhouette
+      // needs and costs nothing at runtime.
+      const rise = row === 0 ? 0 : ringRows[row][1] - ringRows[row - 1][1];
+      const run = row === 0 ? 1 : Math.max(1e-3, ringRows[row][0] - ringRows[row - 1][0]);
+      const slope = Math.atan2(rise, run);
+      const facing = Math.cos(angle) * SUN_DIRECTION.x + Math.sin(angle) * SUN_DIRECTION.z;
+      const lambert = THREE.MathUtils.clamp(
+        0.5 + 0.5 * (Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * facing), 0, 1,
+      );
+      const shade = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
+      const tone = (0.94 + jitterA * 0.12) * shade;
       colors.push(vertexColor.r * tone, vertexColor.g * tone, vertexColor.b * tone);
     }
   }
@@ -179,8 +247,74 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
 }
 
 /**
+ * Height of the beyond-fence ground at (x, z), metres.
+ *
+ * v4 2026-08-31 — "the forest stands on a plate". The skirt used to be a flat
+ * CircleGeometry at a constant y and every one of the 769 forest instances was
+ * planted at that same constant, so 769 trees met the ground on a razor edge
+ * with no contact anywhere. This is the ground the forest now queries (see
+ * nuketown-forest-surround.ts): gentle seeded swells with a shallow rise
+ * toward the foothills.
+ *
+ * CONTRACT: the return value is always <= NUKETOWN_BACKDROP_SKIRT_Y_M, i.e.
+ * this ground can dip below the arena floor but never rise through it. The
+ * skirt-containment test depends on that and so does the "no lip at the fence"
+ * read, so the clamp is not a safety net, it is the definition.
+ */
+export function nuketownBackdropGroundY(x: number, z: number): number {
+  const radial = Math.hypot(x, z);
+  // Long swells (two decorrelated sine pairs) plus a shorter chop: enough
+  // relief to break the plate, far too little to read as cover or terrain.
+  const swell =
+    Math.sin(x * 0.041 + 1.7) * Math.cos(z * 0.037 - 0.6) * 0.95 +
+    Math.sin(x * 0.093 - 2.3) * Math.cos(z * 0.081 + 1.1) * 0.42 +
+    Math.sin((x + z) * 0.171 + 0.4) * 0.18;
+  // Beyond the forest band the ground lifts toward the foothill feet so the
+  // massif grows out of the land instead of being parked on it.
+  const lift = THREE.MathUtils.smoothstep(radial, 52, 74) * 1.35;
+  return Math.min(NUKETOWN_BACKDROP_SKIRT_Y_M, NUKETOWN_BACKDROP_SKIRT_Y_M - 1.15 + swell * 0.62 + lift);
+}
+
+/** Ground normal at (x, z), central-differenced from the height field. */
+export function nuketownBackdropGroundNormal(x: number, z: number, target = new THREE.Vector3()): THREE.Vector3 {
+  const step = 1.6;
+  const dx = nuketownBackdropGroundY(x + step, z) - nuketownBackdropGroundY(x - step, z);
+  const dz = nuketownBackdropGroundY(x, z + step) - nuketownBackdropGroundY(x, z - step);
+  return target.set(-dx, 2 * step, -dz).normalize();
+}
+
+/** The rolling beyond-fence ground disc, vertex-coloured scrub to forest floor. */
+function buildGroundSkirt(): THREE.BufferGeometry {
+  // A ring grid, not a triangle fan: CircleGeometry has no interior vertices,
+  // so it cannot carry a height field at all.
+  const geometry = new THREE.RingGeometry(0.5, NUKETOWN_BACKDROP_MAX_RADIAL_M, 72, 16);
+  geometry.rotateX(-Math.PI / 2);
+  const positions = geometry.getAttribute('position');
+  const colors = new Float32Array(positions.count * 3);
+  const near = new THREE.Color(0x4c5340); // damp forest floor under the trees
+  const far = new THREE.Color(0x5d6047); // dry scrub running up to the foothills
+  const scratch = new THREE.Color();
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const z = positions.getZ(index);
+    positions.setY(index, nuketownBackdropGroundY(x, z) - NUKETOWN_BACKDROP_SKIRT_Y_M);
+    const radial = Math.hypot(x, z);
+    scratch.copy(near).lerp(far, THREE.MathUtils.clamp((radial - 34) / 40, 0, 1));
+    const mottle = 0.9 + 0.2 * (0.5 + 0.5 * Math.sin(x * 0.37 + 2.1) * Math.cos(z * 0.29 - 1.3));
+    colors[index * 3] = scratch.r * mottle;
+    colors[index * 3 + 1] = scratch.g * mottle;
+    colors[index * 3 + 2] = scratch.b * mottle;
+  }
+  positions.needsUpdate = true;
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  geometry.name = 'nuketown-backdrop-ground-skirt';
+  return geometry;
+}
+
+/**
  * Build the backdrop under `parent`. Deterministic; art-only. Returns stats
- * for telemetry/tests. Three meshes = three draws, ~2.3k triangles total.
+ * for telemetry/tests. Four meshes = four draws.
  */
 export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownMountainBackdrop {
   const group = new THREE.Group();
@@ -188,15 +322,26 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   group.userData.presentationOnly = true;
   group.userData.blocksShots = false;
   group.userData.nuketownBackdrop = true;
+  // THE fix for the paper-snowdrift ridge - see cause (a) in the file header.
+  // legacy-main re-batches the whole pass31 group in 'palette-lit' mode, which
+  // deletes the `color` attribute and replaces the material with flat white.
+  // `dynamic` is art-kit.ts::batchStaticMeshes's documented opt-out.
+  group.userData.dynamic = true;
 
-  const ridgeMaterial = new THREE.MeshStandardMaterial({
+  // Unlit ridge rings. A distant backdrop is painted, not lit: the sun term
+  // and the haze term are baked per vertex above, so nothing here needs a
+  // lighting pass, a shadow pass, or the arena's fog (which is keyed 0xb1c0be,
+  // brighter than this arena's sky, and was putting a floor under the ridge
+  // well above the sky behind it - measured ridge/sky 2.15 in the worst band).
+  const ridgeMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true,
-    flatShading: true,
-    roughness: 0.96,
-    metalness: 0,
+    fog: RIDGE_FOG,
   });
+  ridgeMaterial.name = 'nuketown-ridge-painted';
+  // The skirt is different in kind: it is GROUND continuing out of the arena,
+  // at arena distances, so it stays lit and stays fogged.
   const skirtMaterial = new THREE.MeshStandardMaterial({
-    color: 0x76765c, // dry scrubland tying the fence line to the foothills
+    vertexColors: true,
     roughness: 1,
     metalness: 0,
   });
@@ -210,9 +355,11 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
       outerRadius: 92,
       heightMin: 4,
       heightMax: 12,
-      footColor: 0x6f7355,
-      crestColor: 0x7c8069,
+      footColor: 0x2f3a2c,
+      crestColor: 0x3d4735,
       phase: 1.9,
+      haze: 0.34,
+      shadeStrength: 0.55,
     }),
     ridgeMaterial,
   );
@@ -225,16 +372,17 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
       outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M, // 132
       heightMin: 13,
       heightMax: NUKETOWN_BACKDROP_MAX_HEIGHT_M - 4, // 30
-      footColor: 0x6b705f,
-      crestColor: 0x848c94,
+      footColor: 0x2d3444,
+      crestColor: 0x3b4358,
       phase: 4.7,
-      snowline: 0.8,
+      haze: 0.6,
+      shadeStrength: 0.42,
     }),
     ridgeMaterial,
   );
   // v3: a third, taller far range fills the gap between the main ridge's
-  // saddles so the horizon reads as a layered massif instead of one band;
-  // its peaks carry the snowline.
+  // saddles so the horizon reads as a layered massif instead of one band.
+  // v4: it carries the heaviest haze instead of a snowline, so it recedes.
   const farRange = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-far-range',
@@ -243,20 +391,16 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
       outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M,
       heightMin: 20,
       heightMax: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
-      footColor: 0x707a84,
-      crestColor: 0x9aa6b0,
+      footColor: 0x323a51,
+      crestColor: 0x414a63,
       phase: 8.3,
-      snowline: 0.66,
+      haze: 0.82,
+      shadeStrength: 0.3,
     }),
     ridgeMaterial,
   );
-  const skirt = new THREE.Mesh(
-    new THREE.CircleGeometry(NUKETOWN_BACKDROP_MAX_RADIAL_M, 48),
-    skirtMaterial,
-  );
-  skirt.geometry.name = 'nuketown-backdrop-ground-skirt';
+  const skirt = new THREE.Mesh(buildGroundSkirt(), skirtMaterial);
   skirt.name = 'nuketown-backdrop-ground-skirt';
-  skirt.rotation.x = -Math.PI / 2;
   skirt.position.y = NUKETOWN_BACKDROP_SKIRT_Y_M;
 
   let triangles = 0;

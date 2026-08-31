@@ -12,11 +12,15 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Box2 } from '../collision';
 import {
+  VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   viewmodelObstructionPose,
+  viewmodelProbeLattice,
+  type ViewmodelContactEnvelope,
 } from '../weapon-presentation-state';
 import {
+  measuredEnvelopeContactDepthMeters,
   nearestViewmodelForwardObstructionMeters,
   resolveViewmodelObstructionPose,
   sampleViewmodelContactProbes,
@@ -44,6 +48,22 @@ function input(overrides: Partial<ViewmodelObstructionPoseInput> = {}): Viewmode
   };
 }
 
+/**
+ * The carbine's rig envelope as MEASURED in installed Chrome on 2026-08-31
+ * (docs/assets/viewmodel-clipping-fix-2026-08-31/measurements-after.json).
+ * Inlined as data so this gate pins real geometry rather than a
+ * plausible-looking invention.
+ */
+const MEASURED_CARBINE_ENVELOPE: ViewmodelContactEnvelope = Object.freeze({
+  contract: VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
+  weapon: 'carbine',
+  minX: 0.198,
+  maxX: 0.459,
+  minY: -0.839,
+  maxY: -0.111,
+  forwardReachMeters: 1.97,
+});
+
 /** A wall the camera looks straight into, 1.0-1.2 m ahead down -Z. */
 const WALL: Box2 = Object.freeze({ minX: -3, maxX: 3, minZ: -1.2, maxZ: -1, minY: 0, maxY: 3 });
 
@@ -64,10 +84,93 @@ describe('forward contact lattice', () => {
     expect(nearestViewmodelForwardObstructionMeters(input({ colliders: [far] }))).toBeNull();
   });
 
+  /**
+   * THE TEST THAT ENCODED THE BUG, corrected 2026-08-31.
+   *
+   * This file used to assert only the clause above and treat it as the whole
+   * truth: geometry beyond `probeLengthMeters` is invisible, full stop. That is
+   * the right rule for the FIRE gate - widening what the trigger can refuse is
+   * not presentation work - but it was also the only rule the POSE had, and the
+   * authored length is shorter than the weapon. Measured 2026-08-31: carbine
+   * probeLengthMeters 1.65 m against a muzzle 1.958 m from the eye, sniper
+   * 1.95 m against 2.157 m. At a 1.80 m gap the lattice reported
+   * `nearestForwardMeters: null` and `retreat: 0` while the muzzle was already
+   * 15.8 cm inside the wall - and this file called that correct.
+   *
+   * The blindness is now confined to the fire path; the pose path sees the rig
+   * it is actually posing.
+   */
+  it('the POSE still sees a wall the authored envelope is too short to reach', () => {
+    // 1.80 m ahead: past the carbine's 1.65 m authored envelope, well inside
+    // the 1.958 m the measured muzzle reaches.
+    const beyondAuthored: Box2 = { ...WALL, minZ: -2.0, maxZ: -1.8 };
+    const world = input({ colliders: [beyondAuthored] });
+    expect(CARBINE.probeLengthMeters).toBeLessThan(1.8);
+    expect(nearestViewmodelForwardObstructionMeters(world)).toBeNull();
+
+    const measured = measuredEnvelopeContactDepthMeters({ ...world, envelope: MEASURED_CARBINE_ENVELOPE });
+    expect(measured).not.toBeNull();
+    expect(measured!).toBeGreaterThan(1.5);
+    expect(measured!).toBeLessThan(2.1);
+  });
+
+  it('leaves the fire gate blind to the same wall - retreat may not move', () => {
+    const beyondAuthored: Box2 = { ...WALL, minZ: -2.0, maxZ: -1.8 };
+    const authored = resolveViewmodelObstructionPose(input({ colliders: [beyondAuthored] }));
+    const withEnvelope = resolveViewmodelObstructionPose(input({
+      colliders: [beyondAuthored],
+      envelope: MEASURED_CARBINE_ENVELOPE,
+    }));
+    // The presentation-only channel is the ONLY thing the envelope changes.
+    expect(withEnvelope.retreat).toBe(authored.retreat);
+    expect(withEnvelope.lift).toBe(authored.lift);
+    expect(authored.contactDepthMeters).toBeNull();
+    expect(withEnvelope.contactDepthMeters).not.toBeNull();
+  });
+
   it('walks the complete authored probe set, not a subset', () => {
     const sweep = sampleViewmodelContactProbes(input({ colliders: [WALL] }));
     expect(sweep.samples).toHaveLength(VIEWMODEL_CONTACT_PROBE_OFFSETS.length);
     expect(sweep.samples.map((sample) => sample.offset)).toEqual([...VIEWMODEL_CONTACT_PROBE_OFFSETS]);
+  });
+});
+
+describe('the lattice covers the volume the weapon is in (owner 2026-08-31)', () => {
+  it('the authored lattice is centred on the EYE, which is not where the weapon is', () => {
+    const authored = viewmodelProbeLattice(CARBINE, null);
+    expect(authored.source).toBe('authored-profile');
+    expect(authored.centreRightMeters).toBe(0);
+    expect(authored.centreUpMeters).toBe(0);
+    // Measured: the rig occupies camera-space X +0.198..+0.459, Y -0.839..-0.111.
+    // The authored lattice spans X -0.24..+0.24 and Y -0.28..+0.25 around the
+    // eye, so it samples a volume the weapon is almost entirely outside of.
+    expect(authored.centreRightMeters).toBeLessThan(MEASURED_CARBINE_ENVELOPE.minX);
+    expect(authored.centreUpMeters).toBeGreaterThan(MEASURED_CARBINE_ENVELOPE.maxY);
+  });
+
+  it('the measured lattice is centred on the rig and reaches as far as it does', () => {
+    const measured = viewmodelProbeLattice(CARBINE, MEASURED_CARBINE_ENVELOPE);
+    expect(measured.source).toBe('measured-envelope');
+    const centreX = (MEASURED_CARBINE_ENVELOPE.minX + MEASURED_CARBINE_ENVELOPE.maxX) / 2;
+    const centreY = (MEASURED_CARBINE_ENVELOPE.minY + MEASURED_CARBINE_ENVELOPE.maxY) / 2;
+    expect(measured.centreRightMeters).toBeCloseTo(centreX, 6);
+    expect(measured.centreUpMeters).toBeCloseTo(centreY, 6);
+    // Every part of the rig lies inside the sampled span.
+    expect(measured.centreRightMeters - measured.halfWidthMeters).toBeCloseTo(MEASURED_CARBINE_ENVELOPE.minX, 6);
+    expect(measured.centreRightMeters + measured.halfWidthMeters).toBeCloseTo(MEASURED_CARBINE_ENVELOPE.maxX, 6);
+    expect(measured.centreUpMeters - measured.lowerOffsetMeters).toBeCloseTo(MEASURED_CARBINE_ENVELOPE.minY, 6);
+    expect(measured.centreUpMeters + measured.upperOffsetMeters).toBeCloseTo(MEASURED_CARBINE_ENVELOPE.maxY, 6);
+    // And it reaches past the muzzle rather than stopping short of it.
+    expect(measured.lengthMeters).toBeGreaterThan(MEASURED_CARBINE_ENVELOPE.forwardReachMeters);
+    expect(measured.lengthMeters).toBeGreaterThan(CARBINE.probeLengthMeters);
+  });
+
+  it('a rig that cannot be measured falls back to the authored profile exactly', () => {
+    const fallback = viewmodelProbeLattice(CARBINE, null);
+    expect(fallback.halfWidthMeters).toBe(CARBINE.probeHalfWidthMeters);
+    expect(fallback.upperOffsetMeters).toBe(CARBINE.probeUpperOffsetMeters);
+    expect(fallback.lowerOffsetMeters).toBe(CARBINE.probeLowerOffsetMeters);
+    expect(fallback.lengthMeters).toBe(CARBINE.probeLengthMeters);
   });
 });
 

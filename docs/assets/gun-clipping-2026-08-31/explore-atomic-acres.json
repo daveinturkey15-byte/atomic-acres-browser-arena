@@ -1,0 +1,488 @@
+{
+  "spawn": {
+    "weapon": "carbine",
+    "stance": "stand",
+    "eye": [
+      -34.5,
+      1.6983986282348633,
+      23
+    ],
+    "yaw": -0.982793723247329,
+    "pitch": 0,
+    "grounded": true,
+    "forward": [
+      0.8320502943378437,
+      0,
+      -0.5547001962252291
+    ],
+    "retreat": 0,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 0,
+      "highReadyBlend": 0,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vm": {
+      "meshes": 274,
+      "rootLocal": [
+        0.339227333479749,
+        -0.3769794199683876,
+        -1.1400000000000001
+      ],
+      "rootScale": 0.9289587570571032,
+      "rootRot": [
+        0,
+        0.18,
+        0
+      ],
+      "rootWorld": [
+        -33.363293196008684,
+        1.4614192082664759,
+        22.649895978972506
+      ],
+      "worldMin": [
+        -35.55503747785851,
+        0.3093418829138788,
+        20.441206872070616
+      ],
+      "worldMax": [
+        -31.157911845358008,
+        2.090646620757003,
+        24.84541440001842
+      ],
+      "sockets": {
+        "blade-edge-socket": [
+          -33.08758712044114,
+          0.6034816951728958,
+          22.69667975664022
+        ],
+        "blade-tip-socket": [
+          -33.01125621602375,
+          0.3431991913250446,
+          22.70668716056877
+        ],
+        "grip-socket-r": [
+          -33.469033227924335,
+          1.0385999912023545,
+          22.753076594783543
+        ],
+        "pommel-socket": [
+          -33.56649485776278,
+          1.358250657048904,
+          22.74097535897133
+        ],
+        "left-hand-grenade-socket": [
+          -31.959297963735718,
+          3.0250592036761828,
+          22.543967388233227
+        ],
+        "left-hand-grip-socket": [
+          -32.1342447212524,
+          3.1619828276285284,
+          22.893682346355178
+        ],
+        "right-hand-grip-socket": [
+          -34.35190304752113,
+          1.9637972722392347,
+          24.114905726623533
+        ],
+        "right-wrist-knife-socket": [
+          -33.450159153457435,
+          1.145573227392168,
+          22.733791165706197
+        ],
+        "eject-socket": [
+          -33.38779301461855,
+          1.3215000024437904,
+          22.583414932464763
+        ],
+        "front-sight-socket": [
+          -33.050256993709624,
+          1.4280999985337257,
+          22.348622289368226
+        ],
+        "magazine-socket": [
+          -33.33927157027289,
+          1.3215000024437904,
+          22.627752718147207
+        ],
+        "muzzle-socket": [
+          -32.9735796203894,
+          1.3215000024437904,
+          22.274567242224833
+        ],
+        "optic-socket": [
+          -33.256695967552226,
+          1.4280999985337257,
+          22.54800115797267
+        ],
+        "rear-sight-socket": [
+          -33.44544019606441,
+          1.4280999985337257,
+          22.73029043230839
+        ],
+        "reload-socket-l": [
+          -33.30549576754378,
+          1.3255999985337257,
+          22.68633185219343
+        ],
+        "support-socket-l": [
+          -33.157837623120884,
+          1.2354000005498529,
+          22.532323563680606
+        ]
+      },
+      "layerMask": 4
+    },
+    "muzzleWorld": [
+      -32.9735796203894,
+      1.3215000024437904,
+      22.274567242224833
+    ],
+    "muzzleForwardMeters": 1.672456219224376,
+    "vmForwardMaxMeters": 4.200148482935088
+  },
+  "results": [
+    {
+      "yaw": 0,
+      "eye": [
+        -34.5,
+        1.7,
+        10.711
+      ],
+      "retreat": 0.78,
+      "nearest": 0.259,
+      "box": {
+        "minX": -34.806,
+        "maxX": -34.194,
+        "minZ": 9.693999999999999,
+        "maxZ": 10.306000000000001,
+        "minY": 0,
+        "maxY": 3.6
+      },
+      "muzzleFwd": -11.563469524939677,
+      "vmFwdMax": 2.1135229694171205
+    },
+    {
+      "yaw": 0.393,
+      "eye": [
+        -36.595,
+        1.725,
+        8.916
+      ],
+      "retreat": 0.78,
+      "nearest": 0.099,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -13.727400920997042,
+      "vmFwdMax": 2.8188138865773924
+    },
+    {
+      "yaw": 0.785,
+      "eye": [
+        -36.595,
+        1.729,
+        11.86
+      ],
+      "retreat": 0.78,
+      "nearest": 0.127,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -9.924504806759069,
+      "vmFwdMax": 3.2238983751134276
+    },
+    {
+      "yaw": 1.178,
+      "eye": [
+        -36.595,
+        1.725,
+        17.232
+      ],
+      "retreat": 0.78,
+      "nearest": 0.181,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -5.275434174667328,
+      "vmFwdMax": 2.885699671583855
+    },
+    {
+      "yaw": 1.571,
+      "eye": [
+        -36.595,
+        1.7,
+        23
+      ],
+      "retreat": 0.78,
+      "nearest": 0.26,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -3.621318603487552,
+      "vmFwdMax": 2.113522969418028
+    },
+    {
+      "yaw": 1.963,
+      "eye": [
+        -36.595,
+        1.725,
+        28.851
+      ],
+      "retreat": 0.78,
+      "nearest": 0.181,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -5.8624208575031584,
+      "vmFwdMax": 2.8188135082278953
+    },
+    {
+      "yaw": 2.356,
+      "eye": [
+        -36.595,
+        1.725,
+        29.595
+      ],
+      "retreat": 0.78,
+      "nearest": 0.127,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -7.737009027959901,
+      "vmFwdMax": 3.2238980557062327
+    },
+    {
+      "yaw": 2.749,
+      "eye": [
+        -36.595,
+        1.725,
+        29.595
+      ],
+      "retreat": 0.78,
+      "nearest": 0.099,
+      "box": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -8.148859108380586,
+      "vmFwdMax": 2.8856997908385256
+    },
+    {
+      "yaw": 3.142,
+      "eye": [
+        -34.5,
+        1.71,
+        29.595
+      ],
+      "retreat": 0.78,
+      "nearest": 0.259,
+      "box": {
+        "minX": -37.5,
+        "maxX": 37.5,
+        "minZ": 30,
+        "maxZ": 30.6,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -7.320332889000753,
+      "vmFwdMax": 2.1135229693936637
+    },
+    {
+      "yaw": 3.534,
+      "eye": [
+        -28.613,
+        1.725,
+        29.595
+      ],
+      "retreat": 0.78,
+      "nearest": 0.182,
+      "box": {
+        "minX": -37.5,
+        "maxX": 37.5,
+        "minZ": 30,
+        "maxZ": 30.6,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -8.431537328759061,
+      "vmFwdMax": 2.818813318854247
+    },
+    {
+      "yaw": 3.927,
+      "eye": [
+        -23.614,
+        1.728,
+        29.595
+      ],
+      "retreat": 0.78,
+      "nearest": 0.127,
+      "box": {
+        "minX": -37.5,
+        "maxX": 37.5,
+        "minZ": 30,
+        "maxZ": 30.6,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -11.794348194588865,
+      "vmFwdMax": 3.2238976617678645
+    },
+    {
+      "yaw": 4.32,
+      "eye": [
+        -19.526,
+        1.715,
+        29.203
+      ],
+      "retreat": 0.389,
+      "nearest": 1.123,
+      "box": {
+        "minX": -37.5,
+        "maxX": 37.5,
+        "minZ": 30,
+        "maxZ": 30.6,
+        "minY": 0,
+        "maxY": 3
+      },
+      "muzzleFwd": -15.075570593129205,
+      "vmFwdMax": 3.184515879830334
+    },
+    {
+      "yaw": 4.712,
+      "eye": [
+        -18.394,
+        1.713,
+        23
+      ],
+      "retreat": 0,
+      "nearest": null,
+      "box": null,
+      "muzzleFwd": -14.579517578153073,
+      "vmFwdMax": 2.9307270650532
+    },
+    {
+      "yaw": 5.105,
+      "eye": [
+        -19.431,
+        1.715,
+        16.758
+      ],
+      "retreat": 0,
+      "nearest": null,
+      "box": null,
+      "muzzleFwd": -14.62243242167491,
+      "vmFwdMax": 3.9482110971939717
+    },
+    {
+      "yaw": 5.498,
+      "eye": [
+        -23.039,
+        1.716,
+        13.255
+      ],
+      "retreat": 0,
+      "nearest": null,
+      "box": null,
+      "muzzleFwd": -13.40271390606869,
+      "vmFwdMax": 4.211256462120767
+    },
+    {
+      "yaw": 5.89,
+      "eye": [
+        -28.375,
+        1.716,
+        8.215
+      ],
+      "retreat": 0,
+      "nearest": null,
+      "box": null,
+      "muzzleFwd": -14.748682481516346,
+      "vmFwdMax": 3.5451391772334793
+    }
+  ]
+}

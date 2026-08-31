@@ -65,14 +65,17 @@ const FLOOR_EPSILON = 0.01;
  * chest.
  *
  * On the five arenas this script originally covered nothing is authored below
- * y = 0, so the error was invisible. test1 and test2 author their ground and
- * terrace slabs as real movement colliders (test1 a single 150 x 130 m pad at
- * y[-1, 0]; test2 six terrace slabs plus a sunken parterre at y[-1.35, -0.35]),
- * so the sunken probe was inside the ground everywhere and EVERY position in
- * both arenas came back illegal. The sweep then emitted only the spots hugging
- * the outside rim of the ground pad itself - 2262 for test1 and 1176 for test2,
- * of which ZERO were inside the playable bounds. A roster fix alone would have
- * produced a green-looking artifact covering nothing.
+ * y = 0, so the error was invisible. test1 and test2 author their ground slabs
+ * as real movement colliders (test1 a single 150 x 130 m pad at y[-1, 0];
+ * test2 twenty-one paving slabs at y[-1, 0] plus a sunken sport court at
+ * y[-1.35, -0.35] and a pool basin at y[-1.55, -0.55]), so the sunken probe was
+ * inside the ground everywhere and EVERY position in both arenas came back
+ * illegal. The sweep then emitted only the spots hugging the outside rim of the
+ * ground pad itself - 2262 for test1 and 1176 for test2, of which ZERO were
+ * inside the playable bounds. A roster fix alone would have produced a
+ * green-looking artifact covering nothing. (Those two rim counts are the
+ * historical record of the bug, not a current expectation: test2's bounds moved
+ * to 100 x 76 m on 2026-08-31 and its spot count moved with them.)
  *
  * So legality is now asked the way the game asks it: per stance, filter to the
  * colliders overlapping that stance's capsule span, then probe at the capsule
@@ -157,7 +160,8 @@ type ArenaBuilder = (scene: THREE.Scene) => { colliders: Box2[] };
  *
  * Owner 2026-08-30. This used to be a hand-written five-arena array, so test1
  * and test2 - both rebuilt at full scale that same day (64 x 46 m and
- * 76 x 58 m, 32852f89) - had NO eye-clearance or traversal coverage at all,
+ * 76 x 58 m, 32852f89; test2 has since been rebuilt again at 100 x 76 m) - had
+ * NO eye-clearance or traversal coverage at all,
  * and nothing said so. That is the third instance tonight of one failure mode:
  * a verifier carrying its own frozen arena roster that silently goes stale when
  * an arena is added (the menu-preview gate was 5ac48931, the cross-browser

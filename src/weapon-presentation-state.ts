@@ -18,7 +18,68 @@ export type HitReactionState = {
 export type ViewmodelObstructionPose = Readonly<{
   retreat: number;
   lift: number;
+  /**
+   * Metres from the eye, along camera-forward, to the nearest obstruction
+   * inside the MEASURED rig envelope - or null when the rig is clear.
+   *
+   * `retreat` above is deliberately NOT this. `retreat` is derived from the
+   * AUTHORED probe profile and is an input to the HF-343 fire gate, so its
+   * value must stay byte-identical; this field is the presentation-only
+   * geometry the contact fold solves against, and nothing gameplay reads it.
+   */
+  contactDepthMeters: number | null;
 }>;
+
+/**
+ * MEASURED camera-space envelope of the presented first-person rig, taken at
+ * the NEUTRAL (unfolded, un-retreated) pose so that folding the weapon cannot
+ * feed back into the probe that asked for the fold.
+ *
+ * Owner, repeatedly: "the gun clipping is still happening everywhere". Five
+ * measured defects sat behind that; two of them were here. The authored
+ * profile claimed a 1.65 m carbine envelope against a muzzle measured 1.958 m
+ * from the eye, so at a 1.8 m gap the lattice reported "clear" while the
+ * muzzle was already 15.8 cm inside the wall. The authored lattice was also
+ * centred on the EYE (camera-space X -0.386..+0.386, Y -0.426..+0.396) while
+ * the rig actually occupies X +0.076..+0.559, Y -0.772..-0.043 - so 17.3 cm
+ * of the weapon's right side and 34.6 cm of its underside were never sampled
+ * and about half the sampled volume held no weapon at all.
+ *
+ * Nothing here is authored. Every number is read off the mounted model.
+ */
+export const VIEWMODEL_CONTACT_ENVELOPE_CONTRACT = 'measured-viewmodel-contact-envelope-v1';
+
+export type ViewmodelContactEnvelope = Readonly<{
+  contract: typeof VIEWMODEL_CONTACT_ENVELOPE_CONTRACT;
+  weapon: WeaponId;
+  /** Camera-space span the rig actually occupies. */
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  /** Camera-forward metres to the forward-most rig point at the neutral pose. */
+  forwardReachMeters: number;
+}>;
+
+/** One placed probe ray: where it starts relative to the eye, and how far it runs. */
+export type ViewmodelProbeLattice = Readonly<{
+  /** Camera-space centre of the sampled volume. Zero for the authored fallback. */
+  centreRightMeters: number;
+  centreUpMeters: number;
+  halfWidthMeters: number;
+  upperOffsetMeters: number;
+  lowerOffsetMeters: number;
+  lengthMeters: number;
+  paddingMeters: number;
+  source: 'measured-envelope' | 'authored-profile';
+}>;
+
+/**
+ * How far past the forward-most rig point the envelope sweep still looks. The
+ * fold has to begin BEFORE the muzzle reaches the surface, not at the instant
+ * it arrives, or the weapon snaps instead of folding.
+ */
+export const VIEWMODEL_ENVELOPE_PROBE_LEAD_METERS = 0.35;
 
 export type ViewmodelContactProfile = Readonly<{
   weapon: WeaponId;
@@ -101,6 +162,54 @@ export function viewmodelContactProbePaddingMeters(profile: ViewmodelContactProf
     profile.probeUpperOffsetMeters * 0.52,
     profile.probeLowerOffsetMeters * 0.52,
   );
+}
+
+/**
+ * Places the nine-probe lattice over the volume the weapon is ACTUALLY in.
+ *
+ * With no measured envelope this returns the authored profile unchanged and
+ * centred on the eye - that path is what the HF-343 fire gate samples, and its
+ * numbers must not move. With a measured envelope the lattice is re-centred
+ * and re-sized onto the rig, and its reach is the rig's own forward reach plus
+ * a lead, so a longer weapon gets a longer probe instead of an authored guess.
+ */
+export function viewmodelProbeLattice(
+  profile: ViewmodelContactProfile,
+  envelope: ViewmodelContactEnvelope | null | undefined,
+): ViewmodelProbeLattice {
+  const authoredPadding = viewmodelContactProbePaddingMeters(profile);
+  if (!envelope || envelope.contract !== VIEWMODEL_CONTACT_ENVELOPE_CONTRACT) {
+    return Object.freeze({
+      centreRightMeters: 0,
+      centreUpMeters: 0,
+      halfWidthMeters: profile.probeHalfWidthMeters,
+      upperOffsetMeters: profile.probeUpperOffsetMeters,
+      lowerOffsetMeters: profile.probeLowerOffsetMeters,
+      lengthMeters: profile.probeLengthMeters,
+      paddingMeters: authoredPadding,
+      source: 'authored-profile',
+    });
+  }
+  const centreRight = (envelope.minX + envelope.maxX) / 2;
+  const centreUp = (envelope.minY + envelope.maxY) / 2;
+  const halfWidth = Math.max(0.05, (envelope.maxX - envelope.minX) / 2);
+  const halfHeight = Math.max(0.05, (envelope.maxY - envelope.minY) / 2);
+  // Padded until neighbouring samples overlap, exactly as the authored lattice
+  // is - a thin doorjamb must not pass between two probes.
+  const padding = Math.max(0.085, halfWidth * 0.52, halfHeight * 0.52);
+  return Object.freeze({
+    centreRightMeters: finite(centreRight),
+    centreUpMeters: finite(centreUp),
+    halfWidthMeters: halfWidth,
+    upperOffsetMeters: halfHeight,
+    lowerOffsetMeters: halfHeight,
+    lengthMeters: Math.max(
+      profile.probeLengthMeters,
+      Math.max(0, finite(envelope.forwardReachMeters)) + VIEWMODEL_ENVELOPE_PROBE_LEAD_METERS,
+    ),
+    paddingMeters: padding,
+    source: 'measured-envelope',
+  });
 }
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
 // Owner 2026-08-30 ("clipping ... or prone, longtime issue"): flat-ground
@@ -420,6 +529,12 @@ export function viewmodelObstructionPose(
     )),
     lift: Math.min(0.2, Math.max(0, (prone ? VIEWMODEL_PRONE_BASE_LIFT_METERS : 0)
       + Math.max(proneGroundedLift, floorPressure * (prone ? VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS : VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS)))),
+    // Null from the pure reducer by construction: this reducer only ever sees
+    // the AUTHORED probe distance, and handing that to the fold would rebuild
+    // the same authored-guess problem one layer down. The runtime resolver in
+    // systems/viewmodel-contact-probe.ts fills it from the measured envelope
+    // sweep, which is the only sweep that knows where the weapon really is.
+    contactDepthMeters: null,
   };
 }
 

@@ -91,10 +91,17 @@ describe('weapon presentation state', () => {
   });
 
   it('adds bounded prone and floor clearance without moving gameplay authority', () => {
-    expect(viewmodelObstructionPose(null, false, null)).toEqual({ retreat: 0, lift: 0 });
+    // contactDepthMeters is null from this reducer BY CONSTRUCTION: it only
+    // ever sees the authored probe distance, and the presentation fold must be
+    // handed the measured envelope depth instead (filled in by
+    // systems/viewmodel-contact-probe.ts). Pinned so a future caller cannot
+    // quietly start feeding the fold an authored guess again.
+    expect(viewmodelObstructionPose(null, false, null))
+      .toEqual({ retreat: 0, lift: 0, contactDepthMeters: null });
     expect(viewmodelObstructionPose(null, true, 0.61)).toEqual({
       retreat: 0.09,
       lift: expect.any(Number),
+      contactDepthMeters: null,
     });
     expect(viewmodelObstructionPose(null, true, 0.61).lift).toBeGreaterThanOrEqual(0.13);
     expect(viewmodelObstructionPose(0.2, true, 0.2).retreat).toBeLessThanOrEqual(

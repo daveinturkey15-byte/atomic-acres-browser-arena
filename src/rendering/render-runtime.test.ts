@@ -8,7 +8,9 @@ import {
   detectLivePresentationStall,
   shouldResetPresentationAfterSchedulerGap,
   formatWebGpuUncapturedError,
+  WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS,
   maximumInFlightWebGpuSubmissions,
+  shouldRecoverStarvedPresentation,
   pendingCompletionStartAfterProgress,
   OPTIONAL_WEBGPU_DEVICE_FEATURES,
   resolveRenderRuntimeRequest,
@@ -469,8 +471,15 @@ describe('Pass 64 render runtime boundary', () => {
 
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
     expect(maximumInFlightWebGpuSubmissions('serialized')).toBe(1);
-    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(2);
-    expect(maximumInFlightWebGpuSubmissions('input-response')).toBe(3);
+    // Depth three, measured: at depth two the completion fence WAS the frame
+    // timer and presentation was pinned near 50 fps with the GPU at 14%
+    // utilisation. Measured by scripts/qa/measure-presented-frames.mjs.
+    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS);
+    expect(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS).toBe(3);
+    // An input-response frame always keeps exactly one slot beyond the warmed
+    // live frontier, so a shot is never the frame admission refuses.
+    expect(maximumInFlightWebGpuSubmissions('input-response'))
+      .toBe(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS + 1);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
@@ -536,7 +545,12 @@ describe('Pass 64 render runtime boundary', () => {
     expect(pending).toHaveLength(1);
   });
 
-  it('admits exactly two warmed-live frames behind one completion-frontier probe', async () => {
+  it('pipelines one completion probe per warmed-live submission up to the depth bound', async () => {
+    // THE CONTRACT THAT WAS WRONG. This used to assert "exactly two frames
+    // behind ONE probe": a single mutable observer meant the completion
+    // frontier could advance at most one queue round trip at a time, and with a
+    // two-deep bound that made `onSubmittedWorkDone` the frame timer. Every
+    // admitted frame now carries its own observer, and they settle in order.
     const pending: Array<() => void> = [];
     const renderer = {
       backend: { isWebGPUBackend: true },
@@ -567,41 +581,174 @@ describe('Pass 64 render runtime boundary', () => {
 
     expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
     expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(false);
-    expect(render).toHaveBeenCalledTimes(2);
-    expect(pending).toHaveLength(1);
+    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(3);
+    // One observer per admitted frame, all outstanding together.
+    expect(pending).toHaveLength(3);
     expect(runtime.presentationTelemetry()).toMatchObject({
       submissionMode: 'warmed-live',
-      maximumInFlightSubmissions: 2,
-      inFlightSubmissions: 2,
+      maximumInFlightSubmissions: 3,
+      inFlightSubmissions: 3,
       completionProbeTargetSequence: 1,
-      completionProbeCount: 1,
-      submissionSequence: 2,
+      outstandingCompletionProbes: 3,
+      completionProbeCount: 3,
+      submissionSequence: 3,
       completedSequence: 0,
     });
-    expect(() => runtime.submitFrame(125, true, 'serialized'))
+    expect(() => runtime.submitFrame(135, true, 'serialized'))
       .toThrow('Forced WebGPU submission requires an idle completion frontier');
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledTimes(3);
 
+    // Each observer retires its own submission; the frontier advances one
+    // frame per resolution instead of waiting for a fresh round trip.
     pending.shift()?.();
     await settleProbe();
-    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(true);
-    expect(pending).toHaveLength(1);
     expect(runtime.presentationTelemetry()).toMatchObject({
       inFlightSubmissions: 2,
-      completionProbeTargetSequence: 3,
-      completionProbeCount: 2,
-      submissionSequence: 3,
       completedSequence: 1,
+      completionProbeTargetSequence: 2,
+      outstandingCompletionProbes: 2,
     });
-    pending.shift()?.();
-    await settleProbe();
+    expect(runtime.submitFrame(140, false, 'warmed-live')).toBe(true);
+    expect(pending).toHaveLength(3);
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      inFlightSubmissions: 3,
+      submissionSequence: 4,
+      completedSequence: 1,
+      outstandingCompletionProbes: 3,
+      completionProbeCount: 4,
+    });
+
+    while (pending.length > 0) {
+      pending.shift()?.();
+      await settleProbe();
+    }
     expect(runtime.presentationTelemetry()).toMatchObject({
       inFlightSubmissions: 0,
       completionProbeTargetSequence: null,
-      submissionSequence: 3,
-      completedSequence: 3,
+      outstandingCompletionProbes: 0,
+      submissionSequence: 4,
+      completedSequence: 4,
     });
+  });
+
+  it('breaks the starvation collapse with one admitted frame, and only when the frame is cheap', async () => {
+    // THE COLLAPSE. Completion latency walks from ~5 ms to ~48 ms in about
+    // three seconds and never recovers: refusals starve the GPU, the idle GPU
+    // downclocks, the low clocks keep the fence slow. Nothing in the loop broke
+    // that cycle, so a match finished pinned near 20 fps with the GPU at 14%.
+    const pending: Array<() => void> = [];
+    // three's WebGPU backend reports drawCalls, which is the field
+    // webGpuRenderInfoSnapshot reads; a fixture using `calls` records undefined.
+    const info = { reset: vi.fn(), render: { drawCalls: 181, triangles: 528_000, points: 0, lines: 0 } };
+    const renderer = { backend: { isWebGPUBackend: true }, info };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+
+    // Fill the queue, then never resolve a fence: the collapse, exactly.
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    const refusals: boolean[] = [];
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      refusals.push(runtime.submitFrame(130 + attempt, false, 'warmed-live'));
+    }
+    // Seven refusals, then the valve admits one frame - a bounded floor, not an
+    // override: presentation can never stop entirely while frames stay cheap.
+    expect(refusals).toEqual([false, false, false, false, false, false, false, true]);
+    expect(render).toHaveBeenCalledTimes(4);
+    expect(runtime.presentationCounters()).toMatchObject({
+      starvationRecoveries: 1,
+      consecutiveRefusedSubmissions: 0,
+      skippedSubmissions: 7,
+      inFlightSubmissions: 4,
+    });
+
+    // And it stays a floor, not a leak: the streak has to build again.
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      expect(runtime.submitFrame(200 + attempt, false, 'warmed-live')).toBe(false);
+    }
+    expect(runtime.submitFrame(210, false, 'warmed-live')).toBe(true);
+    expect(runtime.presentationCounters()).toMatchObject({ starvationRecoveries: 2 });
+  });
+
+  it('leaves backpressure alone when the frame is genuinely expensive', () => {
+    const pending: Array<() => void> = [];
+    // A frame this heavy could plausibly be what is occupying the GPU, so the
+    // relief valve must not fire - that is the difference between a starved
+    // device and a saturated one, and the page cannot read GPU utilisation.
+    const info = { reset: vi.fn(), render: { drawCalls: 9_000, triangles: 40_000_000, points: 0, lines: 0 } };
+    const renderer = { backend: { isWebGPUBackend: true }, info };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      expect(runtime.submitFrame(130 + attempt, false, 'warmed-live')).toBe(false);
+    }
+    expect(runtime.presentationCounters()).toMatchObject({
+      starvationRecoveries: 0,
+      consecutiveRefusedSubmissions: 40,
+    });
+  });
+
+  it('decides starvation relief from the refusal streak, the bound and the frame cost', () => {
+    const base = {
+      consecutiveRefusedSubmissions: 8,
+      refusalStreakThreshold: 8,
+      inFlightSubmissions: 3,
+      maximumInFlightSubmissions: 3,
+      drawCalls: 181,
+      triangles: 528_000,
+      trivialDrawCallCeiling: 6_000,
+      trivialTriangleCeiling: 12_000_000,
+    };
+    expect(shouldRecoverStarvedPresentation(base)).toBe(true);
+    expect(shouldRecoverStarvedPresentation({ ...base, consecutiveRefusedSubmissions: 7 })).toBe(false);
+    // Refused for the stall clause rather than the depth clause: the queue is
+    // not pinned at its bound, so this is not starvation.
+    expect(shouldRecoverStarvedPresentation({ ...base, inFlightSubmissions: 2 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, drawCalls: 6_001 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, triangles: 12_000_001 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, refusalStreakThreshold: 0 })).toBe(false);
+    // An unreadable frame cost keeps backpressure rather than opening the valve.
+    expect(shouldRecoverStarvedPresentation({ ...base, drawCalls: Number.NaN })).toBe(false);
   });
 
   it('admits one bounded input-response frame beyond the warmed-live frontier', () => {
@@ -630,17 +777,19 @@ describe('Pass 64 render runtime boundary', () => {
       device,
     });
 
-    expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(120, false, 'input-response')).toBe(true);
-    expect(runtime.submitFrame(130, false, 'input-response')).toBe(false);
-    expect(render).toHaveBeenCalledTimes(3);
-    expect(pending).toHaveLength(1);
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(false);
+    // The input frame still gets its one extra slot.
+    expect(runtime.submitFrame(140, false, 'input-response')).toBe(true);
+    expect(runtime.submitFrame(150, false, 'input-response')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(4);
     expect(runtime.presentationTelemetry()).toMatchObject({
       submissionMode: 'input-response',
-      maximumInFlightSubmissions: 3,
-      inFlightSubmissions: 3,
-      submissionSequence: 3,
+      maximumInFlightSubmissions: 4,
+      inFlightSubmissions: 4,
+      submissionSequence: 4,
       completedSequence: 0,
     });
   });
