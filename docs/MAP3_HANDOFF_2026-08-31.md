@@ -2,8 +2,9 @@
 
 You are picking up a half-built feature from another model. Everything you need
 is here; read the **Gotchas** section before you write a line of shader code,
-because four of the five bugs in this session were things that look like a
-different bug than they are.
+because most of the bugs in this session presented as a different bug than they
+were — three of them were 'correct on the WebGL2 fallback, wrong on WebGPU',
+which is the single trap most likely to catch you next.
 
 ---
 
@@ -80,7 +81,7 @@ That has already bitten once — see Gotcha 1.
 | `src/map3/corridors-extra.ts` | corridors 4–6 |
 | `src/map3/sky.ts` | dome, SDF sun, SDF planet, clouds, orbit |
 | `src/map3/corridor-physics.ts` | corridor 7 — Rapier playground |
-| `src/map3/corridor-colosseum.ts` | corridor 8 — **may still be in progress, check it exists** |
+| `src/map3/corridor-colosseum.ts` | corridor 8 — colonnade, amphitheatre, pyramids, shafts |
 | `scripts/map3-validate-geometry.mts` | headless geometry validator |
 
 ### The corridors
@@ -94,18 +95,22 @@ That has already bitten once — see Gotcha 1.
 3. **Grammar** — three rule sets on one pipeline: towers, cottages, and a ruin
    built by a *subtractive* seeded survival test.
 4. **Water** — Gerstner shoreline whose foam gate is derived from the band table.
-5. **Weather** — four bays, spring→winter, one points cloud serving rain, storm
-   rain and snow via per-particle bay index.
+5. **Weather** — four bays, spring→winter. Rain, storm rain and snow all come
+   from ONE instanced billboard buffer via a per-particle bay index (NOT
+   THREE.Points — see Gotcha 8).
 6. **Volume** — god-ray march. **Weak — reads as a wash, not distinct beams.**
 7. **Physics** — Rapier: Jenga tower, 8 instanced balls with motion ribbons,
    76-brick running-bond wall, `B` rebuilds it.
-8. **Colosseum** — amphitheatre, pyramids, better beams. *Verify it landed.*
+8. **Colosseum** — colonnade approach, amphitheatre, two pyramids on the
+   horizon, shafts through the arcades. `COLOSSEUM_VIEWPOINT` names the pose
+   the composition is framed from.
 
 ### Controls
 
 `WASD` walk · `Shift` sprint · `Space` jump · click to look · `Esc` release ·
 `1`–`6` solo a corridor · `0` all · `O` shadows · `P` foliage · `H` half-res ·
-`B` rebuild the brick wall.
+`B` rebuild the brick wall. (Solo keys cover 1–6; corridors 7 and 8 have no
+solo key yet — trivial to extend in main.ts's keydown handler.)
 
 ### The HUD line is a diagnostic, read it
 
