@@ -93,11 +93,6 @@ export function createNatureCorridor(seed = 7): Corridor {
   });
   const litterGeo = mergeGeometries(litterParts);
   litterParts.forEach((g) => g.dispose());
-  const litterMesh = new THREE.Mesh(litterGeo, foliageMat);
-  litterMesh.castShadow = false;
-  litterMesh.receiveShadow = true;
-  group.add(litterMesh);
-  disposables.push(litterGeo);
 
   // Trees. Wood casts shadow; canopy explicitly does not — that exclusion is
   // what lets direct sun reach the floor and produce readable sunflecks
@@ -108,8 +103,20 @@ export function createNatureCorridor(seed = 7): Corridor {
     1.9,
     seed,
   );
+  // BATCHING. Every tree used to be three separate meshes (wood, canopy,
+  // litter) and every shrub one more, which put ~370 draw calls on screen for
+  // a scene with 19 materials. Geometry is merged per MATERIAL instead: the
+  // whole forest becomes a handful of draws. Nothing about the look changes -
+  // this is purely how the same triangles are submitted.
+  const woodBatch: THREE.BufferGeometry[] = [];
+  const canopyBatch: THREE.BufferGeometry[] = [];
+  const canopyAutumnBatch: THREE.BufferGeometry[] = [];
+  const flatBatch: THREE.BufferGeometry[] = [];
+  const litterBatch: THREE.BufferGeometry[] = [litterGeo];
+
+  const xf = new THREE.Matrix4();
+
   treeSites.forEach((p, i) => {
-    // Keep the walking lane clear.
     if (Math.abs(p.x) < 1.7) return;
     const isBefore = p.y > -LEN / 3 && p.x < 0;
     const autumn = !isBefore && hash11(seed + i * 5.3) > 0.72;
@@ -122,29 +129,14 @@ export function createNatureCorridor(seed = 7): Corridor {
       deadFraction: autumn ? 0.5 : 0.1,
     });
 
-    const wood = new THREE.Mesh(parts.wood, barkMat);
-    wood.castShadow = true;
-    wood.receiveShadow = true;
-    wood.position.set(p.x, 0, p.y);
-    group.add(wood);
-    disposables.push(parts.wood);
+    xf.makeTranslation(p.x, 0, p.y);
+    parts.wood.applyMatrix4(xf);
+    parts.foliage.applyMatrix4(xf);
+    parts.litter.applyMatrix4(xf);
 
-    const canopy = new THREE.Mesh(parts.foliage, isBefore ? flatMat : (autumn ? autumnMat : foliageMat));
-    canopy.castShadow = false;             // the measured technique
-    canopy.receiveShadow = false;
-    canopy.position.set(p.x, 0, p.y);
-    group.add(canopy);
-    disposables.push(parts.foliage);
-
-    if (!isBefore) {
-      const skirt = new THREE.Mesh(parts.litter, foliageMat);
-      skirt.position.set(p.x, 0, p.y);
-      skirt.receiveShadow = true;
-      group.add(skirt);
-      disposables.push(parts.litter);
-    } else {
-      parts.litter.dispose();
-    }
+    woodBatch.push(parts.wood);
+    (isBefore ? flatBatch : (autumn ? canopyAutumnBatch : canopyBatch)).push(parts.foliage);
+    if (!isBefore) litterBatch.push(parts.litter); else parts.litter.dispose();
   });
 
   // Undergrowth.
@@ -158,14 +150,35 @@ export function createNatureCorridor(seed = 7): Corridor {
     if (Math.abs(p.x) < 1.25) return;
     const isBefore = p.y > -LEN / 3 && p.x < 0;
     const g = createShrub(seed * 20 + i, 0.6 + hash11(seed + i * 3) * 1.15);
-    const m = new THREE.Mesh(g, isBefore ? flatMat : foliageMat);
-    m.position.set(p.x, 0, p.y);
-    m.rotation.y = hash11(seed + i * 9) * Math.PI * 2;
-    m.castShadow = false;
-    m.receiveShadow = true;
-    group.add(m);
-    disposables.push(g);
+    xf.makeRotationY(hash11(seed + i * 9) * Math.PI * 2);
+    xf.setPosition(p.x, 0, p.y);
+    g.applyMatrix4(xf);
+    (isBefore ? flatBatch : canopyBatch).push(g);
   });
+
+  /** Merge a batch into one mesh, or skip it if empty. */
+  function addBatch(
+    parts: THREE.BufferGeometry[],
+    material: THREE.Material,
+    castShadow: boolean,
+  ): void {
+    if (!parts.length) return;
+    const merged = mergeGeometries(parts);
+    parts.forEach((g) => g.dispose());
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = !castShadow;
+    group.add(mesh);
+    disposables.push(merged);
+  }
+
+  // Wood is the ONLY shadow caster. The canopy is deliberately excluded so
+  // direct sun reaches the floor instead of turning into leaf mush.
+  addBatch(woodBatch, barkMat, true);
+  addBatch(canopyBatch, foliageMat, false);
+  addBatch(canopyAutumnBatch, autumnMat, false);
+  addBatch(flatBatch, flatMat, false);
+  addBatch(litterBatch, foliageMat, false);
 
   return {
     group,
@@ -252,7 +265,7 @@ export function createMathsCorridor(): Corridor {
     return d.add(ripple);
   });
 
-  const MAX_STEPS = 64;
+  const MAX_STEPS = 48;
 
   sdfMat.colorNode = Fn(() => {
     // March in WORLD space, from the fragment on the proxy's back face along

@@ -76,6 +76,35 @@ function createSign(title: string, skill: string, widthM = 5.2, heightM = 1.5): 
   return mesh;
 }
 
+/**
+ * Report which GPU is actually rendering.
+ *
+ * A browser can silently fall back to a software rasteriser (Microsoft Basic
+ * Render Driver on Windows, SwiftShader, llvmpipe) and everything still works
+ * — it just runs on the CPU. An fps number measured there is not a performance
+ * number, and it looks exactly like a real one. This cost a whole optimisation
+ * round on 2026-08-31: 22 fps that turned out to be a software rasteriser in an
+ * embedded preview pane, not a scene problem.
+ *
+ * So the HUD says which it is, always. If it says SOFTWARE, ignore the fps.
+ */
+function gpuIdentity(): { renderer: string; software: boolean } {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') as WebGL2RenderingContext | null;
+    const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
+    const renderer = dbg && gl
+      ? String(gl.getParameter((dbg as { UNMASKED_RENDERER_WEBGL: number }).UNMASKED_RENDERER_WEBGL))
+      : 'unknown';
+    return {
+      renderer,
+      software: /swiftshader|llvmpipe|software|basic render|microsoft basic/i.test(renderer),
+    };
+  } catch {
+    return { renderer: 'unknown', software: false };
+  }
+}
+
 /* ---------------------------------------------------------------- */
 /* Bootstrap                                                         */
 /* ---------------------------------------------------------------- */
@@ -120,10 +149,10 @@ async function main(): Promise<void> {
   const sun = new THREE.DirectionalLight(0xfff0d0, 4.2);
   sun.position.set(60, 16, 104);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1536, 1536);
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 140;
-  const s = 60;
+  sun.shadow.camera.far = 190;
+  const s = 34;
   sun.shadow.camera.left = -s;
   sun.shadow.camera.right = s;
   sun.shadow.camera.top = s;
@@ -221,6 +250,11 @@ async function main(): Promise<void> {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  const gpu = gpuIdentity();
+  const gpuShort = gpu.software
+    ? 'SOFTWARE RENDERER — fps below is NOT a hardware number'
+    : gpu.renderer.replace(/^ANGLE \(|\)$/g, '').slice(0, 46);
+
   const forward = new THREE.Vector3();
   const right = new THREE.Vector3();
   const clock = new THREE.Clock();
@@ -262,13 +296,15 @@ async function main(): Promise<void> {
       fps = Math.round(frames / fpsAccum);
       frames = 0;
       fpsAccum = 0;
-      hud.textContent = `${fps} fps · WASD walk · Shift sprint · click to look · Esc release`;
+      const dc = (renderer.info?.render as { drawCalls?: number } | undefined)?.drawCalls ?? 0;
+      hud.textContent = `${fps} fps · ${dc} draws · ${gpuShort}`;
+      hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
     }
     requestAnimationFrame(tick);
   }
 
   status.remove();
-  hud.textContent = 'click to look around · WASD to walk';
+  hud.textContent = 'click to look around · WASD to walk · ' + gpuShort;
   requestAnimationFrame(tick);
 
   // Expose a tiny probe so a QA harness can drive the camera from the render
