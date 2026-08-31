@@ -698,14 +698,15 @@
         }
       ],
       "sourceScript": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
-      "sourceScriptSha256": "503a0908c9a73ce4bcb024e6b7ceaba08f002f04ffdd1d768a3f8c57b2fe9513",
+      "sourceScriptSha256": "b49121349ed7141b080c86f4af36e62db8374a06e920a73d6c3c0f3efcb85e50",
       "sourceSpec": "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
       "sourceSpecSha256": "1cb7311b1bf7889d590c35a520e9fd5248db995ca3fed3446a6dfbf94d862051",
       "sourceProvenance": "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
       "sourceProvenanceSha256": "c03cfa106a1ae7cb81e244b789451a66f74b411a2cde03e210b531cb368e2dc0",
       "format": "Eleven distinct 960x540 JPEG poster frames from the real Gun Range grey test bay, one per canonical support, plus a fail-closed digest and capture-proof manifest",
       "modifications": "Each clean-session Chromium frame is admitted only after its nearby canonical station wins the actual keyboard F press lifecycle, the normal host/offline training grant traverses canonical activation, and support-specific runtime telemetry proves the expected effect. No video is claimed; the menu decodes these bounded local posters and starts no live gameplay renderer.",
-      "attributionRequired": false
+      "attributionRequired": false,
+      "sourceScriptRepin": "Re-pinned 2026-08-31 (commit b96e145d). The capture spec gained --mute-audio under the owner standing instruction that every browser this repo launches stays silent while he is at the PC. A playback flag cannot change an output byte: no media digest in this entry moved, and none was re-pinned."
     },
     {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
@@ -904,107 +905,6 @@
       "modifications": "Project-original Tidewrack Operative archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
     },
     {
-      "id": "atomic-acres-operator-skin-cards-2026-08-24",
-      "kind": "original-project-ai-assisted-operator-skin-card-art",
-      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
-      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
-      "generatedAsOf": "2026-08-24",
-      "license": "Original project AI-assisted artwork",
-      "attributionRequired": false,
-      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
-      "sourceProvenanceSha256": "a94c809f1b3aa7150d4911f7dde4bc15dae58951ea11c527b7fb7b43353ce18b",
-      "sourceScript": "scripts/art-gen/comfy_generate.py",
-      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
-      "files": [
-        {
-          "path": "public/assets/original/skin-cards/default-card.webp",
-          "sha256": "f29201c296177db89d779f111737830c728eb0a8c9e29933e5e31b071f4d108a"
-        },
-        {
-          "path": "public/assets/original/skin-cards/explorer-card.webp",
-          "sha256": "d7088bf00b1499283e65995e1dcee7ce1431ce9d5ef60b93805d9fa4bdcc1647"
-        },
-        {
-          "path": "public/assets/original/skin-cards/symbiote-card.webp",
-          "sha256": "d4e84af223935360e7f8961868dc4f352bb148088c2ca6e530d18eaf7439bd29"
-        },
-        {
-          "path": "public/assets/original/skin-cards/navalops-card.webp",
-          "sha256": "fc8a6888312303a4e6eefc811dd67c5d847b6f4fc14dc4594f1ea5f92cbcc8d4"
-        }
-      ],
-      "owner": "wiringNotes: operator skin select cards (one portrait per selectable skin in src/operator-skin-catalog.ts)",
-      "placeholderStatus": "production",
-      "format": "448x576 quality-90 lossy WebP per card, derived by Lanczos reduction from 896x1152 PNG masters preserved byte-for-byte under source-assets/art-gen/skin-cards/",
-      "modifications": "Four operator portrait cards generated locally with Qwen-Image-2512, one per selectable skin (default, explorer, symbiote, navalops), art directed to each skin's authored card palette and material read (ISSUE WEAVE, CANVAS, CHITIN, WET SHELL). Exact prompts and seeds recorded in the source provenance record."
-    },
-    {
-      "id": "atomic-acres-arena-deployment-loading-art-2026-08-24",
-      "kind": "original-project-ai-assisted-arena-loading-backdrop",
-      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
-      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
-      "generatedAsOf": "2026-08-24",
-      "license": "Original project AI-assisted artwork",
-      "attributionRequired": false,
-      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
-      "sourceProvenanceSha256": "a94c809f1b3aa7150d4911f7dde4bc15dae58951ea11c527b7fb7b43353ce18b",
-      "sourceScript": "scripts/art-gen/comfy_generate.py",
-      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
-      "files": [
-        {
-          "path": "public/assets/original/loading/atomic-acres-loading.webp",
-          "sha256": "62da36cf2d00ae364bd88b93775e19de3b207669ce868c52aaa7d4c47fbdbdb2"
-        },
-        {
-          "path": "public/assets/original/loading/skyline-terminal-loading.webp",
-          "sha256": "0f0cd0364b002220728c541c8c9fb4e7fb7d27b302cac3f19e5ea55dcd8bb656"
-        },
-        {
-          "path": "public/assets/original/loading/rustworks-loading.webp",
-          "sha256": "884fd5e57d5a33d98b9b475c6d473ccba06b2dadacf2cbfcdae38a756477ac97"
-        },
-        {
-          "path": "public/assets/original/loading/gun-range-loading.webp",
-          "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
-        },
-        {
-          "path": "public/assets/original/loading/farcrysis-loading.webp",
-          "sha256": "b6c697230455738657597c07350b924aff6525d3d428fa7ff45270990df69fdc"
-        },
-        {
-          "path": "public/assets/original/loading/high-seas-loading.webp",
-          "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
-        }
-      ],
-      "owner": "wiringNotes: deployment loading surface backdrops (one per arena in src/arena-identity.ts)",
-      "placeholderStatus": "production",
-      "format": "1536x864 quality-88 lossy WebP per arena, native generation resolution, PNG masters preserved byte-for-byte under source-assets/art-gen/loading/",
-      "modifications": "Six deployment/loading backdrops generated locally with Qwen-Image-2512, one per arena, grounded in each arena's authored grade identity description and deployment briefing approach line. Exact prompts and seeds recorded in the source provenance record."
-    },
-    {
-      "id": "atomic-acres-main-menu-backdrop-2026-08-24",
-      "kind": "original-project-ai-assisted-menu-key-art",
-      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
-      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
-      "generatedAsOf": "2026-08-24",
-      "license": "Original project AI-assisted artwork",
-      "attributionRequired": false,
-      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
-      "sourceProvenanceSha256": "a94c809f1b3aa7150d4911f7dde4bc15dae58951ea11c527b7fb7b43353ce18b",
-      "sourceScript": "scripts/art-gen/comfy_generate.py",
-      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
-      "files": [
-        {
-          "path": "public/assets/original/menu/main-menu-backdrop.webp",
-          "sha256": "06fe14380ae6077bc0552ed76dd7e5c5de372601aa2c14bb95b43cfc204eb163"
-        }
-      ],
-      "owner": "wiringNotes: main menu backdrop key art",
-      "placeholderStatus": "production",
-      "format": "1536x864 quality-88 lossy WebP, native generation resolution, PNG master preserved byte-for-byte under source-assets/art-gen/menu/",
-      "modifications": "One main-menu key-art backdrop generated locally with Qwen-Image-2512: four operator silhouettes over the project's coastal-suburb-and-superyacht identity, composed with negative space for UI. Exact prompt and seed recorded in the source provenance record."
-    },
-    {
       "id": "atomic-acres-pass79-test-arena-menu-previews",
       "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
       "creator": "Atomic Acres project",
@@ -1074,6 +974,107 @@
       "placeholderStatus": "production",
       "format": "1536x864 lossy WebP per arena (Pillow, method 6, quality test1 85, test2 88), matching the six Lane I backdrops in format, resampler and 169200-239202 byte size band; quality is stepped down from the family ceiling of 88 because a runtime capture carries more detail than the generated art. PNG masters preserved byte-for-byte under source-assets/loading/pass79-test-arena-loading/",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. These two files replace placeholders that were byte-for-byte copies of gun-range-loading.webp (test1) and high-seas-loading.webp (test2), which made the deployment loading screen for both arenas show another map. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-operator-skin-cards-2026-08-31",
+      "kind": "original-project-ai-assisted-operator-skin-card-art",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/skin-cards/default-card.webp",
+          "sha256": "42f64b73660dfd455a7baee68be30eafd5e97842fe19a0b2bd4b2fd3c2dba0bd"
+        },
+        {
+          "path": "public/assets/original/skin-cards/explorer-card.webp",
+          "sha256": "331f07b22af777b564a220eb523fbeaa488060f9a9f44833b198b453d93e7232"
+        },
+        {
+          "path": "public/assets/original/skin-cards/symbiote-card.webp",
+          "sha256": "578e22c7e7befe3c7f155a0f2ad791ca0500349c326e3723ec4937dd77bc9515"
+        },
+        {
+          "path": "public/assets/original/skin-cards/navalops-card.webp",
+          "sha256": "9d2326c23d6ecdc8d799c15287c49f406ed91995e6de1326dcbb3cd7a46611c5"
+        }
+      ],
+      "owner": "wiringNotes: operator skin select cards (one portrait per selectable skin in src/operator-skin-catalog.ts)",
+      "placeholderStatus": "production",
+      "format": "448x576 quality-90 lossy WebP per card, derived by Lanczos reduction from 896x1152 PNG masters preserved byte-for-byte under source-assets/art-gen/skin-cards/",
+      "modifications": "Four operator portrait cards generated locally with Qwen-Image-2512, one per selectable skin (default, explorer, symbiote, navalops), art directed to each skin's authored card palette and material read (ISSUE WEAVE, CANVAS, CHITIN, WET SHELL). Exact prompts and seeds recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-arena-deployment-loading-art-2026-08-31",
+      "kind": "original-project-ai-assisted-arena-loading-backdrop",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/loading/atomic-acres-loading.webp",
+          "sha256": "62da36cf2d00ae364bd88b93775e19de3b207669ce868c52aaa7d4c47fbdbdb2"
+        },
+        {
+          "path": "public/assets/original/loading/skyline-terminal-loading.webp",
+          "sha256": "0f0cd0364b002220728c541c8c9fb4e7fb7d27b302cac3f19e5ea55dcd8bb656"
+        },
+        {
+          "path": "public/assets/original/loading/rustworks-loading.webp",
+          "sha256": "884fd5e57d5a33d98b9b475c6d473ccba06b2dadacf2cbfcdae38a756477ac97"
+        },
+        {
+          "path": "public/assets/original/loading/gun-range-loading.webp",
+          "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
+        },
+        {
+          "path": "public/assets/original/loading/farcrysis-loading.webp",
+          "sha256": "b6c697230455738657597c07350b924aff6525d3d428fa7ff45270990df69fdc"
+        },
+        {
+          "path": "public/assets/original/loading/high-seas-loading.webp",
+          "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena in src/arena-identity.ts)",
+      "placeholderStatus": "production",
+      "format": "1536x864 quality-88 lossy WebP per arena, native generation resolution, PNG masters preserved byte-for-byte under source-assets/art-gen/loading/",
+      "modifications": "Six deployment/loading backdrops generated locally with Qwen-Image-2512, one per arena, grounded in each arena's authored grade identity description and deployment briefing approach line. Exact prompts and seeds recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-main-menu-backdrop-2026-08-31",
+      "kind": "original-project-ai-assisted-menu-key-art",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/menu/main-menu-backdrop.webp",
+          "sha256": "06fe14380ae6077bc0552ed76dd7e5c5de372601aa2c14bb95b43cfc204eb163"
+        }
+      ],
+      "owner": "wiringNotes: main menu backdrop key art",
+      "placeholderStatus": "production",
+      "format": "1536x864 quality-88 lossy WebP, native generation resolution, PNG master preserved byte-for-byte under source-assets/art-gen/menu/",
+      "modifications": "One main-menu key-art backdrop generated locally with Qwen-Image-2512: four operator silhouettes over the project's coastal-suburb-and-superyacht identity, composed with negative space for UI. Exact prompt and seed recorded in the source provenance record."
     }
   ],
   "rejectedCandidates": [

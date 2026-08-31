@@ -9,11 +9,11 @@
   "sourceScript": "scripts/art-gen/comfy_generate.py",
   "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
   "jobsFile": "scripts/art-gen/lane_i_jobs.json",
-  "jobsFileSha256": "266546bef3ea859053c97006e5413afde6b38ef1e8d50b26feee741d9b6ee60d",
+  "jobsFileSha256": "54cc4d1c7f6df54a2c44d2064e92db22f89d8d01db479f1315e78793a59a90b5",
   "masters": [
     {
       "path": "source-assets/art-gen/skin-cards/default-card-master.png",
-      "sha256": "b90d2d42ee64b0b91c9349fdf3d6fc43880524fa523df9347b20dc1b72a96da4",
+      "sha256": "c907ff0a0308f271ed2a82511936224ff0628c659c479276a19aa3da46d2dfca",
       "job": {
         "name": "skin-card-default",
         "prompt": "Tactical FPS video game operator selection card: portrait of a single special forces operator, three-quarter view from the chest up, wearing teal-grey standard issue woven fatigues with a matte ballistic plate carrier and webbing, full-face helmet with a glowing cyan visor strip, subtle teal-cyan trim lines on the gear, warm tan skin visible at the jaw, dramatic cyan rim light from the left, dark teal vertical gradient studio backdrop fading from deep teal at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, matte woven fabric texture, no text, no letters, no watermark, no logo",
@@ -36,7 +36,7 @@
     },
     {
       "path": "source-assets/art-gen/skin-cards/explorer-card-master.png",
-      "sha256": "3d5358c2366d597125bae870013692236f4d01fa22fd2f910ea245fa3f95e9d9",
+      "sha256": "17aa241b5e250a9cee2308aa861f8d1d2809366ae50f25cf1b9d3f83c4fa297a",
       "job": {
         "name": "skin-card-explorer",
         "prompt": "Tactical FPS video game operator selection card: portrait of a single athletic woman adventurer and former archaeologist turned mercenary, three-quarter view from the chest up, wearing a sun-faded teal tank top under a worn brown leather shoulder holster strap, olive cargo trousers with a utility belt, fingerless climbing gloves, amber-tinted goggles pushed up onto her forehead, auburn hair in one practical braid over her shoulder, a small scar on one cheekbone, confident weathered expression, warm golden jungle sunlight rim light from the left, dark jungle-green vertical gradient studio backdrop fading from deep green at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, no text, no letters, no watermark, no logo",
@@ -59,7 +59,7 @@
     },
     {
       "path": "source-assets/art-gen/skin-cards/symbiote-card-master.png",
-      "sha256": "7a0e2b88c8391785f6e95508d3551f72ea7d058509fee8104418e4ba9fbb83de",
+      "sha256": "b03659627e1d322533c2df1c5e452a7c2f41857f08c2338b66dc6fa1de827caf",
       "job": {
         "name": "skin-card-symbiote",
         "prompt": "Tactical FPS video game operator selection card: portrait of a single hulking human soldier fused with a living alien symbiote creature, three-quarter view from the chest up, glossy wet black bio-armored carapace plates covering shoulders chest and arms like polished beetle shell, jagged bone-white markings across the chest and collar, muscular black-sheened body suit with deep violet sinew undertones showing between the plates, smooth black helmet faceplate with one large bone-white angular eye lens and fine white veins radiating from it, dramatic cold white rim light from the left, near-black vertical gradient studio backdrop with a faint violet glow at the top fading to pure black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, wet glossy chitin texture, no text, no letters, no watermark, no logo",
@@ -82,7 +82,7 @@
     },
     {
       "path": "source-assets/art-gen/skin-cards/navalops-card-master.png",
-      "sha256": "9508a0fa8c7825f9ae3afcbe6ca65754d15551e8e158b4f47b7c996afa751e0e",
+      "sha256": "f35260b726800dbd4da5df8d0491ddb6957088ae22f7d2130031ff5f69815c17",
       "job": {
         "name": "skin-card-navalops",
         "prompt": "Tactical FPS video game operator selection card: portrait of a single maritime special operations diver, three-quarter view from the chest up, wearing a matte navy-blue wet neoprene dive suit with a snug hood, low-profile grey maritime chest rig, compact dive mask with a pale ice-blue glass pushed up on the forehead, fine water droplets beading on the wet rubber, cool steel-blue rim light from the left, deep navy vertical gradient studio backdrop fading from dark ocean blue at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, wet sheen neoprene texture, no text, no letters, no watermark, no logo",
