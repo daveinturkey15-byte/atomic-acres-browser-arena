@@ -11,7 +11,9 @@
  *
  * This verifier owns the additive pass77 family, and since 2026-08-30 it also
  * owns the SHELF-WIDE invariants no per-family gate can express (see "THE SHELF
- * INVARIANTS" near the bottom). It deliberately re-derives everything it asserts
+ * INVARIANTS" near the bottom) - extended on 2026-08-31 to cover the deployment
+ * LOADING backdrops as well, which shipped the identical byte-copy defect one
+ * directory over. It deliberately re-derives everything it asserts
  * rather than trusting the finalizer's own receipt, and it pins the one contract
  * that makes an additive family legitimate: the retained Pass 66 masters
  * choreography still describes exactly the four arenas it was captured for. Pass 74 broke that by appending a fifth arena to the retained
@@ -45,6 +47,7 @@ const mapSelectionPath = path.join(root, 'src/map-selection.ts');
 const menuSourceRoot = path.join(root, 'source-assets/menu');
 const cameraSourcePath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const runtimeRoot = path.join(root, 'public/assets/original/menu-previews');
+const loadingRoot = path.join(root, 'public/assets/original/loading');
 
 /** Display order, matching ARENA_SELECTIONS: farcrysis fifth, high-seas sixth. */
 const ARENAS = Object.freeze(['farcrysis', 'high-seas']);
@@ -476,6 +479,81 @@ for (const relativePath of shippedFiles) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// D. THE LOADING SURFACE (2026-08-31).
+//
+// The same defect, one directory over. public/assets/original/loading/
+// test1-loading.webp was a byte-for-byte copy of gun-range-loading.webp and
+// test2-loading.webp of high-seas-loading.webp, so DEPLOYING into Test1 put the
+// Gun Range on the loading screen even after its menu card was fixed. The
+// 2026-08-30 pass deliberately stopped at the preview directory: extending the
+// assertion here would have gone red for work that pass was not doing. Both
+// backdrops are now real captures of their own arenas, so the assertion covers
+// both surfaces and no arena may ship another arena's loading art either.
+//
+// Filenames are not arena ids here - rustworks-1v1 ships rustworks-loading.webp
+// - so the coverage half maps ids through LOADING_BACKDROP_STEMS rather than
+// assuming the file is named after the arena. Distinctness needs no map: it
+// compares the shipped bytes against each other.
+// ---------------------------------------------------------------------------
+const LOADING_BACKDROP_STEMS = Object.freeze({ 'rustworks-1v1': 'rustworks' });
+const loadingStem = (arenaId) => LOADING_BACKDROP_STEMS[arenaId] ?? arenaId;
+
+const shippedLoadingFiles = (await readdir(loadingRoot).catch(() => []))
+  .filter((name) => name.endsWith('-loading.webp'))
+  .map((name) => `public/assets/original/loading/${name}`)
+  .sort();
+if (shippedLoadingFiles.length === 0) {
+  fail('no arena loading backdrops found under public/assets/original/loading/; the loading-surface invariants cannot run');
+}
+
+// D1. Coverage, from the same derived ARENA_SELECTIONS roster as invariant A.
+for (const arenaId of selectableArenas) {
+  const relativePath = `public/assets/original/loading/${loadingStem(arenaId)}-loading.webp`;
+  const bytes = await sizeOf(relativePath);
+  if (bytes === null || bytes <= 0) fail(`selectable arena ${arenaId} ships no deployment loading backdrop (${relativePath})`);
+}
+
+// D2. One manifest claim per backdrop. Two entries claiming one path is a coin
+//     flip over which digest the public-asset provenance gate treats as
+//     authoritative - exactly how the retired placeholder entry kept pinning
+//     the stub bytes for the preview files it double-claimed.
+const loadingClaims = new Map();
+for (const asset of manifest?.assets ?? []) {
+  for (const file of asset.files ?? []) {
+    if (typeof file?.path !== 'string' || !file.path.startsWith('public/assets/original/loading/')) continue;
+    const existing = loadingClaims.get(file.path);
+    if (existing && existing.id !== asset.id) {
+      fail(`${file.path} is claimed by two assets.manifest.json entries: ${existing.id} and ${asset.id}`);
+    }
+    loadingClaims.set(file.path, { id: asset.id, sha256: file.sha256 });
+  }
+}
+
+// D3. Distinctness, and every claimed digest re-derived from the bytes.
+const loadingDigestOwners = new Map();
+for (const relativePath of shippedLoadingFiles) {
+  const stem = path.basename(relativePath).replace(/-loading\.webp$/, '');
+  let digest = null;
+  try {
+    digest = await sha256File(path.join(root, relativePath));
+  } catch (error) {
+    fail(`${relativePath} could not be hashed for the cross-arena distinctness check: ${error.message}`);
+    continue;
+  }
+  const claim = loadingClaims.get(relativePath);
+  if (!claim) fail(`${relativePath} ships to players but assets.manifest.json declares no entry for it`);
+  else if (typeof claim.sha256 === 'string' && claim.sha256 !== digest) {
+    fail(`${relativePath} does not match the digest recorded by ${claim.id}: recorded ${claim.sha256}, got ${digest}`);
+  }
+  const owner = loadingDigestOwners.get(digest);
+  if (owner) {
+    fail(`${relativePath} is byte-identical to ${owner.path}: ${stem} would show ${owner.stem} art on its deployment loading screen (sha256 ${digest})`);
+  } else {
+    loadingDigestOwners.set(digest, { stem, path: relativePath });
+  }
+}
+
 if (failures.length > 0) {
   console.error(`Pass 77 arena menu preview verification FAILED (${failures.length} issue${failures.length === 1 ? '' : 's'}):`);
   for (const failure of failures) console.error(`- ${failure}`);
@@ -492,6 +570,11 @@ console.log(JSON.stringify({
     shippedPreviewFiles: shippedFiles.length,
     claimedPreviewFiles: declaredFiles.size,
     distinctPreviewDigests: digestOwners.size,
+  },
+  loadingSurface: {
+    shippedBackdrops: shippedLoadingFiles.length,
+    claimedBackdrops: loadingClaims.size,
+    distinctBackdropDigests: loadingDigestOwners.size,
   },
   finalMediaSetSha256: provenance.finalMediaSet.sha256,
   provenanceSha256: createHash('sha256').update(await readFile(provenancePath)).digest('hex'),

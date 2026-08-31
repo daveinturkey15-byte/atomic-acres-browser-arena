@@ -823,29 +823,6 @@
       "attributionRequired": false
     },
     {
-      "id": "atomic-acres-pass79-test-arena-placeholder-previews",
-      "kind": "original-project-placeholder-menu-video-and-loading-family",
-      "creator": "Atomic Acres project",
-      "source": "byte-for-byte copies of the shipped gun-range (test1) and high-seas (test2) LOADING backdrops",
-      "generatedAsOf": "2026-08-30",
-      "license": "Original project work",
-      "files": [
-        {
-          "path": "public/assets/original/loading/test1-loading.webp",
-          "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
-        },
-        {
-          "path": "public/assets/original/loading/test2-loading.webp",
-          "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
-        }
-      ],
-      "owner": "deployment loading surface backdrops",
-      "placeholderStatus": "placeholder",
-      "format": "test1-loading.webp and test2-loading.webp, 1536x864, same encode as their source families",
-      "modifications": "PLACEHOLDER, NARROWED 2026-08-30. This entry originally also claimed the six test1/test2 MENU PREVIEW files as byte-copies of gun-range.* and high-seas.*. Those six were replaced the same day by real captures of the Test1 and Test2 runtime arenas and now belong to atomic-acres-pass79-test-arena-menu-previews, so they are removed here rather than left double-claimed with stale digests. What REMAINS placeholder is the loading pair: test1-loading.webp is still byte-identical to gun-range-loading.webp (5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6) and test2-loading.webp to high-seas-loading.webp (b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083), so the deployment loading screen for both arenas still shows another map. That is the same defect on a different surface and is not fixed by this pass.",
-      "attributionRequired": false
-    },
-    {
       "id": "pass74-operator-skin-explorer-2026-08-22",
       "kind": "original-project-blender-operator-archetype-skin",
       "creator": "Atomic Acres project",
@@ -1032,32 +1009,32 @@
       "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
       "creator": "Atomic Acres project",
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "generatedAsOf": "2026-08-30",
+      "generatedAsOf": "2026-08-31",
       "license": "Original project work",
       "files": [
         {
           "path": "public/assets/original/menu-previews/test1.mp4",
-          "sha256": "06ffd5cefe99e995ca957ec87552f458e74a1c62156ceb7a7d4aaa86e57afb44"
+          "sha256": "db5f0ebc63bcac07b84e1ddbfecf14fa9f7100017aba6051b63f8cdfae53414e"
         },
         {
           "path": "public/assets/original/menu-previews/test1.webm",
-          "sha256": "149c3299915eec41008a0539da95b49846ba48e3a048f3fff9fbebd4dcdf87de"
+          "sha256": "2fde904290e05e4934c44c7aeb33fb3a5b745b9afbe9162a883d2c2266f252ec"
         },
         {
           "path": "public/assets/original/menu-previews/test1.webp",
-          "sha256": "ffd8894895989e5b185a75a5d1b7be21961f6aef9297cd52bf057007af6e4e5f"
+          "sha256": "3867859c7183f9629a05f479afa40359112ad1ff0fe91c3b4dd217d3315e519f"
         },
         {
           "path": "public/assets/original/menu-previews/test2.mp4",
-          "sha256": "e2e71aebfece09f478fb56b6e624b64b9d7f00d79868929440d949dd310d483f"
+          "sha256": "a4eacdb3cc9720d83b74e7028d16a605b0b8cefb903ad2e24729d57ea0634817"
         },
         {
           "path": "public/assets/original/menu-previews/test2.webm",
-          "sha256": "86482f8ab2d1ed799f9959f3f24487bfbe0fcd98103dc98a0289c55b2de3b5ce"
+          "sha256": "0134638d23896ad2cc53087b4b1a8e151926af53ab5a5ff7085874c4bceb81d3"
         },
         {
           "path": "public/assets/original/menu-previews/test2.webp",
-          "sha256": "1f57bf11017218406e6f61c9a86f7e2bc6ca96f618203bae000a7da141780f69"
+          "sha256": "d9d6a3f4ab15613f2086c68633a951a3f7b81c25bda546d05c1c4834eeec1e58"
         }
       ],
       "contactSheet": [
@@ -1070,6 +1047,33 @@
       "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
       "modifications": "Captured offline from the actual authoritative Test1 and Test2 runtime arenas on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. These files replace placeholder stubs that were byte-identical copies of the gun-range and high-seas previews. No downloaded or sampled art is used.",
       "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass79-test-arena-loading-backdrops",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Test1 and Test2 authoritative runtime arenas",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass79-test-arena-loading/provenance.json",
+      "sourceProvenanceSha256": "ea83159806b78da53dd2745d1bb4a85667be8642293355b74513b914d2f98b29",
+      "sourceScript": "scripts/assets/finalize_pass79_test_arena_loading_backdrops.py",
+      "sourceScriptSha256": "7612170305b47c70a08aafe9079b2b50d3c72f6734364bd9fde63829cfc2148d",
+      "files": [
+        {
+          "path": "public/assets/original/loading/test1-loading.webp",
+          "sha256": "a8c429949f7a589545cf6a40b6e8b7765508070c62925228086d63e89d74b12a"
+        },
+        {
+          "path": "public/assets/original/loading/test2-loading.webp",
+          "sha256": "d8b6a346474fa9c847f53f0cd68b61e5f76a443dff61c17af5dd2f6003bd2d48"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP per arena (Pillow, method 6, quality test1 85, test2 88), matching the six Lane I backdrops in format, resampler and 169200-239202 byte size band; quality is stepped down from the family ceiling of 88 because a runtime capture carries more detail than the generated art. PNG masters preserved byte-for-byte under source-assets/loading/pass79-test-arena-loading/",
+      "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. These two files replace placeholders that were byte-for-byte copies of gun-range-loading.webp (test1) and high-seas-loading.webp (test2), which made the deployment loading screen for both arenas show another map. No downloaded or sampled art is used."
     }
   ],
   "rejectedCandidates": [

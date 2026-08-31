@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "familyId": "pass79-test-arena-menu-previews",
   "cacheKey": "pass79-test-arena-preview-v1",
-  "generatedAt": "2026-08-30",
+  "generatedAt": "2026-08-31",
   "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
   "note": "Additive family for Test1/Test2. Replaces the 2026-08-30 placeholder stubs, which were byte-identical copies of the gun-range and high-seas media. The retained pass66-runtime-preview-v15 media, its cache-family lock and the pass77 family are untouched by this finalizer.",
   "finalMediaSet": {
     "algorithm": "sha256-ordered-name-size-bytes-v1",
     "fileCount": 6,
-    "totalBytes": 30632204,
-    "sha256": "d26b8cc670b613ef5412fef3b8b7706114f4332185b58e47c259ca8a43338824"
+    "totalBytes": 30710376,
+    "sha256": "b9d5ba16df474452f0cfc0e79dfcfe2f408e18208c6c30b2735b5468ee2cd70d"
   },
   "finalizer": {
     "path": "scripts/assets/finalize-pass79-test-arena-menu-previews.mjs",
@@ -33,36 +33,29 @@
         "softwareAdapter": false,
         "compatReason": null,
         "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
-        "inputsStable": false,
-        "driftedInputPaths": [
-          "src/legacy-main.ts",
-          "src/pass70-weapon-contact-scope-integration.test.ts",
-          "src/rendering/instanced-grass-field.test.ts",
-          "src/rendering/instanced-grass-field.ts",
-          "src/ui/menu-preview-video.test.ts",
-          "src/ui/menu-preview-video.ts"
-        ],
+        "inputsStable": true,
+        "driftedInputPaths": [],
         "capturedFrames": 240,
-        "frameSetSha256": "ad14e17c747ff3b1f13c4f749031bffd046ddf42fafa33378de7410fb013409e",
-        "frameSetBytes": 1002004128
+        "frameSetSha256": "bb2233f0b77111378284a6fd8ad8f1aa0e8f8526a7c773e7e2aeb49a53fa6fa3",
+        "frameSetBytes": 1177494497
       },
       "runtimeFiles": [
         {
           "path": "public/assets/original/menu-previews/test1.mp4",
-          "sha256": "06ffd5cefe99e995ca957ec87552f458e74a1c62156ceb7a7d4aaa86e57afb44"
+          "sha256": "db5f0ebc63bcac07b84e1ddbfecf14fa9f7100017aba6051b63f8cdfae53414e"
         },
         {
           "path": "public/assets/original/menu-previews/test1.webm",
-          "sha256": "149c3299915eec41008a0539da95b49846ba48e3a048f3fff9fbebd4dcdf87de"
+          "sha256": "2fde904290e05e4934c44c7aeb33fb3a5b745b9afbe9162a883d2c2266f252ec"
         },
         {
           "path": "public/assets/original/menu-previews/test1.webp",
-          "sha256": "ffd8894895989e5b185a75a5d1b7be21961f6aef9297cd52bf057007af6e4e5f"
+          "sha256": "3867859c7183f9629a05f479afa40359112ad1ff0fe91c3b4dd217d3315e519f"
         }
       ],
       "reviewSheet": {
         "path": "docs/assets/pass79-menu-previews/test1-review-frames.webp",
-        "sha256": "29295746baf7b53672277762f07b1d3804968602a374fc0e1313ba854e001a05"
+        "sha256": "95f4bb9a3c147e3f1e48882688a276a501b7ece6f05db6c04995fa10925ce4e0"
       }
     },
     {
@@ -78,36 +71,29 @@
         "softwareAdapter": false,
         "compatReason": null,
         "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
-        "inputsStable": false,
-        "driftedInputPaths": [
-          "src/legacy-main.ts",
-          "src/pass70-weapon-contact-scope-integration.test.ts",
-          "src/rendering/instanced-grass-field.test.ts",
-          "src/rendering/instanced-grass-field.ts",
-          "src/ui/menu-preview-video.test.ts",
-          "src/ui/menu-preview-video.ts"
-        ],
+        "inputsStable": true,
+        "driftedInputPaths": [],
         "capturedFrames": 240,
-        "frameSetSha256": "472f3b40107ed491b4fd68d3fdfd13b0573499e026235412964989577b3c5038",
-        "frameSetBytes": 1018437191
+        "frameSetSha256": "67ca2674c891093e2c3ed2b8c6cf78746c777b612cdddfa2e987f6aa86161069",
+        "frameSetBytes": 1018640631
       },
       "runtimeFiles": [
         {
           "path": "public/assets/original/menu-previews/test2.mp4",
-          "sha256": "e2e71aebfece09f478fb56b6e624b64b9d7f00d79868929440d949dd310d483f"
+          "sha256": "a4eacdb3cc9720d83b74e7028d16a605b0b8cefb903ad2e24729d57ea0634817"
         },
         {
           "path": "public/assets/original/menu-previews/test2.webm",
-          "sha256": "86482f8ab2d1ed799f9959f3f24487bfbe0fcd98103dc98a0289c55b2de3b5ce"
+          "sha256": "0134638d23896ad2cc53087b4b1a8e151926af53ab5a5ff7085874c4bceb81d3"
         },
         {
           "path": "public/assets/original/menu-previews/test2.webp",
-          "sha256": "1f57bf11017218406e6f61c9a86f7e2bc6ca96f618203bae000a7da141780f69"
+          "sha256": "d9d6a3f4ab15613f2086c68633a951a3f7b81c25bda546d05c1c4834eeec1e58"
         }
       ],
       "reviewSheet": {
         "path": "docs/assets/pass79-menu-previews/test2-review-frames.webp",
-        "sha256": "f50409370c522e6e70f7846ff7dac77e95e296616b155b81b9938b41b9fd87d0"
+        "sha256": "bc732c3acfa223cfe17843eb15a5b2c0a069ec97ecf5e57da63969e228776996"
       }
     }
   ]
