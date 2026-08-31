@@ -5,65 +5,52 @@
  * Repo contract: no ShaderMaterial, no RawShaderMaterial, no onBeforeCompile.
  * Everything here is a `three/webgpu` MeshStandardNodeMaterial node graph.
  *
+ * WHY THERE IS NO `Fn()` IN THIS FILE.
+ *
+ * The first version wrapped every `colorNode` in `Fn(() => { ... })()`. That
+ * compiles under the WebGL2/GLSL backend and renders correctly, and on real
+ * WebGPU every mesh using it silently vanishes — the scene dropped to 8 draw
+ * calls and 96 triangles with nothing logged on screen. The production TSL in
+ * this repository never does that: it assigns built node EXPRESSIONS to
+ * `colorNode` directly (`src/farcrysis-tsl-foliage.ts:215`,
+ * `src/farcrysis-water-surface.ts:207`, `src/rendering/pass64-tsl-scene.ts:506`)
+ * and reserves `Fn` for the one case that genuinely needs statement scope, with
+ * explicitly typed parameters.
+ *
+ * A node graph is built at JavaScript time either way, so a plain JS helper
+ * that returns a node does everything `Fn` was being used for here, with none
+ * of the risk. `Fn` now appears only where a loop needs its own scope.
+ *
  * The terms, in the order they matter:
  *
- *  1. TRANSLUCENCY. A leaf is thin, so light that hits its far side comes
- *     THROUGH it. Without this term a canopy with the sun behind it renders as
- *     a black cutout, which is the single most artificial thing a rendered
- *     tree can do — and it is what our foliage does today. The fix is one
- *     view-dependent lobe added as emission: bend the light direction by the
- *     surface normal, take the lobe against the view vector, and modulate by
- *     albedo so it glows the leaf's own colour rather than the light's.
- *
- *  2. ABAXIAL (underside) SHADING. Roughly half the leaves in any frame show
- *     you their back. The underside of a real leaf is paler, matter and less
- *     translucent than the top. One `frontFacing` branch buys that.
- *
+ *  1. TRANSLUCENCY. A leaf is thin, so light hitting its far side comes
+ *     THROUGH it. Without this a canopy with the sun behind it renders as a
+ *     black cutout — the single most artificial thing a rendered tree can do.
+ *  2. ABAXIAL (underside) SHADING. Half the leaves in any frame show you their
+ *     back, and a real underside is paler, matter and less translucent.
  *  3. SENESCENCE. A canopy where every leaf is the same green reads as
- *     plastic. A per-leaf `aDead` scalar ramps green -> ochre -> tan, raises
- *     roughness and kills transmission, so a few dying leaves and all the
- *     ground litter come from the same material.
+ *     plastic. One per-leaf scalar ramps green -> ochre -> tan.
+ *  4. EDGE AND SPAN VARIATION, carried from the geometry by `aSpan`/`aSide`.
  *
- *  4. EDGE AND SPAN VARIATION. Leaves are darker and rougher at the petiole,
- *     thinner and more translucent at the tip and edges. `aSpan` and `aSide`
- *     carry that from the geometry.
- *
- * There is deliberately NO texture here. The colour variation is positional and
- * per-leaf, which is cheaper than an atlas, has no mip or alpha-coverage
- * failure mode at distance, and cannot be accused of being an imported asset.
+ * There is deliberately NO texture. The variation is positional and per-leaf:
+ * cheaper than an atlas, no mip or alpha-coverage failure at distance, and not
+ * an imported asset by any definition.
  */
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 
 /**
- * TSL is a runtime DSL whose TypeScript definitions do not model operator
- * chaining or the polymorphic overloads it actually accepts. The repo's
- * existing node code works around this with `as unknown as Node<'vec3'>` at
- * every assignment; collapsing the cast to ONE boundary here keeps the graph
- * below readable and keeps the unsafety in a single, obvious place.
+ * One cast boundary. TSL is a runtime DSL whose TypeScript definitions do not
+ * model operator chaining or its polymorphic overloads; the repo's own node
+ * code works around this with `as unknown as Node<'vec3'>` at every assignment.
+ * Collapsing it here keeps the graphs below readable.
  */
 const {
-  Fn, abs, attribute, cameraPosition, clamp, dot, float, frontFacing, mix,
+  abs, attribute, cameraPosition, clamp, dot, float, frontFacing, mix,
   normalWorld, normalize, positionWorld, pow, select, smoothstep, sub, uniform,
   vec3,
 } = TSL as unknown as Record<string, any>;
-
-/**
- * Colour literal -> TSL vec3.
- *
- * NOT `vec3(color.toArray())`: TSL's vec3() takes scalar components or a node,
- * and handing it a JS array silently produces a broken node rather than an
- * error — the material compiles, renders black, and looks like a lighting bug.
- * Cost me a debugging round; hence this helper and this comment.
- *
- * THREE.Color stores linear-working-space components under colour management,
- * which is exactly what an albedo node wants.
- */
-export function rgb(hex: THREE.ColorRepresentation, scale = 1) {
-  const c = new THREE.Color(hex);
-  return vec3(c.r * scale, c.g * scale, c.b * scale);
-}
 
 export interface FoliageUniforms {
   sunDirection: ReturnType<typeof uniform>;
@@ -82,6 +69,22 @@ export function createFoliageUniforms(): FoliageUniforms {
     time: uniform(0),
     enhance: uniform(1),
   };
+}
+
+/**
+ * Colour literal -> TSL vec3.
+ *
+ * NOT `vec3(color.toArray())`: TSL's vec3() takes scalar components or a node,
+ * and handing it a JS array silently produces a broken node rather than an
+ * error — the material compiles, renders black, and looks exactly like a
+ * lighting bug.
+ *
+ * THREE.Color stores linear-working-space components under colour management,
+ * which is what an albedo node wants.
+ */
+export function rgb(hex: THREE.ColorRepresentation, scale = 1) {
+  const c = new THREE.Color(hex);
+  return vec3(c.r * scale, c.g * scale, c.b * scale);
 }
 
 export interface FoliagePalette {
@@ -112,10 +115,10 @@ export const WINTER_PALETTE: FoliagePalette = {
  * Build the foliage material.
  *
  * `uniforms` is shared across every call so the whole scene animates and
- * re-tunes from one place — and, more importantly, so the WebGPU backend can
- * reuse one pipeline per palette rather than one per plant. Node identity is
- * what three hashes into the pipeline cache key, so two structurally identical
- * graphs built from two separate calls do NOT share a pipeline.
+ * re-tunes from one place — and so the WebGPU backend can reuse one pipeline
+ * per palette rather than one per plant. Node identity is what three hashes
+ * into the pipeline cache key, so two structurally identical graphs built from
+ * two separate calls do NOT share a pipeline.
  */
 export function createFoliageMaterial(
   uniforms: FoliageUniforms,
@@ -136,81 +139,63 @@ export function createFoliageMaterial(
   const dead = attribute('aDead', 'float');
 
   // --- base albedo -------------------------------------------------------
-  const albedo = Fn(() => {
-    // Darker and bluer toward the petiole; the tip catches more light in life
-    // as well as in shading, so the ramp is part of the colour, not only the
-    // lighting.
-    const base = mix(cShade, cTop, smoothstep(0.0, 0.55, span));
-    // Underside is a different colour, not a darker version of the top.
-    const withFace = select(frontFacing, base, mix(base, cUnder, float(0.75)));
-    // Edges thin out and pale slightly.
-    const edge = smoothstep(float(0.55), float(1.0), abs(side));
-    const withEdge = mix(withFace, mix(withFace, cUnder, float(0.35)), edge.mul(0.5));
-    // Senescence overrides everything it touches.
-    return mix(withEdge, cDead, dead);
-  })();
+  // Darker and bluer toward the petiole; the underside is a different colour
+  // rather than a darker top; edges thin and pale; senescence overrides all.
+  const base = mix(cShade, cTop, smoothstep(float(0.0), float(0.55), span));
+  const withFace = select(frontFacing, base, mix(base, cUnder, float(0.75)));
+  const edge = smoothstep(float(0.55), float(1.0), abs(side));
+  const withEdge = mix(withFace, mix(withFace, cUnder, float(0.35)), edge.mul(0.5));
+  const albedo = mix(withEdge, cDead, dead);
 
   mat.colorNode = albedo;
 
   // --- roughness ---------------------------------------------------------
   // A dead leaf is dry and matte; an underside is matte; a young tip is waxy.
-  const rough = Fn(() => {
-    const base = mix(float(0.62), float(0.86), span);
-    const withFace = select(frontFacing, base, base.add(0.1));
-    return clamp(mix(withFace, float(0.95), dead), float(0.0), float(1.0));
-  })();
-  mat.roughnessNode = rough;
+  const roughBase = mix(float(0.62), float(0.86), span);
+  const roughFace = select(frontFacing, roughBase, roughBase.add(0.1));
+  mat.roughnessNode = clamp(mix(roughFace, float(0.95), dead), float(0.0), float(1.0));
 
   // --- translucency (the term that does the work) ------------------------
   //
-  // Emission is the honest place for this in a standard PBR graph: it is
-  // energy leaving the surface that did not come from a reflection lobe. The
-  // lobe is taken against the view vector using a light direction BENT by the
-  // surface normal, which is what makes the glow follow the leaf's curvature
-  // instead of appearing uniformly wherever the sun is behind it. Since the
-  // geometry is cupped and twisted per leaf, that bend is different for every
-  // leaf in the clump — which is exactly why the curvature in leaf-geometry.ts
-  // and this term have to land together to be worth anything.
-  const transmission = Fn(() => {
-    const V = normalize(sub(cameraPosition, positionWorld));
-    const L = normalize(uniforms.sunDirection);
-    const N = normalWorld;
+  // Emission is the honest place for this in a standard PBR graph: energy
+  // leaving the surface that did not come from a reflection lobe. The lobe is
+  // taken against the view vector using a light direction BENT by the surface
+  // normal, which makes the glow follow the leaf's curvature instead of
+  // appearing uniformly wherever the sun happens to be behind it. Because the
+  // geometry is cupped and twisted per leaf, that bend differs for every leaf
+  // in a clump — which is why the curvature in leaf-geometry.ts and this term
+  // only pay off together.
+  const V = normalize(sub(cameraPosition, positionWorld));
+  const L = normalize(uniforms.sunDirection);
+  const bent = normalize(sub(L.negate(), normalWorld.mul(float(0.45))));
+  const lobe = pow(clamp(dot(V, bent), float(0.0), float(1.0)), float(3.5));
 
-    // Bend the light through the leaf: -L pushed along the normal.
-    const bent = normalize(sub(L.negate(), N.mul(float(0.45))));
-    const lobe = pow(clamp(dot(V, bent), float(0.0), float(1.0)), float(3.5));
+  // Thin at the tip and the margins, thick at the petiole and the midrib.
+  const thin = mix(float(0.35), float(1.0), span).mul(
+    mix(float(0.6), float(1.0), smoothstep(float(0.2), float(1.0), abs(side))),
+  );
+  // The back of a leaf transmits LESS: it is the waxy lit side that scatters.
+  const faceScale = select(frontFacing, float(1.0), float(0.55));
+  const alive = sub(float(1.0), dead).mul(0.85).add(0.15);
 
-    // Thin at the tip and the margins, thick at the petiole and the midrib.
-    const thin = mix(float(0.35), float(1.0), span).mul(
-      mix(float(0.6), float(1.0), smoothstep(float(0.2), float(1.0), abs(side))),
-    );
-    // The back face of a leaf transmits less, not more — it is the waxy side
-    // facing the light that scatters.
-    const faceScale = select(frontFacing, float(1.0), float(0.55));
-    // Dead leaves are opaque.
-    const alive = sub(float(1.0), dead).mul(0.85).add(0.15);
+  const amount = lobe
+    .mul(thin)
+    .mul(faceScale)
+    .mul(alive)
+    .mul(uniforms.transmissionStrength)
+    .mul(uniforms.enhance);
 
-    const amount = lobe
-      .mul(thin)
-      .mul(faceScale)
-      .mul(alive)
-      .mul(uniforms.transmissionStrength)
-      .mul(uniforms.enhance);
-
-    // Glow the leaf's own colour lit by the sun, never the sun's colour alone.
-    return albedo.mul(uniforms.sunColor).mul(amount).mul(float(1.35));
-  })();
-
-  mat.emissiveNode = transmission;
+  // Glow the leaf's own colour lit by the sun, never the sun's colour alone.
+  mat.emissiveNode = albedo.mul(uniforms.sunColor).mul(amount).mul(float(1.35));
 
   return mat;
 }
 
 /**
- * The deliberately unenhanced material for a side-by-side plate: same geometry,
- * same palette, same triangle count — flat green, no transmission, no face
- * differentiation. This exists so the corridor can PROVE the difference rather
- * than assert it.
+ * The deliberately unenhanced material for a side-by-side plate: same
+ * geometry, same palette, same triangle count — flat green, no transmission,
+ * no face differentiation. This exists so a corridor can PROVE the difference
+ * rather than assert it.
  */
 export function createFlatFoliageMaterial(
   palette: FoliagePalette = SUMMER_PALETTE,
@@ -232,43 +217,39 @@ export function createBarkMaterial(tint = 0x6a5a44): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial();
   mat.roughness = 0.95;
   mat.metalness = 0;
-  const base = rgb(tint);
-  const dark = rgb(tint, 0.45);
-  mat.colorNode = Fn(() => {
-    const p = positionWorld;
-    // Vertical fissures from two incommensurate frequencies so the pattern
-    // never tiles. Ratio deliberately irrational-ish (11.3 / 4.7) — harmonic
-    // frequencies would march and read as stripes.
-    const a = p.x.mul(11.3).add(p.z.mul(9.1)).sin();
-    const b = p.x.mul(4.7).sub(p.z.mul(5.3)).sin();
-    const fissure = a.mul(0.6).add(b.mul(0.4)).mul(0.5).add(0.5);
-    // Damp toward the ground: bark is darker and wetter at the base.
-    const ground = smoothstep(float(0.0), float(3.0), p.y);
-    return mix(dark, base, clamp(fissure.mul(ground.mul(0.6).add(0.4)), float(0), float(1)));
-  })();
+
+  const p = positionWorld;
+  // Two incommensurate frequencies so the fissures never tile. Harmonically
+  // related ones would march together and read as stripes.
+  const a = p.x.mul(11.3).add(p.z.mul(9.1)).sin();
+  const b = p.x.mul(4.7).sub(p.z.mul(5.3)).sin();
+  const fissure = a.mul(0.6).add(b.mul(0.4)).mul(0.5).add(0.5);
+  // Damp toward the ground: bark is darker and wetter at the base.
+  const ground = smoothstep(float(0.0), float(3.0), p.y);
+  mat.colorNode = mix(
+    rgb(tint, 0.45),
+    rgb(tint),
+    clamp(fissure.mul(ground.mul(0.6).add(0.4)), float(0), float(1)),
+  );
   return mat;
 }
 
 /**
  * Ground. A forest floor is not one colour — it is soil showing through a
- * broken layer of fallen material. Two noise octaves and a slope term give
- * that without a texture; the actual litter is real geometry on top.
+ * broken layer of fallen material. Two noise octaves and a moss term give that
+ * without a texture; the actual litter is real geometry on top.
  */
 export function createForestFloorMaterial(): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial();
   mat.roughness = 0.98;
   mat.metalness = 0;
-  const soil = rgb(0x3a2c1e);
-  const duff = rgb(0x5c4526);
-  const moss = rgb(0x3f5326);
-  mat.colorNode = Fn(() => {
-    const p = positionWorld;
-    const n1 = p.x.mul(0.7).sin().mul(p.z.mul(0.62).cos());
-    const n2 = p.x.mul(2.9).sin().mul(p.z.mul(3.3).sin());
-    const f = clamp(n1.mul(0.6).add(n2.mul(0.4)).mul(0.5).add(0.5), float(0), float(1));
-    const mossy = smoothstep(float(0.62), float(0.95), f);
-    return mix(mix(soil, duff, f), moss, mossy.mul(0.65));
-  })();
+
+  const p = positionWorld;
+  const n1 = p.x.mul(0.7).sin().mul(p.z.mul(0.62).cos());
+  const n2 = p.x.mul(2.9).sin().mul(p.z.mul(3.3).sin());
+  const f = clamp(n1.mul(0.6).add(n2.mul(0.4)).mul(0.5).add(0.5), float(0), float(1));
+  const mossy = smoothstep(float(0.62), float(0.95), f);
+  mat.colorNode = mix(mix(rgb(0x3a2c1e), rgb(0x5c4526), f), rgb(0x3f5326), mossy.mul(0.65));
   return mat;
 }
 
@@ -283,7 +264,8 @@ export function setSun(
   direction: THREE.Vector3,
   color: THREE.Color,
 ): void {
-  (uniforms.sunDirection as unknown as { value: THREE.Vector3 }).value.copy(direction.clone().normalize());
+  (uniforms.sunDirection as unknown as { value: THREE.Vector3 }).value
+    .copy(direction.clone().normalize());
   (uniforms.sunColor as unknown as { value: THREE.Color }).value.copy(color);
 }
 

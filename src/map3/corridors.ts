@@ -435,11 +435,10 @@ export function createGrammarCorridor(seed = 11): Corridor {
 
   const stoneMat = new MeshStandardNodeMaterial();
   stoneMat.roughness = 0.82;
-  stoneMat.colorNode = Fn(() => {
-    const p = positionWorld;
-    const band = sin(p.y.mul(6.1)).mul(0.5).add(0.5);
-    return mix(vec3(0.52, 0.49, 0.44), vec3(0.63, 0.60, 0.55), band);
-  })();
+  {
+    const band = sin(positionWorld.y.mul(6.1)).mul(0.5).add(0.5);
+    stoneMat.colorNode = mix(vec3(0.52, 0.49, 0.44), vec3(0.63, 0.60, 0.55), band);
+  }
 
   const glassMat = new MeshStandardNodeMaterial();
   glassMat.roughness = 0.14;

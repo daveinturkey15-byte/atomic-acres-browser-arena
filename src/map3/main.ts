@@ -25,6 +25,7 @@ import {
 import {
   createWaterCorridor, createWeatherCorridor, createVolumeCorridor,
 } from './corridors-extra';
+import { installTintSwizzleShim, tintSwizzleShimTelemetry } from '../webgpu-tint-swizzle-shim';
 
 /* ---------------------------------------------------------------- */
 /* Signage — canvas to CanvasTexture on a world plane.               */
@@ -108,11 +109,66 @@ function gpuIdentity(): { renderer: string; software: boolean } {
   }
 }
 
+/**
+ * On-screen error surface.
+ *
+ * A TSL graph that lowers cleanly to GLSL can still fail to compile to WGSL,
+ * and when it does three logs to the console and carries on rendering
+ * everything else — so the page looks alive, the frame rate looks fine, and
+ * the scene is quietly empty. Nothing on screen tells you. This puts the first
+ * few compile errors where they cannot be missed, and reports how many meshes
+ * actually made it into the frame versus how many exist.
+ */
+function installErrorSurface(): (visible: number, total: number) => void {
+  const box = document.createElement('div');
+  box.style.cssText = [
+    'position:fixed', 'left:16px', 'top:16px', 'right:16px', 'z-index:50',
+    'max-height:42vh', 'overflow:auto', 'display:none',
+    'font:500 11px/1.45 ui-monospace,Consolas,monospace',
+    'color:#ffd9c9', 'background:rgba(38,12,6,.92)',
+    'border:1px solid rgba(226,134,92,.6)', 'border-radius:6px', 'padding:10px 12px',
+    'white-space:pre-wrap', 'pointer-events:auto',
+  ].join(';');
+  document.body.appendChild(box);
+
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  const push = (kind: string, msg: string) => {
+    const key = kind + msg.slice(0, 160);
+    if (seen.has(key) || seen.size > 24) return;
+    seen.add(key);
+    lines.push(`[${kind}] ${msg}`);
+    box.textContent = lines.join(String.fromCharCode(10, 10));
+    box.style.display = 'block';
+  };
+
+  const origErr = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    push('error', args.map((a) => (a instanceof Error ? a.stack ?? a.message : String(a))).join(' '));
+    origErr(...args);
+  };
+  const origWarn = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    const s = args.map(String).join(' ');
+    if (/wgsl|shader|pipeline|compil|attribute|node/i.test(s)) push('warn', s);
+    origWarn(...args);
+  };
+  window.addEventListener('unhandledrejection', (e) => push('promise', String(e.reason)));
+  window.addEventListener('error', (e) => push('window', String(e.message)));
+
+  return (visible: number, total: number) => {
+    if (visible >= total || total === 0) return;
+    push('scene', `${total - visible} of ${total} meshes did not reach the frame (rendered `
+      + `${visible}). A mesh whose material fails to compile is skipped silently.`);
+  };
+}
+
 /* ---------------------------------------------------------------- */
 /* Bootstrap                                                         */
 /* ---------------------------------------------------------------- */
 
 async function main(): Promise<void> {
+  const reportScene = installErrorSurface();
   const status = document.getElementById('status')!;
   const hud = document.getElementById('hud')!;
 
@@ -122,6 +178,23 @@ async function main(): Promise<void> {
       + 'the corridors use TSL node materials the WebGL2 path cannot compile.';
     return;
   }
+
+  // MUST run before the renderer requests a device.
+  //
+  // Chrome 153's Tint IR lowering deterministically rejects the CHAINED
+  // SWIZZLES three r185 emits from its DFGLUT helper (`texture(lut, uv).rg`
+  // then `.x`/`.y` off that, producing `nodeVar.xy.x`). Every pipeline lit via
+  // GGX multiscatter - which is every MeshStandardNodeMaterial - fails to
+  // compile with "swizzle view instruction still has usages after lowering".
+  // three logs it and carries on, so the page runs at a healthy frame rate
+  // with an empty world: exactly the 8-draws/96-triangle symptom this entry
+  // showed. MeshBasicMaterial survives because it is not lit that way, which
+  // is why the signs were the only things visible.
+  //
+  // The game installs this at legacy-main.ts:1847. This entry bypasses that
+  // bootstrap entirely, so it has to install it itself - the cost of being a
+  // standalone page, and worth writing down.
+  const shimInstalled = installTintSwizzleShim();
 
   const renderer = new WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -303,6 +376,10 @@ async function main(): Promise<void> {
   // performance characteristics are completely different. Name it in the HUD.
   const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend;
   const backendName = backend?.isWebGPUBackend ? 'WebGPU' : 'WebGL2-fallback';
+  const shimTel = () => {
+    const s = tintSwizzleShimTelemetry();
+    return shimInstalled ? `shim ${s.modulesRewritten}/${s.modulesSeen}` : 'shim OFF';
+  };
 
   const gpu = gpuIdentity();
   const gpuShort = gpu.software
@@ -351,8 +428,11 @@ async function main(): Promise<void> {
       frames = 0;
       fpsAccum = 0;
       const dc = (renderer.info?.render as { drawCalls?: number } | undefined)?.drawCalls ?? 0;
+      let total = 0;
+      scene.traverse((o) => { if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints) total++; });
+      reportScene(dc, total);
       const tri = Math.round(((renderer.info?.render as { triangles?: number } | undefined)?.triangles ?? 0) / 1000);
-      hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${gpuShort}`
+      hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${shimTel()} · ${gpuShort}`
         + `  |  1-6 solo corridor · 0 all · O shadows · P foliage · H half-res`;
       hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
     }

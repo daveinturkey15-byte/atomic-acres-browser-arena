@@ -66,23 +66,29 @@ export function createWaterCorridor(): Corridor {
   // Everything that gates on slope is scaled by THIS, never by a constant.
   const slopeMax = AMPLITUDE * BANDS.reduce((s, b) => s + b[3] * ((2 * Math.PI) / b[2]), 0);
 
-  /** Gerstner displacement + slope, evaluated in the vertex and fragment. */
-  const waveAt = Fn(([p]: [any]) => {
-    const t = float(time);
-    const y = float(0).toVar();
-    const sx = float(0).toVar();
-    const sz = float(0).toVar();
+  /**
+   * Gerstner displacement and slope.
+   *
+   * A plain JS helper, not a TSL `Fn`: the band count is known at build time,
+   * so the sum unrolls into one node expression with no loop and no statement
+   * scope. That is also the pattern the repo's production TSL uses.
+   */
+  const waveAt = (p: any) => {
+    const t = time;
+    let y: any = float(0);
+    let sx: any = float(0);
+    let sz: any = float(0);
     BANDS.forEach(([dx, dz, lambda, weight]) => {
       const k = (2 * Math.PI) / lambda;
       const speed = Math.sqrt(9.81 / k);
       const phase = p.x.mul(dx * k).add(p.z.mul(dz * k)).add(t.mul(k * speed));
       const a = AMPLITUDE * weight;
-      y.addAssign(sin(phase).mul(a));
-      sx.addAssign(cos(phase).mul(a * k * dx));
-      sz.addAssign(cos(phase).mul(a * k * dz));
+      y = y.add(sin(phase).mul(a));
+      sx = sx.add(cos(phase).mul(a * k * dx));
+      sz = sz.add(cos(phase).mul(a * k * dz));
     });
-    return vec3(y, sx, sz);
-  });
+    return { y, sx, sz };
+  };
 
   const waterMat = new MeshStandardNodeMaterial();
   waterMat.roughness = 0.14;
@@ -91,18 +97,18 @@ export function createWaterCorridor(): Corridor {
   waterMat.opacity = 0.92;
 
   // Vertex displacement.
-  waterMat.positionNode = Fn(() => {
+  {
     const p = positionLocal;
     const w = waveAt(p);
-    return vec3(p.x, p.y.add(w.x), p.z);
-  })();
+    waterMat.positionNode = vec3(p.x, p.y.add(w.y), p.z);
+  }
 
-  waterMat.colorNode = Fn(() => {
+  {
     const p = positionWorld;
     const w = waveAt(p);
     // Gradient MAGNITUDE. Summing |dx|+|dz| double-counts a diagonal wave and
     // saturates the normaliser, which is what put foam on every pixel.
-    const slope = w.y.mul(w.y).add(w.z.mul(w.z)).sqrt();
+    const slope = TSL.sqrt(w.sx.mul(w.sx).add(w.sz.mul(w.sz)));
     const norm = clamp(slope.div(float(slopeMax)), float(0), float(1));
 
     // Depth: the shore is at -z near the corridor mouth, deep water beyond.
@@ -117,8 +123,9 @@ export function createWaterCorridor(): Corridor {
     // A second foam band at the waterline itself, independent of slope.
     const edge = float(1).sub(smoothstep(float(0), float(3.2), p.z.negate().sub(5)));
     const foamColour = rgb(0xdff0f2);
-    return mix(body, foamColour, clamp(foam.mul(0.8).add(edge.mul(0.45)), float(0), float(1)));
-  })();
+    waterMat.colorNode =
+      mix(body, foamColour, clamp(foam.mul(0.8).add(edge.mul(0.45)), float(0), float(1)));
+  }
 
   const waterGeo = new THREE.PlaneGeometry(W * 4, 42, 90, 90);
   waterGeo.rotateX(-Math.PI / 2);
@@ -131,19 +138,14 @@ export function createWaterCorridor(): Corridor {
   // sells a shoreline — a uniform sand plane meeting water reads as a decal.
   const sandMat = new MeshStandardNodeMaterial();
   sandMat.roughness = 0.9;
-  sandMat.colorNode = Fn(() => {
+  {
     const p = positionWorld;
     const wet = smoothstep(float(-2.5), float(-9.5), p.z);
-    const dry = rgb(0xb9a582);
-    const damp = rgb(0x6d5c44);
     const grain = sin(p.x.mul(31.7)).mul(sin(p.z.mul(27.3))).mul(0.5).add(0.5).mul(0.06);
-    return mix(dry, damp, wet).add(vec3(grain, grain, grain));
-  })();
-  sandMat.roughnessNode = Fn(() => {
+    sandMat.colorNode = mix(rgb(0xb9a582), rgb(0x6d5c44), wet).add(vec3(grain, grain, grain));
     // Wet sand is glossy. One term, and it does more for a beach than detail.
-    const wet = smoothstep(float(-2.5), float(-9.5), positionWorld.z);
-    return mix(float(0.95), float(0.22), wet);
-  })();
+    sandMat.roughnessNode = mix(float(0.95), float(0.22), wet);
+  }
   const sandGeo = new THREE.PlaneGeometry(W * 4, LEN, 24, 90);
   sandGeo.rotateX(-Math.PI / 2);
   sandGeo.translate(0, 0, -LEN / 2);
@@ -225,7 +227,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
   const barkMat = createBarkMaterial();
   const floorMat = new MeshStandardNodeMaterial();
   floorMat.roughness = 0.95;
-  floorMat.colorNode = Fn(() => {
+  {
     const z = positionWorld.z;
     // Ground changes with the season band: green -> ochre -> snow.
     const spring = rgb(0x4a6a34);
@@ -235,8 +237,8 @@ export function createWeatherCorridor(seed = 21): Corridor {
     const a = smoothstep(float(-BAY), float(-BAY * 1.4), z);
     const b = smoothstep(float(-BAY * 2), float(-BAY * 2.4), z);
     const c = smoothstep(float(-BAY * 3), float(-BAY * 3.4), z);
-    return mix(mix(mix(spring, summer, a), autumnG, b), winterG, c);
-  })();
+    floorMat.colorNode = mix(mix(mix(spring, summer, a), autumnG, b), winterG, c);
+  }
   disposables.push(barkMat, floorMat);
 
   const floorGeo = new THREE.PlaneGeometry(W + 6, LEN, 12, 56);
@@ -331,10 +333,10 @@ export function createWeatherCorridor(seed = 21): Corridor {
 
   // Fall, drift and respawn entirely in the vertex graph — no CPU per-particle
   // work, one draw call for all four weather states.
-  rainMat.positionNode = Fn(() => {
+  {
     const p = positionLocal;
     const s = attribute('aSeed', 'float');
-    const t = float(time);
+    const t = time;
 
     // Which bay is this particle in? 1 = rain, 2 = storm, 3 = snow.
     const bay = clamp(p.z.negate().div(float(BAY)).floor(), float(0), float(3));
@@ -344,30 +346,24 @@ export function createWeatherCorridor(seed = 21): Corridor {
     // Snow falls slowly and wanders; rain falls fast and straight; storm rain
     // falls faster still and slants.
     const speed = mix(mix(float(9.5), float(15.0), isStorm), float(1.5), isSnow);
-    const fall = t.mul(speed).add(s).mod(float(13.0));
+    // Wrap without a chained .mod(): x - floor(x/13)*13 is the floored form,
+    // which is what we want and is expressible with operators that exist.
+    const raw = t.mul(speed).add(s);
+    const fall = raw.sub(raw.div(float(13.0)).floor().mul(float(13.0)));
     const y = float(13.0).sub(fall);
 
     const wander = sin(t.mul(0.8).add(s)).mul(isSnow.mul(0.55))
       .add(sin(t.mul(2.3).add(s.mul(1.7))).mul(isSnow.mul(0.3)));
     const slant = isStorm.mul(float(2.2)).mul(float(1).sub(y.div(13.0)));
 
-    return vec3(p.x.add(wander).add(slant), y, p.z.add(wander.mul(0.6)));
-  })();
+    rainMat.positionNode = vec3(p.x.add(wander).add(slant), y, p.z.add(wander.mul(0.6)));
 
-  rainMat.colorNode = Fn(() => {
-    const p = positionLocal;
-    const bay = clamp(p.z.negate().div(float(BAY)).floor(), float(0), float(3));
-    const isSnow = smoothstep(float(2.5), float(2.9), bay);
+    // Colour, opacity and size all key off the SAME bay index, so one buffer
+    // and one draw call carry rain, storm rain and snow.
     const inWeather = smoothstep(float(0.5), float(0.9), bay);
-    return vec4(mix(rgb(0x9fc4d8), rgb(0xf4f8fb), isSnow), inWeather);
-  })();
-
-  rainMat.sizeNode = Fn(() => {
-    const p = positionLocal;
-    const bay = clamp(p.z.negate().div(float(BAY)).floor(), float(0), float(3));
-    const isSnow = smoothstep(float(2.5), float(2.9), bay);
-    return mix(float(2.4), float(6.5), isSnow);
-  })();
+    rainMat.colorNode = vec4(mix(rgb(0x9fc4d8), rgb(0xf4f8fb), isSnow), inWeather);
+    rainMat.sizeNode = mix(float(2.4), float(6.5), isSnow);
+  }
 
   const rain = new THREE.Points(rainGeo, rainMat);
   rain.frustumCulled = false;
