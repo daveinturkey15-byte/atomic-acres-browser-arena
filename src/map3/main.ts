@@ -246,6 +246,12 @@ async function main(): Promise<void> {
   hubGeo.rotateX(-Math.PI / 2);
   const hub = new THREE.Mesh(hubGeo, hubMat);
   hub.receiveShadow = true;
+  // The hub, the corridor floors and the world ground were all within 2 cm of
+  // each other and two of them were exactly coplanar, which is what produced
+  // the shimmering seams. They now sit on three clearly separated planes:
+  // ground -0.35, hub 0, corridor floor +0.03. Depth precision at this scale
+  // needs centimetres, not microns.
+  hub.position.y = 0;
   scene.add(hub);
 
   // Ground plane beyond the hub so the world does not end in void.
@@ -255,9 +261,20 @@ async function main(): Promise<void> {
   const groundGeo = new THREE.PlaneGeometry(600, 600);
   groundGeo.rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.position.y = -0.02;
+  ground.position.y = -0.35;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // A low kerb around the hub, so the 35 cm step down to the world ground
+  // reads as a built edge rather than a hole in the floor.
+  const kerbMat = new MeshStandardNodeMaterial();
+  kerbMat.roughness = 0.9;
+  kerbMat.colorNode = vec3(0.24, 0.25, 0.24);
+  const kerbGeo = new THREE.CylinderGeometry(19.35, 19.35, 0.38, 64, 1, true);
+  const kerb = new THREE.Mesh(kerbGeo, kerbMat);
+  kerb.position.y = -0.19;
+  kerb.receiveShadow = true;
+  scene.add(kerb);
 
   // --- corridors ------------------------------------------------------
   const corridors: Corridor[] = [

@@ -68,12 +68,12 @@ export function createNatureCorridor(seed = 7): Corridor {
   const flatMat = createFlatFoliageMaterial(SUMMER_PALETTE);
   const barkMat = createBarkMaterial();
   const darkBarkMat = createBarkMaterial(0x4a4034);
-  const floorMat = createForestFloorMaterial();
+  const floorMat = createForestFloorMaterial({ z1: Z1, z2: Z2 });
   disposables.push(foliageMat, autumnMat, springMat, flatMat, barkMat, darkBarkMat, floorMat);
 
   const floorGeo = new THREE.PlaneGeometry(CORRIDOR_WIDTH, LEN, 12, 48);
   floorGeo.rotateX(-Math.PI / 2);
-  floorGeo.translate(0, 0, -LEN / 2);
+  floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.receiveShadow = true;
   group.add(floor);
@@ -233,7 +233,7 @@ export function createMathsCorridor(): Corridor {
   floorMat.colorNode = vec3(0.16, 0.17, 0.19);
   const floorGeo = new THREE.PlaneGeometry(CORRIDOR_WIDTH, LEN, 4, 4);
   floorGeo.rotateX(-Math.PI / 2);
-  floorGeo.translate(0, 0, -LEN / 2);
+  floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.receiveShadow = true;
   group.add(floor);
@@ -427,7 +427,7 @@ export function createGrammarCorridor(seed = 11): Corridor {
   floorMat.colorNode = vec3(0.22, 0.21, 0.2);
   const floorGeo = new THREE.PlaneGeometry(CORRIDOR_WIDTH, LEN, 4, 4);
   floorGeo.rotateX(-Math.PI / 2);
-  floorGeo.translate(0, 0, -LEN / 2);
+  floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.receiveShadow = true;
   group.add(floor);

@@ -243,7 +243,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
 
   const floorGeo = new THREE.PlaneGeometry(W + 6, LEN, 12, 56);
   floorGeo.rotateX(-Math.PI / 2);
-  floorGeo.translate(0, 0, -LEN / 2);
+  floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.receiveShadow = true;
   group.add(floor);
@@ -420,7 +420,7 @@ export function createVolumeCorridor(): Corridor {
   stoneMat.colorNode = rgb(0x2b2b2e);
   const floorGeo = new THREE.PlaneGeometry(W, LEN, 4, 4);
   floorGeo.rotateX(-Math.PI / 2);
-  floorGeo.translate(0, 0, -LEN / 2);
+  floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, stoneMat);
   floor.receiveShadow = true;
   group.add(floor);

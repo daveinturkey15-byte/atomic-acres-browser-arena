@@ -39,6 +39,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
+import { fbm2, warpedFbm2, ridgedFbm2, xz } from './noise';
 
 /**
  * One cast boundary. TSL is a runtime DSL whose TypeScript definitions do not
@@ -47,9 +48,9 @@ import * as TSL from 'three/tsl';
  * Collapsing it here keeps the graphs below readable.
  */
 const {
-  abs, attribute, cameraPosition, clamp, dot, float, frontFacing, mix,
-  normalWorld, normalize, positionWorld, pow, select, smoothstep, sub, uniform,
-  vec3,
+  abs, attribute, cameraPosition, clamp, cos, dot, float, frontFacing, mix,
+  normalWorld, normalize, positionLocal, positionWorld, pow, select, sin,
+  smoothstep, sub, uniform, vec3,
 } = TSL as unknown as Record<string, any>;
 
 export interface FoliageUniforms {
@@ -59,6 +60,10 @@ export interface FoliageUniforms {
   time: ReturnType<typeof uniform>;
   /** 0 = every enhancement off (the "before" state), 1 = full. */
   enhance: ReturnType<typeof uniform>;
+  /** Wind speed in m/s. Drives sway amplitude and gust rate together. */
+  windSpeed: ReturnType<typeof uniform>;
+  /** Wind bearing as a unit XZ direction. */
+  windDirection: ReturnType<typeof uniform>;
 }
 
 export function createFoliageUniforms(): FoliageUniforms {
@@ -68,6 +73,8 @@ export function createFoliageUniforms(): FoliageUniforms {
     transmissionStrength: uniform(1.0),
     time: uniform(0),
     enhance: uniform(1),
+    windSpeed: uniform(1.4),
+    windDirection: uniform(new THREE.Vector3(0.82, 0, 0.57).normalize()),
   };
 }
 
@@ -148,6 +155,32 @@ export function createFoliageMaterial(
   const albedo = mix(withEdge, cDead, dead);
 
   mat.colorNode = albedo;
+
+  // --- wind ---------------------------------------------------------------
+  //
+  // Sway scales with HEIGHT ABOVE GROUND, because that is what makes a canopy
+  // move like a tree rather than like a flag: a trunk base is rigid, a branch
+  // tip is not. Two incommensurate frequencies (1.7 and 0.43) keep the motion
+  // from settling into a visible pulse - harmonically related ones march in
+  // lockstep within seconds of standing still, which is the single cheapest
+  // way to make a scene read as fake.
+  //
+  // The phase also varies with world XZ, so neighbouring plants are never in
+  // step with each other and a gust visibly travels across the stand.
+  {
+    const t = uniforms.time;
+    const w = uniforms.windSpeed;
+    const dir = uniforms.windDirection;
+    const p = positionWorld;
+
+    const height = clamp(p.y.mul(0.34), float(0), float(1.6));
+    const phase = p.x.mul(0.21).add(p.z.mul(0.17)).add(t.mul(1.7));
+    const gust = sin(t.mul(0.43).add(p.x.mul(0.06))).mul(0.5).add(0.85);
+    const sway = sin(phase).mul(0.055).add(cos(phase.mul(1.9)).mul(0.022));
+
+    const amount = sway.mul(height).mul(w).mul(gust).mul(uniforms.enhance);
+    mat.positionNode = positionLocal.add(vec3(dir.x.mul(amount), float(0), dir.z.mul(amount)));
+  }
 
   // --- roughness ---------------------------------------------------------
   // A dead leaf is dry and matte; an underside is matte; a young tip is waxy.
@@ -239,17 +272,59 @@ export function createBarkMaterial(tint = 0x6a5a44): MeshStandardNodeMaterial {
  * broken layer of fallen material. Two noise octaves and a moss term give that
  * without a texture; the actual litter is real geometry on top.
  */
-export function createForestFloorMaterial(): MeshStandardNodeMaterial {
+export function createForestFloorMaterial(
+  zones?: { z1: number; z2: number },
+): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial();
   mat.roughness = 0.98;
   mat.metalness = 0;
 
   const p = positionWorld;
-  const n1 = p.x.mul(0.7).sin().mul(p.z.mul(0.62).cos());
-  const n2 = p.x.mul(2.9).sin().mul(p.z.mul(3.3).sin());
-  const f = clamp(n1.mul(0.6).add(n2.mul(0.4)).mul(0.5).add(0.5), float(0), float(1));
-  const mossy = smoothstep(float(0.62), float(0.95), f);
-  mat.colorNode = mix(mix(rgb(0x3a2c1e), rgb(0x5c4526), f), rgb(0x3f5326), mossy.mul(0.65));
+
+  // Real value-noise fBM, not products of sines.
+  //
+  // The previous version multiplied sin(x*a) by cos(z*b), which is a GRID by
+  // construction and rendered as a visible checkerboard on the floor. See
+  // noise.ts for why no number of octaves of that shape can fix it: they are
+  // all aligned to the same two axes. These octaves are hashed and rotated.
+  //
+  // Three scales, each doing a different job: a large warped blotch for where
+  // soil shows through, a medium break-up, and a fine grain for close-up.
+  const blotch = warpedFbm2(xz(p, 0.055), 0.7, 4);
+  const breakup = fbm2(xz(p, 0.42), 3);
+  const grainN = fbm2(xz(p, 3.1), 2);
+  const f = blotch.mul(0.6).add(breakup.mul(0.3)).add(grainN.mul(0.1));
+
+  // Ridged noise for the dry cracks that show through thin litter. Sparse, so
+  // it reads as a detail rather than a pattern.
+  const cracks = ridgedFbm2(xz(p, 0.9), 3);
+  const crackMask = smoothstep(float(0.72), float(0.95), cracks).mul(0.35);
+
+  const grain = grainN.sub(0.5).mul(0.06);
+  const mossy = smoothstep(float(0.58), float(0.9), blotch);
+
+  // Per-zone floors. Broadleaf duff, then a rust-brown needle bed under the
+  // conifers, then heavy ochre leaf litter in the autumn grove. Without this
+  // the ground is one colour down the whole corridor and visually flattens
+  // three distinct zones into one.
+  const broadleaf = mix(mix(rgb(0x3a2c1e), rgb(0x5c4526), f), rgb(0x3f5326), mossy.mul(0.6));
+  const needle = mix(mix(rgb(0x2e2318), rgb(0x5a3d22), f), rgb(0x36452a), mossy.mul(0.35));
+  const autumnBed = mix(mix(rgb(0x4a3418), rgb(0x7d5a24), f), rgb(0x8a6a2c), mossy.mul(0.25));
+
+  let base = broadleaf;
+  if (zones) {
+    // Blend across the boundary over ~4 m rather than switching, so the zones
+    // meet in a gradient instead of a ruled line on the floor.
+    const toNeedle = smoothstep(float(zones.z1 + 2), float(zones.z1 - 2), p.z);
+    const toAutumn = smoothstep(float(zones.z2 + 2), float(zones.z2 - 2), p.z);
+    base = mix(mix(broadleaf, needle, toNeedle), autumnBed, toAutumn);
+  }
+
+  mat.colorNode = mix(base, rgb(0x241a10), crackMask).add(vec3(grain, grain, grain));
+  // Damp soil is rougher than dry litter; tie roughness to the same field so
+  // the specular break-up lines up with the colour break-up instead of
+  // fighting it.
+  mat.roughnessNode = mix(float(0.99), float(0.86), f);
   return mat;
 }
 
@@ -267,6 +342,17 @@ export function setSun(
   (uniforms.sunDirection as unknown as { value: THREE.Vector3 }).value
     .copy(direction.clone().normalize());
   (uniforms.sunColor as unknown as { value: THREE.Color }).value.copy(color);
+}
+
+/** Drive the wind. Weather writes here. */
+export function setWind(
+  uniforms: FoliageUniforms,
+  speed: number,
+  bearingRadians: number,
+): void {
+  (uniforms.windSpeed as unknown as { value: number }).value = speed;
+  (uniforms.windDirection as unknown as { value: THREE.Vector3 }).value
+    .set(Math.sin(bearingRadians), 0, Math.cos(bearingRadians));
 }
 
 /** Fade every enhancement for the corridor's before/after lever. */
