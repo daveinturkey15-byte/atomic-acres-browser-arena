@@ -33519,6 +33519,22 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       0.44,
     );
   },
+  // KNOWN DEFECT, deliberately NOT patched here - see
+  // docs/STALE_CHECK_AUDIT_2026-08-31.md finding 2. This hook diverges from the
+  // runtime it stands in for in three ways: isBlocked reads its point as the
+  // capsule TOP while every caller passes some other height above the feet
+  // (feetY + 0.9 in the invisible-wall sweep, position[1] - 1.05 in the prone
+  // matrix); the radius is 0.36 against the mover's 0.44; and there is no
+  // collidersOverlappingVerticalSpan filter.
+  //
+  // The fix is at the ~10 CALL SITES, not here: the contract that matches
+  // isBlocked and the mover is "y is the capsule top", and the callers are the
+  // ones violating it. Changing the hook's meaning underneath them - which I
+  // tried - just moves the probe from 0.75 m underground to 1.7 m airborne.
+  // Doing it properly means updating each caller and re-measuring what it
+  // reports, which is its own pass. Left correct-as-documented rather than
+  // half-changed, because a shared debug hook with ten consumers is exactly
+  // where a partial fix does the most damage.
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
     ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,

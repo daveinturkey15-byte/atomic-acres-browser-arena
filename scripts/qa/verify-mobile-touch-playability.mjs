@@ -53,8 +53,18 @@ const VIEWPORTS = arg('--viewports', '390x844,768x1024').split(',').map((entry) 
 
 const proxy = await startStableDevProxy({ target: new URL(BASE) });
 
+// Owner 2026-08-31: this lane must drive the INSTALLED Chrome, not Playwright's
+// bundled Chromium. Measured on this machine, same flags, same device emulation,
+// same URL: bundled Chromium gets an adapter but requestDevice() throws
+// "DynamicLib.Open: dxil.dll Windows Error: 87" from Dawn's EnsureDXCLibraries,
+// so a WebGPU-only build can never boot and every mobile cell timed out at 240 s.
+// Installed Chrome acquires a device on the same call. That made the lane look
+// like "mobile is broken" for a reason that has nothing to do with mobile - the
+// same trap as this repo's bundled-Firefox lane, which drives firefox.exe for
+// exactly this kind of reason.
 const browser = await chromium.launch({
   headless: !HEADED,
+  channel: 'chrome',
   args: ['--mute-audio', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });
 
