@@ -111,7 +111,46 @@ export type ViewmodelObstructionPoseInput = ViewmodelContactProbeInput & Readonl
   prone: boolean;
   /** stanceEyeHeight(stance): the analytic ground plane and floor fallback. */
   stanceEyeHeightMeters: number;
+  /**
+   * World Y of the surface the player last stood on, or null when they have
+   * not yet stood anywhere this life.
+   *
+   * WHY THIS EXISTS. Owner 2026-08-31, still: "gun still goes through walls
+   * and floor", with a screenshot of the weapon buried in sloped grass. The
+   * floor clamp below was gated on `grounded`, and that gate is the defect.
+   * `grounded` is not "there is a floor beneath me" - it is the character
+   * controller's per-frame contact result, and it drops out constantly in
+   * exactly the situation the screenshot shows: walking DOWN any slope, the
+   * controller reports airborne on the frames between steps. The clamp then
+   * flickers off, the analytic floor vanishes for those frames, and the
+   * viewmodel dips through the ground - once per step, on every slope, on
+   * every map with terrain.
+   *
+   * Tracking the last standing height instead means the floor stays modelled
+   * across steps, jumps and falls, and the clamp is driven by the eye's real
+   * height above it rather than by a stance constant that is only correct
+   * while standing still on flat ground.
+   */
+  lastGroundedFeetY: number | null;
 }>;
+
+/**
+ * Metres from the eye down to the analytic floor, or null when no floor is
+ * known. Prefers the tracked standing height and falls back to the stance
+ * constant, which is exact whenever the player is genuinely on flat ground.
+ */
+function eyeHeightAboveFloorMeters(input: ViewmodelObstructionPoseInput): number | null {
+  const tracked = input.lastGroundedFeetY;
+  if (tracked !== null && Number.isFinite(tracked)) {
+    const above = input.position.y - tracked;
+    // A negative height means the eye is below the last known floor - inside a
+    // stairwell, down a ramp, under a deck. The plane is stale, so it is
+    // dropped rather than clamping against a floor that is now overhead.
+    if (above > 0) return above;
+    return input.grounded ? input.stanceEyeHeightMeters : null;
+  }
+  return input.grounded ? input.stanceEyeHeightMeters : null;
+}
 
 /** What `forEachContactProbe` reports once the lattice has been walked. */
 type ContactProbeFrame = Readonly<{
@@ -282,9 +321,9 @@ function sweepNearestForwardMeters(
   // dismembered into the floor). Clamp the forward obstruction analytically
   // against the stance ground plane so the SAME contact fold that keeps the
   // weapon camera-side of walls also keeps it above the floor.
-  if (input.grounded && frame.forwardY < -GROUND_CLAMP_MIN_DOWN_COMPONENT) {
-    const groundPlaneY = input.position.y - input.stanceEyeHeightMeters;
-    const groundDistance = (input.position.y - groundPlaneY) / -frame.forwardY;
+  const eyeAboveFloor = eyeHeightAboveFloorMeters(input);
+  if (eyeAboveFloor !== null && frame.forwardY < -GROUND_CLAMP_MIN_DOWN_COMPONENT) {
+    const groundDistance = eyeAboveFloor / -frame.forwardY;
     if (groundDistance > 0 && groundDistance < frame.lattice.lengthMeters) takeNearest(groundDistance);
   }
   return nearestForward;
@@ -481,8 +520,9 @@ export function measuredEnvelopeCutDepthMeters(
   // eyeHeight / -forwardY, and that is the face-on surface a perpendicular
   // plane represents best of all. It votes here for the same reason it clamps
   // the fold.
-  if (input.grounded && frame.forwardY < -GROUND_CLAMP_MIN_DOWN_COMPONENT) {
-    const groundDistance = input.stanceEyeHeightMeters / -frame.forwardY;
+  const eyeAboveFloorForCut = eyeHeightAboveFloorMeters(input);
+  if (eyeAboveFloorForCut !== null && frame.forwardY < -GROUND_CLAMP_MIN_DOWN_COMPONENT) {
+    const groundDistance = eyeAboveFloorForCut / -frame.forwardY;
     if (groundDistance > 0 && groundDistance < frame.lattice.lengthMeters) vote(groundDistance);
   }
   return nearest;

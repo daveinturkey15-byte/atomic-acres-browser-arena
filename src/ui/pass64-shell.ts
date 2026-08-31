@@ -55,8 +55,10 @@ function mapCardsMarkup(): string {
   return SELECTABLE_ARENAS.map((entry, index) => `<button type="button" class="map-card${index === 0 ? ' selected' : ''}" data-arena-id="${entry.id}" data-arena-route="${entry.routeId}" aria-pressed="${index === 0}" disabled>
     <i class="map-index">0${index + 1}</i>
     <span>${entry.selectorLabel}</span>
+    ${entry.prototype ? '<em class="map-prototype">PROTOTYPE</em>' : ''}
     <strong>${entry.summary}</strong>
     <small>${entry.rulesLabel}</small>
+    <u class="map-authoring" data-authoring="${entry.authoring}">${entry.authoringNote}</u>
   </button>`).join('');
 }
 

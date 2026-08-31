@@ -556,6 +556,7 @@ describe('the cut is placed by what a plane can represent (owner 2026-08-31)', (
       grounded: true,
       prone: false,
       stanceEyeHeightMeters: 1.7,
+      lastGroundedFeetY: null,
       ...overrides,
     };
   }

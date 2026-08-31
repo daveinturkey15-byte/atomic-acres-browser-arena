@@ -6,7 +6,7 @@
   "arenas": {
     "test1": {
       "kind": "helicopter",
-      "label": "HELO FLYOVER // TEST1",
+      "label": "HELO FLYOVER // FIRING RANGE",
       "presentationId": "menu-video-runtime-helo-test1-v1",
       "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
       "seed": 79013001,
@@ -26,7 +26,7 @@
     },
     "test2": {
       "kind": "helicopter",
-      "label": "HELO FLYOVER // TEST2",
+      "label": "HELO FLYOVER // RAID",
       "presentationId": "menu-video-runtime-helo-test2-v1",
       "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
       "seed": 79013002,

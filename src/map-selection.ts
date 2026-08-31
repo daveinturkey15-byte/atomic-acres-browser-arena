@@ -25,6 +25,28 @@ export type ArenaSelection = Readonly<{
   overdrive: boolean;
   matchRules: MatchRules;
   /**
+   * WHERE THIS MAP'S GEOMETRY COMES FROM. Owner question 2026-08-31: "are these
+   * just made by you generating code, or did you have to make blender assets
+   * and import etc ... ensure its listed against the map".
+   *
+   * - `'code'`   every wall, floor and prop in the playable space is built by
+   *              TypeScript at runtime. No mesh file is downloaded for the map.
+   * - `'import'` the playable space is an authored mesh file loaded at runtime.
+   *
+   * This describes the ARENA ONLY. Weapons, operators, grenades and killstreak
+   * vehicles are authored `.glb` on every map without exception, so naming them
+   * here would make every row read the same and tell the reader nothing.
+   */
+  authoring: 'code' | 'import';
+  /** One line for the menu card, naming the asset when there is one. */
+  authoringNote: string;
+  /**
+   * Marks an arena as unfinished on the card itself. Owner 2026-08-31: "have
+   * Farycrsis labelled as 'prototype' whereas the otheres are now". A player
+   * who picks it should know before they load it, not after.
+   */
+  prototype?: boolean;
+  /**
    * Whether the arena is offered in the menu. Absent means yes.
    *
    * This is deliberately NOT the same thing as existing. A hidden arena keeps its stable
@@ -56,6 +78,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: true,
+    authoring: 'import' as const,
+    authoringNote: 'Authored in Blender, imported as atomic-acres-blender-arena.glb',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -74,6 +98,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -92,6 +118,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - its Blender tower was retired',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -112,6 +140,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // grants one host-authoritative training activation at a time.
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
   }),
   // HF-359 (Pass 74): revived Pass 69 hidden-lane arena (branch
@@ -129,6 +159,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // farcrysis lanes land and verify-player-path-cdp.mjs passes it.
     selectable: false,
     legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
+    prototype: true,
     selectorLabel: 'FARCrySIS',
     displayName: 'Farcrysis',
     titleLead: 'FARCry',
@@ -141,6 +172,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: false,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -159,16 +192,18 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
     id: 'test1' as const,
     routeId: 'test1' as const,
     legacyAliases: Object.freeze([]),
-    selectorLabel: 'TEST1',
-    displayName: 'Test1',
-    titleLead: 'TEST',
-    titleAccent: '1',
+    selectorLabel: 'FIRING RANGE',
+    displayName: 'Firing Range',
+    titleLead: 'FIRING',
+    titleAccent: 'RANGE',
     menuLede: 'Fight across a sun-bleached range training ground — sandbag firing lanes, a two-storey range tower, and a container-yard flank.',
     summary: 'Range training ground · tower · container yard',
     rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
@@ -177,16 +212,18 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
     id: 'test2' as const,
     routeId: 'test2' as const,
     legacyAliases: Object.freeze([]),
-    selectorLabel: 'TEST2',
-    displayName: 'Test2',
-    titleLead: 'TEST',
-    titleAccent: '2',
+    selectorLabel: 'RAID',
+    displayName: 'Raid',
+    titleLead: 'RAID',
+    titleAccent: '',
     menuLede: 'Storm a hillside mansion — pool deck, sunken court and garden terraces, with three-zone Domination as the headline mode.',
     summary: 'Hillside mansion · three lanes · Domination',
     rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
@@ -195,6 +232,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'Built entirely in code - no map mesh is downloaded',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);

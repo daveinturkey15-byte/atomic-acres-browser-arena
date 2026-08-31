@@ -24,7 +24,7 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Test1', 'Test2']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid']);
     expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(8);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
@@ -94,7 +94,13 @@ describe('opening arena selection', () => {
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
     // owner 2026-08-30: Test1/Test2 arenas added — both host up to 6 with 2-bot solo.
-    for (const [id, label, name] of [['test1', 'TEST1', 'Test1'], ['test2', 'TEST2', 'Test2']] as const) {
+    // owner 2026-08-31: renamed to Firing Range and Raid. The STABLE IDS ARE
+    // UNCHANGED on purpose - they are the network, storage and replay boundary,
+    // so a rename must never move them. That is what this pairing pins.
+    for (const [id, label, name] of [
+      ['test1', 'FIRING RANGE', 'Firing Range'],
+      ['test2', 'RAID', 'Raid'],
+    ] as const) {
       expect(arenaSelection(id)).toMatchObject({
         id,
         selectorLabel: label,
@@ -110,6 +116,45 @@ describe('opening arena selection', () => {
     }
   });
 
+  /**
+   * Owner 2026-08-31 asked to be able to see, per map, whether it is authored
+   * art or generated code. That answer is only useful if it stays true, so it
+   * is pinned against the thing it describes: the ONE arena that streams a
+   * mesh file is the one flagged 'import'.
+   */
+  it('states truthfully, per map, whether the arena is imported art or generated code', () => {
+    const byId = Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.authoring]));
+    expect(byId).toEqual({
+      'atomic-acres': 'import',
+      'skyline-terminal': 'code',
+      'rustworks-1v1': 'code',
+      'gun-range': 'code',
+      farcrysis: 'code',
+      'high-seas': 'code',
+      test1: 'code',
+      test2: 'code',
+    });
+    // Exactly one imported arena today; a second one appearing without this
+    // gate being revisited is the drift worth catching.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.authoring === 'import')).toHaveLength(1);
+    for (const entry of ARENA_SELECTIONS) {
+      expect(entry.authoringNote.length, `${entry.id} must explain its origin`).toBeGreaterThan(12);
+    }
+    // The imported one names its asset; the generated ones must not claim to.
+    expect(arenaSelection('atomic-acres').authoringNote).toMatch(/\.glb/);
+    for (const entry of ARENA_SELECTIONS.filter((candidate) => candidate.authoring === 'code')) {
+      expect(entry.authoringNote, `${entry.id} is code-built and must not name a mesh file`).not.toMatch(/\.glb/);
+    }
+  });
+
+  it('labels an unfinished arena as a prototype on its own card', () => {
+    expect(arenaSelection('farcrysis').prototype).toBe(true);
+    // Every arena the owner considers finished must NOT carry the badge.
+    for (const entry of ARENA_SELECTIONS.filter((candidate) => candidate.id !== 'farcrysis')) {
+      expect(entry.prototype ?? false, `${entry.id} is not a prototype`).toBe(false);
+    }
+  });
+
   it('binds hosted round clocks and canvas labels to the selected arena', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
@@ -122,8 +167,8 @@ describe('opening arena selection', () => {
       'Gun Range multiplayer arena',
       'Farcrysis multiplayer arena',
       'High Seas multiplayer arena',
-      'Test1 multiplayer arena',
-      'Test2 multiplayer arena',
+      'Firing Range multiplayer arena',
+      'Raid multiplayer arena',
     ]);
   });
 

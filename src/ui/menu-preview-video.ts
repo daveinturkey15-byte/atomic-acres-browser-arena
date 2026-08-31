@@ -139,7 +139,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'test1': Object.freeze({
     arenaId: 'test1',
     frame: 'helicopter',
-    label: 'PRERECORDED HELO // TEST1',
+    label: 'PRERECORDED HELO // FIRING RANGE',
     motionLabel: 'AUTHORED RANGE FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-test1-v1',
@@ -154,7 +154,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'test2': Object.freeze({
     arenaId: 'test2',
     frame: 'helicopter',
-    label: 'PRERECORDED HELO // TEST2',
+    label: 'PRERECORDED HELO // RAID',
     motionLabel: 'AUTHORED ESTATE FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-test2-v1',

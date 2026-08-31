@@ -32,10 +32,20 @@ export function ensureCompactOpticOverlay(hudRoot: HTMLElement): HTMLElement {
   overlay.id = COMPACT_OPTIC_OVERLAY_ID;
   overlay.hidden = true;
   overlay.setAttribute('aria-hidden', 'true');
+  // THE STACKED-SCOPE DEFECT. Owner 2026-08-31: the crossbow optic "feels like
+  // two stacked ones". It was. The weapon's AUTHORED optic is real geometry -
+  // housing, two lenses and an illuminated reticle - and since the HF-405 bore
+  // carve you can see through it and see that reticle. This overlay then drew a
+  // SECOND ring and a SECOND reticle in screen space at a fixed
+  // `clamp(58px, 11.8vh, 148px)`, centred on the screen rather than on the
+  // weapon's own sight axis. Two rings of different sizes at different centres,
+  // one of them not tracking the gun: exactly "two stacked ones".
+  //
+  // The authored optic is now the whole sight picture. This overlay keeps only
+  // what geometry genuinely cannot carry - the peripheral vignette that sells
+  // the narrowed field, and the magnification legend - and draws no ring, no
+  // glass disc and no reticle of its own.
   overlay.innerHTML = '<div class="compact-optic-housing"></div>'
-    + '<div class="compact-optic-bloom"></div>'
-    + '<div class="compact-optic-glass"></div>'
-    + '<div class="compact-optic-reticle"><i></i><b></b><span></span><em></em></div>'
     + '<small></small>';
   hudRoot.append(overlay);
   return overlay;

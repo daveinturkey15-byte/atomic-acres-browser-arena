@@ -3586,7 +3586,7 @@
           "name": "TAC-15 Explosive Crossbow",
           "optic": {
             "kind": "standard",
-            "magnification": 1.5,
+            "magnification": 2.5,
             "solidOcclusion": "required"
           },
           "pellets": 1,
@@ -3606,10 +3606,10 @@
           "recoilPitch": 0.024,
           "recoilRecovery": 8,
           "recoilYaw": 0.004,
-          "reload": 2.45,
+          "reload": 1.22,
           "reportGain": 0.5,
           "reserve": 8,
-          "rpm": 36,
+          "rpm": 72,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0,
           "switchSeconds": 0.58

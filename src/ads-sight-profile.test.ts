@@ -44,14 +44,37 @@ describe('HF-405 ADS reads the authored optic', () => {
   const BASE_FOV = 82;
   const IRON_SIGHT_FOV = 62;
 
-  it('gives the crossbow its authored 1.5x instead of the iron-sight fallback', () => {
-    expect(authoredOpticMagnification('explosive-crossbow')).toBe(1.5);
+  it('gives the crossbow an optic that is actually felt, not merely non-zero', () => {
+    expect(authoredOpticMagnification('explosive-crossbow')).toBe(2.5);
     const aimed = adsAimingFovDegrees('explosive-crossbow', BASE_FOV);
-    expect(aimed).toBeCloseTo(magnifiedFovDegrees(BASE_FOV, 1.5), 10);
-    // The measured numbers: 60.19 degrees of true 1.5x against the 62 degree
-    // generic ADS the crossbow used to share with every ironsight weapon.
-    expect(aimed).toBeCloseTo(60.19, 2);
+    expect(aimed).toBeCloseTo(magnifiedFovDegrees(BASE_FOV, 2.5), 10);
+    expect(aimed).toBeCloseTo(38.35, 2);
     expect(aimed).toBeLessThan(ironSightAdsFovDegrees(BASE_FOV));
+  });
+
+  /**
+   * THE DEFECT THIS GATE EXISTS FOR, and the reason the assertion above is not
+   * enough on its own. Owner 2026-08-31: the crossbow scope had "no zoom". It
+   * was not broken code - it was arithmetic. The generic iron-sight ADS already
+   * takes 20 degrees off the base FOV, which at 82 is about 1.45x on its own,
+   * so an authored 1.5x bought 1.04x over iron sights: measurably magnified,
+   * perceptually nothing.
+   *
+   * `toBeLessThan(ironSight)` passed that whole time. What matters is not that
+   * an optic tightens the view but that it tightens it ENOUGH TO NOTICE, so
+   * this gate measures the ratio a player actually experiences.
+   */
+  it('requires a presented optic to beat iron sights by a felt margin', () => {
+    const felt = (weapon: 'explosive-crossbow' | 'sniper') => {
+      const iron = ironSightAdsFovDegrees(BASE_FOV);
+      const aimed = adsAimingFovDegrees(weapon, BASE_FOV);
+      // Zoom ratio, not a degree difference: what the player sees is the ratio
+      // of the tangents, which is how magnification is defined.
+      return Math.tan((iron * Math.PI) / 360) / Math.tan((aimed * Math.PI) / 360);
+    };
+    // 1.04x is what shipped and what the owner correctly called no zoom.
+    expect(felt('explosive-crossbow')).toBeGreaterThan(1.5);
+    expect(felt('sniper')).toBeGreaterThan(1.5);
   });
 
   it('leaves weapons with no authored optic on the exact iron-sight fallback', () => {
@@ -77,7 +100,7 @@ describe('HF-405 ADS reads the authored optic', () => {
     // The floor is a floor on the FALLBACK, never a ceiling on a real optic:
     // the crossbow still magnifies from a narrow base.
     expect(adsAimingFovDegrees('explosive-crossbow', 60))
-      .toBeCloseTo(magnifiedFovDegrees(60, 1.5), 10);
+      .toBeCloseTo(magnifiedFovDegrees(60, 2.5), 10);
     expect(adsAimingFovDegrees('explosive-crossbow', 60)).toBeLessThan(ADS_IRON_SIGHT_MINIMUM_FOV_DEGREES);
   });
 

@@ -103,7 +103,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['explosive-crossbow']).toMatchObject({
       displayName: 'TAC-15 Explosive Crossbow', fireKind: 'projectile',
-      optic: { kind: 'standard', magnification: 1.5 },
+      optic: { kind: 'standard', magnification: 2.5 },
       policies: { authority: 'host-projectile-v1' },
     });
     expect(byId.flamethrower).toMatchObject({

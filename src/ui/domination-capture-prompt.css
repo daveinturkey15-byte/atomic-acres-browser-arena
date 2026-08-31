@@ -1,0 +1,83 @@
+/*
+ * The Domination capture prompt.
+ *
+ * Owner 2026-08-31: "its not clear how to cpature flags and zones". Before
+ * this, the whole mode was three 12-pixel pips in the corner. This sits low on
+ * the frame - under the crosshair, above the weapon - so it reads while the
+ * player is looking where they are shooting, and it never covers the centre of
+ * the screen where the fight is.
+ *
+ * The bar is the same progress the pips encode, at a size a player can act on.
+ */
+
+#domination-capture {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  z-index: 11;
+  pointer-events: none;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: min(360px, 62vw);
+  text-align: center;
+  /* Team tones. Neutral is the HUD's own amber so an un-owned zone does not
+     imply either side. */
+  --domination-capture-tone: #f2b74f;
+}
+
+#domination-capture[hidden] { display: none; }
+#domination-capture[data-tone='friendly'] { --domination-capture-tone: #4fd8f2; }
+#domination-capture[data-tone='hostile'] { --domination-capture-tone: #ff7048; }
+
+#domination-capture strong {
+  font: 900 19px/1 'Barlow Condensed', Inter, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--domination-capture-tone);
+  text-shadow: 0 2px 6px #000, 0 0 14px rgba(0, 0, 0, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+#domination-capture small {
+  font: 800 10px/1.2 Inter, system-ui, sans-serif;
+  letter-spacing: 0.16em;
+  color: #e8e0d2;
+  text-shadow: 0 1px 4px #000, 0 0 10px rgba(0, 0, 0, 0.9);
+}
+
+/* The bar. Hidden for states with no meaningful progress, so a held zone does
+   not show a permanently full bar the player might read as a countdown. */
+#domination-capture i {
+  display: block;
+  width: 100%;
+  height: 5px;
+  background: rgba(6, 9, 12, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+#domination-capture[data-state='holding'] i,
+#domination-capture[data-state='approaching'] i { visibility: hidden; }
+
+#domination-capture i b {
+  display: block;
+  height: 100%;
+  width: calc(var(--domination-capture-progress, 0) * 100%);
+  background: var(--domination-capture-tone);
+  box-shadow: 0 0 10px var(--domination-capture-tone);
+}
+
+/* A frozen bar must not look like a moving one. */
+#domination-capture[data-state='contested'] i b {
+  background: repeating-linear-gradient(
+    115deg,
+    var(--domination-capture-tone) 0 6px,
+    rgba(0, 0, 0, 0.42) 6px 12px
+  );
+}
+
+@media (max-width: 700px) {
+  #domination-capture { bottom: 26%; width: min(300px, 78vw); }
+  #domination-capture strong { font-size: 17px; }
+}

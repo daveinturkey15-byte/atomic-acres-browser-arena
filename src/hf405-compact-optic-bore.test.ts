@@ -251,7 +251,8 @@ describe('HF-405 compact optic sight picture', () => {
     adsHeld: true,
     adsProgress: 1,
     baseFovDegrees: BASE_FOV,
-    cameraFovDegrees: 60.19,
+    // The settled ADS field of view for the crossbow's 2.5x optic.
+    cameraFovDegrees: 38.35,
   } as const;
 
   it('presents settled glass only once the camera has actually magnified', () => {
@@ -259,9 +260,9 @@ describe('HF-405 compact optic sight picture', () => {
     expect(picture.active).toBe(true);
     expect(picture.contract).toBe(COMPACT_OPTIC_SIGHT_PICTURE_CONTRACT);
     expect(picture.glassBlend).toBeGreaterThan(0.99);
-    expect(picture.magnification).toBe(1.5);
-    expect(picture.label).toBe('1.5x');
-    expect(opticMagnificationLabel(2.5)).toBe('2.5x');
+    expect(picture.magnification).toBe(2.5);
+    expect(picture.label).toBe('2.5x');
+    expect(opticMagnificationLabel(1.5)).toBe('1.5x');
   });
 
   it('never draws glass over an un-magnified or un-aimed frame', () => {
@@ -273,7 +274,7 @@ describe('HF-405 compact optic sight picture', () => {
     // not caught up. Blend in, do not pop in.
     const rising = deriveCompactOpticSightPicture({ ...settled, adsProgress: 0.7, cameraFovDegrees: 72 });
     expect(rising.active).toBe(false);
-    const midway = deriveCompactOpticSightPicture({ ...settled, adsProgress: 0.8, cameraFovDegrees: 62 });
+    const midway = deriveCompactOpticSightPicture({ ...settled, adsProgress: 0.8, cameraFovDegrees: 40.5 });
     expect(midway.glassBlend).toBeGreaterThan(0);
     expect(midway.glassBlend).toBeLessThan(1);
     // A weapon with no compact optic never presents one, however it is aimed.

@@ -136,8 +136,14 @@ import {
   advanceDomination,
   createDominationState,
   dominationObjectiveFor,
+  DOMINATION_ZONE_RADIUS_M,
   type DominationState,
 } from './domination-mode';
+import {
+  deriveDominationCapturePrompt,
+  type DominationPromptZoneView,
+} from './domination-capture-prompt';
+import './ui/domination-capture-prompt.css';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
@@ -6039,6 +6045,12 @@ let stanceRecoveryUntil = 0;
 let sprintRecoveryUntil = 0;
 let deferredFireAt = 0;
 let lastGroundedAt = 0;
+/**
+ * World Y of the surface the player last stood on, or null before they have
+ * stood anywhere this life. Feeds the viewmodel's analytic floor clamp, which
+ * must survive the frames `playerGrounded` reports false between steps.
+ */
+let lastGroundedFeetY: number | null = null;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
 const footstepEmitters = new FootstepEmitterRegistry();
@@ -10820,6 +10832,10 @@ function currentViewmodelObstructionInput(): ViewmodelObstructionPoseInput {
     grounded: playerGrounded,
     prone: player.stance === 'prone',
     stanceEyeHeightMeters: stanceEyeHeight(player.stance),
+    // The floor the viewmodel is kept above. Tracked rather than derived,
+    // because `grounded` drops out between steps on every slope and took the
+    // analytic floor with it - see `lastGroundedFeetY` in the probe module.
+    lastGroundedFeetY: lastGroundedFeetY,
   };
 }
 
@@ -22450,17 +22466,84 @@ function ensureDominationHud(): HTMLElement {
   return strip;
 }
 
+/**
+ * The centre-screen capture prompt. Owner 2026-08-31: "its not clear how to
+ * cpature flags and zones, make that clear too?" - the three corner pips were
+ * the entire presentation of the mode, so nothing on screen ever said that
+ * standing in a circle is what takes it. `deriveDominationCapturePrompt` owns
+ * the wording and the thresholds; this owns only the DOM.
+ */
+function ensureDominationCapturePromptElement(): HTMLElement {
+  let prompt = document.getElementById('domination-capture');
+  if (!prompt) {
+    prompt = document.createElement('div');
+    prompt.id = 'domination-capture';
+    prompt.hidden = true;
+    prompt.setAttribute('aria-hidden', 'true');
+    prompt.innerHTML = '<strong></strong><small></small><i><b></b></i>';
+    element<HTMLElement>('#hud').appendChild(prompt);
+  }
+  return prompt;
+}
+
+function applyDominationCapturePrompt(zones: ReadonlyArray<DominationPromptZoneView>): void {
+  const prompt = deriveDominationCapturePrompt({
+    alive: player.alive,
+    team: (player.team === 1 ? 1 : 0) as 0 | 1,
+    position: { x: player.position.x, z: player.position.z },
+    zones,
+  });
+  const node = ensureDominationCapturePromptElement();
+  const visible = prompt.state !== 'clear';
+  if (node.hidden !== !visible) node.hidden = !visible;
+  if (!visible) return;
+  // Every write guarded: this runs every frame and an unchanged frame must not
+  // invalidate style.
+  const headline = prompt.secondsRemaining !== null
+    ? `${prompt.headline}  ${prompt.secondsRemaining}s`
+    : prompt.headline;
+  const strong = node.querySelector('strong');
+  if (strong && strong.textContent !== headline) strong.textContent = headline;
+  const small = node.querySelector('small');
+  if (small && small.textContent !== prompt.detail) small.textContent = prompt.detail;
+  if (node.dataset.tone !== prompt.tone) node.dataset.tone = prompt.tone;
+  if (node.dataset.state !== prompt.state) node.dataset.state = prompt.state;
+  const bar = (Math.round(prompt.progress * 100) / 100).toFixed(2);
+  if (node.dataset.progress !== bar) {
+    node.dataset.progress = bar;
+    node.style.setProperty('--domination-capture-progress', bar);
+  }
+}
+
 function updateDominationHud(): void {
   const display = dominationDisplayState();
   const existing = document.getElementById('domination-zones');
   if (!display) {
     if (existing) existing.hidden = true;
+    const prompt = document.getElementById('domination-capture');
+    if (prompt) prompt.hidden = true;
     lastDominationOwners.clear();
     return;
   }
   const strip = ensureDominationHud();
   strip.hidden = false;
   announceDominationChanges(display.zones);
+  // Zone geometry is static map data present on host and guest alike, so the
+  // prompt needs no protocol field: replicated ownership is merged onto the
+  // local seeds by id. A zone the seeds do not name is simply not prompted.
+  applyDominationCapturePrompt(display.zones.flatMap((zone) => {
+    const seed = TEST2_DOMINATION_ZONES.find((candidate) => candidate.id === zone.id);
+    if (!seed) return [];
+    return [{
+      id: seed.id,
+      centre: seed.centre,
+      radius: DOMINATION_ZONE_RADIUS_M,
+      owner: (zone.owner === 1 ? 1 : zone.owner === 0 ? 0 : null) as 0 | 1 | null,
+      capturingTeam: (zone.capturingTeam === 1 ? 1 : zone.capturingTeam === 0 ? 0 : null) as 0 | 1 | null,
+      progress: zone.progress,
+      contested: zone.contested,
+    }];
+  }));
   for (const zone of display.zones) {
     const pip = strip.querySelector<HTMLElement>(`[data-zone="${zone.id}"]`);
     if (!pip) continue;
@@ -25322,7 +25405,12 @@ function updatePhysics(dt: number): void {
     if (player.velocity.y < 0.4) player.velocity.y = Math.max(player.velocity.y, 1.2);
     playerGrounded = false;
   }
-  if (playerGrounded) lastGroundedAt = now;
+  if (playerGrounded) {
+    lastGroundedAt = now;
+    // Recorded AFTER the move resolves, so it is the surface actually stood on
+    // this frame rather than the one the frame started above.
+    lastGroundedFeetY = player.position.y - stanceEyeHeight(player.stance);
+  }
   if (playerGrounded && !wasGrounded && impactVelocity < -5 && !localSwimState.swimming) {
     const impactSpeed = Math.abs(impactVelocity);
     landingImpulse = Math.min(1, impactSpeed / 14);

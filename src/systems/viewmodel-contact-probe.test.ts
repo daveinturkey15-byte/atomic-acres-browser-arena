@@ -44,6 +44,7 @@ function input(overrides: Partial<ViewmodelObstructionPoseInput> = {}): Viewmode
     grounded: false,
     prone: false,
     stanceEyeHeightMeters: STAND_EYE_HEIGHT_M,
+    lastGroundedFeetY: null,
     ...overrides,
   };
 }
@@ -240,6 +241,7 @@ describe('analytic ground clamp on a box-free floor (owner 2026-08-30)', () => {
     grounded: true,
     prone: true,
     stanceEyeHeightMeters: PRONE_EYE_HEIGHT_M,
+    lastGroundedFeetY: null,
   });
 
   it('clamps to the stance ground plane with no collider present at all', () => {
@@ -283,6 +285,7 @@ describe('floor clearance', () => {
     const clearance = viewmodelFloorClearanceFor(input({
       position: { x: 0, y: PRONE_EYE_HEIGHT_M, z: 0 },
       stanceEyeHeightMeters: PRONE_EYE_HEIGHT_M,
+      lastGroundedFeetY: null,
       colliders: [floor],
       grounded: true,
     }));
@@ -335,5 +338,82 @@ describe('source shape: the contact lattice has exactly one home (re-pinned 2026
     // No renderer, no DOM: the point of the extraction is that this is testable.
     expect(MODULE).not.toContain('document.');
     expect(MODULE).not.toContain('WebGPURenderer');
+  });
+});
+
+/**
+ * THE SLOPE DEFECT, pinned as behaviour.
+ *
+ * Owner 2026-08-31, with a screenshot of the weapon buried in sloped grass:
+ * "gun still goes through walls and floor". The floor clamp was gated on
+ * `grounded`, which is the character controller's per-frame contact result,
+ * not "there is a floor beneath me". Walking down any slope reports airborne
+ * on the frames between steps, so the analytic floor vanished on those frames
+ * and the viewmodel dipped through the ground once per step.
+ *
+ * These assert the CLAMP DISTANCE, not that a flag was read. A regression that
+ * reinstates the `grounded` gate fails the first case; one that stops tracking
+ * the standing height fails the second.
+ */
+describe('viewmodel floor clamp across the frames grounded drops out', () => {
+  // PRONE, looking down. This is the stance the original clamp was written for
+  // ("worst while prone looking down - the weapon dismembered into the floor")
+  // and the only one where the floor is inside the 1.65 m probe: standing, the
+  // eye is 1.7 m up, so even straight down the floor is past the lattice and
+  // the weapon genuinely cannot reach it.
+  const PRONE = { stanceEyeHeightMeters: PRONE_EYE_HEIGHT_M, prone: true } as const;
+  const STRAIGHT_DOWN = -1.42;
+
+  it('still clamps against the floor on the airborne frames between steps', () => {
+    const clamped = nearestViewmodelForwardObstructionMeters(input({
+      ...PRONE,
+      pitch: STRAIGHT_DOWN,
+      grounded: false,
+      position: { x: 0, y: PRONE_EYE_HEIGHT_M, z: 0 },
+      lastGroundedFeetY: 0,
+    }));
+    expect(clamped, 'an airborne frame over known ground must still model the floor').not.toBeNull();
+
+    // The same frame with no tracked floor is the OLD behaviour, and it is the
+    // defect: `grounded` false meant no floor at all.
+    const untracked = nearestViewmodelForwardObstructionMeters(input({
+      ...PRONE,
+      pitch: STRAIGHT_DOWN,
+      grounded: false,
+      position: { x: 0, y: PRONE_EYE_HEIGHT_M, z: 0 },
+      lastGroundedFeetY: null,
+    }));
+    expect(untracked, 'without a tracked floor the clamp is absent - this is what shipped').toBeNull();
+  });
+
+  it('measures the eye above the ground it actually stood on, not a stance constant', () => {
+    const onALedge = nearestViewmodelForwardObstructionMeters(input({
+      ...PRONE,
+      pitch: STRAIGHT_DOWN,
+      grounded: true,
+      position: { x: 0, y: 3 + PRONE_EYE_HEIGHT_M, z: 0 },
+      lastGroundedFeetY: 3,
+    }));
+    const onFlatGround = nearestViewmodelForwardObstructionMeters(input({
+      ...PRONE,
+      pitch: STRAIGHT_DOWN,
+      grounded: true,
+      position: { x: 0, y: PRONE_EYE_HEIGHT_M, z: 0 },
+      lastGroundedFeetY: 0,
+    }));
+    // Both lie 0.61 m above their own floor, so both must clamp identically -
+    // the clamp follows the surface, not the absolute world height.
+    expect(onALedge).toBeCloseTo(onFlatGround as number, 6);
+  });
+
+  it('drops a stale floor rather than clamping against one that is now overhead', () => {
+    const belowLastFloor = nearestViewmodelForwardObstructionMeters(input({
+      ...PRONE,
+      pitch: STRAIGHT_DOWN,
+      grounded: false,
+      position: { x: 0, y: 0.2, z: 0 },
+      lastGroundedFeetY: 4,
+    }));
+    expect(belowLastFloor, 'a floor above the eye is stale and must not clamp').toBeNull();
   });
 });

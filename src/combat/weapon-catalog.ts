@@ -267,14 +267,25 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'explosive-crossbow', displayName: 'TAC-15 Explosive Crossbow', slot: 'secondary', family: 'launcher',
-    fireKind: 'projectile', fireMode: 'semi', rpm: 36, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
+    // Owner 2026-08-31: "double fire rate and reload rate somehow". 36 -> 72 rpm
+    // takes the shot interval from 1.67 s to 0.83 s.
+    fireKind: 'projectile', fireMode: 'semi', rpm: 72, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
     damage: { policy: 'standard', base: 45, minimum: 45, falloffStartM: 120, falloffEndM: 121, headMultiplier: 1, limbMultiplier: 1 },
     spread: { hipRadians: 0.028, adsMultiplier: 0.12, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.72, proneMultiplier: 0.58, sustainedPerShot: 0, maximumRadians: 0.028 },
     recoil: { pitchRadians: 0.024, yawRadians: 0.004, recoveryPerSecond: 8, adsMultiplier: 0.72, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.58, deterministicPatternId: 'explosive-crossbow-pattern-v1' },
-    ammo: { magazine: 1, reserve: 8, reloadSeconds: 2.45, emptyReloadSeconds: 2.45, switchSeconds: 0.58 },
+    // Reload rate doubled with the fire rate: 2.45 s -> 1.22 s to rack a bolt.
+    ammo: { magazine: 1, reserve: 8, reloadSeconds: 1.22, emptyReloadSeconds: 1.22, switchSeconds: 0.58 },
     penetration: { calibreLabel: 'explosive bolt', power: 0, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
     effects: { tracerColorHex: 0xff724f, muzzleFlashScale: 0.2, reportGain: 0.5, flashlight: null },
-    optic: { kind: 'standard', magnification: 1.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
+    // THE "NO ZOOM" DEFECT, and it is arithmetic rather than rendering. The
+    // generic iron-sight ADS already takes 20 degrees off the base FOV, which
+    // at the default 82 is 62 degrees - about 1.45x on its own. An authored
+    // 1.5x resolves to 60.2 degrees, so `adsAimingFovDegrees` handed the
+    // crossbow a 1.04x sight picture over its own iron sights: measurably
+    // magnified, perceptually nothing, exactly as the owner reported. 2.5x
+    // resolves to 38.3 degrees - a real 1.73x over iron - which is a mid-range
+    // launcher optic and still well short of the 4x sniper.
+    optic: { kind: 'standard', magnification: 2.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
     policies: { loadout: 'eligible', bot: 'never', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
     modelSetId: 'explosive-crossbow-model-set-v1', presentationId: 'explosive-crossbow-family-view-v1', audioId: 'explosive-crossbow-audio-v1', provenanceId: 'explosive-crossbow-procedural-cc0-v1', evidenceIds: ['r223-explosive-crossbow', 'r232-explosive-crossbow'],
   },
