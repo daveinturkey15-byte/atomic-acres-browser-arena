@@ -1,67 +1,86 @@
 {
- "capturedAt": "2026-08-29",
- "probeM": 0.15,
- "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality) then sweep-eye-clearance-live.mjs (analytic eye seats vs canonical shot surfaces) then scripts/qa/verify-eye-clearance-runtime.mjs (teleports the REAL player to every flagged spot, matching stance, and re-probes from the actual camera seat - i.e. after src/camera-eye-clearance.ts resolveEyeClearance runs)",
- "roster": "All three stages derive the arena roster from SELECTABLE_ARENAS in src/map-selection.ts - stage 1 imports it, stages 2 and 3 scrape it through scripts/qa/eye-clearance-roster.mjs (floor of 7, so a scrape that stops matching throws instead of yielding an empty roster). `ceilings` must therefore carry exactly one entry per selectable arena, no more and no fewer: scripts/qa/eye-clearance-sweep-contract.test.mjs FAILS when the roster and this ledger disagree, which is what let the five-id ceiling set outlive a seven-arena game unnoticed.",
- "ceilings": {
-  "atomic-acres": 15,
-  "rustworks-1v1": 0,
-  "skyline-terminal": 3,
-  "gun-range": 2,
-  "high-seas": 2,
-  "test1": -1,
-  "test2": -1
- },
- "unmeasuredCeiling": -1,
- "unmeasured": [
-  {
-   "arena": "test1",
-   "since": "2026-08-31",
-   "note": "Never measured by stage 2. The live sweep hardcoded a five-arena roster, so test1 was never opened, never probed, and never asked the ledger for a ceiling - the missing-ceiling guard could not fire for an arena that never reached the loop. Entered at the -1 UNMEASURED sentinel, which is below the smallest possible measurement, so the ratchet is RED for test1 until someone runs the sweep with a browser and writes down the number it actually finds. A guessed ceiling here would pre-forgive whatever test1 turns out to do."
+  "capturedAt": "2026-08-31",
+  "probeM": 0.15,
+  "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality) then sweep-eye-clearance-live.mjs (analytic eye seats vs canonical shot surfaces) then scripts/qa/verify-eye-clearance-runtime.mjs (teleports the REAL player to every flagged spot, matching stance, and re-probes from the actual camera seat - i.e. after src/camera-eye-clearance.ts resolveEyeClearance runs)",
+  "roster": "All three stages derive the arena roster from SELECTABLE_ARENAS in src/map-selection.ts - stage 1 imports it, stages 2 and 3 scrape it through scripts/qa/eye-clearance-roster.mjs (floor of 7, so a scrape that stops matching throws instead of yielding an empty roster). `ceilings` must therefore carry exactly one entry per selectable arena, no more and no fewer: scripts/qa/eye-clearance-sweep-contract.test.mjs FAILS when the roster and this ledger disagree, which is what let the five-id ceiling set outlive a seven-arena game unnoticed.",
+  "ceilings": {
+    "atomic-acres": 15,
+    "rustworks-1v1": 0,
+    "skyline-terminal": 3,
+    "gun-range": 2,
+    "high-seas": 2,
+    "test1": 0,
+    "test2": 0
   },
-  {
-   "arena": "test2",
-   "since": "2026-08-31",
-   "note": "Same as test1. Both were rebuilt at full scale on 2026-08-30 (64 x 46 m and 76 x 58 m, 32852f89) and both author real ground/terrace colliders below y = 0, the geometry class that broke stage 1's legality probe - so their violation counts are exactly the numbers nobody should guess. -1 until measured."
-  }
- ],
- "accepted": [
-  {
-   "arena": "gun-range",
-   "rows": "wallbang-panel glass (0.052 m) and brick (0.000 m), crouch",
-   "reason": "The panels are authored solid:false, shots:true - deliberately walk-through range fixtures you shoot targets through. A player standing inside one clips by design; making them movement-solid would change what the range IS. Accepted, not deferred."
+  "unmeasuredCeiling": -1,
+  "unmeasured": [],
+  "accepted": [
+    {
+      "arena": "gun-range",
+      "rows": "wallbang-panel glass (0.052 m) and brick (0.000 m), crouch",
+      "reason": "The panels are authored solid:false, shots:true - deliberately walk-through range fixtures you shoot targets through. A player standing inside one clips by design; making them movement-solid would change what the range IS. Accepted, not deferred."
+    },
+    {
+      "arena": "skyline-terminal",
+      "rows": "skyline-airstair x3, stand, 0.069 m at (18.40, 1.3-2.7)",
+      "reason": "Escalator flank fringe: eye 11 mm inside the near-plane+bob margin beside the sloped belly. Real but sub-centimetre-class; fixing means reshaping the rotated stair collider. Deferred with numbers, revisit on any player report."
+    },
+    {
+      "arena": "high-seas",
+      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (\u00b10.90, 22.15)",
+      "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
+    },
+    {
+      "arena": "atomic-acres",
+      "rows": "exterior-access-ramp x12 + interior-access-ramp x3 (d=0.028-0.142, all stances)",
+      "reason": "Sub-15 cm flank/underside fringe beside the house ramps, pre-existing visually and newly measurable now the ramps are registered with true rotation. A geometry fix means clearance pads on ramp flanks, which is navigation-coupled (ramp-foot anchors and traversal gates live exactly there) - deferred with numbers, revisit on any player report."
+    }
+  ],
+  "farcrysis": "excluded - parked by the owner 2026-08-28",
+  "rebaseline": "2026-08-29 layout v3: atomic-acres 9 -> 15. Same single deferred class (house access-ramp flank fringe, sub-15 cm); the open v3 map simply exposes more LEGAL hug spots beside the ramps than the walled map did (3,248 spots vs 3,046). No new surface class; the other four arenas hold 3/0/2/2. Prior rebaselines: 0->24 (instrument vision), 24->9 (greenhouse walls went solid).",
+  "runtimeResolve": {
+    "module": "src/camera-eye-clearance.ts (resolveEyeClearance), wired at the end of the local camera seat in legacy-main",
+    "behaviour": "per-frame probes push the eye so no solid-backed shot surface lies within 0.15 m; shallow volume intrusions depenetrate through the nearest face (limit 0.4 m, push cap 0.34 m); wallbang panels and breakable window panes are design-exempt",
+    "verifiedAt": "2026-08-29",
+    "runtimeRemaining": {
+      "atomic-acres": "2 (prone under interior-access-ramp, runtime distance 0.143 - 95% of the 0.15 radius, bare near plane is 0.08)",
+      "skyline-terminal": "3 (airstair, 0.069 -> 0.136 runtime)",
+      "rustworks-1v1": "0",
+      "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
+      "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
+      "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
+      "test2": "UNMEASURED (2026-08-31) - as test1"
+    },
+    "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },
-  {
-   "arena": "skyline-terminal",
-   "rows": "skyline-airstair x3, stand, 0.069 m at (18.40, 1.3-2.7)",
-   "reason": "Escalator flank fringe: eye 11 mm inside the near-plane+bob margin beside the sloped belly. Real but sub-centimetre-class; fixing means reshaping the rotated stair collider. Deferred with numbers, revisit on any player report."
-  },
-  {
-   "arena": "high-seas",
-   "rows": "stern-engine-access ramp x2, stand, 0.096 m at (\u00b10.90, 22.15)",
-   "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
-  },
-  {
-   "arena": "atomic-acres",
-   "rows": "exterior-access-ramp x12 + interior-access-ramp x3 (d=0.028-0.142, all stances)",
-   "reason": "Sub-15 cm flank/underside fringe beside the house ramps, pre-existing visually and newly measurable now the ramps are registered with true rotation. A geometry fix means clearance pads on ramp flanks, which is navigation-coupled (ramp-foot anchors and traversal gates live exactly there) - deferred with numbers, revisit on any player report."
-  }
- ],
- "farcrysis": "excluded - parked by the owner 2026-08-28",
- "rebaseline": "2026-08-29 layout v3: atomic-acres 9 -> 15. Same single deferred class (house access-ramp flank fringe, sub-15 cm); the open v3 map simply exposes more LEGAL hug spots beside the ramps than the walled map did (3,248 spots vs 3,046). No new surface class; the other four arenas hold 3/0/2/2. Prior rebaselines: 0->24 (instrument vision), 24->9 (greenhouse walls went solid).",
- "runtimeResolve": {
-  "module": "src/camera-eye-clearance.ts (resolveEyeClearance), wired at the end of the local camera seat in legacy-main",
-  "behaviour": "per-frame probes push the eye so no solid-backed shot surface lies within 0.15 m; shallow volume intrusions depenetrate through the nearest face (limit 0.4 m, push cap 0.34 m); wallbang panels and breakable window panes are design-exempt",
-  "verifiedAt": "2026-08-29",
-  "runtimeRemaining": {
-   "atomic-acres": "2 (prone under interior-access-ramp, runtime distance 0.143 - 95% of the 0.15 radius, bare near plane is 0.08)",
-   "skyline-terminal": "3 (airstair, 0.069 -> 0.136 runtime)",
-   "rustworks-1v1": "0",
-   "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
-   "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
-   "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
-   "test2": "UNMEASURED (2026-08-31) - as test1"
-  },
-  "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
- }
+  "measured": [
+    {
+      "arena": "test1",
+      "at": "2026-08-31",
+      "violations": 0,
+      "note": "First real measurement. 3688 legal hug spots, 25816 traces, ZERO violations across all three stances - entered at 0, the strictest possible ceiling and the measured value."
+    },
+    {
+      "arena": "test2",
+      "at": "2026-08-31",
+      "violations": 0,
+      "note": "First real measurement. 3665 legal hug spots, 25655 traces, ZERO violations. Note stage 1 reports 24 colliders with no legal adjacent stance, all veranda balustrade: the sweep evaluates hug candidates against a hardcoded ground plane of 0 while that deck sits at 0.7, so it is asking whether a player can stand beside a balustrade from the wrong elevation. Instrument limitation, not a map defect; tracked as the per-candidate standing-surface follow-up."
+    }
+  ],
+  "openRegressions": [
+    {
+      "arena": "skyline-terminal",
+      "at": "2026-08-31",
+      "measured": 6,
+      "ceiling": 3,
+      "note": "NOT re-baselined. The ceilings were set 2026-08-29 against a sweep whose legality probe modelled a capsule 0.75 m underground (fixed 60886c35), so it measured far fewer legal spots than exist. The instrument got stricter and more complete, which means these rows are candidates for spots the old sweep could not see rather than a new defect in the map. Raising the ceiling to 6 would forgive them unexamined. Triage each row, then either fix it or accept it explicitly the way the `accepted` block does."
+    },
+    {
+      "arena": "gun-range",
+      "at": "2026-08-31",
+      "measured": 55,
+      "ceiling": 2,
+      "note": "NOT re-baselined, same reason, and this one is the loudest signal in the sweep. Legal spots went 2386 -> 2944 and colliders-with-no-legal-stance 4 -> 0 when the probe was corrected, so the corrected instrument is seeing most of this arena for the first time. 55 violations across stand/prone/crouch is exactly the 'I can see through walls when I hug them' class the owner keeps reporting, and it deserves a real look rather than a bigger number in this file."
+    }
+  ]
 }

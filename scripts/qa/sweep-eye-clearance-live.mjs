@@ -18,7 +18,12 @@ import { readLedger, resolveArenaRoster, UNMEASURED_CEILING } from './eye-cleara
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
-const BASE = arg('--url', 'http://127.0.0.1:41975');
+// Owner 2026-08-31: follow the server the runner actually started. This
+// defaulted to a fixed 41975 while run-with-preview-server.mjs defaults to
+// 4180 and exports QA_BASE_URL to its child, so `npm run qa:eye-clearance`
+// died with ERR_CONNECTION_REFUSED before measuring anything - a gate that
+// could not be run by the command that names it, whatever its roster said.
+const BASE = arg('--url', process.env.QA_BASE_URL ?? 'http://127.0.0.1:41975');
 // Owner 2026-08-31: this used to be a hand-written five-id default while stage 1
 // already generated spots for all seven selectable arenas, so the pipeline
 // measured five and printed a green ratchet over a roster it had not covered.
