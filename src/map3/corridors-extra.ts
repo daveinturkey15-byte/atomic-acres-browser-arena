@@ -12,13 +12,14 @@
  * and nothing reaching outside it.
  */
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial, PointsNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 
 /** One cast boundary; see the note in foliage-material.ts. */
 const {
-  Fn, Loop, abs, attribute, cameraPosition, clamp, cos, exp, float, mix,
-  normalize, positionLocal, positionWorld, sin, smoothstep, uniform, vec3, vec4,
+  Fn, Loop, abs, attribute, cameraPosition, clamp, cos, cross, exp, float, mix,
+  normalize, positionLocal, positionWorld, sin, smoothstep, uniform, uv, vec2,
+  vec3, vec4,
 } = TSL as unknown as Record<string, any>;
 
 import type { Corridor } from './corridors';
@@ -303,52 +304,78 @@ export function createWeatherCorridor(seed = 21): Corridor {
   disposables.push(woodMerged);
 
   /* --- precipitation ---------------------------------------------------
-   * One points cloud spanning the corridor. Each particle knows which bay it
-   * is in from its own X/Z, so rain falls in bay 2, storm-rain in bay 3 and
-   * snow in bay 4 from a SINGLE draw call and a single buffer. Falling speed,
-   * size and drift are all derived from that same bay index — which is the
-   * pattern the real system wants: weather is a field over the world, not a
-   * separate emitter per condition.
+   *
+   * Instanced BILLBOARD QUADS, not THREE.Points.
+   *
+   * This was Points + PointsNodeMaterial.sizeNode originally, which is the
+   * obvious way to do precipitation and is silently broken on the real target.
+   * three's own PointsNodeMaterial doc says it outright: WebGPU supports point
+   * primitives only "with a pixel size of 1, it's not possible to define a
+   * size", and the size branch in setupVertex is skipped for an isPoints
+   * object. On the WebGL2 fallback gl_PointSize honours it and the rain looks
+   * right; on WebGPU every drop collapses to a single pixel and the snow's
+   * 6.5 px size is simply dead. Correct on the fallback, wrong on the
+   * hardware - the exact failure mode this map has already been bitten by
+   * twice, so it is written down rather than just fixed.
+   *
+   * A quad billboarded in the vertex graph costs the same one draw call, and
+   * its size is in METRES, so attenuation is just the perspective divide.
+   *
+   * All four weather states still come out of this single buffer: each
+   * particle reads its own bay index off its Z and derives fall speed, drift,
+   * slant, size and colour from it. Weather is a field over the world, not an
+   * emitter per condition - which is the property the cross-arena system wants.
    */
   const COUNT = 4200;
-  const pos = new Float32Array(COUNT * 3);
   const seedAttr = new Float32Array(COUNT);
+  const originAttr = new Float32Array(COUNT * 3);
   for (let i = 0; i < COUNT; i++) {
     const h0 = hash11(i * 1.37);
     const h1 = hash11(i * 3.71 + 11);
     const h2 = hash11(i * 7.13 + 29);
-    pos[i * 3] = (h0 - 0.5) * (W + 8);
-    pos[i * 3 + 1] = h1 * 12;
-    // Bias particles into the wet bays: none in spring, all three others busy.
-    pos[i * 3 + 2] = -(BAY + h2 * BAY * 3);
+    originAttr[i * 3] = (h0 - 0.5) * (W + 8);
+    originAttr[i * 3 + 1] = h1 * 12;
+    // Biased into the wet bays: spring stays clear, the other three are busy.
+    originAttr[i * 3 + 2] = -(BAY + h2 * BAY * 3);
     seedAttr[i] = h0 * 97 + h1 * 31;
   }
-  const rainGeo = new THREE.BufferGeometry();
-  rainGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  rainGeo.setAttribute('aSeed', new THREE.BufferAttribute(seedAttr, 1));
 
-  const rainMat = new PointsNodeMaterial();
+  // One unit quad, instanced COUNT times.
+  const rainGeo = new THREE.InstancedBufferGeometry();
+  const quad = new Float32Array([
+    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0,
+    -0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
+  ]);
+  const quadUv = new Float32Array([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1]);
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(quad, 3));
+  rainGeo.setAttribute('uv', new THREE.BufferAttribute(quadUv, 2));
+  rainGeo.setAttribute('aOrigin', new THREE.InstancedBufferAttribute(originAttr, 3));
+  rainGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seedAttr, 1));
+  rainGeo.instanceCount = COUNT;
+  // Spread instances are far wider than the source quad, so without this the
+  // whole batch frustum-culls as a unit against a 1 m sphere and blinks out.
+  rainGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 6, -LEN / 2), LEN);
+
+  const rainMat = new MeshBasicNodeMaterial();
   rainMat.transparent = true;
   rainMat.depthWrite = false;
-  rainMat.sizeAttenuation = true;
+  rainMat.side = THREE.DoubleSide;
+  rainMat.fog = false;
 
-  // Fall, drift and respawn entirely in the vertex graph — no CPU per-particle
-  // work, one draw call for all four weather states.
   {
-    const p = positionLocal;
+    const o = attribute('aOrigin', 'vec3');
     const s = attribute('aSeed', 'float');
     const t = time;
 
     // Which bay is this particle in? 1 = rain, 2 = storm, 3 = snow.
-    const bay = clamp(p.z.negate().div(float(BAY)).floor(), float(0), float(3));
-    const isSnow = smoothstep(float(2.5), float(2.9), bay);      // bay 3
-    const isStorm = smoothstep(float(1.5), float(1.9), bay);     // bay 2+
+    const bay = clamp(o.z.negate().div(float(BAY)).floor(), float(0), float(3));
+    const isSnow = smoothstep(float(2.5), float(2.9), bay);
+    const isStorm = smoothstep(float(1.5), float(1.9), bay);
 
     // Snow falls slowly and wanders; rain falls fast and straight; storm rain
     // falls faster still and slants.
     const speed = mix(mix(float(9.5), float(15.0), isStorm), float(1.5), isSnow);
-    // Wrap without a chained .mod(): x - floor(x/13)*13 is the floored form,
-    // which is what we want and is expressible with operators that exist.
+    // Wrap without a chained .mod(): x - floor(x/13)*13 is the floored form.
     const raw = t.mul(speed).add(s);
     const fall = raw.sub(raw.div(float(13.0)).floor().mul(float(13.0)));
     const y = float(13.0).sub(fall);
@@ -357,17 +384,38 @@ export function createWeatherCorridor(seed = 21): Corridor {
       .add(sin(t.mul(2.3).add(s.mul(1.7))).mul(isSnow.mul(0.3)));
     const slant = isStorm.mul(float(2.2)).mul(float(1).sub(y.div(13.0)));
 
-    rainMat.positionNode = vec3(p.x.add(wander).add(slant), y, p.z.add(wander.mul(0.6)));
+    const centre = vec3(o.x.add(wander).add(slant), y, o.z.add(wander.mul(0.6)));
 
-    // Colour, opacity and size all key off the SAME bay index, so one buffer
-    // and one draw call carry rain, storm rain and snow.
+    // Billboard the quad toward the camera. Rain is stretched along its fall
+    // direction because a falling drop is a streak, not a dot; snow stays
+    // round. Size is in METRES, which is what makes this correct on WebGPU.
+    const toCam = normalize(cameraPosition.sub(centre));
+    const right = normalize(cross(vec3(0, 1, 0), toCam));
+    const up = cross(toCam, right);
+
+    const wide = mix(float(0.012), float(0.055), isSnow);
+    const tall = mix(float(0.34), float(0.055), isSnow);
+
+    rainMat.positionNode = centre
+      .add(right.mul(positionLocal.x.mul(wide)))
+      .add(up.mul(positionLocal.y.mul(tall)));
+
+    // Round off the snow, keep the rain a soft streak.
+    const d = uv().sub(vec2(0.5, 0.5)).length().mul(2);
+    const round = float(1).sub(smoothstep(float(0.35), float(1.0), d));
+    const streak = float(1).sub(smoothstep(float(0.2), float(1.0), abs(uv().x.sub(0.5)).mul(2)));
+    const shape = mix(streak, round, isSnow);
+
     const inWeather = smoothstep(float(0.5), float(0.9), bay);
-    rainMat.colorNode = vec4(mix(rgb(0x9fc4d8), rgb(0xf4f8fb), isSnow), inWeather);
-    rainMat.sizeNode = mix(float(2.4), float(6.5), isSnow);
+    rainMat.colorNode = vec4(
+      mix(rgb(0x9fc4d8), rgb(0xf4f8fb), isSnow),
+      shape.mul(inWeather).mul(mix(float(0.5), float(0.9), isSnow)),
+    );
   }
 
-  const rain = new THREE.Points(rainGeo, rainMat);
+  const rain = new THREE.Mesh(rainGeo, rainMat);
   rain.frustumCulled = false;
+  rain.renderOrder = 6;
   group.add(rain);
   disposables.push(rainGeo, rainMat);
 

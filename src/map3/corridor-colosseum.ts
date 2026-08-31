@@ -23,19 +23,18 @@
  *    METRES in front of the player, so the entire excavation hides behind flat
  *    ground. A hole cannot be cut in a plane this module is not allowed to edit.
  *
- * The resolution is one object — `cavityEraser` below. It is the closed shell
- * of the excavation, drawn with `colorWrite:false, depthTest:false` at
- * renderOrder 1: it paints nothing and writes the FAR depth of the hole over
- * whatever the shared ground left in the depth buffer. Everything after it,
- * including this corridor's own near ruins, depth-tests normally and sorts
- * correctly. One weird object, and the other forty are ordinary.
+ * The resolution is ONE object: the cavity eraser, step 1 of the assembly. It
+ * is the closed shell of the excavation, drawn with `colorWrite:false,
+ * depthTest:false` at renderOrder 1 — it paints nothing and writes the FAR
+ * depth of the hole over whatever the shared ground left in the depth buffer.
+ * Everything after it, including this corridor's own near ruins, depth-tests
+ * normally and sorts correctly. One weird object; the other nine are ordinary.
  *
- * The desert apron then repairs the daylight side of the same problem: it is a
- * single ShapeGeometry with an elliptical HOLE at the bowl mouth, laid 38 cm
- * above the shared ground so the excavation has a lip to sit in and the
- * pyramids have a floor to stand on. It is a keyhole, not a disc, and its
- * half-width is tabulated so it never reaches the neighbouring corridors —
- * see APRON_PROFILE.
+ * The desert apron then repairs the daylight side of the same problem: a single
+ * ShapeGeometry with an elliptical HOLE at the bowl mouth, laid 41 cm above the
+ * shared ground so the excavation has a lip to sit in and the pyramids have a
+ * floor to stand on. It is a keyhole, not a disc, and its half-width is
+ * tabulated so it never reaches the neighbouring corridors — see APRON_PROFILE.
  * ---------------------------------------------------------------------------
  *
  * Repo contract: no ShaderMaterial, no RawShaderMaterial, no onBeforeCompile.
@@ -107,11 +106,47 @@ const STOREYS: Array<{ base: number; height: number; inset: number }> = [
   { base: 18.6, height: 2.9, inset: 3.1 },
 ];
 
-/** Height the light shafts are gated at: the middle of the storey-1 openings. */
-const ARCH_Y = 6.2;
+/**
+ * The arcade module, and the ONE place its dimensions live.
+ *
+ * buildFacade places its piers and voussoirs from these, and the light-shaft
+ * gate in createShaftMaterial reconstructs the openings from the same five
+ * numbers. That is the point: a beam pattern hand-tuned to "look about right"
+ * against an arcade drifts the moment either is retuned, and the failure is
+ * silent — the shafts simply stop landing in the holes.
+ */
+const BAY_ARC = (Math.PI * (FAC_A + FAC_B)) / BAYS;    // ~8.38 m
+const PIER_W = 3.2;
+const OPEN_W = BAY_ARC - PIER_W;                       // ~5.18 m
+/** Extrados radius of the voussoir ring. */
+const ARCH_R = OPEN_W / 2 + 0.45;
+const FAC_DEPTH = 3.4;
+const VOUSSOIRS = 9;
+/** Springing height of each arcaded storey. The attic has no arch. */
+const SPRING = [
+  STOREYS[0].base + STOREYS[0].height * 0.46,          // 4.60
+  STOREYS[1].base + STOREYS[1].height * 0.44,          // 13.78
+];
+/** Floor of each arcaded storey — below this the opening is walled. */
+const STOREY_FLOOR = [0.35, STOREYS[1].base + 0.2];
+/** Top of the whole facade; above it a ray met nothing at all. */
+const FAC_TOP = STOREYS[2].base + STOREYS[2].height;   // 21.5
 
-/** Terrace lip. Two metres short of the rim kerb, so the drop reads as a drop. */
-const TERRACE_Z = -60.0;
+/**
+ * Terrace lip — and why it is AT the rim with nothing standing on it.
+ *
+ * Work the sight lines from a 1.7 m eye and the answer is forced. An occluder
+ * of height k at distance d hides every depression angle steeper than
+ * (1.7 - k) / d. A 1.05 m parapet four metres back hides everything below 7.6
+ * degrees; the arena floor sits between 12 and 36 degrees down. Even a 35 cm
+ * kerb at that distance hides more than half the bowl, and a waist-high rail
+ * lays a five-degree bar straight across it.
+ *
+ * So the deck runs to the excavation, there is no kerb on the rim, and the
+ * balustrade is on the SIDES only, where it is at 80 degrees of azimuth and out
+ * of frame. The lip is unguarded — which is what the edge of a ruin is.
+ */
+const TERRACE_Z = -67.5;
 
 /**
  * The shot.
@@ -123,7 +158,7 @@ const TERRACE_Z = -60.0;
  * `__MAP3.setPose` to the world transform of this point with yaw = the pivot
  * angle + pi; the eye height is not negotiable, main.ts pins it to 1.7.
  */
-export const COLOSSEUM_VIEWPOINT = Object.freeze({ x: 0, y: 1.7, z: -55.5 });
+export const COLOSSEUM_VIEWPOINT = Object.freeze({ x: 0, y: 1.7, z: -66.5 });
 
 /** Corridor walk length; the hub uses it only to place the far sign. */
 const LEN = 44;
@@ -139,7 +174,7 @@ const LEN = 44;
  */
 const APRON_PROFILE: Array<[number, number]> = [
   [-18, 14], [-30, 20], [-44, 30], [-60, 50], [-80, 84],
-  [-105, 120], [-140, 158], [-180, 192], [-230, 214], [-284, 222],
+  [-105, 120], [-140, 158], [-180, 192], [-235, 218], [-302, 226],
 ];
 
 /* ================================================================== */
@@ -397,11 +432,10 @@ function createPyramidMaterial(height: number): MeshStandardNodeMaterial {
  * is spent where it reads instead, on the rim and the facade.
  */
 function buildCavea(strip: Strip, seg = 96): void {
-  // Kerb: a low lip at the very rim, so the step where the apron meets the
-  // excavation is a moulding rather than a seam.
-  strip.ring(seg, RIM_A + 1.2, RIM_B + 1.2, 0.55, RIM_A + 1.2, RIM_B + 1.2, 0);
-  strip.ring(seg, RIM_A + 1.2, RIM_B + 1.2, 0.55, RIM_A, RIM_B, 0.55);
-
+  // NO KERB. See the note on TERRACE_Z: a 55 cm ring at the rim, seen from six
+  // metres back at eye height 1.7, hides every depression angle past 10 degrees
+  // — which is the whole bowl. The apron laps 50 cm over the top tread instead,
+  // 6 cm clear of it, and that is the entire transition.
   for (let i = 0; i < TIERS; i++) {
     const aOut = RIM_A - i * TIER_RUN;
     const bOut = RIM_B - i * TIER_RUN;
@@ -477,11 +511,9 @@ function buildHypogeum(seed: number): THREE.BufferGeometry[] {
  */
 function buildFacade(seed: number): THREE.BufferGeometry[] {
   const blocks: THREE.BufferGeometry[] = [];
-  const bayArc = (Math.PI * (FAC_A + FAC_B)) / BAYS;   // ~8.4 m
-  const PIER_W = 3.2;
-  const OW = bayArc - PIER_W;
-  const DEPTH = 3.4;
-  const VOUSSOIRS = 9;
+  const bayArc = BAY_ARC;
+  const OW = OPEN_W;
+  const DEPTH = FAC_DEPTH;
 
   for (let i = 0; i < BAYS; i++) {
     const tPier = (i / BAYS) * Math.PI * 2;
@@ -548,8 +580,8 @@ function buildFacade(seed: number): THREE.BufferGeometry[] {
       const ayaw = ellipseYaw(a, b, tArch);
       const tanX = Math.cos(ayaw);
       const tanZ = -Math.sin(ayaw);
-      const Rm = OW / 2 + 0.45;
-      const spring = st.base + st.height * (k === 0 ? 0.46 : 0.44);
+      const Rm = ARCH_R;
+      const spring = SPRING[k];
       const chord = 2 * Rm * Math.sin(Math.PI / (2 * VOUSSOIRS)) * 1.12;
 
       for (let v = 0; v < VOUSSOIRS; v++) {
@@ -628,14 +660,14 @@ function buildRimAndStairs(seed: number): THREE.BufferGeometry[] {
 
 /** The processional way and the terrace, as one tapered ribbon of quads. */
 const DECK_PROFILE: Array<[number, number]> = [
-  [2, 7.0], [-14, 7.4], [-30, 8.4], [-44, 10.4], [-53, 14.0], [TERRACE_Z, 15.4],
+  [2, 7.0], [-16, 7.4], [-32, 8.6], [-48, 11.4], [-58, 14.6], [TERRACE_Z, 15.8],
 ];
 
 function buildTerraceDeck(strip: Strip): void {
   for (let i = 0; i < DECK_PROFILE.length - 1; i++) {
     const [z0, w0] = DECK_PROFILE[i];
     const [z1, w1] = DECK_PROFILE[i + 1];
-    strip.quad([-w0, 0.10, z0], [-w1, 0.10, z1], [w1, 0.10, z1], [w0, 0.10, z0]);
+    strip.quad([-w0, 0.13, z0], [-w1, 0.13, z1], [w1, 0.13, z1], [w0, 0.13, z0]);
   }
 }
 
@@ -672,14 +704,16 @@ function buildApproach(seed: number): THREE.BufferGeometry[] {
     }
   }
 
-  // Parapet across the lip, with returns down both sides of the terrace.
-  parts.push(box(31.0, 1.05, 0.75, 0, 0.63, TERRACE_Z + 0.4));
+  // Balustrade down the SIDES of the terrace only — at 80 degrees of azimuth
+  // from the standing point, so it frames without occluding. Nothing crosses
+  // the lip.
   for (const side of [-1, 1]) {
-    parts.push(box(0.75, 1.05, 9.0, side * 15.1, 0.63, TERRACE_Z + 4.9));
-    // Marker: plinth and obelisk. Known human scale at the rim's distance.
-    parts.push(box(2.2, 1.1, 2.2, side * 13.2, 0.65, TERRACE_Z + 2.6));
-    const ob = new THREE.ConeGeometry(1.05, 6.2, 4, 1, false);
-    ob.translate(side * 13.2, 1.2 + 3.1, TERRACE_Z + 2.6);
+    parts.push(box(0.8, 1.05, 13.0, side * 15.4, 0.66, TERRACE_Z + 7.2));
+    // Marker: plinth and obelisk. Something of known human size at the rim's
+    // own distance, which is what lets the eye scale the 17 m drop beyond it.
+    parts.push(box(2.4, 1.2, 2.4, side * 12.4, 0.72, TERRACE_Z + 2.4));
+    const ob = new THREE.ConeGeometry(1.1, 6.6, 4, 1, false);
+    ob.translate(side * 12.4, 1.32 + 3.3, TERRACE_Z + 2.4);
     parts.push(ob);
   }
   return parts;
@@ -743,24 +777,63 @@ function createShaftMaterial(
       const ez = p.z.sub(float(CZ)).div(float(RIM_B * 1.06));
       const e = sqrt(ex.mul(ex).add(ez.mul(ez)));
       const inBowl = float(1).sub(smoothstep(float(0.80), float(1.03), e));
-      const dens = exp(p.y.sub(float(ARENA_Y)).mul(-0.085)).mul(inBowl).mul(0.062);
+      // 0.030 per metre, not the volume corridor's 0.09. Its rays cross about
+      // 20 m of medium; these cross a hundred, and at 0.09 the integral hits
+      // the clamp before a ray has left the bowl — every beam the same flat
+      // white, which is a wash by another route. shaftStrength is the knob.
+      const dens = exp(p.y.sub(float(ARENA_Y)).mul(-0.085)).mul(inBowl).mul(0.030);
 
-      // --- the gate: back-project to the arcade band --------------------
-      const back = float(ARCH_Y).sub(p.y).div(max(S.y, float(0.14)));
-      const q = p.add(S.mul(back));
-      const qx = q.x.div(float(FAC_A));
-      const qz = q.z.sub(float(CZ)).div(float(FAC_B));
-      const eq = sqrt(qx.mul(qx).add(qz.mul(qz)));
+      // --- the gate: where does the ray back to the sun leave the ring? --
+      //
+      // Not a fixed sampling height. The first version projected back to the
+      // middle of the storey-1 openings and asked whether the result was
+      // inside the ring, and at the sky's real sun elevation (16-55 deg) the
+      // answer was "inside" for every sample in the bowl — the ray actually
+      // leaves through storey TWO. That gate reported open sky everywhere and
+      // produced exactly the flat wash this corridor exists to beat.
+      //
+      // So solve it properly: intersect the backward ray with the facade's
+      // elliptical cylinder. It is one quadratic, the exit root is unique
+      // because the sample is inside the ring, and it gives both the angle
+      // (which bay) and the height (which storey, and how far up the arch).
+      const ox = p.x.div(float(FAC_A));
+      const oz = p.z.sub(float(CZ)).div(float(FAC_B));
+      const dx = S.x.div(float(FAC_A));
+      const dz = S.z.div(float(FAC_B));
+      const qa = max(dx.mul(dx).add(dz.mul(dz)), float(1e-7));
+      const qb = ox.mul(dx).add(oz.mul(dz)).mul(2);
+      const qc = ox.mul(ox).add(oz.mul(oz)).sub(1);
+      const disc = sqrt(max(qb.mul(qb).sub(qa.mul(qc).mul(4)), float(0)));
+      const hit = disc.sub(qb).div(qa.mul(2));
 
-      const overTop = float(1).sub(smoothstep(float(0.70), float(0.90), eq));
-      const onRing = smoothstep(float(0.86), float(0.97), eq)
-        .mul(float(1).sub(smoothstep(float(1.03), float(1.20), eq)));
-      // atan(y, x) is atan2; on the unit-normalised ellipse it returns the
-      // parametric angle the facade's bays were placed with.
-      const bay = atan(qz, qx).mul(float(BAYS / (Math.PI * 2)));
-      const d = abs(fract(bay).sub(float(0.5)));
-      const slot = smoothstep(float(0.30), float(0.13), d);
-      const gate = clamp(overTop.add(onRing.mul(slot)), float(0), float(1));
+      const wx = ox.add(dx.mul(hit));
+      const wz = oz.add(dz.mul(hit));
+      const yh = p.y.add(S.y.mul(hit));
+
+      // Which bay. atan(y, x) is atan2, and on the unit-normalised ellipse it
+      // returns the very parametric angle buildFacade placed its piers at, so
+      // an integer bay index IS a pier and a half-integer IS an opening.
+      const d = abs(fract(atan(wz, wx).mul(float(BAYS / (Math.PI * 2)))).sub(float(0.5)));
+
+      // Which storey, and the clear half-width of the opening at that height:
+      // full below the springing, then the arch closing it down to nothing at
+      // the crown. This is what gives a beam its ROUNDED top instead of a
+      // rectangular one, and it comes out of ARCH_R for free.
+      const upper = smoothstep(float(STOREYS[1].base - 1.0), float(STOREYS[1].base + 1.0), yh);
+      const spring = mix(float(SPRING[0]), float(SPRING[1]), upper);
+      const sill = mix(float(STOREY_FLOOR[0]), float(STOREY_FLOOR[1]), upper);
+      const dyp = max(yh.sub(spring), float(0));
+      const halfW = min(
+        float(OPEN_W / 2),
+        sqrt(max(float(ARCH_R * ARCH_R).sub(dyp.mul(dyp)), float(0))),
+      );
+      const hw = max(halfW.div(float(BAY_ARC)), float(0.006));
+      const slot = float(1).sub(smoothstep(hw.mul(0.55), hw.mul(1.02), d));
+
+      const above = smoothstep(sill.sub(float(0.4)), sill.add(float(0.4)), yh);
+      const overTop = smoothstep(float(FAC_TOP - 0.7), float(FAC_TOP + 0.9), yh);
+      const through = above.mul(slot).mul(float(1).sub(overTop));
+      const gate = clamp(overTop.add(through), float(0), float(1));
 
       // --- axial falloff -------------------------------------------------
       const w = p.sub(vec3(0, ARENA_Y, CZ));
@@ -777,7 +850,7 @@ function createShaftMaterial(
       t.addAssign(stepLen);
     });
 
-    return tint.mul(clamp(acc.mul(strength), float(0), float(1.7)));
+    return tint.mul(clamp(acc.mul(strength), float(0), float(1.2)));
   })();
 
   return mat;
@@ -855,8 +928,12 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
   {
     const s = new Strip();
     const floorY = ARENA_Y - 2.5;
-    s.ring(96, RIM_A + 1.2, RIM_B + 1.2, 0.10, RIM_A + 1.2, RIM_B + 1.2, floorY);
-    s.cap(96, RIM_A + 1.2, RIM_B + 1.2, floorY);
+    // A metre wider than the apron's hole and starting 10 cm BELOW the apron,
+    // so it is coplanar with nothing. Coplanar with the kerb it would stamp an
+    // equal depth there and the equality would fail the Less test, taking a
+    // band out of the near rim.
+    s.ring(96, RIM_A + 1.9, RIM_B + 1.9, -0.10, RIM_A + 1.9, RIM_B + 1.9, floorY);
+    s.cap(96, RIM_A + 1.9, RIM_B + 1.9, floorY);
     const eraserMat = new MeshBasicNodeMaterial();
     eraserMat.colorWrite = false;
     eraserMat.depthTest = false;
@@ -884,7 +961,8 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     const DB = ARENA_B * 0.62;
     const DZ = CZ - 10.5;
     s.cap(64, DA, DB, DECK_Y, DZ);
-    s.ring(64, DA, DB, DECK_Y, DA, DB, DECK_Y - 0.55, DZ);
+    // Low ring first so the broken edge of the deck faces OUT, at the player.
+    s.ring(64, DA, DB, DECK_Y - 0.55, DA, DB, DECK_Y, DZ);
     add(s.build(), sandMat, 2, false, true);
   }
   {
@@ -907,12 +985,16 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
       pts.push(new THREE.Vector2(-APRON_PROFILE[i][1], -APRON_PROFILE[i][0]));
     }
     shape.setFromPoints(pts);
+    // The hole is 50 cm INSIDE the rim, so the apron laps over the cavea's top
+    // tread rather than butting it. Butted, the two edges are coincident in
+    // plan and 6 cm apart in height, which is a hairline you can see the void
+    // through from a shallow angle.
     const hole = new THREE.Path();
-    hole.absellipse(0, -CZ, RIM_A + 1.2, RIM_B + 1.2, 0, Math.PI * 2, true);
+    hole.absellipse(0, -CZ, RIM_A - 0.5, RIM_B - 0.5, 0, Math.PI * 2, true);
     shape.holes.push(hole);
     const geo = new THREE.ShapeGeometry(shape, 80);
     geo.rotateX(-Math.PI / 2);
-    geo.translate(0, 0.03, 0);
+    geo.translate(0, 0.06, 0);
     add(geo, apronMat, 3, false, true);
   }
 
@@ -976,11 +1058,14 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
       const body = core.mul(core);
       hazeMat.colorNode = mix(rgb(0xff9a45), rgb(0xfff0cc), body.mul(body))
         .mul(body)
-        .mul(hazeGlow);
+        .mul(hazeGlow)
+        .mul(0.6);
     }
     disposables.push(hazeMat);
+    // 263 m from the world origin: inside sky.ts's 265 m dome, and well inside
+    // main.ts's 400 m far plane even from the far end of another corridor.
     const geo = new THREE.PlaneGeometry(430, 210);
-    geo.translate(0, 56, -256);
+    geo.translate(0, 52, -240);
     const mesh = add(geo, hazeMat, -700, false, false);
     mesh.frustumCulled = false;
   }
@@ -1062,8 +1147,13 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
       const azi = Math.hypot(_sunL.x, _sunL.z) || 1e-3;
       const align = Math.max(0, -_sunL.z / azi);
       const low = 1 - Math.min(1, _sunL.y / 0.85);
+      // Strongest with a LOW sun behind the arcade, which is the only geometry
+      // that makes shafts at all. At 55 degrees every back-projected ray leaves
+      // the ring above the facade, the gate opens everywhere and the medium
+      // would be a flat wash — so it drops to a faint haze instead, which is
+      // both physically right and the failure this corridor exists to avoid.
       (shaftStrength as unknown as { value: number }).value =
-        0.45 + 1.15 * align * align * (0.45 + 0.55 * low);
+        0.26 + 1.35 * align * align * Math.pow(low, 0.7);
       (hazeGlow as unknown as { value: number }).value = 0.22 + 0.78 * align * align;
 
       // Park the key light on the sun's own ray, 260 m out, aimed at the arena.

@@ -187,6 +187,32 @@ now matches that. But the repo *does* ship `Fn(() => ...)()` at
 `raytraced-light-node.ts:342`, so `Fn` is not inherently broken. Reserve it for
 where `Loop()` needs statement scope. Recorded so you don't re-investigate it.
 
+### 8. `THREE.Points` size does nothing on WebGPU
+
+`PointsNodeMaterial.sizeNode` and `sizeAttenuation` are **inert on the WebGPU
+backend**. three's own doc for the class says it: WebGPU supports point
+primitives only *"with a pixel size of 1, it's not possible to define a size"*,
+and `setupVertex` skips the size branch for an `isPoints` object. On the WebGL2
+fallback `gl_PointSize` honours it and everything looks right; on WebGPU every
+particle collapses to a single pixel.
+
+Correct on the fallback, wrong on the hardware — the same shape as Gotchas 1
+and 6. The precipitation in `corridors-extra.ts` had exactly this and is now
+**instanced billboard quads**: same single draw call, size in metres, so
+attenuation is the perspective divide. `sky.ts` clouds use the same approach
+for the same reason. Do not reach for `THREE.Points` here.
+
+Related: TSL's `pointUV` exists but its `generate()` emits `gl_PointCoord` and
+its doc says WebGL-only — it produces invalid WGSL. Use a real `uv` attribute.
+
+### 9. The agent browser console accumulates across page loads
+
+`read_console_messages` returns history from previous navigations, so a fixed
+error keeps reappearing and looks live. The **on-screen error panel** only ever
+contains errors from the current load — trust that, or check the served module
+directly with `fetch('/src/...')`. This nearly caused a second round of chasing
+an already-fixed bug.
+
 ---
 
 ## 5. Codebase rules that are not negotiable
