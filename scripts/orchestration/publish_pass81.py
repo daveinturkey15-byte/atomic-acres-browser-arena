@@ -411,9 +411,61 @@ def assert_in_game_fallback_exists(worktree):
     print(f"  in-build fallback guard: OK ({key} -> {path} is on gh-pages)")
 
 
+def assert_build_is_not_stale():
+    """The build being published must be newer than the sources it was built from.
+
+    THE DEFECT THIS CLOSES. `dist-pass81` is not produced by any npm script - it
+    is a directory someone populates by hand from `dist`. The only check here was
+    `os.path.isdir`, so on 2026-08-31 a publish ran against a tree built BEFORE
+    that session's changes, printed every guard OK, printed PUBLISHED, and put a
+    stale bundle on the channel. The owner would have loaded a build with none of
+    the fixes in it and reasonably concluded they were never made.
+
+    Existence is not freshness. This compares the newest file in the build
+    against the newest tracked source file and refuses a build that is older.
+    """
+    newest_source = 0.0
+    newest_source_path = None
+    for root, dirs, files in os.walk(SRC):
+        dirs[:] = [d for d in dirs if d not in {
+            "node_modules", ".git", "dist", "dist-pass81", ".gh-pages-publish",
+            ".qa-dist", "source-assets", "public", "docs", "baselines",
+        } and not d.startswith(".")]
+        for name in files:
+            if not name.endswith((".ts", ".tsx", ".css", ".html", ".json")):
+                continue
+            path = os.path.join(root, name)
+            try:
+                stamp = os.path.getmtime(path)
+            except OSError:
+                continue
+            if stamp > newest_source:
+                newest_source, newest_source_path = stamp, path
+
+    newest_build = 0.0
+    for root, _dirs, files in os.walk(DIST):
+        for name in files:
+            try:
+                newest_build = max(newest_build, os.path.getmtime(os.path.join(root, name)))
+            except OSError:
+                continue
+
+    if newest_build < newest_source:
+        import datetime
+        fmt = lambda t: datetime.datetime.fromtimestamp(t).strftime("%H:%M:%S")
+        sys.exit(
+            f"STALE BUILD: {DIST} is older than the sources it should contain.\n"
+            f"  newest build file:  {fmt(newest_build)}\n"
+            f"  newest source file: {fmt(newest_source)}  ({newest_source_path})\n"
+            f"Run `npm run build` and refresh {DIST} from dist/, then publish again.\n"
+            f"Publishing anyway would ship a bundle without the changes just made.")
+    print(f"  build freshness guard: OK (build newer than newest source)")
+
+
 def main():
     if not os.path.isdir(DIST):
         sys.exit(f"no build at {DIST}")
+    assert_build_is_not_stale()
     # Prove the guard can fire before trusting its pass (it shipped vacuous once).
     import tempfile
     with tempfile.TemporaryDirectory() as red_dir:
