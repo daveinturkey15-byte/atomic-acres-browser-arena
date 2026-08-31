@@ -102,6 +102,10 @@ import {
 } from './minigun-spool';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 import { stableDirectionDelta } from './stable-bone-orientation';
+import {
+  VIEWMODEL_SURFACE_CLIP_PLANE_COUNT,
+  type ViewmodelSurfacePlane,
+} from './systems/viewmodel-surface-clip';
 
 export type WeaponPose = {
   dt: number;
@@ -129,6 +133,18 @@ export type WeaponPose = {
    * that difference is the whole 2026-08-31 "the weapon vanishes" defect.
    */
   surfaceContactCutDepth?: number | null;
+  /**
+   * The nearby SURFACES themselves, as world-space planes that keep the eye.
+   *
+   * `surfaceContactCutDepth` above can only describe a surface the view axis
+   * runs into, which is a real limit of a camera-perpendicular plane and not a
+   * bug in it. Measured turning on the spot at the Nuke Town house wall: facing
+   * it, penetration is 0.000 m; with the same wall alongside the rig it is
+   * 0.26-0.36 m, because no perpendicular plane can represent a surface the
+   * crosshair never meets. These planes are the surfaces' own, so they cut at
+   * any angle. See src/systems/viewmodel-surface-clip.ts.
+   */
+  surfaceClipPlanes?: readonly ViewmodelSurfacePlane[];
   /** Presentation-only vertical clearance from nearby floor geometry. */
   surfaceLift?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
@@ -1761,6 +1777,19 @@ export class WeaponPresentation {
    * change the clipping context's cache key and recompile pipelines.
    */
   private readonly contactClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), Number.POSITIVE_INFINITY);
+  /**
+   * Surface-aligned cut planes, FIXED LENGTH for the rig's whole lifetime.
+   *
+   * The array never grows or shrinks. three folds the clipping-plane COUNT into
+   * a material's shader cache key, so resizing this per frame would recompile
+   * every viewmodel material on every wall approach - the exact defect fixed on
+   * 2026-08-31, where 85.7% of all pipeline creations landed inside a stall.
+   * Unused slots are parked far ahead of the camera where they clip nothing.
+   */
+  private readonly surfaceClipPlanes: THREE.Plane[] = Array.from(
+    { length: VIEWMODEL_SURFACE_CLIP_PLANE_COUNT },
+    () => new THREE.Plane(new THREE.Vector3(0, 0, -1), Number.POSITIVE_INFINITY),
+  );
   private readonly contactClipScratch = {
     eye: new THREE.Vector3(),
     forward: new THREE.Vector3(),
@@ -2049,7 +2078,7 @@ export class WeaponPresentation {
     clippingRoot.enabled = true;
     clippingRoot.clipIntersection = false;
     clippingRoot.clipShadows = false;
-    clippingRoot.clippingPlanes = [this.contactClipPlane];
+    clippingRoot.clippingPlanes = [this.contactClipPlane, ...this.surfaceClipPlanes];
     this.root.userData.viewmodelContactClipContract = VIEWMODEL_CONTACT_CLIP_CONTRACT;
     camera.add(this.root);
     this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, 3.2, 2);
@@ -3473,6 +3502,42 @@ export class WeaponPresentation {
     const point = scratch.point.copy(eye).addScaledVector(forward, VIEWMODEL_CONTACT_CLIP_PARKED_METERS);
     this.contactClipPlane.normal.copy(forward).multiplyScalar(-1);
     this.contactClipPlane.constant = -this.contactClipPlane.normal.dot(point);
+  }
+
+  /**
+   * Point a plane 1 km ahead of the camera, where every viewmodel vertex is on
+   * its kept side. This is how an unused slot is retired WITHOUT changing the
+   * array length, which is what holds the shader permutation constant.
+   */
+  private parkPlane(plane: THREE.Plane): void {
+    const scratch = this.contactClipScratch;
+    const eye = this.camera.getWorldPosition(scratch.eye);
+    const forward = this.camera.getWorldDirection(scratch.forward);
+    const point = scratch.point.copy(eye).addScaledVector(forward, VIEWMODEL_CONTACT_CLIP_PARKED_METERS);
+    plane.normal.copy(forward).multiplyScalar(-1);
+    plane.constant = -plane.normal.dot(point);
+  }
+
+  /**
+   * Apply this frame's surface-aligned cuts.
+   *
+   * These are the surfaces' OWN planes, so unlike the camera-perpendicular cut
+   * they work at any angle - which is the whole point. Every slot is written
+   * every frame: a live one takes a surface, a spare one is parked. Nothing
+   * ever changes the array's length.
+   */
+  private applyViewmodelSurfaceClip(planes: readonly ViewmodelSurfacePlane[] | undefined): void {
+    this.camera.updateWorldMatrix(true, false);
+    for (let slot = 0; slot < this.surfaceClipPlanes.length; slot += 1) {
+      const target = this.surfaceClipPlanes[slot]!;
+      const source = planes?.[slot];
+      if (!source) {
+        this.parkPlane(target);
+        continue;
+      }
+      target.normal.set(source.normal.x, source.normal.y, source.normal.z);
+      target.constant = source.constant;
+    }
   }
 
   private applyViewmodelContactClip(): void {
@@ -5746,6 +5811,7 @@ export class WeaponPresentation {
       nearPlaneMeters: viewmodelCameraNearMeters(this.camera) + VIEWMODEL_NEAR_PLANE_CLEARANCE,
     });
     this.applyViewmodelContactClip();
+    this.applyViewmodelSurfaceClip(pose.surfaceClipPlanes);
     // Unmeasured rigs (headless, a model still loading, a weapon with no mesh)
     // keep the historical clamp exactly: this change only moves poses the
     // renderer can actually measure.

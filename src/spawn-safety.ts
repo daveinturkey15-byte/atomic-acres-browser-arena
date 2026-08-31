@@ -145,7 +145,28 @@ export function scoreSpawnCandidates(context: SpawnSelectionContext): SpawnSelec
     const repeated = index === context.previousIndex;
     const modePressure = context.mode === 'ffa' ? 1.25 : context.mode === 'solo' ? 0.9 : 1;
     const separationSq = context.mode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 25;
-    const proximityPenalty = nearestOccupantDistanceSq < separationSq ? (separationSq - nearestOccupantDistanceSq) * 20_000 : 0;
+    // CROWDING, SUMMED OVER EVERY OCCUPANT - not just the nearest one.
+    //
+    // Owner 2026-08-31: "make player and bot spawns nicely spread and balanced
+    // everywhere alwys need a good rule". The rule was already general; this
+    // term was where it stopped working. Taking only the NEAREST occupant means
+    // that once every candidate has a body standing on it,
+    // `nearestOccupantDistanceSq` is 0 everywhere, the penalty saturates at an
+    // identical 500,000, and the scorer can no longer tell a point with one bot
+    // on it from a point with three. All that then separates candidates is the
+    // repeat penalty, which produces a strict A/B alternation and duplicate
+    // spawns - measured on rustworks and farcrysis as two bots on the exact same
+    // point (minimum bot pair distance 0.00 m).
+    //
+    // Summing gives every additional crowd member its own weight, so a busy
+    // point keeps getting worse and the fifth bot goes somewhere the first four
+    // did not. It is identical to the old behaviour when at most one occupant is
+    // in range, which is the common case.
+    let proximityPenalty = 0;
+    for (const occupant of context.occupants) {
+      const occupantDistanceSq = distanceSq(point, occupant);
+      if (occupantDistanceSq < separationSq) proximityPenalty += (separationSq - occupantDistanceSq) * 20_000;
+    }
     const score = nearestThreatDistanceSq
       - visibleThreats * 1_000_000 * modePressure
       - recentDeathPressure * 250_000

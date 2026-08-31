@@ -63,6 +63,7 @@ import {
   nearestViewmodelForwardObstructionMeters,
   type ViewmodelObstructionPoseInput,
 } from './systems/viewmodel-contact-probe';
+import { VIEWMODEL_SURFACE_CLIP_PLANE_COUNT } from './systems/viewmodel-surface-clip';
 import { type WeaponPose } from './weapon-presentation';
 
 const REST_POSE: WeaponPose = Object.freeze({
@@ -307,12 +308,22 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
     };
     expect(clippingRoot.isClippingGroup).toBe(true);
     expect(clippingRoot.enabled).toBe(true);
-    expect(clippingRoot.clippingPlanes).toHaveLength(1);
+    // THE INVARIANT IS THAT THIS NUMBER NEVER MOVES, not that it is any
+    // particular value. three folds the clipping-plane COUNT into a material's
+    // shader cache key, so an array that grows and shrinks with the number of
+    // nearby surfaces would recompile every viewmodel material on every wall
+    // approach - the defect that had 85.7% of all pipeline creations landing
+    // inside a stall on 2026-08-31. The rig therefore keeps one camera-facing
+    // contact plane plus a fixed set of surface-aligned slots, and parks the
+    // ones it is not using.
+    const EXPECTED_PLANES = 1 + VIEWMODEL_SURFACE_CLIP_PLANE_COUNT;
+    expect(clippingRoot.clippingPlanes).toHaveLength(EXPECTED_PLANES);
     expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters)
       .toBeCloseTo(WALL_DISTANCE_METERS, 6);
 
     // The kept half-space is camera-side: the eye must be inside it and a point
     // beyond the surface must not be.
+    // Slot 0 is the camera-perpendicular contact cut; the rest are surfaces.
     const plane = clippingRoot.clippingPlanes[0];
     const eye = rig.camera.getWorldPosition(new THREE.Vector3());
     const forward = rig.camera.getWorldDirection(new THREE.Vector3());

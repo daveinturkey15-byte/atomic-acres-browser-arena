@@ -900,6 +900,7 @@ import {
   type ThermalRevealCandidate,
 } from './systems/thermal-reveal-selection';
 import { createSupportFlightWorld } from './systems/support-flight-world';
+import { viewmodelSurfaceClipPlanes } from './systems/viewmodel-surface-clip';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -10889,6 +10890,185 @@ function currentViewmodelSurfaceRetreat(): number {
 // distances plus the blocking collider bounds, so a false-positive block at
 // spawn names its geometry instead of staying invisible. Read-only; never
 // referenced by gameplay.
+/**
+ * One mesh vertex in WORLD space, honouring skinning.
+ *
+ * THE ARMS ARE A SKINNED MESH, and reading their position attribute directly is
+ * meaningless: those are BIND-POSE vertices, and the pose the player sees is
+ * produced by the skeleton at draw time. Measuring the raw attribute reported
+ * arm geometry 2.17 m below the camera on flat ground - anatomy that does not
+ * exist - and made the arms look like the worst offender in every wall
+ * measurement. `applyBoneTransform` is what the GPU does, so it is what a
+ * measurement of what the player sees has to do too.
+ */
+function worldVertex(
+  mesh: THREE.Mesh,
+  position: THREE.BufferAttribute,
+  index: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  target.fromBufferAttribute(position, index);
+  const skinned = mesh as THREE.SkinnedMesh;
+  if ((skinned as { isSkinnedMesh?: boolean }).isSkinnedMesh && skinned.skeleton) {
+    skinned.applyBoneTransform(index, target);
+  }
+  return target.applyMatrix4(mesh.matrixWorld);
+}
+
+/**
+ * HOW FAR THE WEAPON IS INSIDE THE WORLD, in metres, right now.
+ *
+ * The owner has reported "gun goes through walls and floor" repeatedly, and
+ * every previous attempt was graded on something that was NOT that number: the
+ * muzzle socket (one authored point, which passed while the magazine sat 0.26 m
+ * through a wall), a screenshot (the viewmodel draws on a depth-cleared overlay,
+ * so it paints over geometry whether it is inside it or not, and a human cannot
+ * tell those apart), or a probe's own reported distance (which is an input to
+ * the fix, not a measure of it).
+ *
+ * This measures the thing itself: every visible viewmodel VERTEX, in world
+ * space, against the solid boxes it could be inside, and against the floor.
+ * Penetration is the depth of the deepest vertex inside any solid. Zero means
+ * no part of the weapon or the arms is inside anything.
+ *
+ * Debug only; allocates freely and walks full vertex buffers. Never called from
+ * the frame loop.
+ */
+function sampleViewmodelPenetration(): Record<string, unknown> {
+  const colliders = activeWorldColliders();
+  const dressing = activePresentationObstructionBoxes();
+  const solids = [...colliders, ...dressing];
+  const vertex = new THREE.Vector3();
+  // THE CLIPPING PLANES MUST BE PART OF THIS MEASUREMENT.
+  //
+  // A clipping plane does not move a vertex - it discards the fragment. So a
+  // weapon that is perfectly cut at a wall still has vertices inside that wall,
+  // and a probe that only walks vertex positions reports a defect that the
+  // player cannot see. This was measured the wrong way once: the surface-clip
+  // fix changed nothing at all in the numbers because the metric never looked at
+  // whether the geometry was drawn.
+  //
+  // `clipIntersection` is false on this group, which in three means a fragment
+  // survives only if it is on the kept side of EVERY plane. So a vertex counts
+  // as visible when its signed distance is non-negative for all of them.
+  const clippingRoot = weaponView.root as unknown as { clippingPlanes?: THREE.Plane[] };
+  const activeClipPlanes = Array.isArray(clippingRoot.clippingPlanes) ? clippingRoot.clippingPlanes : [];
+  const drawnAt = (point: THREE.Vector3): boolean => {
+    for (const plane of activeClipPlanes) {
+      if (plane.distanceToPoint(point) < 0) return false;
+    }
+    return true;
+  };
+  let clippedVertices = 0;
+  let worstDepth = 0;
+  let worstMesh: string | null = null;
+  let worstBox: unknown = null;
+  let worstPoint: [number, number, number] | null = null;
+  let vertexCount = 0;
+  let meshCount = 0;
+  const perMesh: Array<{ mesh: string; vertices: number; maxDepthM: number }> = [];
+
+  weaponView.root.updateWorldMatrix(true, true);
+  weaponView.root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+    // An invisible or non-writing material is not something the player can see
+    // sticking through a wall, so it is not penetration.
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!materials.some((material) => material && material.visible && material.colorWrite !== false)) return;
+    let ancestor: THREE.Object3D | null = mesh.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return;
+    meshCount += 1;
+    let meshWorst = 0;
+    // Decimated on large buffers: the silhouette of a weapon is dense enough
+    // that every 3rd vertex still finds the deepest point to well under a mm.
+    const stride = position.count > 6_000 ? 3 : 1;
+    for (let index = 0; index < position.count; index += stride) {
+      worldVertex(mesh, position, index, vertex);
+      vertexCount += 1;
+      // Cut geometry is not visible geometry. A vertex the clipping planes
+      // reject cannot be seen through a wall, so it is not penetration.
+      if (!drawnAt(vertex)) { clippedVertices += 1; continue; }
+      for (const box of solids) {
+        if (box.rotation) continue; // oriented boxes need the collider frame; skipped, not silently counted
+        const minY = box.minY ?? Number.NEGATIVE_INFINITY;
+        const maxY = box.maxY ?? Number.POSITIVE_INFINITY;
+        if (vertex.x <= box.minX || vertex.x >= box.maxX) continue;
+        if (vertex.z <= box.minZ || vertex.z >= box.maxZ) continue;
+        if (vertex.y <= minY || vertex.y >= maxY) continue;
+        // Inside. Depth is the distance to the NEAREST face - the smallest
+        // push that would get this vertex back out of the solid.
+        const depth = Math.min(
+          vertex.x - box.minX, box.maxX - vertex.x,
+          vertex.z - box.minZ, box.maxZ - vertex.z,
+          Number.isFinite(minY) ? vertex.y - minY : Number.POSITIVE_INFINITY,
+          Number.isFinite(maxY) ? maxY - vertex.y : Number.POSITIVE_INFINITY,
+        );
+        if (depth > meshWorst) meshWorst = depth;
+        if (depth > worstDepth) {
+          worstDepth = depth;
+          worstMesh = mesh.name || '(unnamed)';
+          worstBox = box;
+          worstPoint = [vertex.x, vertex.y, vertex.z];
+        }
+      }
+    }
+    if (meshWorst > 0) perMesh.push({ mesh: mesh.name || '(unnamed)', vertices: position.count, maxDepthM: Math.round(meshWorst * 1000) / 1000 });
+  });
+
+  // The floor is measured separately: most authored floors are not collider
+  // boxes, which is exactly why the analytic floor clamp exists at all.
+  let belowFloorM = 0;
+  if (lastGroundedFeetY !== null) {
+    weaponView.root.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+      const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!position) return;
+      const stride = position.count > 6_000 ? 3 : 1;
+      for (let index = 0; index < position.count; index += stride) {
+        worldVertex(mesh, position, index, vertex);
+        if (!drawnAt(vertex)) continue;
+        const below = (lastGroundedFeetY as number) - vertex.y;
+        if (below > belowFloorM) belowFloorM = below;
+      }
+    });
+  }
+
+  perMesh.sort((left, right) => right.maxDepthM - left.maxDepthM);
+  return {
+    contract: 'viewmodel-world-penetration-v1',
+    weapon: player.weapon,
+    stance: player.stance,
+    position: [player.position.x, player.position.y, player.position.z],
+    yaw: player.yaw,
+    pitch: player.pitch,
+    solidBoxes: solids.length,
+    colliderBoxes: colliders.length,
+    dressingBoxes: dressing.length,
+    meshesMeasured: meshCount,
+    verticesMeasured: vertexCount,
+    /** Vertices the clipping planes removed - these are not visible, so not defects. */
+    clippedVertices,
+    activeClipPlanes: activeClipPlanes.length,
+    /** THE NUMBER. Metres the deepest visible viewmodel vertex is inside a solid. */
+    maxPenetrationM: Math.round(worstDepth * 1000) / 1000,
+    worstMesh,
+    worstPoint,
+    worstBox,
+    /** Metres the lowest visible vertex is below the tracked standing surface. */
+    maxBelowFloorM: Math.round(belowFloorM * 1000) / 1000,
+    lastGroundedFeetY,
+    perMesh: perMesh.slice(0, 12),
+    contactFold: weaponView.contactFoldState(),
+  };
+}
+
 function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
   // The fire gate never sees dressing geometry, so neither does this view of
   // it: passing the dressing set here would report a block the trigger cannot
@@ -23264,6 +23444,18 @@ function showGunnerTargetConfirm(
 function resetKillstreakPossessionPresentation(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
+  // Hand the player back a camera at rest.
+  //
+  // While possessing, `updatePhysics` early-returns, so the shake spring is
+  // never integrated - but blast impulses keep being ADDED to it (the gunner's
+  // own missiles, at a one-per-second cadence). The integrator is stable again
+  // since the substep fix, so what lands here is bounded rather than the
+  // thousands of metres it used to be; it is still a jolt the player did not
+  // earn, applied on the first frame they get their body back. Clearing it is
+  // the difference between "the camera settles" and "the camera settles from
+  // somewhere".
+  cameraShakeState = createCameraShakeState(cameraShakeState.seed);
+  cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
   if (camera.near !== 0.08) {
     camera.near = 0.08;
     camera.updateProjectionMatrix();
@@ -25480,6 +25672,20 @@ function updatePhysics(dt: number): void {
     // the plane from an off-axis surface is what emptied the frame at
     // `atomic-acres/corner` on 2026-08-31.
     surfaceContactCutDepth: viewmodelObstruction.contactCutDepthMeters,
+    // The nearby surfaces as their OWN planes. The cut depth above can only
+    // describe a surface the view axis runs into; measured turning on the spot
+    // at the Nuke Town house wall, that leaves 0.26-0.36 m of arm and weapon
+    // inside the wall at every angle except head on, which was 117 of 183
+    // measured poses. These cut at any angle because they are the wall.
+    surfaceClipPlanes: viewmodelSurfaceClipPlanes({
+      eye: camera.position,
+      colliders: activeWorldColliders(),
+      dressingBoxes: activePresentationObstructionBoxes(),
+      // Terrain is a raycast surface, not a collider box, so no box face can
+      // ever describe it. The tracked standing height is the cheapest exact
+      // answer, and it survives the frames `grounded` drops out between steps.
+      groundPlaneY: lastGroundedFeetY,
+    }),
     triggerHeld,
   });
   audio.minigunDrive(
@@ -30339,6 +30545,7 @@ const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
+    sampleViewmodelPenetration: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
@@ -31524,6 +31731,7 @@ function debugRiggedOperatorJointScreenPositions(
 })();
 
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  sampleViewmodelPenetration,
   // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
   // runtime coefficient revert). This probe ends the guessing: live bus
   // gains, context state, the music scheduler flag and a real output

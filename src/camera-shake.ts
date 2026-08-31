@@ -96,17 +96,60 @@ export function addCameraShakeImpulse(
   });
 }
 
+/**
+ * Longest step this integrator may take in one go, in seconds.
+ *
+ * THE CAMERA THAT FLEW THE PLAYER ACROSS THE MAP. Owner 2026-08-31, on the
+ * Chopper Gunner: "when u exit it flies you around like crazy then back to ur
+ * body". This constant is why.
+ *
+ * Semi-implicit Euler on a stiffness-46, ratio-1.05 spring is only stable while
+ * the step is small. Measured spectral radius of the state-transition matrix:
+ *
+ *     dt = 1/120 s   0.962    stable
+ *     dt = 1/60  s   0.928    stable
+ *     dt = 1/30  s   0.871    stable
+ *     dt = 0.05  s   0.823    stable
+ *     dt = 0.10  s   0.712    stable
+ *     dt = 0.25  s   4.953    DIVERGES
+ *
+ * The old code clamped dt to 0.25 s, which is on the wrong side of that line.
+ * The clamp existed to survive long gaps between frames - and while possessing
+ * a killstreak there is nothing BUT long gaps, because `updatePhysics` (which
+ * owns the only per-frame integrate/sample call) early-returns for the whole
+ * ride while missile impacts keep adding impulses. Each impulse then integrated
+ * once at the 0.25 s ceiling and was amplified about fivefold instead of damped.
+ * Eight impacts - one chopper ride at the 1 s missile cadence - reach 32,933 m
+ * of displacement. On exit that lands in `camera.position` in one frame, then
+ * rings back down: exactly "flies you around like crazy then back to ur body".
+ *
+ * Clamping lower would fix today's symptom and leave the trap armed for the next
+ * long gap (an alt-tabbed tab, a loading hitch, a dead player). Substepping
+ * removes it: any gap is walked in stable slices, so the spring is stable for
+ * every dt by construction.
+ */
+export const CAMERA_SHAKE_MAX_SUBSTEP_SECONDS = 1 / 120;
+/** Longest total gap integrated. Beyond this the spring has long since settled. */
+export const CAMERA_SHAKE_MAX_GAP_SECONDS = 0.25;
+
 /** Advance the spring by dt derived from now; returns updated state. */
 export function integrateCameraShake(state: CameraShakeState, now: number): CameraShakeState {
   if (!Number.isFinite(now)) return state;
-  const dtSeconds = clampFinite((now - state.lastUpdatedMs) / 1000, 0, 0.25);
+  const dtSeconds = clampFinite((now - state.lastUpdatedMs) / 1000, 0, CAMERA_SHAKE_MAX_GAP_SECONDS);
   if (dtSeconds <= 0) return state;
   const omega = Math.sqrt(CAMERA_SHAKE_STIFFNESS);
-  // Semi-implicit Euler: stable enough at frame rates >30fps for this stiffness.
-  const acceleration = -CAMERA_SHAKE_STIFFNESS * state.displacement
-    - 2 * CAMERA_SHAKE_DAMPING_RATIO * omega * state.velocity;
-  const velocity = state.velocity + acceleration * dtSeconds;
-  const displacement = state.displacement + velocity * dtSeconds;
+  // Walk the gap in slices no larger than the stability bound. At a normal
+  // frame time this is a single iteration and behaves exactly as before.
+  const steps = Math.max(1, Math.ceil(dtSeconds / CAMERA_SHAKE_MAX_SUBSTEP_SECONDS));
+  const step = dtSeconds / steps;
+  let displacement = state.displacement;
+  let velocity = state.velocity;
+  for (let index = 0; index < steps; index += 1) {
+    const acceleration = -CAMERA_SHAKE_STIFFNESS * displacement
+      - 2 * CAMERA_SHAKE_DAMPING_RATIO * omega * velocity;
+    velocity += acceleration * step;
+    displacement += velocity * step;
+  }
   // Snap tiny residuals to rest so the system actually settles.
   const settled = Math.abs(displacement) < 1e-4 && Math.abs(velocity) < 1e-3;
   return Object.freeze({

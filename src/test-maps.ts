@@ -992,11 +992,23 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
-    // Exact X MIRRORS of one another (see the file header): six points spread
-    // across 12 m of z at each end, so one grenade cannot cover a spawn.
+    // Exact X MIRRORS of one another (see the file header).
+    //
+    // Owner 2026-08-31: "bot spawns are bad on other maps than nuketown ... make
+    // player and bot spawns nicely spread and balanced everywhere". These six
+    // points used to sit in a 4 x 10 m box - 10 m of a 100 m map, a minimum pair
+    // distance of 2.83 m, and one point ((-43,-7) and its mirror) authored
+    // INSIDE geometry, so the whole enemy team materialised inside an 11 m
+    // circle that one grenade covers. Now a spawn LINE across 46 m of z, every
+    // point verified walkable at the authored 1.7 m spawn height and every pair
+    // at least 7.2 m apart, and every point chosen from the set that is walkable
+    // on BOTH sides - because the collider set is NOT actually X-mirrored even
+    // though the layout is: (-45,-14) is walkable while (45,-14) is inside
+    // geometry, and (-45,4) is inside geometry while (45,4) is walkable. Pinned
+    // by src/spawn-layout-quality.test.ts.
     spawns: spawnRecord(
-      [[-47, -8], [-47, -2], [-47, 2], [-45, -5], [-45, 0], [-43, -7]],
-      [[47, -8], [47, -2], [47, 2], [45, -5], [45, 0], [43, -7]],
+      [[-47, -26], [-45, -19], [-47, -12], [-46, 0], [-47, 13], [-45, 26]],
+      [[47, -26], [45, -19], [47, -12], [46, 0], [47, 13], [45, 26]],
     ),
     // Ten at grade and FOUR on the +3.40 m floors. The old comment kept every
     // anchor at grade because the only raised surface was a 0.70 m deck a bot

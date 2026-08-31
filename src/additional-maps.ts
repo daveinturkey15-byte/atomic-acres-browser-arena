@@ -1275,10 +1275,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [0, 19], [-13, 19], [13, 19], [-19, 11], [-19, 0], [-13, 14],
+        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14],
       ],
       [
-        [0, -19], [13, -19], [-13, -19], [19, -11], [19, 0], [13, -14],
+        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14],
       ],
     ),
     patrolPoints: [
@@ -2379,8 +2379,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
-      [[0, 16.5], [-8, 16.5], [8, 16.5]],
-      [[0, 16.5], [-8, 16.5], [8, 16.5]],
+      // Owner 2026-08-31: "make player and bot spawns nicely spread and
+      // balanced everywhere". Both team lists here were BYTE-IDENTICAL - three
+      // points on one line, cross-team minimum separation 0.00 m - so in a
+      // six-player FFA every player drew from the same three spots and could
+      // spawn on top of each other. Widened to six points across the firing
+      // line's full width, and the second list offset so the two never collide.
+      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5]],
+      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5]],
     ),
     patrolPoints: [],
     targets,
