@@ -54,6 +54,37 @@ function repositoryRoot(): string {
   throw new Error(`cannot locate the repository root from ${process.cwd()}`);
 }
 
+/**
+ * Owner 2026-08-31. This spec is WebGPU-only by definition - it boots a real
+ * match - but the chromium project only selects INSTALLED Chrome when
+ * PASS73_NATIVE_WEBGPU=1. Without it Playwright launches its bundled Chromium,
+ * which on this machine gets a GPU adapter and then throws
+ * "DynamicLib.Open: dxil.dll Windows Error: 87" from Dawn on requestDevice. The
+ * game then correctly fails closed, and every arena times out after 90 s.
+ *
+ * Run bare, that is 13 minutes producing eight identical timeouts and no hint
+ * that the browser, not the game, is the problem - which is exactly how someone
+ * concludes "all eight arenas are broken". Fail in seconds with the reason and
+ * the fix instead. Measured: with the flag all nine tests pass, farcrysis
+ * included.
+ */
+test('runs on a browser that can actually get a WebGPU device', async ({ page }) => {
+  await page.goto('/');
+  const device = await page.evaluate(async () => {
+    if (!navigator.gpu) return 'no navigator.gpu';
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return 'no adapter';
+    try { await adapter.requestDevice(); return 'ok'; } catch (error) { return String(error); }
+  });
+  expect(
+    device,
+    'This spec boots real matches and needs a WebGPU device. Run it as '
+      + '`PASS73_NATIVE_WEBGPU=1 npm run qa:pass74:arena-boot-smoke` so the chromium '
+      + 'project selects installed Chrome; the bundled Chromium cannot '
+      + 'acquire a device on this machine and every arena will time out.',
+  ).toBe('ok');
+});
+
 test('the boot roster names every arena module on disk', () => {
   const arenasDir = resolve(repositoryRoot(), 'src', 'rendering', 'arenas');
   const onDisk = readdirSync(arenasDir)

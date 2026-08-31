@@ -86,6 +86,11 @@ export default defineConfig({
         launchOptions: pass73NativeWebGpu ? {
           executablePath: pass73NativeChromePath,
           args: [
+            // Owner standing instruction: every browser this repo launches stays
+            // silent while he is at the PC. This path runs HEADED (parked
+            // off-screen), so without this it is the one lane that can actually
+            // make noise.
+            '--mute-audio',
             '--enable-unsafe-webgpu',
             '--disable-background-timer-throttling',
             '--disable-renderer-backgrounding',
