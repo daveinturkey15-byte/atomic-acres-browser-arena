@@ -213,7 +213,19 @@ function streak(coord: number, cycles: number, warp: number): number {
 // Test1 surfaces
 // ---------------------------------------------------------------------------
 
-const HARDPAN_SHADOW = rgb(0x7d6540);
+// ART PASS 2026-08-31: the three hardpan stops were 29 / 30 / 34 deg after this
+// arena's near-white key - one hue at three values - and hardpan is most of
+// every frame, so the map's dominant 10-degree bin was 47-58% of its whole
+// chroma budget against 34-50% for the two shipped controls. The SHADOW stop is
+// the one that can honestly move: caliche crust bleaches warm in the sun and
+// the mineral under it reads grey-olive in shade, which is the extraction's own
+// cool-shadow/warm-light separation applied to albedo instead of to lights.
+// 29 -> 47 deg at linear Y 0.129 -> 0.135, i.e. the value the last pass measured
+// this stop needed is unchanged; only its hue moves. 58 deg was tried first and
+// measured better still, but it turned the whole hardpan field olive against
+// the cooled distance - this is a dust range, and the stop is pulled back to
+// where the floor still reads as mineral rather than as grass.
+const HARDPAN_SHADOW = rgb(0x6f6d4e);
 const HARDPAN_MID = rgb(0xb0925c);
 const HARDPAN_BLEACH = rgb(0xd8c193);
 
@@ -314,7 +326,9 @@ const corrugatedSurface: SurfaceDescription = (u, v, noise) => {
 // separation to read cover against. Jute is genuinely greener and greyer than
 // desert dust: hue moves to 50-53 and saturation drops, which is a material
 // correction rather than a repaint.
-const SANDBAG_SHADOW = rgb(0x776f4d);
+// Same move as HARDPAN_SHADOW, same reason: hessian in shade is a green-khaki,
+// 41 -> 60 deg at an unchanged linear Y (0.1438 -> 0.1453).
+const SANDBAG_SHADOW = rgb(0x6d7350);
 const SANDBAG_MID = rgb(0xa8a173);
 const SANDBAG_SUN = rgb(0xcfc9a2);
 
@@ -413,7 +427,13 @@ const tarpSurface: SurfaceDescription = (u, v, noise) => {
 // Test2 surfaces
 // ---------------------------------------------------------------------------
 
-const TRAVERTINE_JOINT = rgb(0x9b8f76);
+// ART PASS 2026-08-31: a golden key of (1.000, 0.624, 0.287) puts EVERY neutral
+// or warm albedo at 26-35 deg - there is no albedo that reads cool under it - so
+// the terrace could not be given a second family, only a second material. The
+// joint is grey mortar, not more travertine: 26 -> 32 deg at an identical
+// luminance (linear Y 0.1960 -> 0.1963), which is a real material distinction
+// the eye reads as a joint rather than two shades of the same stone.
+const TRAVERTINE_JOINT = rgb(0x8f9490);
 const TRAVERTINE_MID = rgb(0xd6c9b0);
 const TRAVERTINE_PALE = rgb(0xece2cd);
 
@@ -471,9 +491,26 @@ const stuccoSurface: SurfaceDescription = (u, v, noise) => {
 // surface's 0.28 AO floor the deep stop resolved under 0.01 in any shadow,
 // which is what turned the clipped hedges - the arena's only large green mass -
 // into black blocks in the flyover.
-const HEDGE_DEEP = rgb(0x2e4629);
-const HEDGE_MID = rgb(0x4a6b3a);
-const HEDGE_LIT = rgb(0x74924b);
+//
+// ART PASS 2026-08-31 - AND THEN THEY WERE NOT GREEN, THEY WERE OLIVE. The
+// cause is arithmetic, not taste. Diffuse is albedo * light in LINEAR, and this
+// arena's key 0xffcf92 is linear (1.000, 0.624, 0.287), so a surface only comes
+// out of the multiply reading green if its own linear green beats its linear
+// red by more than 1/0.624 = 1.60x. The stop that carries the hedge's weight is
+// the LIT one, and HEDGE_LIT 0x74924b sat at 1.65 - a hair over the line, and
+// it landed at hue 62 deg, i.e. in the yellow-olive band the travertine and the
+// hillside already own rather than in a green one. MID was 78 deg, DEEP 81 deg.
+// The map measured 2 live hue bins against 5 and 7 for the shipped controls,
+// and its "only large green mass" was contributing to the dominant bin.
+//
+// Re-authored well clear of the line - 3.24 / 3.81 / 3.67 against 1.60 - which
+// puts the three stops at 93 / 98 / 100 deg. Tone spacing is deliberately kept:
+// lit-stop linear Y moves 0.167 -> 0.191 and the deep stop 0.0336 -> 0.0332, so
+// the clipped face still separates from the crevice by exactly the value the
+// last pass measured it needed. Only the hue the key leaves behind changes.
+const HEDGE_DEEP = rgb(0x24482a);
+const HEDGE_MID = rgb(0x3d7536);
+const HEDGE_LIT = rgb(0x5fa444);
 
 /**
  * Clipped box hedge. tileMetres 1.0, 512 px = 2.0 mm/texel.
@@ -496,9 +533,23 @@ const hedgeSurface: SurfaceDescription = (u, v, noise) => {
   return emitMix(HEDGE_DEEP, tone > 0.58 ? HEDGE_LIT : HEDGE_MID, tone, height, roughness, 0.4 + depth * 0.6);
 };
 
-const POOL_GROUT = rgb(0x4e8e9b);
-const POOL_TILE = rgb(0x76bfcb);
-const POOL_GLINT = rgb(0xbfe9ee);
+// The same key-multiply arithmetic as the hedge above, one axis over. To come
+// out of a (1.000, 0.624, 0.287) key reading CYAN a tile needs its linear blue
+// to beat its linear green by 0.624/0.287 = 2.17x. 0x76bfcb was 1.15x, so the
+// basin resolved at hue 116 deg - green, not cyan - and the brief's headline
+// element read as another shade of the garden. 1.68x puts it at 158 deg and the
+// grout at 166 deg. Luminance is held on purpose: a first attempt at 0x4dafe4
+// reached 166 deg but cost the tile 0.283 -> 0.223 linear Y and dropped the
+// shaded half of the basin back through the 0.02 crush floor the last pass had
+// just cleared. 0.269 / 0.136 against the authored 0.283 / 0.109 keeps it.
+const POOL_GROUT = rgb(0x3a8cb6);
+const POOL_TILE = rgb(0x63bced);
+// The glint stays a near-white highlight, but a pale one is dominated by the
+// key's own spectrum: 0xbfe9ee measured out at 57 deg, i.e. the pool's
+// BRIGHTEST stop - the one carrying most of its weight - was feeding the yellow
+// bins. 87 deg at linear Y 0.429 against the authored 0.492: blue enough to
+// leave the warm side, bright enough to still read as a highlight.
+const POOL_GLINT = rgb(0xa5dffa);
 
 /**
  * Glazed pool tile with a baked caustic web. tileMetres 1.2, 512 px =
@@ -731,7 +782,10 @@ export function test1Materials(): Test1Materials {
     sandbag: forgedMaterial(sandbag, 'test1-sandbag', { roughness: 0.99, normalScale: 1.05, metresPerTile: 1.6 }),
     containerRed: container(0xd97a62, 'test1-container-red'),
     containerBlue: container(0x6f9fc4, 'test1-container-blue'),
-    containerGreen: container(0x8fa878, 'test1-container-green'),
+    // 0x8fa878 resolved at 80 deg - a yellow-green that sat with the tarps
+    // rather than reading as the third container colour. 96 deg at the same
+    // luminance (linear Y 0.316 -> 0.321).
+    containerGreen: container(0x7fae6c, 'test1-container-green'),
     // Galvanised roofing: the corrugated set de-rusted and tighter. Hot-dip
     // zinc weathers to a chalked oxide within a season, which is a dielectric
     // (extraction: "every oxide layer on top of it is 0"), and with no
@@ -780,7 +834,17 @@ export function test2Materials(): Test2Materials {
     stucco: forgedMaterial(stucco, 'test2-stucco', { roughness: 0.9, normalScale: 0.9, metresPerTile: 3 }),
     // Cut ashlar: the same travertine, read at a third of the scale so coping
     // and balustrade run as 0.8 m blocks rather than 2.4 m slabs.
-    stone: forgedMaterial(travertine, 'test2-stone', { color: 0xcfc5ae, roughness: 0.88, normalScale: 1.1, metresPerTile: 0.8 }),
+    // Cool grey limestone, not more travertine. Under the key the two are
+    // indistinguishable (27 deg against 26 deg - a golden key overwhelms a
+    // neutral albedo), but this arena's fill is 0x8fb2d8 and it is the SHADED
+    // faces of coping, balustrade and step nosings that a player reads, so a
+    // cooler albedo is where the extraction's "cool stone against warm floor"
+    // actually resolves. Luminance is HELD, and that is not cosmetic: the first
+    // attempt at 0xb8bcc6 took the lit face 0.391 -> 0.338 linear Y and pushed
+    // 2.3% of the flyover frame - every shaded coping and balustrade return -
+    // through the 0.02 crush floor the last pass had just cleared. 0xc6cad4 is
+    // 0.397, i.e. the same stone value in a cooler spectrum.
+    stone: forgedMaterial(travertine, 'test2-stone', { color: 0xc6cad4, roughness: 0.88, normalScale: 1.1, metresPerTile: 0.8 }),
     hedge: forgedMaterial(hedge, 'test2-hedge', { roughness: 0.97, normalScale: 1.4, metresPerTile: 1 }),
     poolTile: forgedMaterial(poolTile, 'test2-pool-tile', { roughness: 0.3, metalness: 0.05, normalScale: 0.7, metresPerTile: 1.2 }),
     court: forgedMaterial(court, 'test2-court', { roughness: 0.72, normalScale: 0.8, metresPerTile: 3 }),
@@ -986,8 +1050,15 @@ export function applyTest1Dressing(root: THREE.Group, materials: Test1Materials)
       nearColor: 0x8e7f5e,
       farColor: 0xa79a78,
       // Matched to the arena definition's fog colour (src/rendering/arenas/
-      // test1.ts, fog 0xdbd2bc) so the ridge dissolves into the haze it sits in.
-      hazeColor: 0xdbd2bc,
+      // test1.ts) so the ridge dissolves into the haze it sits in. Art pass
+      // 2026-08-31: that fog is defined as "the horizon dust band", and the
+      // horizon dust band in sky-backdrop.ts moved from cream to a blue-grey
+      // when the flyover window was re-measured, so both follow it to 0xcdd6dd.
+      // Fine airborne dust at 100 m+ scatters short wavelengths - the distance
+      // in a clear mid-morning desert is blue, not cream - and on a map whose
+      // every surface lands in one warm bin it is also the only cool family the
+      // ridge ring can honestly carry.
+      hazeColor: 0xcdd6dd,
       hazeStrength: 0.7,
       name: 'test1-ridge-ring',
     },
@@ -1122,7 +1193,10 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
 
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd9dee2, roughness: 0.16, metalness: 0.85 });
   const canvasCream = new THREE.MeshStandardMaterial({ color: 0xefe6d2, roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
-  const gravel = new THREE.MeshStandardMaterial({ color: 0x9a9078, roughness: 1, metalness: 0 });
+  // Cool river gravel on the motor court, for the same reason as `stone`: it is
+  // the shaded half, lit by the 0x8fb2d8 fill, that separates it from the warm
+  // travertine it abuts.
+  const gravel = new THREE.MeshStandardMaterial({ color: 0x8f96a4, roughness: 1, metalness: 0 });
   const courtLine = new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.7, metalness: 0 });
   const glassBlue = new THREE.MeshStandardMaterial({ color: 0x9fc8d8, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.35 });
 
@@ -1161,7 +1235,16 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
   // Grey-ochre, not orange. A saturated tint here reads as a Martian plate
   // under this arena's golden key, and this band is the largest single area in
   // any flyover frame, so its chroma dominates the whole arena's hue budget.
-  hillside.color.setHex(0x9c9a80);
+  //
+  // ART PASS 2026-08-31: that is exactly the problem - 0x9c9a80 resolves at hue
+  // 31 deg under this key, i.e. the largest area in the flyover was sitting in
+  // the travertine's own bin and making it the dominant one. Taken to dry
+  // hillside grass rather than bare soil, which is what a Mediterranean estate
+  // is actually cut into: hue 45 deg, its own bin, and linear Y 0.219 -> 0.207
+  // so the value the last pass measured for this band is unchanged. 49 deg
+  // measured better still and read frankly green on the largest surface in the
+  // flyover; 41 deg cost 0.74 of the frame's hue perplexity. 45 holds both.
+  hillside.color.setHex(0x8c9c6c);
   hillside.roughness = 1;
   hillside.userData.metresPerTile = 5;
   // Half-extents of the terrace band decomposition in src/test-maps.ts (its
@@ -1184,12 +1267,24 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
   // The estate palette: dark clipped cypress, olive broadleaf, box shrub, over
   // a pale gravel litter. Shared by both passes so the two belts read as one
   // planting scheme.
+  //
+  // ART PASS 2026-08-31: the canopies were failing the same key-multiply test
+  // as the hedge surface (see HEDGE_DEEP). Against a linear key of (1.000,
+  // 0.624, 0.287) a canopy needs linear g/r above 1.60 to read green at all;
+  // broadleaf 0x5d7440 was 1.60 exactly and resolved at hue 60 deg - the same
+  // yellow band as the travertine terrace it is meant to contrast with - and
+  // shrub 0x47653a at 76 deg was barely out of it. Conifer was green (86 deg)
+  // but at linear Y 0.033 carried no weight in any frame. Re-authored to
+  // 94 / 104 / 98 deg with the conifer lifted to 0.043, which is still the
+  // darkest mass on the hillside but is now a dark GREEN one. dryScrub goes the
+  // other way on purpose: it is dry grass, so it stays warm, but 35 deg put it
+  // inside the travertine's own bin, and 42 deg gives the hillside its own.
   const estatePalette = {
     trunk: 0x6b563c,
-    broadleafCanopy: 0x5d7440,
-    coniferCanopy: 0x2c4630,
-    shrub: 0x47653a,
-    dryScrub: 0x8c8d5c,
+    broadleafCanopy: 0x4f8c3a,
+    coniferCanopy: 0x27522f,
+    shrub: 0x3d7434,
+    dryScrub: 0x8f9a5e,
     litter: 0xa39a80,
   } as const;
 
@@ -1268,11 +1363,23 @@ export function applyTest2Dressing(root: THREE.Group, materials: Test2Materials)
       outerRadiusM: 196,
       peakHeightM: 34,
       lobes: [2, 5, 11],
-      nearColor: 0x7d7a5c,
-      farColor: 0x9d9375,
-      // Arena fog is 0xe9c9a0 (src/rendering/arenas/test2.ts): a golden-hour
-      // haze, so the hillsides warm as they recede instead of greying out.
-      hazeColor: 0xe9c9a0,
+      // ART PASS 2026-08-31: the ring is the SAME hillside the terrain band is,
+      // continued past the wall, and it was authored as a different and warmer
+      // material - 31 and 27 deg against the terrain's 45 - so the arena's
+      // largest two surfaces were both feeding the same dominant hue bin from
+      // different materials. Matched to the terrain (43 / 38 deg) at unchanged
+      // luminance (0.133 -> 0.136, 0.206 -> 0.210); it is one hillside, so it
+      // gets one colour.
+      nearColor: 0x74805a,
+      farColor: 0x939a75,
+      // Matched to the arena definition's fog colour (src/rendering/arenas/
+      // test2.ts) so the hillsides dissolve into the haze they sit in. The
+      // authored 0xe9c9a0 had drifted off that fog (0xe6cbab) and was the
+      // single brightest large surface in the flyover at hue 22 deg - i.e. the
+      // biggest single contributor to the dominant bin. It now tracks the fog,
+      // which this pass took to the lilac a golden-hour valley haze actually is
+      // when you look across it rather than into the sun.
+      hazeColor: 0xdcc4cd,
       hazeStrength: 0.74,
       name: 'test2-ridge-ring',
     },

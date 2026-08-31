@@ -78,7 +78,18 @@ export const definition = createProceduralArenaVisualDefinition({
   // frame's chroma weight, against 37-44% for Atomic Acres and Farcrysis).
   // near 98 puts the whole playfield in front of the haze; the ridge and the
   // hillside behind it still recede.
-  fog: { color: 0xe6cbab, near: 98, far: 186 },
+  // Art pass 2026-08-31: colour, not distance. near/far are the last pass's and
+  // stay. 0xe6cbab put the fog at hue 28 deg - inside the travertine's own bin -
+  // and everything past 98 m (the whole ridge ring and the hillside behind it,
+  // the largest bright mass in the menu flyover) graded toward it, which is why
+  // this map still measured 2 hue bins carrying 5% of frame chroma against 5
+  // and 7 for the shipped controls. A golden-hour haze is gold when you look
+  // INTO the sun and lilac when you look across the valley away from it; this
+  // fog is explicitly matched to the horizon band and not to the sun, so lilac
+  // is the honest half of that pair. Luminance is held (Rec.709 luma 0.809 ->
+  // 0.791 in sRGB), and near 98 keeps the whole playfield in front of it, so this
+  // changes the distance and nothing a player fights in.
+  fog: { color: 0xdcc4cd, near: 98, far: 186 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.051 },
   atmosphere: { preset: 'estate-golden-hour', mist: 0.1, dust: 0.08, clouds: true },
   colorPipeline: colorPipeline('pass81.test2.hdr.v1', 1.07),

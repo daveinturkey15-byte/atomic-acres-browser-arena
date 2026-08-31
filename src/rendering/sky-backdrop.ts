@@ -142,6 +142,40 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   // sitting ON the horizon, about a degree thick, with real sky held down to
   // 0.49. A level player (who sees y 0.31-0.50) still gets a hazy horizon line;
   // the flyover gets sky.
+  //
+  // ART PASS 2026-08-31 - THE FLYOVER WINDOW ABOVE WAS DERIVED, NOT MEASURED,
+  // AND IT IS WRONG. Measured directly this time, by rendering the backdrop
+  // twice at the shipped helo pose: once flat magenta (scene.environment is
+  // null on this route, so the backdrop lights nothing and a magenta pixel is
+  // backdrop and only backdrop - an exact mask, real occlusion included) and
+  // once as twenty coded 0.005-tall bands. Classifying the masked pixels of the
+  // second frame against the first gives the window off the render:
+  //
+  //   Test1 menu flyover : backdrop = 12.1% of the frame, 80.4% of it BELOW
+  //                        y 0.520, 15.4% in 0.495-0.515, ~0% above 0.490.
+  //   Test1 firing line  : 0.31-0.435.   container-occlusion: 0.31-0.435.
+  //   Test1 into-sun     : 0.29-0.46.    tower-overview:      0.43-0.64.
+  //
+  // The limit at the flyover is not the ridge ring, it is the TOP OF FRAME. The
+  // camera orbits at 22 m looking at [0, 2.4, 0] on a 30 x 23 m ellipse, so its
+  // pitch is fixed by geometry at -33.2 to -40.4 degrees; at fov 68 the top
+  // edge of the frame is +0.8 to -6.4 degrees of elevation, i.e. y 0.4956 to
+  // 0.5356. The analytic prediction for the captured phase (+0.60 deg,
+  // y 0.4967) lands inside the measured band, so the model and the render
+  // agree. THE MENU FLYOVER HAS ESSENTIALLY NO SKY IN IT. What it has is the
+  // wedge between the ridge silhouette and the arena's far edge, and that wedge
+  // is the BELOW-HORIZON half of this gradient - which was one smooth ramp, and
+  // is what the review saw as "a flat pale wash".
+  //
+  // So the structure goes where the camera is looking. From 22 m, y 0.52 is
+  // ground 350 m out, 0.55 is 139 m, 0.60 is 68 m: it is the far distance, and
+  // the far distance has layers. Authored as aerial perspective actually
+  // behaves - the farthest band is the palest and the COOLEST (that is dust
+  // scattering, and it is also the only cool family anywhere in this arena's
+  // flyover frame), a distant butte line takes a real value step below it, then
+  // the flats come back out of the haze warm and sunlit. Everything at and
+  // above 0.4985 is untouched: the eye-level cameras look at 0.29-0.46 and that
+  // half now measures well.
   'range-midmorning': Object.freeze([
     [0, '#2f5f9e'],
     [0.16, '#3b73b0'],
@@ -150,8 +184,18 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0.474, '#8fbcdc'],
     [0.492, '#b7c8cf'],
     [0.4985, '#e7d9ba'],
-    [0.53, '#d6c092'],
-    [0.7, '#b39a72'],
+    // Below the horizon: the far-distance band the menu flyover actually sees.
+    // Stops come in PAIRS that hold a value across a band. A single stop per
+    // colour never plateaus - every pixel lands on a transition, which is how
+    // the first attempt at this turned a violet band into a pink ramp - and the
+    // flyover's mass sits at y 0.52-0.62 (screen rows 56-287 at the captured
+    // phase), so that is the span the cool bank has to actually occupy.
+    [0.505, '#c6d5e2'],
+    [0.520, '#93aecb'],
+    [0.548, '#86a2c0'],
+    [0.578, '#aebdca'],
+    [0.608, '#c7bb9c'],
+    [0.72, '#b39a72'],
     [1, '#7d6c4e'],
   ] as const),
   // Owner 2026-08-30 (v2): Test2 - late golden hour over the hillside estate.
@@ -175,6 +219,32 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   // all. It is worth the stop budget - the estate's surfaces are all warm, and
   // an entirely amber dome was leaving 56-72% of the frame's chroma weight in
   // one 10-degree hue bin.
+  //
+  // ART PASS 2026-08-31 - AND THAT WINDOW IS WRONG TOO, harder than Test1's.
+  // Same two-frame measurement (see range-midmorning above), same conclusion in
+  // a more extreme form:
+  //
+  //   Test2 menu flyover  : backdrop = 10.9% of the frame, 98.4% of it BELOW
+  //                         y 0.520. NOTHING above the horizon at all.
+  //   Test2 estate-overview: 0.42-0.64.   pool-lane / garden: 0.31-0.465.
+  //   Test2 into-sun-terrace: 0.29-0.465.
+  //
+  // The helo orbits at 26 m looking at [0, 3.6, 0] on a 36 x 28 m ellipse, so
+  // its pitch runs -31.9 to -38.7 degrees and the TOP EDGE of the frame is
+  // +2.1 to -4.7 degrees - y 0.4883 to 0.5261. At the captured phase the whole
+  // frame is below the horizon. No cloud band in the sky hemisphere can ever
+  // appear in this camera; the amber wash it shows is this gradient's ground
+  // half and nothing else.
+  //
+  // That band is therefore where both residuals get paid at once. It is the
+  // valley the estate looks down into, it is 10.9% of the flyover frame and
+  // 19.7% of that frame's entire chroma weight, and every bit of that weight
+  // was landing in hue bin 30-39 - the same bin the travertine is in, which is
+  // most of why this map measured 2 live hue bins against the shipped controls'
+  // 5 and 7. Authored as golden-hour aerial perspective genuinely looks away
+  // from the sun: the far ridge goes violet-blue in shade, sunlit slopes come
+  // back warm between the folds. Above 0.4985 is untouched - the eye-level
+  // cameras look at 0.29-0.465 and that half is good.
   'estate-golden-hour': Object.freeze([
     [0, '#1d4a8c'],
     [0.16, '#2f5c9b'],
@@ -183,8 +253,16 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0.462, '#a98a92'],
     [0.482, '#e39f6d'],
     [0.4985, '#ffcf90'],
-    [0.53, '#e8c294'],
-    [0.7, '#c2a87f'],
+    // Below the horizon: the valley, which is the whole of the flyover frame.
+    // Paired stops for the same reason as range-midmorning above - the flyover's
+    // mass is at y 0.53-0.62 and a single violet stop there just interpolates
+    // into the warm ones either side of it, which measured as pink, not violet.
+    [0.506, '#eab89e'],
+    [0.522, '#9d8fbe'],
+    [0.552, '#8177ac'],
+    [0.582, '#a691ae'],
+    [0.612, '#d7b287'],
+    [0.72, '#c2a87f'],
     [1, '#8a7657'],
   ] as const),
 });
@@ -240,20 +318,33 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     alpha: 0.58, scale: 0.54,
   }),
   // Test1. The brief says "a hard, clear sky", and v2 read that as clouds:null.
-  // That is right OVERHEAD and wrong at the horizon: the two cameras that
-  // matter both look at the low sky (a level player sees y 0.31-0.50, the menu
-  // flyover only 0.487-0.497), so clouds:null left every frame anyone looks at
-  // with an empty band - half of "the sky has nothing in it" in the review. A
-  // distant cumulus line ALONG the horizon is what a desert range actually has
-  // at mid-morning and it costs the brief nothing: the band is 0.462-0.488,
-  // i.e. 1-3.5 degrees of elevation, so everything above 4 degrees stays hard
-  // and clear. The small scale keeps them distant cloud rather than a deck, and
-  // the shadow colour is cool and dark enough to read against the haze band
-  // they sit on - white-on-cream was invisible.
+  // That is right OVERHEAD and wrong at the horizon, so a band was added - but
+  // it was placed at 0.462-0.488 on a mis-derived flyover window, and measuring
+  // the windows properly (see the two gradient entries above) shows 0.462-0.488
+  // is a DEAD ZONE: the three eye-level gameplay cameras top out at y 0.435-0.46
+  // and the menu flyover starts at 0.4956. Only tower-overview, one camera of
+  // five, could see any of it.
+  //
+  // Measured windows, union over every camera this arena has:  0.29 - 0.64.
+  // So the band is simply the shape every other shipped outdoor preset already
+  // uses - sunset-farmland 0.18-0.56, airport-dawn 0.12-0.55, open-ocean-day
+  // 0.10-0.46 - and it satisfies the same assertion in sky-backdrop.test.ts
+  // that those three do (bandTop < 0.25, bandBottom <= 0.56). The narrowness
+  // was the defect, not the fix. Density is controlled where it belongs, by
+  // count/alpha/scale: 30 small scattered cumulus over a 0.29-wide band is
+  // fair-weather scatter, not the closed deck the jungle note warns about, so
+  // "hard, clear sky" survives - and that is measured, not asserted. The count,
+  // scale and alpha below are a bounded search against the eye-level cameras,
+  // which is where "clear" is judged: 30 / 0.46 / 0.46 covered the sky and cost
+  // the firing line 36% of its frame chroma (0.215 -> 0.138), 21 / 0.38 / 0.44
+  // gave the chroma back but also gave back every bit of the hue spread the
+  // clouds' cool shadow sides had bought (huePerplexity 6.03 -> 3.23). 26 /
+  // 0.42 / 0.42 is where both hold. bandBottom 0.505 puts cloud BASES on the
+  // horizon line, which is where the flyover's few rows of real sky are.
   'range-midmorning': Object.freeze({
-    count: 34, bandTop: 0.462, bandBottom: 0.488,
-    rgb: [255, 251, 242] as [number, number, number], shadowRgb: [118, 132, 156] as [number, number, number],
-    alpha: 0.5, scale: 0.3,
+    count: 26, bandTop: 0.22, bandBottom: 0.505,
+    rgb: [253, 250, 244] as [number, number, number], shadowRgb: [116, 136, 168] as [number, number, number],
+    alpha: 0.42, scale: 0.42,
   }),
   // v2: the band was 0.16-0.50, so more than half of it sat above the visible
   // sky band (0.31-0.50 for a level camera) and the rest ran straight into the
@@ -268,10 +359,28 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
   // is where both the flyover and a level player's low sky overlap, and the
   // count raised: a golden-hour sky whose only structure is a gradient is
   // exactly the plateau the extraction's sky roll-off item warns about.
+  //
+  // Art pass 2026-08-31: that window was wrong (the measurement is in the
+  // 'estate-golden-hour' gradient entry above). This arena's flyover sees
+  // NOTHING above the horizon at any orbit phase, so no cloud band can reach
+  // it and the flyover is fixed in the gradient's ground half instead. What
+  // this band has to serve is the four cameras that do look up - 0.29-0.465 for
+  // the three at eye level, 0.42-0.64 for the estate overview - and 0.44-0.488
+  // covered only the last of them. Back to the shipped shape (bandTop < 0.25,
+  // bandBottom <= 0.56, the assertion sky-backdrop.test.ts already makes of
+  // sunset-farmland, industrial-night and airport-dawn).
+  //
+  // RECOLOURED, not just moved. At alpha 0.5 with rgb(255,214,166) the deck was
+  // amber cloud on an amber sky: no value step, no hue step, and it read as
+  // dirty haze rather than as cloud. A golden-hour cumulus has a very high
+  // contrast ratio across itself - the lit top takes the full unattenuated beam
+  // and is nearly white, the underside sees only the blue zenith and goes cold
+  // violet. Both ends are pushed to what they physically are, and the alpha
+  // raised so the cold side actually resolves.
   'estate-golden-hour': Object.freeze({
-    count: 30, bandTop: 0.44, bandBottom: 0.488,
-    rgb: [255, 214, 166] as [number, number, number], shadowRgb: [82, 78, 112] as [number, number, number],
-    alpha: 0.5, scale: 0.36,
+    count: 32, bandTop: 0.20, bandBottom: 0.505,
+    rgb: [255, 243, 228] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
+    alpha: 0.56, scale: 0.5,
   }),
 });
 

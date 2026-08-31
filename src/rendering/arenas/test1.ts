@@ -89,7 +89,13 @@ export const definition = createProceduralArenaVisualDefinition({
       { id: 'test1-range-practicals', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
     ],
   },
-  fog: { color: 0xdbd2bc, near: 82, far: 168 },
+  // Colour follows the sky preset's horizon dust band by rule, not by eye.
+  // Art pass 2026-08-31: that band was re-authored blue-grey when the menu
+  // flyover's real window was measured (see sky-backdrop.ts), so the fog goes
+  // with it, 0xdbd2bc -> 0xcdd6dd. Rec.709 luma 0.825 -> 0.834, so this
+  // is not an exposure change; it is the aerial perspective on the backdrop
+  // finally being the colour that distance actually is.
+  fog: { color: 0xcdd6dd, near: 82, far: 168 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 130, normalBias: 0.033 },
   atmosphere: { preset: 'range-midmorning', mist: 0.05, dust: 0.22, clouds: false },
   colorPipeline: colorPipeline('pass81.test1.hdr.v1', 1.05),
