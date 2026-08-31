@@ -28,6 +28,7 @@ import {
 import { installTintSwizzleShim, tintSwizzleShimTelemetry } from '../webgpu-tint-swizzle-shim';
 import { createSky } from './sky';
 import { createPhysicsCorridor, type PhysicsCorridor } from './corridor-physics';
+import { createColosseumCorridor } from './corridor-colosseum';
 import { setSun } from './foliage-material';
 
 /* ---------------------------------------------------------------- */
@@ -300,6 +301,7 @@ async function main(): Promise<void> {
     createWeatherCorridor(21),
     createVolumeCorridor(),
     physics,
+    createColosseumCorridor(),
   ];
 
   const HUB_R = 19;
