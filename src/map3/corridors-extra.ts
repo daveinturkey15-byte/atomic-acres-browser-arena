@@ -195,6 +195,7 @@ export function createWaterCorridor(): Corridor {
   return {
     group,
     length: LEN,
+    foliage: uniforms,
     title: 'Gerstner shoreline with reachable foam',
     skill: 'threejs-webgpu-water',
     update(elapsed) {
@@ -379,6 +380,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
   return {
     group,
     length: LEN,
+    foliage: uniforms,
     title: 'Seasons and weather, one seeded field',
     skill: 'atomic-acres-procedural-art-authoring',
     update(elapsed) {

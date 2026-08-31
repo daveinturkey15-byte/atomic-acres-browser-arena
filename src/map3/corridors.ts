@@ -28,12 +28,21 @@ import { createLitterSkirt, hash11, mergeGeometries } from './leaf-geometry';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, createBarkMaterial, createFlatFoliageMaterial,
   createFoliageMaterial, createFoliageUniforms, createForestFloorMaterial,
+  type FoliageUniforms,
 } from './foliage-material';
 
 export interface Corridor {
   group: THREE.Group;
   update(elapsed: number, dt: number): void;
   dispose(): void;
+  /**
+   * Exposed so the bootstrap can point leaf transmission at the REAL sun.
+   * Each corridor builds its own FoliageUniforms privately; without this the
+   * translucency term keeps its construction-time sun and stops agreeing with
+   * the sky the moment the sun starts orbiting — the leaves would glow from a
+   * direction the sun is no longer in.
+   */
+  foliage?: FoliageUniforms;
   /** Walk-through length in metres; the hub uses it to place the far sign. */
   length: number;
   title: string;
@@ -195,6 +204,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   return {
     group,
     length: LEN,
+    foliage: uniforms,
     title: 'Leaf translucency, curvature and litter',
     skill: 'threejs-procedural-vegetation',
     update(elapsed) {

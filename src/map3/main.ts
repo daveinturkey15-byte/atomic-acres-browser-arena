@@ -26,6 +26,9 @@ import {
   createWaterCorridor, createWeatherCorridor, createVolumeCorridor,
 } from './corridors-extra';
 import { installTintSwizzleShim, tintSwizzleShimTelemetry } from '../webgpu-tint-swizzle-shim';
+import { createSky } from './sky';
+import { createPhysicsCorridor, type PhysicsCorridor } from './corridor-physics';
+import { setSun } from './foliage-material';
 
 /* ---------------------------------------------------------------- */
 /* Signage — canvas to CanvasTexture on a world plane.               */
@@ -207,8 +210,11 @@ async function main(): Promise<void> {
   document.body.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x8fb3c4);
-  scene.fog = new THREE.Fog(0x8fb3c4, 55, 320);
+  // The sky dome covers the whole view, so there is nothing for a background
+  // clear to contribute. Fog is matched to the dome's horizon colour, because
+  // a mismatch shows up as a hard line where the treeline meets the sky.
+  scene.background = null;
+  scene.fog = new THREE.Fog(0x9dc0d2, 55, 320);
 
   const camera = new THREE.PerspectiveCamera(76, window.innerWidth / window.innerHeight, 0.08, 400);
   camera.position.set(2.5, 1.7, 4.0);
@@ -237,6 +243,12 @@ async function main(): Promise<void> {
   sun.shadow.normalBias = 0.02;
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(0xbcd8e8, 0x38402c, 1.9));
+
+  // --- sky --------------------------------------------------------------
+  // Must sit at the origin, unrotated and unscaled: the dome shades from the
+  // view direction and the two SDF bodies march in world space.
+  const sky = createSky();
+  scene.add(sky.group);
 
   // --- hub ------------------------------------------------------------
   const hubMat = new MeshStandardNodeMaterial();
@@ -277,6 +289,9 @@ async function main(): Promise<void> {
   scene.add(kerb);
 
   // --- corridors ------------------------------------------------------
+  // Rapier's init() is async, so this one corridor has to be awaited before
+  // the hub can lay the spokes out.
+  const physics: PhysicsCorridor = await createPhysicsCorridor();
   const corridors: Corridor[] = [
     createNatureCorridor(7),
     createMathsCorridor(),
@@ -284,6 +299,7 @@ async function main(): Promise<void> {
     createWaterCorridor(),
     createWeatherCorridor(21),
     createVolumeCorridor(),
+    physics,
   ];
 
   const HUB_R = 19;
@@ -404,13 +420,27 @@ async function main(): Promise<void> {
     : gpu.renderer.replace(/^ANGLE \(|\)$/g, '').slice(0, 46);
 
   const forward = new THREE.Vector3();
+  const playerVel = new THREE.Vector3();
   const right = new THREE.Vector3();
   const clock = new THREE.Clock();
   let frames = 0;
   let fpsAccum = 0;
   let fps = 0;
 
+  // renderer.info is populated by the render, and renderAsync has not
+  // necessarily finished by the time the same tick reads it - which made the
+  // HUD report 0 draws and the scene check claim every mesh had been culled
+  // while the world was plainly on screen. Sample it at the TOP of the next
+  // frame instead, so the numbers describe the frame that actually completed.
+  let lastDraws = 0;
+  let lastTris = 0;
+
   function tick(): void {
+    const info = renderer.info?.render as { drawCalls?: number; triangles?: number } | undefined;
+    if (info && (info.drawCalls ?? 0) > 0) {
+      lastDraws = info.drawCalls ?? 0;
+      lastTris = info.triangles ?? 0;
+    }
     const dt = Math.min(clock.getDelta(), 0.05);
     const elapsed = clock.elapsedTime;
 
@@ -434,6 +464,24 @@ async function main(): Promise<void> {
 
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
 
+    // Drive the sky first: the sun position it produces is what the light and
+    // the leaf transmission both read this frame, so doing it after them would
+    // leave the lighting one frame behind the visible sun.
+    sky.update(elapsed, dt);
+    // 120 rather than the sun's own orbit radius: shadow.camera.far is 190 and
+    // the ortho box is +/-34, so 120 + 34 fits inside it with room to spare.
+    sun.position.copy(sky.sunDirection).multiplyScalar(120);
+    sun.color.copy(sky.sunColor);
+    // Point every corridor's leaf transmission at the REAL sun, so a backlit
+    // canopy glows from the direction the sun is actually in.
+    for (const c of corridors) {
+      if (c.foliage) setSun(c.foliage, sky.sunDirection, sky.sunColor);
+    }
+
+    // `move` is already speed*dt, so dividing by dt recovers m/s.
+    playerVel.set(dt > 0 ? move.x / dt : 0, vy, dt > 0 ? move.z / dt : 0);
+    physics.setPlayer(camera.position, playerVel);
+
     corridors.forEach((c) => c.update(elapsed, dt));
 
     renderer.renderAsync(scene, camera);
@@ -444,11 +492,14 @@ async function main(): Promise<void> {
       fps = Math.round(frames / fpsAccum);
       frames = 0;
       fpsAccum = 0;
-      const dc = (renderer.info?.render as { drawCalls?: number } | undefined)?.drawCalls ?? 0;
+      const dc = lastDraws;
       let total = 0;
       scene.traverse((o) => { if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints) total++; });
-      reportScene(dc, total);
-      const tri = Math.round(((renderer.info?.render as { triangles?: number } | undefined)?.triangles ?? 0) / 1000);
+      // Only meaningful once a frame has actually reported. Draw calls also
+      // legitimately fall below the mesh count through frustum culling, so
+      // only flag a collapse, not any shortfall.
+      if (dc > 0 && dc < total * 0.25) reportScene(dc, total);
+      const tri = Math.round(lastTris / 1000);
       hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${shimTel()} · ${gpuShort}`
         + `  |  1-6 solo corridor · 0 all · O shadows · P foliage · H half-res`;
       hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
