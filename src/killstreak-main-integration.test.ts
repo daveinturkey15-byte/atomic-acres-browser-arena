@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const deathDropSource = readFileSync(new URL('./death-drops.ts', import.meta.url), 'utf8');
+/** New home of the support airspace, lifted out of legacy-main on 2026-08-31. */
+const flightWorld = readFileSync(new URL('./systems/support-flight-world.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 playable killstreak integration', () => {
   it('freezes the persisted five-slot selection and routes keys 3-7 through activation or possession', () => {
@@ -276,11 +278,21 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'");
     expect(source).not.toContain("LEFT CLICK or [F] to confirm target  [ESC] to cancel");
     expect(source).toContain('cancelSupportTargeting(true)');
-    expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
-    expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
-    expect(source).toContain('colliders: flightSolids');
+    // Re-pinned 2026-08-31: the lazy placement-ground sampler moved out of
+    // legacy-main into src/systems/support-flight-world.ts. The invariant is
+    // unchanged - host-owned surface height, built at most once per world, off
+    // the SAME collider snapshot support flight uses - so the pins follow it.
+    // legacy-main keeps the half that genuinely belongs to it: the scene walk.
+    expect(flightWorld).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
+    expect(flightWorld).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
+    expect(flightWorld).toContain('colliders: input.solids,');
     expect(source).toContain('arena.root.updateWorldMatrix(true, true);');
-    expect(source).toContain('groundHeightAt,');
+    expect(source).toContain('prepareRaycastMeshes: () => {');
+    expect(flightWorld).toContain('groundHeightAt: (x, z) => {');
+    // Strengthened: legacy-main must not grow a second sampler where the first
+    // one lived, and must not go back to assembling the airspace inline.
+    expect(source).not.toContain('new SupportPlacementGroundSampler(');
+    expect(source.split('createSupportFlightWorld(')).toHaveLength(2);
     expect(source).toContain('crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null');
     expect(source).toContain('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND');
     expect(source).not.toContain('CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE');
@@ -347,13 +359,30 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(source).toContain("context.fillText(index === 0 ? 'START' : 'END', x, y + 1);");
   });
 
+  // Re-pinned 2026-08-31: the airspace (portal/no-fly navigation, centre-spawn
+  // volume, flight predicates and the placement ground surface) moved into
+  // src/systems/support-flight-world.ts. It is one arena-derived unit and it now
+  // has one home, which is the point: HF-131 ("always spawn in the center of the
+  // map") could previously only be observed by flying a killstreak, so the
+  // drone-deployment suite tested a hand-copied duplicate of this arithmetic.
+  // Same feed, same predicates - nothing relaxed, and the negative assertions
+  // below stop legacy-main assembling a second airspace where the first one was.
   it('feeds arena-owned portal/no-fly data and current static plus dynamic solids into support flight', () => {
-    expect(source).toContain('PASS65_FLIGHT_NAVIGATION[selectedArena.id]');
+    expect(flightWorld).toContain('PASS65_FLIGHT_NAVIGATION[input.arenaId]');
     expect(source).toContain('const flightSolids = activeWorldColliders();');
-    expect(source).toContain('resolveFlightPosition: (from, desired, radius)');
-    expect(source).toContain('resolveSupportFlightStep({');
-    expect(source).toContain('solids: flightSolids');
-    expect(source).toContain('!flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid))');
+    expect(source).toContain('solids: flightSolids,');
+    expect(flightWorld).toContain('resolveFlightPosition: (from, desired, radius)');
+    expect(flightWorld).toContain('resolveSupportFlightStep({');
+    expect(flightWorld).toContain('solids: input.solids,');
+    expect(flightWorld).toContain('!input.solids.some((solid) => sphereIntersectsBox(point, FLIGHT_POSITION_CLEARANCE_M, solid))');
+    expect(flightWorld).toContain('const FLIGHT_POSITION_CLEARANCE_M = 0.35;');
+    // The moved half must not reach back into the module it came from.
+    expect(flightWorld).not.toMatch(/from\s+'\.\.\/legacy-main'/u);
+    expect(flightWorld).not.toContain('document.');
+    // ...and legacy-main must not regrow it.
+    expect(source).not.toContain('resolveSupportFlightStep(');
+    expect(source).not.toContain('resolveSupportAircraftEnvelopeStep(');
+    expect(source).not.toContain('supportFlightCentreVolume:');
   });
 
   it('routes one pinned F press only through exact world interactions', () => {

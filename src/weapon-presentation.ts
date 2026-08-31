@@ -69,9 +69,11 @@ export {
   viewmodelGripFamily,
   type ViewmodelGripFamily,
 } from './weapon-presentation-pose-profiles';
+import { adsSightProfile } from './ads-sight-profile';
 import {
   PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT,
   PASS70_FIRST_PERSON_OPTIC_WINDOW_OPACITY,
+  authoredOpticAssembly,
   capturePass70FirstPersonMaterialState,
   createPass65CrossbowModel,
   createPass65FieldKnifeModel,
@@ -783,6 +785,22 @@ function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
   'mini-uzi': 0.024,
 });
+export const COMPACT_OPTIC_ADS_PRESENTATION_CONTRACT = 'authored-optic-assembly-eye-scale-v1' as const;
+/**
+ * How much larger the authored compact optic presents at settled ADS.
+ *
+ * HF-405. The crossbow's optic is authored at true size on a viewmodel that
+ * sits about 1.2 m from the eye, so its ocular subtends barely 36 px on a
+ * 720p frame: a correct 1.5x whose glass and reticle are too small to read as
+ * glass or reticle. The physical weapon cannot simply be brought closer — the
+ * stock would pass through the camera — so the OPTIC alone grows about its
+ * own authored socket as the aim blend completes, which is the same thing the
+ * shooter's eye moving up behind it would do. Hip presentation is untouched
+ * (the factor is 1 at zero blend) and no socket, bore or aim ray moves: the
+ * assembly's scale and its compensating position are the only writes.
+ */
+export const COMPACT_OPTIC_ADS_EYE_SCALE = 1.85;
+
 const FIRST_PERSON_ADS_SIGHT_PICTURE_RETREAT: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
   // The authored muzzle/front-sight geometry extends close to the camera when
   // its rear socket is centred. A bounded ADS-only retreat keeps the opaque
@@ -3594,11 +3612,57 @@ export class WeaponPresentation {
                       : ['pistol-rear-sight'];
     // Pass 65 authored GLBs expose a canonical socket contract. Cosmetic mesh
     // names are retained only as a fallback for the procedural/headless models.
-    return (this.active === 'carbine'
+    // HF-405: a weapon that presents a compact optic aims through its OPTIC
+    // socket, not through the iron rear sight it also carries. The crossbow
+    // authors both; centring the irons left the glass a couple of pixels off
+    // the aim point it is supposed to own.
+    return (this.active === 'carbine' || adsSightProfile(this.active).marker === 'compact-optic'
       ? model?.getObjectByName('optic-socket') ?? model?.getObjectByName('optic-reticle')
       : model?.getObjectByName('rear-sight-socket'))
       ?? model?.getObjectByName('rear-sight-socket')
       ?? sightNames.map((name) => model?.getObjectByName(name)).find((sight) => sight !== undefined);
+  }
+
+  /**
+   * The authored optic assembly for the mounted model, or undefined when the
+   * weapon does not present a compact optic. Cached per model: the traversal
+   * and the pivot are fixed for the life of the mounted instance.
+   */
+  private compactOpticAssembly(model: THREE.Object3D | undefined): THREE.Object3D | undefined {
+    if (!model || adsSightProfile(this.active).marker !== 'compact-optic') return undefined;
+    const cached = model.userData.compactOpticAssembly as THREE.Object3D | null | undefined;
+    if (cached !== undefined) return cached ?? undefined;
+    const assembly = authoredOpticAssembly(model);
+    model.userData.compactOpticAssembly = assembly;
+    if (!assembly) return undefined;
+    assembly.updateWorldMatrix(true, true);
+    const socket = model.getObjectByName('optic-socket');
+    const pivot = socket
+      ? assembly.worldToLocal(socket.getWorldPosition(new THREE.Vector3()))
+      : new THREE.Box3().setFromObject(assembly).getCenter(new THREE.Vector3()).applyMatrix4(
+        assembly.matrixWorld.clone().invert(),
+      );
+    assembly.userData.compactOpticPivot = pivot;
+    assembly.userData.compactOpticBasePosition = assembly.position.clone();
+    return assembly;
+  }
+
+  /** Grows the authored optic to eye scale as the aim blend completes. See COMPACT_OPTIC_ADS_EYE_SCALE. */
+  private applyCompactOpticAdsPresentation(model: THREE.Object3D | undefined): void {
+    const assembly = this.compactOpticAssembly(model);
+    if (!assembly) return;
+    const pivot = assembly.userData.compactOpticPivot as THREE.Vector3;
+    const base = assembly.userData.compactOpticBasePosition as THREE.Vector3;
+    const scale = 1 + (COMPACT_OPTIC_ADS_EYE_SCALE - 1) * this.adsBlend;
+    // p' = base + q(1 - s) keeps the authored pivot exactly where it was, so
+    // the optic grows off the rail rather than sliding along it.
+    assembly.scale.setScalar(scale);
+    assembly.position.set(
+      base.x + pivot.x * (1 - scale),
+      base.y + pivot.y * (1 - scale),
+      base.z + pivot.z * (1 - scale),
+    );
+    assembly.updateWorldMatrix(false, true);
   }
 
   private centerSightReference(model: THREE.Object3D | undefined): void {
@@ -3846,6 +3910,20 @@ export class WeaponPresentation {
       attachedWeaponBatchStats: model?.userData.attachedWeaponBatchStats ?? null,
       adsProgress: this.adsBlend,
       sightReferenceName: sight?.name ?? null,
+      // HF-405 observability: whether the authored optic actually has an open
+      // bore and what scale it is presenting at. Both were unmeasurable while
+      // the sight picture was a capped housing.
+      compactOptic: (() => {
+        const assembly = this.compactOpticAssembly(model);
+        if (!assembly) return null;
+        return {
+          contract: COMPACT_OPTIC_ADS_PRESENTATION_CONTRACT,
+          assembly: assembly.name,
+          eyeScale: assembly.scale.x,
+          maximumEyeScale: COMPACT_OPTIC_ADS_EYE_SCALE,
+          bore: assembly.userData.hf405CompactOpticBore ?? null,
+        };
+      })(),
       sightOffset: projected ? [projected.x, projected.y] : null,
       armsVisible: arms?.visible === true || this.meleeRig.visible,
       armMeshCount,
@@ -5086,6 +5164,7 @@ export class WeaponPresentation {
         + this.stancePose.rollRadians * stanceHip,
       smoothing(13),
     );
+    this.applyCompactOpticAdsPresentation(activeModel);
     this.centerSightReference(activeModel);
     if (arms && !meleeActive) this.solveArms(arms, activeModel, reloadPose);
     if (!authoredMeleeActive) this.solveRiggedArms(activeModel, reloadPose);

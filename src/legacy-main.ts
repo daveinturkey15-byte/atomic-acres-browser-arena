@@ -262,9 +262,7 @@ import {
   withExactChopperRootHiddenForControl,
   type ChopperExteriorReviewBounds,
 } from './chopper-exterior-review-camera';
-import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
-import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
-import { SupportPlacementGroundSampler } from './support-placement-ground';
+import { PASS65_FLIGHT_NAVIGATION } from './killstreak-flight-navigation';
 import {
   applyPilotedDronePointerDelta,
   applyPilotedDroneScreenLookDelta,
@@ -381,7 +379,8 @@ import {
   type Stance,
 } from './gameplay';
 import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countdown-continuity';
-import { adsAimingFovDegrees, adsSightProfile } from './ads-sight-profile';
+import { adsAimingFovDegrees, adsSightProfile, deriveCompactOpticSightPicture } from './ads-sight-profile';
+import { applyCompactOpticSightPicture } from './ui/compact-optic-sight';
 import { ArenaMap, buildArena } from './map';
 import {
   admitCrossbowThroughGlass,
@@ -893,6 +892,7 @@ import {
   type ThermalRevealActivation,
   type ThermalRevealCandidate,
 } from './systems/thermal-reveal-selection';
+import { createSupportFlightWorld } from './systems/support-flight-world';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -6473,6 +6473,10 @@ function clearGameplayInput(): void {
   dmrThermalActive = false;
   sniperScopeOverlay.hidden = true;
   hudRoot.classList.remove('sniper-scope-active');
+  applyCompactOpticSightPicture(hudRoot, deriveCompactOpticSightPicture({
+    alive: false, weapon: player.weapon, adsHeld: false, adsProgress: 0,
+    baseFovDegrees: preferredFov, cameraFovDegrees: camera.fov,
+  }));
   dmrThermalPresentation.update(camera, [], false);
   hudRoot.classList.remove('dmr-thermal-active');
   deactivateRailgunScopePresentation();
@@ -22375,92 +22379,25 @@ function killstreakWorldState(): KillstreakWorld {
     }
   }
   lastKillstreakWorldTargetCount = targets.length;
-  const flightNavigation = PASS65_FLIGHT_NAVIGATION[selectedArena.id];
-  const centrePortal = [...flightNavigation.portals]
-    .sort((left, right) => right.altitudeM - left.altitudeM || left.id.localeCompare(right.id))[0];
-  const centreSpawn: [number, number, number] = [
-    (arena.bounds.minX + arena.bounds.maxX) / 2
-      + (centrePortal?.xQ ?? 0) * (arena.bounds.maxX - arena.bounds.minX) / 2,
-    centrePortal?.altitudeM ?? flightNavigation.ceilingY * 0.45,
-    (arena.bounds.minZ + arena.bounds.maxZ) / 2
-      + (centrePortal?.zQ ?? 0) * (arena.bounds.maxZ - arena.bounds.minZ) / 2,
-  ];
   // Centre-spawn admission can run hundreds of bounded probes. Snapshot the
   // current collision authority once so each probe does not rebuild/enumerate
   // the full collider set and introduce an activation hitch.
   const flightSolids = activeWorldColliders();
-  let groundSampler: SupportPlacementGroundSampler | null = null;
-  const groundHeightAt = (x: number, z: number): number => {
-    groundSampler ??= new SupportPlacementGroundSampler({
+  return {
+    // The airspace, the centre-spawn volume and the placement ground surface
+    // are one arena-derived unit, owned and unit-tested in its own module.
+    ...createSupportFlightWorld({
+      arenaId: selectedArena.id,
       bounds: arena.bounds,
-      ceilingY: flightNavigation.ceilingY,
-      colliders: flightSolids,
+      solids: flightSolids,
       prepareRaycastMeshes: () => {
         arena.root.updateWorldMatrix(true, true);
         return activeRaycastMeshes();
       },
-    });
-    return groundSampler.heightAt(x, z);
-  };
-  return {
-    bounds: {
-      minX: arena.bounds.minX,
-      maxX: arena.bounds.maxX,
-      minZ: arena.bounds.minZ,
-      maxZ: arena.bounds.maxZ,
-      floorY: 0,
-      ceilingY: flightNavigation.ceilingY,
-    },
+    }),
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
     hasLineOfSight: (from, to) => killstreakLineOfSight(flightSolids, from, to),
-    groundHeightAt,
-    resolveFlightPosition: (from, desired, radius) => {
-      const result = resolveSupportFlightStep({
-        definition: flightNavigation,
-        arenaBounds: arena.bounds,
-        solids: flightSolids,
-        from: { x: from[0], y: from[1], z: from[2] },
-        desired: { x: desired[0], y: desired[1], z: desired[2] },
-        radius,
-      });
-      return [result.position.x, result.position.y, result.position.z];
-    },
-    resolveFlightEnvelopePosition: (from, desired, envelope) => resolveSupportAircraftEnvelopeStep({
-      bounds: {
-        minX: arena.bounds.minX,
-        maxX: arena.bounds.maxX,
-        minZ: arena.bounds.minZ,
-        maxZ: arena.bounds.maxZ,
-        floorY: 0,
-        ceilingY: flightNavigation.ceilingY,
-      },
-      solids: flightSolids,
-      from,
-      desired,
-      envelope,
-    }).position,
-    isFlightPositionValid: (position) => {
-      const point = { x: position[0], y: position[1], z: position[2] };
-      return pointInsideBounds(point, arena.bounds, 0.35)
-        && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
-    },
-    supportStrikeBoundsAt: (anchor) => {
-      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
-      return selectedArena.id === 'gun-range'
-        && anchor[0] >= bay.minX && anchor[0] <= bay.maxX
-        && anchor[2] >= bay.minZ && anchor[2] <= bay.maxZ
-        ? bay
-        : arena.bounds;
-    },
-    supportFlightCentreVolume: {
-      centre: centreSpawn,
-      halfExtents: [
-        Math.min(7.5, (arena.bounds.maxX - arena.bounds.minX) * 0.12),
-        Math.min(2, flightNavigation.ceilingY * 0.05),
-        Math.min(7.5, (arena.bounds.maxZ - arena.bounds.minZ) * 0.12),
-      ],
-    },
   };
 }
 
@@ -25360,6 +25297,17 @@ function updatePhysics(dt: number): void {
     cameraFov: camera.fov,
   });
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
+  // HF-405: the crossbow's authored 1.5x presents its own compact-optic sight
+  // picture. It keeps the viewmodel and the periphery, so it never enters the
+  // fullscreen-suppression path the sniper/DMR/railgun optics use above.
+  applyCompactOpticSightPicture(hudRoot, deriveCompactOpticSightPicture({
+    alive: player.alive,
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFovDegrees: preferredFov,
+    cameraFovDegrees: camera.fov,
+  }));
   camera.position.copy(player.position);
   camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
