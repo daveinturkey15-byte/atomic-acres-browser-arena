@@ -3830,6 +3830,13 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
 }
 
 /**
+ * Standing capsule height used by the debug collision probes, matching the live
+ * bot mover's botCapsuleHeight. isBlocked is given the capsule TOP, so a probe
+ * must be raised by this much above the surface it is testing.
+ */
+const DEBUG_PROBE_CAPSULE_HEIGHT_M = 1.7;
+
+/**
  * Owner 2026-08-30: "its physics to destruction and push need some help" - shed
  * wreckage sat inert while you walked straight through it. interactive-world-runtime
  * has supported source: 'player-contact' for a while but nothing ever called it.
@@ -33514,9 +33521,25 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       positions: stagedBots.map((bot) => bot.position.toArray()),
     };
   },
-  collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
-    ? isBlocked({ x, y: 0, z }, activeWorldColliders(), 0.44)
-    : true,
+  // Owner 2026-08-31: isBlocked takes the CAPSULE TOP, not the feet - see its
+  // `point.y - PLAYER_CAPSULE_HEIGHT > box.maxY` early-out, and the live bot
+  // mover above, which span-filters then probes at position.y + 1.7. Probing at
+  // y: 0 modelled a capsule spanning -1.7..0, i.e. entirely underground. That
+  // was invisible on the five arenas that author nothing below y = 0, but test1
+  // and test2 author their ground as real movement colliders at y[-1, 0], so
+  // this reported EVERY point in both arenas as solid. Nine playtest-*.mjs
+  // scripts consume this hook, and would have read that as a catastrophic
+  // traversal failure rather than a probe bug. Same defect the eye-clearance
+  // sweep carried (60886c35); this is its twin on the live debug surface.
+  collisionProbe: (x, z) => {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return true;
+    const capsuleTop = DEBUG_PROBE_CAPSULE_HEIGHT_M;
+    return isBlocked(
+      { x, y: capsuleTop, z },
+      collidersOverlappingVerticalSpan(activeWorldColliders(), 0, capsuleTop),
+      0.44,
+    );
+  },
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
     ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,
