@@ -149,16 +149,21 @@ export function supportStrikeBoundsAt(
 export function createSupportFlightWorld(input: SupportFlightWorldInput): SupportFlightWorld {
   const definition = PASS65_FLIGHT_NAVIGATION[input.arenaId];
   const centreSpawn = supportFlightCentreSpawn(definition, input.bounds);
-  // INHERITED, reported not fixed: the runtime bounds floor is the literal 0
-  // legacy-main passed, NOT `definition.floorY`. They differ on high-seas
-  // (floorY 3.2), where resolveSupportFlightStep clamps flight to the deck
-  // while everything reading `world.bounds.floorY` still believes the sea.
+  // Owner 2026-08-31. This was a literal 0 inherited from legacy-main, NOT
+  // `definition.floorY`, and the two systems therefore disagreed about where an
+  // arena's airspace begins: resolveSupportFlightStep clamps flight to
+  // definition.floorY, while every consumer of `world.bounds.floorY` (spawn
+  // altitudes, carpet corridors, hover clamps, the centre volume) computed
+  // against 0. Every arena authors 0 EXCEPT high-seas, which authors 3.2 for the
+  // yacht deck - so on that one map the placement systems were told the floor
+  // was the sea, 3.2 m below the deck the mover would actually allow. Publishing
+  // the authored floor makes the two agree; it is a no-op on the other seven.
   const flightBounds: SupportFlightWorld['bounds'] = {
     minX: input.bounds.minX,
     maxX: input.bounds.maxX,
     minZ: input.bounds.minZ,
     maxZ: input.bounds.maxZ,
-    floorY: 0,
+    floorY: definition.floorY,
     ceilingY: definition.ceilingY,
   };
   // The sampler walks the scene and updates world matrices, so it is built on

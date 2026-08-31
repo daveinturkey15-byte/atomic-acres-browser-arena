@@ -6804,40 +6804,71 @@ function requirePlayerName(): string | null {
   return name;
 }
 
+/**
+ * Last-resort fatal message. A hoisted function declaration that touches
+ * NOTHING but `document`, so it works at any point in module evaluation -
+ * including before every module-scope binding below it exists. This is the
+ * floor under showFatalError: whatever else fails, the player is told why.
+ */
+function renderPreInitFatalMessage(message: string): void {
+  if (typeof document === 'undefined' || !document.body) return;
+  const existing = document.getElementById('pre-init-fatal');
+  const node = existing ?? document.createElement('div');
+  node.id = 'pre-init-fatal';
+  node.setAttribute('role', 'alert');
+  node.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;'
+    + 'align-items:center;justify-content:center;padding:8vh 6vw;margin:0;'
+    + 'background:#140f0c;color:#f4ece2;font:600 clamp(15px,2.2vw,22px)/1.5 '
+    + 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:center;'
+    + 'white-space:pre-wrap;';
+  node.textContent = message;
+  if (!existing) document.body.appendChild(node);
+}
+
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  // Owner-facing correctness, found by the cross-browser gate 2026-08-30:
-  // showFatalError is reachable DURING module evaluation - the WebGPU
-  // requirement path calls it from the top-level bootstrap, long before the
-  // client world-repair state below it is initialised. Assigning a module
-  // `let` from inside its temporal dead zone throws a ReferenceError, so the
-  // player saw "Cannot access 'clientWorldRepairAdmission' before
-  // initialization" INSTEAD of "This game needs WebGPU..." - the error handler
-  // destroyed the very message it existed to deliver, in the one situation
-  // where a clear message matters most.
+  // Console FIRST, because it depends on nothing. Everything below this line
+  // touches module-scope state that may not exist yet.
+  console.error('[Nuke Town fatal]', error);
+  // Owner-facing correctness. showFatalError is reachable DURING module
+  // evaluation - the WebGPU requirement path calls it from the top-level
+  // bootstrap at ~line 1854, which runs BEFORE `bootstrapStage` (~2339),
+  // `clientWorldRepairAdmission` (~5638) and every other binding used here.
+  // Reading or assigning a module `let` from inside its temporal dead zone
+  // throws a ReferenceError, so the error reporter destroyed the very message
+  // it existed to deliver, in the one situation where a clear message matters
+  // most: a browser that cannot run the game at all.
   //
-  // This function's contract is that it works at ANY point in the lifecycle,
-  // so the session-state reset is now best-effort and can never mask the real
-  // failure. Ordering is not something a 33k-line module can be trusted to
-  // preserve; not throwing is.
+  // A previous fix (1a263aa0) guarded only `clientWorldRepairAdmission` and so
+  // fixed the INSTANCE, not the CLASS - `setBootstrapStage('failed')` on the
+  // very next line hit the same dead zone, and the cross-browser gate caught
+  // "Cannot access 'bootstrapStage' before initialization" still reaching the
+  // player. The whole tail is therefore one guarded block: this function's
+  // contract is that it works at ANY point in the lifecycle, and ordering is
+  // not something a 34k-line module can be trusted to preserve. Not throwing
+  // is. See src/regression-fatal-error-preinit.test.ts, which now pins the
+  // class rather than either instance.
   try {
     clientWorldRepairAdmission = null;
     pendingClientReconnectWorldRepairConnectionEpoch = null;
+    setBootstrapStage('failed');
+    bootstrapError = message;
+    gameStarted = false;
+    // Silence the music with the match. A failed bootstrap leaves the player on
+    // an error screen, and a cheerful loop under a failure message reads as a
+    // bug.
+    audio.stopGameMusic();
+    clearGameplayInput();
+    setLocalTriggerHeld(false);
+    setStatus(`Game paused: ${message}`, 'error');
+    applyMenuLifecycle({ type: 'fatal-error' });
+    presentBanner('fatal', 'SYSTEM PAUSED', 'Reload the page to re-enter the test block.', null);
   } catch {
-    // Pre-initialisation call: there is no session state to reset yet.
+    // Pre-initialisation call: none of the state above exists yet, and the
+    // usual UI cannot be reached. Fall back to a primitive DOM write so the
+    // real message still lands on screen.
+    renderPreInitFatalMessage(message);
   }
-  setBootstrapStage('failed');
-  bootstrapError = message;
-  gameStarted = false;
-  // Silence the music with the match. A failed bootstrap leaves the player on an
-  // error screen, and a cheerful loop under a failure message reads as a bug.
-  audio.stopGameMusic();
-  clearGameplayInput();
-  setLocalTriggerHeld(false);
-  setStatus(`Game paused: ${message}`, 'error');
-  applyMenuLifecycle({ type: 'fatal-error' });
-  presentBanner('fatal', 'SYSTEM PAUSED', 'Reload the page to re-enter the test block.', null);
-  console.error('[Nuke Town fatal]', error);
 }
 
 const webRtcSupported = typeof window.RTCPeerConnection === 'function';

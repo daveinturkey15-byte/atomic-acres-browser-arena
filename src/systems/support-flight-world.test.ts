@@ -240,29 +240,41 @@ describe('support-flight predicates', () => {
 });
 
 /**
- * INHERITED DIVERGENCE, pinned as-is and NOT fixed here (this extraction is a
- * move). legacy-main published `floorY: 0` in the runtime bounds regardless of
- * the arena's authored flight floor, while `resolveFlightPosition` clamps to
- * that authored floor. They agree on every arena but high-seas, whose deck sits
- * at 3.2 m. Reported to the owner as a follow-up; the pin exists so a later fix
- * is a deliberate, visible change rather than a silent one.
+ * FIXED 2026-08-31, and pinned so it cannot silently come back.
+ *
+ * The extraction found this and deliberately preserved it (a move is not the
+ * place to change behaviour), pinning the divergence as a characterisation
+ * test. It is now fixed: the published runtime bounds floor was a literal 0
+ * regardless of the arena's authored flight floor, while resolveFlightPosition
+ * has always clamped to that authored floor. Every arena authors 0 EXCEPT
+ * high-seas, whose deck sits at 3.2 m - so on that one map every consumer of
+ * `world.bounds.floorY` (spawn altitudes, carpet corridors, hover clamps, the
+ * centre volume) was computing against the sea, 3.2 m below the floor the mover
+ * would actually allow.
  */
-describe('inherited: published bounds floor vs the authored flight floor', () => {
-  it('publishes floorY 0 while flight is clamped to the authored deck on high-seas', () => {
+describe('the published bounds floor matches the authored flight floor', () => {
+  it('publishes the yacht deck, not the sea, on high-seas', () => {
     const definition = PASS65_FLIGHT_NAVIGATION['high-seas'];
+    // Guard the premise: if high-seas ever stops authoring a raised floor, this
+    // test would pass for the wrong reason and prove nothing.
     expect(definition.floorY).toBe(3.2);
     const world = flightWorld('high-seas');
-    expect(world.bounds.floorY).toBe(0);
+    expect(world.bounds.floorY).toBe(definition.floorY);
     expect(world.bounds.ceilingY).toBe(definition.ceilingY);
-    const radius = 0.6;
-    const [, y] = world.resolveFlightPosition([0, 10, 0], [0, 0, 0], radius);
-    expect(y).toBeCloseTo(definition.floorY + radius, 8);
-    expect(y).toBeGreaterThan(world.bounds.floorY);
   });
 
-  it('agrees with the published floor on every other arena', () => {
+  it('has the mover and the published floor agree, which was the actual defect', () => {
+    const world = flightWorld('high-seas');
+    const radius = 0.6;
+    // Dive at the deck: the mover clamps to floorY + radius, and that result
+    // must sit on the floor the bounds advertise. Before the fix the mover
+    // stopped at 3.8 while the bounds claimed the floor was 0.
+    const [, y] = world.resolveFlightPosition([0, 10, 0], [0, 0, 0], radius);
+    expect(y).toBeCloseTo(world.bounds.floorY + radius, 8);
+  });
+
+  it('agrees with the authored floor on every arena, not just the awkward one', () => {
     for (const arenaId of ARENA_IDS) {
-      if (arenaId === 'high-seas') continue;
       expect(PASS65_FLIGHT_NAVIGATION[arenaId].floorY, `${arenaId} floor`)
         .toBe(flightWorld(arenaId).bounds.floorY);
     }
