@@ -137,13 +137,17 @@ describe('opening arena selection', () => {
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
     expect(ARENA_SELECTIONS.filter((entry) => entry.authoring === 'import')).toHaveLength(1);
-    for (const entry of ARENA_SELECTIONS) {
-      expect(entry.authoringNote.length, `${entry.id} must explain its origin`).toBeGreaterThan(12);
-    }
-    // The imported one names its asset; the generated ones must not claim to.
-    expect(arenaSelection('atomic-acres').authoringNote).toMatch(/\.glb/);
+    // The owner's own wording, 2026-08-31: "imported assets" for Nuke Town and
+    // "all code build, no asset import" for everything else.
+    expect(arenaSelection('atomic-acres').authoringNote).toBe('IMPORTED ASSETS');
     for (const entry of ARENA_SELECTIONS.filter((candidate) => candidate.authoring === 'code')) {
-      expect(entry.authoringNote, `${entry.id} is code-built and must not name a mesh file`).not.toMatch(/\.glb/);
+      expect(entry.authoringNote, `${entry.id} is code-built`).toBe('ALL CODE BUILD, NO ASSET IMPORT');
+    }
+    // The note and the flag must never disagree - a card that says one thing while
+    // the registry says another is worse than no card at all.
+    for (const entry of ARENA_SELECTIONS) {
+      const claimsImport = entry.authoringNote.includes('IMPORTED');
+      expect(claimsImport, `${entry.id} note must match its authoring flag`).toBe(entry.authoring === 'import');
     }
   });
 

@@ -455,17 +455,19 @@
    */
   .map-card .map-authoring {
     display: block;
-    margin-top: 5px;
-    padding-top: 5px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px dashed var(--p66-line);
-    font-size: 9px;
-    font-weight: 600;
-    line-height: 1.3;
-    letter-spacing: 0.04em;
+    font: 800 8px/1.25 Inter, system-ui, sans-serif;
+    letter-spacing: 0.12em;
     text-decoration: none;
     color: var(--p66-faint);
   }
-  .map-card .map-authoring[data-authoring='import'] { color: var(--p66-cyan); }
+  /* The two origins must read differently at a glance, not on close reading. */
+  .map-card .map-authoring[data-authoring='import'] {
+    color: var(--p66-cyan);
+    font-weight: 900;
+  }
   /*
    * PROTOTYPE. An unfinished arena says so on the card, before it is loaded.
    */

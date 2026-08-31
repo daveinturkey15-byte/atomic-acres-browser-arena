@@ -79,7 +79,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: true,
     authoring: 'import' as const,
-    authoringNote: 'Authored in Blender, imported as atomic-acres-blender-arena.glb',
+    authoringNote: 'IMPORTED ASSETS',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -99,7 +99,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -119,7 +119,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - its Blender tower was retired',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -141,7 +141,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: GUN_RANGE_ROUND_MS, scoreLimit: null }),
   }),
   // HF-359 (Pass 74): revived Pass 69 hidden-lane arena (branch
@@ -173,7 +173,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: false,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -193,7 +193,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -213,7 +213,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
@@ -233,7 +233,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: true,
     overdrive: false,
     authoring: 'code' as const,
-    authoringNote: 'Built entirely in code - no map mesh is downloaded',
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);

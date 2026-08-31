@@ -742,6 +742,22 @@
   grid-column: 1 / -1;
 }
 
+/*
+ * The provenance line and the prototype badge are subject to the EXACT defect
+ * documented above: `.map-card` is a `31px 1fr` grid with auto-placed children,
+ * so any element added to the card drops into the 31px column and wraps to one
+ * word per line. Added 2026-08-31 for the owner's "listed against the map"
+ * request; spanning both columns is what makes them readable at all.
+ */
+#menu .map-card .map-authoring,
+#menu .map-card .map-prototype {
+  grid-column: 1 / -1;
+}
+
+#menu .map-card .map-prototype {
+  justify-self: start;
+}
+
 /* ---------------------------------------------------------------------------
  * PART 6 - voice. One decisive action; everything else stays quiet.
  * ------------------------------------------------------------------------ */
