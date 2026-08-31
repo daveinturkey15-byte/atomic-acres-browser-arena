@@ -40,7 +40,7 @@
  *     --out docs/assets/viewmodel-clipping-fix-2026-08-31 --tag extent-after
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -85,6 +85,11 @@ const browser = await chromium.launch({
   channel: 'chrome',
   args: [
     '--mute-audio',
+    // The owner's second monitor. Headed is required (bundled Chromium cannot
+    // get a WebGPU device on this machine and headless Chrome will not present
+    // frames the way the presented-frame measurement needs), so the window is
+    // parked off the primary screen instead of over the owner's work.
+    '--window-position=2560,0',
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',
@@ -136,11 +141,34 @@ async function measure(context) {
     const muzzle = mounted ? mounted.getObjectByName('muzzle-socket') : null;
     const muzzleWorld = muzzle ? muzzle.getWorldPosition(new V3()) : null;
 
+    // The applied cut, resolved BEFORE the vertex sweep so the sweep can count
+    // what actually survives it. `applyViewmodelContactClip` clamps the plane
+    // to the camera near plane plus the viewmodel's clearance; mirror that
+    // exactly rather than approximating it, or a clamped row reports a cut the
+    // renderer never placed.
+    const diag = api.sampleFireAdmissionDiagnostics();
+    const fold = diag.contactFold ?? null;
+    const cutAt = (depth) => (Number.isFinite(depth) ? Math.max(camera.near + 0.06, depth - 0.02) : null);
+    const clipM = fold ? cutAt(fold.clipPlaneDistanceMeters) : null;
+    // THE COUNTERFACTUAL. This pass changed WHERE the plane goes and nothing
+    // else - the fold still solves against the conservative lattice minimum -
+    // so replaying the PREVIOUS placement (`contactDepthMeters`) against these
+    // same vertices reproduces the previous build's frame exactly, with none of
+    // the run-to-run variance a second browser run would add.
+    const clipConservativeM = cutAt(diag.contactDepthMeters);
+
     // Furthest-forward VERTEX per visible mesh, skinning applied.
     let weaponFwdMax = -Infinity;
     let weaponFwdPart = null;
     let armsFwdMax = -Infinity;
     let armsFwdPart = null;
+    // NEAREST vertex of the whole rig, and how much of the rig survives the
+    // cut. `visibleFwdMaxM` alone cannot tell "cut back to the surface" from
+    // "cut away entirely" - both report the plane's own distance - which is
+    // why the 2026-08-31 empty frames had to be found by eye in the PNGs.
+    let rigFwdMin = Infinity;
+    let keptVertices = 0;
+    let keptVerticesConservative = 0;
     let meshes = 0;
     let vertices = 0;
     const scratch = new V3();
@@ -160,6 +188,9 @@ async function measure(context) {
         scratch.applyMatrix4(n.matrixWorld);
         const d = (scratch.x - eye.x) * fwd.x + (scratch.y - eye.y) * fwd.y + (scratch.z - eye.z) * fwd.z;
         if (d > localMax) localMax = d;
+        if (d < rigFwdMin) rigFwdMin = d;
+        if (clipM === null || d <= clipM) keptVertices += 1;
+        if (clipConservativeM === null || d <= clipConservativeM) keptVerticesConservative += 1;
       }
       const arms = /arm|sleeve|hand|glove|finger|skin|wrist/i.test(n.name);
       if (arms) { if (localMax > armsFwdMax) { armsFwdMax = localMax; armsFwdPart = n.name; } }
@@ -186,12 +217,7 @@ async function measure(context) {
       if (fwd.y < -0.001) { surfaceDistanceM = (eye.y - footY) / -fwd.y; surfaceKind = 'stance-ground-plane'; }
     }
 
-    const diag = api.sampleFireAdmissionDiagnostics();
     const snap = api.snapshot();
-    const fold = diag.contactFold ?? null;
-    const clipM = fold && Number.isFinite(fold.clipPlaneDistanceMeters)
-      ? fold.clipPlaneDistanceMeters - 0.02
-      : null;
     const rigFwdMax = Math.max(
       Number.isFinite(weaponFwdMax) ? weaponFwdMax : -Infinity,
       Number.isFinite(armsFwdMax) ? armsFwdMax : -Infinity,
@@ -212,7 +238,18 @@ async function measure(context) {
       armsFwdMaxM: Number.isFinite(armsFwdMax) ? armsFwdMax : null,
       armsFwdPart,
       rigFwdMaxM: Number.isFinite(rigFwdMax) ? rigFwdMax : null,
+      rigFwdMinM: Number.isFinite(rigFwdMin) ? rigFwdMin : null,
       clipPlaneDistanceM: clipM,
+      // HOW MUCH WEAPON REACHES THE SCREEN, measured rather than inferred.
+      //
+      // `visibleFwdMaxM` cannot tell "cut back to the wall" from "cut away
+      // entirely" - both report the plane's own distance - which is why the
+      // 2026-08-31 empty frames had to be found by eye in the PNGs. A cut that
+      // leaves 0.1% of the rig's vertices is an empty frame to a player, so the
+      // fraction is published and no boolean pretends otherwise.
+      keptVertexFraction: vertices > 0 ? keptVertices / vertices : null,
+      keptVertexFractionConservative: vertices > 0 ? keptVerticesConservative / vertices : null,
+      clipConservativeM,
       visibleFwdMaxM: Number.isFinite(rigFwdMax)
         ? (clipM === null ? rigFwdMax : Math.min(rigFwdMax, clipM))
         : null,
@@ -229,15 +266,31 @@ async function measure(context) {
         fireAdmission: diag.fireAdmission ?? null,
         dressingBoxCount: diag.dressingBoxCount ?? null,
         contactDepthMeters: diag.contactDepthMeters ?? null,
+        contactCutDepthMeters: diag.contactCutDepthMeters ?? null,
         contactFold: fold,
+        presentationProbes: diag.presentationProbes ?? null,
+        cutProbes: diag.presentationProbes?.cutProbes ?? null,
       },
     };
   }, context);
 }
 
-const rows = [];
 const ARENAS = arg('--arenas', '').split(',').map((a) => a.trim()).filter(Boolean);
 const OUT_JSON = resolve(OUT, `measurements-${TAG}.json`);
+/**
+ * Resume, for running the matrix one arena at a time.
+ *
+ * A 2560x1440 WebGPU run shares this machine with whatever else is on it, and
+ * on 2026-08-31 an arena load starved for twenty minutes behind another agent's
+ * three-lane browser sweep and had to be killed. Losing a completed leg to that
+ * is pure waste. `--arenas <one> --append 1` keeps the finished legs; rows for
+ * an arena being re-run are dropped first, so a leg can also simply be redone.
+ */
+const APPEND = arg('--append', '0') !== '0';
+const rows = APPEND && existsSync(OUT_JSON)
+  ? JSON.parse(readFileSync(OUT_JSON, 'utf8')).filter((r) => !ARENAS.includes(r.arena))
+  : [];
+if (rows.length) console.error(`[vmclip] resuming with ${rows.length} rows already measured`);
 /**
  * Write after every row. A long 2560x1440 WebGPU run occasionally loses the
  * page ("Target page, context or browser has been closed"), and a run that
@@ -358,9 +411,17 @@ for (const [arena, sites] of Object.entries(SITES)) {
           const pen = (v) => (v !== null && surface !== null ? v - surface : null);
           const name = `${TAG}-${arena}-${site.site}-${weapon}-${stance}`;
           if (SHOTS) await page.screenshot({ path: resolve(OUT, `${name}.png`) });
+          // The counterfactual's own extent, from the same vertices. See
+          // `clipConservativeM` inside measure(): the pose is unchanged by this
+          // pass, so this IS the previous build's frame.
+          const visibleConservativeM = m.rigFwdMaxM === null
+            ? null
+            : (m.clipConservativeM === null ? m.rigFwdMaxM : Math.min(m.rigFwdMaxM, m.clipConservativeM));
           const row = {
             tag: TAG, arena, site: site.site, siteLabel: site.label, standoffRequestedM: standoff,
             weapon, stance, ...m,
+            visibleFwdMaxConservativeM: visibleConservativeM,
+            penetrationConservativeM: pen(visibleConservativeM),
             muzzlePenetrationM: pen(m.muzzleForwardM),
             weaponPenetrationM: pen(m.weaponFwdMaxM),
             armsPenetrationM: pen(m.armsFwdMaxM),
@@ -371,8 +432,11 @@ for (const [arena, sites] of Object.entries(SITES)) {
           rows.push(row);
           flush();
           console.error(`[vmclip] ${name}  surface=${surface === null ? 'n/a' : surface.toFixed(3)}`
+            + ` cut=${m.clipPlaneDistanceM === null ? 'none' : m.clipPlaneDistanceM.toFixed(3)}`
             + ` muzzle=${m.muzzleForwardM?.toFixed(3)} weapon=${m.weaponFwdMaxM?.toFixed(3)}`
             + ` arms=${m.armsFwdMaxM?.toFixed(3)} visible=${m.visibleFwdMaxM?.toFixed(3)}`
+            + ` kept=${m.keptVertexFractionConservative === null ? 'n/a' : (m.keptVertexFractionConservative * 100).toFixed(0)}%`
+            + `->${m.keptVertexFraction === null ? 'n/a' : (m.keptVertexFraction * 100).toFixed(0)}%`
             + ` PEN=${row.penetrationM === null ? 'n/a' : row.penetrationM.toFixed(3)}`);
         }
       }
@@ -383,9 +447,48 @@ for (const [arena, sites] of Object.entries(SITES)) {
 flush();
 const graded = rows.filter((r) => r.penetrationM !== null && r.surfaceDistanceM > 0.05);
 const bad = graded.filter((r) => r.penetrationM > 0);
+// The second grade, added 2026-08-31. Closing the penetration number is not
+// enough on its own: a cut placed near enough closes it by deleting the
+// weapon, and the owner reported exactly that. A row fails here when the frame
+// has no weapon in it while the on-axis surface is further than 0.30 m - i.e.
+// the cut removed more than the geometry in front of the player required.
+const OVER_CUT_SURFACE_METERS = 0.3;
+/**
+ * A frame keeping under 5% of the rig's vertices has no weapon in it to a
+ * player. The 2026-08-31 empty frames kept 0.1%, so an `=== 0` test would have
+ * called them populated; this threshold is deliberately generous to the build
+ * being graded, and every row's exact fraction is in the JSON regardless.
+ */
+const EMPTY_FRAME_KEPT_FRACTION = 0.05;
+const nearCut = graded.filter((r) => r.clipPlaneDistanceM !== null && r.clipPlaneDistanceM < 0.25);
+const overCut = graded.filter((r) => r.keptVertexFraction !== null
+  && r.keptVertexFraction < EMPTY_FRAME_KEPT_FRACTION
+  && r.surfaceDistanceM > OVER_CUT_SURFACE_METERS);
 console.error(`[vmclip] ${rows.length} rows, ${graded.length} graded, ${bad.length} with VISIBLE geometry past the surface. stalled=${stalled} errors=${errors.length}`);
+const nearCutBefore = graded.filter((r) => r.clipConservativeM !== null && r.clipConservativeM < 0.25);
+const overCutBefore = graded.filter((r) => r.keptVertexFractionConservative !== null
+  && r.keptVertexFractionConservative < EMPTY_FRAME_KEPT_FRACTION
+  && r.surfaceDistanceM > OVER_CUT_SURFACE_METERS);
+const badBefore = graded.filter((r) => r.penetrationConservativeM !== null && r.penetrationConservativeM > 0);
+console.error(`[vmclip] cut nearer than 0.25 m: ${nearCutBefore.length} -> ${nearCut.length}`);
+console.error(`[vmclip] weapon fully removed with the on-axis surface past ${OVER_CUT_SURFACE_METERS} m: `
+  + `${overCutBefore.length} -> ${overCut.length}`);
+console.error(`[vmclip] visible geometry past the surface: ${badBefore.length} -> ${bad.length}`);
 for (const r of bad.slice(0, 12)) {
   console.error(`[vmclip]   FAIL ${r.arena}/${r.site}/${r.weapon}/${r.stance} pen=${r.penetrationM.toFixed(3)}`);
 }
+for (const r of overCut.slice(0, 12)) {
+  console.error(`[vmclip]   GONE ${r.arena}/${r.site}/${r.weapon}/${r.stance}`
+    + ` cut=${r.clipPlaneDistanceM.toFixed(3)} surface=${r.surfaceDistanceM.toFixed(3)}`
+    + ` kept=${(r.keptVertexFraction * 100).toFixed(1)}%`);
+}
+const keptMedian = (rowsIn, key) => {
+  const values = rowsIn.map((r) => r[key]).filter((v) => v !== null).sort((a, b) => a - b);
+  return values.length ? values[Math.floor(values.length / 2)] : null;
+};
+const contactRows = graded.filter((r) => r.clipPlaneDistanceM !== null);
+console.error(`[vmclip] median rig kept across ${contactRows.length} cut rows: `
+  + `${((keptMedian(contactRows, 'keptVertexFractionConservative') ?? 0) * 100).toFixed(1)}%`
+  + ` -> ${((keptMedian(contactRows, 'keptVertexFraction') ?? 0) * 100).toFixed(1)}%`);
 if (errors.length) console.error(errors.slice(0, 5).join('\n'));
 await browser.close();

@@ -44,6 +44,21 @@ const FLOOR_PROBE_PADDING_METERS = 0.035;
  */
 const GROUND_CLAMP_MIN_DOWN_COMPONENT = 0.001;
 
+/**
+ * A contact surface only places the CUT when the view axis meets it at least
+ * this squarely. `forward . normal` is -1 for a wall faced head-on and 0 for a
+ * wall running exactly alongside the view axis; below this the crossing point
+ * runs away to infinity and the surface is one a camera-perpendicular plane
+ * cannot represent at all.
+ */
+const CUT_FACE_MINIMUM_FACING = 1e-3;
+/** Axis-aligned face normals, indexed as (axis, sign) by the slab entry test. */
+const CUT_FACE_NORMALS: readonly (readonly [number, number, number])[] = Object.freeze([
+  Object.freeze([1, 0, 0] as const), Object.freeze([-1, 0, 0] as const),
+  Object.freeze([0, 1, 0] as const), Object.freeze([0, -1, 0] as const),
+  Object.freeze([0, 0, 1] as const), Object.freeze([0, 0, -1] as const),
+]);
+
 /** Where the camera is and which way it looks, plus the world it looks into. */
 export type ViewmodelContactProbeInput = Readonly<{
   weapon: WeaponId;
@@ -76,6 +91,8 @@ export type ViewmodelContactProbeSample = Readonly<{
   colliderBox: Box2 | null;
   /** Metres along the probe to the nearest dressing box, or null. */
   dressingMeters: number | null;
+  /** The dressing box that produced `dressingMeters`. Places the cut plane. */
+  dressingBox: Box2 | null;
 }>;
 
 export type ViewmodelContactProbeSweep = Readonly<{
@@ -118,6 +135,10 @@ const probeVolumeMin = new THREE.Vector3();
 const probeVolumeMax = new THREE.Vector3();
 const nearbyColliders: Box2[] = [];
 const nearbyDressing: Box2[] = [];
+const cutBoxMinimum = [0, 0, 0];
+const cutBoxMaximum = [0, 0, 0];
+const cutProbeOrigin = [0, 0, 0];
+const cutProbeDirection = [0, 0, 0];
 
 /**
  * Discards boxes no probe in this lattice can reach, before the nine segment
@@ -155,6 +176,9 @@ function forEachContactProbe(
     colliderMeters: number | null,
     colliderBox: Box2 | null,
     dressingMeters: number | null,
+    dressingBox: Box2 | null,
+    /** Probe origin in world space. The cut needs it to place a face plane. */
+    origin: THREE.Vector3,
   ) => void,
 ): ContactProbeFrame {
   const profile = VIEWMODEL_CONTACT_PROFILES[input.weapon];
@@ -206,6 +230,8 @@ function forEachContactProbe(
       hit ? hit.time * probeLengthMeters : null,
       hit ? hit.box : null,
       dressingHit ? dressingHit.time * probeLengthMeters : null,
+      dressingHit ? dressingHit.box : null,
+      probeStart,
     );
   }
   return { profile, probePaddingMeters: sweepPaddingMeters, forwardY: probeDirection.y, lattice };
@@ -219,8 +245,8 @@ export function sampleViewmodelContactProbes(
   input: ViewmodelContactProbeInput,
 ): ViewmodelContactProbeSweep {
   const samples: ViewmodelContactProbeSample[] = [];
-  const frame = forEachContactProbe(input, (offset, colliderMeters, colliderBox, dressingMeters) => {
-    samples.push({ offset, colliderMeters, colliderBox, dressingMeters });
+  const frame = forEachContactProbe(input, (offset, colliderMeters, colliderBox, dressingMeters, dressingBox) => {
+    samples.push({ offset, colliderMeters, colliderBox, dressingMeters, dressingBox });
   });
   return { ...frame, samples };
 }
@@ -262,6 +288,204 @@ function sweepNearestForwardMeters(
     if (groundDistance > 0 && groundDistance < frame.lattice.lengthMeters) takeNearest(groundDistance);
   }
   return nearestForward;
+}
+
+/**
+ * Camera-forward metres from the eye to the point where the surface a probe
+ * struck crosses the VIEW AXIS, or null when it never does.
+ *
+ * This is the whole correction of 2026-08-31, so it is worth being explicit
+ * about what it computes and why the probe's own hit distance is not it.
+ *
+ * The cut is one plane perpendicular to camera-forward, and the only thing
+ * such a plane can faithfully stand in for is a surface crossing the view
+ * axis at some depth. So ask the surface that question directly: take the box
+ * FACE the probe entered through, extend it to its plane, and intersect that
+ * plane with the ray from the eye along camera-forward. For a wall faced
+ * head-on the answer is the wall's distance and nothing changes. For a wall
+ * met at an angle it is where that wall crosses the crosshair, which is the
+ * depth a perpendicular plane genuinely represents - NOT the much shorter
+ * distance from a probe offset toward the wall, which is what the old
+ * conservative sweep reported. For a wall running alongside the view axis
+ * there is no crossing at all, `forward . normal` goes to zero, and the
+ * surface correctly places no cut.
+ *
+ * Measured at `atomic-acres/corner`, standing 0.400 m off the west fence with
+ * the camera at 45 degrees to it: the nine probes reported 0.000-0.188 m
+ * because the rig sits 0.33 m to the RIGHT, a third of a metre nearer that
+ * wall than the eye is. Every one of them struck the SAME fence the crosshair
+ * is looking at - there was never a second surface off to one side. The face
+ * plane of that fence crosses the view axis at 0.4000003 m, which is the
+ * ballistic trace's answer to nine significant figures.
+ *
+ * Rotated boxes fall back to the probe's own hit distance: deriving a face
+ * from an oriented box needs the collider's frame, which this module cannot
+ * reach, and being conservative there keeps geometry behind the surface.
+ */
+function cutDepthFromFaceCrossing(
+  box: Box2,
+  hitMeters: number,
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+  eye: Point3,
+): number | null {
+  if (box.rotation) return hitMeters;
+  // Retained scratch, like the vectors above: this runs up to nine times per
+  // frame and the module deliberately allocates nothing in the per-frame path.
+  cutBoxMinimum[0] = box.minX;
+  cutBoxMinimum[1] = box.minY ?? Number.NEGATIVE_INFINITY;
+  cutBoxMinimum[2] = box.minZ;
+  cutBoxMaximum[0] = box.maxX;
+  cutBoxMaximum[1] = box.maxY ?? Number.POSITIVE_INFINITY;
+  cutBoxMaximum[2] = box.maxZ;
+  cutProbeOrigin[0] = origin.x;
+  cutProbeOrigin[1] = origin.y;
+  cutProbeOrigin[2] = origin.z;
+  cutProbeDirection[0] = direction.x;
+  cutProbeDirection[1] = direction.y;
+  cutProbeDirection[2] = direction.z;
+  // Slab entry: the face the probe came in through is the one whose near-plane
+  // crossing happens LAST. An unbounded or parallel slab never enters, and a
+  // probe that starts inside the box still names the face it would have used,
+  // which is exactly the face to clip against when the rig is in the wall.
+  let entryTime = Number.NEGATIVE_INFINITY;
+  let entryFace = -1;
+  let entryBound = 0;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const speed = cutProbeDirection[axis];
+    if (Math.abs(speed) < 1e-9) continue;
+    const bound = speed > 0 ? cutBoxMinimum[axis] : cutBoxMaximum[axis];
+    if (!Number.isFinite(bound)) continue;
+    const time = (bound - cutProbeOrigin[axis]) / speed;
+    if (time > entryTime) {
+      entryTime = time;
+      entryFace = axis * 2 + (speed > 0 ? 1 : 0);
+      entryBound = bound;
+    }
+  }
+  if (entryFace < 0) return null;
+  const normal = CUT_FACE_NORMALS[entryFace];
+  const facing = normal[0] * direction.x + normal[1] * direction.y + normal[2] * direction.z;
+  // Facing away, or so nearly edge-on that the crossing runs to infinity.
+  if (facing > -CUT_FACE_MINIMUM_FACING) return null;
+  // The plane constant comes from the box's OWN face coordinate, never from
+  // the hit point: `firstSegmentBoxHit` inflates every box by the lattice
+  // padding, so the hit point sits that far camera-side of the real surface.
+  // Reading the constant off it put the cut 0.19 m in front of a wall measured
+  // at 0.40 m and emptied even the head-on frames - measured, and the reason
+  // this comment exists.
+  const constant = normal[entryFace >> 1] * entryBound;
+  const depth = (constant - (normal[0] * eye.x + normal[1] * eye.y + normal[2] * eye.z)) / facing;
+  // A crossing at or behind the eye means the eye is already past the surface.
+  // No plane helps there, and clamping one to the near plane empties the frame.
+  return depth > 0 && Number.isFinite(depth) ? depth : null;
+}
+
+/** One cut probe, with the crossing it contributed. Diagnostics only. */
+export type ViewmodelCutProbeSample = Readonly<{
+  offset: string;
+  hitMeters: number | null;
+  cutDepthMeters: number | null;
+  bounds: Box2 | null;
+  set: 'collider' | 'dressing' | null;
+}>;
+
+/**
+ * The CUT's lattice as data, probe by probe. Diagnostics only.
+ *
+ * The sweep below collapses to one scalar, and a scalar cannot say WHICH probe
+ * placed the plane, what it struck, or how far its own hit distance was from
+ * the crossing it contributed - the facts every question about a vanished
+ * weapon turns on. This publishes all four.
+ */
+export function sampleViewmodelCutProbes(
+  input: ViewmodelObstructionPoseInput,
+): readonly ViewmodelCutProbeSample[] {
+  const samples: ViewmodelCutProbeSample[] = [];
+  forEachContactProbe(input, (offset, colliderMeters, colliderBox, dressingMeters, dressingBox, origin) => {
+    const useDressing = colliderMeters === null
+      || (dressingMeters !== null && dressingMeters < colliderMeters);
+    const meters = useDressing ? dressingMeters : colliderMeters;
+    const box = useDressing ? dressingBox : colliderBox;
+    samples.push({
+      offset: `${offset.rightScale}/${offset.vertical}`,
+      hitMeters: meters,
+      cutDepthMeters: meters === null || box === null
+        ? null
+        : cutDepthFromFaceCrossing(box, meters, origin, probeDirection, input.position),
+      bounds: box,
+      set: meters === null ? null : (useDressing ? 'dressing' : 'collider'),
+    });
+  });
+  return samples;
+}
+
+/**
+ * ON-AXIS contact depth for the CUT, in metres, or null when nothing in front
+ * of the rig can place a plane.
+ *
+ * WHY THIS IS A SECOND NUMBER, and why the fold does not use it.
+ *
+ * The fold and the cut are answers to two different questions and they must
+ * not share one scalar.
+ *
+ *   - The FOLD asks "is something close?". Any nearby surface, on whichever
+ *     side, should pull the weapon back and fold it up - the pose response is
+ *     correct in every direction - so the conservative minimum over the padded
+ *     lattice is exactly right and stays exactly as it was.
+ *
+ *   - The CUT asks "what would have OCCLUDED the weapon?". The viewmodel draws
+ *     on a depth-cleared overlay, so the cut reinstates the depth test a wall
+ *     would have performed. One camera-perpendicular plane is a faithful
+ *     stand-in for a surface that crosses the view axis, and a false one for a
+ *     surface running alongside it: a wall parallel to the view axis occludes
+ *     a lateral slab of the frame, never a depth slab, and no perpendicular
+ *     plane expresses that. Placing the plane from such a surface deletes
+ *     weapon geometry nothing in the world was going to hide. Measured
+ *     2026-08-31: 15 of 68 contact rows cut nearer than 0.25 m against on-axis
+ *     surfaces at 0.400 m, and in the tightest of them the frame came back
+ *     EMPTY.
+ *
+ * The whole lattice still votes, and that is deliberate. Reducing the cut to
+ * the centre probe alone would look like the same fix on this matrix - the
+ * harness's surface ray IS the centre answer, so the grade could not tell them
+ * apart - and it would quietly lose every camera-FACING surface that misses
+ * the middle of the rig: a pillar off to your right, a door reveal, a wall you
+ * face at a shallow angle while the barrel is already inside it. Those are
+ * genuine occluders, a perpendicular plane represents them well, and they
+ * still place the cut here because the crossing is computed per surface rather
+ * than assumed from the probe's own distance.
+ */
+export function measuredEnvelopeCutDepthMeters(
+  input: ViewmodelObstructionPoseInput,
+): number | null {
+  if (!input.envelope) return null;
+  let nearest: number | null = null;
+  const vote = (depth: number | null): void => {
+    if (depth === null) return;
+    nearest = nearest === null ? depth : Math.min(nearest, depth);
+  };
+  const frame = forEachContactProbe(
+    input,
+    (_offset, colliderMeters, colliderBox, dressingMeters, dressingBox, origin) => {
+      if (colliderMeters !== null && colliderBox !== null) {
+        vote(cutDepthFromFaceCrossing(colliderBox, colliderMeters, origin, probeDirection, input.position));
+      }
+      if (dressingMeters !== null && dressingBox !== null) {
+        vote(cutDepthFromFaceCrossing(dressingBox, dressingMeters, origin, probeDirection, input.position));
+      }
+    },
+  );
+  // The analytic ground plane is the same computation with a normal of +Y: a
+  // horizontal floor under a down-pitched camera crosses the view axis at
+  // eyeHeight / -forwardY, and that is the face-on surface a perpendicular
+  // plane represents best of all. It votes here for the same reason it clamps
+  // the fold.
+  if (input.grounded && frame.forwardY < -GROUND_CLAMP_MIN_DOWN_COMPONENT) {
+    const groundDistance = input.stanceEyeHeightMeters / -frame.forwardY;
+    if (groundDistance > 0 && groundDistance < frame.lattice.lengthMeters) vote(groundDistance);
+  }
+  return nearest;
 }
 
 /**
@@ -309,17 +533,38 @@ export function viewmodelFloorClearanceFor(input: ViewmodelObstructionPoseInput)
 }
 
 /**
+ * The obstruction pose plus the cut depth.
+ *
+ * `ViewmodelObstructionPose` is declared in `weapon-presentation-state.ts`,
+ * which the contact lattice does not own; the extra presentation-only field is
+ * therefore added here rather than widening a shared reducer type. Every
+ * existing consumer is typed to the base shape and is unaffected.
+ */
+export type ViewmodelObstructionPoseWithCut = ViewmodelObstructionPose & Readonly<{
+  /**
+   * Metres from the eye to the nearest surface that a camera-perpendicular
+   * plane can honestly represent, or null. Places the CUT only. See
+   * `measuredEnvelopeCutDepthMeters` for why this is not `contactDepthMeters`.
+   */
+  contactCutDepthMeters: number | null;
+}>;
+
+/**
  * The complete presentation-only obstruction pose. This is what the runtime
  * calls each frame; it changes no camera, gameplay ray or character capsule.
  */
 export function resolveViewmodelObstructionPose(
   input: ViewmodelObstructionPoseInput,
-): ViewmodelObstructionPose {
+): ViewmodelObstructionPoseWithCut {
   const nearestForward = nearestViewmodelForwardObstructionMeters(input);
   const floorClearance = viewmodelFloorClearanceFor(input);
   const pose = viewmodelObstructionPose(nearestForward, input.prone, floorClearance, input.weapon);
   // `retreat`/`lift` above are byte-identical to what the fire gate has always
-  // consumed. The measured depth rides alongside them for the presentation
-  // contact fold and for nothing else.
-  return { ...pose, contactDepthMeters: measuredEnvelopeContactDepthMeters(input) };
+  // consumed. The two measured depths ride alongside them for the presentation
+  // contact fold and cut, and for nothing else.
+  return {
+    ...pose,
+    contactDepthMeters: measuredEnvelopeContactDepthMeters(input),
+    contactCutDepthMeters: measuredEnvelopeCutDepthMeters(input),
+  };
 }

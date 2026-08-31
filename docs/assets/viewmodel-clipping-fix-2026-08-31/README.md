@@ -317,3 +317,220 @@ node docs/assets/viewmodel-clipping-fix-2026-08-31/measure-viewmodel-penetration
 measurement defect that made the arms look unfoldable and then unmeasurable.
 `probe-arm-joints.mjs` prints the arm chain in camera-forward metres and names the bone
 that owns the offending vertex.
+
+---
+
+# Third correction, same day: the cut was the right idea placed by the wrong number
+
+Everything above stands. The penetration grade it closed is still closed. What it
+also did, and said so plainly in "The cost of the cut, stated plainly", was cut
+**15 of 68 rows nearer than 0.25 m**, and in the tightest of those the frame came
+back with no weapon in it at all. The owner noticed.
+
+That section proposed the fix as "carry an on-axis contact depth from the centre
+probe". The direction was right and the diagnosis underneath it was wrong, so this
+pass states the corrected one first.
+
+## What was actually happening
+
+The previous pass wrote that the conservative minimum "can name a surface off to
+one side of the rig". Measured at `atomic-acres/corner`, standing 0.400 m off the
+west fence at a heading of 2.356 rad, every one of the nine probes named **the same
+fence the crosshair was looking at** - `minX -37.6, maxX -37`, the box the ballistic
+trace reports at 0.400 m. There was never a second surface.
+
+```
+probe        padded hit    box
+0/centre       0.000       west fence  (-37.6 .. -37)
+-1/centre      0.000       west fence
+1/centre       0.000       west fence
+...            0.000       west fence   (all nine)
+```
+
+The lattice is centred on the RIG, and the rig sits `centreRight = 0.329 m` to the
+right of the eye with a half-width of 0.130 m. Facing a wall at 45 degrees, "camera
+right" points at that wall: the centre probe stands 0.233 m nearer it than the eye
+does and the outermost probe is 0.042 m **inside** it. Their answers - 0.000 to
+0.188 m - were correct. A plane perpendicular to camera-forward simply cannot
+express them, because the thing they measured is 0.4 m away *at the crosshair* and
+0 m away *at the barrel*, and a perpendicular plane has one number for both.
+
+So the defect was never a bad probe. It was a right answer read as the wrong kind
+of quantity.
+
+## The corrected rule
+
+> A camera-perpendicular plane may only be placed at the depth where the
+> contacting surface **crosses the view axis**.
+
+`cutDepthFromFaceCrossing` in `src/systems/viewmodel-contact-probe.ts` computes it:
+take the box FACE the probe entered through (slab entry, exact for an AABB), extend
+it to its plane, and intersect that plane with the ray from the eye along camera
+forward.
+
+| situation | old cut | new cut | why |
+|---|---|---|---|
+| wall faced head-on at 0.400 m | 0.400 | 0.400 | unchanged, by construction |
+| same wall met at 45 degrees | 0.189 | 0.400 | the crossing, not the barrel's distance |
+| wall you are standing BESIDE | ~padding | **none** | it never crosses the axis; `forward . normal` is 0 |
+| floor under a down-pitched camera | eyeHeight / -forwardY | same | the same formula with a normal of +Y |
+
+The face plane of that fence crosses the view axis at **0.4000003 m**. The ballistic
+trace, which knows nothing about the lattice, reports **0.4000003 m**.
+
+## Why the whole lattice still votes, and why "the centre probe" would have been wrong
+
+The obvious implementation is to take the centre probe alone, or an eye-centred ray.
+It passes this matrix perfectly - and it passes it for a bad reason: the harness's
+`surfaceDistanceM` **is** the eye-centred ray, so the grade cannot tell the two
+designs apart. It would have quietly lost every camera-facing surface that misses
+the middle of the rig: a pillar off to your right, a door reveal, a wall you face at
+a shallow angle with the barrel already inside it. Those are genuine occluders, a
+perpendicular plane represents them well, and the crossing computation keeps them.
+
+## What the split does NOT fix, stated plainly
+
+The fold keeps the conservative lattice minimum, and it should: a surface beside the
+rig is a real reason to pull the weapon back, whichever side it is on. But at the
+corner the right flank of the carbine is genuinely ~4 cm inside that fence, and a
+camera-perpendicular plane at 0.400 m does not remove it. Whether that flank is
+then visible through the wall is a question this pass could not close - see the
+second defect below, where the same corner turns out to be occluding the whole
+weapon by some route that is not this plane.
+
+That is a smaller artefact than deleting the weapon, and it is the honest trade:
+**a plane perpendicular to the view axis cannot clip a rig against a wall parallel
+to it.** The complete fix is a second clipping plane carrying the surface's own
+orientation - `ClippingGroup` takes an array and `clipIntersection = false` already
+intersects the kept half-spaces, so the machinery is there. It is not in this pass
+because the grade above (`visibleFwdMax <= surfaceDistance`) is itself a
+perpendicular-plane model, and an oriented cut can leave geometry that is correct in
+the world and fails that number. Re-pinning the grade to admit it is a change that
+should be made deliberately, with the owner's eyes on the frames, not folded into a
+bug fix.
+
+## Result, one run, 96 rows / 72 graded
+
+`measurements-extent-axis.json`. The "before" column is the previous
+placement replayed against the same vertices in the same frame, not a second
+browser run - see Harness below.
+
+| | before | after |
+|---|---|---|
+| rows with VISIBLE geometry past the surface | **0** | **0** |
+| worst penetration | -0.001 m | **-0.020 m** |
+| graded rows cut nearer than 0.25 m | **16** | **0** |
+| rows with an EMPTY frame while the on-axis surface is past 0.30 m | **5** | **0** |
+| smallest share of the rig surviving the cut, any graded row | **1.4%** | **34.1%** |
+| median share of the rig surviving, over 72 cut rows | 68.8% | **75.5%** |
+| open-ground control rows with the fold engaged, atomic-acres | 0 | **0** |
+
+The named cases, all four weapons:
+
+| row | surface | cut before | cut after | rig kept before | rig kept after |
+|---|---|---|---|---|---|
+| atomic-acres/corner/carbine/stand | 0.400 | 0.169 | **0.380** | 1.4% | **58.1%** |
+| atomic-acres/corner/sniper/prone | 0.400 | 0.204 | **0.380** | 8.4% | **49.1%** |
+| atomic-acres/corner/flamethrower/prone | 0.400 | 0.175 | **0.380** | 5.5% | **75.3%** |
+| test2/flat-wall/carbine/prone | 0.400 | 0.169 | **0.380** | 2.1% | **57.9%** |
+| test2/flat-wall/sniper/crouch | 0.400 | 0.204 | **0.380** | 7.3% | **48.9%** |
+| test2/flat-wall/flamethrower/prone | 0.400 | 0.175 | **0.380** | 5.5% | **75.5%** |
+
+Frames: `extent-axis-<arena>-<site>-<weapon>-<stance>.png`, 2560x1440. The
+matching before frames are the `extent-after-*.png` set.
+`extent-after-test2-flat-wall-carbine-stand.png` - the empty frame the previous
+pass named - against `extent-axis-test2-flat-wall-carbine-stand.png`, where the
+folded carbine fills the lower right and is cut cleanly at the wall.
+
+### The previous run's test2 leg was measuring atomic-acres
+
+Stated because the before/after tables above would otherwise be read wrongly.
+In `measurements-extent-after.json` every test2 row reports
+`surfaceKind.id = "atomic-acres:219:north fence"` and `dressingBoxCount = 88` -
+the arena switch had not taken effect, and that leg graded atomic-acres
+geometry under test2 labels. This run's test2 rows report
+`Test2 arena:22:test2 boundary west 1` and `dressingBoxCount = 218`. The
+counterfactual columns are unaffected (they are the same frame, same vertices,
+two plane placements), but the paired PNGs across the two runs are not the same
+site for test2, and the row counts differ for the same reason - 68 graded then,
+72 now, because test2's prone rows have a real surface this time.
+
+## A SECOND defect at `atomic-acres/corner`, not fixed, isolated
+
+`atomic-acres/corner` is the one named case whose frame is still empty, and the
+cut is not why.
+
+Measured after this change: the corner pose is byte-identical to
+`atomic-acres/flat-wall` (root z, pitch 1.5, scale 0.528, forward reach 0.560,
+plane at 0.380 m), 58% of the rig's vertices are camera-side of the plane, and
+2496 of the WEAPON's own vertices project inside the frustum. The flat-wall
+frame shows the folded carbine. The corner frame shows nothing, at any
+contrast.
+
+`probe-corner-yaw-sweep.mjs` isolates it. From the corner row's own eye
+position, sweeping the camera through a full turn:
+
+| yaw | contact depth | cut | weapon vertices on screen | weapon in frame |
+|---|---|---|---|---|
+| 0.785 | 0.520 | 0.380 | 2496 | **yes** |
+| 2.356 | 0.189 | 0.380 | 2496 | **no** |
+| 3.142 | 0.189 | none | 4921 | no |
+
+Same position, same plane, same vertex count, 90 degrees apart, and the weapon
+comes back. So it is not the fold, not the cut depth and not the plane: at
+yaw 2.356 the camera looks into the inside corner and BOTH walls wrap the frame
+0.28-0.40 m away - nearer, in the weapon's own screen region, than any part of
+the weapon. The reading that fits every frame here is that the viewmodel is
+being depth-tested against the world rather than composited over a cleared
+depth buffer, and the wall is occluding it exactly as a wall should.
+
+If that is right it is good news and a bigger correction than this pass:
+the premise the cut was built on - "the viewmodel draws on a depth-cleared
+overlay, so geometry past the wall is painted over it" - would be false on this
+route, and the plane would be re-doing work the depth buffer already does. It
+would also mean the flat-wall armed/disarmed frames looking identical is not a
+failed experiment but the expected result.
+
+It is stated as a reading and not a finding because it is not proven here: two
+attempts to disarm the plane from the page (`enabled`, then `isClippingGroup`
+and `clippingPlanes`) both left the frame unchanged, and neither can be
+distinguished from the plane simply not mattering. Proving it needs a route
+that does not go through the live clipping group - drive the viewmodel root
+forward into a wall with the plane never armed and watch where it disappears.
+That is the next thing to look at, and it should be looked at before any more
+work goes into the plane.
+
+## Gate
+
+Six assertions in `src/viewmodel-contact-applied-transform.test.ts`, under
+"the cut is placed by what a plane can represent". They pin the split in **both**
+directions:
+
+- the 45-degree wall: the fold's depth stays under 0.25 m *and* the cut's is 0.400 m
+  - making the fold use the on-axis number fails here, and so does making the cut
+  use the conservative one;
+- the plane constant is taken from the box face, not from the padded hit point (the
+  bug that emptied even the head-on frames while this was being built);
+- a wall alongside the view axis folds the pose and places no cut;
+- dressing geometry may cut, and still may not reach the fire gate;
+- with a conservative depth of 0.189 m and an on-axis depth of 0.400 m, the nearest
+  rig vertex is camera-side of the plane - a weapon is on the screen;
+- an absent `contactCutDepthMeters` still means "use one depth for both", so every
+  gate written before this pass grades the same build it always did.
+
+## Harness
+
+`measure-viewmodel-penetration.mjs` now measures what the previous run had to find
+by eye:
+
+- `keptVertexFraction` - the share of the rig's real vertices camera-side of the
+  plane. `visibleFwdMaxM` alone reports the plane's own distance whether the cut
+  trimmed the weapon back to the wall or removed it entirely.
+- `keptVertexFractionConservative` / `clipConservativeM` - the SAME vertices replayed
+  against the previous build's placement. This pass changed only where the plane
+  goes; the pose is untouched, so that replay is the previous build's frame exactly,
+  with none of the variance a second browser run would add. It is why there is one
+  run below and not two, and `measurements-extent-after.json` is the check on the
+  claim: the pose columns match.
+- The window is launched at `--window-position=2560,0`, off the owner's primary
+  screen. It was headed with no position before.

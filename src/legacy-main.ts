@@ -877,12 +877,13 @@ import {
 import {
   magnifiedFovDegrees,
   viewmodelFireAdmission, // HF-343
-  type ViewmodelObstructionPose,
 } from './weapon-presentation-state';
 import {
   resolveViewmodelObstructionPose,
   sampleViewmodelContactProbes,
+  sampleViewmodelCutProbes,
   type ViewmodelObstructionPoseInput,
+  type ViewmodelObstructionPoseWithCut,
 } from './systems/viewmodel-contact-probe';
 import {
   deriveThermalRevealMode,
@@ -10822,8 +10823,43 @@ function currentViewmodelObstructionInput(): ViewmodelObstructionPoseInput {
   };
 }
 
-function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
+function currentViewmodelObstructionPose(): ViewmodelObstructionPoseWithCut {
   return resolveViewmodelObstructionPose(currentViewmodelObstructionInput());
+}
+
+/**
+ * The PRESENTATION lattice, per probe, as the cut and the fold actually see
+ * it. Read-only observability.
+ *
+ * `sampleFireAdmissionDiagnostics` below already dumps a nine-probe sweep, but
+ * that one deliberately mirrors the fire gate: authored profile, colliders
+ * only, no dressing. The contact fold and the contact cut read a different
+ * world - the measured rig envelope over BOTH collider sets - and the
+ * 2026-08-31 "the weapon vanishes at a corner" defect lived entirely in the
+ * difference between the two. Diagnosing it required rebuilding this by hand,
+ * so it is published instead.
+ */
+function describePresentationContactProbes(): Record<string, unknown> {
+  const input = currentViewmodelObstructionInput();
+  const sweep = sampleViewmodelContactProbes(input);
+  return {
+    lattice: sweep.lattice,
+    envelope: input.envelope,
+    probePaddingMeters: sweep.probePaddingMeters,
+    forwardY: sweep.forwardY,
+    dressingBoxCount: input.dressingBoxes.length,
+    probes: sweep.samples.map((sample) => ({
+      offset: `${sample.offset.rightScale}/${sample.offset.vertical}`,
+      colliderMeters: sample.colliderMeters,
+      dressingMeters: sample.dressingMeters,
+      colliderBounds: sample.colliderBox ?? null,
+    })),
+    // The same lattice as the CUT reads it: each probe's own hit distance
+    // beside the depth at which the surface it struck crosses the view axis.
+    // Reading the two columns side by side is what turned "the weapon vanishes
+    // at a corner" from a screenshot into a number.
+    cutProbes: sampleViewmodelCutProbes(input),
+  };
 }
 
 function currentViewmodelSurfaceRetreat(): number {
@@ -10897,8 +10933,10 @@ function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
     // transform as a result.
     dressingBoxCount: activePresentationObstructionBoxes().length,
     contactDepthMeters: pose.contactDepthMeters,
+    contactCutDepthMeters: pose.contactCutDepthMeters,
     contactEnvelope: weaponView.contactProbeEnvelope(),
     contactFold: weaponView.contactFoldState(),
+    presentationProbes: describePresentationContactProbes(),
   };
 }
 
@@ -25347,6 +25385,13 @@ function updatePhysics(dt: number): void {
     surfaceRetreat: viewmodelObstruction.retreat,
     surfaceLift: viewmodelObstruction.lift,
     surfaceContactDepth: viewmodelObstruction.contactDepthMeters,
+    // Two depths, on purpose. The FOLD retreats from anything nearby, so it
+    // takes the conservative minimum over the padded lattice above. The CUT
+    // places one camera-perpendicular plane, which is only an honest stand-in
+    // for a surface the rig runs INTO, so it takes the on-axis depth. Placing
+    // the plane from an off-axis surface is what emptied the frame at
+    // `atomic-acres/corner` on 2026-08-31.
+    surfaceContactCutDepth: viewmodelObstruction.contactCutDepthMeters,
     triggerHeld,
   });
   audio.minigunDrive(

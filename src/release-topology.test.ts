@@ -240,3 +240,117 @@ describe('Pass 80 release topology', () => {
     expect(result.ok).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------------------
+// The chooser is published content-addressed. Owner, 2026-08-30: "I just opened it in a new
+// chrome I ran as admin and now I see pass 73 and 72 lol, before I only saw 81 and 63 or
+// something. Defo something odd going on here? ... now i opened in firefox, and its back to
+// pass 81."
+//
+// He was looking at three separately cached root URLs - index.html, release-shell.js and
+// release-channel-config.js - with nothing tying a generation of one to a generation of
+// another, all served `Cache-Control: max-age=600` by a host that offers no way to change
+// that. Measured against the live origin on 2026-08-31: a request-side `no-cache` does not
+// force revalidation (Age: 109 came back) and the query string is stripped from the CDN
+// cache key (`?ts=<random>` returned Age: 82), so the ONLY reliable freshness primitive
+// there is a path nobody has requested before (those always return Age: 0).
+//
+// What is pinned below is the shape that makes a cross-generation mixture unrepresentable.
+// The cross-browser proof that a reload converges lives outside the unit suite, because it
+// needs three real browser HTTP caches; this is the structural half.
+describe('the published chooser cannot be assembled from two publishes', () => {
+  const publish = readFileSync('scripts/orchestration/publish_pass81.py', 'utf8');
+
+  it('gives index.html the substitution points publish needs, and no second cacheable list', () => {
+    // The channel list is INLINED. A separate release-channel-config.js is still written
+    // for index.html generations cached before this change, but the current document must
+    // not depend on a second URL whose cache lifetime is its own.
+    expect(shellHtml).toContain('/*__RELEASE_GENERATION__*/');
+    expect(shellHtml).toContain('window.__ATOMIC_ACRES_RELEASE_CHANNELS__');
+    expect(shellHtml).toContain('href="./release-shell.css"');
+    expect(shellHtml).toContain('src="./release-shell.js"');
+    // The legacy config tag stays in the TEMPLATE - stage-release-topology.mjs publishes
+    // this document verbatim and feeds it the channel list that way, so removing it there
+    // would ship that path a chooser with a null list, which throws before it draws. The
+    // publish script deletes the tag, which is what the next assertion pins.
+    expect(shellHtml).toContain('src="./release-channel-config.js"');
+  });
+
+  it('content-addresses the shell and publishes a generation-addressed manifest', () => {
+    expect(publish).toContain('def generation_id(channels, sources)');
+    expect(publish).toContain('shell_js = f"release-shell.{generation}.js"');
+    expect(publish).toContain('shell_css = f"release-shell.{generation}.css"');
+    expect(publish).toContain('manifest_name = f"release-manifest.{generation}.json"');
+    expect(publish).toContain('write("release-index.json"');
+    // ...and deletes the second cacheable channel list from the document it publishes.
+    expect(publish).toContain(String.raw`<script defer src="\./release-channel-config\.js"></script>`);
+    // The generation hashes the CODE as well as the channel list. Hashing only the channels
+    // would keep serving the previous script filename after a shell fix, and that script is
+    // exactly what cannot be evicted from a browser inside its ten-minute freshness window.
+    expect(publish).toContain('digest.update(canonical_channel_bytes(channels))');
+    expect(publish).toContain('digest.update(sources[name])');
+  });
+
+  it('keeps the previous generation reachable and still writes the legacy filenames', () => {
+    // A browser that loaded the previous index.html seconds ago must still be able to fetch
+    // the script that document names, and an index.html cached before this change still asks
+    // for the unhashed files. Deleting either 404s a real visitor into a blank chooser.
+    expect(publish).toContain('keep_generations = {generation}');
+    expect(publish).toContain('keep_generations.add(previous)');
+    expect(publish).toContain('write("release-shell.js"');
+    expect(publish).toContain('write("release-shell.css"');
+    expect(publish).toContain('write("release-channel-config.js"');
+  });
+
+  it('substitutes with callables, because the channel labels are full of backslash escapes', () => {
+    // A string replacement raised `re.PatternError: bad escape \u` the first time this ran
+    // against the real channel set - every retained label carries a · middot.
+    expect(publish).toContain('lambda _: inline');
+    expect(publish).toContain('lambda _: f"./{shell_css}"');
+    expect(publish).toContain('lambda _: f"./{shell_js}"');
+    expect(publish).not.toMatch(/re\.subn\([^)]*,\s*inline\s*,/);
+  });
+
+  it('escapes the channel list for the script block it now lives inside, and proves it did', () => {
+    // Inlining moved authored channel strings into a <script> block - a sink the separate
+    // config file never was. A description containing "</script>" would close the block and
+    // spill the rest of the list into the document as markup.
+    expect(publish).toContain('def script_safe(text)');
+    expect(publish).toContain('r"\\u003c"');
+    // The first draft of that escape was a Python "\\u003c" literal, which IS the '<'
+    // character - a silent no-op. So the script self-tests the escape and round-trips the
+    // bytes it is about to write, rather than trusting that escaping happened.
+    expect(publish).toContain('script_safe is not escaping');
+    expect(publish).toContain('json.loads(emitted) != channels');
+  });
+
+  it('refuses to publish a chooser that would ship a blank or unsubstituted document', () => {
+    expect(publish).toContain('if not (inline_hits and css_hits and js_hits and tag_hits)');
+    expect(publish).toContain("did not survive inlining into index.html");
+    expect(publish).toContain("does not reference this generation's shell assets");
+  });
+
+  it('refuses to offer the newest pass with no recent predecessor beside it', () => {
+    // Owner, 2026-08-30: "i dont want pass 63, stable webgl, i want the previous 1/2
+    // versions we had, 73 and 71 I think? i forgot, unhide those on next publish please."
+    expect(publish).toContain('def assert_predecessors_offered(channels)');
+    expect(publish).toContain('if len(predecessors) < 2');
+    expect(publish).toContain('"experimental": {');
+    expect(publish).toContain('PASS 73 · PREVIOUS VERSION');
+    expect(publish).toContain('PASS 72 · THE ONE BEFORE THAT');
+    expect(publish).toContain('KEEP_AT_LEAST = {"experimental", "previous", "pass81"}');
+    // And it has to have been seen red. A gate nobody has watched fail is a gate nobody
+    // has checked - this file's own history is the argument for that.
+    expect(publish).toContain('the predecessor guard failed its own red test');
+  });
+
+  it('refuses to publish while the in-build chooser links a fallback that is not on gh-pages', () => {
+    // src/bootstrap.ts draws its own two-card chooser from release-channels.json for anyone
+    // opening a channel URL with no ?release=. Its second card is `rollback ?? stable`,
+    // which is PASS 63 at channels/pass63-rollback - a path that returns 404 on the live
+    // host (measured 2026-08-31). That dead card is the other half of "I only saw 81 and 63".
+    expect(publish).toContain('def assert_in_game_fallback_exists(worktree)');
+    expect(publish).toContain("config.get(\"rollback\") or config.get(\"stable\")");
+    expect(publish).toContain('is NOT on gh-pages');
+  });
+});

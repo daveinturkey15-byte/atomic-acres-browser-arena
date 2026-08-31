@@ -52,7 +52,17 @@ import {
   solveViewmodelContactFold,
   type ViewmodelRigBounds,
 } from './weapon-presentation';
-import { viewmodelObstructionPose, viewmodelSurfaceRetreat } from './weapon-presentation-state';
+import {
+  VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
+  viewmodelObstructionPose,
+  viewmodelSurfaceRetreat,
+} from './weapon-presentation-state';
+import {
+  measuredEnvelopeContactDepthMeters,
+  measuredEnvelopeCutDepthMeters,
+  nearestViewmodelForwardObstructionMeters,
+  type ViewmodelObstructionPoseInput,
+} from './systems/viewmodel-contact-probe';
 import { type WeaponPose } from './weapon-presentation';
 
 const REST_POSE: WeaponPose = Object.freeze({
@@ -66,6 +76,24 @@ const REST_POSE: WeaponPose = Object.freeze({
   landingImpulse: 0,
   lateralSpeed: 0,
   reloadProgress: null,
+});
+
+/**
+ * The carbine's rig bounds, MEASURED in installed Chrome on 2026-08-31. These
+ * are data, not estimates: they come out of
+ * docs/assets/viewmodel-clipping-fix-2026-08-31/. Module-scope because both the
+ * solve block and the cut block below grade against the same real rig.
+ */
+const MEASURED_CARBINE: ViewmodelRigBounds = Object.freeze({
+  minX: -0.152, maxX: 0.128,
+  minY: -0.43, maxY: 0.355,
+  minZ: -0.894, maxZ: 0.713,
+  muzzleX: -0.156, muzzleY: 0.118, muzzleZ: -0.88,
+  hullYZ: Object.freeze([
+    [-0.43, -0.179], [-0.43, -0.025], [-0.369, -0.65], [-0.15, -0.894],
+    [0.12, 0.713], [0.147, 0.67], [0.355, 0.25], [0.355, -0.888],
+  ] as const),
+  meshes: 7,
 });
 
 /** The failing case the owner reports: a wall 0.40 m from the eye. */
@@ -334,18 +362,6 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
  * docs/assets/viewmodel-clipping-fix-2026-08-31/.
  */
 describe('the contact fold solve, on measured rig bounds', () => {
-  const MEASURED_CARBINE: ViewmodelRigBounds = Object.freeze({
-    minX: -0.152, maxX: 0.128,
-    minY: -0.43, maxY: 0.355,
-    minZ: -0.894, maxZ: 0.713,
-    muzzleX: -0.156, muzzleY: 0.118, muzzleZ: -0.88,
-    hullYZ: Object.freeze([
-      [-0.43, -0.179], [-0.43, -0.025], [-0.369, -0.65], [-0.15, -0.894],
-      [0.12, 0.713], [0.147, 0.67], [0.355, 0.25], [0.355, -0.888],
-    ] as const),
-    meshes: 7,
-  });
-
   const base = {
     bounds: MEASURED_CARBINE,
     baseRootZ: -1.14,
@@ -442,5 +458,167 @@ describe('the reducer alone cannot answer this - which is why the gate is not on
     // the eye, which is 0.78 m through a wall at 0.40 m. The reducer is right
     // about the demand and says nothing at all about the result.
     expect(pose.contactDepthMeters).toBeNull();
+  });
+});
+
+/**
+ * THE CUT'S OWN GATE, added 2026-08-31 after the owner reported the opposite
+ * failure: the weapon vanishing.
+ *
+ * The pass above closed the penetration number - 60 of 68 contact rows had
+ * visible geometry through the wall, then 0 - and it closed it partly with a
+ * plane placed at `contactDepthMeters`, the conservative minimum over the
+ * nine-probe lattice. Measured over the same 68 rows: 15 were cut nearer than
+ * 0.25 m, and at `atomic-acres/corner` and `test2/flat-wall` the frame came
+ * back EMPTY with the on-axis surface at 0.400 m.
+ *
+ * The cause was not a second surface off to one side. It was the SAME wall,
+ * met at 45 degrees, sampled by a lattice centred on the rig - which sits
+ * 0.33 m to the RIGHT of the eye, a third of a metre nearer that wall. The
+ * probes were right; the plane was the wrong shape for their answer.
+ *
+ * So the two questions are separated, and this block pins the separation in
+ * both directions. Making the fold use the on-axis number, or the cut use the
+ * conservative one, fails here.
+ */
+describe('the cut is placed by what a plane can represent (owner 2026-08-31)', () => {
+  /** The carbine's real measured envelope, from installed Chrome on 2026-08-31. */
+  const CARBINE_ENVELOPE = Object.freeze({
+    contract: VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
+    weapon: 'carbine' as const,
+    minX: 0.19833852287900303,
+    maxX: 0.45886844423053896,
+    minY: -0.8394522721789852,
+    maxY: -0.1106662365348069,
+    forwardReachMeters: 1.970489135742839,
+  });
+
+  /** Camera-forward (0, 0, -1) rotated by yaw. Mirrors the lattice's own basis. */
+  const forwardFor = (yaw: number) => ({ x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) });
+
+  function world(overrides: Partial<ViewmodelObstructionPoseInput>): ViewmodelObstructionPoseInput {
+    return {
+      weapon: 'carbine',
+      position: { x: 0, y: 1.7, z: 0 },
+      yaw: 0,
+      pitch: 0,
+      colliders: [],
+      dressingBoxes: [],
+      envelope: CARBINE_ENVELOPE,
+      grounded: true,
+      prone: false,
+      stanceEyeHeightMeters: 1.7,
+      ...overrides,
+    };
+  }
+
+  it('reads a wall met at 45 degrees at the crosshair, not at the barrel', () => {
+    // The live `atomic-acres/corner` row, rebuilt: a long wall whose camera-side
+    // face is x = 0, an eye 0.400 m off it ALONG THE VIEW AXIS, and a heading of
+    // 3pi/4 so that "camera right" points at the wall.
+    const yaw = (3 * Math.PI) / 4;
+    const forward = forwardFor(yaw);
+    const eye = { x: 0.4 * -forward.x, y: 1.7, z: 0.4 * -forward.z };
+    const wall = { minX: -1, maxX: 0, minZ: -50, maxZ: 50, minY: 0, maxY: 3 };
+    const input = world({ position: eye, yaw, colliders: [wall] });
+
+    // The FOLD's number stays conservative, and that is correct: the rig really
+    // is inside that wall on its right, and the pose must retreat from it.
+    const fold = measuredEnvelopeContactDepthMeters(input);
+    expect(fold, 'the fold must still see the wall').not.toBeNull();
+    expect(fold!, 'the conservative sweep reads the wall from the rig, not the eye')
+      .toBeLessThan(0.25);
+
+    // The CUT's number is where that wall crosses the view axis - the only depth
+    // a camera-perpendicular plane can honestly stand in for.
+    const cut = measuredEnvelopeCutDepthMeters(input);
+    expect(cut, 'the wall crosses the view axis and must place a cut').not.toBeNull();
+    expect(cut!, 'the crossing is the ballistic surface distance').toBeCloseTo(0.4, 6);
+  });
+
+  it('is not fooled by the padding the lattice sweeps with', () => {
+    // Faced head-on, the two must agree to within the padding restore, and the
+    // cut must land on the wall itself. Taking the plane constant from the
+    // padded HIT POINT instead of the box face put it 0.19 m in front of a wall
+    // at 0.40 m and emptied even the head-on frames.
+    const wall = { minX: -50, maxX: 50, minZ: -1, maxZ: 0, minY: 0, maxY: 3 };
+    const input = world({ position: { x: 0, y: 1.7, z: 0.4 }, colliders: [wall] });
+    expect(measuredEnvelopeCutDepthMeters(input)).toBeCloseTo(0.4, 6);
+  });
+
+  it('places no cut for a wall running alongside the view axis', () => {
+    // A wall you are standing BESIDE occludes a lateral slab of the frame, never
+    // a depth slab. It must fold the pose and must not place a plane; cutting
+    // there is what deleted the weapon.
+    const wall = { minX: 0.5, maxX: 1.5, minZ: -50, maxZ: 50, minY: 0, maxY: 3 };
+    const input = world({ colliders: [wall] });
+    expect(measuredEnvelopeContactDepthMeters(input), 'the fold must still retreat from it')
+      .not.toBeNull();
+    expect(measuredEnvelopeCutDepthMeters(input), 'no crossing, no cut').toBeNull();
+  });
+
+  it('keeps the dressing set able to cut, and the authored sweep unable to', () => {
+    // Decoration bends the gun and now also occludes it - a crate in front of
+    // the muzzle hides the muzzle. What it still may never do is reach the
+    // trigger, and `nearestViewmodelForwardObstructionMeters` is the number the
+    // fire gate consumes: it must not see this box at all.
+    const crate = { minX: -2, maxX: 2, minZ: -0.6, maxZ: -0.4, minY: 0, maxY: 2 };
+    const input = world({ dressingBoxes: [crate] });
+    expect(measuredEnvelopeCutDepthMeters(input)).toBeCloseTo(0.4, 6);
+    expect(nearestViewmodelForwardObstructionMeters({ ...input, dressingBoxes: [] })).toBeNull();
+  });
+
+  it('leaves a weapon on the screen when the surface is 0.40 m away', async () => {
+    // ACCEPTANCE, stated as a unit gate. `atomic-acres/corner/carbine/stand`
+    // reproduced: the conservative depth that used to place the plane, and the
+    // on-axis depth that now does. Some of the rig must survive the cut.
+    const rig = await mountedRig('carbine');
+    settle(rig, {
+      surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, 'carbine'),
+      surfaceContactDepth: 0.189,
+      surfaceContactCutDepth: WALL_DISTANCE_METERS,
+    });
+    const fold = rig.presentation.contactFoldState();
+    expect(fold.engaged).toBe(true);
+    expect(fold.clipPlaneDistanceMeters, 'the plane follows the on-axis depth')
+      .toBeCloseTo(WALL_DISTANCE_METERS, 9);
+
+    const extent = rigExtent(rig);
+    const cutAt = WALL_DISTANCE_METERS - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS;
+    expect(
+      extent.nearest,
+      `nearest rig vertex ${extent.nearest.toFixed(3)} m must be camera-side of the cut at ${cutAt.toFixed(3)} m`,
+    ).toBeLessThan(cutAt);
+    // ... and the first grade must not have regressed to buy it.
+    expect(visibleForwardMeters(rig) - WALL_DISTANCE_METERS).toBeLessThanOrEqual(0);
+  });
+
+  it('falls back to the conservative depth when a caller has no cut depth', () => {
+    // Every gate written before this pass, and every headless caller, passes one
+    // depth. `undefined` has to keep meaning "use it for both"; an explicit
+    // `null` has to mean "nothing a plane can represent".
+    const base = {
+      bounds: MEASURED_CARBINE,
+      baseRootZ: -1.14,
+      authoredRootZ: -1.14 + 0.78,
+      basePitchRadians: 0.82,
+      baseScale: 0.734,
+      nearPlaneMeters: 0.11,
+    };
+    expect(solveViewmodelContactFold({ ...base, contactDepthMeters: 0.4 }).clipPlaneDistanceMeters)
+      .toBeCloseTo(0.4, 9);
+    expect(solveViewmodelContactFold({
+      ...base, contactDepthMeters: 0.189, contactCutDepthMeters: 0.4,
+    }).clipPlaneDistanceMeters).toBeCloseTo(0.4, 9);
+    expect(solveViewmodelContactFold({
+      ...base, contactDepthMeters: 0.189, contactCutDepthMeters: null,
+    }).clipPlaneDistanceMeters).toBeNull();
+    // The FOLD still solved against the conservative number in all three.
+    expect(solveViewmodelContactFold({
+      ...base, contactDepthMeters: 0.189, contactCutDepthMeters: 0.4,
+    }).forwardReachMeters).toBeCloseTo(
+      solveViewmodelContactFold({ ...base, contactDepthMeters: 0.189 }).forwardReachMeters,
+      9,
+    );
   });
 });

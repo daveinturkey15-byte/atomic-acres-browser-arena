@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
   awaitSubmissionCompletionTarget,
@@ -1512,5 +1513,48 @@ describe('cold-generation prewarm fence', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// Owner 2026-08-31: he could not launch the game at all in his everyday Chrome
+// while a fresh Chrome, a copy of his GPU caches and a pristine profile all
+// acquired an adapter on the same machine, same URL, same second. The cause was
+// that the runtime asked for powerPreference 'high-performance' and gave up on
+// the whole game when that returned null. powerPreference is a HINT: a browser
+// may legitimately return null for it while a usable default adapter exists.
+describe('WebGPU adapter acquisition falls back rather than refusing to run', () => {
+  const gpuThatOnlyAnswersUnhinted = () => {
+    const calls: Array<Record<string, unknown> | undefined> = [];
+    return {
+      calls,
+      gpu: {
+        requestAdapter: async (options?: Record<string, unknown>) => {
+          calls.push(options);
+          // The exact real-world shape: the hinted request yields nothing, the
+          // unhinted one yields a perfectly good adapter.
+          if (options?.powerPreference === 'high-performance') return null;
+          return { features: new Set<string>(), info: { vendor: 'nvidia', architecture: 'blackwell' } };
+        },
+      },
+    };
+  };
+
+  it('retries without the power hint before declaring WebGPU unavailable', async () => {
+    const { calls, gpu } = gpuThatOnlyAnswersUnhinted();
+    const first = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+    expect(first, 'precondition: the hinted request returns null').toBeNull();
+    const second = await gpu.requestAdapter();
+    expect(second, 'an unhinted request must still be tried, and here it succeeds').not.toBeNull();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('keeps the fallback wired in the shipped source, not just in this test', () => {
+    const source = readFileSync(new URL('./render-runtime.ts', import.meta.url), 'utf8');
+    // The old code threw on the hinted result directly. It must not come back.
+    expect(source).not.toContain("if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available')");
+    expect(source).toContain('adapter = await gpu.requestAdapter();');
+    expect(source).toContain("adapterFallback = 'default'");
+    // And the failure that remains must be the honest one: no adapter AT ALL.
+    expect(source).toContain('no GPU adapter was available at all');
   });
 });

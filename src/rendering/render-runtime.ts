@@ -956,7 +956,7 @@ type GpuAdapterShape = Readonly<{
 
 type GpuNavigatorShape = Readonly<{
   gpu?: Readonly<{
-    requestAdapter(options: Readonly<{ powerPreference: 'high-performance' }>): Promise<GpuAdapterShape | null>;
+    requestAdapter(options?: Readonly<{ powerPreference?: 'high-performance' | 'low-power' }>): Promise<GpuAdapterShape | null>;
   }>;
 }>;
 
@@ -1256,10 +1256,36 @@ export class WebGpuRenderRuntime {
   }>): Promise<WebGpuRenderRuntime> {
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
     if (!gpu) throw new Error('WebGPU was required, but navigator.gpu is unavailable');
-    const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available');
+    // Owner 2026-08-31: he could not launch the game at all in his everyday
+    // Chrome - "This game needs WebGPU ... (WebGPU was required, but no
+    // high-performance adapter was available)" - while a fresh Chrome, a copy of
+    // his GPU caches and a pristine profile all acquired an adapter fine on the
+    // same machine, same URL, same second.
+    //
+    // The cause was here, not on his machine. powerPreference is a HINT, not a
+    // requirement: per spec a browser may return null for a hinted request while
+    // a perfectly usable default adapter exists, and it does so in real
+    // conditions - power saving, an integrated GPU preferred, or an instance
+    // that has been running long enough to be holding many GPU contexts. This
+    // asked for high-performance and then gave up on the whole game.
+    //
+    // Note the asymmetry it sat next to: requestDevice below already falls back
+    // to a bare device "rather than killing the whole renderer". The adapter
+    // deserved the same courtesy.
+    let adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+    let adapterFallback: 'high-performance' | 'default' = 'high-performance';
+    if (!adapter) {
+      adapter = await gpu.requestAdapter();
+      adapterFallback = 'default';
+    }
+    if (!adapter) throw new Error('WebGPU was required, but no GPU adapter was available at all');
     const adapterInfo = adapter.info ?? await adapter.requestAdapterInfo?.() ?? {};
-    const adapterLabel = adapterInfoLabel(adapterInfo);
+    // Surface the fallback rather than hiding it: if we are running on the
+    // default adapter because the high-performance hint came back empty, that
+    // is worth seeing in telemetry and in any bug report.
+    const adapterLabel = adapterFallback === 'default'
+      ? `${adapterInfoLabel(adapterInfo)} (default adapter; high-performance hint unavailable)`
+      : adapterInfoLabel(adapterInfo);
     const requiredFeatures = selectOptionalDeviceFeatures(adapter.features);
     // Ask with the intersected list, and fall back to a bare device rather than
     // killing the whole renderer if a driver rejects a feature it advertised.

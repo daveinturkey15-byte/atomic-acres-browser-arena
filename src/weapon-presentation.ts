@@ -121,6 +121,14 @@ export type WeaponPose = {
    * HF-343 fire gate keeps consuming `surfaceRetreat` unchanged.
    */
   surfaceContactDepth?: number | null;
+  /**
+   * Presentation-only metres from the eye to the nearest surface a
+   * camera-perpendicular plane can honestly represent. Places the contact CUT;
+   * `surfaceContactDepth` above keeps driving the FOLD. They differ whenever
+   * the nearest thing to the rig is beside it rather than in front of it, and
+   * that difference is the whole 2026-08-31 "the weapon vanishes" defect.
+   */
+  surfaceContactCutDepth?: number | null;
   /** Presentation-only vertical clearance from nearby floor geometry. */
   surfaceLift?: number;
   /** Authoritative gameplay reload progress. Null means no active reload. */
@@ -908,10 +916,14 @@ export type ViewmodelContactFold = Readonly<{
    */
   residualMeters: number;
   /**
-   * Camera-forward metres at which the rig is CUT, or null when nothing is in
-   * contact. See `VIEWMODEL_CONTACT_CLIP_CONTRACT`: the fold cannot always
-   * close the gap, and what it cannot move is cut at the surface rather than
-   * painted over it.
+   * Camera-forward metres at which the rig is CUT, or null when nothing that
+   * a plane can represent is in front of it. See
+   * `VIEWMODEL_CONTACT_CLIP_CONTRACT`: the fold cannot always close the gap,
+   * and what it cannot move is cut at the surface rather than painted over it.
+   *
+   * This is NOT `contactDepthMeters`. The fold's depth is the conservative
+   * minimum over the padded lattice and may name a surface off to one side;
+   * the cut's depth is the nearest surface the rig actually runs into.
    */
   clipPlaneDistanceMeters: number | null;
 }>;
@@ -1004,6 +1016,12 @@ export function solveViewmodelContactFold(input: {
   bounds: ViewmodelRigBounds | null;
   /** Measured metres from the eye to the surface, or null when clear. */
   contactDepthMeters: number | null;
+  /**
+   * Metres to the surface that PLACES THE CUT, or null when nothing in front
+   * of the rig can place a plane. Defaults to `contactDepthMeters` so a caller
+   * that has only the conservative number keeps the old behaviour exactly.
+   */
+  contactCutDepthMeters?: number | null;
   /** Root z with the authored contact retreat already subtracted, no fold. */
   baseRootZ: number;
   /** Root z the authored response alone would reach (base + authored retreat). */
@@ -1020,6 +1038,14 @@ export function solveViewmodelContactFold(input: {
   const { bounds } = input;
   const depth = input.contactDepthMeters;
   if (!bounds || bounds.meshes <= 0 || depth === null || !Number.isFinite(depth)) return CONTACT_FOLD_CLEAR;
+  // THE CUT'S OWN DEPTH. `depth` above is the conservative lattice minimum and
+  // it keeps driving the fold: the pose should retreat from anything nearby,
+  // whichever side it is on. The plane is different - it can only stand in for
+  // a surface the rig runs INTO - so it is placed by the on-axis sweep. When
+  // the caller has no such number (headless callers, and every gate written
+  // before this pass) the two are the same and nothing moves.
+  const cutDepth = input.contactCutDepthMeters === undefined ? depth : input.contactCutDepthMeters;
+  const clipPlaneDistanceMeters = cutDepth !== null && Number.isFinite(cutDepth) ? cutDepth : null;
   const maximumPitch = Math.max(
     input.basePitchRadians,
     input.maximumPitchRadians ?? VIEWMODEL_CONTACT_FOLD_MAXIMUM_PITCH_RADIANS,
@@ -1075,8 +1101,8 @@ export function solveViewmodelContactFold(input: {
       // the wall - it is painted over it, which is what "the gun is clipping
       // through the wall" looks like. When the fold cannot close the gap the
       // renderer cuts the rig at the surface instead; see
-      // `contactClipPlaneDistanceMeters`.
-      clipPlaneDistanceMeters: depth,
+      // `applyViewmodelContactClip`.
+      clipPlaneDistanceMeters,
     });
   };
 
@@ -3404,11 +3430,13 @@ export class WeaponPresentation {
   }
 
   /**
-   * Places the contact cut and the arms tuck for this frame.
+   * Places the contact cut for this frame.
    *
-   * Both are driven by ONE measured number - the distance to the contacting
-   * surface the fold already solved against - so they cannot disagree with the
-   * fold or with each other, and both are inert when nothing is in contact.
+   * It reads exactly one number - `clipPlaneDistanceMeters`, which the fold
+   * solve published - so the plane cannot disagree with the pose that was
+   * actually applied, and it is inert when nothing a plane can represent is in
+   * front of the rig. That number is the ON-AXIS depth, not the conservative
+   * lattice minimum the fold solved against; see `measuredEnvelopeCutDepthMeters`.
    */
   private applyViewmodelContactClip(): void {
     const clippingRoot = this.root as ViewmodelClippingRoot;
@@ -5664,6 +5692,13 @@ export class WeaponPresentation {
     this.contactFold = solveViewmodelContactFold({
       bounds: this.measureRigBounds(),
       contactDepthMeters: pose.surfaceContactDepth ?? null,
+      // The fold keeps the conservative minimum above; the cut is placed by
+      // the on-axis depth. Passed through UNDEFAULTED on purpose: `undefined`
+      // has to keep meaning "this caller has no separate cut depth", which the
+      // solve answers by falling back to `contactDepthMeters` exactly as
+      // before, while an explicit `null` means "nothing a plane can represent"
+      // and correctly disarms the cut.
+      contactCutDepthMeters: pose.surfaceContactCutDepth,
       baseRootZ: contactFoldBaseZ,
       authoredRootZ: contactFoldBaseZ + surfaceRetreatDemand,
       basePitchRadians: this.contactResponse.pitchRadians,
