@@ -77,9 +77,9 @@ export function createNatureCorridor(seed = 7): Corridor {
   // Ground litter as a scatter of its own, independent of the plants' skirts.
   const litterParts: THREE.BufferGeometry[] = [];
   const litterSites = poissonScatter(
-    260,
+    150,
     { minX: -CORRIDOR_WIDTH / 2 + 0.2, maxX: CORRIDOR_WIDTH / 2 - 0.2, minZ: -LEN + 1, maxZ: -1 },
-    0.34,
+    0.5,
     seed * 3,
   );
   litterSites.forEach((p, i) => {
@@ -98,9 +98,9 @@ export function createNatureCorridor(seed = 7): Corridor {
   // what lets direct sun reach the floor and produce readable sunflecks
   // instead of the uniform leaf-mush a shadow-mapped canopy gives.
   const treeSites = poissonScatter(
-    64,
+    40,
     { minX: -CORRIDOR_WIDTH / 2 - 9, maxX: CORRIDOR_WIDTH / 2 + 9, minZ: -LEN - 4, maxZ: 1 },
-    1.9,
+    2.6,
     seed,
   );
   // BATCHING. Every tree used to be three separate meshes (wood, canopy,
@@ -124,8 +124,8 @@ export function createNatureCorridor(seed = 7): Corridor {
       seed: seed * 10 + i,
       height: 3.6 + hash11(seed + i) * 7.5,
       trunkRadius: 0.11 + hash11(seed * 2 + i) * 0.2,
-      depth: 4,
-      leavesPerClump: 22,
+      depth: 3,
+      leavesPerClump: 11,
       deadFraction: autumn ? 0.5 : 0.1,
     });
 
@@ -141,9 +141,9 @@ export function createNatureCorridor(seed = 7): Corridor {
 
   // Undergrowth.
   const shrubSites = poissonScatter(
-    170,
+    90,
     { minX: -CORRIDOR_WIDTH / 2 - 7, maxX: CORRIDOR_WIDTH / 2 + 7, minZ: -LEN - 2, maxZ: 0 },
-    0.62,
+    1.0,
     seed * 5,
   );
   shrubSites.forEach((p, i) => {
@@ -265,7 +265,7 @@ export function createMathsCorridor(): Corridor {
     return d.add(ripple);
   });
 
-  const MAX_STEPS = 48;
+  const MAX_STEPS = 32;
 
   sdfMat.colorNode = Fn(() => {
     // March in WORLD space, from the fragment on the proxy's back face along

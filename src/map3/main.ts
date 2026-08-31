@@ -239,9 +239,47 @@ async function main(): Promise<void> {
     pitch -= e.movementY * 0.0022;
     pitch = Math.max(-1.42, Math.min(1.42, pitch));
   });
+  // --- perf bisect ------------------------------------------------------
+  // Never optimise a frame you have not bisected. 1/2/3 isolate a corridor,
+  // 4 drops shadows, 5 drops the canopy (the overdraw suspect), 6 halves the
+  // resolution (separates fragment cost from everything else). Read the fps
+  // and draw count in the HUD after each.
+  const pivots = scene.children.filter((o) => o.type === 'Group');
+  let shadowsOn = true;
+  let halfRes = false;
+
+  function applyResolution(): void {
+    const scale = halfRes ? 0.5 : 1;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * scale);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
   window.addEventListener('keydown', (e) => {
     keys.add(e.code);
     if (e.code === 'Space' && grounded) { vy = 6.35; grounded = false; }
+
+    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
+      const idx = Number(e.code.slice(5)) - 1;
+      pivots.forEach((p, i) => { p.visible = i === idx ? !p.visible : p.visible; });
+    }
+    if (e.code === 'Digit0') pivots.forEach((p) => { p.visible = true; });
+    if (e.code === 'Digit4') {
+      shadowsOn = !shadowsOn;
+      sun.castShadow = shadowsOn;
+      renderer.shadowMap.enabled = shadowsOn;
+    }
+    if (e.code === 'Digit5') {
+      // Hide every foliage mesh (anything not casting shadows and not the
+      // ground) to isolate canopy overdraw.
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh && m.material && (m.material as THREE.Material).side === THREE.DoubleSide
+            && !m.userData.presentationOnly) {
+          m.visible = !m.visible;
+        }
+      });
+    }
+    if (e.code === 'Digit6') { halfRes = !halfRes; applyResolution(); }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
   window.addEventListener('resize', () => {
@@ -249,6 +287,13 @@ async function main(): Promise<void> {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+
+  // three's WebGPURenderer falls back to a WebGL2 backend silently when WebGPU
+  // is unavailable or the device request fails. Everything still renders, TSL
+  // still compiles (lowered to GLSL), and nothing warns you — but the
+  // performance characteristics are completely different. Name it in the HUD.
+  const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend;
+  const backendName = backend?.isWebGPUBackend ? 'WebGPU' : 'WebGL2-fallback';
 
   const gpu = gpuIdentity();
   const gpuShort = gpu.software
@@ -297,14 +342,16 @@ async function main(): Promise<void> {
       frames = 0;
       fpsAccum = 0;
       const dc = (renderer.info?.render as { drawCalls?: number } | undefined)?.drawCalls ?? 0;
-      hud.textContent = `${fps} fps · ${dc} draws · ${gpuShort}`;
+      const tri = Math.round(((renderer.info?.render as { triangles?: number } | undefined)?.triangles ?? 0) / 1000);
+      hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${gpuShort}`
+        + `  |  1/2/3 corridor · 4 shadows · 5 foliage · 6 half-res · 0 reset`;
       hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
     }
     requestAnimationFrame(tick);
   }
 
   status.remove();
-  hud.textContent = 'click to look around · WASD to walk · ' + gpuShort;
+  hud.textContent = `click to look around · WASD to walk · ${backendName} · ${gpuShort}`;
   requestAnimationFrame(tick);
 
   // Expose a tiny probe so a QA harness can drive the camera from the render

@@ -58,7 +58,7 @@ export interface TreeOptions {
 }
 
 const DEFAULT_LEAF: LeafOptions = {
-  length: 0.46, width: 0.17, segmentsV: 4, segmentsU: 2,
+  length: 0.72, width: 0.30, segmentsV: 3, segmentsU: 2,
   droop: 0.6, cup: 0.38, twist: 0.28, asymmetry: 0.2, widestAt: 0.4,
 };
 
@@ -71,9 +71,9 @@ export function createTree(opts: TreeOptions = {}): TreeParts {
   const seed = opts.seed ?? 1;
   const height = opts.height ?? 7.5;
   const trunkRadius = opts.trunkRadius ?? 0.22;
-  const depth = opts.depth ?? 4;
-  const leavesPerClump = opts.leavesPerClump ?? 22;
-  const radialSegments = opts.radialSegments ?? 6;
+  const depth = opts.depth ?? 3;
+  const leavesPerClump = opts.leavesPerClump ?? 11;
+  const radialSegments = opts.radialSegments ?? 5;
   const leaf: LeafOptions = { ...DEFAULT_LEAF, ...opts.leaf };
 
   const woodParts: THREE.BufferGeometry[] = [];
@@ -146,8 +146,8 @@ export function createTree(opts: TreeOptions = {}): TreeParts {
     clumpSites.forEach((site, i) => {
       const spray = createLeafSpray({
         count: leavesPerClump,
-        radius: 0.62 * site.scale,
-        height: 0.44 * site.scale,
+        radius: 0.78 * site.scale,
+        height: 0.5 * site.scale,
         seed: seed * 100 + i,
         leaf,
         deadFraction: opts.deadFraction ?? 0.1,
@@ -160,7 +160,7 @@ export function createTree(opts: TreeOptions = {}): TreeParts {
 
   const litter = createLitterSkirt(
     trunkRadius * 7.5,
-    opts.bare ? 26 : 18,
+    opts.bare ? 14 : 9,
     leaf,
     seed * 7 + 3,
   );
@@ -198,14 +198,14 @@ function stripToWood(g: THREE.BufferGeometry): THREE.BufferGeometry {
  */
 export function createShrub(seed = 1, scale = 1): THREE.BufferGeometry {
   const leaf: LeafOptions = {
-    length: 0.42 * scale, width: 0.1 * scale, segmentsV: 4, segmentsU: 2,
+    length: 0.6 * scale, width: 0.16 * scale, segmentsV: 3, segmentsU: 2,
     droop: 0.95, cup: 0.42, twist: 0.4, asymmetry: 0.28, widestAt: 0.35,
   };
   const spray = createLeafSpray({
-    count: 18, radius: 0.34 * scale, height: 0.16 * scale,
+    count: 9, radius: 0.36 * scale, height: 0.16 * scale,
     seed, leaf, deadFraction: 0.16, pitch: [0.55, 1.35],
   });
-  const skirt = createLitterSkirt(0.4 * scale, 7, leaf, seed + 11);
+  const skirt = createLitterSkirt(0.4 * scale, 4, leaf, seed + 11);
   return mergeGeometries([spray, skirt]);
 }
 
