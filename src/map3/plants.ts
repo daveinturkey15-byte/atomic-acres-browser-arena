@@ -240,3 +240,124 @@ export function poissonScatter(
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/* Additional archetypes — a forest of one tree species reads as       */
+/* wallpaper no matter how good that one tree is.                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Conifer. Needles are the opposite problem to broadleaves: individually they
+ * are far too small to be geometry, so the readable unit is the SPRAY, not the
+ * needle. Each spray is a long narrow leaf card with heavy droop and near-zero
+ * width taper, which at any real viewing distance reads as a needle bundle for
+ * one twelfth of the triangles.
+ */
+export function createConifer(opts: TreeOptions = {}): TreeParts {
+  const seed = opts.seed ?? 1;
+  const height = opts.height ?? 11;
+  const trunkRadius = opts.trunkRadius ?? 0.24;
+  const woodParts: THREE.BufferGeometry[] = [];
+  const foliageParts: THREE.BufferGeometry[] = [];
+
+  // A single straight leader — conifers do not fork like broadleaves, and
+  // forking them is the classic tell of a tree generator with one rule.
+  const trunk = new THREE.CylinderGeometry(trunkRadius * 0.16, trunkRadius, height, 6, 1, false);
+  trunk.translate(0, height / 2, 0);
+  woodParts.push(stripToWood(trunk));
+
+  const needle: LeafOptions = {
+    length: 0.5, width: 0.035, segmentsV: 3, segmentsU: 2,
+    droop: 1.15, cup: 0.15, twist: 0.1, asymmetry: 0.05, widestAt: 0.5,
+  };
+
+  // Whorls of branches, shorter toward the top: the silhouette IS the species.
+  const whorls = 9;
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  for (let w = 0; w < whorls; w++) {
+    const f = w / (whorls - 1);
+    const y = height * (0.22 + f * 0.74);
+    const reach = (1 - f) * height * 0.2 + 0.35;
+    const perWhorl = 5 + Math.floor(hash11(seed + w) * 3);
+    for (let i = 0; i < perWhorl; i++) {
+      const yaw = (i / perWhorl) * Math.PI * 2 + hash11(seed * 3 + w * 7 + i) * 0.9;
+      const droop = 0.35 + f * 0.25;
+
+      const branch = new THREE.CylinderGeometry(0.012, 0.045, reach, 4, 1, false);
+      branch.translate(0, reach / 2, 0);
+      e.set(Math.PI / 2 - droop, yaw, 0);
+      q.setFromEuler(e);
+      m.compose(new THREE.Vector3(0, y, 0), q, new THREE.Vector3(1, 1, 1));
+      branch.applyMatrix4(m);
+      woodParts.push(stripToWood(branch));
+
+      const spray = createLeafSpray({
+        count: 9, radius: reach * 0.5, height: 0.1,
+        seed: seed * 40 + w * 11 + i, leaf: needle,
+        deadFraction: 0.05, pitch: [0.7, 1.5],
+      });
+      spray.applyMatrix4(
+        new THREE.Matrix4().makeTranslation(
+          Math.cos(yaw) * reach * 0.62, y - 0.1, Math.sin(yaw) * reach * 0.62,
+        ),
+      );
+      foliageParts.push(spray);
+    }
+  }
+
+  return {
+    wood: mergeGeometries(woodParts),
+    foliage: mergeGeometries(foliageParts),
+    litter: createLitterSkirt(trunkRadius * 6, 9, needle, seed * 5 + 2),
+    height,
+  };
+}
+
+/**
+ * A fallen log with its own moss-and-litter bed. Deadwood on the floor is what
+ * makes a forest read as having a HISTORY rather than having been placed a
+ * second ago, and it is nearly free: one tapered cylinder plus a skirt.
+ */
+export function createFallenLog(seed = 1, length = 4.2): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const r = 0.18 + hash11(seed) * 0.16;
+  const log = new THREE.CylinderGeometry(r * 0.72, r, length, 7, 1, false);
+  log.rotateZ(Math.PI / 2);
+  log.rotateY(hash11(seed * 3) * 0.5 - 0.25);
+  log.translate(0, r * 0.85, 0);
+  parts.push(stripToWood(log));
+
+  // A couple of broken stubs so it is not a pipe.
+  for (let i = 0; i < 3; i++) {
+    const h = hash11(seed * 7 + i * 3.3);
+    const stub = new THREE.CylinderGeometry(0.03, 0.07, 0.3 + h * 0.5, 4, 1, false);
+    const e = new THREE.Euler(h * 1.2 - 0.2, h * 6.28, 0.6 + h);
+    stub.applyMatrix4(new THREE.Matrix4().compose(
+      new THREE.Vector3((h - 0.5) * length * 0.8, r * 1.1, (h - 0.5) * 0.3),
+      new THREE.Quaternion().setFromEuler(e), new THREE.Vector3(1, 1, 1),
+    ));
+    parts.push(stripToWood(stub));
+  }
+
+  parts.push(createLitterSkirt(length * 0.42, 8, {
+    length: 0.2, width: 0.07, segmentsV: 3, segmentsU: 2, widestAt: 0.4,
+  }, seed * 13));
+  return mergeGeometries(parts);
+}
+
+/**
+ * Grass tuft: narrow blades with a strong arch. Distinct from the shrub only
+ * in proportion, which is the point — one leaf primitive, many plants.
+ */
+export function createGrassTuft(seed = 1, scale = 1): THREE.BufferGeometry {
+  return createLeafSpray({
+    count: 7, radius: 0.1 * scale, height: 0.05 * scale, seed,
+    leaf: {
+      length: 0.44 * scale, width: 0.028 * scale, segmentsV: 3, segmentsU: 2,
+      droop: 1.35, cup: 0.6, twist: 0.55, asymmetry: 0.1, widestAt: 0.3,
+    },
+    deadFraction: 0.2, pitch: [0.05, 0.55],
+  });
+}

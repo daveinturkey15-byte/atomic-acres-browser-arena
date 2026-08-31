@@ -22,6 +22,9 @@ import { vec3 } from 'three/tsl';
 import {
   createNatureCorridor, createMathsCorridor, createGrammarCorridor, type Corridor,
 } from './corridors';
+import {
+  createWaterCorridor, createWeatherCorridor, createVolumeCorridor,
+} from './corridors-extra';
 
 /* ---------------------------------------------------------------- */
 /* Signage — canvas to CanvasTexture on a world plane.               */
@@ -132,7 +135,7 @@ async function main(): Promise<void> {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x8fb3c4);
-  scene.fog = new THREE.Fog(0x8fb3c4, 30, 150);
+  scene.fog = new THREE.Fog(0x8fb3c4, 55, 320);
 
   const camera = new THREE.PerspectiveCamera(76, window.innerWidth / window.innerHeight, 0.08, 400);
   camera.position.set(2.5, 1.7, 4.0);
@@ -166,7 +169,7 @@ async function main(): Promise<void> {
   const hubMat = new MeshStandardNodeMaterial();
   hubMat.roughness = 0.94;
   hubMat.colorNode = vec3(0.29, 0.3, 0.29);
-  const hubGeo = new THREE.CircleGeometry(15, 48);
+  const hubGeo = new THREE.CircleGeometry(19, 64);
   hubGeo.rotateX(-Math.PI / 2);
   const hub = new THREE.Mesh(hubGeo, hubMat);
   hub.receiveShadow = true;
@@ -188,13 +191,16 @@ async function main(): Promise<void> {
     createNatureCorridor(7),
     createMathsCorridor(),
     createGrammarCorridor(11),
+    createWaterCorridor(),
+    createWeatherCorridor(21),
+    createVolumeCorridor(),
   ];
 
-  const HUB_R = 15;
+  const HUB_R = 19;
   corridors.forEach((c, i) => {
-    // Fan the corridors out from the hub. Three of them at 90 degrees apart
-    // keeps each fully visible from the centre.
-    const angle = -Math.PI / 2 + (i - 1) * (Math.PI / 3);
+    // Six spokes evenly around the hub, so every corridor mouth is visible
+    // from the centre and none of them overlap at the rim.
+    const angle = (i / corridors.length) * Math.PI * 2;
     const pivot = new THREE.Group();
     pivot.rotation.y = angle;
     pivot.position.set(0, 0, 0);
@@ -258,17 +264,20 @@ async function main(): Promise<void> {
     keys.add(e.code);
     if (e.code === 'Space' && grounded) { vy = 6.35; grounded = false; }
 
-    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
-      const idx = Number(e.code.slice(5)) - 1;
-      pivots.forEach((p, i) => { p.visible = i === idx ? !p.visible : p.visible; });
+    const digit = e.code.startsWith('Digit') ? Number(e.code.slice(5)) : -1;
+    if (digit >= 1 && digit <= 6) {
+      // Solo a corridor: show only that one. Press again to restore all.
+      const idx = digit - 1;
+      const soloed = pivots.every((p, i) => (i === idx) === p.visible);
+      pivots.forEach((p, i) => { p.visible = soloed ? true : i === idx; });
     }
     if (e.code === 'Digit0') pivots.forEach((p) => { p.visible = true; });
-    if (e.code === 'Digit4') {
+    if (e.code === 'KeyO') {
       shadowsOn = !shadowsOn;
       sun.castShadow = shadowsOn;
       renderer.shadowMap.enabled = shadowsOn;
     }
-    if (e.code === 'Digit5') {
+    if (e.code === 'KeyP') {
       // Hide every foliage mesh (anything not casting shadows and not the
       // ground) to isolate canopy overdraw.
       scene.traverse((o) => {
@@ -279,7 +288,7 @@ async function main(): Promise<void> {
         }
       });
     }
-    if (e.code === 'Digit6') { halfRes = !halfRes; applyResolution(); }
+    if (e.code === 'KeyH') { halfRes = !halfRes; applyResolution(); }
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
   window.addEventListener('resize', () => {
@@ -344,7 +353,7 @@ async function main(): Promise<void> {
       const dc = (renderer.info?.render as { drawCalls?: number } | undefined)?.drawCalls ?? 0;
       const tri = Math.round(((renderer.info?.render as { triangles?: number } | undefined)?.triangles ?? 0) / 1000);
       hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${gpuShort}`
-        + `  |  1/2/3 corridor · 4 shadows · 5 foliage · 6 half-res · 0 reset`;
+        + `  |  1-6 solo corridor · 0 all · O shadows · P foliage · H half-res`;
       hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
     }
     requestAnimationFrame(tick);
