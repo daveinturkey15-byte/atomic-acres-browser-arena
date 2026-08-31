@@ -1,0 +1,1 @@
+import{a as e,c as t,i as n,n as r,o as i,r as a,s as o,t as s}from"./webgpu-adapter-diagnostics-BK_qrMAJ.js";export{s as attachWebGpuDiagnostics,r as browserDiagnosticsEnvironment,a as collectWebGpuDiagnostics,n as deriveWebGpuNextSteps,e as formatWebGpuDiagnostics,i as formatWebGpuObservations,o as observeWebGl2,t as webGpuDiagnosticsFromError};
