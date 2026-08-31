@@ -27,6 +27,13 @@ export type ReleaseChannelConfig = {
   retained: PinnedReleaseChannel;
   historical: PinnedReleaseChannel;
   stable: PinnedReleaseChannel;
+  /**
+   * PASS 73, retained live at channels/the-big-one. Optional because the key
+   * post-dates schemaVersion 5 consumers, but it IS on gh-pages today and it is
+   * the newest live predecessor - which is why the direct-link chooser in
+   * bootstrap.ts prefers it over `rollback`, whose tree 404s.
+   */
+  pass73Retained?: Readonly<{ label: string; description: string; pass: string; path: string }>;
   rollback?: PinnedReleaseChannel & {
     rebuiltFromSource: boolean;
   };

@@ -24,7 +24,20 @@ import {
 } from './release-channel';
 
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
-const stableFallback = releaseChannels.rollback ?? releaseChannels.stable;
+// Owner 2026-08-31: "i dont want pass 63, stable webgl, i want the previous 1/2
+// versions we had". This chooser - the one a DIRECT LINK or bookmark lands on,
+// distinct from the root release shell - offered `rollback`, which is
+// channels/pass63-rollback. That tree is not on gh-pages and 404s live, so the
+// second card was a dead link. Verified against the branch: the only channels
+// that actually exist are pass81, the-big-one (PASS 73), pass72-retained and
+// recent-stable; rollback, retained and historical all point at trees that were
+// never published or have been removed.
+//
+// Prefer the newest LIVE predecessor - PASS 73 - which is also the one he asked
+// for, and keep `stable` as the last resort. `rollback` is deliberately no longer
+// consulted here; it stays in release-channels.json because project-map.ts
+// documents it, but it must not be offered to a player until its tree exists.
+const stableFallback = releaseChannels.pass73Retained ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
 // The pass name used to be hand-written into both of these strings, and had been stale for
 // ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"

@@ -377,11 +377,29 @@ def assert_in_game_fallback_exists(worktree):
     """
     config_path = os.path.join(SRC, "release-channels.json")
     config = json.load(open(config_path, encoding="utf-8"))
-    fallback = config.get("rollback") or config.get("stable")
+    # 2026-08-31: this used to ASSUME the fallback was `rollback ?? stable`. That is
+    # exactly the class of bug this repo has spent the week removing - a checker that
+    # hardcodes what it thinks the code does, and then passes or fails for the wrong
+    # reason when the code changes. bootstrap.ts now prefers `pass73Retained`, so read
+    # the key list out of the source and verify whichever one actually wins.
+    bootstrap_src = open(os.path.join(SRC, "src", "bootstrap.ts"), encoding="utf-8").read()
+    match = re.search(r"const stableFallback = ([^;]+);", bootstrap_src)
+    if not match:
+        sys.exit("REFUSING: cannot find `const stableFallback = ...` in src/bootstrap.ts, so "
+                 "this guard can no longer tell which channel the in-build chooser offers. "
+                 "Fix the guard rather than removing it.")
+    candidates = re.findall(r"releaseChannels\.([A-Za-z0-9_]+)", match.group(1))
+    if not candidates:
+        sys.exit(f"REFUSING: could not read any channel key from `{match.group(1).strip()}`")
+    key, fallback = None, None
+    for candidate in candidates:          # `a ?? b` - first one present wins, as in JS
+        if config.get(candidate):
+            key, fallback = candidate, config[candidate]
+            break
     if not fallback:
-        sys.exit("REFUSING: release-channels.json has neither rollback nor stable, so the "
-                 "in-build chooser has no fallback card to draw")
-    key = "rollback" if config.get("rollback") else "stable"
+        sys.exit("REFUSING: release-channels.json has none of the channels the in-build "
+                 f"chooser would fall back to ({', '.join(candidates)}), so it has no "
+                 "second card to draw")
     path = fallback.get("path", "")
     if not path or not os.path.isdir(os.path.join(worktree, *path.split("/"))):
         sys.exit(
