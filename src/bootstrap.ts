@@ -52,10 +52,40 @@ if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
 
 
+/**
+ * Failure path only. The renderer fails closed with a friendly sentence the
+ * player cannot act on ("This game needs WebGPU ... no GPU adapter was
+ * available at all"), and from outside the browser nobody can see WHY the
+ * adapter was refused. When the failure carries a diagnostics report, put the
+ * observations on screen underneath that sentence; when it carries none - any
+ * other crash - leave the screen exactly as it was rather than inventing a
+ * graphics diagnosis for an unrelated bug.
+ */
+async function presentRendererFailureDiagnostics(error: unknown): Promise<void> {
+  try {
+    const [{ webGpuDiagnosticsFromError }, { presentWebGpuDiagnostics }] = await Promise.all([
+      import('./rendering/webgpu-adapter-diagnostics'),
+      import('./rendering/webgpu-diagnostics-screen'),
+    ]);
+    const report = webGpuDiagnosticsFromError(error);
+    if (report) presentWebGpuDiagnostics(report, document);
+  } catch {
+    // The screen already shows the real failure; never let the explanation of
+    // it become a second failure.
+  }
+}
+
 async function loadLatestBuild(): Promise<void> {
   document.title = 'Nuke Town — Browser Arena FPS';
   app.replaceChildren();
-  await import('./main');
+  try {
+    await import('./main');
+  } catch (error) {
+    await presentRendererFailureDiagnostics(error);
+    // Rethrown unchanged: the existing failure reporting, logging and QA
+    // signals all key off this rejection.
+    throw error;
+  }
 }
 
 function openStableBuild(): void {

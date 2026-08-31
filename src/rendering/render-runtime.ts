@@ -960,6 +960,36 @@ type GpuNavigatorShape = Readonly<{
   }>;
 }>;
 
+/**
+ * FAILURE PATH ONLY - the two `throw`s in adapter acquisition below.
+ *
+ * The requirement screen used to end the story at "no GPU adapter was
+ * available at all", which is the one fact the player already knew and cannot
+ * act on. This gathers what the PAGE can observe - navigator.gpu, each
+ * powerPreference separately, WebGL2's unmasked renderer, secure context - and
+ * hangs it on the error, where the failure screen picks it up and prints it.
+ *
+ * It costs the success path nothing: the diagnostics live behind a dynamic
+ * `import()` reached only from here, so an acquired adapter never loads, parses
+ * or runs a line of it. Diagnostics are also a courtesy, never a replacement:
+ * whatever they do, the caller still gets the real failure with its original
+ * message.
+ */
+async function diagnosedWebGpuFailure(headline: string): Promise<Error> {
+  const failure = new Error(headline);
+  try {
+    const diagnostics = await import('./webgpu-adapter-diagnostics');
+    const report = await diagnostics.collectWebGpuDiagnostics();
+    diagnostics.attachWebGpuDiagnostics(failure, report);
+    // Also on the console, because a player who can reach devtools - or a QA
+    // run reading console output - should not have to reproduce the screen.
+    console.error(`[Nuke Town WebGPU diagnostics]\n${diagnostics.formatWebGpuDiagnostics(report)}`);
+  } catch {
+    // A diagnostic that throws must not become the reported failure.
+  }
+  return failure;
+}
+
 const EMPTY_DEVICE_FEATURES: readonly string[] = Object.freeze([]);
 
 /**
@@ -1255,7 +1285,7 @@ export class WebGpuRenderRuntime {
     gradeProfileId?: GradeProfileId;
   }>): Promise<WebGpuRenderRuntime> {
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
-    if (!gpu) throw new Error('WebGPU was required, but navigator.gpu is unavailable');
+    if (!gpu) throw await diagnosedWebGpuFailure('WebGPU was required, but navigator.gpu is unavailable');
     // Owner 2026-08-31: he could not launch the game at all in his everyday
     // Chrome - "This game needs WebGPU ... (WebGPU was required, but no
     // high-performance adapter was available)" - while a fresh Chrome, a copy of
@@ -1278,7 +1308,7 @@ export class WebGpuRenderRuntime {
       adapter = await gpu.requestAdapter();
       adapterFallback = 'default';
     }
-    if (!adapter) throw new Error('WebGPU was required, but no GPU adapter was available at all');
+    if (!adapter) throw await diagnosedWebGpuFailure('WebGPU was required, but no GPU adapter was available at all');
     const adapterInfo = adapter.info ?? await adapter.requestAdapterInfo?.() ?? {};
     // Surface the fallback rather than hiding it: if we are running on the
     // default adapter because the high-performance hint came back empty, that

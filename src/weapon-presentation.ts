@@ -837,6 +837,10 @@ export const VIEWMODEL_CONTACT_CLIP_CONTRACT = 'viewmodel-contact-surface-clip-v
  * the wall it is cutting against.
  */
 export const VIEWMODEL_CONTACT_CLIP_MARGIN_METERS = 0.02;
+/** Where the contact plane rests when nothing is being clipped. Far enough
+ * that the whole rig is on the kept side, so the plane is a no-op without
+ * ever changing the clipping state. */
+const VIEWMODEL_CONTACT_CLIP_PARKED_METERS = 1_000;
 
 /** The viewmodel root, with the WebGPU clipping-group fields it publishes. */
 type ViewmodelClippingRoot = THREE.Group & {
@@ -2021,12 +2025,28 @@ export class WeaponPresentation {
     this.root.name = 'original-weapon-view';
     this.root.position.set(HIP_VIEWMODEL_POSITION.x, HIP_VIEWMODEL_POSITION.y, HIP_VIEWMODEL_POSITION.z);
     this.root.scale.setScalar(HIP_VIEWMODEL_SCALE);
-    // The contact cut, declared once. `enabled` is false until the rig is
-    // genuinely in contact, so open ground renders through exactly the code
-    // path it always did - no plane, no clipping context, no cache-key change.
+    // The contact cut, declared once and left ARMED FOR THE LIFETIME OF THE RIG.
+    //
+    // Owner 2026-08-31: "it just freezes every few seconds ... mega unstable".
+    // This used to set `enabled = false` until the rig was genuinely in contact,
+    // on the reasoning quoted here before: "no plane, no clipping context, no
+    // cache-key change". That is true AT REST and wrong IN MOTION - the TOGGLE is
+    // the cache-key change. Every engage and disengage flips the clipping state,
+    // which changes each material's shader permutation, and three recompiles the
+    // pipeline. Combat means constantly nearing and leaving walls, so the whole
+    // viewmodel - weapon, lenses, sleeve, gloves - recompiled several times a
+    // second.
+    //
+    // Measured: 85.7% of ALL pipeline creations landed inside a stall, against
+    // 2.73% expected if unrelated - a 31x enrichment - and the same material
+    // (MAT_Pass65_Arms_FingerGlove_PBR_855) recompiled three times in two seconds.
+    //
+    // So the group stays enabled and the PLANE moves instead. Out of contact it
+    // is parked far in front of the rig, where every viewmodel vertex is on the
+    // kept camera side and it clips nothing. One permutation, compiled once.
     const clippingRoot = this.root as ViewmodelClippingRoot;
     clippingRoot.isClippingGroup = true;
-    clippingRoot.enabled = false;
+    clippingRoot.enabled = true;
     clippingRoot.clipIntersection = false;
     clippingRoot.clipShadows = false;
     clippingRoot.clippingPlanes = [this.contactClipPlane];
@@ -3438,11 +3458,31 @@ export class WeaponPresentation {
    * front of the rig. That number is the ON-AXIS depth, not the conservative
    * lattice minimum the fold solved against; see `measuredEnvelopeCutDepthMeters`.
    */
+  /**
+   * Move the contact plane far enough forward that nothing is clipped, WITHOUT
+   * changing the clipping state. Keeping the group armed at a harmless position
+   * holds the shader permutation constant; toggling `enabled` does not.
+   */
+  private parkViewmodelContactClip(): void {
+    this.camera.updateWorldMatrix(true, false);
+    const scratch = this.contactClipScratch;
+    const eye = this.camera.getWorldPosition(scratch.eye);
+    const forward = this.camera.getWorldDirection(scratch.forward);
+    // 1 km ahead: every viewmodel vertex sits within ~3 m, so all of it is on
+    // the kept camera side of the plane.
+    const point = scratch.point.copy(eye).addScaledVector(forward, VIEWMODEL_CONTACT_CLIP_PARKED_METERS);
+    this.contactClipPlane.normal.copy(forward).multiplyScalar(-1);
+    this.contactClipPlane.constant = -this.contactClipPlane.normal.dot(point);
+  }
+
   private applyViewmodelContactClip(): void {
     const clippingRoot = this.root as ViewmodelClippingRoot;
     const surfaceMeters = this.contactFold.clipPlaneDistanceMeters;
     if (surfaceMeters === null || !Number.isFinite(surfaceMeters)) {
-      clippingRoot.enabled = false;
+      // Park the plane instead of disarming the group - see the constructor.
+      // Disabling would flip every viewmodel material's shader permutation and
+      // recompile the lot, which is what was freezing the game.
+      this.parkViewmodelContactClip();
       return;
     }
     const nearPlane = viewmodelCameraNearMeters(this.camera);

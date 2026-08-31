@@ -272,7 +272,31 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
     const rig = await mountedRig('carbine');
     settle(rig, {});
     expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters).toBeNull();
-    expect((rig.presentation.root as unknown as { enabled: boolean }).enabled).toBe(false);
+    // Re-pinned 2026-08-31. This asserted `enabled === false` out of contact.
+    // That WAS the freeze: toggling the clipping state flips every viewmodel
+    // material's shader permutation, so three recompiled the weapon, lenses,
+    // sleeve and gloves on every wall approach and departure. Measured 85.7% of
+    // all pipeline creations landing inside a stall (31x enrichment).
+    //
+    // The group is now armed for the rig's lifetime and the PLANE parks instead.
+    // So pin the property that actually matters - out of contact the plane must
+    // clip NOTHING - which is strictly stronger than pinning a boolean, because
+    // an armed-but-wrongly-placed plane would eat the weapon and still pass the
+    // old check.
+    {
+      const clipRoot = rig.presentation.root as unknown as {
+        enabled: boolean; clippingPlanes: THREE.Plane[];
+      };
+      expect(clipRoot.enabled, 'the group stays armed - toggling it is what froze the game').toBe(true);
+      const parked = clipRoot.clippingPlanes[0];
+      // Every vertex of the rig sits within ~3 m of the camera; the parked plane
+      // must leave all of it on the kept side (positive distance).
+      for (const probe of [0, 0.5, 1, 2, 3]) {
+        const point = new THREE.Vector3(0, 0, -probe).applyMatrix4(rig.camera.matrixWorld);
+        expect(parked.distanceToPoint(point), `rig point at ${probe} m must survive the parked cut`)
+          .toBeGreaterThan(0);
+      }
+    }
 
     settle(rig, {
       surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, 'carbine'),
@@ -315,7 +339,31 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
     expect(rigExtent(rig).furthest).toBeCloseTo(openExtent, 9);
     expect(rig.presentation.contactFoldState().engaged).toBe(false);
     expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters).toBeNull();
-    expect((rig.presentation.root as unknown as { enabled: boolean }).enabled).toBe(false);
+    // Re-pinned 2026-08-31. This asserted `enabled === false` out of contact.
+    // That WAS the freeze: toggling the clipping state flips every viewmodel
+    // material's shader permutation, so three recompiled the weapon, lenses,
+    // sleeve and gloves on every wall approach and departure. Measured 85.7% of
+    // all pipeline creations landing inside a stall (31x enrichment).
+    //
+    // The group is now armed for the rig's lifetime and the PLANE parks instead.
+    // So pin the property that actually matters - out of contact the plane must
+    // clip NOTHING - which is strictly stronger than pinning a boolean, because
+    // an armed-but-wrongly-placed plane would eat the weapon and still pass the
+    // old check.
+    {
+      const clipRoot = rig.presentation.root as unknown as {
+        enabled: boolean; clippingPlanes: THREE.Plane[];
+      };
+      expect(clipRoot.enabled, 'the group stays armed - toggling it is what froze the game').toBe(true);
+      const parked = clipRoot.clippingPlanes[0];
+      // Every vertex of the rig sits within ~3 m of the camera; the parked plane
+      // must leave all of it on the kept side (positive distance).
+      for (const probe of [0, 0.5, 1, 2, 3]) {
+        const point = new THREE.Vector3(0, 0, -probe).applyMatrix4(rig.camera.matrixWorld);
+        expect(parked.distanceToPoint(point), `rig point at ${probe} m must survive the parked cut`)
+          .toBeGreaterThan(0);
+      }
+    }
     expect(rig.presentation.root.position.z)
       .toBeCloseTo(HIP_VIEWMODEL_POSITION.z - VIEWMODEL_NEAR_PLANE_CLEARANCE, 6);
   });

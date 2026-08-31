@@ -346,11 +346,24 @@ describe('the published chooser cannot be assembled from two publishes', () => {
 
   it('refuses to publish while the in-build chooser links a fallback that is not on gh-pages', () => {
     // src/bootstrap.ts draws its own two-card chooser from release-channels.json for anyone
-    // opening a channel URL with no ?release=. Its second card is `rollback ?? stable`,
-    // which is PASS 63 at channels/pass63-rollback - a path that returns 404 on the live
-    // host (measured 2026-08-31). That dead card is the other half of "I only saw 81 and 63".
+    // opening a channel URL with no ?release=. Its second card used to be `rollback ??
+    // stable`, i.e. PASS 63 at channels/pass63-rollback - a path that returns 404 on the
+    // live host (measured 2026-08-31). That dead card was the other half of "I only saw
+    // 81 and 63".
+    //
+    // Re-pinned 2026-08-31: this asserted the guard contained the literal
+    // `config.get("rollback") or config.get("stable")`, i.e. it pinned the guard's
+    // ASSUMPTION about which key bootstrap.ts uses. bootstrap.ts now prefers
+    // pass73Retained (the newest LIVE predecessor), and the guard refused a correct
+    // publish because of that stale assumption - the guard committing the exact bug it
+    // was written to catch. The guard now PARSES the stableFallback expression out of
+    // bootstrap.ts and resolves the ?? chain, so pin that behaviour instead of a literal.
     expect(publish).toContain('def assert_in_game_fallback_exists(worktree)');
-    expect(publish).toContain("config.get(\"rollback\") or config.get(\"stable\")");
+    expect(publish).toContain('const stableFallback = ([^;]+);');
+    expect(publish, 'the guard must read the real expression, not assume a key')
+      .toContain('bootstrap.ts');
+    expect(publish, 'and must fail loudly if it can no longer find it, not check nothing')
+      .toContain('this guard can no longer tell which channel the in-build chooser offers');
     expect(publish).toContain('is NOT on gh-pages');
   });
 });

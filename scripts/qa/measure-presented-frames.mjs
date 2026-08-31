@@ -44,8 +44,9 @@
 // ---------------------------------------------------------------------------
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { dirname, resolve, join, extname } from 'node:path';
+import { createServer } from 'node:http';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
@@ -55,7 +56,7 @@ const arg = (name, fallback) => {
 };
 const flag = (name) => argv.includes(name);
 
-const BASE = arg('--url', 'http://127.0.0.1:4180');
+let BASE = arg('--url', 'http://127.0.0.1:4180');
 const ARENA = arg('--arena', 'atomic-acres');
 const LABEL = arg('--label', 'run');
 const SECONDS = Number(arg('--seconds', flag('--soak') ? 60 : 30));
@@ -64,6 +65,21 @@ const HEIGHT = Number(arg('--height', 1440));
 const NO_VSYNC = flag('--no-vsync');
 const IDLE = flag('--idle');
 const OUT = resolve(arg('--out', `artifacts/presented-frames/${LABEL}.json`));
+
+// ACCEPTANCE NEEDS TWO ENGINES, NOT ONE. The owner's report names Edge as well
+// as Firefox, and the published pass81 measurement had Edge 16.2% frozen beside
+// Chrome's 17.7%. Playwright drives INSTALLED Edge through channel:'msedge' the
+// same way it drives installed Chrome through channel:'chrome' - both are the
+// real browser off this machine, and both are headless here. The bundled
+// Chromium is never an option: it cannot get a WebGPU device on this machine
+// (dxil.dll Windows Error 87).
+const CHANNEL = arg('--channel', 'chrome');
+
+// Serve a LOCAL BUILD directly, so a fix can be measured before it is
+// published. Without this the instrument can only point at an already-published
+// origin, which makes a before/after impossible to run on an unpublished tree.
+const DIST = argv.includes('--dist') ? resolve(arg('--dist', '')) : null;
+const DIST_PORT = Number(arg('--dist-port', '4188'));
 
 // ---------------------------------------------------------------------------
 // GPU sampler. The central evidence that this is not a rendering-cost problem
@@ -327,9 +343,72 @@ async function driveCombat(page, deadline) {
 // this lane ever has to go headed again, it must NOT be parked off-screen:
 // mark it DECLARED VISIBLE LANE and say why, the way the installed-browser
 // lanes do. See scripts/qa/browser-visibility-contract.test.mjs.
+// ---------------------------------------------------------------------------
+// Optional local-build server. Mirrors the dist directory on loopback so a
+// candidate fix is measurable before it is published.
+// ---------------------------------------------------------------------------
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.wasm': 'application/wasm',
+  '.glb': 'model/gltf-binary', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+  '.svg': 'image/svg+xml', '.mp4': 'video/mp4', '.webm': 'video/webm', '.ktx2': 'image/ktx2', '.hdr': 'image/vnd.radiance',
+  '.bin': 'application/octet-stream', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
+};
+let distServer = null;
+if (DIST !== null) {
+  if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No build at ${DIST}`);
+  distServer = createServer((request, response) => {
+    const requested = new URL(request.url, `http://127.0.0.1:${DIST_PORT}`);
+    const relative = decodeURIComponent(requested.pathname === '/' ? '/index.html' : requested.pathname).replace(/^\/+/, '');
+    const file = join(DIST, relative);
+    if (!file.startsWith(DIST) || !existsSync(file) || statSync(file).isDirectory()) { response.writeHead(404).end('nope'); return; }
+    const body = readFileSync(file);
+    response.writeHead(200, { 'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream', 'content-length': body.length, 'cache-control': 'no-store' });
+    response.end(body);
+  });
+  await new Promise((ready) => distServer.listen(DIST_PORT, '127.0.0.1', ready));
+  BASE = `http://127.0.0.1:${DIST_PORT}`;
+}
+
+// ---------------------------------------------------------------------------
+// STALL STATISTICS over the PRESENTED series.
+//
+// The owner's complaint is not a low average, it is a freeze: "it just freezes
+// every few seconds ... unplayable". A mean frame rate cannot see that - a run
+// that presents perfectly for three seconds and then blocks for 900 ms has a
+// respectable mean and is unplayable. These are the numbers that decide whether
+// the defect is fixed:
+//
+//   frozenFractionPercent - share of the playable window inside a stall. This
+//                           is the number the player actually experiences.
+//   stallsPerMinute       - how often the freeze interrupts play.
+//   medianStallMs / max   - how long each interruption lasts.
+//
+// The floor adapts to the lane: whichever is larger of 100 ms and 5x the lane's
+// own median presented interval, so a 60 Hz lane and a 165 Hz lane are judged
+// on the same terms rather than the faster one being flattered.
+// ---------------------------------------------------------------------------
+function stallStatistics(intervalsMs, spanMs) {
+  if (intervalsMs.length === 0) return { floorMs: null, count: 0, perMinute: null, medianMs: null, maxMs: null, frozenFractionPercent: null };
+  const ordered = [...intervalsMs].sort((a, b) => a - b);
+  const median = ordered[Math.floor((ordered.length - 1) * 0.5)];
+  const floorMs = Math.max(100, round(median * 5, 2));
+  const stalls = intervalsMs.filter((interval) => interval >= floorMs);
+  const orderedStalls = [...stalls].sort((a, b) => a - b);
+  const frozenMs = stalls.reduce((total, interval) => total + interval, 0);
+  return {
+    floorMs: round(floorMs, 2),
+    count: stalls.length,
+    perMinute: round(stalls.length / (spanMs / 60_000)),
+    medianMs: orderedStalls.length === 0 ? null : round(orderedStalls[Math.floor((orderedStalls.length - 1) * 0.5)]),
+    maxMs: orderedStalls.length === 0 ? null : round(orderedStalls[orderedStalls.length - 1]),
+    frozenFractionPercent: round(100 * frozenMs / spanMs, 2),
+  };
+}
+
 const browser = await chromium.launch({
   headless: true,
-  channel: 'chrome',
+  channel: CHANNEL,
   args: [
     ...SILENT_ARGS,
     '--use-angle=d3d11',
@@ -461,6 +540,8 @@ try {
     label: LABEL,
     arena: ARENA,
     seconds: SECONDS,
+    channel: CHANNEL,
+    source: DIST ?? BASE,
     vsync: NO_VSYNC ? 'disabled' : 'browser-default',
     driver: IDLE ? 'idle' : 'combat',
     viewport: { width: WIDTH, height: HEIGHT },
@@ -476,6 +557,8 @@ try {
       framesPerSecondOverWindow: round(presentedIntervals.length / (presentedSpanMs / 1_000)),
       framesOverWholeWindow: presentedFrames,
     },
+    // The freeze, in the terms the owner reported it.
+    presentedStalls: stallStatistics(presentedIntervals, presentedSpanMs),
     submitted: {
       ...intervalStatistics(submittedIntervals),
       framesPerSecondOverWindow: round(submittedIntervals.length / (submittedSpanMs / 1_000)),
@@ -521,6 +604,7 @@ try {
   result = result ?? { label: LABEL, failed: true };
   result.gpu = gpu.stop();
   await browser.close();
+  if (distServer !== null) await new Promise((done) => distServer.close(done));
 }
 
 mkdirSync(dirname(OUT), { recursive: true });
@@ -531,6 +615,11 @@ console.log(JSON.stringify({
   presentedMeanFps: result.presented?.meanFps ?? null,
   presented1PercentLowFps: result.presented?.low1PercentFps ?? null,
   presented01PercentLowFps: result.presented?.low01PercentFps ?? null,
+  channel: result.channel ?? null,
+  frozenFractionPercent: result.presentedStalls?.frozenFractionPercent ?? null,
+  stallsPerMinute: result.presentedStalls?.perMinute ?? null,
+  medianStallMs: result.presentedStalls?.medianMs ?? null,
+  maxStallMs: result.presentedStalls?.maxMs ?? null,
   submittedFps: result.submitted?.framesPerSecondOverWindow ?? null,
   rafPerSecond: result.animationFrameCallbacks?.callbacksPerSecondOverWindow ?? null,
   refusedPerSecond: result.refused?.perSecond ?? null,
