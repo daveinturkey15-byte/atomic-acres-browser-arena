@@ -2,7 +2,7 @@
  * What the running build calls ITSELF - the header badge, the session block and the
  * blocked-renderer notice all read this.
  *
- * Stamped to PASS 82 on 2026-09-01 (the pass82 publish had shipped with the PASS 81
+ * Stamped to PASS 83 on 2026-09-01 (the pass83 cut) (the pass82 publish had shipped with the PASS 81
  * stamp still in place - the exact repeat of the PASS 80/PASS 81 class of failure
  * this file's rule exists to stop: stamping is part of CUTTING a release, and the
  * identity must always name the channel this source will publish to).
@@ -11,15 +11,15 @@
  * stamped pass differs, so guests on an older channel can no longer connect and
  * silently play a different map.
  *
- * PASS 81 remains live at channels/pass81 as the previous version; PASS 73 remains
+ * PASS 82 remains live at channels/pass82 as the previous version; PASS 73 remains
  * live at channels/the-big-one. Both untouched.
  */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 82',
-  label: 'PASS 82',
+  pass: 'PASS 83',
+  label: 'PASS 83',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/pass82',
-  runtimeLabel: 'PASS 82',
+  route: 'channels/pass83',
+  runtimeLabel: 'PASS 83',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

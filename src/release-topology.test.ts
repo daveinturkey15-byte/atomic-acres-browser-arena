@@ -10,20 +10,20 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 82 release topology', () => {
-  // Re-pinned from PASS 81 on 2026-09-01. The pass82 publish shipped with the PASS 81
+describe('Pass 83 release topology', () => {
+  // Re-pinned from PASS 82 on 2026-09-01. The pass82 publish shipped with the PASS 81
   // stamp still in place - the same never-stamped-the-new-pass failure this test was
   // written for on PASS 80. Re-pinned at EQUAL strictness - every field still exact -
   // and the protected fallback pins below are untouched.
-  it('identifies this source as Pass 82 without moving any protected fallback pin', () => {
+  it('identifies this source as Pass 83 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 82',
-      label: 'PASS 82',
+      pass: 'PASS 83',
+      label: 'PASS 83',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/pass82',
-      runtimeLabel: 'PASS 82',
+      route: 'channels/pass83',
+      runtimeLabel: 'PASS 83',
     });
-    expect(config.latest.label).toBe('PASS 82');
+    expect(config.latest.label).toBe('PASS 83');
     // The identity's route must be the channel the config actually stages, or the shell
     // links players at a 404 - which is exactly how a correct bundle came to announce
     // itself as the wrong pass. This assertion did not exist before.
@@ -257,7 +257,7 @@ describe('Pass 82 release topology', () => {
 // The cross-browser proof that a reload converges lives outside the unit suite, because it
 // needs three real browser HTTP caches; this is the structural half.
 describe('the published chooser cannot be assembled from two publishes', () => {
-  const publish = readFileSync('scripts/orchestration/publish_pass82.py', 'utf8');
+  const publish = readFileSync('scripts/orchestration/publish_pass83.py', 'utf8');
 
   it('gives index.html the substitution points publish needs, and no second cacheable list', () => {
     // The channel list is INLINED. A separate release-channel-config.js is still written
@@ -334,10 +334,11 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     expect(publish).toContain('def assert_predecessors_offered(channels)');
     expect(publish).toContain('if len(predecessors) < 2');
     expect(publish).toContain('"experimental": {');
-    expect(publish).toContain('PASS 81 · PREVIOUS VERSION');
+    expect(publish).toContain('PASS 82 · PREVIOUS VERSION');
+    expect(publish).toContain('PASS 81 · RETAINED');
     expect(publish).toContain('PASS 73 · RETAINED');
     expect(publish).toContain('PASS 72 · RETAINED');
-    expect(publish).toContain('KEEP_AT_LEAST = {"experimental", "previous", "pass81"}');
+    expect(publish).toContain('KEEP_AT_LEAST = {"experimental", "previous", "pass82"}');
     // And it has to have been seen red. A gate nobody has watched fail is a gate nobody
     // has checked - this file's own history is the argument for that.
     expect(publish).toContain('the predecessor guard failed its own red test');

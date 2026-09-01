@@ -9,9 +9,9 @@ const read = (name: string) => readFileSync(join(here, '..', name), 'utf8');
 
 describe('pass83 build-identity lobby handshake', () => {
   it('stamps the running build for the channel this source publishes to', () => {
-    expect(PASS66_RELEASE_IDENTITY.pass).toBe('PASS 82');
-    expect(PASS66_RELEASE_IDENTITY.route).toBe('channels/pass82');
-    expect(PASS66_RELEASE_IDENTITY.runtimeLabel).toBe('PASS 82');
+    expect(PASS66_RELEASE_IDENTITY.pass).toBe('PASS 83');
+    expect(PASS66_RELEASE_IDENTITY.route).toBe('channels/pass83');
+    expect(PASS66_RELEASE_IDENTITY.runtimeLabel).toBe('PASS 83');
   });
 
   it('carries the stamped build id on every lobby join', () => {

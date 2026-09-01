@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 82",
-    "description": "Pass 82: the cross-browser freeze is fixed - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready."
+    "label": "PASS 83",
+    "description": "Pass 83: freezes fixed cross-browser - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready."
   },
   "experimental": {
-    "pass": "PASS 82",
-    "label": "PASS 82",
-    "description": "Pass 82: the cross-browser freeze is fixed - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready.",
-    "path": "channels/pass82"
+    "pass": "PASS 83",
+    "label": "PASS 83",
+    "description": "Pass 83: freezes fixed cross-browser - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready.",
+    "path": "channels/pass83"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
