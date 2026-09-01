@@ -2603,7 +2603,12 @@ export class WeaponPresentation {
     const browserRuntime = typeof document !== 'undefined';
     const assetOnly = browserRuntime && options.mode === 'asset-only';
     const initialWeapon = this.active;
-    if (assetOnly) this.setPresentationVisible(false);
+    // Staging-time hide, deliberately NOT setPresentationVisible(false): no
+    // live scene exists yet, so there is no light set to invalidate. The
+    // retained-structural-lights contract governs RUNTIME hides, where
+    // root.visible=false would invalidate every material program in the live
+    // scene at once (see setPresentationVisible).
+    if (assetOnly) this.root.visible = false;
     if (browserRuntime) {
       await Promise.all([
         loadPass65WeaponPresentation(initialWeapon, 'first-person'),
@@ -3748,12 +3753,29 @@ export class WeaponPresentation {
   setPresentationVisible(visible: boolean): void {
     if (this.fullscreenPresentationSuppressed) {
       this.fullscreenPresentationSuppressed = false;
-      this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     }
-    this.root.visible = visible;
+    // Retained-structural-lights contract v1 (same rule as
+    // setFullscreenPresentationSuppressed): the hidden first-person viewmodel
+    // must NOT drive this.root.visible false. The root carries
+    // first-person-muzzle-light and first-person-viewmodel-fill, so hiding the
+    // root removes both from Three's WebGPU light set, LightsNode's cache key
+    // changes, and every material program in the scene is invalidated at once.
+    // Each death/respawn cycle then rebuilt hundreds of render pipelines inside
+    // combat: probe 2026-09-01 (artifacts/qa/pipeline-compile/
+    // before-local-pass81.json) measured 251 in-combat pipeline creations with
+    // 99.2% landing inside compositor stalls (7.1x enrichment), and the probe's
+    // cache-key diffs name exactly these two lights toggling on every
+    // alive:false -> alive:true transition. Keep the lights resident and
+    // express "hidden" as the suppressed scale plus zero intensities instead -
+    // uniform writes, never a light-set change.
+    this.root.visible = true;
+    this.root.scale.setScalar(visible
+      ? this.unsuppressedViewmodelScale()
+      : FULLSCREEN_PRESENTATION_SUPPRESSED_SCALE);
     this.viewmodelFill.intensity = visible
       ? Number(this.viewmodelFill.userData.authoredIntensity ?? 0)
       : 0;
+    if (!visible) this.muzzleLight.intensity = 0;
   }
 
   private restoreArmEvidenceCapture(): void {
