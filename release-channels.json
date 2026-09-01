@@ -2,17 +2,17 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 81",
-    "description": "Pass 81 wave 1: Nuke Town rebaked so the Quality art matches its colliders, the two authored props an index bug deleted are back, HUD bob normalised per map, ray-tracing toggle actually rebuilds the pipeline, first-person arms carry real authored motion, cold visitors deploy on the first click. Farcrysis hidden until ready."
+    "label": "PASS 82",
+    "description": "Pass 82: the cross-browser freeze is fixed - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready."
   },
   "experimental": {
-    "pass": "PASS 81",
-    "label": "PASS 81",
-    "description": "Pass 81 wave 1: Nuke Town rebaked so the Quality art matches its colliders, the two authored props an index bug deleted are back, HUD bob normalised per map, ray-tracing toggle actually rebuilds the pipeline, first-person arms carry real authored motion, cold visitors deploy on the first click. Farcrysis hidden until ready.",
-    "path": "channels/pass81"
+    "pass": "PASS 82",
+    "label": "PASS 82",
+    "description": "Pass 82: the cross-browser freeze is fixed - dying no longer forced every material in the map to rebuild its WebGPU pipelines (measured: Edge 21.8% of the window frozen, Firefox 11.5%, Chrome 8.5%, all now ~0%). If this browser's WebGPU compiler fails, the game retries and then switches itself to the compatibility renderer. Farcrysis hidden until ready.",
+    "path": "channels/pass82"
   },
   "previous": {
-    "label": "PASS 72 \u00b7 PREVIOUS LIVE",
+    "label": "PASS 72 · PREVIOUS LIVE",
     "description": "The exact previously live Pass 72 Pages runtime, retained byte-for-byte for comparison and immediate rollback testing.",
     "pass": "PASS 72",
     "sourceSha": "5da686551d92387d08b00be40125386c391bb3ed",
@@ -23,7 +23,7 @@
     "path": "channels/pass72-retained"
   },
   "retained": {
-    "label": "PASS 70 \u00b7 RETAINED LIVE",
+    "label": "PASS 70 · RETAINED LIVE",
     "description": "The exact Pass 70 Pages runtime, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 70",
     "sourceSha": "130fd59bd2cf1e1719b802463219ddf36e2484d5",
@@ -34,7 +34,7 @@
     "path": "channels/pass70-retained"
   },
   "historical": {
-    "label": "PASS 69 \u00b7 RETAINED STABLE",
+    "label": "PASS 69 · RETAINED STABLE",
     "description": "The exact previously hosted Pass 69 build, retained byte-for-byte for comparison and fallback testing.",
     "pass": "PASS 69",
     "sourceSha": "685ed7865018e107df5acf6cb6f7498b4468940c",
@@ -56,7 +56,7 @@
     "path": "channels/recent-stable"
   },
   "rollback": {
-    "label": "PASS 63 \u00b7 STABLE WEBGL",
+    "label": "PASS 63 · STABLE WEBGL",
     "description": "The retained stable WebGL build, rebuilt deterministically from its approved Pass 63 source SHA.",
     "pass": "PASS 63",
     "sourceSha": "ac85e9b8b46cc2370aee903d564ecf3c4682b24c",
@@ -68,7 +68,7 @@
     "rebuiltFromSource": true
   },
   "pass73Retained": {
-    "label": "PASS 73 \u00b7 RETAINED LIVE",
+    "label": "PASS 73 · RETAINED LIVE",
     "description": "The exact Pass 73 Pages runtime, retained byte-for-byte at its original path for comparison and fallback testing.",
     "pass": "PASS 73",
     "path": "channels/the-big-one"

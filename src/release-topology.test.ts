@@ -10,21 +10,20 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 80 release topology', () => {
-  // Re-pinned from PASS 73 on 2026-08-26. The build published to channels/pass80 still
-  // announced itself as PASS 73 in the header, the session block and the blocked-renderer
-  // notice, so the owner opened the new URL and was told he was looking at the old build.
-  // The bundle was correct; the identity was never stamped. Re-pinned at EQUAL strictness -
-  // every field still exact - and the protected fallback pins below are untouched.
-  it('identifies this source as Pass 80 without moving any protected fallback pin', () => {
+describe('Pass 82 release topology', () => {
+  // Re-pinned from PASS 81 on 2026-09-01. The pass82 publish shipped with the PASS 81
+  // stamp still in place - the same never-stamped-the-new-pass failure this test was
+  // written for on PASS 80. Re-pinned at EQUAL strictness - every field still exact -
+  // and the protected fallback pins below are untouched.
+  it('identifies this source as Pass 82 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 81',
-      label: 'PASS 81',
+      pass: 'PASS 82',
+      label: 'PASS 82',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/pass81',
-      runtimeLabel: 'PASS 81',
+      route: 'channels/pass82',
+      runtimeLabel: 'PASS 82',
     });
-    expect(config.latest.label).toBe('PASS 81');
+    expect(config.latest.label).toBe('PASS 82');
     // The identity's route must be the channel the config actually stages, or the shell
     // links players at a 404 - which is exactly how a correct bundle came to announce
     // itself as the wrong pass. This assertion did not exist before.
@@ -250,7 +249,6 @@ describe('Pass 80 release topology', () => {
 // He was looking at three separately cached root URLs - index.html, release-shell.js and
 // release-channel-config.js - with nothing tying a generation of one to a generation of
 // another, all served `Cache-Control: max-age=600` by a host that offers no way to change
-// that. Measured against the live origin on 2026-08-31: a request-side `no-cache` does not
 // force revalidation (Age: 109 came back) and the query string is stripped from the CDN
 // cache key (`?ts=<random>` returned Age: 82), so the ONLY reliable freshness primitive
 // there is a path nobody has requested before (those always return Age: 0).
@@ -259,7 +257,7 @@ describe('Pass 80 release topology', () => {
 // The cross-browser proof that a reload converges lives outside the unit suite, because it
 // needs three real browser HTTP caches; this is the structural half.
 describe('the published chooser cannot be assembled from two publishes', () => {
-  const publish = readFileSync('scripts/orchestration/publish_pass81.py', 'utf8');
+  const publish = readFileSync('scripts/orchestration/publish_pass82.py', 'utf8');
 
   it('gives index.html the substitution points publish needs, and no second cacheable list', () => {
     // The channel list is INLINED. A separate release-channel-config.js is still written
@@ -336,8 +334,9 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     expect(publish).toContain('def assert_predecessors_offered(channels)');
     expect(publish).toContain('if len(predecessors) < 2');
     expect(publish).toContain('"experimental": {');
-    expect(publish).toContain('PASS 73 · PREVIOUS VERSION');
-    expect(publish).toContain('PASS 72 · THE ONE BEFORE THAT');
+    expect(publish).toContain('PASS 81 · PREVIOUS VERSION');
+    expect(publish).toContain('PASS 73 · RETAINED');
+    expect(publish).toContain('PASS 72 · RETAINED');
     expect(publish).toContain('KEEP_AT_LEAST = {"experimental", "previous", "pass81"}');
     // And it has to have been seen red. A gate nobody has watched fail is a gate nobody
     // has checked - this file's own history is the argument for that.

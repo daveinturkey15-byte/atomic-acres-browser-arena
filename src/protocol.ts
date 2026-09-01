@@ -460,6 +460,10 @@ export type LobbyJoinMessage = {
   skinId?: string;
   /** HF-382: the joiner's idle stance; host-validated, optional-tolerant. */
   stanceId?: string;
+  /** Build identity: the pass label the joiner was shipped as. The host refuses
+   * joiners stamped for a different pass (or omitting the field) so a guest on
+   * an older channel can never silently play a different map. */
+  buildId?: string;
   resumeToken: string;
   nonce: number;
 };
@@ -579,7 +583,7 @@ export type LobbyStartMessage = {
   type: 'lobby-start'; by: string; activeAtHostTimeMs: number; activeAtEpochMs: number;
   hostSentTimeMs: number; revision: number; nonce: number;
 };
-export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch';
+export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch' | 'build-mismatch';
 export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
 /** 'host-superseded' (HF-325): the sender observed a newer succession term and
  * surrendered the room; guests should stop rejoin attempts against it. */

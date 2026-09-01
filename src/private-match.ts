@@ -153,7 +153,7 @@ export function rejoinReservationExpired(disconnectedAtMonoMs: number, nowMonoMs
   return Number.isFinite(disconnectedAtMonoMs) && Number.isFinite(nowMonoMs)
     && nowMonoMs - disconnectedAtMonoMs >= REJOIN_GRACE_MS;
 }
-export const LOBBY_START_LEAD_MS = 3_500;
+export const LOBBY_START_LEAD_MS = 5_000;
 export const CLOCK_PING_INTERVAL_MS = 2_000;
 export const MAX_CLOCK_RTT_MS = 5_000;
 

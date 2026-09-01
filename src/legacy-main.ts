@@ -8276,6 +8276,11 @@ function sendLobbyJoin(): void {
     squadColor: localSquadColor,
     skinId: localOperatorSkinId, // HF-360
     stanceId: localOperatorStanceId, // HF-382
+    // Build identity: the host refuses joiners whose stamped pass differs, so a
+    // guest on an older channel can no longer connect cleanly and silently play
+    // a different map. Optional on the wire; a joiner that omits it (a build
+    // from before this field existed) is refused with 'build-mismatch' too.
+    buildId: PASS66_RELEASE_IDENTITY.pass,
     resumeToken: localResumeToken,
     nonce: randomNonce(),
   };
@@ -8309,7 +8314,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
 
 function rejectLobbyPlayer(
   playerId: string,
-  reason: 'room-full' | 'rejoin-denied' | 'match-active',
+  reason: 'room-full' | 'rejoin-denied' | 'match-active' | 'build-mismatch',
   provisionalResumeToken?: string,
   connectionEpoch?: string,
 ): void {
@@ -8915,6 +8920,15 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       }
       if (hostLobbyMembers.size >= privateMatchConfig.capacity) {
         rejectLobbyPlayer(message.playerId, 'room-full', message.resumeToken, message.connectionEpoch);
+        return;
+      }
+      // Build identity: a joiner stamped for a different pass (or a build too
+      // old to stamp one) would be admitted into a lobby whose arena, weapons
+      // and protocol vocabulary it does not share, and would silently play a
+      // different map from the host. Refuse with the reason the joiner's UI
+      // can name before any membership state is mutated.
+      if (message.buildId !== PASS66_RELEASE_IDENTITY.pass) {
+        rejectLobbyPlayer(message.playerId, 'build-mismatch', message.resumeToken, message.connectionEpoch);
         return;
       }
       await rememberHostLobbyResumeTokenDigest(message.playerId, message.resumeToken, attempt);
@@ -10045,6 +10059,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
       'match-active': 'Match already active; only reconnecting players may enter.',
       'invalid-config': 'Host settings were rejected.',
       'protocol-mismatch': 'This lobby uses a newer multiplayer protocol. Reload the game and rejoin.',
+      'build-mismatch': 'Your build differs from the host\u2019s channel. Open the chooser and join the host\u2019s pass, then rejoin.',
     } as const;
     setStatus(labels[message.reason], 'error');
     invalidateMatchAdmission(`Lobby rejected the active connection: ${message.reason}`);
@@ -10115,6 +10130,19 @@ function handleLobbyMessage(message: GameMessage): boolean {
   return false;
 }
 
+/** One self-cancelling per-tick refresh while the hosted countdown phase is
+ * live, so the DEPLOYING IN 5..1 title counts down without a standing interval.
+ * renderPrivateLobby stops rescheduling the moment the phase leaves countdown. */
+let lobbyCountdownRefreshScheduled = false;
+function scheduleLobbyCountdownRefresh(): void {
+  if (lobbyCountdownRefreshScheduled || privateLobbySnapshot?.phase !== 'countdown') return;
+  lobbyCountdownRefreshScheduled = true;
+  window.setTimeout(() => {
+    lobbyCountdownRefreshScheduled = false;
+    renderPrivateLobby();
+  }, 250);
+}
+
 function renderPrivateLobby(): void {
   const section = element<HTMLElement>('#private-lobby');
   const lobbyAvailable = network.role !== 'offline' || privateLobbySnapshot !== null;
@@ -10134,7 +10162,16 @@ function renderPrivateLobby(): void {
   const connectedCount = members.filter((member) => member.connected).length;
   const capacity = snapshot?.config.capacity ?? privateMatchConfig.capacity;
   element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
-  element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active' ? 'MATCH IN PROGRESS' : snapshot?.phase === 'countdown' ? 'DEPLOYING' : 'WAITING ROOM';
+  // The hosted 5-4-3-2-1: the phase carries the host's shared epoch, so every
+  // client counts the same five seconds from one authoritative instant. Re-render
+  // on a short local tick while the phase lasts; it stops itself otherwise.
+  const countdownRemainS = snapshot?.phase === 'countdown' && snapshot.activeAtEpochMs !== null
+    ? Math.max(1, Math.min(5, Math.ceil((snapshot.activeAtEpochMs - Date.now()) / 1000)))
+    : null;
+  element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active'
+    ? 'MATCH IN PROGRESS'
+    : countdownRemainS !== null ? `DEPLOYING IN ${countdownRemainS}` : 'WAITING ROOM';
+  if (countdownRemainS !== null) scheduleLobbyCountdownRefresh();
   const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
   const arenaInput = element<HTMLSelectElement>('#lobby-arena');
   arenaInput.value = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;

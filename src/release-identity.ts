@@ -2,20 +2,24 @@
  * What the running build calls ITSELF - the header badge, the session block and the
  * blocked-renderer notice all read this.
  *
- * Stamped to PASS 81 on 2026-08-28. The previous stamp (PASS 80) survived into the
- * first channels/pass81 publish, so the owner clicked PASS 81 in the chooser and the game
- * introduced itself as PASS 80 - the third time this exact class of failure has shipped
- * (PASS 73 before that). Stamping the identity is part of CUTTING a release, not an
- * afterthought, and the identity must always name the channel this source will publish to.
+ * Stamped to PASS 82 on 2026-09-01 (the pass82 publish had shipped with the PASS 81
+ * stamp still in place - the exact repeat of the PASS 80/PASS 81 class of failure
+ * this file's rule exists to stop: stamping is part of CUTTING a release, and the
+ * identity must always name the channel this source will publish to).
  *
- * PASS 73 remains live at channels/the-big-one and is untouched.
+ * The build identity is also the multiplayer lobby gate: hosts refuse joins whose
+ * stamped pass differs, so guests on an older channel can no longer connect and
+ * silently play a different map.
+ *
+ * PASS 81 remains live at channels/pass81 as the previous version; PASS 73 remains
+ * live at channels/the-big-one. Both untouched.
  */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 81',
-  label: 'PASS 81',
+  pass: 'PASS 82',
+  label: 'PASS 82',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/pass81',
-  runtimeLabel: 'PASS 81',
+  route: 'channels/pass82',
+  runtimeLabel: 'PASS 82',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({
