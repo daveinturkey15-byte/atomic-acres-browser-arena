@@ -5136,37 +5136,57 @@ export class WeaponPresentation {
     const candidate = scratch.shoulderReachCandidate;
     const blended = scratch.shoulderBlendedDirection;
     let projected = scratch.shoulderProjected;
-    let clearedLane = false;
-    for (let step = 0; step <= 16; step += 1) {
-      blended.copy(initialDirection).lerp(anatomicalDirection, step / 16).normalize();
-      candidate.copy(socketTarget).addScaledVector(blended, safeReach);
-      projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
-      if (projected.y <= targetNdcY - 0.005) { clearedLane = true; break; }
-    }
-    // HF-413. The search above stops at the ANATOMICAL direction, which since
-    // HF-365 carries a real shoulder-width lateral component so the arm enters
-    // diagonally instead of as a vertical "pale post". For most poses that
-    // already clears the lane. But when the grip is high and close (measured:
-    // Railgun at hip, sidearm at ADS) the anatomical terminal projects ABOVE
-    // the lane - the loop exhausted, the shoulder was left inside the frame at
-    // NDC y -0.975..-0.983, and the gate correctly reported a sleeve that does
-    // not continue below the frame.
+    // HF-413. Arc 0 is the historical search and is unchanged: walk from the
+    // pinned lane direction toward the ANATOMICAL direction (HF-365 gave that
+    // a shoulder-width lateral component so the arm enters diagonally instead
+    // of as a vertical "pale post") and stop at the FIRST step that clears the
+    // lane. Any pose that clears the lane on arc 0 - the overwhelming majority
+    // - resolves exactly as it did before this block existed.
     //
-    // Continue the same walk from the anatomical direction toward straight
-    // down, still stopping at the FIRST step that clears the lane. This is the
-    // behaviour the HF-365 comment already describes ("walks the shoulder
-    // toward straight-down until the joint clears that lane"); only the
-    // preferred resting direction was ever meant to be anatomical. Poses that
-    // clear the lane anatomically never enter this loop, so no pose that reads
-    // correctly today is moved at all, and a pose that cannot clear the lane at
-    // any direction still reports the violation rather than being hidden.
-    if (!clearedLane) {
-      for (let step = 1; step <= 16; step += 1) {
-        blended.copy(anatomicalDirection).lerp(cameraDown, step / 16).normalize();
+    // MEASURED problem being fixed: when the grip is high and close (Railgun at
+    // hip, sidearm and flare gun at ADS) the anatomical terminal itself
+    // projects ABOVE the lane. Arc 0 exhausted and its LAST candidate was
+    // accepted unchecked, leaving the support shoulder inside the frame at NDC
+    // y -0.975..-0.983 against the -0.98 floor: a proximal sleeve ending in
+    // mid-air, the same defect class as the firing-side one.
+    //
+    // Arcs 1 and 2 are only ever reached when arc 0 exhausted. They sample two
+    // further families of direction, and if nothing clears the lane the search
+    // falls back to the LOWEST candidate it saw anywhere rather than to
+    // whichever candidate happened to be last. Direction is deliberately not
+    // assumed: an earlier attempt at this walked straight down and made the
+    // reading WORSE (-0.980 -> -0.917), because pure camera-down drops the
+    // anatomical direction's camera-back component, pushing the joint further
+    // from the eye where the same metres project to a smaller screen offset.
+    // Choosing by measured projection instead of by assumed direction cannot
+    // make a pose worse than the old "accept the last candidate" behaviour.
+    let clearedLane = false;
+    let bestNdcY = Number.POSITIVE_INFINITY;
+    let bestArc = 0;
+    let bestStep = 0;
+    for (let arc = 0; arc < 3 && !clearedLane; arc += 1) {
+      for (let step = 0; step <= 16; step += 1) {
+        if (arc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, step / 16);
+        else if (arc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, step / 16);
+        else blended.copy(initialDirection).lerp(cameraDown, step / 16);
+        blended.normalize();
         candidate.copy(socketTarget).addScaledVector(blended, safeReach);
         projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
-        if (projected.y <= targetNdcY - 0.005) break;
+        if (projected.y < bestNdcY) {
+          bestNdcY = projected.y;
+          bestArc = arc;
+          bestStep = step;
+        }
+        if (projected.y <= targetNdcY - 0.005) { clearedLane = true; break; }
       }
+    }
+    if (!clearedLane) {
+      if (bestArc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, bestStep / 16);
+      else if (bestArc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, bestStep / 16);
+      else blended.copy(initialDirection).lerp(cameraDown, bestStep / 16);
+      blended.normalize();
+      candidate.copy(socketTarget).addScaledVector(blended, safeReach);
+      projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
     }
 
     parent.updateWorldMatrix(true, false);
