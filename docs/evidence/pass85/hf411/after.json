@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T16:19:11.280Z",
+  "generatedAt": "2026-09-02T17:23:43.714Z",
   "arena": "test1",
   "roofLevelMinY": 2.4,
   "summary": {
@@ -32,6 +32,7 @@
       "topY": 5.2,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           24.5,
@@ -70,6 +71,7 @@
       "topY": 5.2,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           24.5,
@@ -108,6 +110,7 @@
       "topY": 3.5,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           16.3,
@@ -146,6 +149,7 @@
       "topY": 3.5,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           16.3,
@@ -184,6 +188,7 @@
       "topY": 3.46,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -17,
@@ -222,6 +227,7 @@
       "topY": 3.3,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -5.3,
@@ -260,6 +266,7 @@
       "topY": 3.3,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -5.3,
@@ -298,6 +305,7 @@
       "topY": 3.14,
       "slopeDeg": 2.01,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           16.5,
@@ -336,6 +344,7 @@
       "topY": 3.14,
       "slopeDeg": 2.01,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           16.5,
@@ -374,6 +383,7 @@
       "topY": 2.9,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -4.6,
@@ -412,6 +422,7 @@
       "topY": 2.9,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -0.9,
@@ -450,6 +461,7 @@
       "topY": 2.9,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -0.9,
@@ -488,6 +500,7 @@
       "topY": 2.64,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -10.35,
@@ -526,6 +539,7 @@
       "topY": 2.64,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           4.05,
@@ -564,6 +578,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           -32,
@@ -602,6 +617,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           12,
@@ -640,6 +656,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           12,
@@ -678,6 +695,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           19.31,
@@ -716,6 +734,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           18.8,
@@ -754,6 +773,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           9.82,
@@ -792,6 +812,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           10.27,
@@ -830,6 +851,7 @@
       "topY": 2.6,
       "slopeDeg": 0,
       "unsupportedShare": 0,
+      "largestHoleM2": 0,
       "quad": [
         [
           27.2,
