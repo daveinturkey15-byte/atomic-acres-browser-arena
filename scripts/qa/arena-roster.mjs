@@ -96,21 +96,41 @@ export function allArenaIds() {
  * hidden arena keeps its id but must not be required of a menu/selection gate.
  */
 export function selectableArenaIds() {
+  return arenaRegistryEntries().filter((entry) => entry.selectable).map((entry) => entry.id);
+}
+
+/**
+ * The registry as `{ id, selectable }` pairs, in registry order.
+ *
+ * PASS 85 Lane N repair: this is the shape
+ * `scripts/qa/verify-pass77-arena-menu-preview-production.mjs` needed for its
+ * shelf-wide invariants, and it had grown its OWN copy of this scrape with its
+ * own regex and its own shape assumptions - the fourth copy of the thing this
+ * module exists to be the only one of. It now imports this instead.
+ *
+ * The floor applies here rather than in `selectableArenaIds()` so every caller
+ * of either function gets it.
+ */
+export function arenaRegistryEntries() {
   const body = readRegistryBody();
   const found = [...body.matchAll(/id:\s*'([a-z0-9-]+)'\s*as const/gu)];
-  const ids = [];
+  const entries = [];
   for (let index = 0; index < found.length; index += 1) {
     const start = found[index].index;
     const end = index + 1 < found.length ? found[index + 1].index : body.length;
-    if (!/selectable:\s*false/u.test(body.slice(start, end))) ids.push(found[index][1]);
+    entries.push({
+      id: found[index][1],
+      selectable: !/selectable:\s*false/u.test(body.slice(start, end)),
+    });
   }
-  if (ids.length < MINIMUM_SELECTABLE_ARENAS) {
+  const selectable = entries.filter((entry) => entry.selectable).length;
+  if (selectable < MINIMUM_SELECTABLE_ARENAS) {
     throw new Error(
-      `arena roster: derived only ${ids.length} selectable arenas from src/map-selection.ts `
+      `arena roster: derived only ${selectable} selectable arenas from src/map-selection.ts `
       + `(expected at least ${MINIMUM_SELECTABLE_ARENAS}); the scrape is stale`,
     );
   }
-  return ids;
+  return entries;
 }
 
 /** The ids the registry marks `selectable: false`. */
