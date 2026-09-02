@@ -12,6 +12,7 @@ import {
   resolveGraphicsRuntime,
   writePass65Settings,
 } from './pass65-settings';
+import { GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import { activeWeatherPresentation, resetWeatherPresentation } from './weather/weather-settings';
 import { sampleWeather } from './weather/weather-state';
 
@@ -76,7 +77,12 @@ describe('Pass 65 settings contract', () => {
   });
 
   it('keeps every named profile uncapped while preserving an explicit Custom cap', () => {
-    for (const preset of ['performance', 'high', 'max'] as const) {
+    // DERIVED, not listed. This loop used to name three presets by hand, so
+    // RAY TRACED went unchecked from the day it shipped and BALANCED would
+    // have too: a roster written out beside a registry is a gate that stops
+    // looking at the newest thing. Reading the registry means a new preset is
+    // covered the moment it exists.
+    for (const preset of Object.keys(GRAPHICS_PRESET_VALUES) as ReadonlyArray<keyof typeof GRAPHICS_PRESET_VALUES>) {
       const named = normalizePass65Settings({
         graphics: { preset, targetFps: 60, frameRateLimit: 60 },
       });
