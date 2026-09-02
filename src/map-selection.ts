@@ -18,6 +18,25 @@ export type ArenaSelection = Readonly<{
   menuLede: string;
   summary: string;
   rulesLabel: string;
+  /**
+   * WHAT KIND OF THING THIS ARENA IS. Owner 2026-09-02 16:55, on Map 3: "Just
+   * keep the showcase in and it's not about combat, it's a mode you can
+   * explore."
+   *
+   * - `'team'`    a match arena. Two sides, a clock, a score, and therefore
+   *               spawn fronts that must be separated from an enemy front.
+   * - `'explore'` there is no opposing side at all: no hosted lobby, no bots,
+   *               no field support, no match clock. The content IS the mode.
+   *
+   * This is REQUIRED rather than optional on purpose. Several gates ask "does
+   * this arena run team modes?" and used to answer it from an exemption list of
+   * ids, which every new arena silently joined the wrong side of. Making the
+   * kind a declared field means a new arena cannot be added without answering
+   * the question, and `src/spawn-layout-quality.test.ts` asserts that an arena
+   * declaring `'explore'` really has no lobby and no bots - so the kind cannot
+   * be used to duck a gate while shipping combat.
+   */
+  kind: 'team' | 'explore';
   soloBotCount: number;
   maximumSoloBots: number;
   multiplayer: boolean;
@@ -65,6 +84,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'atomic-acres' as const,
     routeId: 'nuke-town' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze(['nuketown']),
     selectorLabel: 'NUKE TOWN',
     displayName: 'Nuke Town',
@@ -85,6 +105,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'skyline-terminal' as const,
     routeId: 'terminal' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'TERMINAL',
     displayName: 'Terminal',
@@ -105,6 +126,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'rustworks-1v1' as const,
     routeId: 'rustrig' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze(['rustworks', 'rust-rig']),
     selectorLabel: 'RUSTRIG',
     displayName: 'RustRig',
@@ -125,6 +147,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'gun-range' as const,
     routeId: 'gun-range' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'GUN RANGE',
     displayName: 'Gun Range',
@@ -152,6 +175,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'farcrysis' as const,
     routeId: 'farcrysis' as const,
+    kind: 'team' as const,
     // HIDDEN 2026-08-28, owner request: "remove farcrysis for now its not ready".
     // Measured against the LIVE build through the real player path the same day: the only
     // arena of six that never reaches an active match - 279 s, then the tab crashes. The
@@ -179,6 +203,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'high-seas' as const,
     routeId: 'high-seas' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'HIGH SEAS',
     displayName: 'High Seas',
@@ -199,6 +224,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'test1' as const,
     routeId: 'test1' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'FIRING RANGE',
     displayName: 'Firing Range',
@@ -219,6 +245,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'test2' as const,
     routeId: 'test2' as const,
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'RAID',
     displayName: 'Raid',
@@ -255,6 +282,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'map3' as const,
     routeId: 'map3' as const,
+    kind: 'explore' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'MAP 3 · PREVIEW',
     displayName: 'Map 3',
@@ -268,47 +296,38 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: false,
     fieldSupport: false,
     overdrive: false,
-    // THE CARD IS STILL WITHDRAWN. TEN ASSERTIONS IN SIX FILES ARE IN THE WAY,
-    // not one. An earlier version of this comment said "exactly one" and was
-    // wrong; this is the corrected, measured record.
+    // THE CARD IS BACK (PASS 86, HF-409 finish). It was withdrawn for one day
+    // while the showcase was built; every gate that stood in the way was moved
+    // WITH it rather than around it, and none of them was weakened.
     //
-    // The arena itself is finished: the showcase corridors are in it, with 225
-    // movement colliders and 225 shot surfaces authored from the corridors'
-    // own published solids. Re-measured 2026-09-02 on this exact tree with
+    // The arena: the showcase corridors, with 225 movement colliders and 225
+    // shot surfaces authored from the corridors' own published solids.
+    // Measured 2026-09-02 on this tree with
     // `npx tsx scripts/qa/audit-collider-visual-parity.ts --arenas map3`:
     // 225 colliders, 0 invisible, 130 visible meshes, 2 triaged walk-throughs.
-    // An earlier note here said 209 colliders / 114 meshes; that was a stale
-    // intermediate reading taken before the sixteen hub waymarkers existed.
+    // (An earlier note here said 209 / 114; that was a stale intermediate
+    // reading taken before the sixteen hub waymarkers existed.)
     //
-    // WHAT ACTUALLY BLOCKS THE CARD, measured by flipping this field to `true`
-    // on a clean checkout, running the gates, and reverting:
-    //   vitest - 5 failures in 4 files
-    //     * `src/spawn-layout-quality.test.ts` "exempts nothing else: every
-    //       other selectable arena is held to team separation". This is the
-    //       only one that needs a RULE change: Map 3 is the first arena with
-    //       no hosted lobby AND no bots, so there is no second team for its
-    //       spawns to be separated FROM. The exact 16-line patch is in the
-    //       Lane V report; that file is outside this lane's ownership.
-    //     * `src/arena-selectability.test.ts` - two assertions that pin map3
-    //       into the hidden set.
-    //     * `src/map-selection.test.ts` "keeps Map 3 a real solo-preview arena
-    //       while its card is withdrawn".
-    //     * `src/ui/pass64-shell.test.ts` "renders the new command hierarchy
-    //       and ordered player-facing arenas" - the offered route order is
-    //       pinned explicitly.
-    //   node --test - 5 failures in 2 files
-    //     * `scripts/qa/cross-browser-gate-contract.test.mjs` x2.
-    //     * `scripts/qa/eye-clearance-sweep-contract.test.mjs` x3, including
-    //       "the ledger carries exactly one ceiling per selectable arena" and
-    //       "the runtime-resolve record covers the roster too".
-    //
-    // Flipping the field therefore also means restoring
-    // MINIMUM_EYE_CLEARANCE_ARENAS and MINIMUM_SWEPT_ARENAS to 8 and
-    // re-entering map3 in `docs/eye-clearance/ledger.json` at the unmeasured
-    // sentinel, with a real eye-clearance sweep behind it. Every one of those
-    // ten is a gate doing its job on a roster change; none of them may be
-    // weakened to make the card appear.
-    selectable: false,
+    // WHAT MOVED WITH THE CARD - the ten assertions in six files that pinned it
+    // hidden, each re-pointed at the truth rather than exempted:
+    //   * `src/spawn-layout-quality.test.ts` now models `kind` (above). An
+    //     EXPLORE arena has no second team for a spawn to be separated FROM, so
+    //     the team-separation rule is vacuous for it - and the same test now
+    //     asserts an explore arena really carries no lobby and no bots, which
+    //     is a check that did not exist before.
+    //   * `src/arena-selectability.test.ts` x2 - the hidden set is farcrysis
+    //     alone again.
+    //   * `src/map-selection.test.ts` - now pins the offered card and the
+    //     EXPLORE shape of it.
+    //   * `src/ui/pass64-shell.test.ts` - map3 joins the ordered player-facing
+    //     routes.
+    //   * `scripts/qa/cross-browser-gate-contract.test.mjs` x2 and
+    //     `scripts/qa/eye-clearance-sweep-contract.test.mjs` x3 - the roster
+    //     floors go BACK UP 7 -> 8 (they were lowered for the day the card was
+    //     withdrawn; a floor is a collapsed-scrape alarm and must equal the
+    //     real roster), and `docs/eye-clearance/ledger.json` carries a MEASURED
+    //     map3 ceiling from the headless sweep, not the unmeasured sentinel.
+    selectable: true,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
@@ -346,8 +365,14 @@ export function hostedArenaDurationMs(selection: ArenaSelection): number {
   return selection.matchRules.durationMs ?? MATCH_DURATION_MS;
 }
 
+/**
+ * The canvas's accessible name. MAP3 (HF-409): an EXPLORE arena is not a
+ * multiplayer arena, and a screen reader announcing one that way is the same
+ * dishonesty as a TEAM DEATHMATCH banner over a bot-less walk. Derived from the
+ * declared kind, so a new explore arena gets the right word for free.
+ */
 export function arenaCanvasLabel(selection: ArenaSelection): string {
-  return `${selection.displayName} multiplayer arena`;
+  return `${selection.displayName} ${selection.kind === 'explore' ? 'explore' : 'multiplayer'} arena`;
 }
 
 export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths: number): number {

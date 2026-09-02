@@ -36,7 +36,7 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * arena it drops is pinned as deliberately hidden in
  * scripts/qa/eye-clearance-sweep-contract.test.mjs.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 7;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 8;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

@@ -182,7 +182,8 @@ describe('opening arena selection', () => {
       'High Seas multiplayer arena',
       'Firing Range multiplayer arena',
       'Raid multiplayer arena',
-      'Map 3 multiplayer arena',
+      // MAP3: an explore arena is not a multiplayer arena.
+      'Map 3 explore arena',
     ]);
   });
 
@@ -239,17 +240,22 @@ describe('opening arena selection', () => {
     ]);
   });
 
-  // MAP3 (owner 2026-09-02, HF-405 then HF-409). Map 3 shipped selectable and
-  // SOLO on 2026-09-02 15:14 and was withdrawn from the menu at 16:25 the same
-  // day: the card launched the authored stone gallery rather than the corridor
-  // showcase, and the owner read that as the showcase having been destroyed.
-  // The row, the labels and the id boundary all stay - only the card is gone,
-  // and it comes back the moment the arena IS the showcase.
-  it('keeps Map 3 a real solo-preview arena while its card is withdrawn', () => {
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409; card restored PASS 86). Map 3
+  // shipped selectable and SOLO at 15:14, was withdrawn at 16:25 the same day
+  // because the card launched the authored stone gallery rather than the
+  // corridor showcase, and is offered again now that the showcase IS the arena.
+  // It comes back as an EXPLORE arena, which is a declared registry kind.
+  it('offers Map 3 as an explore arena, with no lobby, no bots and no clock pressure', () => {
     const map3 = arenaSelection('map3');
     expect(map3.id).toBe('map3');
-    expect(map3.selectable).toBe(false);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('map3');
+    expect(map3.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    // The kind is the thing every gate reads; it is not a list of ids.
+    expect(map3.kind).toBe('explore');
+    // ...and it is the ONLY explore arena, so a team arena silently acquiring
+    // the kind (and dropping out of the team-spawn rule) fails here.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'explore').map((entry) => entry.id)).toEqual(['map3']);
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'team').length).toBe(ARENA_SELECTIONS.length - 1);
     // Still registered: audio, spawn safety, replay and the compatibility
     // decoder all read the FULL registry, and a saved match or a shared link
     // naming map3 has to keep resolving.
@@ -266,6 +272,11 @@ describe('opening arena selection', () => {
     expect(map3.rulesLabel).toContain('EXPLORE');
     expect(map3.soloBotCount).toBe(0);
     expect(map3.maximumSoloBots).toBe(0);
+    // An explore arena must not carry a match clock into its HUD. The registry
+    // keeps `matchRules.durationMs` because the id is also the replay/storage
+    // boundary and a saved match naming map3 must still decode - so the HUD
+    // reads the KIND, not the clock. See `src/ui/hud-mode-banner.ts`.
+    expect(map3.fieldSupport).toBe(false);
     // Stable id is the network/storage boundary from the first commit.
     expect(decodeArenaId('map3')).toBe('map3');
     expect(isArenaId('map3')).toBe(true);

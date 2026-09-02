@@ -85,14 +85,16 @@ test('the selectable roster this test measures against is the real one', () => {
   // coverage promise; it must never be lowered to excuse an arena that is
   // still offered in the menu, and the explicit exclusion below is what pins
   // this particular drop to a deliberate decision.
+  // MAP3 (owner 2026-09-02, HF-409, PASS 86): ratcheted BACK UP 7 -> 8 with the
+  // card. The 8 -> 7 drop lasted exactly as long as the withdrawal did.
   assert.ok(
-    selectable.length >= 7,
+    selectable.length >= 8,
     `expected the real selectable roster, got ${JSON.stringify(selectable)}`,
   );
-  for (const required of ['atomic-acres', 'test1', 'test2']) {
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be swept`);
   }
-  for (const hidden of ['farcrysis', 'map3']) {
+  for (const hidden of ['farcrysis']) {
     assert.ok(
       !selectable.includes(hidden),
       `${hidden} is selectable:false and must stay out of the required set`,
@@ -119,9 +121,11 @@ test('the sweep keeps a floor under the derived roster', () => {
   // Importing a real array cannot silently collapse the way a scraped one can,
   // but a truncated roster would still sweep less than the game ships while
   // printing success, so the script asserts a floor rather than assuming one.
-  // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable. This
-  // pin only ever moves UP: it is the guard against a truncated roster.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*7/u, 'the roster floor must be pinned at 7');
+  // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable, dropped
+  // back to 7 for the day its card was withdrawn, and raised to 8 again in
+  // PASS 86 when the card returned. The floor must equal the REAL roster, which
+  // is what the equality assertion below enforces in both directions.
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*8/u, 'the roster floor must be pinned at 8');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -244,15 +248,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*7/u,
-    'the shared roster floor must be pinned at 7',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*8/u,
+    'the shared roster floor must be pinned at 8',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 7, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 8, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so
