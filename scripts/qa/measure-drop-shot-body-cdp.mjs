@@ -5,8 +5,21 @@
 // the SAME function a guest runs for a remote peer, a host runs for a bot, and
 // the local player's shadow runs for itself. This script drives one rig's
 // stance through the debug bot-presentation lever and samples the rig's own
-// `animationContract.proneBlend` every frame, so "the body falls, it does not
-// snap" is a measurement rather than a screenshot impression.
+// prone blend every frame, so "the body falls, it does not snap" is a
+// measurement rather than a screenshot impression.
+//
+// WHAT THIS IS NOT. It drives the QA presentation override, not a networked
+// peer: gameplay bots carry no stance at all. The guest-side evidence the
+// HF-412 ledger row asks for is `measure-drop-shot-guest-cdp.mjs`.
+//
+// SAMPLING (fixed 2026-09-02 after review). The first version read
+// `debug.snapshot()` every iteration, which rebuilds the whole operator report
+// and stretched the sampling frame to ~65 ms - so its "largest single-frame
+// blend step" was a 65 ms sample delta, not a frame, and its two runs were not
+// aligned to the same point in the fall. It now reads
+// `debug.sampleBodyStancePose('bot')`, which touches five fields, and it
+// records the blend at the exact frame of the press so before/after start from
+// the same pose.
 //
 // Headless only.
 import { chromium } from '@playwright/test';
@@ -51,31 +64,36 @@ try {
   const run = await page.evaluate(async () => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
-    const proneBlend = () => {
-      const bot = debug.snapshot().bots[0];
+    // Cheap: five fields off the rig runtime, no bone walk. See
+    // sampleBodyStancePose in legacy-main.ts.
+    const pose = () => {
+      const sample = debug.sampleBodyStancePose('bot');
       return {
-        stance: bot?.operatorModel?.animationContract?.stance ?? null,
-        proneBlend: bot?.operatorModel?.animationContract?.proneBlend ?? null,
-        crouchBlend: bot?.operatorModel?.animationContract?.crouchBlend ?? null,
-        pivotHeight: bot?.operatorModel?.animationContract?.pivotHeight ?? null,
+        stance: sample.stance,
+        proneBlend: sample.proneBlend,
+        crouchBlend: sample.crouchBlend,
+        pivotHeight: sample.pivotHeight,
+        blendProgress: sample.blendProgress,
       };
     };
     // Settle the rig standing first, so the fall starts from a known pose.
     debug.setBotPresentation('stand', 0);
-    for (let warm = 0; warm < 45; warm += 1) await frame();
+    for (let warm = 0; warm < 60; warm += 1) await frame();
 
     const samples = [];
     const start = performance.now();
     let droppedAt = null;
     for (;;) {
-      const now = performance.now();
-      const elapsed = now - start;
+      const elapsed = performance.now() - start;
       if (elapsed > 1_200) break;
+      // Sample FIRST, then press on this same frame, so sample 0 after the drop
+      // is the pose at the press (blend 0) in both runs rather than whatever the
+      // sampling interval happened to leave.
+      const contract = pose();
       if (droppedAt === null && elapsed >= 200) {
         droppedAt = elapsed;
         debug.setBotPresentation('prone', 0);
       }
-      const contract = proneBlend();
       samples.push({ t: Math.round(elapsed * 100) / 100, ...contract });
       await frame();
     }
@@ -89,8 +107,13 @@ try {
     return hit ? Math.round((hit.t - run.droppedAt) * 100) / 100 : null;
   };
   let biggestStep = 0;
+  let biggestStepFrameMs = 0;
+  let worstFrameMs = 0;
   for (let index = 1; index < after.length; index += 1) {
-    biggestStep = Math.max(biggestStep, (after[index].proneBlend ?? 0) - (after[index - 1].proneBlend ?? 0));
+    const step = (after[index].proneBlend ?? 0) - (after[index - 1].proneBlend ?? 0);
+    const frameMs = after[index].t - after[index - 1].t;
+    worstFrameMs = Math.max(worstFrameMs, frameMs);
+    if (step > biggestStep) { biggestStep = step; biggestStepFrameMs = frameMs; }
   }
   const report = {
     label: LABEL,
@@ -102,6 +125,17 @@ try {
     fivePercentAfterMs: at(0.05),
     ninetyFivePercentAfterMs: at(0.95),
     biggestSingleFrameBlendStep: Math.round(biggestStep * 1_000) / 1_000,
+    // The frame that step was taken over, so the number can be read as a rate
+    // rather than mistaken for a per-frame constant.
+    biggestStepFrameMs: Math.round(biggestStepFrameMs * 100) / 100,
+    worstSampleFrameMs: Math.round(worstFrameMs * 100) / 100,
+    medianSampleFrameMs: (() => {
+      const gaps = [];
+      for (let index = 1; index < after.length; index += 1) gaps.push(after[index].t - after[index - 1].t);
+      gaps.sort((a, b) => a - b);
+      return gaps.length ? Math.round(gaps[Math.floor(gaps.length / 2)] * 100) / 100 : null;
+    })(),
+    sampleCount: after.length,
     // A body that SNAPS covers the whole blend in one frame. A body that falls
     // cannot: the step is bounded by frame time over the transition window.
     snapped: biggestStep > 0.5,
@@ -114,6 +148,8 @@ try {
     fivePercentAfterMs: report.fivePercentAfterMs,
     ninetyFivePercentAfterMs: report.ninetyFivePercentAfterMs,
     biggestSingleFrameBlendStep: report.biggestSingleFrameBlendStep,
+    medianSampleFrameMs: report.medianSampleFrameMs,
+    proneBlendAtDrop: report.proneBlendAtDrop,
     finalProneBlend: report.finalProneBlend,
     snapped: report.snapped,
   }, null, 2)}`);

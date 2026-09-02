@@ -20,11 +20,14 @@
  *     drop shotting as close-range only precisely because the shots that go out
  *     mid-drop are inaccurate.
  *
- * Measured before this landed (artifacts/qa/drop-shot/before-*.json, headless
- * Chrome, Firing Range): the eye fell 1.09 m in a SINGLE frame, and `tryFire`
- * refused 54 consecutive shots with `stance-or-sprint-recovery` — a 260 ms
- * hard fire block going down and 290 ms coming up. That is the opposite of a
- * drop shot.
+ * Measured before this landed (docs/evidence/pass85/hf412/before-test1-quiet.json,
+ * the tracked receipt, headless Chrome, Firing Range): the eye fell 1.09 m in a
+ * SINGLE frame, and `tryFire` refused 30 consecutive shots with
+ * `stance-or-sprint-recovery` — a 260 ms hard fire block going down and 290 ms
+ * coming up. That is the opposite of a drop shot. (An earlier noisy run quoted
+ * 54 refusals in commit 98f88e4e's message and in three source comments; that
+ * run was discarded and is not in the tree. The tracked receipt is the record;
+ * an independent re-measurement of the same base reported 29.)
  *
  * Pure and deterministic: clocks come in as arguments, nothing is read from
  * `performance`, nothing touches THREE or the DOM, so every rule here is
@@ -48,19 +51,26 @@ import { stanceEyeHeight } from './legacy-pure-helpers-2';
  *
  * `holdCrouchToProneMs`: the console control. Tapping crouch crouches; holding
  * it past this goes prone. Short enough to feel like one motion, long enough
- * that a normal crouch tap never triggers it.
+ * that a DELIBERATE crouch press — not just a flick — never converts by
+ * accident. It was 250 ms and a 200 ms press is an ordinary deliberate press,
+ * so the threshold sits near the top of the tuning band instead.
  */
 export const DROP_SHOT_TIMING = Object.freeze({
   standToProneMs: 300,
   proneToStandMs: 380,
   crouchStepMs: 170,
-  holdCrouchToProneMs: 250,
+  holdCrouchToProneMs: 320,
   /**
-   * Peak hip-fire cone multiplier at the middle of a prone transition. The
-   * reference penalises accuracy heavily while you are falling; it never takes
-   * the trigger away. 1 means "no penalty", so this must stay above 1 for the
+   * Peak cone multiplier at the middle of a prone transition. The reference
+   * penalises accuracy heavily while you are falling; it never takes the
+   * trigger away. 1 means "no penalty", so this must stay above 1 for the
    * penalty to exist at all and bounded so the drop shot stays a technique
    * rather than a coin flip.
+   *
+   * The consumer decides WHICH cone it scales. `tryFire` applies it to the
+   * hip-fire cone only: a shot taken with the sights settled keeps the ADS cone
+   * it earned, because the reference's cost is a hip-fire cost and an
+   * undocumented ADS penalty is not what was asked for.
    */
   transitionSpreadPeak: 1.85,
 });
@@ -97,7 +107,10 @@ export type StanceTransitionSample = Readonly<{
   eyeOffsetMeters: number;
   /** 0..1 blend for the third-person body pose, on the same clock as the eye. */
   bodyProgress: number;
-  /** Hip-fire cone multiplier; exactly 1 outside a prone transition. */
+  /**
+   * Cone multiplier for the shot the caller is about to take; exactly 1 outside
+   * a prone transition. `tryFire` applies it to the hip-fire cone only.
+   */
   spreadMultiplier: number;
   /** True while this is a stand/crouch -> prone drop specifically. */
   dropping: boolean;
@@ -209,9 +222,23 @@ export type CrouchHoldState = Readonly<{
   pressedAtMs: number | null;
   /** Set once the hold has already been converted, so it converts exactly once. */
   convertedToProne: boolean;
+  /**
+   * Whether THIS press may convert to prone at all.
+   *
+   * The crouch bind is how a prone player gets up: `nextStance('prone',
+   * 'toggle-crouch')` is 'crouch'. If every hold could convert, a deliberate
+   * press-and-hold from prone would start the rise and then be forced back
+   * down `holdCrouchToProneMs` later - the player would be unable to stand up
+   * with the key they have always used, and would see a camera bounce and two
+   * spread windows for one press. The hold is therefore armed only when the
+   * press came from a NON-prone stance, which is the only case where "hold
+   * crouch to keep going down" means anything.
+   */
+  armed: boolean;
 }>;
 
-export const IDLE_CROUCH_HOLD: CrouchHoldState = Object.freeze({ pressedAtMs: null, convertedToProne: false });
+export const IDLE_CROUCH_HOLD: CrouchHoldState =
+  Object.freeze({ pressedAtMs: null, convertedToProne: false, armed: false });
 
 export type CrouchHoldOutcome = Readonly<{
   state: CrouchHoldState;
@@ -219,21 +246,31 @@ export type CrouchHoldOutcome = Readonly<{
   action: 'crouch' | 'prone' | null;
 }>;
 
-/** The crouch button went down. The crouch step happens immediately, as it always has. */
-export function crouchPressed(state: CrouchHoldState, nowMs: number): CrouchHoldOutcome {
+/**
+ * The crouch button went down. The crouch step happens immediately, as it
+ * always has. `stanceAtPress` decides whether the hold may deepen into prone:
+ * from prone the press is a request to GET UP and must stay one.
+ */
+export function crouchPressed(
+  state: CrouchHoldState,
+  nowMs: number,
+  stanceAtPress: Stance,
+): CrouchHoldOutcome {
   if (state.pressedAtMs !== null) return Object.freeze({ state, action: null });
   return Object.freeze({
-    state: Object.freeze({ pressedAtMs: nowMs, convertedToProne: false }),
+    state: Object.freeze({ pressedAtMs: nowMs, convertedToProne: false, armed: stanceAtPress !== 'prone' }),
     action: 'crouch',
   });
 }
 
 /** Called every frame while the crouch button is down. */
 export function crouchHeld(state: CrouchHoldState, nowMs: number): CrouchHoldOutcome {
-  if (state.pressedAtMs === null || state.convertedToProne) return Object.freeze({ state, action: null });
+  if (state.pressedAtMs === null || state.convertedToProne || !state.armed) {
+    return Object.freeze({ state, action: null });
+  }
   if (nowMs - state.pressedAtMs < DROP_SHOT_TIMING.holdCrouchToProneMs) return Object.freeze({ state, action: null });
   return Object.freeze({
-    state: Object.freeze({ pressedAtMs: state.pressedAtMs, convertedToProne: true }),
+    state: Object.freeze({ pressedAtMs: state.pressedAtMs, convertedToProne: true, armed: true }),
     action: 'prone',
   });
 }

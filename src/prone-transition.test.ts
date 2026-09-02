@@ -5,8 +5,9 @@
  *
  * The source-pinned half of this file guards the thing a unit test cannot see:
  * that `legacy-main.ts` does not put the prone transition back inside the fire
- * gate. That gate is what made the shipped build refuse 54 consecutive shots
- * across a drop (artifacts/qa/drop-shot/before-test1.json).
+ * gate. That gate is what made the shipped build refuse 30 consecutive shots
+ * across a drop (docs/evidence/pass85/hf412/before-test1-quiet.json - the
+ * tracked receipt; an independent re-measurement of the same base reported 29).
  */
 
 import { readFileSync } from 'node:fs';
@@ -163,7 +164,7 @@ describe('HF-412 no slide, no dive', () => {
 
 describe('HF-412 hold-crouch-to-prone', () => {
   it('crouches on the press and converts to prone once the hold passes the threshold', () => {
-    const press = crouchPressed(IDLE_CROUCH_HOLD, 1_000);
+    const press = crouchPressed(IDLE_CROUCH_HOLD, 1_000, 'stand');
     expect(press.action).toBe('crouch');
     expect(crouchHeld(press.state, 1_000 + DROP_SHOT_TIMING.holdCrouchToProneMs - 1).action).toBeNull();
     const converted = crouchHeld(press.state, 1_000 + DROP_SHOT_TIMING.holdCrouchToProneMs);
@@ -173,16 +174,51 @@ describe('HF-412 hold-crouch-to-prone', () => {
   });
 
   it('a short tap never goes prone', () => {
-    const press = crouchPressed(IDLE_CROUCH_HOLD, 0);
+    const press = crouchPressed(IDLE_CROUCH_HOLD, 0, 'stand');
     expect(crouchHeld(press.state, 80).action).toBeNull();
     expect(crouchReleased().state).toEqual(IDLE_CROUCH_HOLD);
   });
 
+  it('a deliberate 200 ms crouch press is still only a crouch', () => {
+    // The regression this guards: a threshold short enough that an ordinary
+    // deliberate press - not a flick - drops the player prone by accident.
+    const press = crouchPressed(IDLE_CROUCH_HOLD, 0, 'stand');
+    for (let heldMs = 16; heldMs <= 200; heldMs += 16) {
+      expect(crouchHeld(press.state, heldMs).action).toBeNull();
+    }
+  });
+
   it('ignores a repeat press while the button is already down (key auto-repeat)', () => {
-    const press = crouchPressed(IDLE_CROUCH_HOLD, 0);
-    const repeat = crouchPressed(press.state, 40);
+    const press = crouchPressed(IDLE_CROUCH_HOLD, 0, 'stand');
+    const repeat = crouchPressed(press.state, 40, 'stand');
     expect(repeat.action).toBeNull();
     expect(repeat.state).toBe(press.state);
+  });
+
+  it('NEVER converts a press that started from prone - the crouch bind is how you get up', () => {
+    // nextStance('prone', 'toggle-crouch') is 'crouch', so a press from prone
+    // starts the rise. If the hold could still convert, the poll would force
+    // the player back down mid-rise and the crouch key would stop being able to
+    // stand a prone player up at all.
+    const press = crouchPressed(IDLE_CROUCH_HOLD, 500, 'prone');
+    expect(press.action).toBe('crouch');
+    expect(press.state.armed).toBe(false);
+    for (const heldMs of [
+      500 + DROP_SHOT_TIMING.holdCrouchToProneMs,
+      500 + DROP_SHOT_TIMING.holdCrouchToProneMs * 2,
+      500 + 10_000,
+    ]) {
+      expect(crouchHeld(press.state, heldMs).action).toBeNull();
+    }
+  });
+
+  it('re-arms on the NEXT press once the player is no longer prone', () => {
+    const fromProne = crouchPressed(IDLE_CROUCH_HOLD, 0, 'prone');
+    expect(crouchHeld(fromProne.state, 5_000).action).toBeNull();
+    const released = crouchReleased();
+    const again = crouchPressed(released.state, 6_000, 'crouch');
+    expect(again.state.armed).toBe(true);
+    expect(crouchHeld(again.state, 6_000 + DROP_SHOT_TIMING.holdCrouchToProneMs).action).toBe('prone');
   });
 });
 
@@ -202,6 +238,33 @@ describe('HF-412 source contract: the fire path does not gate on the prone trans
   it('routes the rendered eye through the transition sampler rather than a clamped lag', () => {
     expect(LEGACY_MAIN).toMatch(/sampleStanceTransition\(/);
     expect(LEGACY_MAIN).toMatch(/stanceTransitionSample\.eyeOffsetMeters/);
+  });
+
+  it('arms the hold-to-prone conversion from the stance at the press', () => {
+    // Both input paths must pass the current stance in, or the prone player's
+    // crouch press becomes a forced re-drop 320 ms later.
+    const presses = LEGACY_MAIN.match(/crouchPressed\(crouchHoldState,[^;\n]*/g) ?? [];
+    expect(presses.length).toBeGreaterThanOrEqual(2);
+    for (const press of presses) expect(press).toMatch(/player\.stance/);
+  });
+
+  it('applies the drop-shot cone multiplier to HIP FIRE only', () => {
+    // computeSpread has already resolved the ADS cone by this point, so an
+    // unconditional multiply would widen the ADS cone too.
+    expect(LEGACY_MAIN).toMatch(
+      /const dropShotSpreadMultiplier = adsSettled \? 1 : dropShotSample\.spreadMultiplier;/,
+    );
+    expect(LEGACY_MAIN).toMatch(/admittedSpread = obstructedSpread \* dropShotSpreadMultiplier;/);
+    expect(LEGACY_MAIN).not.toMatch(/obstructedSpread \* dropShotSample\.spreadMultiplier/);
+  });
+
+  it('leaves the plain stand<->crouch body settle exactly as it shipped', () => {
+    // The fixed window is a PRONE-transition change. Putting every operator's
+    // crouch step on it would slow down every rig on every arena for a drop-shot
+    // row, in a file Lane Z owns, with no measurement behind it.
+    const operatorModel = readFileSync(new URL('./operator-model.ts', import.meta.url), 'utf8');
+    expect(operatorModel).toMatch(/const proneInvolved = blendFrom === 'prone' \|\| runtimeState\.stance === 'prone';/);
+    expect(operatorModel).toMatch(/alpha = 1 - Math\.exp\(-Math\.max\(0, dt\) \* 12\);/);
   });
 
   it('adds no velocity anywhere in the stance request', () => {

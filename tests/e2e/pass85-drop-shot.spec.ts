@@ -12,9 +12,10 @@ import { DROP_SHOT_TIMING } from '../../src/prone-transition';
  * show: that going prone MID-BURST in the real game keeps putting rounds out,
  * over a real fixed transition, with no lateral impulse.
  *
- * Measured on the shipped build before this landed: the eye covered its whole
- * 1.09 m fall in ONE frame and `tryFire` refused 30 consecutive shots with
- * `stance-or-sprint-recovery`. Both are asserted against here.
+ * Measured on the shipped build before this landed
+ * (docs/evidence/pass85/hf412/before-test1-quiet.json): the eye covered its
+ * whole 1.09 m fall in ONE frame and `tryFire` refused 30 consecutive shots
+ * with `stance-or-sprint-recovery`. Both are asserted against here.
  *
  * Headless installed Chrome, muted (owner standing instruction: no visible QA
  * windows, no audio).
@@ -187,6 +188,42 @@ test.describe('HF-412 drop shot', () => {
       travelled = Math.max(travelled, Math.hypot(sample.x - start.x, sample.z - start.z));
     }
     expect(travelled).toBeLessThan(0.05);
+  });
+
+  test('the crouch bind still stands a PRONE player up, however long it is held', async ({ page }) => {
+    // The regression this pins: `nextStance('prone', 'toggle-crouch')` is
+    // 'crouch', so a press from prone starts the rise - and an unconditional
+    // hold-to-prone poll then forced the player straight back down
+    // holdCrouchToProneMs later. The crouch key must remain the way out of
+    // prone no matter how deliberately it is pressed.
+    await ready(page);
+    const result = await page.evaluate(async (holdMs) => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      const wait = (ms: number): Promise<void> => new Promise((resolve) => { window.setTimeout(resolve, ms); });
+      const stance = (): string => debug.snapshot().player.stance as string;
+      const down = (): void => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC', bubbles: true }));
+      const up = (): void => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyC', bubbles: true }));
+
+      debug.setStanceForQa('prone');
+      await wait(200);
+      const beforePress = stance();
+      down();
+      await wait(120);
+      const shortlyAfterPress = stance();
+      // Hold well past the conversion threshold, twice over.
+      await wait(holdMs * 2 + 300);
+      const whileStillHeld = stance();
+      up();
+      await wait(200);
+      const afterRelease = stance();
+      debug.setStanceForQa('stand');
+      return { beforePress, shortlyAfterPress, whileStillHeld, afterRelease };
+    }, DROP_SHOT_TIMING.holdCrouchToProneMs);
+
+    expect(result.beforePress).toBe('prone');
+    expect(result.shortlyAfterPress).toBe('crouch');
+    expect(result.whileStillHeld).toBe('crouch');
+    expect(result.afterRelease).toBe('crouch');
   });
 
   test('holding the crouch bind goes prone, and a tap only crouches', async ({ page }) => {
