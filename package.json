@@ -68,6 +68,8 @@
     "qa:pass66:owned-browser-verifier-contract": "node --test scripts/qa/pass66-owned-browser-verifier-contract.test.mjs",
     "qa:private-lobby": "npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs private-lobby",
     "qa:rustworks-lobby-sync": "node scripts/qa/verify-rustworks-lobby-sync.mjs",
+    "qa:mp-lab": "node scripts/qa/mp-lab/run-host-guest.mjs",
+    "qa:mp-lab:contract": "node --test tests/e2e/mp-lab-registry-contract.test.mjs",
     "qa:pass52:changelog": "npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass52-changelog.mjs",
     "qa:pass53:changelog": "npm run build && node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-pass53-changelog.mjs",
     "qa:network-chaos": "tsx scripts/qa/run-network-chaos-matrix.ts",
