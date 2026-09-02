@@ -25,7 +25,8 @@ import {
   gunRangeTestBayDoorDynamicColliders,
 } from './gun-range-test-bay';
 import type { ArenaMap } from './map';
-import { WEAPONS, type Stance } from './gameplay';
+import { WEAPONS, movementProfile, type Stance } from './gameplay';
+import { EYE_CLEARANCE_RADIUS_M } from './camera-eye-clearance';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
 import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
@@ -1203,6 +1204,66 @@ describe('additional authored maps', () => {
       const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
       expect(placeholder.userData.skylineCollisionPresentationVisible, entry.placeholder).toBe(false);
       expect(materials.every((material) => material.colorWrite && material.depthWrite), entry.placeholder).toBe(true);
+    }
+  });
+
+  it('seats both jetliner nacelles on the wing underside and keeps the prone crawl space under them', () => {
+    // Lane J, 2026-09-02 (eye-clearance triage), pinned in the Lane J repair.
+    //
+    // NACELLE_CENTRE_Y = 1.73 was the pass's only landed gameplay-geometry
+    // change and nothing tested it: the HF-188 block above pins the nacelle's
+    // SIZE (1.9 x 1.9 x 4.1) and says nothing about where it sits. Both facts
+    // the seat height was chosen for are silent invariants between two bodies
+    // authored 150 lines apart, so either one moving would restore the defect
+    // with every gate still green - and `qa:eye-clearance`, the gate that would
+    // notice, is referenced by no CI workflow.
+    //
+    // Derived from the built arena and from the shipped stance profile, never
+    // from a literal, so a change to the prone eye height or to the clearance
+    // radius re-derives this instead of quietly invalidating it.
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const wingAuthority: THREE.Object3D[] = [];
+    map.root.traverse((object) => {
+      if (/^skyline-jetliner-wing-(port|starboard)-authority-\d+$/u.test(object.name)) wingAuthority.push(object);
+    });
+    expect(wingAuthority.length, 'the wing authority slices must exist to seat the nacelle against')
+      .toBeGreaterThan(0);
+    const wingAuthorityUnderside = [...new Set(
+      wingAuthority.map((object) => Number(new THREE.Box3().setFromObject(object).min.y.toFixed(4))),
+    )];
+    expect(wingAuthorityUnderside, 'every wing authority slice shares one underside').toHaveLength(1);
+    const undersideY = wingAuthorityUnderside[0];
+
+    const proneEyeY = movementProfile({
+      crouched: false, prone: true, ads: false, sprinting: false, grounded: true,
+    }).eyeHeight;
+    const prone = STANCE_SHAPES.prone;
+    // The prone capsule's top, measured from the eye the camera actually uses.
+    const proneCapsuleTopY = proneEyeY - prone.eyeFromCenter + prone.halfHeight + prone.radius;
+
+    for (const name of ['skyline-jetliner-engine-1', 'skyline-jetliner-engine-2']) {
+      const nacelle = map.root.getObjectByName(name);
+      expect(nacelle, name).toBeTruthy();
+      const bounds = new THREE.Box3().setFromObject(nacelle!);
+      // Seated, not floating: the engines hung 0.13 m below the wing they are
+      // bolted to before this pass.
+      expect(Number(bounds.max.y.toFixed(4)), `${name}: nacelle top must land on the wing underside`)
+        .toBe(undersideY);
+      // The belly must clear the prone eye by at least the radius the runtime
+      // resolve and the sweep both probe at, or the camera is inside the engine
+      // again (it measured 0.035 m at the real seat before the fix). This is the
+      // MODELLED eye - the number stage 2 judges. The shipped camera adds a flat
+      // 0.14 m floor standoff on top of it, so the real seat starts 0.03 m under
+      // this belly and resolveEyeClearance pushes it back down; that half is
+      // measured every run by the skyline-nacelle-prone-* forced probes, and the
+      // divergence is recorded in docs/eye-clearance/ledger.json.
+      expect(bounds.min.y - proneEyeY, `${name}: belly over the ${proneEyeY} m prone eye`)
+        .toBeGreaterThanOrEqual(EYE_CLEARANCE_RADIUS_M);
+      // ...and the crawl space has to be real: if the prone CAPSULE does not
+      // fit, the character controller ejects the player sideways instead and
+      // the clearance above is measured at a seat nobody occupies.
+      expect(bounds.min.y, `${name}: prone capsule top ${proneCapsuleTopY} must fit under the belly`)
+        .toBeGreaterThanOrEqual(proneCapsuleTopY);
     }
   });
 
