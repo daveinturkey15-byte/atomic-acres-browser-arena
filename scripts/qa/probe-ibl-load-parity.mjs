@@ -70,6 +70,7 @@ const LABEL = arg('--label', 'pass85');
 const OUT = resolve(process.cwd(), arg('--out', 'artifacts/qa/ibl'));
 const SHOTS = Number(arg('--shots', '2'));
 const SETTLE_MS = Number(arg('--settle-ms', '6000'));
+const LONG_FLOOR_MS = Number(arg('--long-floor-ms', '15000'));
 const PER_ARENA_MS = Number(arg('--per-arena-ms', '180000'));
 const SEED = arg('--seed', 'iblparity');
 const VIEWPORT = (() => {
@@ -80,7 +81,32 @@ const ARENAS = arg('--arenas', registryArenaIds().join(','))
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 mkdirSync(OUT, { recursive: true });
 
-// --- GPU headroom. The owner's ComfyUI shares this GPU; never crowd it. -----
+// --- The owner's ComfyUI shares this GPU; never crowd it, never kill it. ----
+/**
+ * Free VRAM is necessary but not sufficient: ComfyUI can hold a model resident
+ * and still be mid-generation, and a GPU sharing a diffusion sampler misses
+ * WebGPU submission deadlines. That is not hypothetical here - the 2026-09-02
+ * sweep lost the gun-range map switch to "WebGPU queue completion exceeded
+ * 12000 ms". Wait for an idle queue rather than measure through the contention.
+ */
+async function waitForComfyIdle(attempts = 20) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    let busy = false;
+    try {
+      const response = await fetch('http://127.0.0.1:8188/queue', { signal: AbortSignal.timeout(5_000) });
+      if (!response.ok) return { comfy: 'unreachable', attempt };
+      const queue = await response.json();
+      busy = (queue.queue_running?.length ?? 0) > 0 || (queue.queue_pending?.length ?? 0) > 0;
+    } catch {
+      return { comfy: 'absent', attempt }; // not running at all; nothing to yield to
+    }
+    if (!busy) return { comfy: 'idle', attempt };
+    console.error(`[ibl-parity] ComfyUI is generating; waiting 60 s (attempt ${attempt + 1}/${attempts})`);
+    await new Promise((r) => setTimeout(r, 60_000));
+  }
+  throw new Error(`ComfyUI never went idle after ${attempts} checks; measure later rather than crowd it`);
+}
+
 async function waitForGpuHeadroom(minimumFreeMiB = 3000, attempts = 10) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { stdout } = await execFileAsync('nvidia-smi',
@@ -156,8 +182,9 @@ function compare(before, after) {
   };
 }
 
+const comfy = await waitForComfyIdle();
 const gpu = await waitForGpuHeadroom();
-console.error(`[ibl-parity] GPU ${gpu.free}/${gpu.total} MiB free`);
+console.error(`[ibl-parity] ComfyUI ${comfy.comfy}; GPU ${gpu.free}/${gpu.total} MiB free`);
 
 const browser = await chromium.launch({
   headless: true,
@@ -178,7 +205,11 @@ const gitSha = await execFileAsync('git', ['rev-parse', 'HEAD'])
   .then((r) => r.stdout.trim()).catch(() => null);
 const report = {
   generatedAt: new Date().toISOString(), label: LABEL, base: BASE, gitSha,
-  viewport: VIEWPORT, seed: SEED, arenas: {},
+  viewport: VIEWPORT, seed: SEED,
+  // What else the machine was doing. A run measured beside a live diffusion
+  // sampler is not comparable to one measured on a quiet GPU.
+  machine: { comfyUi: comfy.comfy, gpuFreeMiB: gpu.free, gpuTotalMiB: gpu.total },
+  arenas: {},
 };
 
 /** Boots a page, optionally through a warm-up arena and a real menu round trip. */
@@ -199,8 +230,42 @@ async function measureCase(arena, { warmup }) {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
     }, undefined, { timeout: PER_ARENA_MS });
+    // FREEZE BEFORE THE SETTLE, not after. Measured 2026-09-02 on
+    // rustworks-1v1: freezing after a 6 s idle settle let the solo bot shoot
+    // the parked player, and `#low-health-vignette` painted a radial red wash
+    // over the WHOLE frame (+118/255 red at the corners, centre pixels
+    // byte-identical). That read out as "first load is 23% darker than second
+    // load" - a lighting divergence that did not exist. Freezing a bot does
+    // not undo damage already taken, so the only correct order is: no live
+    // combat at any point in the measured window.
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true); });
     await page.waitForTimeout(SETTLE_MS);
   };
+  /**
+   * Combat state at capture time. The red overlay is a DOM element
+   * (`#low-health-vignette`, driven by `--low-health-opacity`), so it is IN the
+   * screenshot but NOT in the scene: nothing about the environment, the grade
+   * or the renderer can be inferred from a frame that carries it. This is read
+   * on both cases and required to be clean, so a combat difference is reported
+   * as a combat difference instead of being laundered into a luminance number.
+   */
+  const combatState = async () => page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const sensory = snapshot?.sensory ?? null;
+    return {
+      hp: snapshot?.player?.hp ?? null,
+      alive: snapshot?.player?.alive ?? null,
+      // The game publishes what it painted; read that rather than re-deriving
+      // it from CSS, so the receipt and the pixels have the same author.
+      lowHealthOpacity: sensory ? sensory.lowHealthOpacity : null,
+      lowHealthActive: sensory ? sensory.lowHealthActive : null,
+      // Directional hit markers are a second on-screen overlay from the same
+      // cause; a frame carrying one is contaminated even at full health.
+      damageMarkerOpacity: sensory
+        ? Math.max(0, ...(sensory.directions ?? []).map((entry) => entry?.opacity ?? 0))
+        : null,
+    };
+  });
   try {
     await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=${SEED}&previewTime=0`,
       { waitUntil: 'domcontentloaded' });
@@ -227,12 +292,8 @@ async function measureCase(arena, { warmup }) {
       await page.waitForTimeout(1_500);
     }
     await enter(arena);
-    await page.evaluate(() => {
-      window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true);
-      // A live bot shoots the idle player and paints a damage vignette over
-      // the frame; a frozen bot is a posed static part of the compared world.
-      window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
-    });
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true); });
+    const combat = await combatState();
     const observation = await page.evaluate(() => {
       const debug = window.__ATOMIC_ACRES_DEBUG__;
       const scene = debug.sampleSceneGraph();
@@ -269,7 +330,25 @@ async function measureCase(arena, { warmup }) {
       if (!committed) { shots.push({ cameraId, ok: false, error: 'camera revision never committed' }); continue; }
       await page.waitForTimeout(1_800);
       const buffer = await page.screenshot();
-      shots.push({ cameraId, ok: true, buffer });
+      // THIS CAMERA'S OWN temporal floor, not the arena's. One floor per arena
+      // is measured at whichever camera happened to be last, and cameras differ
+      // enormously in how much of the frame is animated: measured 2026-09-02,
+      // farcrysis read 0% moved at the jungle camera and 6.4% at the same
+      // arena's second sample. A delta can only be called a lighting delta
+      // against the floor of the frame it was taken in.
+      await page.waitForTimeout(900);
+      const bufferAgain = await page.screenshot();
+      // A SECOND floor on a LONG baseline. 900 ms catches fast jitter and
+      // nothing else: an animation whose period is tens of seconds - swell,
+      // canopy sway, drifting cloud - barely moves inside that window and
+      // still lands the two load paths on different phases, because they
+      // reach the camera at different elapsed times. Measured 2026-09-02 on
+      // farcrysis: 0% moved at 900 ms while the two load paths differed by
+      // 17%. Without this sample there is no way to tell that apart from a
+      // lighting difference, and the 900 ms floor alone would call it one.
+      await page.waitForTimeout(LONG_FLOOR_MS);
+      const bufferLater = await page.screenshot();
+      shots.push({ cameraId, ok: true, buffer, bufferAgain, bufferLater });
     }
     // Temporal noise floor, in this same session: two frames, nothing changed.
     await page.waitForTimeout(700);
@@ -277,7 +356,10 @@ async function measureCase(arena, { warmup }) {
     await page.waitForTimeout(900);
     const noiseB = await page.screenshot();
     const noise = compare(await statsOf(noiseA), await statsOf(noiseB));
-    return { ok: true, backend, adapter, observation, shots, noise, errors };
+    // Read combat state again AFTER the last pixel, so a hit landed anywhere
+    // inside the capture window is caught, not just one landed before it.
+    const combatAfter = await combatState();
+    return { ok: true, backend, adapter, observation, shots, noise, errors, combat, combatAfter };
   } catch (error) {
     return { ok: false, failure: String(error).slice(0, 400), errors };
   } finally {
@@ -293,10 +375,62 @@ try {
     report.arenas[arena] = entry;
     const first = await measureCase(arena, { warmup: null });
     const second = await measureCase(arena, { warmup });
-    entry.first = { ...first, shots: (first.shots ?? []).map(({ buffer, ...rest }) => rest) };
-    entry.second = { ...second, shots: (second.shots ?? []).map(({ buffer, ...rest }) => rest) };
+    entry.first = { ...first, shots: (first.shots ?? []).map(({ buffer, bufferAgain, bufferLater, ...rest }) => rest) };
+    entry.second = { ...second, shots: (second.shots ?? []).map(({ buffer, bufferAgain, bufferLater, ...rest }) => rest) };
     if (!first.ok || !second.ok) {
       console.error(`[ibl-parity] ${arena}: FAILED first=${first.ok} second=${second.ok} ${first.failure ?? ''} ${second.failure ?? ''}`);
+      exitCode = 1;
+      continue;
+    }
+    // WHICH ARENA IS ACTUALLY COMMITTED, before anything is compared. A map
+    // switch can fail and leave the PREVIOUS arena live (measured 2026-09-02:
+    // "[Gun Range map selection failed] WebGPU queue completion exceeded
+    // 12000 ms"), and the match stays active throughout - so the naive
+    // comparison reads the previous arena's environment as this arena's and
+    // reports a lighting divergence that is really a failed selection. Those
+    // are different defects and must never be conflated.
+    entry.committedArena = {
+      first: first.observation.published?.arenaId ?? null,
+      second: second.observation.published?.arenaId ?? null,
+    };
+    if (entry.committedArena.first !== arena || entry.committedArena.second !== arena) {
+      entry.selectionFailed = true;
+      console.error(`[ibl-parity] ${arena}: SELECTION FAILED - committed first=${entry.committedArena.first} second=${entry.committedArena.second}; page errors: ${JSON.stringify((second.errors ?? []).slice(0, 2))}`);
+      exitCode = 1;
+      continue;
+    }
+    // COMBAT STATE, before any pixel is compared. `#low-health-vignette` is a
+    // DOM overlay on top of the canvas; a frame carrying it says nothing about
+    // lighting. Both cases must be untouched at full health with the overlay
+    // fully off, at the start AND the end of the capture window. This is a
+    // hard invalidation, never a tolerance: an arena measured under fire has
+    // no lighting measurement at all.
+    const combatClean = (side) => {
+      const before = side.combat ?? null;
+      const after = side.combatAfter ?? null;
+      if (!before || !after) return { clean: false, reason: 'combat state unavailable' };
+      for (const [label, state] of [['before', before], ['after', after]]) {
+        if (state.alive !== true) return { clean: false, reason: `player not alive (${label})` };
+        if (state.hp !== 100) return { clean: false, reason: `hp ${state.hp} != 100 (${label})` };
+        if (!(state.lowHealthOpacity === 0)) {
+          return { clean: false, reason: `low-health vignette ${state.lowHealthOpacity} != 0 (${label})` };
+        }
+        if (state.lowHealthActive !== false) return { clean: false, reason: `low-health feedback active (${label})` };
+        if (!(state.damageMarkerOpacity === 0)) {
+          return { clean: false, reason: `damage marker ${state.damageMarkerOpacity} != 0 (${label})` };
+        }
+      }
+      return { clean: true };
+    };
+    const combatFirst = combatClean(first);
+    const combatSecond = combatClean(second);
+    entry.combat = {
+      first: { ...(first.combat ?? {}), after: first.combatAfter ?? null, ...combatFirst },
+      second: { ...(second.combat ?? {}), after: second.combatAfter ?? null, ...combatSecond },
+    };
+    if (!combatFirst.clean || !combatSecond.clean) {
+      entry.combatContaminated = true;
+      console.error(`[ibl-parity] ${arena}: COMBAT-CONTAMINATED - first: ${combatFirst.reason ?? 'clean'}; second: ${combatSecond.reason ?? 'clean'}. No lighting comparison is valid on these frames.`);
       exitCode = 1;
       continue;
     }
@@ -323,13 +457,58 @@ try {
       writeFileSync(resolve(dir, `${shot.cameraId}-first.png`), shot.buffer);
       writeFileSync(resolve(dir, `${shot.cameraId}-second.png`), mate.buffer);
       const measurement = compare(await statsOf(shot.buffer), await statsOf(mate.buffer));
-      entry.cameras.push({ cameraId: shot.cameraId, ok: true, ...measurement });
-      console.error(`[ibl-parity] ${arena}/${shot.cameraId}: ${measurement.meanLuminanceFirst} -> ${measurement.meanLuminanceSecond} (${measurement.meanLuminanceDeltaPercent}%), ${measurement.pixelsMovedPercent}% pixels moved`);
+      // Per-camera temporal floor: the worse of the two cases' own repeat
+      // frames at THIS camera. A delta inside it is the frame moving, not the
+      // load path.
+      const floorFirst = shot.bufferAgain
+        ? compare(await statsOf(shot.buffer), await statsOf(shot.bufferAgain)) : null;
+      const floorSecond = mate.bufferAgain
+        ? compare(await statsOf(mate.buffer), await statsOf(mate.bufferAgain)) : null;
+      const cameraNoisePercent = floorFirst && floorSecond
+        ? Number(Math.max(Math.abs(floorFirst.meanLuminanceDeltaPercent), Math.abs(floorSecond.meanLuminanceDeltaPercent)).toFixed(2))
+        : null;
+      const cameraNoiseMovedPercent = floorFirst && floorSecond
+        ? Number(Math.max(floorFirst.pixelsMovedPercent, floorSecond.pixelsMovedPercent).toFixed(1))
+        : null;
+      const longFirst = shot.bufferLater
+        ? compare(await statsOf(shot.buffer), await statsOf(shot.bufferLater)) : null;
+      const longSecond = mate.bufferLater
+        ? compare(await statsOf(mate.buffer), await statsOf(mate.bufferLater)) : null;
+      const longNoisePercent = longFirst && longSecond
+        ? Number(Math.max(Math.abs(longFirst.meanLuminanceDeltaPercent), Math.abs(longSecond.meanLuminanceDeltaPercent)).toFixed(2))
+        : null;
+      const longNoiseMovedPercent = longFirst && longSecond
+        ? Number(Math.max(longFirst.pixelsMovedPercent, longSecond.pixelsMovedPercent).toFixed(1))
+        : null;
+      entry.cameras.push({
+        cameraId: shot.cameraId, ok: true, ...measurement,
+        cameraNoisePercent, cameraNoiseMovedPercent,
+        longFloorMs: LONG_FLOOR_MS, longNoisePercent, longNoiseMovedPercent,
+        withinCameraNoise: cameraNoisePercent === null
+          ? null
+          : Math.abs(measurement.meanLuminanceDeltaPercent) <= cameraNoisePercent
+            && measurement.pixelsMovedPercent <= cameraNoiseMovedPercent,
+        // The honest verdict: a delta inside EITHER floor is the frame moving
+        // on its own, not the load path producing different light.
+        withinLongFloor: longNoisePercent === null
+          ? null
+          : Math.abs(measurement.meanLuminanceDeltaPercent) <= longNoisePercent
+            && measurement.pixelsMovedPercent <= longNoiseMovedPercent,
+      });
+      console.error(`[ibl-parity] ${arena}/${shot.cameraId}: ${measurement.meanLuminanceFirst} -> ${measurement.meanLuminanceSecond} (${measurement.meanLuminanceDeltaPercent}%), ${measurement.pixelsMovedPercent}% pixels moved; this camera's own floors ${cameraNoisePercent}%/${cameraNoiseMovedPercent}% @900ms, ${longNoisePercent}%/${longNoiseMovedPercent}% @${LONG_FLOOR_MS}ms`);
     }
     entry.noiseFloorPercent = Number(Math.max(
       Math.abs(first.noise.meanLuminanceDeltaPercent), Math.abs(second.noise.meanLuminanceDeltaPercent),
     ).toFixed(2));
-    console.error(`[ibl-parity] ${arena}: env parity=${entry.observationParity} noise floor ${entry.noiseFloorPercent}% env='${first.observation.sceneEnvironment}' vs '${second.observation.sceneEnvironment}'`);
+    // Pixels-moved needs its own floor. On arenas with animated content that
+    // the review clock does not pin - farcrysis surf and canopy, measured
+    // 2026-09-02 at 19.2% and 12.8% moved on a mean luminance delta of -0.4%
+    // and -0.17% - a large moved% is the animation, not the lighting, and
+    // without this floor there is nothing to say so.
+    entry.noiseFloorMovedPercent = Number(Math.max(
+      first.noise.pixelsMovedPercent, second.noise.pixelsMovedPercent,
+    ).toFixed(1));
+    console.error(`[ibl-parity] ${arena}: env parity=${entry.observationParity} noise floor ${entry.noiseFloorPercent}% luminance / ${entry.noiseFloorMovedPercent}% pixels env='${first.observation.sceneEnvironment}' vs '${second.observation.sceneEnvironment}'`);
     if (!entry.observationParity) exitCode = 1;
   }
 } finally {
