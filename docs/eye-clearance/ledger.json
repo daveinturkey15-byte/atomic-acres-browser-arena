@@ -12,7 +12,7 @@
     "test1": 0,
     "test2": 0,
     "map3": -1,
-    "nuketown2": -1
+    "nuketown2": 18
   },
   "unmeasuredCeiling": -1,
   "unmeasured": [
@@ -20,11 +20,6 @@
       "arena": "map3",
       "since": "2026-09-02",
       "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
-    },
-    {
-      "arena": "nuketown2",
-      "since": "2026-09-02",
-      "note": "NUKETOWN2 (HF-407) registered selectable on 2026-09-02, the same day it was authored. No stage of the eye-clearance pipeline has been run against it - stages 2 and 3 need a browser and this lane's machine rules forbid a headed one - so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for nuketown2 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here. The arena's own mechanical parity audit is green (0 invisible colliders, 0 walk-through meshes over 187 colliders and 192 visible meshes, re-measured 2026-09-02 in the repair pass), which is evidence about COLLIDERS, not about where the camera eye ends up."
     }
   ],
   "accepted": [
@@ -64,7 +59,7 @@
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
       "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it",
-      "nuketown2": "UNMEASURED (2026-09-02) - the arena was authored today and stage 3 has never teleported the player into it. Stages 2 and 3 need a browser; the HF-407 lane's machine rules forbid a headed one and no headless run was made, so this stays the sentinel string rather than a number nobody measured."
+      "nuketown2": "2 (measured 2026-09-02, headless: stage 3 teleported the real player to all 18 flagged spots, checked 18, 2 remain - both prone beside the NORTH truck at z=-2.40). Row 1 (x=-24.92) is the loud one: the camera seats at y=0.748 and the truck deck sits 0.003 m above it with resolveEyeClearance reporting pushedM=0, so the resolve did not move the eye at all - a genuine open row, not a bob-margin fringe. Row 2 (x=-24.77) DID resolve (pushedM=0.150, seat y=1.763) and then reads 0.150 m off 'nuketown2 north truck box flank 0', i.e. exactly at the probe radius rather than inside it. The other 16 rows resolve clear."
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },
@@ -80,6 +75,12 @@
       "at": "2026-08-31",
       "violations": 0,
       "note": "RE-MEASURED after the 100 x 76 m layout rebuild (was 76 x 58 m). 3467 legal hug spots, 24269 traces, ZERO violations across all three stances; stage 3 teleported the real player to every flagged spot and had none to check. The ceiling stays at 0 - it is not re-pinned, because the measurement did not move off it. The SPOT COUNT moved (3665 -> 3467) and that is expected: the bounds changed, the thinning stride went 4 -> 5 with the larger collider set, and 21 paving slabs replaced 10 terrace bands. The rebuild also cut colliders-with-no-legal-adjacent-stance from 24 to 9; the 24 were all veranda balustrade, and the veranda is demolished. The 9 that remain are the same instrument limitation the old note recorded - the sweep evaluates hug candidates against a hardcoded ground plane of 0, so it asks whether a player can stand beside a +3.40 m upper-room wall from grade. Tracked as the per-candidate standing-surface follow-up, not a map defect."
+    },
+    {
+      "arena": "nuketown2",
+      "at": "2026-09-02",
+      "violations": 18,
+      "note": "FIRST REAL MEASUREMENT, taken headless at HEAD 8d74618e against a dist rebuilt from that HEAD (the checked-in dist was 2.5 h stale and would have measured yesterday's arena). 209 colliders (5 floor) -> 3037 legal hug spots -> 21241 traces -> 18 violations, ALL prone, all at exactly 0.140 m, all straight up ([0,1,0]). The class is one thing and one thing only: a prone player under a pickup bed. 9 rows are 'nuketown2 north truck deck' and 9 are 'nuketown2 south truck deck' - the two set-piece trucks - and there is no third surface in the set. 18 is entered as the measured value, not as a forgiving ceiling: stage 3 then re-probed all 18 from the real camera seat and 2 survive the runtime resolve (see runtimeResolve.runtimeRemaining.nuketown2), so this row is a real open item to triage, not a clean bill. Nothing here is a wall-hug clip - the arena's flat surfaces produced zero violations across stand and crouch."
     }
   ],
   "openRegressions": [
