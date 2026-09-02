@@ -18,6 +18,8 @@
     "author:pass65:menu-previews": "tsx scripts/assets/generate-pass65-runtime-menu-previews.ts",
     "finalize:pass65:menu-previews": "node scripts/assets/finalize_pass65_menu_previews.mjs",
     "finalize:pass79:menu-previews": "node scripts/assets/finalize-pass79-test-arena-menu-previews.mjs",
+    "finalize:pass84:menu-preview": "node scripts/assets/finalize-pass84-map3-menu-preview.mjs",
+    "finalize:pass84:loading-backdrop": "python scripts/assets/finalize_pass84_map3_loading_backdrop.py",
     "author:pass66:killstreak-demo-videos": "node scripts/qa/run-pass66-killstreak-demo-capture.mjs",
     "finalize:pass66:killstreak-demo-videos": "tsx scripts/qa/finalize-pass66-killstreak-demo-media.ts",
     "qa:pass66:killstreak-demo-videos": "tsx scripts/qa/finalize-pass66-killstreak-demo-media.ts --verify-only",

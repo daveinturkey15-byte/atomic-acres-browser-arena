@@ -1075,6 +1075,60 @@
       "placeholderStatus": "production",
       "format": "1536x864 quality-88 lossy WebP, native generation resolution, PNG master preserved byte-for-byte under source-assets/art-gen/menu/",
       "modifications": "One main-menu key-art backdrop generated locally with Qwen-Image-2512: four operator silhouettes over the project's coastal-suburb-and-superyacht identity, composed with negative space for UI. Exact prompt and seed recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-pass84-map3-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/map3.mp4",
+          "sha256": "74c3ca982640c38b0cf23a1f1f514f574eacfe108b5efcb302180da3faa75464"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webm",
+          "sha256": "77846e8b6a4b4f47c37b9c790eb79e7711a9d88d6f846228cac5b466207cad28"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webp",
+          "sha256": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass84-menu-previews/map3-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass84-map3-menu-preview.mjs",
+      "sourceScriptSha256": "5cd6bfbd6132562bc95aff654930a2880f803951e0596b94e9e2639b53dbb4e3",
+      "sourceProvenance": "source-assets/menu/pass84-map3-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Map 3 runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass84-map3-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Map 3 authoritative runtime arena",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass84-map3-loading/provenance.json",
+      "sourceProvenanceSha256": "0aa078cedd41fcaf307d53af39c0b9e8eeee6a8c965b3cbbec1ff331a4755db0",
+      "sourceScript": "scripts/assets/finalize_pass84_map3_loading_backdrop.py",
+      "sourceScriptSha256": "92ec1b50a569dddeab16fe4b6d369465f1fe1c1126788731346b5733730a27b1",
+      "files": [
+        {
+          "path": "public/assets/original/loading/map3-loading.webp",
+          "sha256": "89ec16a2d2b6fe88954921b55ee67b88a2a37ef0343661578e089635b5aab40c"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 43.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass84-map3-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Map 3 production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
     }
   ],
   "rejectedCandidates": [
