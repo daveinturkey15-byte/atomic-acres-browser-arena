@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GAMEPAD_SETTINGS_STORAGE_KEY } from './curves';
 import { GamepadInputRuntime, type GamepadLike } from './gamepad-input';
 
 class FakeStorage implements Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
@@ -202,5 +203,52 @@ describe('GamepadInputRuntime', () => {
     expect(h.runtime.telemetry().activeIndex).toBe(1);
     expect(frame.layout?.family).toBe('playstation');
     expect(frame.look.x).toBeGreaterThan(0.5);
+  });
+
+  // PASS 84 skeptic finding: the connect transition used to clear the edge
+  // baseline, so the first poll after a connect saw previous = [] and reported
+  // a press for every button that was already down — a pad paired with the
+  // trigger held fired a shot the player never asked for.
+  it('a button already held when the pad connects is held, not pressed, on the first frame', () => {
+    const h = harness();
+    const pad = makePad('Xbox');
+    pad.buttons[7] = { pressed: true, value: 1 };
+    pad.buttons[0] = { pressed: true, value: 1 };
+    h.pads[0] = pad;
+    h.target.dispatch('gamepadconnected', pad);
+    const first = h.tick();
+    expect(first.connected).toBe(true);
+    expect(first.held('fire')).toBe(true);
+    expect(first.pressed('fire'), 'a held trigger at connect time must not report a press edge').toBe(false);
+    expect(first.pressed('jump')).toBe(false);
+    // A genuine release/press after the connect is still an edge.
+    pad.buttons[7] = { pressed: false, value: 0 };
+    h.tick();
+    pad.buttons[7] = { pressed: true, value: 1 };
+    expect(h.tick().pressed('fire')).toBe(true);
+  });
+
+  it('promoting a second pad by activity does not fire its already-held trigger', () => {
+    const h = harness();
+    const xbox = makePad('Xbox', 'standard', 0);
+    const ps = makePad('Wireless Controller 054c', 'standard', 1);
+    h.pads[0] = xbox;
+    h.pads[1] = ps;
+    h.tick();
+    expect(h.runtime.telemetry().activeIndex).toBe(0);
+    ps.buttons[7] = { pressed: true, value: 1 };
+    const promoted = h.tick();
+    expect(h.runtime.telemetry().activeIndex).toBe(1);
+    expect(promoted.held('fire')).toBe(true);
+    expect(promoted.pressed('fire')).toBe(false);
+  });
+
+  it('reset-to-defaults clears the persisted settings key through the shared helper', () => {
+    const h = harness();
+    h.runtime.updateSettings({ invertLookY: true });
+    expect(h.storage.getItem(GAMEPAD_SETTINGS_STORAGE_KEY)).not.toBeNull();
+    expect(h.runtime.resetSettings().invertLookY).toBe(false);
+    expect(h.storage.getItem(GAMEPAD_SETTINGS_STORAGE_KEY)).toBeNull();
+    expect([...h.storage.data.keys()]).toEqual([]);
   });
 });

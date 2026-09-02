@@ -12,6 +12,7 @@
 
 import {
   buttonPressed,
+  clearGamepadSettings,
   readGamepadSettings,
   shapeStick,
   TRIGGER_PRESS_THRESHOLD,
@@ -202,7 +203,6 @@ export class GamepadInputRuntime {
     this.hotplug = next;
     const connected = hotplugConnected(next);
     if (connected !== wasConnected || previousActive !== next.activeIndex) {
-      this.previousButtons = [];
       this.captureBaseline = null;
       if (!connected) {
         this.baseLayout = null;
@@ -211,9 +211,28 @@ export class GamepadInputRuntime {
         this.lastPadInputAt = 0;
       }
       this.refreshLayout();
+      // A button already held at the moment a pad connects (or is promoted by
+      // activity) is "held", not "pressed": seed the edge baseline from the
+      // live sample so the first frame cannot fire or jump without a fresh press.
+      const pad = connected ? this.activePad() : null;
+      this.previousButtons = pad && this.layout ? this.buttonStates(pad, this.layout) : [];
       for (const listener of this.padListeners) listener(connected, this.layout);
       this.updateScheme();
     }
+  }
+
+  /**
+   * Per-physical-index pressed truth for edge detection. Fire and ADS use the
+   * analogue trigger threshold; everything else the digital one, so shared
+   * buttons (reload/interact) see one consistent press.
+   */
+  private buttonStates(pad: GamepadLike, layout: PadLayout): boolean[] {
+    const states = (pad.buttons ?? []).map((button) => buttonPressed(button));
+    for (const action of ['fire', 'ads'] as const) {
+      const buttonIndex = layout.buttons[action];
+      if (buttonIndex !== null) states[buttonIndex] = buttonPressed(pad.buttons?.[buttonIndex], TRIGGER_PRESS_THRESHOLD);
+    }
+    return states;
   }
 
   private activePad(): GamepadLike | null {
@@ -308,14 +327,7 @@ export class GamepadInputRuntime {
       this.lastPadInputAt = Math.max(this.lastPadInputAt, at);
       this.updateScheme();
     }
-    // Edge detection uses the same per-index truth for every action so shared
-    // buttons (reload/interact) see one consistent press.
-    const currentByIndex = buttons.slice();
-    for (const action of ['fire', 'ads'] as const) {
-      const buttonIndex = layout.buttons[action];
-      if (buttonIndex !== null) currentByIndex[buttonIndex] = heldNow.get(action) === true;
-    }
-    this.previousButtons = currentByIndex;
+    this.previousButtons = this.buttonStates(pad, layout);
     const frame: GamepadFrame = Object.freeze({
       connected: true,
       layout,
@@ -379,7 +391,7 @@ export class GamepadInputRuntime {
   resetSettings(): GamepadSettings {
     this.settings = readGamepadSettings(null);
     this.rumbleAdapter.setEnabled(this.settings.rumble);
-    try { this.storage?.removeItem('atomic-acres-gamepad-settings.v1'); } catch { /* best effort */ }
+    clearGamepadSettings(this.storage);
     return this.settings;
   }
 
