@@ -649,3 +649,15 @@ we can of course test stuff in map 3 if not clear to be widely deployed"
 - **Access rule:** X sources are read through public mirrors; if a thread is
   auth-blocked, the lane reports BLOCKED and the owner is asked to log in (never a
   search substitute).
+
+### HF-408 Raid layout rethink — SCHEDULED 22:05 BST (owner asked again: "didn't we have stuff for RAID")
+Lane AQ (`docs/pass84-lanes/LANE-AQ-raid-rejig.md`): the Nuke Town protocol
+applied to Raid - reference study first, code-authored `raid2` preview beside the
+shipped Raid, wall-density and sightline table against the reference, Lane U's
+skeptic findings as the do-not-repeat list. Targets PASS 87 if merge-ready by
+04:30, else the next pass. The Raid ART pass (Lane L) stays shelved as the owner
+asked; the rebuild ships a clean first-pass style.
+### Lane AR — PASS 87 residuals brief written (`docs/pass84-lanes/LANE-AR-pass87-residuals.md`)
+HUD/menu overflow with 8+ cards (red since PASS 84), minimap 30 Hz, bot stance,
+line-ceiling one-direction ratchet, overdrive roof claim, review-camera near
+plane, stale webgl2 copy, operator visual gate. Launches after the 22:20 cut.

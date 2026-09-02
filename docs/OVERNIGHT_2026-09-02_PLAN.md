@@ -24,7 +24,10 @@ H load-time deep cut with the Gun Range switch failure as job 0 (HF-417,
 first), AB dynamic time-of-day/weather lighting (Lane I found the IBL bug
 already fixed; AB can start), AI graphics profiles: audit + Balanced profile + RTX explainer (after Lane
 U lands), AL lighting quality tiers (baked probes, SSR, AO; after AI and
-AB design docs), AD release-CI fix + shared publish module, AE emulated
+AB design docs), AQ Raid layout rethink (HF-408, code-authored raid2
+preview, launched 22:05), AR PASS 87 residuals (HUD overflow, minimap 30 Hz,
+bot stance, line-ceiling ratchet, overdrive roof claim; launch after the 22:20
+cut), HF-419..422 owner-links trials (running, wf_d3563d0e-854), AD release-CI fix + shared publish module, AE emulated
 mobile pass + phone checklist, AG hill-climb loop (staged, three supervised
 iterations), AH ComfyUI native 3D pipeline skill intake + animation options
 (governed skill work, no game source), AJ brief-driven scene-production
