@@ -1,4 +1,5 @@
 import { HOUSE_LAYOUT } from './arena-layout';
+import { NUKETOWN2_RARE_GUN_SITES } from './nuketown2-layout';
 export const RAILGUN_WEAPON_ID = 'railgun' as const;
 export const RAILGUN_ARENA_ID = 'atomic-acres' as const; // Stable arena id; Pass 64 display name is Nuke Town.
 // HF-384 (owner, 2026-08-28): the fixed 180 s spawn could be clock-camped - stand on
@@ -30,7 +31,12 @@ export const RAILGUN_TARGET_RADIUS_M = 0.62;
 export const RAILGUN_TARGET_HALF_HEIGHT_M = 0.78;
 
 export type RailgunSpawnSite = Readonly<{
-  id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear';
+  /**
+   * The four shipped Nuke Town rooms, plus the `<house>-upper` ids the code-authored
+   * arenas derive from their own house layout. Deliberately NOT widened to bare
+   * `string`: an id still has to be one this file knows the shape of.
+   */
+  id: 'aqua-front' | 'aqua-rear' | 'coral-front' | 'coral-rear' | `${string}-upper`;
   /** World-space pickup position in one of the four authored upper rooms. */
   position: readonly [number, number, number];
 }>;
@@ -64,6 +70,53 @@ export const RAILGUN_UPPER_ROOM_SPAWN_SITES: readonly RailgunSpawnSite[] = Objec
   Object.freeze({ id: 'coral-front', position: [HOUSE_LAYOUT[1].x, 4.18, HOUSE_LAYOUT[1].z + 4 * HOUSE_LAYOUT[1].facing] as const }),
   Object.freeze({ id: 'coral-rear', position: [HOUSE_LAYOUT[1].x, 4.18, HOUSE_LAYOUT[1].z - 4 * HOUSE_LAYOUT[1].facing] as const }),
 ]);
+
+/**
+ * HF-407 (owner's third kept feature, 2026-09-02). The rare weapon was gated on ONE
+ * arena id, so the Nuke Town rebuild - which exists precisely to carry the shipped
+ * map's gameplay - scheduled nothing at all. The gate is now a set and the sites are
+ * a per-arena table, because `RAILGUN_UPPER_ROOM_SPAWN_SITES` is derived from the
+ * SHIPPED map's `HOUSE_LAYOUT` and those coordinates mean nothing on another layout:
+ * dropping the rebuild into the existing table would have reproduced, on purpose,
+ * the exact defect this file's header exists to record.
+ *
+ * `atomic-acres` keeps its own entry, its own table and its own arithmetic, so its
+ * behaviour is byte-identical to before this change.
+ */
+export const RAILGUN_ARENA_IDS: ReadonlySet<string> = new Set<string>([RAILGUN_ARENA_ID, 'nuketown2']);
+
+/**
+ * Per-arena pickup sites. Every entry is DERIVED from the arena it belongs to -
+ * `NUKETOWN2_RARE_GUN_SITES` comes out of `NUKETOWN2_HOUSE_LAYOUT` the same way the
+ * arena's own geometry does, and `src/nuketown2-fidelity.test.ts` asserts a player
+ * can stand at each one. No hand-written world coordinate is added here.
+ */
+export const RAILGUN_SPAWN_SITES_BY_ARENA: Readonly<Record<string, readonly RailgunSpawnSite[]>> = Object.freeze({
+  [RAILGUN_ARENA_ID]: RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  nuketown2: Object.freeze(NUKETOWN2_RARE_GUN_SITES.map((site) => Object.freeze({
+    id: site.id,
+    position: [site.position[0], site.position[1], site.position[2]] as const,
+  }))),
+});
+
+/** The authored sites for an arena, or null when the arena does not carry the weapon. */
+export function railgunSpawnSitesForArena(arenaId: string): readonly RailgunSpawnSite[] | null {
+  if (!RAILGUN_ARENA_IDS.has(arenaId)) return null;
+  const sites = RAILGUN_SPAWN_SITES_BY_ARENA[arenaId];
+  return sites && sites.length > 0 ? sites : null;
+}
+
+/**
+ * Uniform site choice over one arena's table, from the replicated random unit. Identical
+ * arithmetic to `chooseRailgunUpperRoom`, which stays as the shipped map's entry point so
+ * that call site and its pinned test are untouched.
+ */
+export function chooseRailgunSpawnSite(arenaId: string, randomUnit: number): RailgunSpawnSite | null {
+  const sites = railgunSpawnSitesForArena(arenaId);
+  if (!sites) return null;
+  const bounded = Number.isFinite(randomUnit) ? Math.max(0, Math.min(0.999999999999, randomUnit)) : 0;
+  return sites[Math.floor(bounded * sites.length)]!;
+}
 
 export type RailgunAuthorityState = Readonly<{
   generation: number;
@@ -114,14 +167,15 @@ export function chooseRailgunUpperRoom(randomUnit: number): RailgunSpawnSite {
   return RAILGUN_UPPER_ROOM_SPAWN_SITES[Math.floor(bounded * RAILGUN_UPPER_ROOM_SPAWN_SITES.length)];
 }
 
-/** Host-only match initialization. Non-Nuke-Town arenas never schedule the pickup. */
+/** Host-only match initialization. Arenas outside `RAILGUN_ARENA_IDS` never schedule the pickup. */
 export function createRailgunAuthorityState(
   arenaId: string,
   matchStartedAtHostTimeMs: number,
   randomUnit = Math.random(),
   generation = 1,
 ): RailgunAuthorityState {
-  if (arenaId !== RAILGUN_ARENA_ID || !validHostTime(matchStartedAtHostTimeMs)) {
+  const spawnSiteForArena = validHostTime(matchStartedAtHostTimeMs) ? chooseRailgunSpawnSite(arenaId, randomUnit) : null;
+  if (spawnSiteForArena === null) {
     return {
       generation,
       revision: 0,
@@ -136,7 +190,7 @@ export function createRailgunAuthorityState(
       processedShotIds: [],
     };
   }
-  const spawnSite = chooseRailgunUpperRoom(randomUnit);
+  const spawnSite = spawnSiteForArena;
   return {
     generation,
     revision: 0,

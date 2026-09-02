@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ARENA_BOUNDS, HOUSE_LAYOUT } from './arena-layout';
 import { createHouseArchitecture } from './house-navigation';
+import { NUKETOWN2_BOUNDS, NUKETOWN2_RARE_GUN_SITES } from './nuketown2-layout';
 import {
   RAILGUN_DAMAGE,
   RAILGUN_MAX_TARGET_OUTCOMES,
@@ -11,10 +12,12 @@ import {
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_STATE_RESYNC_MS,
   RAILGUN_TOTAL_ROUNDS,
+  RAILGUN_ARENA_IDS,
   RAILGUN_UPPER_ROOM_SPAWN_SITES,
   advanceRailgunAuthority,
   advanceRailgunChamber,
   admitRailgunTargets,
+  chooseRailgunSpawnSite,
   chooseRailgunUpperRoom,
   claimRailgun,
   createRailgunBeamAuthority,
@@ -27,6 +30,7 @@ import {
   railgunStateResyncDue,
   isRailgunProtocolMessage,
   railgunThermalTargetEligible,
+  railgunSpawnSitesForArena,
   replenishRailgunAmmo,
   railgunSpawnDelayMs,
   RAILGUN_SPAWN_DELAY_BASE_MS,
@@ -358,5 +362,78 @@ describe('host-authoritative railgun', () => {
       type: 'railgun-claim-request', protocolVersion: 5, by: 'player-a', generation: 1,
       position: [1, 2, 3], nonce: 1,
     }, 6)).toBe(false);
+  });
+});
+
+
+// HF-407 (owner's third kept feature). The rare gun was gated on a single arena id, so
+// the Nuke Town rebuild - an arena that exists to carry the shipped map's gameplay -
+// scheduled nothing. These cases pin BOTH halves: the shipped arena is untouched, and the
+// rebuild spawns the weapon at sites DERIVED from its own house layout rather than at the
+// shipped map's coordinates, which is the failure this file's header records.
+describe('railgun arena set (HF-407)', () => {
+  it('leaves the shipped Nuke Town byte-identical', () => {
+    expect(RAILGUN_ARENA_IDS.has('atomic-acres')).toBe(true);
+    expect(railgunSpawnSitesForArena('atomic-acres')).toBe(RAILGUN_UPPER_ROOM_SPAWN_SITES);
+    // Same site for the same replicated unit, same schedule, same order as before.
+    for (const unit of [0, 0.249999, 0.25, 0.499999, 0.5, 0.749999, 0.75, 0.999999]) {
+      expect(chooseRailgunSpawnSite('atomic-acres', unit)).toBe(chooseRailgunUpperRoom(unit));
+      const state = createRailgunAuthorityState('atomic-acres', 10_000, unit);
+      expect(state.status).toBe('scheduled');
+      expect(state.spawnSite).toEqual(chooseRailgunUpperRoom(unit));
+      expect(state.spawnAtHostTimeMs).toBe(10_000 + railgunSpawnDelayMs(unit));
+    }
+  });
+
+  it('spawns the rare gun on nuketown2 at its own derived sites', () => {
+    expect(RAILGUN_ARENA_IDS.has('nuketown2')).toBe(true);
+    const sites = railgunSpawnSitesForArena('nuketown2');
+    expect(sites).not.toBeNull();
+    expect(sites).toHaveLength(NUKETOWN2_RARE_GUN_SITES.length);
+    expect(sites).toHaveLength(2);
+
+    // DERIVED, not transcribed: every site is the arena's own, to full precision.
+    for (const [index, site] of sites!.entries()) {
+      const authored = NUKETOWN2_RARE_GUN_SITES[index]!;
+      expect(site.id).toBe(authored.id);
+      expect(site.position[0]).toBe(authored.position[0]);
+      expect(site.position[1]).toBe(authored.position[1]);
+      expect(site.position[2]).toBe(authored.position[2]);
+      // Inside this arena's bounds, and NOT at a shipped-map coordinate.
+      expect(NUKETOWN2_BOUNDS.minX).toBeLessThanOrEqual(site.position[0]);
+      expect(NUKETOWN2_BOUNDS.maxX).toBeGreaterThanOrEqual(site.position[0]);
+      expect(NUKETOWN2_BOUNDS.minZ).toBeLessThanOrEqual(site.position[2]);
+      expect(NUKETOWN2_BOUNDS.maxZ).toBeGreaterThanOrEqual(site.position[2]);
+      expect(RAILGUN_UPPER_ROOM_SPAWN_SITES.some((shipped) =>
+        shipped.position[0] === site.position[0]
+        && shipped.position[1] === site.position[1]
+        && shipped.position[2] === site.position[2])).toBe(false);
+    }
+
+    // A real match on the rebuild schedules the pickup, at one of those sites, on the
+    // same delay function as the shipped map. This is the assertion that was false
+    // before HF-407: the state came back 'disabled'.
+    for (const unit of [0, 0.499999, 0.5, 0.999999]) {
+      const state = createRailgunAuthorityState('nuketown2', 10_000, unit);
+      expect(state.status).toBe('scheduled');
+      expect(state.spawnAtHostTimeMs).toBe(10_000 + railgunSpawnDelayMs(unit));
+      expect(state.pickupPosition).not.toBeNull();
+      expect(sites!.some((site) => site.id === state.spawnSite?.id)).toBe(true);
+    }
+    // Both sites are reachable by the uniform choice - one unreachable half is exactly
+    // the shipped map's HF-384 defect.
+    expect(new Set([0, 0.499999, 0.5, 0.999999]
+      .map((unit) => createRailgunAuthorityState('nuketown2', 10_000, unit).spawnSite?.id)))
+      .toEqual(new Set(sites!.map((site) => site.id)));
+  });
+
+  it('still schedules nothing on an arena that does not carry the weapon', () => {
+    expect(railgunSpawnSitesForArena('skyline-terminal')).toBeNull();
+    expect(chooseRailgunSpawnSite('skyline-terminal', 0.5)).toBeNull();
+    for (const arenaId of ['skyline-terminal', 'high-seas', 'gun-range', 'map3', 'disabled']) {
+      const state = createRailgunAuthorityState(arenaId, 10_000, 0.5);
+      expect(state.status, arenaId).toBe('disabled');
+      expect(state.spawnSite, arenaId).toBeNull();
+    }
   });
 });

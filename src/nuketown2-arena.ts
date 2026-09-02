@@ -80,23 +80,35 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import {
+  NUKETOWN2_BOUNDS,
+  NUKETOWN2_FLOOR_T,
+  NUKETOWN2_GROUND_STOREY_H,
+  NUKETOWN2_HOUSE_DEPTH,
+  NUKETOWN2_HOUSE_FRONT_Z,
+  NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_STREET_HALF_WIDTH,
+  NUKETOWN2_UPPER_Y0,
+} from './nuketown2-layout';
 
 // ---------------------------------------------------------------------------
 // Footprint
 // ---------------------------------------------------------------------------
 
 /**
- * The fenced playable rectangle: 58 m along the street by 52 m across it =
- * 3,016 m², against the reference's published 2,972 m² minimum playspace
- * (+1.5 %). The perimeter wall stands just inside these lines.
+ * Footprint, house layout and rare-gun sites are authored in `./nuketown2-layout`,
+ * which imports nothing: the weapon authority needs the sites and cannot import this
+ * module without closing a require cycle through `protocol.ts`. Re-exported here so
+ * every existing importer of this file is unchanged.
  */
-export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -29, maxX: 29, minZ: -26, maxZ: 26 });
+export {
+  NUKETOWN2_BOUNDS,
+  NUKETOWN2_STREET_HALF_WIDTH,
+  NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_RARE_GUN_SITES,
+} from './nuketown2-layout';
 
-/** Half-width of the road. 9 m of carriageway: two lanes plus kerbs. */
-export const NUKETOWN2_STREET_HALF_WIDTH = 4.5;
-
-/** Depth of a house, front wall to back wall. */
-const HOUSE_DEPTH = 10;
+const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 /** Width of a house along the street. 16 x 10 = 160 m², 5.3 % of the playspace. */
 const HOUSE_WIDTH = 16;
 /** Back yard depth: enough for a spawn line, the shed and a fence gate. */
@@ -112,16 +124,16 @@ const SIDE_PATH_DEPTH = -NUKETOWN2_BOUNDS.minZ
   - (NUKETOWN2_STREET_HALF_WIDTH + HOUSE_DEPTH + YARD_DEPTH);
 
 /** Front face of a house = the kerb line. */
-const HOUSE_FRONT_Z = -NUKETOWN2_STREET_HALF_WIDTH;
+const HOUSE_FRONT_Z = NUKETOWN2_HOUSE_FRONT_Z;
 /** Back face of a house. */
 const HOUSE_BACK_Z = HOUSE_FRONT_Z - HOUSE_DEPTH;          // -14.5
 /** Fence line between the back yard and the border path. */
 const YARD_FENCE_Z = HOUSE_BACK_Z - YARD_DEPTH;            // -22
 
 /** Storey heights. Ground 3.0, upper 2.9, both slabs 0.3, roof deck at 6.5. */
-const GROUND_H = 3.0;
-const FLOOR_T = 0.3;
-const UPPER_Y0 = GROUND_H + FLOOR_T;                        // 3.3
+const GROUND_H = NUKETOWN2_GROUND_STOREY_H;
+const FLOOR_T = NUKETOWN2_FLOOR_T;
+const UPPER_Y0 = NUKETOWN2_UPPER_Y0;                        // 3.3
 const UPPER_H = 2.9;
 const ROOF_Y0 = UPPER_Y0 + UPPER_H;                         // 6.2
 const ROOF_T = 0.3;
@@ -132,20 +144,6 @@ const LOW_COVER = 0.95;
 /** Hard cover: clears the 1.65 m standing eye line. */
 const HARD_COVER = 1.9;
 
-/**
- * The two houses, as the arena actually builds them. `facing: 1` means the front
- * wall looks toward +z (the road); the south house is the exact 180-degree image.
- *
- * The 8 m offset along the street between the two house centres is DERIVED (see
- * the design doc §2.3): it is the smallest offset that makes each front window
- * look diagonally across the road at the other house's driveway rather than
- * straight into its own mirror image, which is what makes the place read as a
- * street instead of a pair of facing boxes.
- */
-export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
-  Object.freeze({ id: 'north', team: 0 as const, x: -4, z: HOUSE_FRONT_Z - HOUSE_DEPTH / 2, facing: 1 as const }),
-  Object.freeze({ id: 'south', team: 1 as const, x: 4, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
-]);
 
 /** House extents along the street, north house. The south house is its negation. */
 const HOUSE_X0 = NUKETOWN2_HOUSE_LAYOUT[0].x - HOUSE_WIDTH / 2;  // -12
@@ -226,33 +224,6 @@ const BUS_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.fr
   Object.freeze([2.60, -5.0, -3.8] as const),
 ]);
 
-/**
- * The two upper rooms the rare weapon belongs in. Published analyses of the
- * reference all reach the same conclusion about it: the front-facing upstairs
- * window is the strongest position on the map, because it holds the whole
- * central lane.
- *
- * These are EXPORTED and DERIVED from `NUKETOWN2_HOUSE_LAYOUT` rather than
- * hand-written, because the shipped map's equivalent list was hand-written
- * against a layout that later moved, and for a while half of all matches put
- * the rare weapon outside the map where no player could stand
- * (`src/railgun-authority.ts` header). The runtime gate that decides WHICH
- * arena spawns the weapon lives in that same file, which is weapons code and
- * outside this lane's ownership, so the switch is not flipped here — the sites
- * exist and are correct the day it is.
- */
-export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map((house) => Object.freeze({
-  id: `${house.id}-upper` as const,
-  // 3.0 m toward the street from the house centre, NOT at the centre. The
-  // centre is where the internal partition stands (PARTITION_Z is the house
-  // mid-line), so the obvious `[house.x, y, house.z]` puts the weapon inside a
-  // wall - which `nuketown2-fidelity.test.ts` caught on its first run, and
-  // which is the identical failure src/railgun-authority.ts' header records
-  // against the shipped map. This lands it in the FRONT upper room, at the
-  // window the reference's analyses call its strongest position, 0.7 m above the
-  // upper floor slab.
-  position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.0] as const),
-})));
 
 /**
  * Spawn table. Both teams stand in their own BACK YARD behind their own house,

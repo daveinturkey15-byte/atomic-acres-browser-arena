@@ -1024,7 +1024,7 @@ import {
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
-  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  railgunSpawnSitesForArena,
   admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
@@ -35097,9 +35097,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastOverdriveState(now);
   },
   stageRailgunSpawn: (siteIndex = 0) => {
-    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
-    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
-    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
+    // HF-407: the staging path is arena-scoped, not Nuke-Town-scoped. Hard-coding
+    // 'atomic-acres' here while the player stood in another railgun arena would have
+    // staged the pickup at the SHIPPED map's coordinates - a debug backdoor telling a
+    // QA run the weapon works where a real match would put it somewhere else.
+    const stagedSites = gameStarted ? railgunSpawnSitesForArena(selectedArena.id) : null;
+    if (!stagedSites) return railgunState;
+    const boundedIndex = Math.max(0, Math.min(stagedSites.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState(selectedArena.id, 0, (boundedIndex + 0.01) / stagedSites.length, railgunState.generation + 1);
     const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
