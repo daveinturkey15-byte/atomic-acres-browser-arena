@@ -179,3 +179,52 @@ time-of-day and weather lighting -> wave 3 after Lane I lands.
   checklist itself.
 - **Plan:** Lane Q (`docs/pass84-lanes/LANE-Q-menu-identity-project-map.md`)
   on the release-prep branch; part of the PASS 84 publish gate.
+
+## PASS 84 publish record — 2026-09-02 15:16 BST (integrated head 75a4e508)
+
+Published by `scripts/orchestration/publish_pass84.py` from
+`contrib/dave-gaming-pc/omp/pass84-overnight`; gh-pages generation
+`3382bb988c2b`; channels now exactly `pass84` (live) + `pass83` (safe backup);
+retired pass72-retained, pass81, pass82, recent-stable, the-big-one. Live
+checks: channel roots 200/200, retired roots 404, identity chunk PASS 84 x3 /
+PASS 83 x0, changelog chunk "Pass 84" x5 / HITL x0, chooser manifest
+experimental=PASS 84 live / previous=PASS 83. Gates on the integrated tree:
+tsc 0, vitest 543 files / 5,151 passed / 0 failed, Map 3 boot smoke green
+headless on installed Chrome.
+
+Row states after this publish (evidence: lane reports under each lane
+worktree's `artifacts/lane-report.md`, skeptic verdicts alongside, and
+`docs/pass84-lanes/`):
+
+- HF-395 clip residue: **VERIFIED (partial)** — floor clip 37 -> 0 poses in
+  STANDING, bus/van gap 2 -> 0; garage-door 12 poses at 0.323 m and 6
+  bus/van-gap poses remain and need arena-side geometry (not clip planes).
+- HF-396 rail seating: **VERIFIED** — rails seated on receivers, optics on
+  rails, 18 probe-sets green at fp/world/drop LOD0; whole weapon family
+  re-exported through the generators.
+- HF-397 pullback halved: **VERIFIED** (anatomy test re-pinned by Lane B).
+- HF-398 EBR +40% / +25%: **VERIFIED** (52.1 / 33.6 / 46 rpm; seven balance
+  tests re-pinned at integration).
+- HF-399 fps: **VERIFIED (partial)** — cross-arena CPU cost, not the lawn; Lane
+  A +4.4% quiet-machine plus the weapon-presentation freeze patch; the owner's
+  150 fps is not reproducible headless (78-85 fps at 1440p uncapped) and must
+  be measured HEADED on the owner's rig. The in-HUD FPS readout is suspect.
+- HF-400 two-channel policy: **VERIFIED live**.
+- HF-401 chopper pilot: **CLAIMED** — activation-edge flush shipped; visual
+  half under measurement in Lane M (wave 2a).
+- HF-402 spawns: **VERIFIED** — Raid 12/12 with floor and routes (was 9/12
+  floorless); gate derives its roster from the registry; Map 3 table authored
+  from the solver at integration.
+- HF-403 host/guest: **VERIFIED (partial)** — harness on every multiplayer
+  map; a peer against a perimeter wall no longer freezes everyone
+  (STATE_ADMISSION_BOUNDS_MARGIN 0.44 -> 0); remaining items in Lane G's report.
+- HF-404 smooth in three browsers: **VERIFIED for Chrome and Edge** (zero
+  errors/crashes; Edge not worse than Chrome); **Firefox BLOCKED** — no
+  headless WebGPU adapter in Firefox 155 here; owner runs
+  `docs/HF404_FIREFOX_MANUAL_CHECK.md` (two minutes). Live smoke appended below.
+- HF-405 Map 3: **VERIFIED** — registered as "MAP 3 · PREVIEW", solo, boot
+  smoke green; art grade re-cut at integration to clear distinctiveness.
+- HF-406 badge / project map: **VERIFIED live** (identity + changelog chunks).
+- Farcrysis load path (Lane C): **VERIFIED, hidden** — admits in 38-39 s
+  (was: never), 0 in-combat pipelines; still not inside the 12 s fence;
+  Lane R makes it a playable preview.
