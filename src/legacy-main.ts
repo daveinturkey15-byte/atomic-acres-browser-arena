@@ -4758,6 +4758,14 @@ const remotes = new Map<string, RemotePlayer>();
 // Lane J (HF-347 residual): silent state/join admission drops, made observable.
 // MP-LAB: see the outside-arena-bounds admission below. Must stay at or below
 // the smallest character capsule radius in physics.ts (0.36) or legal poses drop.
+// 0 is deliberate, not the loosest value the invariant tolerates: the capsule is
+// the thing that keeps a body out of a wall, and it already does - a resting
+// centre sits exactly `radius` inside the bounds. Admission's own question is
+// only "is this inside the world at all", and at margin 0 it still answers no
+// for a pose beyond the face (proved by
+// scripts/qa/mp-lab/resting-pose-admission.mts, pinned in
+// tests/e2e/mp-lab-state-admission-contract.test.mjs). Any nonzero band here
+// re-invents a second, weaker collision authority.
 const STATE_ADMISSION_BOUNDS_MARGIN = 0;
 const stateAdmissionDropTelemetry: {
   total: number;
@@ -8766,7 +8774,17 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   const projection = guestResumeProjection(message);
   const canonical = projection.player;
   const stance = canonical.stance ?? 'stand';
-  if (!pointInsideBounds(canonical, arena.bounds, 0.44) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
+  // MP-LAB: the same family as the state-admission drop fixed earlier in this
+  // lane, on the path that decides whether a resuming guest may stand where the
+  // host says it stands. At 0.44 the bounds half rejects the resting pose of
+  // EVERY stance against a perimeter wall (stand rests at maxX - 0.38,
+  // crouch/prone at maxX - 0.36; all three measured rejected at 0.44 and
+  // admitted at the admission margin by scripts/qa/mp-lab/resting-pose-admission.mts),
+  // so a guest that reconnects while hugging a wall NACKs 'blocked-pose' and
+  // spends its resume retries on a legal position. The world question is the
+  // one state admission asks; the collider question keeps the mover's own
+  // 0.44 m radius, unchanged.
+  if (!pointInsideBounds(canonical, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
     nackGuestResumeAuthority(message, 'blocked-pose');
     return true;
   }
