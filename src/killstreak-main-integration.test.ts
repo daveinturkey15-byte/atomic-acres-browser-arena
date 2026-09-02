@@ -157,7 +157,13 @@ describe('Pass 65 playable killstreak integration', () => {
     const clearBlock = source.slice(clearStart, clearEnd);
     expect(clearBlock).toContain('killstreakPresentation.setFirstPersonEntity(null);');
     expect(clearBlock).toContain("document.documentElement.dataset.killstreakPossession = 'none';");
-    expect(clearBlock).toContain('camera.near = 0.08;');
+    // RE-PINNED FOR HF-410. The contract is "the on-foot near plane is restored
+    // on every exit path", not "the literal 0.08 appears here". The plane moved
+    // to 0.02 m because the first-person rig now sits inside the player's
+    // collision capsule and is drawn with this camera, and it moved into one
+    // named constant so the three restore sites cannot drift apart. Pinning the
+    // constant is what the old line was trying to say.
+    expect(clearBlock).toContain('camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;');
     expect(clearBlock).toContain('weaponView.setPresentationVisible(player.alive);');
   });
 

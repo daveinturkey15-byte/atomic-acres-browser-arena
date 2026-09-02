@@ -861,6 +861,7 @@ import {
   type DynamicWorldCollider,
 } from './physics';
 import {
+  FIRST_PERSON_CAMERA_NEAR_METERS,
   VIEWMODEL_BODY_FIT_SCALE,
   viewmodelBodyFitLightDistance,
   viewmodelBodyFitLightIntensity,
@@ -2094,7 +2095,10 @@ function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsE
     decalLifetimeScale: budget.decalLifetimeScale * graphicsRuntime.decalScale,
   });
 }
-const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
+// HF-410: the on-foot near plane is a VIEWMODEL number and now lives with the
+// body fit that sizes it. See FIRST_PERSON_CAMERA_NEAR_METERS for the
+// measurement, the reason and the stated depth-precision cost.
+const camera = new THREE.PerspectiveCamera(76, 1, FIRST_PERSON_CAMERA_NEAR_METERS, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
@@ -11390,6 +11394,26 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
   // box must be the same before and after. This is the side-by-side capture,
   // expressed as numbers a gate can read.
   const ndcVertex = new THREE.Vector3();
+  // HF-410: WHAT THE WORLD NEAR PLANE ACTUALLY CUTS.
+  //
+  // `atomicSignal` is hardcoded null, so the depth-cleared first-person overlay
+  // does not run on the shipped WebGPU route: the rig is submitted with the
+  // gameplay camera and its 0.08 m near plane. The fit brings rig points closer
+  // to the eye, so the honest question is not "is anything past the plane" but
+  // "is anything the PLAYER CAN SEE past it". A vertex below the frame is cut
+  // either way and costs nothing; one inside the viewport is a visible defect.
+  const nearPlaneCutMeshes = new Set<string>();
+  let nearPlaneCutVertices = 0;
+  let nearPlaneCutInViewport = 0;
+  // The nearest ON-SCREEN vertex. This, not the whole rig's nearest point, is
+  // what a near plane has to clear: the sleeve continues below the frame by
+  // contract and cutting it costs nothing.
+  let viewportForwardMin = Number.POSITIVE_INFINITY;
+  let viewportForwardMinMesh: string | null = null;
+  let cutMinX = Number.POSITIVE_INFINITY;
+  let cutMaxX = Number.NEGATIVE_INFINITY;
+  let cutMinY = Number.POSITIVE_INFINITY;
+  let cutMaxY = Number.NEGATIVE_INFINITY;
   let ndcMinX = Number.POSITIVE_INFINITY;
   let ndcMaxX = Number.NEGATIVE_INFINITY;
   let ndcMinY = Number.POSITIVE_INFINITY;
@@ -11447,6 +11471,25 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
       const forward = -eyeVertex.z;
       if (forward < forwardMin) forwardMin = forward;
       if (forward > forwardMax) { forwardMax = forward; forwardMesh = name; }
+      if (forward < camera.near && forward > 1e-4) {
+        nearPlaneCutVertices += 1;
+        nearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          nearPlaneCutInViewport += 1;
+          if (ndcVertex.x < cutMinX) cutMinX = ndcVertex.x;
+          if (ndcVertex.x > cutMaxX) cutMaxX = ndcVertex.x;
+          if (ndcVertex.y < cutMinY) cutMinY = ndcVertex.y;
+          if (ndcVertex.y > cutMaxY) cutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward > 1e-4 && forward < viewportForwardMin) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          viewportForwardMin = forward;
+          viewportForwardMinMesh = name;
+        }
+      }
       // Only points in FRONT OF THE EYE project meaningfully. The near plane is
       // deliberately not the filter: a perspective matrix's x/y mapping is
       // independent of `near`, so a point inside the plane still reports the
@@ -11506,6 +11549,18 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
     contactFloorBlend: viewmodelPose.contactResponse.floorBlend,
     foldPitchRadians: weaponView.contactFoldState().foldPitchRadians,
     foldRetreatM: weaponView.contactFoldState().retreatMeters,
+    /** Visible vertices the gameplay camera's near plane discards, and how many are on screen. */
+    nearPlaneCutVertices,
+    nearPlaneCutInViewport,
+    nearPlaneCutMeshes: [...nearPlaneCutMeshes],
+    /** WHERE on screen the cut lands. Bottom-edge only is invisible; anything higher is not. */
+    cutNdcMinX: round(cutMinX), cutNdcMaxX: round(cutMaxX),
+    cutNdcMinY: round(cutMinY), cutNdcMaxY: round(cutMaxY),
+    /** THE NEAR PLANE THE RIG ACTUALLY NEEDS: nearest ON-SCREEN vertex, metres. */
+    viewportForwardMinM: Number.isFinite(viewportForwardMin)
+      ? Math.round(viewportForwardMin * 10_000) / 10_000
+      : null,
+    viewportForwardMinMesh,
     /** THE FRAMING. Identical before and after the fit, or the fit changed the picture. */
     ndcMinX: round(ndcMinX), ndcMaxX: round(ndcMaxX),
     ndcMinY: round(ndcMinY), ndcMaxY: round(ndcMaxY),
@@ -23969,8 +24024,9 @@ function resetKillstreakPossessionPresentation(): void {
   // somewhere".
   cameraShakeState = createCameraShakeState(cameraShakeState.seed);
   cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
 }
@@ -23995,7 +24051,8 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  // HF-410: the gunner cockpit mirrored the on-foot plane; the drone keeps its own.
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? FIRST_PERSON_CAMERA_NEAR_METERS : 0.35;
   if (camera.near !== supportCameraNear) {
     camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
@@ -25852,8 +25909,9 @@ function clearFieldSupport(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
   document.documentElement.dataset.killstreakPossession = 'none';
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
   weaponView.setPresentationVisible(player.alive);

@@ -124,6 +124,38 @@ export const VIEWMODEL_BODY_FIT_SCALE = 0.13;
  */
 export const VIEWMODEL_OVERLAY_NEAR_METERS = 0.002;
 
+/**
+ * The on-foot gameplay camera's near plane, in metres.
+ *
+ * 0.08 m was a VIEWMODEL number. Nothing in the world is ever within 8 cm of
+ * the eye - the player's own capsule is 0.38 m wide - so the only geometry that
+ * plane has ever had to clear is the first-person rig, and 0.08 m cleared a rig
+ * whose nearest point sat 0.126 m out.
+ *
+ * The fitted rig sits closer, and the standard technique pairs a body-fitted
+ * viewmodel with a SEPARATE submission carrying its own near plane. This build
+ * has none: `atomicSignal` is hardcoded null in legacy-main, so the
+ * depth-cleared first-person overlay does not run on the shipped WebGPU route
+ * and the rig is drawn with the gameplay camera.
+ * `renderSceneOverlayLayer` still narrows the plane for the WebGL2
+ * compatibility route, which does run it.
+ *
+ * MEASURED (docs/evidence/pass85/hf410/body-fit-after.json, field
+ * `viewportForwardMinM`, all 60 graded poses, installed Chrome, WebGPU): the
+ * nearest ON-SCREEN rig vertex is 0.0293 m - slug-shotgun, prone, hip, with the
+ * other five long guns within 4 mm. Off-screen sleeve geometry reaches closer
+ * and is cut either way, below the frame, by contract. At 0.08 m, 42 of those
+ * 60 poses had WEAPON geometry clipped inside the viewport.
+ *
+ * 0.02 m clears the measured minimum with 1.47x of margin. THE COST, stated
+ * rather than hidden: depth resolution scales as 1/near, so distant precision
+ * is 4x coarser - about 1 cm at 60 m and 3 cm at 100 m, against 0.3 cm and
+ * 0.8 cm before. That is a shared graphics budget. The durable fix is to give
+ * the first-person layer its own submission again, which is a render-runtime
+ * change this lane does not own.
+ */
+export const FIRST_PERSON_CAMERA_NEAR_METERS = 0.02;
+
 /** World metres expressed in the unfitted rig frame the presentation composes in. */
 export function viewmodelWorldToRigMeters(worldMeters: number): number {
   return worldMeters / VIEWMODEL_BODY_FIT_SCALE;

@@ -1,6 +1,6 @@
 {
   "contract": "pipeline-compile-stall-probe-v1",
-  "measuredAt": "2026-09-02T16:46:28.813Z",
+  "measuredAt": "2026-09-02T17:37:22.114Z",
   "label": "run",
   "arena": "atomic-acres",
   "idle": false,
@@ -12,13 +12,13 @@
     "height": 900
   },
   "window": {
-    "windowS": 75.044,
-    "rafCallbacks": 2626,
-    "stallCount": 15,
-    "stallsPerMinute": 11.99,
-    "frozenFractionPercent": 2.36,
-    "medianStallMs": 105.6,
-    "maxStallMs": 205.5
+    "windowS": 75.01,
+    "rafCallbacks": 3554,
+    "stallCount": 3,
+    "stallsPerMinute": 2.4,
+    "frozenFractionPercent": 0.47,
+    "medianStallMs": 116.8,
+    "maxStallMs": 127.9
   },
   "pipelines": {
     "beforeWindow": 374,
@@ -26,7 +26,7 @@
     "perMinuteInWindow": 0,
     "inStall": 0,
     "inStallSharePercent": null,
-    "expectedIfUnrelatedPercent": 2.36,
+    "expectedIfUnrelatedPercent": 0.47,
     "enrichment": null
   },
   "shaderModules": {
@@ -35,12 +35,12 @@
     "perMinuteInWindow": 0,
     "inStall": 0,
     "inStallSharePercent": null,
-    "expectedIfUnrelatedPercent": 2.36,
+    "expectedIfUnrelatedPercent": 0.47,
     "enrichment": null
   },
   "stateTransitions": [
     {
-      "atMs": 89406,
+      "atMs": 85410,
       "alive": true,
       "weapon": "carbine"
     }
@@ -49,7 +49,7 @@
   "cacheKeyDiffCount": 0,
   "determinantFlips": [
     {
-      "atMs": 89145,
+      "atMs": 85168,
       "signs": [
         "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
         "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
@@ -70,79 +70,19 @@
   "samplePipelineLabels": [],
   "stalls": [
     {
-      "startMs": 90158.4,
-      "endMs": 90264,
-      "durationMs": 105.6
+      "startMs": 121480.2,
+      "endMs": 121597,
+      "durationMs": 116.8
     },
     {
-      "startMs": 92119.5,
-      "endMs": 92264,
-      "durationMs": 144.5
-    },
-    {
-      "startMs": 95848.1,
-      "endMs": 95959,
-      "durationMs": 110.9
-    },
-    {
-      "startMs": 97364,
-      "endMs": 97464,
-      "durationMs": 100
-    },
-    {
-      "startMs": 99097.3,
-      "endMs": 99203,
-      "durationMs": 105.7
-    },
-    {
-      "startMs": 99598,
-      "endMs": 99698,
-      "durationMs": 100
-    },
-    {
-      "startMs": 103353.1,
-      "endMs": 103492,
-      "durationMs": 138.9
-    },
-    {
-      "startMs": 109353,
-      "endMs": 109453,
-      "durationMs": 100
-    },
-    {
-      "startMs": 114297.9,
-      "endMs": 114420,
-      "durationMs": 122.1
-    },
-    {
-      "startMs": 114681,
-      "endMs": 114781,
-      "durationMs": 100
-    },
-    {
-      "startMs": 130336.3,
-      "endMs": 130464,
-      "durationMs": 127.7
-    },
-    {
-      "startMs": 131814.4,
-      "endMs": 131920,
-      "durationMs": 105.6
-    },
-    {
-      "startMs": 151542.5,
-      "endMs": 151748,
-      "durationMs": 205.5
-    },
-    {
-      "startMs": 152858.8,
-      "endMs": 152959,
-      "durationMs": 100.2
-    },
-    {
-      "startMs": 163336.5,
-      "endMs": 163442,
+      "startMs": 122863.5,
+      "endMs": 122969,
       "durationMs": 105.5
+    },
+    {
+      "startMs": 144291.1,
+      "endMs": 144419,
+      "durationMs": 127.9
     }
   ]
 }

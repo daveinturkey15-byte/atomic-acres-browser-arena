@@ -15,6 +15,7 @@ Lane W. Base: `75a4e508` (the PASS 84 head that shipped at 15:14).
 | `body-fit-fit-disabled.json` | the SAME build with `VIEWMODEL_BODY_FIT_SCALE = 1`, 4 weapons — the A/B that isolates the fit from every other change in the lane |
 | `penetration-after-summary.json`, `penetration-after-rows.json` | `scripts/qa/measure-viewmodel-penetration-cdp.mjs --weapons carbine --ratchet`, 327 rows / 303 graded, atomic-acres + test2 |
 | `pipeline-compile-after.json` | `scripts/qa/probe-pipeline-compile-stalls-cdp.mjs --dist dist --seconds 75` |
+| `frames/` | headless 1280x720 captures, `fitted-*` against `fit-disabled-*` at the same poses, halved to stay under the evidence size cap |
 
 The BEFORE penetration table is the checked-in ratchet,
 `scripts/qa/viewmodel-penetration-ratchet.json`, recorded from the shipped
@@ -61,3 +62,31 @@ one real framing change is the removal of the permanent 1.0 rad fold above:
 the m4a1's top edge moves from NDC y +0.274 (a folded rig filling the frame)
 to -0.097, which is the authored hip pose. That change is the owner's request,
 and it is the one line in this lane that is his taste to accept.
+
+## The near plane, and the one shared cost this lane spends
+
+`atomicSignal` is hardcoded null in `legacy-main.ts`, so the depth-cleared
+first-person overlay does not run on the shipped WebGPU route: the rig is drawn
+with the gameplay camera. Fitting the rig inside the body therefore moves it
+inside the camera's near plane.
+
+MEASURED (`body-fit-after.json`, field `viewportForwardMinM`): the nearest
+ON-SCREEN rig vertex under the fit is 0.0293 m (slug-shotgun, prone, hip). At
+the old 0.08 m plane, 42 of the 60 graded poses had WEAPON geometry clipped
+inside the viewport — a new visible defect. At 0.02 m, `nearPlaneCutVertices` is
+zero on all 60 rows.
+
+The cost is stated rather than hidden: depth resolution scales as 1/near, so
+distant precision is 4x coarser — roughly 1 cm at 60 m and 3 cm at 100 m,
+against 0.3 cm and 0.8 cm before. No z-fighting was visible in the captured
+frames on atomic-acres. A wider long-range sweep across every arena is the
+integrator's call, and the durable fix is to give the first-person layer its
+own submission again, which is a render-runtime change this lane does not own.
+
+## Frames
+
+| pose | shipped (`fit-disabled-*`) | this lane (`fitted-*`) |
+|---|---|---|
+| open ground, prone, carbine | the rig held near-vertical, filling the centre of the frame | a compact, flat, low hold |
+| wall corner, standing, LMG | the rig folded to the right edge, most of it off-frame | the LMG held normally, in front of the wall, whole |
+| open ground, standing | a folded 60-degree high-ready | the authored hip pose |
