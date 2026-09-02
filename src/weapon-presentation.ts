@@ -540,9 +540,31 @@ export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.04,
   // Ordinary hip/fire poses need the closed proximal sleeve safely below the
   // crop. Raised/ADS/heavy poses use the lifted lane below instead.
-  right: -0.97,
+  //
+  // HF-413 (2026-09-02). MEASURED at base 75a4e508 by
+  // `npm run qa:pass65:first-person-arms-visual` (headless Chrome, WebGPU,
+  // 1600x900 and 2560x1440, gun-range): the FIRING shoulder joint was reported
+  // at NDC y -0.8304 (m4a1 prone/wall ADS), -0.8309 (m4a1 ADS), -0.8316
+  // (minigun hip), -0.8393 (m4a1 prone/wall hip) and -0.9734 (m4a1 reload) -
+  // every one of them INSIDE the frame, and every one of them a gate violation
+  // ("sleeve entry ... does not continue below frame", floor -0.98). A shoulder
+  // joint inside the frame is exactly the owner's "arms ... strange": the
+  // proximal sleeve terminates in mid-air instead of running off the bottom
+  // edge, so the firing arm reads as a detached floating stub.
+  //
+  // The comment this replaces claimed -0.97 was "comfortably past the -0.98
+  // below-frame continuation requirement". It is not past it at all - it is
+  // 0.01 short, on the wrong side - and the solver's own reach adjustment
+  // moves the reported entry by only a few thousandths, so the shipped lane
+  // could never clear the contract. Both lanes now sit past -0.98 with real
+  // margin. Nothing else about the pose changes: the palm stays welded to the
+  // authored socket (contact error 1e-9 m), the elbow pole still supplies the
+  // raised-pose fold that HF-388 added the lifted lane for, and the raised lane
+  // is still higher than the ordinary lane so the distinction it encodes
+  // survives.
+  right: -1.02,
 });
-export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.82;
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -1;
 export function firstPersonArmShoulderEntryNdc(
   side: 'left' | 'right',
   gripFamily: ViewmodelGripFamily,
