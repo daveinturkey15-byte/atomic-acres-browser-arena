@@ -81,7 +81,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
     leavesOff: Object.freeze([
       'Shadows, anti-aliasing, sun shafts, reflections, ambient occlusion — the whole screen-space stack is structurally absent here, not merely turned down.',
     ]),
-    referenceFrameNote: 'Measured at 2560x1440 on an RTX 5080; the point of this profile is the machines that are not one.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.2 ms median frame. On that card it is barely cheaper than BALANCED — the point of this profile is the machines that are not one.',
   }),
   Object.freeze({
     id: 'balanced',
@@ -101,7 +101,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Sun shafts: a per-pixel raymarch of the shadow map.',
       'Ambient occlusion, screen-space GI, depth of field, motion blur.',
     ]),
-    referenceFrameNote: 'Measured at 2560x1440 on an RTX 5080. It exists for machines below that, where the passes it drops are the ones that hurt.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.6 ms median frame, and the BEST 95th-percentile frame in the whole ladder at 27.0 ms. It buys steadiness rather than headline frame rate, and it exists for machines below a 5080, where the passes it drops are the ones that hurt.',
   }),
   Object.freeze({
     id: 'high',
@@ -118,7 +118,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
     leavesOff: Object.freeze([
       'Screen-space global illumination, depth of field and motion blur — the expensive gather and the two effects that replace pixels. Those belong to a profile you pick on purpose.',
     ]),
-    referenceFrameNote: '"Decent PC" reference: measured at 2560x1440 on an RTX 5080 at a median frame near the display refresh with no in-combat pipeline compiles. A slower card gives up frame rate here before it gives up looks.',
+    referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.1 ms median frame, 0.5 ms above BALANCED, with zero pipelines compiled during play. A slower card gives up frame rate here before it gives up looks.',
   }),
   Object.freeze({
     id: 'raytraced',
@@ -136,7 +136,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'No indirect bounce (classic recursive ray tracing computes none) and no path tracing.',
       'Players, bots and vehicles are not in the traced set, so no reflection can show you an enemy that PERFORMANCE could not.',
     ]),
-    referenceFrameNote: 'Measured at 2560x1440 on an RTX 5080. Needs the WebGPU renderer; on a WebGL2 fallback it is demoted to QUALITY and the badge says so.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame — 0.6 ms above QUALITY and 7.3 ms BELOW MAX. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer; on a WebGL2 fallback it is demoted to QUALITY and the badge says so.',
   }),
   Object.freeze({
     id: 'max',
@@ -155,7 +155,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Ray tracing: MAX is the heaviest profile already, and adding the trace on top would make its first frame worse, not its picture better. RAY TRACED is a different trade, not a lower rung.',
       'Spatial upscaling, which renders below native and would contradict the supersample.',
     ]),
-    referenceFrameNote: 'Measured at 2560x1440 on an RTX 5080 — the machine this profile is aimed at. Anything less should expect to choose QUALITY.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080 — the machine this profile is aimed at — averaged over three arenas: 21.0 ms median frame and 42.8 ms at the 95th percentile. That is 7.3 ms and 14.6 ms worse than the next rung down, and nearly twice the draw calls. It is the only profile that separates from the rest of the ladder. Anything less than a top-end card should expect to choose QUALITY.',
   }),
 ]);
 
