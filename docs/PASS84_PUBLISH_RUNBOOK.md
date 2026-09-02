@@ -36,10 +36,17 @@ no `?release=`) resolves its second card from `release-channels.json` through
 those trees are retired by this publish. `publish_pass84.py` parses that line and refuses
 to publish unless the fallback resolves to `channels/pass83`. Lane F added the
 `pass83Backup` key to `release-channels.json` and removed `pass73Retained`; the two-line
-source change below is outside Lane F's file ownership and is saved as
-`artifacts/pass84-outside-ownership.patch` in the Lane F worktree (verified: with it
-applied, `npx tsc --noEmit` is 0, the six focused test files are 65/65, the contract test
-is 8/8, and the dry run is all-green).
+source change below is outside Lane F's file ownership and is saved as the TRACKED file
+`docs/pass84-outside-ownership.patch` (`git apply docs/pass84-outside-ownership.patch`;
+contract case 9 proves it still applies to the tree, or is already applied). Verified: with
+it applied, `npx tsc --noEmit` is 0, the six focused test files are 66/66, the contract
+test is 9/9, and the dry run is all-green.
+
+**Apply it BEFORE `npm run build`, and commit it on its tracked paths.** The freshness
+guard compares the newest `dist-pass84` mtime against the newest `.ts/.tsx/.css/.html/.json`
+mtime under the repo, so patching `src/bootstrap.ts` AFTER a build makes the very next dry
+run refuse with `STALE BUILD` (the skeptic hit exactly that on 2026-09-02). Patch, commit,
+then build.
 
 `src/bootstrap.ts` (line 40):
 
@@ -79,7 +86,8 @@ correct: it means a direct link would offer a second card that 404s.
 npx tsc --noEmit                                  # must be 0
 npx vitest run                                    # full floor: 4,955+ passed, 0 failed (orchestrator only)
 npx vitest run src/release-topology.test.ts src/project-map.test.ts src/release-channel.test.ts src/release-pipeline.test.ts src/changelog.test.ts src/build-identity-handshake.test.ts
-node --test scripts/orchestration/publish_pass84_plan.test.mjs     # 8/8 (needs the section-0 patch for case 3)
+git apply docs/pass84-outside-ownership.patch && git add src/bootstrap.ts src/release-channel.ts   # section 0, BEFORE the build
+node --test scripts/orchestration/publish_pass84_plan.test.mjs     # 9/9 (case 3 is red until the section-0 patch is applied)
 
 # 2. Identity stamp is PASS 84 in SOURCE
 grep -n "PASS 84\|channels/pass84" src/release-identity.ts        # pass, label, route, runtimeLabel

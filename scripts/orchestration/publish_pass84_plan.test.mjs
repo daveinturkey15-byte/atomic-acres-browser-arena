@@ -244,3 +244,24 @@ test('exit code is 2 while any guard is red and 0 only when every guard is green
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the outside-ownership patch is tracked and either applies cleanly or is already applied', () => {
+  // Case 3 above is red until src/bootstrap.ts prefers `pass83Backup`. That change is
+  // outside Lane F's ownership, so it ships as a patch file. The first copy lived under
+  // artifacts/, which is gitignored and so would not have survived the merge; it lives in
+  // docs/ now, next to the runbook that tells the orchestrator to apply it BEFORE
+  // `npm run build`. This proves the tracked copy still matches the tree it targets: a
+  // patch that neither applies nor reverses has drifted from src/ and must be re-cut.
+  const patch = join(repo, 'docs', 'pass84-outside-ownership.patch');
+  assert.ok(statSync(patch).isFile(), `${patch} is missing`);
+  const text = readFileSync(patch, 'utf8');
+  assert.match(text, /^\+const stableFallback = releaseChannels\.pass83Backup \?\? releaseChannels\.stable;$/m);
+  assert.match(text, /^\+  pass83Backup\?: Readonly</m);
+  assert.match(text, /^\+\s+<small>\$\{stableFallback\.pass\} · SAFE BACKUP<\/small>$/m);
+  const tracked = spawnSync('git', ['ls-files', '--error-unmatch', 'docs/pass84-outside-ownership.patch'], { cwd: repo, encoding: 'utf8' });
+  assert.equal(tracked.status, 0, 'docs/pass84-outside-ownership.patch must be tracked so it survives the merge');
+  const forward = spawnSync('git', ['apply', '--check', patch], { cwd: repo, encoding: 'utf8' });
+  const reverse = spawnSync('git', ['apply', '--check', '--reverse', patch], { cwd: repo, encoding: 'utf8' });
+  assert.ok(forward.status === 0 || reverse.status === 0,
+    `the patch neither applies (${forward.stderr.trim()}) nor is already applied (${reverse.stderr.trim()}); re-cut it against src/bootstrap.ts and src/release-channel.ts`);
+});
