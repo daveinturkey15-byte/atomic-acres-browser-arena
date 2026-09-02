@@ -231,8 +231,16 @@ describe('farcrysis terrain collision proxy', () => {
     expect(muzzleInside, 'no shot may begin inside the ground').toBe(0);
     expect(groundTruth, 'the island must really be in the way of some of these shots')
       .toBeGreaterThan(fired * 0.2);
-    // Measured 56 % over 2,000 shots; pinned at 40 % so ordinary sampling noise
-    // does not fail it, and a collapse back toward zero does.
-    expect(stoppedByGround / groundTruth).toBeGreaterThan(0.4);
+    // This sample is DETERMINISTIC - the LCG above is seeded at 12345 and the
+    // arena is built from the same analytic field every run - so there is no
+    // sampling noise to leave headroom for. MEASURED at this exact seed and
+    // sample size: 147 of 256 = 0.5742 (the 56 % figure in the module docs is
+    // the same measurement over 2,000 shots). Pinned at 0.54: 3.4 points of
+    // headroom for harmless geometry churn, and anything that trades away even
+    // a twentieth of the ground's shot authority fires it. The pin was 0.40
+    // when first written, which allowed a collapse of more than a quarter.
+    expect(stoppedByGround / groundTruth,
+      `ground blocking share ${(stoppedByGround / groundTruth).toFixed(4)} (${stoppedByGround}/${groundTruth})`)
+      .toBeGreaterThan(0.54);
   });
 });
