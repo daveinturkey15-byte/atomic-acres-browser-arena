@@ -227,6 +227,11 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // gust scale is the largest on the board (34 m) because the pier lines are
   // what break the wind up, and they are 6.4 m apart down a 54 m lane.
   'map3': profile('map3', 'open-scrub-gallery-crossbreeze', 0.62, 2.9, 2.6, 34, 1.0, false),
+  // NUKETOWN2 (PREVIEW, HF-407): wind runs ALONG the street (bearing 0 rad =
+  // +x, the street axis), because that is the one direction a 58 m corridor
+  // between two house rows lets it run. Gust scale 20 m is the spacing of the
+  // bodies that break it up: house, garage, bus, garage, house.
+  'nuketown2': profile('nuketown2', 'street-channelled-suburban-draught', 0.0, 2.8, 2.4, 20, 0.7, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

@@ -38,6 +38,10 @@ describe('Pass 66 command shell', () => {
       'test2',
       // MAP3 (owner 2026-09-02, HF-405): shipped selectable, labelled PREVIEW.
       'map3',
+      // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town rebuild, last in the
+      // offered order, labelled PREVIEW. Pinned here as well as against
+      // SELECTABLE_ARENAS because the order is what a player sees.
+      'nuke-town-rebuild',
     ]);
     // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
     expect(markup).not.toContain('data-arena-route="farcrysis"');

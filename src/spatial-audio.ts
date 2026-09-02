@@ -294,6 +294,16 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.073, modulationDepth: 0.11,
     bedPosition: Object.freeze({ x: -34, y: 4, z: -34 }), airPosition: Object.freeze({ x: 30, y: 6, z: 30 }),
   }),
+  // NUKETOWN2 (PREVIEW, HF-407): the bed is the low mains/transformer hum at
+  // the west cul-de-sac, the air layer is wind over the east back yard's fence
+  // line. Placed at opposite ends of the street so the pair gives the player a
+  // bearing along the one axis the whole map is organised on.
+  'nuketown2': Object.freeze({
+    arenaId: 'nuketown2', identity: 'test-town-street-hum-and-fence-wind', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 54, airFrequencyHz: 188, airLowpassHz: 690, airQ: 1.75, airGain: 0.0061,
+    modulationHz: 0.079, modulationDepth: 0.1,
+    bedPosition: Object.freeze({ x: -24, y: 3, z: -2 }), airPosition: Object.freeze({ x: 18, y: 5, z: 21 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

@@ -113,7 +113,7 @@ test('the sweep keeps a floor under the derived roster', () => {
   // printing success, so the script asserts a floor rather than assuming one.
   // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable. This
   // pin only ever moves UP: it is the guard against a truncated roster.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*8/u, 'the roster floor must be pinned at 8');
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*9/u, 'the roster floor must be pinned at 9');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -399,15 +399,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   // Raised 7 -> 8 on 2026-09-02 (HF-405) with Map 3; this pin only moves UP.
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*8/u,
-    'the shared roster floor must be pinned at 8',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*9/u,
+    'the shared roster floor must be pinned at 9',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 8, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 9, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so

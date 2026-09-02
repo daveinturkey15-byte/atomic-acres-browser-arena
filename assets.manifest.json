@@ -1129,6 +1129,60 @@
       "placeholderStatus": "production",
       "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 43.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass84-map3-loading/",
       "modifications": "Captured offline at native 1440p from the actual authoritative Map 3 production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.mp4",
+          "sha256": "6bf1a5f343094229cd91642e868a7a92a3b95f6b0d0d0216e98f330edefe5a52"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webm",
+          "sha256": "720037396ddb2b4060efd5e9dfef8c3ef97feb694fd23167a082cdf0425a7d4a"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webp",
+          "sha256": "524e3fd351231fbf85538ca395e0c47e3741b39e355962b50e98832fd5a03390"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass85-menu-previews/nuketown2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
+      "sourceScriptSha256": "e58b41dfb042db6b0961ab82a57e7d7bdde166fcc92225cc72add56bd66c7f8d",
+      "sourceProvenance": "source-assets/menu/pass85-nuketown2-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Nuke Town Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Nuke Town Rebuild authoritative runtime arena",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass85-nuketown2-loading/provenance.json",
+      "sourceProvenanceSha256": "1c508ecf2ecb20291df3f1363181fad4239bb1d5ef5e829ca9f143a1c519a1b5",
+      "sourceScript": "scripts/assets/finalize_pass85_nuketown2_loading_backdrop.py",
+      "sourceScriptSha256": "028b11e1c1100c315523a739ae5e4cd3eb50a90d86153cb6426d2f615d561b11",
+      "files": [
+        {
+          "path": "public/assets/original/loading/nuketown2-loading.webp",
+          "sha256": "c5efefe10dd1acbf5592e2db8360075e82e6c72ed96093d409af90c21f93e7d1"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the nine shipped backdrops in format, resampler, output size and payload budget. Measured 42.28 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass85-nuketown2-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Nuke Town Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
     }
   ],
   "rejectedCandidates": [

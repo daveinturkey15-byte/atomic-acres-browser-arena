@@ -11,7 +11,8 @@
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": 0
+    "map3": 24,
+    "nuketown2": 18
   },
   "ceilingHistory": "Lane J, 2026-09-02: skyline-terminal 3 -> 0 and gun-range 2 -> 0. Two consequences worth stating plainly. gun-range's 0 is only meaningful ALONGSIDE the `gun-range-wallbang-walkthrough-panels` annotation, because the ceiling now judges unannotated rows only - drop the annotation and the arena measures 2 against a ceiling of 0. skyline-terminal's 0 was measured against a nacelle collider footprint this same lane proved transposed against its visual (F1, not landed), so it certifies the pre-F1 footprint and will very likely move when F1 lands; the lane that lands it fixes geometry, it does not raise this back. Both moved DOWN, to the value measured after the fixes in this pass; no ceiling in this file has ever been raised to make a spot green and none was raised here. map3 -1 (unmeasured sentinel) -> 0 is its FIRST real measurement, not a forgiveness: 3,516 legal hug spots, 24,612 traces, zero violations. atomic-acres stays 15 (measured 15, its access-ramp fringe class is Lane A/U territory) and high-seas stays 2 though it measured 0 today, because one clean run on somebody else's arena is not this lane's mandate to ratchet.",
   "unmeasuredCeiling": -1,
@@ -41,7 +42,11 @@
       "x": -0.63,
       "z": 13.72,
       "stance": "prone",
-      "dir": [0, 0.6, 0.8],
+      "dir": [
+        0,
+        0.6,
+        0.8
+      ],
       "since": "2026-09-02",
       "reason": "Prone under jetliner engine 1, the worst of the six rows Lane J fixed (analytic 0.067 m, runtime 0.035 m with the camera pushed a metre up INTO the nacelle). Stage 3 only ever visits spots stage 2 flagged, so seating the nacelle against the wing took skyline-terminal to zero analytic violations AND removed the pipeline's only runtime view of the geometry it had just moved. This coordinate is re-probed on every run regardless."
     },
@@ -51,7 +56,11 @@
       "x": 0.75,
       "z": 12.38,
       "stance": "prone",
-      "dir": [0, 0.6, -0.8],
+      "dir": [
+        0,
+        0.6,
+        -0.8
+      ],
       "since": "2026-09-02",
       "reason": "Prone under jetliner engine 1, opposite flank and inside the nacelle's x footprint, so the character controller has to eject the capsule as well as the resolve pushing the eye. The lane's own before/after capture recorded a 'prone' seat here at y 1.66 - a camera read mid-fall - which is why stage 3 now settles the body before reading a seat."
     },
@@ -61,7 +70,11 @@
       "x": -0.63,
       "z": -9.72,
       "stance": "prone",
-      "dir": [0, 0.6, -0.8],
+      "dir": [
+        0,
+        0.6,
+        -0.8
+      ],
       "since": "2026-09-02",
       "reason": "Prone under jetliner engine 2. Same class as -b on the other engine, kept so the fix is proven on BOTH nacelles rather than on the one that happened to be sampled."
     }
@@ -120,7 +133,8 @@
       "high-seas": "0 (2026-09-02: stage 2 found 0 violations, so stage 3 had no spot to re-probe). Was 2 stern-ramp rows on the 2026-08-29 instrument.",
       "test1": "0 (2026-09-02: first stage-3 coverage since the roster was derived; stage 2 found 0 violations, so there was no flagged spot to teleport to)",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild and again 2026-09-02: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "0 (2026-09-02, first measurement: stage 2 found 0 violations over 3,516 legal hug spots, so stage 3 had no flagged spot to teleport to)"
+      "map3": "0 (2026-09-02, first measurement: stage 2 found 0 violations over 3,516 legal hug spots, so stage 3 had no flagged spot to teleport to)",
+      "nuketown2": "2 (measured 2026-09-02, headless: stage 3 teleported the real player to all 18 flagged spots, checked 18, 2 remain - both prone beside the NORTH truck at z=-2.40). Row 1 (x=-24.92) is the loud one: the camera seats at y=0.748 and the truck deck sits 0.003 m above it with resolveEyeClearance reporting pushedM=0, so the resolve did not move the eye at all - a genuine open row, not a bob-margin fringe. Row 2 (x=-24.77) DID resolve (pushedM=0.150, seat y=1.763) and then reads 0.150 m off 'nuketown2 north truck box flank 0', i.e. exactly at the probe radius rather than inside it. The other 16 rows resolve clear."
     },
     "note": "Every MEASURED remaining runtime row clears the bare 0.08 near plane, and the gate now fails if one does not. It also fails if an arena returns more UNMEASURED rows than its recorded allowance, so a run that measured nothing can no longer look like a clean one. The atomic-acres ramp rows resolve to 0.143-0.150 and enter the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes are down to that single ramp-flank class: the airstair belly is not reproduced by the current instrument, and the jetliner-nacelle class - which was the worst of them, resolving to 0.035 with the camera shoved a metre above the player's eye - is fixed in geometry."
   },
@@ -161,6 +175,12 @@
       "violations": 2,
       "unannotated": 0,
       "note": "Lane J. 55 -> 2, and both remaining rows are the annotated wallbang panels (glass d=0.052, brick d=0.000, crouch), printed under `gun-range-wallbang-walkthrough-panels` on every run. 2,904 legal hug spots (was 2,944), 20,317 traces. That -40 is NET arithmetic, not a count of leaf rows. Replayed against the base tree: 71 pre-fix spots leave a stance capsule overlapping the closed leaf and 0 post-fix ones do, while the deterministic thinning stride re-partitions the whole list (1,808 rows dropped, 1,782 different rows kept). The first report of this lane wrote the net as though it were the removal count; 71 -> 0 is the measurement. Ceiling tightened 2 -> 0 because the ceiling now judges UNANNOTATED rows only."
+    },
+    {
+      "arena": "nuketown2",
+      "at": "2026-09-02",
+      "violations": 18,
+      "note": "FIRST REAL MEASUREMENT, taken headless at HEAD 8d74618e against a dist rebuilt from that HEAD (the checked-in dist was 2.5 h stale and would have measured yesterday's arena). 209 colliders (5 floor) -> 3037 legal hug spots -> 21241 traces -> 18 violations, ALL prone, all at exactly 0.140 m, all straight up ([0,1,0]). The class is one thing and one thing only: a prone player under a pickup bed. 9 rows are 'nuketown2 north truck deck' and 9 are 'nuketown2 south truck deck' - the two set-piece trucks - and there is no third surface in the set. 18 is entered as the measured value, not as a forgiving ceiling: stage 3 then re-probed all 18 from the real camera seat and 2 survive the runtime resolve (see runtimeResolve.runtimeRemaining.nuketown2), so this row is a real open item to triage, not a clean bill. Nothing here is a wall-hug clip - the arena's flat surfaces produced zero violations across stand and crouch."
     }
   ],
   "openRegressions": [],
