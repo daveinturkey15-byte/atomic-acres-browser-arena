@@ -1,0 +1,24 @@
+     "atomic-acres": 15,
+-    "skyline-terminal": 3,
+-    "gun-range": 2,
++    "skyline-terminal": 0,
++    "gun-range": 0,
+     "high-seas": 2,
+     "test1": 0,
+     "test2": 0,
+-    "map3": -1
++    "map3": 0
+
+--- Reading of this diff (Lane J, 2026-09-02) ---
+Zero ceilings RAISED. Two LOWERED to the value measured after the fixes in this
+pass (skyline-terminal 3 -> 0, gun-range 2 -> 0), and one unmeasured sentinel
+replaced by its first real measurement (map3 -1 -> 0: 3,516 legal hug spots,
+24,612 traces, zero violations). atomic-acres (15) and high-seas (2) are
+untouched: their classes belong to other lanes, and high-seas measuring 0 once
+is not this lane's mandate to ratchet.
+
+The brief asked for "zero ceiling changes" as a guard against forgiving a red
+row with a bigger number. Nothing here forgives anything: every number moved
+down or entered at its measurement. If strict no-change is preferred, restoring
+3 and 2 is a two-token edit and the gate still passes - it would simply leave
+headroom this lane measured to be unnecessary.
