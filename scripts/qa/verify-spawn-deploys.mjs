@@ -13,8 +13,9 @@
 //        [--host-guest test2] [--bot-watch-ms 20000]
 //
 // Writes artifacts/qa/hf402/<label>/<arena>.json and one screenshot per
-// landing from the player's own viewpoint. Exit 0 = every landing matched a
-// committed spawn that passes the gate; 1 = a landing did not; 2 = environment.
+// landing from the player's own viewpoint. Exit 0 = every PLAYER landing and
+// every BOT spawn matched a committed spawn that passes the gate; 1 = one did
+// not; 2 = environment.
 //
 // Machine rules (docs/pass84-lanes/LANE-D): headless only, --mute-audio, one
 // browser, one build, never kill a process this script did not start, and at
@@ -208,6 +209,9 @@ function sample(page) {
       alive: player.alive ?? null,
       hp: player.hp ?? null,
       spawnSelection: snapshot.spawnSelection ?? null,
+      // HF-402: where the runtime PUT each bot, from its own spawn-selection
+      // audit. `bots[].position` is where the bot has since walked to.
+      botSpawnSelections: Array.isArray(snapshot.botSpawnSelections) ? snapshot.botSpawnSelections : [],
       bots: bots.map((bot) => ({ id: bot.id ?? null, team: bot.team ?? null, alive: bot.alive ?? null, position: bot.position ?? (Number.isFinite(bot.x) ? [bot.x, bot.y, bot.z] : null) })),
       snapshotKeys: Object.keys(snapshot),
     };
@@ -247,26 +251,69 @@ async function landing(page, arenaId, name, record) {
   return sampled;
 }
 
+/**
+ * Brief job item 4: "bots: same rules; bots must not spawn in the player's
+ * face or outside the envelope."
+ *
+ * The first version of this sampled `bots[].position` AFTER the deploy
+ * landing had already waited 1.5 s and written a ~1 MB screenshot, called that
+ * "atDeploy", and then ignored the result when deciding whether the run
+ * passed. Two to four seconds of bot walking is not a spawn: every bot on
+ * every arena logged "no committed spawn within 0.75 m" in both runs and
+ * nothing failed, so the bot half of this lane had no falsifier at all.
+ *
+ * It now reads the runtime's OWN spawn-selection audit
+ * (`snapshot.botSpawnSelections`, added in selectSafeBotSpawn), which records
+ * the point selectSafeBotSpawn actually returned. That is race-free - it is
+ * the same THREE.Vector3 the bot was placed on - so the match is exact rather
+ * than within a tolerance, and it is asserted in `record.ok`.
+ *
+ * Drift over BOT_WATCH_MS is still reported, but as what it is: evidence a
+ * bot can move off its spawn, not evidence of where it spawned.
+ */
 async function watchBots(page, arenaId, record) {
   if (BOT_WATCH_MS <= 0) return;
   const first = await sample(page);
+  const botArena = layoutById.get(arenaId)?.botArena === true;
+  const spawns = first.botSpawnSelections.map((audit) => {
+    const match = matchSpawn(arenaId, audit.position);
+    return {
+      actorId: audit.actorId ?? null,
+      team: audit.team ?? null,
+      selectedIndex: audit.selectedIndex ?? null,
+      reason: audit.reason ?? null,
+      position: audit.position ?? null,
+      match,
+      ok: Boolean(match && match.passesGate),
+    };
+  });
   await page.waitForTimeout(BOT_WATCH_MS);
   const later = await sample(page);
   record.bots = {
     watchMs: BOT_WATCH_MS,
-    atDeploy: first.bots,
-    later: later.bots,
+    botArena,
+    spawns,
+    // Kept, clearly named: these are DRIFT samples, not spawns.
+    positionAfterLanding: first.bots,
+    positionAfterWatch: later.bots,
     movedM: later.bots.map((bot, index) => {
       const before = first.bots[index]?.position;
       return bot.position && before ? Number(Math.hypot(bot.position[0] - before[0], bot.position[2] - before[2]).toFixed(2)) : null;
     }),
+    // An arena that fields bots must actually have spawned some, or the
+    // assertion below would pass vacuously - which is how this got missed.
+    ok: spawns.every((spawn) => spawn.ok) && (!botArena || spawns.length > 0),
   };
-  for (const [index, bot] of first.bots.entries()) {
-    const spawnMatch = matchSpawn(arenaId, bot.position);
-    console.error(`[spawn-deploys] ${arenaId.padEnd(16)} bot ${String(bot.id).padEnd(10)} spawned at ${bot.position ? bot.position.map((v) => v.toFixed(1)).join(', ') : 'null'}`
-      + (spawnMatch ? ` = team ${spawnMatch.team} #${spawnMatch.index}` : ' (no committed spawn within 0.75 m)')
-      + `, moved ${record.bots.movedM[index]} m in ${BOT_WATCH_MS / 1000} s`);
+  for (const spawn of spawns) {
+    console.error(`[spawn-deploys] ${arenaId.padEnd(16)} bot ${String(spawn.actorId).padEnd(10)} SPAWNED at ${spawn.position ? spawn.position.map((v) => v.toFixed(2)).join(', ') : 'null'}`
+      + (spawn.match
+        ? ` = committed team ${spawn.match.team} #${spawn.match.index} (${spawn.match.x}, ${spawn.match.z}) ${spawn.match.passesGate ? 'PASSES' : `FAILS ${spawn.match.failures.join(',')}`}`
+        : ' = NO COMMITTED SPAWN within 0.75 m'));
   }
+  for (const [index, bot] of later.bots.entries()) {
+    console.error(`[spawn-deploys] ${arenaId.padEnd(16)} bot ${String(bot.id).padEnd(10)} drifted ${record.bots.movedM[index]} m in ${BOT_WATCH_MS / 1000} s (alive ${bot.alive})`);
+  }
+  if (botArena && spawns.length === 0) console.error(`[spawn-deploys] ${arenaId} fields bots but the runtime recorded no bot spawn selection`);
 }
 
 async function soloDeploy(browser, arenaId) {
@@ -278,10 +325,22 @@ async function soloDeploy(browser, arenaId) {
     await waitActive(page);
     await landing(page, arenaId, 'solo-deploy', record);
     await watchBots(page, arenaId, record);
-    // One respawn through the same path a death takes.
+    // One respawn through the same path a death takes. Recorded honestly: this
+    // CALLS respawn(), it does not stage a death, so the health state either
+    // side of it is written down rather than described as a kill.
+    const beforeRespawn = await sample(page);
     await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.respawn(); });
     await landing(page, arenaId, 'solo-respawn', record);
-    record.ok = record.landings.every((entry) => entry.match && entry.match.passesGate);
+    const afterRespawn = await sample(page);
+    record.respawn = {
+      method: 'window.__ATOMIC_ACRES_DEBUG__.respawn() - an explicit call, not a staged death',
+      aliveBefore: beforeRespawn.alive,
+      hpBefore: beforeRespawn.hp,
+      aliveAfter: afterRespawn.alive,
+      hpAfter: afterRespawn.hp,
+    };
+    record.ok = record.landings.every((entry) => entry.match && entry.match.passesGate)
+      && (record.bots ? record.bots.ok : true);
   } catch (error) {
     record.error = String(error).slice(0, 240);
   } finally {
@@ -366,8 +425,15 @@ try {
     writeFileSync(path, JSON.stringify({ label: LABEL, gitSha, dist: DIST, generatedAt: new Date().toISOString(), ...record }, null, 2));
   }
   const failed = results.filter((record) => !record.ok);
-  console.error(`[spawn-deploys] ${results.length - failed.length}/${results.length} deploy records matched a committed, gate-passing spawn`
-    + (failed.length > 0 ? `; failed: ${failed.map((record) => `${record.arenaId}/${record.mode}${record.error ? ` (${record.error})` : ''}`).join(', ')}` : ''));
+  const why = (record) => {
+    if (record.error) return ` (${record.error})`;
+    const badLanding = record.landings.find((entry) => !entry.match || !entry.match.passesGate);
+    if (badLanding) return ` (landing ${badLanding.name} off a gate-passing spawn)`;
+    if (record.bots && !record.bots.ok) return ' (bot spawn off a gate-passing spawn, or none recorded on a bot arena)';
+    return '';
+  };
+  console.error(`[spawn-deploys] ${results.length - failed.length}/${results.length} deploy records matched a committed, gate-passing spawn for the player AND every bot`
+    + (failed.length > 0 ? `; failed: ${failed.map((record) => `${record.arenaId}/${record.mode}${why(record)}`).join(', ')}` : ''));
   exitCode = failed.length > 0 ? 1 : 0;
 } catch (error) {
   console.error(`[spawn-deploys] environment error: ${String(error).slice(0, 300)}`);

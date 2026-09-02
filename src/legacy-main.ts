@@ -6108,7 +6108,21 @@ let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; lab
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
-const lastBotSpawnAudit = new Map<Team, { selectedIndex: number; score: number; reason: string }>();
+// HF-402: keyed by ACTOR, not by team, and carrying the point selected - two
+// bots on one team overwrote each other's record, and the record held no
+// position, so nothing could check afterwards WHERE a bot was put. Exposed on
+// the debug snapshot as `botSpawnSelections` (the player's equivalent has been
+// exposed as `spawnSelection` all along), which is what lets
+// scripts/qa/verify-spawn-deploys.mjs assert a bot's spawn instead of sampling
+// its position seconds later and calling the drift a spawn.
+const lastBotSpawnAudit = new Map<string, {
+  actorId: string;
+  team: Team;
+  selectedIndex: number;
+  score: number;
+  reason: string;
+  position: [number, number, number];
+}>();
 let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
   createSpawnFlipHysteresis(),
   createSpawnFlipHysteresis(),
@@ -18856,8 +18870,17 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
   });
   const selectedIndex = selection.index;
   lastBotSpawnIndices.set(team, selectedIndex);
-  lastBotSpawnAudit.set(team, { selectedIndex, score: selection.score, reason: selection.reason });
-  return valid.find(({ index }) => index === selectedIndex)!.candidate;
+  const chosen = valid.find(({ index }) => index === selectedIndex)!.candidate;
+  // HF-402: record the point, under the actor that got it.
+  lastBotSpawnAudit.set(actorId, {
+    actorId,
+    team,
+    selectedIndex,
+    score: selection.score,
+    reason: selection.reason,
+    position: [chosen.x, chosen.y, chosen.z],
+  });
+  return chosen;
 }
 
 let botHazeTexture: THREE.CanvasTexture | null = null;
@@ -32325,6 +32348,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : null,
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
+    // HF-402: where each bot was actually SPAWNED, as chosen by
+    // selectSafeBotSpawn - not where it has since walked to.
+    botSpawnSelections: [...lastBotSpawnAudit.values()].map((audit) => ({ ...audit, position: [...audit.position] })),
     bots: [...bots.values()].map((bot) => {
       // Telemetry walks every skinned mesh and bone chain. Cache it once for
       // this actor in this snapshot so presentationReady cannot double that
