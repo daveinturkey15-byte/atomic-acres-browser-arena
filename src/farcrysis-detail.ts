@@ -12,6 +12,7 @@
  * Mount from farcrysis-art.ts via buildDetail() + animateDetail().
  */
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 import {
   FARCRYSIS_ARENA_HALF,
@@ -342,7 +343,7 @@ function buildFloorLitter(root: THREE.Object3D, rng: () => number): void {
   const litterGeom = new THREE.BoxGeometry(0.12, 0.025, 0.28);
   const litterMat = artMat(0x5d4a2c, 0.9, 0.02); // dark brown
 
-  const instances = new THREE.InstancedMesh(litterGeom, litterMat, count);
+  const instances = farcrysisInstancedMesh(litterGeom, litterMat, count);
   artMark(instances, 'farcrysis-detail-floor-litter');
   instances.castShadow = true;
   instances.receiveShadow = true;

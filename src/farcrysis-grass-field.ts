@@ -33,6 +33,7 @@
  * Wind runs on GPU time uniforms; no networked state involved.
  */
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import {
   FARCRYSIS_SHORE,
@@ -447,7 +448,7 @@ export function buildFarcrysisGrassField(root: THREE.Object3D): Readonly<GrassFi
   for (let i = 0; i < buckets.length; i += 1) {
     const instances = buckets[i];
     if (instances.length === 0) continue;
-    const mesh = new THREE.InstancedMesh(geometry, material, instances.length);
+    const mesh = farcrysisInstancedMesh(geometry, material, instances.length);
     const cxi = i % CHUNK_GRID;
     const czi = Math.floor(i / CHUNK_GRID);
     mesh.name = `farcrysis-grass-chunk-${cxi}-${czi}`;

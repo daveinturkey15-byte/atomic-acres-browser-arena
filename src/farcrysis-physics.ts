@@ -30,6 +30,7 @@
  */
 
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box2 } from './collision';
 import { createBallisticSurface, type BallisticMaterialId } from './ballistics';
@@ -298,16 +299,16 @@ export function buildFuelDrumInstances(
   const lidMat = new THREE.MeshStandardMaterial({ color: 0x3c3a36, roughness: 0.66, metalness: 0.45 });
   const hazardBandMat = new THREE.MeshStandardMaterial({ color: 0xd8b02e, roughness: 0.6, metalness: 0.2 });
 
-  const bodies = new THREE.InstancedMesh(bodyGeom, bodyMat, specs.length);
+  const bodies = farcrysisInstancedMesh(bodyGeom, bodyMat, specs.length);
   bodies.name = `${namePrefix}-bodies`;
-  const hoops = new THREE.InstancedMesh(hoopGeom, steelMat, specs.length * 2);
+  const hoops = farcrysisInstancedMesh(hoopGeom, steelMat, specs.length * 2);
   hoops.name = `${namePrefix}-hoops`;
-  const rims = new THREE.InstancedMesh(rimGeom, steelMat, specs.length * 2);
+  const rims = farcrysisInstancedMesh(rimGeom, steelMat, specs.length * 2);
   rims.name = `${namePrefix}-rims`;
-  const lids = new THREE.InstancedMesh(lidGeom, lidMat, specs.length);
+  const lids = farcrysisInstancedMesh(lidGeom, lidMat, specs.length);
   lids.name = `${namePrefix}-lids`;
   const hazardCount = specs.filter((spec) => spec.hazard).length;
-  const bands = hazardCount > 0 ? new THREE.InstancedMesh(bandGeom, hazardBandMat, hazardCount) : null;
+  const bands = hazardCount > 0 ? farcrysisInstancedMesh(bandGeom, hazardBandMat, hazardCount) : null;
   if (bands) bands.name = `${namePrefix}-hazard-bands`;
 
   const m = new THREE.Matrix4();
@@ -425,7 +426,7 @@ function buildQueuedInteractableVisuals(builder: any): void {
   if (_caseSpecs.length > 0) {
     const caseGeom = createSupplyCaseGeometry();
     const caseMat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.86, metalness: 0.04 });
-    const cases = new THREE.InstancedMesh(caseGeom, caseMat, _caseSpecs.length);
+    const cases = farcrysisInstancedMesh(caseGeom, caseMat, _caseSpecs.length);
     cases.name = 'farcrysis-interactable-crates';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -454,7 +455,7 @@ function buildQueuedInteractableVisuals(builder: any): void {
   if (_logSpecs.length > 0) {
     const logGeom = new THREE.CylinderGeometry(0.185, 0.215, 1, 9);
     logGeom.rotateZ(Math.PI / 2); // length along X, unit long
-    const logs = new THREE.InstancedMesh(logGeom, palmTrunkMat, _logSpecs.length);
+    const logs = farcrysisInstancedMesh(logGeom, palmTrunkMat, _logSpecs.length);
     logs.name = 'farcrysis-interactable-fallen-logs';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -489,7 +490,7 @@ function buildQueuedInteractableVisuals(builder: any): void {
     pos.needsUpdate = true;
     rockGeom.computeVertexNormals();
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a877c, roughness: 0.94, metalness: 0.03 });
-    const rocks = new THREE.InstancedMesh(rockGeom, rockMat, _boulderSpecs.length);
+    const rocks = farcrysisInstancedMesh(rockGeom, rockMat, _boulderSpecs.length);
     rocks.name = 'farcrysis-interactable-boulders';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -523,7 +524,7 @@ function buildQueuedInteractableVisuals(builder: any): void {
     // Khaki burlap, deliberately DULLER than the beach sand so walls read as
     // fabric fortification, not sculpted sand; per-bag tint drift below.
     const bagMat = new THREE.MeshStandardMaterial({ color: 0xa89a77, roughness: 0.97, metalness: 0.01 });
-    const bags = new THREE.InstancedMesh(bagGeom, bagMat, _bagSpecs.length);
+    const bags = farcrysisInstancedMesh(bagGeom, bagMat, _bagSpecs.length);
     bags.name = 'farcrysis-interactable-sandbags';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();

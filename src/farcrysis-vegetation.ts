@@ -21,6 +21,7 @@
  * beach pebbles (40).
  */
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
@@ -592,7 +593,7 @@ function addPalms(root: THREE.Group): void {
   // Deep jungle green — distinct from the frond palette so the texture
   // classifier never mistakes the impostor for a frond surface again.
   const lodMat = vegeMat(0x2b4d26, 0.9, 0.02);
-  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, placements.length);
+  const lodMesh = farcrysisInstancedMesh(lodGeom, lodMat, placements.length);
   lodMesh.name = 'farcrysis-vege-palm-imposters';
   lodMesh.castShadow = false;
   lodMesh.receiveShadow = true;
@@ -626,9 +627,9 @@ function addBroadleafTrees(root: THREE.Group): void {
   // Believability: broadleaf canopies stop reading as smooth balls.
   lumpify(canopyGeom, 0.2, 0x0b1a);
 
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6b4e30, 0.92, 0.02), count);
+  const trunks = farcrysisInstancedMesh(trunkGeom, vegeMat(0x6b4e30, 0.92, 0.02), count);
   trunks.name = 'farcrysis-vege-broadleaf-trunks';
-  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x4a8038, 0.88, 0.01), count);
+  const canopies = farcrysisInstancedMesh(canopyGeom, vegeMat(0x4a8038, 0.88, 0.01), count);
   canopies.name = 'farcrysis-vege-broadleaf-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -698,7 +699,7 @@ function addFanPalms(root: THREE.Group): void {
   }
   const fanGeom = mergeTransformed(parts);
 
-  const fans = new THREE.InstancedMesh(fanGeom, vegeMat(0x2f6b2b, 0.88, 0.02), count);
+  const fans = farcrysisInstancedMesh(fanGeom, vegeMat(0x2f6b2b, 0.88, 0.02), count);
   fans.name = 'farcrysis-vege-fan-palms';
 
   const matrix = new THREE.Matrix4();
@@ -733,9 +734,9 @@ function addBananaPlants(root: THREE.Group): void {
   const trunkGeom = new THREE.CylinderGeometry(0.1, 0.2, 1.6, 7);
   const leafGeom = new THREE.BoxGeometry(2.2, 0.07, 0.65);
 
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x7a9a38, 0.85, 0.02), plantCount);
+  const trunks = farcrysisInstancedMesh(trunkGeom, vegeMat(0x7a9a38, 0.85, 0.02), plantCount);
   trunks.name = 'farcrysis-vege-banana-trunks';
-  const leaves = new THREE.InstancedMesh(leafGeom, vegeMat(0x4d8c2a, 0.82, 0.02), leafCount);
+  const leaves = farcrysisInstancedMesh(leafGeom, vegeMat(0x4d8c2a, 0.82, 0.02), leafCount);
   leaves.name = 'farcrysis-vege-banana-leaves';
 
   const tMat = new THREE.Matrix4();
@@ -786,7 +787,7 @@ function addBamboo(root: THREE.Group): void {
 
   const stemGeom = new THREE.CylinderGeometry(0.05, 0.07, 2.8, 6);
 
-  const stems = new THREE.InstancedMesh(stemGeom, vegeMat(0x6a8a3a, 0.84, 0.03), count);
+  const stems = farcrysisInstancedMesh(stemGeom, vegeMat(0x6a8a3a, 0.84, 0.03), count);
   stems.name = 'farcrysis-vege-bamboo-stems';
 
   const matrix = new THREE.Matrix4();
@@ -824,7 +825,7 @@ function addDeadTrees(root: THREE.Group): void {
   const count = 20; // HF-396: doubled with the island area
   const trunkGeom = new THREE.CylinderGeometry(0.14, 0.24, 2.4, 7);
 
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6e6258, 0.94, 0.05), count);
+  const trunks = farcrysisInstancedMesh(trunkGeom, vegeMat(0x6e6258, 0.94, 0.05), count);
   trunks.name = 'farcrysis-vege-dead-trunks';
 
   const matrix = new THREE.Matrix4();
@@ -858,7 +859,7 @@ function addFerns(root: THREE.Group): void {
   const count = 70; // HF-396: doubled with the island area
   const fernGeom = new THREE.BoxGeometry(0.35, 1.2, 0.12);
 
-  const ferns = new THREE.InstancedMesh(fernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
+  const ferns = farcrysisInstancedMesh(fernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
   ferns.name = 'farcrysis-vege-ferns';
 
   const matrix = new THREE.Matrix4();
@@ -888,7 +889,7 @@ function addGrassTufts(root: THREE.Group): void {
   const count = 90; // HF-396: doubled with the island area
   const grassGeom = new THREE.ConeGeometry(0.12, 0.45, 5, 1);
 
-  const grass = new THREE.InstancedMesh(grassGeom, vegeMat(0x4d7a36, 0.9, 0.01), count);
+  const grass = farcrysisInstancedMesh(grassGeom, vegeMat(0x4d7a36, 0.9, 0.01), count);
   grass.name = 'farcrysis-vege-grass-tufts';
 
   const matrix = new THREE.Matrix4();
@@ -921,7 +922,7 @@ function addBushes(root: THREE.Group): void {
   // Believability: irregular bush silhouette.
   lumpify(bushGeom, 0.12, 0x0b05);
 
-  const bushes = new THREE.InstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), count);
+  const bushes = farcrysisInstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), count);
   bushes.name = 'farcrysis-vege-bushes';
 
   const matrix = new THREE.Matrix4();
@@ -952,7 +953,7 @@ function addVines(root: THREE.Group): void {
   // Thin, long cylinder placed at an angle — reads as a hanging vine
   const vineGeom = new THREE.CylinderGeometry(0.03, 0.04, 2.4, 6);
 
-  const vines = new THREE.InstancedMesh(vineGeom, vegeMat(0x3d6e30, 0.82, 0.02), count);
+  const vines = farcrysisInstancedMesh(vineGeom, vegeMat(0x3d6e30, 0.82, 0.02), count);
   vines.name = 'farcrysis-vege-vines';
 
   const matrix = new THREE.Matrix4();
@@ -1042,9 +1043,9 @@ function addKapokTrees(root: THREE.Group): void {
   // Believability: break up the smooth two-sphere blob silhouette.
   lumpify(kapokCanopyGeom, 0.22, 0x4b0b);
 
-  const trunks = new THREE.InstancedMesh(kapokTrunkGeom, vegeMat(0x7a5e3e, 0.9, 0.03), count);
+  const trunks = farcrysisInstancedMesh(kapokTrunkGeom, vegeMat(0x7a5e3e, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-kapok-trunks';
-  const canopies = new THREE.InstancedMesh(kapokCanopyGeom, vegeMat(0x498540, 0.86, 0.01), count);
+  const canopies = farcrysisInstancedMesh(kapokCanopyGeom, vegeMat(0x498540, 0.86, 0.01), count);
   canopies.name = 'farcrysis-vege-kapok-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -1136,7 +1137,7 @@ function addCoconutPalms(root: THREE.Group): void {
 
   const coconutPalmGeom = mergeTransformed(palmParts);
 
-  const palms = new THREE.InstancedMesh(
+  const palms = farcrysisInstancedMesh(
     coconutPalmGeom,
     vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.84, 0.02),
     count,
@@ -1157,9 +1158,9 @@ function addCoconutPalms(root: THREE.Group): void {
   const coconutTrunkGeom = mergeTransformed(trunkOnly);
   const coconutFrondGeom = mergeTransformed(frondOnly);
 
-  const cTrunks = new THREE.InstancedMesh(coconutTrunkGeom, vegeMat(FARCRYSIS_ART_FEEL.palmTrunk, 0.87, 0.03), count);
+  const cTrunks = farcrysisInstancedMesh(coconutTrunkGeom, vegeMat(FARCRYSIS_ART_FEEL.palmTrunk, 0.87, 0.03), count);
   cTrunks.name = 'farcrysis-vege-coconut-trunks';
-  const cFronds = new THREE.InstancedMesh(coconutFrondGeom, vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.83, 0.02), count);
+  const cFronds = farcrysisInstancedMesh(coconutFrondGeom, vegeMat(FARCRYSIS_ART_FEEL.palmFrond, 0.83, 0.02), count);
   cFronds.name = 'farcrysis-vege-coconut-fronds';
 
   const tMat = new THREE.Matrix4();
@@ -1207,7 +1208,7 @@ function addCanopyVines(root: THREE.Group): void {
 
   const vineGeom = new THREE.CylinderGeometry(0.025, 0.032, 1.0, 5);
 
-  const vines = new THREE.InstancedMesh(vineGeom, vegeMat(0x3d6e30, 0.8, 0.02), count);
+  const vines = farcrysisInstancedMesh(vineGeom, vegeMat(0x3d6e30, 0.8, 0.02), count);
   vines.name = 'farcrysis-vege-canopy-vines';
 
   const matrix = new THREE.Matrix4();
@@ -1246,7 +1247,7 @@ function addLeafLitter(root: THREE.Group): void {
 
   const litterGeom = new THREE.BoxGeometry(0.7, 0.025, 0.55);
 
-  const litter = new THREE.InstancedMesh(litterGeom, vegeMat(0x6b5230, 0.92, 0.01), count);
+  const litter = farcrysisInstancedMesh(litterGeom, vegeMat(0x6b5230, 0.92, 0.01), count);
   litter.name = 'farcrysis-vege-leaf-litter';
 
   const matrix = new THREE.Matrix4();
@@ -1281,7 +1282,7 @@ function addDenseGrass(root: THREE.Group): void {
 
   const grassGeom = new THREE.ConeGeometry(0.08, 0.42, 5, 1);
 
-  const grass = new THREE.InstancedMesh(grassGeom, vegeMat(0x4d7a36, 0.88, 0.01), count);
+  const grass = farcrysisInstancedMesh(grassGeom, vegeMat(0x4d7a36, 0.88, 0.01), count);
   grass.name = 'farcrysis-vege-dense-grass';
 
   const matrix = new THREE.Matrix4();
@@ -1342,7 +1343,7 @@ function addFloweringAccents(root: THREE.Group): void {
 
   const flowerAccentGeom = mergeTransformed(flowerParts);
 
-  const flowers = new THREE.InstancedMesh(flowerAccentGeom, vegeMat(0xd8542f, 0.72, 0.03), count);
+  const flowers = farcrysisInstancedMesh(flowerAccentGeom, vegeMat(0xd8542f, 0.72, 0.03), count);
   flowers.name = 'farcrysis-vege-flowering-accents';
 
   const matrix = new THREE.Matrix4();
@@ -1406,7 +1407,7 @@ function addUndergrowthShrubs(root: THREE.Group): void {
   // Believability: lobed undergrowth shrubs get an irregular outline too.
   lumpify(shrubClusterGeom, 0.12, 0x38a8);
 
-  const shrubs = new THREE.InstancedMesh(shrubClusterGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.02), count);
+  const shrubs = farcrysisInstancedMesh(shrubClusterGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.02), count);
   shrubs.name = 'farcrysis-vege-undergrowth-shrubs';
 
   const matrix = new THREE.Matrix4();
@@ -1456,7 +1457,7 @@ function addUnderstoryFerns(root: THREE.Group): void {
 
   const fernClusterGeom = mergeTransformed(fernParts);
 
-  const ferns = new THREE.InstancedMesh(fernClusterGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
+  const ferns = farcrysisInstancedMesh(fernClusterGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
   ferns.name = 'farcrysis-vege-understory-ferns';
 
   const matrix = new THREE.Matrix4();
@@ -1534,9 +1535,9 @@ function addMangroveTrees(root: THREE.Group): void {
   // Believability: lumpy mangrove leaf clumps instead of smooth spheres.
   lumpify(mangroveCanopyGeom, 0.16, 0x9a46);
 
-  const trunks = new THREE.InstancedMesh(mangroveTrunkGeom, vegeMat(0x5a4232, 0.9, 0.04), count);
+  const trunks = farcrysisInstancedMesh(mangroveTrunkGeom, vegeMat(0x5a4232, 0.9, 0.04), count);
   trunks.name = 'farcrysis-vege-mangrove-trunks';
-  const canopies = new THREE.InstancedMesh(mangroveCanopyGeom, vegeMat(0x3d6b38, 0.88, 0.02), count);
+  const canopies = farcrysisInstancedMesh(mangroveCanopyGeom, vegeMat(0x3d6b38, 0.88, 0.02), count);
   canopies.name = 'farcrysis-vege-mangrove-canopies';
 
   const tMat = new THREE.Matrix4();
@@ -1590,7 +1591,7 @@ function addMangroveTrees(root: THREE.Group): void {
     },
   ]);
   const lodMat = vegeMat(0x3d6b38, 0.88, 0.02);
-  const lodMesh = new THREE.InstancedMesh(lodGeom, lodMat, lodCount);
+  const lodMesh = farcrysisInstancedMesh(lodGeom, lodMat, lodCount);
   lodMesh.name = 'farcrysis-vege-mangrove-lod';
   lodMesh.castShadow = false;
   lodMesh.receiveShadow = true;
@@ -1625,7 +1626,7 @@ function addBambooGroves(root: THREE.Group): void {
 
   const stemGeom = new THREE.CylinderGeometry(0.04, 0.06, 3.2, 6);
 
-  const stems = new THREE.InstancedMesh(stemGeom, vegeMat(0x8a9a3a, 0.82, 0.03), count);
+  const stems = farcrysisInstancedMesh(stemGeom, vegeMat(0x8a9a3a, 0.82, 0.03), count);
   stems.name = 'farcrysis-vege-bamboo-grove-stems';
 
   const matrix = new THREE.Matrix4();
@@ -1688,7 +1689,7 @@ function addFloweringBushes(root: THREE.Group): void {
   // Bloom head: small emissive sphere
   const bloomGeom = new THREE.IcosahedronGeometry(0.1, 1);
 
-  const bushes = new THREE.InstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.01), count);
+  const bushes = farcrysisInstancedMesh(bushGeom, vegeMat(FARCRYSIS_ART_FEEL.bushGreen, 0.88, 0.01), count);
   bushes.name = 'farcrysis-vege-flowering-bushes';
 
   // Emissive bloom material — warm magenta-pink glow
@@ -1699,7 +1700,7 @@ function addFloweringBushes(root: THREE.Group): void {
     emissive: 0xff3070,
     emissiveIntensity: 0.6,
   });
-  const blooms = new THREE.InstancedMesh(bloomGeom, bloomMat, bloomCount);
+  const blooms = farcrysisInstancedMesh(bloomGeom, bloomMat, bloomCount);
   blooms.name = 'farcrysis-vege-flowering-blooms';
 
   const bMat = new THREE.Matrix4();
@@ -1780,7 +1781,7 @@ function addJungleVineClusters(root: THREE.Group): void {
   }
   const vineClusterGeom = mergeTransformed(clusterParts);
 
-  const clusters = new THREE.InstancedMesh(vineClusterGeom, vegeMat(0x3d6e30, 0.8, 0.02), count);
+  const clusters = farcrysisInstancedMesh(vineClusterGeom, vegeMat(0x3d6e30, 0.8, 0.02), count);
   clusters.name = 'farcrysis-vege-jungle-vine-clusters';
 
   const matrix = new THREE.Matrix4();
@@ -1816,7 +1817,7 @@ function addBeachGrass(root: THREE.Group): void {
 
   const grassGeom = new THREE.ConeGeometry(0.06, 0.72, 5, 1);
 
-  const grass = new THREE.InstancedMesh(grassGeom, vegeMat(0xb8a04a, 0.86, 0.02), count);
+  const grass = farcrysisInstancedMesh(grassGeom, vegeMat(0xb8a04a, 0.86, 0.02), count);
   grass.name = 'farcrysis-vege-beach-grass';
 
   const matrix = new THREE.Matrix4();
@@ -1877,7 +1878,7 @@ function addLargeFerns(root: THREE.Group): void {
   });
   const largeFernGeom = mergeTransformed(fernParts);
 
-  const ferns = new THREE.InstancedMesh(largeFernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.84, 0.02), count);
+  const ferns = farcrysisInstancedMesh(largeFernGeom, vegeMat(FARCRYSIS_ART_FEEL.fernGreen, 0.84, 0.02), count);
   ferns.name = 'farcrysis-vege-large-ferns';
 
   const matrix = new THREE.Matrix4();
@@ -1939,7 +1940,7 @@ function addFallenFronds(root: THREE.Group): void {
 
   const frondGeom = new THREE.BoxGeometry(1.2, 0.03, 0.25);
 
-  const fronds = new THREE.InstancedMesh(frondGeom, vegeMat(0x8b6b3a, 0.9, 0.01), count);
+  const fronds = farcrysisInstancedMesh(frondGeom, vegeMat(0x8b6b3a, 0.9, 0.01), count);
   fronds.name = 'farcrysis-vege-fallen-fronds'; // named so shore audits attribute this layer
 
   const matrix = new THREE.Matrix4();
@@ -1987,7 +1988,7 @@ function addFlowerPatches(root: THREE.Group): void {
     emissiveIntensity: 0.5,
   });
 
-  const flowers = new THREE.InstancedMesh(flowerGeom, flowerMat, count);
+  const flowers = farcrysisInstancedMesh(flowerGeom, flowerMat, count);
   flowers.name = 'farcrysis-vege-flower-patches';
 
   const matrix = new THREE.Matrix4();
@@ -2031,7 +2032,7 @@ function addBeachPebbles(root: THREE.Group): void {
 
   const pebbleGeom = new THREE.IcosahedronGeometry(0.12, 0);
 
-  const pebbles = new THREE.InstancedMesh(pebbleGeom, vegeMat(0xb8a890, 0.78, 0.08), count);
+  const pebbles = farcrysisInstancedMesh(pebbleGeom, vegeMat(0xb8a890, 0.78, 0.08), count);
   pebbles.name = 'farcrysis-vege-beach-pebbles';
 
   const matrix = new THREE.Matrix4();
@@ -2100,9 +2101,9 @@ function addCycadPalms(root: THREE.Group): void {
   }
   const cycadLeafGeom = mergeTransformed(leafParts);
 
-  const trunks = new THREE.InstancedMesh(trunkCyl, vegeMat(0x6b4e30, 0.9, 0.03), count);
+  const trunks = farcrysisInstancedMesh(trunkCyl, vegeMat(0x6b4e30, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-cycad-trunks';
-  const leaves = new THREE.InstancedMesh(cycadLeafGeom, vegeMat(0x3a7a34, 0.84, 0.02), count);
+  const leaves = farcrysisInstancedMesh(cycadLeafGeom, vegeMat(0x3a7a34, 0.84, 0.02), count);
   leaves.name = 'farcrysis-vege-cycad-leaves';
 
   const tMat = new THREE.Matrix4();
@@ -2181,11 +2182,11 @@ function addBloomTrees(root: THREE.Group): void {
   // Blossom head: small detail-0 icosahedron (20 tris)
   const blossomGeom = new THREE.IcosahedronGeometry(0.12, 0);
 
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x6d5438, 0.9, 0.03), count);
+  const trunks = farcrysisInstancedMesh(trunkGeom, vegeMat(0x6d5438, 0.9, 0.03), count);
   trunks.name = 'farcrysis-vege-bloom-trunks';
-  const canopies = new THREE.InstancedMesh(canopyGeom, vegeMat(0x428a38, 0.86, 0.01), count);
+  const canopies = farcrysisInstancedMesh(canopyGeom, vegeMat(0x428a38, 0.86, 0.01), count);
   canopies.name = 'farcrysis-vege-bloom-canopies';
-  const blossoms = new THREE.InstancedMesh(blossomGeom, vegeMat(0xe8602a, 0.6, 0.02), bloomCount);
+  const blossoms = farcrysisInstancedMesh(blossomGeom, vegeMat(0xe8602a, 0.6, 0.02), bloomCount);
   blossoms.name = 'farcrysis-vege-bloom-blossoms';
 
   const tMat = new THREE.Matrix4();
@@ -2292,7 +2293,7 @@ function addBeachScrubBushes(root: THREE.Group): void {
   }
   const scrubGeom = mergeTransformed(parts);
 
-  const bushes = new THREE.InstancedMesh(scrubGeom, vegeMat(0x4c7a38, 0.88, 0.02), count);
+  const bushes = farcrysisInstancedMesh(scrubGeom, vegeMat(0x4c7a38, 0.88, 0.02), count);
   bushes.name = 'farcrysis-vege-beach-scrub-bushes';
 
   const matrix = new THREE.Matrix4();
@@ -2340,7 +2341,7 @@ function addGrassPatches(root: THREE.Group): void {
   }
   const patchGeom = mergeTransformed(parts);
 
-  const patches = new THREE.InstancedMesh(patchGeom, vegeMat(0x4d8a36, 0.88, 0.01), count);
+  const patches = farcrysisInstancedMesh(patchGeom, vegeMat(0x4d8a36, 0.88, 0.01), count);
   patches.name = 'farcrysis-vege-grass-patches';
 
   const matrix = new THREE.Matrix4();
@@ -2375,7 +2376,7 @@ function addTwigs(root: THREE.Group): void {
   const twigGeom = new THREE.CylinderGeometry(0.015, 0.028, 0.55, 4);
   twigGeom.translate(0, 0, 0);
 
-  const twigs = new THREE.InstancedMesh(twigGeom, vegeMat(0x6b5230, 0.92, 0.01), count);
+  const twigs = farcrysisInstancedMesh(twigGeom, vegeMat(0x6b5230, 0.92, 0.01), count);
   twigs.name = 'farcrysis-vege-twigs';
 
   const matrix = new THREE.Matrix4();
@@ -2415,7 +2416,7 @@ function addSmallRocks(root: THREE.Group): void {
 
   const rockGeom = new THREE.IcosahedronGeometry(0.26, 1);
 
-  const rocks = new THREE.InstancedMesh(rockGeom, vegeMat(0x6e6a64, 0.85, 0.06), count);
+  const rocks = farcrysisInstancedMesh(rockGeom, vegeMat(0x6e6a64, 0.85, 0.06), count);
   rocks.name = 'farcrysis-vege-small-rocks';
 
   const matrix = new THREE.Matrix4();
@@ -2565,7 +2566,7 @@ function addHeliconiaClumps(root: THREE.Group): void {
   }
   const clumpGeom = mergeTransformed(parts);
 
-  const clumps = new THREE.InstancedMesh(clumpGeom, vegeMat(0x3f7a2c, 0.84, 0.02), count);
+  const clumps = farcrysisInstancedMesh(clumpGeom, vegeMat(0x3f7a2c, 0.84, 0.02), count);
   clumps.name = 'farcrysis-vege-heliconia-clumps';
 
   const matrix = new THREE.Matrix4();
@@ -2603,7 +2604,7 @@ function addLeafCardUndergrowth(root: THREE.Group): void {
 
   const cardMat = vegeMat(0x2f6428, 0.86, 0.02);
   cardMat.side = THREE.DoubleSide;
-  const cards = new THREE.InstancedMesh(cardGeom, cardMat, count);
+  const cards = farcrysisInstancedMesh(cardGeom, cardMat, count);
   cards.name = 'farcrysis-vege-undergrowth-cards';
 
   const matrix = new THREE.Matrix4();
@@ -2655,7 +2656,7 @@ function addDriftwoodLogs(root: THREE.Group): void {
   }
   const logGeom = mergeTransformed(parts);
 
-  const logs = new THREE.InstancedMesh(logGeom, vegeMat(0x8a7a64, 0.95, 0.01), count);
+  const logs = farcrysisInstancedMesh(logGeom, vegeMat(0x8a7a64, 0.95, 0.01), count);
   logs.name = 'farcrysis-vege-driftwood-logs';
 
   const matrix = new THREE.Matrix4();
@@ -2847,11 +2848,11 @@ function addEmergentCanopyTrees(root: THREE.Group): void {
   const crownUpperGeom = lumpify(new THREE.SphereGeometry(1, 9, 6), 0.2, 0x71c4);
   crownUpperGeom.translate(0, 11.4 / 1.05, 0); // scaleY = 1.05*s -> +11.4*s
 
-  const trunks = new THREE.InstancedMesh(trunkGeom, vegeMat(0x54402a, 0.92, 0.02), sites.length);
+  const trunks = farcrysisInstancedMesh(trunkGeom, vegeMat(0x54402a, 0.92, 0.02), sites.length);
   trunks.name = 'farcrysis-vege-emergent-trunks';
-  const crownsLower = new THREE.InstancedMesh(crownLowerGeom, vegeMat(0x2f5f28, 0.9, 0.01), sites.length);
+  const crownsLower = farcrysisInstancedMesh(crownLowerGeom, vegeMat(0x2f5f28, 0.9, 0.01), sites.length);
   crownsLower.name = 'farcrysis-vege-emergent-crowns-lower';
-  const crownsUpper = new THREE.InstancedMesh(crownUpperGeom, vegeMat(0x3b7430, 0.88, 0.01), sites.length);
+  const crownsUpper = farcrysisInstancedMesh(crownUpperGeom, vegeMat(0x3b7430, 0.88, 0.01), sites.length);
   crownsUpper.name = 'farcrysis-vege-emergent-crowns-upper';
 
   const m = new THREE.Matrix4();
@@ -2930,7 +2931,7 @@ function addMidstoreyClumps(root: THREE.Group): void {
   }
   const clumpGeom = mergeTransformed(parts);
 
-  const mesh = new THREE.InstancedMesh(clumpGeom, vegeMat(0x35682c, 0.87, 0.01), sites.length);
+  const mesh = farcrysisInstancedMesh(clumpGeom, vegeMat(0x35682c, 0.87, 0.01), sites.length);
   mesh.name = 'farcrysis-vege-midstorey-clumps';
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -2982,7 +2983,7 @@ function addUndergrowthCarpet(root: THREE.Group): void {
   }
   const clumpGeom = mergeTransformed(parts);
 
-  const mesh = new THREE.InstancedMesh(clumpGeom, vegeMat(0x3d7a33, 0.86, 0.01), sites.length);
+  const mesh = farcrysisInstancedMesh(clumpGeom, vegeMat(0x3d7a33, 0.86, 0.01), sites.length);
   mesh.name = 'farcrysis-vege-undergrowth-carpet';
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
