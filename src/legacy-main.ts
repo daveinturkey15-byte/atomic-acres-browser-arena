@@ -414,7 +414,7 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
@@ -10857,6 +10857,40 @@ let presentationObstructionBoxes: Box2[] = [];
 let presentationObstructionKey = '';
 /** Retained empty set for the probe paths that must NOT see dressing. */
 const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
+// HF-399: the test-map dressing root, resolved ONCE per arena root instead of
+// on every call. Both callers below run every frame (the pose fold and the
+// surface clip planes), and on every arena except Test1/Test2 neither name
+// exists, so each call walked the whole arena graph twice and found nothing.
+// Measured 2026-09-02 on atomic-acres at Quality: 10,108 getObjectByProperty
+// calls per frame from this one line, the single largest named JS cost in a
+// main thread that was 0.1% idle.
+//
+// INVARIANT THIS CACHE DEPENDS ON (break it and the fold silently reads a
+// stale group): the dressing group is named exactly once, inside the arena
+// builder - `src/test-maps-art.ts` applyTest1Dressing:984 / applyTest2Dressing:1225
+// are the ONLY two `name = 'testN-dressing'` sites in src/ - and it is added
+// straight to `arena.root`, so it exists the moment `arena.root` does and is
+// never swapped out under a stable root. The three re-resolve triggers below
+// exist so that a future change which DOES swap it is still correct:
+//   * a different `arena.root` object (the normal arena-transition path),
+//   * the root's direct child count changing (dressing added or removed),
+//   * the cached group having been detached from the graph (`parent === null`).
+let presentationDressingRootFor: THREE.Object3D | null = null;
+let presentationDressingRootChildCount = -1;
+let presentationDressingRoot: THREE.Object3D | undefined;
+
+function activePresentationDressingRoot(): THREE.Object3D | undefined {
+  const root = arena.root;
+  const stale = root !== presentationDressingRootFor
+    || root.children.length !== presentationDressingRootChildCount
+    || (presentationDressingRoot !== undefined && presentationDressingRoot.parent === null);
+  if (stale) {
+    presentationDressingRootFor = root;
+    presentationDressingRootChildCount = root.children.length;
+    presentationDressingRoot = root.getObjectByName('test1-dressing') ?? root.getObjectByName('test2-dressing');
+  }
+  return presentationDressingRoot;
+}
 
 function activePresentationObstructionBoxes(): readonly Box2[] {
   // Measured 2026-08-31 on atomic-acres: this fed the fold ZERO boxes against
@@ -10865,7 +10899,7 @@ function activePresentationObstructionBoxes(): readonly Box2[] {
   // life layer - so on the owner's main map the dressing fold was inert and
   // the gun rendered straight through every prop. The arena's own ART root is
   // where atomic-acres keeps its dressing, so it goes in the list.
-  const dressingRoot = arena.root.getObjectByName('test1-dressing') ?? arena.root.getObjectByName('test2-dressing');
+  const dressingRoot = activePresentationDressingRoot();
   const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}:${arenaArtRoot?.uuid ?? ''}`;
   if (key !== presentationObstructionKey) {
     presentationObstructionKey = key;
@@ -19855,12 +19889,35 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
 function botCombatDamage(rawDamage: number): number {
   return botScaledDamage(rawDamage);
 }
+// HF-399: the haze sprite is attached by addNeonBotHaze when the bot rig is
+// built and never moves within it, so it is resolved once per rig instead of
+// with a getObjectByName walk over ~190 rig nodes per bot per frame.
+//
+// INVARIANT THIS CACHE DEPENDS ON: `addNeonBotHaze` (the only site in src/ that
+// creates a node named 'neon-purple-bot-haze') runs exactly once per rig, in
+// the bot rig builder immediately after buildOperator, and no code re-attaches
+// or replaces it afterwards - the other three read sites only set `visible` or
+// test `instanceof`. A cached sprite that has been detached from its rig is
+// re-resolved below, so a future change that swaps the sprite still works; a
+// haze attached to a rig that had NONE at build time would still be missed,
+// which is why the invariant is stated here rather than only assumed.
+const botHazeSpriteByRoot = new WeakMap<THREE.Object3D, THREE.Sprite | null>();
+function botHazeSprite(root: THREE.Object3D): THREE.Sprite | null {
+  let haze = botHazeSpriteByRoot.get(root);
+  if (haze === undefined || (haze !== null && haze.parent === null)) {
+    const found = root.getObjectByName('neon-purple-bot-haze');
+    haze = found instanceof THREE.Sprite && found.material instanceof THREE.SpriteMaterial ? found : null;
+    botHazeSpriteByRoot.set(root, haze);
+  }
+  return haze;
+}
+
 function updateBots(dt: number, now: number): void {
   if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
-    const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+    const haze = botHazeSprite(bot.root);
     if (haze instanceof THREE.Sprite && haze.material instanceof THREE.SpriteMaterial) {
       const pulse = Math.sin(now * 0.0022 + Number(haze.userData.phase ?? 0));
       haze.material.opacity = 0.33 + pulse * 0.055;
@@ -26548,6 +26605,89 @@ function drawMinimapLandmark(
   context.restore();
 }
 
+// HF-399: Nuke Town's static minimap layer (road, houses, cover landmarks),
+// rebuilt only when the arena object or the canvas backing size changes.
+type MinimapStaticLayer = Readonly<{
+  arena: ArenaMap;
+  width: number;
+  height: number;
+  /**
+   * INVARIANT THIS CACHE DEPENDS ON: `arena.bounds`, `arena.houses` and
+   * `arena.physicalCover` are authored by the arena builder and never mutated
+   * at runtime (every `physicalCover` push in src/ is build-time). Arena
+   * identity therefore normally settles the cache on its own; these two counts
+   * are the cheap tripwire that catches a future change which grows or shrinks
+   * either list under a stable arena object, since a stale layer would show the
+   * wrong landmarks with no other symptom.
+   */
+  houseCount: number;
+  coverCount: number;
+  canvas: HTMLCanvasElement;
+  /** Landmark label anchors in minimap pixel space (before the player transform). */
+  labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
+  landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }>;
+}>;
+let minimapStaticLayer: MinimapStaticLayer | null = null;
+
+function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMap['bounds']): MinimapStaticLayer {
+  const cached = minimapStaticLayer;
+  if (
+    cached
+    && cached.arena === arena
+    && cached.width === width
+    && cached.height === height
+    && cached.houseCount === arena.houses.length
+    && cached.coverCount === arena.physicalCover.length
+  ) return cached;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas2D minimap static layer is unavailable');
+  const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
+  const [roadLeft] = point(-10.25, 0);
+  const [roadRight] = point(10.25, 0);
+  context.fillStyle = 'rgba(126, 137, 132, .23)';
+  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
+  context.strokeStyle = 'rgba(244, 196, 79, .42)';
+  context.lineWidth = 2;
+  context.setLineDash([10, 10]);
+  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
+  context.setLineDash([]);
+  for (const house of arena.houses) {
+    const [cx, cy] = point(house.origin.x, house.origin.z);
+    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
+    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
+    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
+    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
+    context.lineWidth = 2;
+    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+  }
+  const labelAnchors: Array<{ label: string; x: number; y: number }> = [];
+  const landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  for (const cover of arena.physicalCover) {
+    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+    if (!kind) continue;
+    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+    drawMinimapLandmark(context, cover.id, kind, footprint);
+    const label = minimapLandmarkLabel(kind);
+    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
+    landmarks.push({ id: cover.id, kind, label });
+  }
+  minimapStaticLayer = Object.freeze({
+    arena,
+    width,
+    height,
+    houseCount: arena.houses.length,
+    coverCount: arena.physicalCover.length,
+    canvas,
+    labelAnchors: Object.freeze(labelAnchors),
+    landmarks,
+  });
+  return minimapStaticLayer;
+}
+
 function updateMinimap(now: number): void {
   if (!presentationFrameDue(now, lastMinimapRenderAt, MINIMAP_RENDER_HZ)) return;
   lastMinimapRenderAt = Number.isFinite(lastMinimapRenderAt)
@@ -26584,47 +26724,45 @@ function updateMinimap(now: number): void {
   context.strokeRect(4, 4, width - 8, height - 8);
 
   const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
+  // HF-399 streamline: one description of the player-up view, shared by the
+  // canvas transform below and by every upright label that has to be mapped
+  // through the same transform in closed form. Previously each landmark branch
+  // recomputed the rotation and the reflection for itself.
+  const labelView = {
+    width,
+    height,
+    playerX: worldPlayerX,
+    playerY: worldPlayerY,
+    rotation: playerUpRotationRadians(player.yaw),
+    scaleX: playerUpScaleX(),
+  };
   context.save();
   context.translate(width / 2, height / 2);
-  context.rotate(playerUpRotationRadians(player.yaw));
-  context.scale(playerUpScaleX(), 1);
+  context.rotate(labelView.rotation);
+  context.scale(labelView.scaleX, 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
-  const renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  let renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
   const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
   if (selectedArena.id === 'atomic-acres') {
-    const [roadLeft] = point(-10.25, 0);
-    const [roadRight] = point(10.25, 0);
-    context.fillStyle = 'rgba(126, 137, 132, .23)';
-    context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
-    context.strokeStyle = 'rgba(244, 196, 79, .42)';
-    context.lineWidth = 2;
-    context.setLineDash([10, 10]);
-    context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
-    context.setLineDash([]);
-    for (const house of arena.houses) {
-      const [cx, cy] = point(house.origin.x, house.origin.z);
-      const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
-      const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
-      context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
-      context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
-      context.lineWidth = 2;
-      context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-      context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    // HF-399: the road, the two houses and every cover landmark are fixed for
+    // the life of the arena, so they are painted ONCE into an offscreen layer
+    // in minimap pixel space and composited under the per-frame player
+    // transform with one drawImage. Measured 2026-09-02 (Quality, 60 Hz
+    // minimap, atomic-acres lawn-idle): this function held 4.4% of an inclusive
+    // CPU profile - about 1.1 ms of the measured 26.1 ms frame - dominated by
+    // the landmark path work plus a getTransform()+DOMPoint allocation per
+    // cover per frame. Label anchors are the same points run through the same
+    // transform in closed form (minimapPlayerViewPoint, guarded against a
+    // composed affine reference by src/minimap-player-view-transform.test.ts),
+    // so the labels stay upright exactly as before.
+    const layer = activeMinimapStaticLayer(width, height, bounds);
+    context.drawImage(layer.canvas, 0, 0);
+    for (const anchor of layer.labelAnchors) {
+      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
+      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
     }
-    for (const cover of arena.physicalCover) {
-      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-      if (!kind) continue;
-      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-      drawMinimapLandmark(context, cover.id, kind, footprint);
-      const label = minimapLandmarkLabel(kind);
-      const centre = context.getTransform().transformPoint(new DOMPoint(
-        footprint.x + footprint.width / 2,
-        footprint.y + footprint.height / 2,
-      ));
-      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
-      renderedLandmarks.push({ id: cover.id, kind, label });
-    }
+    renderedLandmarks = layer.landmarks;
   } else {
     context.lineWidth = 1.5;
     context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
@@ -26663,11 +26801,16 @@ function updateMinimap(now: number): void {
       const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
       drawMinimapLandmark(context, cover.id, kind, footprint);
       const label = minimapLandmarkLabel(kind);
-      const centre = context.getTransform().transformPoint(new DOMPoint(
+      // HF-399 streamline: the same mapping the atomic-acres branch uses, so no
+      // arena reads back the live canvas matrix and allocates a DOMPoint per
+      // landmark per frame any more. Guarded by
+      // src/minimap-player-view-transform.test.ts.
+      const [labelX, labelY] = minimapPlayerViewPoint(
         footprint.x + footprint.width / 2,
         footprint.y + footprint.height / 2,
-      ));
-      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+        labelView,
+      );
+      landmarkLabels.push({ label, x: labelX, y: labelY - 10 });
       renderedLandmarks.push({ id: cover.id, kind, label });
     }
     for (const target of arena.targets) {
@@ -26677,16 +26820,19 @@ function updateMinimap(now: number): void {
     }
   }
   minimapLandmarksRendered = renderedLandmarks;
+  // HF-399 streamline: loop-invariant in both entity loops below (it reads only
+  // `now` and `scoutSweepUntil`), and was being re-evaluated once per remote and
+  // once per bot every minimap frame.
+  const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
   for (const remote of remotes.values()) {
     const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
-    const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
     if (!friendly && !scoutActive && !shouldRevealEnemy(remote.target.distanceTo(player.position), now, remoteRadarFireRevealAt.get(remote.snapshot.id) ?? 0)) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || !scoutSweepPulseVisible(now, scoutSweepUntil) && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || !scoutActive && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
@@ -26729,7 +26875,7 @@ function updateMinimap(now: number): void {
   // while the pulse is visible, so the sweep reads as active radar motion on
   // the minimap instead of a silent state change (and demo clips of the
   // sweep carry genuine motion for the cadence gate).
-  if (scoutSweepPulseVisible(now, scoutSweepUntil)) {
+  if (scoutActive) {
     const pulseStartedAt = scoutSweepUntil - SCOUT_SWEEP_DURATION_MS;
     const pulseElapsed = Math.max(0, now - pulseStartedAt) % SCOUT_SWEEP_PULSE_INTERVAL_MS;
     const pulseProgress = Math.min(1, pulseElapsed / SCOUT_SWEEP_PULSE_VISIBLE_MS);
