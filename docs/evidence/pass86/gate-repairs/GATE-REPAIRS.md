@@ -209,3 +209,56 @@ need its own evidence record under the regression policy.
 `npm run qa:pass85:arms-handedness` (the static GLB gate) was not re-run: this
 branch changes no glTF and no authored node transform, and the prep measured it
 `pass`, 0 violations, on the same tree.
+
+## 5. The pass69-3 run — the setup defect is fixed and proven; the run still does not finish
+
+```
+QA_EXTERNAL_PREVIEW=1 QA_PREVIEW_PORT=4196 PASS73_NATIVE_WEBGPU=1 \
+  PASS69_3_NEAR_PLANE_RENDERER=webgpu \
+  npx playwright test tests/e2e/pass69-3-authored-near-plane-catalog.spec.ts --project=chromium
+```
+
+**What is now proven:** the run gets **past line 993**
+(`expect(designIds.size, 'one exact authored design identity per canonical
+weapon').toBe(WEAPON_IDS.length)`) and into the test body — it reaches
+`deploy()` at line 1002, boots the arena and starts the solo match. The 20-vs-21
+setup failure this job existed to fix is **gone**, and with it the reason the
+spec could never reach a near-plane assertion at all.
+
+**It still does not reach one.** Both attempts (the run plus Playwright's retry)
+fail at **line 649**, `page.waitForFunction(... matchPhase === 'active')`,
+`TimeoutError: 60000ms exceeded` — *before* any weapon is equipped and before
+any identity or near-plane assertion runs. The captured page snapshot shows the
+game **visibly in the match** — "Gun Range multiplayer arena", "TARGET DRILL",
+"SOLO RANGE", a live score/hits HUD — with the round timer already down to
+`00:01`, so the app is alive and the round is running out while the probe waits
+for a phase string that never reads `active`.
+
+**Claim-state, honestly:** *unverified* whether that is environment or a second
+latent defect in this spec. Two facts bound it:
+
+- The HF-410 prep never got past line 960 either, so **nothing on this line has
+  ever executed `deploy()`**. There is no prior green run of this spec to call
+  this a regression against.
+- The box was carrying six lanes, 20+ node processes and a second browser gate
+  in the same window, which is the same load the prep blamed for a Playwright
+  flake on `pass70-chopper-gunner`.
+
+**Also not equivalent to the harness path**, and this is worth recording rather
+than glossing: the run used an **external preview** because the harness's own
+`webServer` (`scripts/qa/playwright-web-server.mjs`, `timeout: 180000`) does
+`build()` **plus** `stage-release-topology.mjs`, and on this loaded box that
+staging did not finish inside 180 s — two separate attempts died there, the
+first leaving `dist/` with `channels/` and no root `index.html`. So the preview
+served the **candidate build without the staged channel topology**. The spec
+requests `?release=latest`, which is the candidate, and the page snapshot
+confirms it loaded and played — but this is **not** the byte-exact topology the
+committed harness serves, and no near-plane number should be quoted from it.
+
+**Owed to the next runner, in order:** re-run on a quiet box through the
+committed harness (no `QA_EXTERNAL_PREVIEW`), giving the build+stage step room
+to finish; if `deploy()` still times out at line 649 with the match visibly
+running, the next question is what `snapshot().matchPhase` actually reports on
+gun-range solo, which is one `page.evaluate` away.
+
+`docs/evidence/pass86/gate-repairs/pass69-3-run.txt` is the head of that run.
