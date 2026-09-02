@@ -49,6 +49,9 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
   test1: [],
   test2: [],
   map3: [],
+  // NUKETOWN2 (owner 2026-09-02, HF-407): 0 fall-through floors on the first sweep
+  // (29 walkable visuals censused, 29 fully supported, 374 colliders).
+  nuketown2: [],
   'atomic-acres': [
     // Nuke Town geometry - Lane U (HF-407) is rebuilding this arena's layout.
     // Four garage roof planes whose ridge sits 1.05 m above the box collider
@@ -170,7 +173,7 @@ describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
     const results = await audit();
     // HF-411's own arenas. These have no ledger and never get one: a finding
     // here is the owner's bug coming back.
-    for (const arenaId of ['test1', 'test2', 'map3']) {
+    for (const arenaId of ['test1', 'test2', 'map3', 'nuketown2']) {
       const result = results.find(({ id }) => id === arenaId)!;
       expect(ACCEPTED_FALL_THROUGH[arenaId], `${arenaId} must keep an empty ledger`).toEqual([]);
       expect(result.findings ?? [], `${arenaId}: fall-through floors`).toEqual([]);
@@ -219,7 +222,7 @@ describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
     // there is no single patch of open air anywhere on it". On the arenas this
     // lane owns the answer is exactly zero, so the weaker of the two floors is
     // never what is holding them clean.
-    for (const arenaId of ['test1', 'test2', 'map3']) {
+    for (const arenaId of ['test1', 'test2', 'map3', 'nuketown2']) {
       const result = results.find(({ id }) => id === arenaId)!;
       const holed = (result.surfaces ?? [])
         .filter((surface) => surface.largestHoleM2 > 0)

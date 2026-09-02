@@ -700,7 +700,9 @@ test('the gap between the modelled eye and the shipped camera stays the number t
   // in its own pass; until then the constant is PINNED, so it cannot drift
   // while the ledger's account of it silently goes stale.
   const legacyMain = readFileSync(resolve(REPO_ROOT, 'src/legacy-main.ts'), 'utf8');
-  const match = /camera\.position\.y = Math\.max\(player\.position\.y \+ ([\d.]+), camera\.position\.y\);/u
+  // HF-412 (drop shots) inserted the stance-transition eye offset into the same
+  // expression; the standoff constant is still the last term and still pinned.
+  const match = /camera\.position\.y = Math\.max\(player\.position\.y \+ (?:stanceTransitionSample\.eyeOffsetMeters \+ )?([\d.]+), camera\.position\.y\);/u
     .exec(legacyMain);
   assert.ok(
     match,

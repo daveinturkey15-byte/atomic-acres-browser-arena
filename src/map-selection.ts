@@ -375,6 +375,8 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   Object.freeze({
     id: 'nuketown2' as const,
     routeId: 'nuke-town-rebuild' as const,
+    // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
+    kind: 'team' as const,
     legacyAliases: Object.freeze([]),
     selectorLabel: 'NUKE TOWN REBUILD · PREVIEW',
     displayName: 'Nuke Town Rebuild',

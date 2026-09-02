@@ -60,7 +60,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 35_720;
+const LINE_CEILING = 36_408;
 
 /**
  * When the file falls this far below the ceiling, the ceiling is stale and the
@@ -79,6 +79,14 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
     note:
       'PASS 85 Lane N: first ceiling, set to the measured size at PASS 84 ship '
       + '(75a4e508). No lines were added or removed to establish it.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 36_408,
+    note:
+      'PASS 86 integration: Lane W viewmodel fit (HF-410), Lane Y drop shots (HF-412), '
+      + 'Lane U Nuke Town Rebuild registration (HF-407) and Lane V Map 3 explore with the '
+      + 'lazy arena registry and explore HUD (HF-409) grew the file; measured at the merged head.',
   },
 ];
 
