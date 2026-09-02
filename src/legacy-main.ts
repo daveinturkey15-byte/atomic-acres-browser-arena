@@ -861,6 +861,7 @@ import {
   type DynamicWorldCollider,
 } from './physics';
 import {
+  FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
   FIRST_PERSON_CAMERA_NEAR_METERS,
   VIEWMODEL_BODY_FIT_SCALE,
   viewmodelBodyFitLightDistance,
@@ -11405,6 +11406,28 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
   const nearPlaneCutMeshes = new Set<string>();
   let nearPlaneCutVertices = 0;
   let nearPlaneCutInViewport = 0;
+  // HF-410 REPAIR - THE COUNTERFACTUAL, MEASURED.
+  //
+  // Moving the on-foot plane from 0.08 m to 0.02 m spends a SHARED budget:
+  // depth resolution scales as 1/near, so distant precision goes 4x coarser.
+  // The first pass justified that with "42 of 60 poses had weapon geometry
+  // clipped inside the viewport at 0.08 m" and then shipped no run carrying
+  // that number - the only 0.08 m rows in the tree predate these fields. An
+  // integrator was asked to approve a shared cost against evidence that was not
+  // there.
+  //
+  // It is measurable exactly, in this same pass, from these same vertices: a
+  // perspective matrix's x/y mapping does not depend on `near` (the frustum
+  // extents scale with it), so with the fit in force the set of vertices a
+  // 0.08 m plane would discard is precisely {forward < 0.08}, and each one's
+  // screen position is the one it already has. This is not a simulation of the
+  // old build - it is the old plane applied to the current rig, which is the
+  // question the decision actually turns on.
+  const referenceNearPlaneCutMeshes = new Set<string>();
+  let referenceNearPlaneCutVertices = 0;
+  let referenceNearPlaneCutInViewport = 0;
+  let referenceCutMinY = Number.POSITIVE_INFINITY;
+  let referenceCutMaxY = Number.NEGATIVE_INFINITY;
   // The nearest ON-SCREEN vertex. This, not the whole rig's nearest point, is
   // what a near plane has to clear: the sleeve continues below the frame by
   // contract and cutting it costs nothing.
@@ -11418,6 +11441,23 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
   let ndcMaxX = Number.NEGATIVE_INFINITY;
   let ndcMinY = Number.POSITIVE_INFINITY;
   let ndcMaxY = Number.NEGATIVE_INFINITY;
+  // HF-410 REPAIR - A FRAMING BOX A GATE CAN ACTUALLY READ.
+  //
+  // The box above deliberately accumulates every vertex in front of the eye,
+  // including ones inside the near plane, so both sides of a before/after
+  // comparison cover the same geometry. The cost is that a vertex approaching
+  // the projection singularity (forward -> 0) throws |ndc| to hundreds and
+  // swamps the box: comparing the fit-disabled and fitted runs at matching
+  // poses, the sniper hip rows differ by -11.55 in ndcMaxX and +16.96 in
+  // ndcMinY, which says nothing about framing and cannot be ratcheted.
+  //
+  // So the DRAWABLE box is reported alongside it: the same measurement
+  // restricted to vertices at or beyond the plane in force, which is exactly
+  // the geometry the rasteriser keeps. That one is stable enough to gate on.
+  let drawnNdcMinX = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxX = Number.NEGATIVE_INFINITY;
+  let drawnNdcMinY = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxY = Number.NEGATIVE_INFINITY;
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -11483,6 +11523,16 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
           if (ndcVertex.y > cutMaxY) cutMaxY = ndcVertex.y;
         }
       }
+      if (forward < FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS && forward > 1e-4) {
+        referenceNearPlaneCutVertices += 1;
+        referenceNearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          referenceNearPlaneCutInViewport += 1;
+          if (ndcVertex.y < referenceCutMinY) referenceCutMinY = ndcVertex.y;
+          if (ndcVertex.y > referenceCutMaxY) referenceCutMaxY = ndcVertex.y;
+        }
+      }
       if (forward > 1e-4 && forward < viewportForwardMin) {
         ndcVertex.copy(vertex).project(camera);
         if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
@@ -11501,6 +11551,12 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
         if (ndcVertex.x > ndcMaxX) ndcMaxX = ndcVertex.x;
         if (ndcVertex.y < ndcMinY) ndcMinY = ndcVertex.y;
         if (ndcVertex.y > ndcMaxY) ndcMaxY = ndcVertex.y;
+        if (forward >= camera.near) {
+          if (ndcVertex.x < drawnNdcMinX) drawnNdcMinX = ndcVertex.x;
+          if (ndcVertex.x > drawnNdcMaxX) drawnNdcMaxX = ndcVertex.x;
+          if (ndcVertex.y < drawnNdcMinY) drawnNdcMinY = ndcVertex.y;
+          if (ndcVertex.y > drawnNdcMaxY) drawnNdcMaxY = ndcVertex.y;
+        }
       }
     }
   });
@@ -11553,6 +11609,17 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
     nearPlaneCutVertices,
     nearPlaneCutInViewport,
     nearPlaneCutMeshes: [...nearPlaneCutMeshes],
+    /**
+     * HF-410 REPAIR: the same counts under the plane this build shipped with
+     * BEFORE the fit (0.08 m), computed exactly from the same vertices. This is
+     * what the near-plane change bought, in the tree, per pose.
+     */
+    referenceNearM: FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+    referenceNearPlaneCutVertices,
+    referenceNearPlaneCutInViewport,
+    referenceNearPlaneCutMeshes: [...referenceNearPlaneCutMeshes],
+    referenceCutNdcMinY: round(referenceCutMinY),
+    referenceCutNdcMaxY: round(referenceCutMaxY),
     /** WHERE on screen the cut lands. Bottom-edge only is invisible; anything higher is not. */
     cutNdcMinX: round(cutMinX), cutNdcMaxX: round(cutMaxX),
     cutNdcMinY: round(cutMinY), cutNdcMaxY: round(cutMaxY),
@@ -11564,6 +11631,9 @@ function sampleViewmodelRigExtent(): Record<string, unknown> {
     /** THE FRAMING. Identical before and after the fit, or the fit changed the picture. */
     ndcMinX: round(ndcMinX), ndcMaxX: round(ndcMaxX),
     ndcMinY: round(ndcMinY), ndcMaxY: round(ndcMaxY),
+    /** The same box over DRAWN geometry only - free of the projection singularity. */
+    drawnNdcMinX: round(drawnNdcMinX), drawnNdcMaxX: round(drawnNdcMaxX),
+    drawnNdcMinY: round(drawnNdcMinY), drawnNdcMaxY: round(drawnNdcMaxY),
     /** Metres between the nearest visible vertex and the render camera near plane. */
     nearPlaneMarginM: round(forwardMin - camera.near),
     cameraNearM: camera.near,
@@ -18878,8 +18948,14 @@ function tryFire(now: number): void {
   // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
   // the barrel axis, so the protected centre cone still applies unchanged.
   if (!flamethrowerShot && !projectileShot) {
+    // HF-410 REPAIR: the WORLD anchor, not the rig socket. Under the body fit
+    // the socket sits ~0.25 m from the eye, inside PARTICLE_READABILITY's hard
+    // 0.35 m near-lens cull, so smoke emitted there is never drawn at all.
+    // muzzleEffectWorldPosition() undoes the uniform scale about the eye, which
+    // puts the anchor back at the world distance it shipped at while keeping
+    // the same pixel on screen.
     hfParticleRuntime.emitMuzzleSmoke(
-      weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin,
+      weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin,
       baseDirection,
       cameraUp,
     );
@@ -18915,7 +18991,10 @@ function tryFire(now: number): void {
       end: Object.freeze({ x: authoritativeEnd.x, y: authoritativeEnd.y, z: authoritativeEnd.z }),
     }));
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
-    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    // HF-410 REPAIR: same reason as emitMuzzleSmoke above - the tracer and the
+    // flamethrower stream are world-space presentations and must start from the
+    // unfitted muzzle point, which is the same pixel and the shipped distance.
+    const visualStart = weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin;
     if (flamethrowerShot) {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
