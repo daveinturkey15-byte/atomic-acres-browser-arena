@@ -22,6 +22,7 @@ import {
   GamepadInputRuntime,
   NO_AIM_ASSIST,
   applyHudInputScheme,
+  applyStrikeTargetingCancelGlyph,
   applyTriggerSnap,
   bindGamepadSettingsPanel,
   evaluateAimAssist,
@@ -6403,10 +6404,14 @@ let gamepadSettingsPanel: GamepadSettingsPanel | null = null;
 /** Aim points sit this far above the body proxy centre (≈ upper chest, 1.28 m standing). */
 const AIM_ASSIST_POINT_LIFT_M = 0.3;
 
-/** Which assist tier the player is currently driving the view with (settings read-out). */
+/**
+ * Which assist tier the player is currently driving the view with. This is the
+ * gate, not just a read-out: a connected-but-idle pad is NOT a pad player, and
+ * a touch overlay suppressed by a pad is NOT a touch player.
+ */
 function activeAimAssistTier(): AimAssistTier {
   if (gamepadRuntime.connected() && gamepadRuntime.currentScheme() === 'gamepad') return 'pad';
-  if (mobilePresentationActive) return 'touch';
+  if (mobilePresentationActive && !(mobileTouchControls?.isGamepadSuppressed() ?? false)) return 'touch';
   return 'mouse';
 }
 
@@ -6454,6 +6459,36 @@ function collectAimAssistTargets(): readonly AimAssistTarget[] {
   return aimAssistTargetsScratch;
 }
 
+/**
+ * Line of sight for the aim assist. A hostile behind a wall must never bend the
+ * player's aim: inside a 5.5 deg (pad) or 8 deg (touch) cone it would read as
+ * the game pulling at nothing. Uses the same cheap AABB segment primitive as
+ * footstep occlusion, memoised per target for AIM_ASSIST_LOS_CACHE_MS so a busy
+ * frame pays at most one fresh test per hostile rather than one per frame.
+ */
+const AIM_ASSIST_LOS_CACHE_MS = 80;
+type AimAssistLosEntry = { at: number; visible: boolean };
+const aimAssistLosCache = new Map<string, AimAssistLosEntry>();
+
+function aimAssistTargetVisible(target: AimAssistTarget): boolean {
+  const id = target.id ?? '';
+  const now = performance.now();
+  const cached = id ? aimAssistLosCache.get(id) : undefined;
+  if (cached && now - cached.at < AIM_ASSIST_LOS_CACHE_MS) return cached.visible;
+  let visible = true;
+  for (const box of activeWorldColliders()) {
+    if (segmentIntersectsBox(player.position, target.point, box)) { visible = false; break; }
+  }
+  if (!id) return visible;
+  if (cached) { cached.at = now; cached.visible = visible; }
+  else {
+    // Ids are roster-bounded; the clear is a leak stop for long sessions.
+    if (aimAssistLosCache.size > 64) aimAssistLosCache.clear();
+    aimAssistLosCache.set(id, { at: now, visible });
+  }
+  return visible;
+}
+
 function evaluateLocalAimAssist(tier: AimAssistTier, dt: number): AimAssistResult {
   if (!gameplayInputEnabled() || localKillstreakActorSnapshot()?.possession) return Object.freeze({ ...NO_AIM_ASSIST, tier });
   return evaluateAimAssist({
@@ -6465,6 +6500,7 @@ function evaluateLocalAimAssist(tier: AimAssistTier, dt: number): AimAssistResul
     velocity: { x: player.velocity.x, z: player.velocity.z },
     dt,
     targets: collectAimAssistTargets(),
+    isVisible: aimAssistTargetVisible,
   });
 }
 
@@ -24788,6 +24824,9 @@ function drawStrikeMap(now = performance.now()): void {
       ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
       : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
   element<HTMLElement>('#strike-target-count').textContent = `${selectedCount} / ${targetCount}`;
+  // GAMEPAD: the caption above is rebuilt from literals every draw, so the cap
+  // is re-glyphed here rather than only on a scheme change (DoD 5).
+  applyStrikeTargetingCancelGlyph(document, pointSupportTargeting && !tacticalMapOpen ? 'point' : 'map');
   lastStrikeMapDrawAt = now;
 }
 
@@ -27673,7 +27712,11 @@ function pollGamepad(dt: number): void {
   // Pause/resume must work while gameplay input is closed; a pad player has
   // no Escape key and no pointer to click the match with.
   if (frame.pressed('pause') && gameStarted && player.alive && !matchFinished && !isTextChatTyping()) {
-    if (menuLifecycle.surface === 'paused-match') resumeActiveMatchFromMenu(false);
+    // The tactical strike map owns Escape while it is open, so the pad's pause
+    // button must back out of it (with the same refund) before it reaches the
+    // pause menu. Pointer lock is never re-acquired for a pad player.
+    if (tacticalMapOpen) cancelSupportTargeting(true, false);
+    else if (menuLifecycle.surface === 'paused-match') resumeActiveMatchFromMenu(false);
     else if (menuLifecycle.surface === 'hidden') openActiveMatchPause('mobile-pause');
   }
   if (!padTrigger) gamepadTriggerArmed = true;
@@ -27700,7 +27743,11 @@ function pollGamepad(dt: number): void {
   // Tiered aim assist, PAD = medium. A look-rate modifier only: the rate the
   // stick produced is scaled inside the target zone and strafe friction is
   // added as a yaw rate. Damage, spread and hit registration are untouched.
-  const assist = evaluateLocalAimAssist('pad', dt);
+  // Gated on the pad being the input IN USE, not merely connected: a
+  // keyboard/mouse player with an idle paired pad is a MOUSE player under the
+  // fairness contract and gets nothing (measured 2026-09-02: an untouched
+  // connected pad was dragging a keyboard strafe by 0.0126 rad / 200 ms).
+  const assist = activeAimAssistTier() === 'pad' ? evaluateLocalAimAssist('pad', dt) : NO_AIM_ASSIST;
   lastGamepadAssist = assist;
   if (canControlPlayer) {
     const yawDelta = gamepadLookRate.yaw * assist.lookRateScale * dt;
@@ -27811,6 +27858,9 @@ function setMobileControlsEnabled(enabled: boolean): void {
 }
 
 function pollMobileTouch(dt: number): void {
+  // GAMEPAD: cleared first so the telemetry read-out never reports a stale
+  // touch assist on a frame where the touch overlay did not drive the view.
+  lastTouchAssist = NO_AIM_ASSIST;
   const touch = mobileTouchControls;
   if (!touch) return;
   // The overlay only ever intercepts input while a match is live and the menu
@@ -27852,6 +27902,7 @@ function applyTouchTriggerSnap(): void {
     yaw: player.yaw,
     pitch: player.pitch,
     targets: collectAimAssistTargets(),
+    isVisible: aimAssistTargetVisible,
   });
   if (snapped.snappedDeg <= 0) return;
   player.yaw = snapped.yaw;
@@ -30797,6 +30848,9 @@ const debugWindow = window as Window & {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     /** GAMEPAD: pad runtime + assist telemetry for the PASS 84 e2e. */
     sampleGamepad: () => Record<string, unknown> & {
+      connected: boolean;
+      /** Which input the player is actually driving with; the assist tier follows it. */
+      scheme: 'keyboard' | 'gamepad';
       assist: AimAssistResult;
       touchAssist: AimAssistResult;
       touchSnapDeg: number;
@@ -30865,6 +30919,12 @@ const debugWindow = window as Window & {
     showBotDamageDirection: () => number | null;
     respawn: () => void;
     aimAtBot: (zone?: HitZone) => void;
+    // GAMEPAD: QA-only exact staging for the aim-assist gates (PASS 84 Lane E).
+    aimAtAimAssistPoint: (yawOffsetDeg?: number, pitchOffsetDeg?: number) => {
+      botId: string;
+      yaw: number;
+      pitch: number;
+    } | null;
     aimPossessedChopperAtTrainingDummy: (targetId: string) => {
       entityId: string;
       activationId: string;
@@ -33508,6 +33568,34 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return sourceScreenAngle(player.position, player.yaw, bot.position);
   },
   respawn: () => respawn(false),
+  /**
+   * GAMEPAD: points the view at the aim-assist point of the staged bot (body
+   * centre lifted by AIM_ASSIST_POINT_LIFT_M) offset by an exact number of
+   * degrees. An assist gate staged this way has a chosen angle rather than one
+   * that falls out of hit-proxy geometry, stance and distance, so the snap-cone
+   * and slowdown-zone preconditions carry real margin. QA-only.
+   */
+  aimAtAimAssistPoint: (yawOffsetDeg = 0, pitchOffsetDeg = 0) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return null;
+    const stance = ((bot.root.userData.operatorStance as Stance | undefined) ?? 'stand');
+    const centre = hitProxyZoneCentre('body', stance);
+    const delta = new THREE.Vector3(
+      bot.position.x + centre[0],
+      bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M,
+      bot.position.z + centre[2],
+    ).sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z) + THREE.MathUtils.degToRad(yawOffsetDeg);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)) + THREE.MathUtils.degToRad(pitchOffsetDeg),
+      -1.42,
+      1.42,
+    );
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return { botId: bot.id, yaw: player.yaw, pitch: player.pitch };
+  },
   aimAtBot: (zone: HitZone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;
