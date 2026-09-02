@@ -428,13 +428,14 @@ try {
       .some((row) => row.textContent?.includes('Reloading')), undefined, { timeout: 10_000 });
   }
 
-  await page.evaluate(() => {
+  await page.evaluate((firstProgress) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setAds(false);
+    api.equipWeapon('m4a1');
     api.setAmmo('m4a1', 30, 60);
     api.melee();
-    api.setMeleeCaptureProgress(ACTION_STRIP_PROGRESS[0]);
-  });
+    api.setMeleeCaptureProgress(firstProgress);
+  }, ACTION_STRIP_PROGRESS[0]);
   await page.waitForFunction(() => {
     const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
     return presentation?.actionContract?.state === 'melee'
