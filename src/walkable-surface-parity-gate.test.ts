@@ -92,16 +92,23 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
     { name: 'skyline-quality-uld-0-28', centre: [0, 2.66, 28], reason: 'ULD container lid 0.20 m proud of its collider; Terminal geometry, Lane J' },
   ],
   farcrysis: [
-    // Farcrysis is selectable:false (map-selection.ts) until its load path is
-    // fixed; every row here is a real finding on a hidden arena.
-    { name: 'farcrysis-art-tower-platform', centre: [-8.5, 4.89, -8.5], reason: 'radio-tower platform with no collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-art-cave-arch-top', centre: [52, 3.18, 32], reason: 'cave arch crown with no collider; hidden arena, Farcrysis lane' },
-    { name: '(unnamed Mesh)', centre: [47.66, 1.55, -47.71], reason: 'unnamed shore slab overhanging its plate; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-art-tower-dish', centre: [-8.5, 6.23, -8.5], reason: 'tower dish top face; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-ne-stack-top', centre: [27.43, 3.5, -30.34], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-sw-stack-top', centre: [-27.43, 6.3, 30.34], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-se-stack-top', centre: [30.34, 6.15, 27.43], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-nw-stack-top', centre: [-30.34, 6.56, -27.43], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
+    // Farcrysis became selectable (PREVIEW) on 2026-09-02, HF-423. Seven of
+    // the eight rows that stood here were excused with the words "hidden
+    // arena", which is not a reason - it is a deferral, and it expired when
+    // the arena entered the menu. All seven were FIXED rather than re-worded:
+    //   - the four crate-stack lids now carry their own cover box
+    //     (src/farcrysis.ts, landmarkCratePlacements tier 1);
+    //   - the tower platform, tower dish and cave arch crown now carry
+    //     collider proxies (src/farcrysis.ts, the art-prop proxy block).
+    // The ledger may only ever shrink, and this is it shrinking.
+    //
+    // What is left is one genuine triage: the seaplane wing overhangs the
+    // fuselage collider, and the audit measures the drop off its outer edge
+    // at 0.25 m onto a collider top of 1.26 m. That is a STEP - it is inside
+    // the character controller's support tolerance and lands on the wreck
+    // itself, not on the sand 1.5 m below. Boxing the whole wing would put a
+    // solid 5 m slab over a piece of beach cover players walk past.
+    { name: '(unnamed Mesh)', centre: [47.66, 1.55, -47.71], reason: 'seaplane wing overhanging the fuselage collider by 0.25 m - a step onto the wreck, not a fall; Farcrysis lane, HF-423' },
   ],
   'high-seas': [
     { name: 'high-seas-bow-upper-chart-table-top', centre: [6.6, 6.98, -18], reason: 'chart table top 0.8 m proud of the table collider; High Seas lane' },

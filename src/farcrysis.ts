@@ -530,15 +530,35 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     for (const crate of landmarkCratePlacements(frame)) {
       const [cx, cz] = crate.pos;
       if (crate.tier === 1) {
-        // Upper tier rides INSIDE the base crate's cover footprint — visual
-        // only, so one collider covers both boxes of the stack.
-        const top = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.85, 1.55), crateMat);
-        top.name = `farcrysis-crate-${frame.tag}-stack-top`;
-        top.position.set(cx + Math.sin(crate.yaw) * 0.06, groundY(cx, cz) + 1.33, cz + Math.cos(crate.yaw) * 0.06);
-        top.rotation.y = crate.yaw;
-        top.castShadow = true;
+        // HF-423 collider/visual parity. The comment that stood here claimed
+        // "one collider covers both boxes of the stack". It did not: the base
+        // crate's cover box tops out at groundY + 0.90 and this lid's visual
+        // top face is at groundY + 1.755, so a player who climbed the stack
+        // stood 0.855 m INSIDE a solid-looking crate. That is the exact
+        // authored-mass-versus-movement-authority defect the arena forging
+        // review in AGENTS.md forbids, and it was carried as an accepted
+        // "hidden arena" row in src/walkable-surface-parity-gate.test.ts -
+        // an excuse that expires the moment the arena ships.
+        //
+        // The upper tier now carries its own cover box, sized and seated on
+        // its own visual. The stack becomes a full-height blocker rather than
+        // vaultable waist cover, which is what a two-tier crate stack has
+        // looked like all along.
+        const topSize: [number, number, number] = [1.55, 0.85, 1.55];
+        const topPos: [number, number, number] = [
+          cx + Math.sin(crate.yaw) * 0.06,
+          groundY(cx, cz) + 1.33,
+          cz + Math.cos(crate.yaw) * 0.06,
+        ];
+        const top = cover(
+          builder,
+          `farcrysis-crate-${frame.tag}-stack-top`,
+          topPos,
+          topSize,
+          crateMat,
+          [0, crate.yaw, 0],
+        );
         top.receiveShadow = true;
-        root.add(top);
         continue;
       }
       cover(
@@ -836,18 +856,39 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // Research tower legs (art tower at [-8.5, -8.5], legs at ±1.3 offsets in
   // farcrysis-art.ts addResearchTower) and cave arch pillars (art cave group
   // at [52, 32], yaw 1.2). World positions are derived from the same authored
-  // constants; the arch top stays open so players can walk through the arch.
+  // constants; the arch OPENING stays clear so players can walk through it.
   for (const [lx, lz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]] as const) {
     const x = -8.5 + lx;
     const z = -8.5 + lz;
     colliderProxy(`farcrysis-art-tower-leg-collider-${lx}-${lz}`, [x, groundY(x, z) + 2.4, z], [0.26, 4.8, 0.26], 'structural-metal');
   }
+  // HF-423: the tower's lookout platform (3.0 x 3.0 steel deck at local
+  // y 4.86) and its dish (0.1 m disc at local y 6.2) carried NO authority at
+  // all while the arena was hidden, and neither did the cave arch crown. That
+  // is the "authored visible mass matches movement and projectile authority"
+  // rule in AGENTS.md, and it was excused in
+  // src/walkable-surface-parity-gate.test.ts by the words "hidden arena" -
+  // an excuse that expires the moment the arena becomes selectable. Bullets
+  // passed straight through a steel deck, and a player put on top of it by any
+  // future route (or by the eye-clearance stage-3 teleporter) fell 4.95 m
+  // through it. All three now block movement and stop shots on their own
+  // visual footprint. The tower group sits at [-8.5, terrainHeight, -8.5], so
+  // the deck's world height is that ground plus its authored local offset -
+  // derived here rather than re-typed, so the collider tracks the art.
+  const towerGroundY = groundY(-8.5, -8.5);
+  colliderProxy('farcrysis-art-tower-platform-collider', [-8.5, towerGroundY + 4.86, -8.5], [3.0, 0.12, 3.0], 'structural-metal');
+  colliderProxy('farcrysis-art-tower-dish-collider', [-8.5, towerGroundY + 6.2, -8.5], [1.6, 0.1, 1.6], 'thin-metal');
   const caveYaw = 1.2;
   for (const side of [-1, 1] as const) {
     const x = 52 + side * 1.5 * Math.cos(caveYaw);
     const z = 32 - side * 1.5 * Math.sin(caveYaw);
     colliderProxy(`farcrysis-art-cave-pillar-collider-${side > 0 ? 'r' : 'l'}`, [x, groundY(x, z) + 1.3, z], [0.7, 2.6, 1.6], 'concrete', [0, caveYaw, 0]);
   }
+  // The arch CROWN, not the opening: the slab spans local y 2.4-3.0, so the
+  // 0-2.4 m gap a player walks through stays clear. The comment above used to
+  // say "the arch top stays open so players can walk through the arch", which
+  // conflated the crown with the opening.
+  colliderProxy('farcrysis-art-cave-arch-top-collider', [52, groundY(52, 32) + 2.7, 32], [3.8, 0.6, 1.4], 'concrete', [0, caveYaw, 0]);
 
   // Representative large palm trunks from the enhanced-palm art layer. The
   // placements are seeded-deterministic, so colliders and instances always
