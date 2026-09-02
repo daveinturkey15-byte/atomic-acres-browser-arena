@@ -162,7 +162,7 @@ truck to the bus. That is the property the fidelity test measures.
 |---|---|---|
 | 2× damage overdrive core | on the **bus roof**, which is why the bus is centred on the world origin: `OVERDRIVE_POSITION` is the global `{0, 3.75, 0}` and the bus roof top is authored at 3.15 m so the core floats 0.6 m above it, inside the 1.9 m pickup window. `overdrive: true` on the registry row. | built |
 | sheds (see-through + push physics) | two `FIELD_SHED_DEFINITION` placements, one per back yard, a 180° pair, through the existing `PASS65_SHED_PLACEMENTS` registry — no new shed code | built |
-| rare gun spawn | the two upper rooms are authored and exported as `NUKETOWN2_RARE_GUN_SITES`. The runtime gate `RAILGUN_ARENA_ID` in `src/railgun-authority.ts` is **outside this lane's ownership** (weapons), so the switch is **not** landed here; the exact patch is in the lane report. | arena half built, runtime half handed over |
+| rare gun spawn | the two upper rooms are authored in `src/nuketown2-layout.ts` and exported as `NUKETOWN2_RARE_GUN_SITES`, derived from the house layout. The runtime gate is now `RAILGUN_ARENA_IDS` (a set) with `RAILGUN_SPAWN_SITES_BY_ARENA`, landed in the PASS 86 finish under orchestrator authorisation. `createRailgunAuthorityState('nuketown2', ...)` returns `scheduled` at one of the two derived sites; `src/railgun-authority.test.ts` asserts both that and the shipped arena's byte-identical behaviour. | **LANDED** (arena + runtime) |
 
 ---
 
@@ -263,8 +263,14 @@ review-camera frames, and the two diagrams this lane drew).
     floor - so it is a property of `OVERDRIVE_PICKUP_HEIGHT_WINDOW_M`, not of
     this arena, and `src/overdrive.ts` is not this lane's file. Handed to the
     overdrive owner in the lane report with an exact patch.
-14. **The rare-gun runtime switch is not landed.** The arena exports correct,
-    derived, standable sites (`NUKETOWN2_RARE_GUN_SITES`) and the fidelity test
-    proves a player can stand at each, but `src/railgun-authority.ts` is weapons
-    code and outside this lane. Exact patch in the lane report; until it lands,
-    the owner's third named kept feature is absent on this arena.
+14. **The rare-gun runtime switch LANDED in the PASS 86 finish** (was: handed
+    over as a patch). The PASS 86 orchestrator authorised the weapons-file change
+    on this branch, so `src/railgun-authority.ts` now gates on a
+    `RAILGUN_ARENA_IDS` set with a per-arena site table, and a real match on this
+    arena schedules the pickup at `NUKETOWN2_RARE_GUN_SITES`. The shipped Nuke
+    Town keeps its own table and arithmetic and is asserted unchanged for all
+    eight pinned random units. One structural consequence: the sites moved into a
+    new dependency-free `src/nuketown2-layout.ts`, because importing
+    `nuketown2-arena.ts` from the weapon authority closes a require cycle through
+    `protocol.ts` - observed, not theorised: seven test files failed at import
+    time with the sites undefined.
