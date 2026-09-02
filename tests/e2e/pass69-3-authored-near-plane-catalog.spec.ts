@@ -121,6 +121,25 @@ const firearmSpecs = (JSON.parse(readFileSync(
 )) as { weapons: FirearmSpec[] }).weapons;
 const designIds = new Map<WeaponId, string>(firearmSpecs.map((entry) => [entry.id, entry.designId]));
 designIds.set('explosive-crossbow', 'pass65-explosive-crossbow-project-original-v1');
+// PASS 86. `crimson-flamethrower` (src/protocol.ts SPECIAL_WEAPON_IDS) is a
+// HF-334 LIVERY of `flamethrower` (WEAPON_LIVERY_ALIASES, src/weapon-model.ts):
+// it reuses that weapon's GLB and ships no second authored delivery, so it
+// appears in no family spec and `designIds` came out 20 against 21 canonical
+// weapons - this spec has been red in setup ever since crimson joined the
+// roster, at Lane W's base and at the PASS 85 publish head alike, which is
+// also why a stale `cameraNear: 0.08` pin survived here unnoticed.
+//
+// The value is READ FROM THE RUNTIME, never derived from the flamethrower's
+// identity: instantiateWeaponAsset() looks for the node tagged
+// `pass65-weapon-crimson-flamethrower` (src/weapon-model.ts), the shared GLB
+// carries only the flamethrower's tag, so the identity falls through to
+// `pass65-${id}-project-original-v1` - exactly the shape of the crossbow
+// precedent above, and exactly what a live snapshot reports:
+// docs/evidence/pass86/gate-repairs/crimson-flamethrower-runtime-identity.json
+// (installed Chrome, WebGPU, gun-range). It is NOT
+// `m2-pressure-wand-twin-tank-v1`; the livery has its own identity over a
+// shared body, which is what keeps this a UNIQUENESS contract.
+designIds.set('crimson-flamethrower', 'pass65-crimson-flamethrower-project-original-v1');
 
 function sha256(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
@@ -137,10 +156,24 @@ function matchTimerSeconds(value: string | null): number {
   return seconds < 60 ? Number(match[1]) * 60 + seconds : Number.NaN;
 }
 
+// PASS 86: a livery loads the ALIASED weapon's delivery, so the source it
+// reports is the donor's URL, not one named after itself - measured, same
+// receipt as the design id above:
+// `./assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod0.glb`
+// with `importedModel.weapon` still `crimson-flamethrower`. Keeping the
+// donor's path here is the point of the alias (one multi-megabyte GLB, not
+// two); the per-weapon identity is still asserted, by weaponModelId and
+// weaponFinishId.
+const LIVERY_ASSET_DONORS: Readonly<Partial<Record<WeaponId, WeaponId>>> = Object.freeze({
+  'crimson-flamethrower': 'flamethrower',
+});
+
 function expectedAssetSource(weapon: WeaponId): string {
-  return weapon === 'explosive-crossbow'
-    ? './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb'
-    : `./assets/original/models/weapons/pass65-firearms/${weapon}/${weapon}-fp-lod0.glb`;
+  if (weapon === 'explosive-crossbow') {
+    return './assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb';
+  }
+  const delivery = LIVERY_ASSET_DONORS[weapon] ?? weapon;
+  return `./assets/original/models/weapons/pass65-firearms/${delivery}/${delivery}-fp-lod0.glb`;
 }
 
 function expectedFirstPersonSource(weapon: WeaponId): string {
