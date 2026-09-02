@@ -165,6 +165,7 @@
     "qa:pass65:operator-assets": "node scripts/qa/verify-pass65-operator-production.mjs",
     "qa:pass64:renderer": "playwright test tests/e2e/pass64-renderer-foundation.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass74:arena-boot-smoke": "playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass85:arena-switch-matrix": "node scripts/qa/probe-arena-switch-matrix.mjs --dist dist --label gate",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
