@@ -169,10 +169,27 @@ function transform(m: number[], p: [number, number, number]): [number, number, n
   ];
 }
 
+/**
+ * WHICH DELIVERED MODELS ARE GATED.
+ *
+ * The lane re-exported six variants per weapon and only the first-person one
+ * was probed, so a rail could have drifted in the world or pickup model without
+ * failing anything. The probes are root-space and the generator emits every
+ * full-detail variant from the same geometry, so they transfer unchanged to the
+ * world and drop models; all three full-detail variants are gated here.
+ *
+ * The LOD1/LOD2 variants are deliberately NOT gated: they are decimated, so a
+ * rail that is genuinely seated can still read as a gap wider than the 12 mm
+ * seam tolerance at a probe line. Their seating is inherited from the LOD0
+ * geometry these tests do gate.
+ */
+const GATED_VARIANTS = ['fp-lod0', 'world-lod0', 'drop-lod0'] as const;
+
 describe('HF-396 rail and optic seating on the delivered first-person weapons', () => {
   for (const [weapon, probes] of Object.entries(CONTRACTS)) {
-    it(`${weapon}: rail on the receiver line and optic on the rail, unbroken to within ${RAIL_SEAT_TOLERANCE_METERS * 1000} mm`, async () => {
-      const triangles = await rootSpaceTriangles(`${FIREARMS}/${weapon}/${weapon}-fp-lod0.glb`);
+    for (const variant of GATED_VARIANTS) {
+    it(`${weapon} ${variant}: rail on the receiver line and optic on the rail, unbroken to within ${RAIL_SEAT_TOLERANCE_METERS * 1000} mm`, async () => {
+      const triangles = await rootSpaceTriangles(`${FIREARMS}/${weapon}/${weapon}-${variant}.glb`);
       expect(triangles.length).toBeGreaterThan(9 * 100);
       const verdicts = probes.map((probe) => probeVerticalStack(triangles, probe));
       const failing = verdicts
@@ -185,5 +202,6 @@ describe('HF-396 rail and optic seating on the delivered first-person weapons', 
         expect(verdict.solids.length, `${weapon} probe z=${verdict.probe.z} found no solid`).toBeGreaterThan(0);
       }
     }, 30_000);
+    }
   }
 });
