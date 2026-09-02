@@ -939,6 +939,7 @@ import {
   type TimedMapWeaponAuthorityState,
   type TimedMapWeaponId,
 } from './timed-map-weapon-authority';
+import { arenaCanAcquireFlamethrower, arenaCanAcquireFlareGun } from './arena-special-weapon-reach';
 import {
   TIMED_MAP_WEAPON_SCHEMA_VERSION,
   type TimedMapWeaponClaimRequestMessage,
@@ -35604,8 +35605,24 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
+    // LOAD-CUT (pass 85, lane H): these two rehearsals are SERIALIZED after the
+    // concurrent families above - they stage a transient world PointLight and
+    // three r185 folds the visible light graph into every render object's cache
+    // key, so they cannot overlap - and they ran on every arena. Measured over
+    // 56 in-session map switches on the shipped PASS 84 build:
+    // `flare-first-shot` 2560.6 ms median, `flamethrower-first-shot` 415.4 ms,
+    // out of a 21.3 s median switch. Neither weapon is a loadout weapon; each
+    // has one authored route onto a map, and `arena-special-weapon-reach.ts`
+    // asks those authorities (TIMED_MAP_WEAPON_DEFINITIONS, and the
+    // field-support rule for the care package's crimson flamethrower) instead
+    // of restating an arena list. Nothing leaves the ADMITTED vocabulary: the
+    // full weapon catalogue is still prewarmed above, and
+    // prewarmMatchBoundFirstShotPresentations still rehearses both exact fire
+    // compositions against the complete match scene on every arena before
+    // admission. This only drops the duplicate arena-side rehearsal on arenas
+    // whose own authority can never produce the weapon.
     groups.push(await runGroup('flare-first-shot', () => (
-      flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlareGun(selectedArena) ? Promise.resolve() : flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -35613,7 +35630,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ))
     )));
     groups.push(await runGroup('flamethrower-first-shot', () => (
-      flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlamethrower(selectedArena) ? Promise.resolve() : flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
           () => renderRuntime.compileAndRender(scene, camera, scene),
