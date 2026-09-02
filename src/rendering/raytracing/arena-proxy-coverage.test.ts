@@ -106,16 +106,37 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // silently would put Map 3 in the exact pass79 state this gate was written
   // for - a correctly-implemented reflection layer rendering nothing.
   map3: { meshes: 2, footprintM2: 272 },
-  // RAID2 (owner 2026-09-02, HF-408). MEASURED on the authored build, not
-  // guessed: 2 meshes / 631.6 m2. The two are the pool's presentation water
-  // sheet over its basin slab and the courtyard fountain's basin - the only
-  // two reflective surfaces a mansion terrace has, and between them they are
-  // this arena's entire mirror budget. The floor is pinned at 631 rather than
-  // at a round number, so deleting the water sheet - which is presentation-only
-  // and therefore the easiest thing in the arena to delete by accident - puts
-  // this arena straight into the pass79 state this gate exists for: a
-  // correctly-implemented reflection layer with nothing to reflect.
-  raid2: { meshes: 2, footprintM2: 631 },
+  // RAID2 (owner 2026-09-02, HF-408). RE-MEASURED 2026-09-03 in the lane's
+  // repair pass, and the previous pin has to be explained rather than quietly
+  // replaced, because it went DOWN.
+  //
+  // The old pin was 2 meshes / 631.6 m2 and its comment said the two were "the
+  // pool's presentation water sheet and the courtyard fountain's basin". That
+  // was wrong on both halves, and only measuring the extractor's own output
+  // showed it:
+  //
+  //  - The 609.3 m2 mesh was not the water sheet. It was
+  //    `raid2-presentation-presentation-batch-0`, the merged batch of every
+  //    presentation-only box in the arena. Merging the pool sheet (at z -29)
+  //    and the courtyard basin (at z -11) into one mesh gives that mesh a
+  //    BOUNDING BOX spanning 28 x 22 m of map, and the extractor measures
+  //    footprint from the bounding box. 609.3 m2 was a batching artefact, not
+  //    609.3 m2 of water.
+  //  - The second mesh was `raid2 wing glazing` (22.3 m2), a shots:true pane
+  //    standing 0.3 m proud of a solid wall INSIDE the pool wing. Eye-clearance
+  //    stage 2 found 13 violations on this arena and every one of them was that
+  //    pane; stage 3 confirmed the runtime camera could not resolve out of any
+  //    of them. It is removed, which is why this pin had to move at all.
+  //
+  // The new pin is the sum of two INDEPENDENTLY EXTRACTED real surfaces:
+  // `raid2 pool water` (195.8 m2) and `raid2 courtyard fountain basin`
+  // (11.6 m2), the latter enlarged to 3.4 x 3.4 m inside its own kerb and given
+  // its own shot surface so it stops being batched away. Deleting either one
+  // fails this gate, which the old pin could not do: under the old authoring
+  // both water surfaces were ONE mesh, so losing the pool sheet would still
+  // have left the count at 2 and only moved a number nobody could attribute.
+  // Pinned at 207, not a round number, for the same reason as before.
+  raid2: { meshes: 2, footprintM2: 207 },
 };
 
 type Coverage = {

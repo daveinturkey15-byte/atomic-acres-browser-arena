@@ -12,7 +12,7 @@
     "test1": 0,
     "test2": 0,
     "map3": -1,
-    "raid2": -1
+    "raid2": 0
   },
   "unmeasuredCeiling": -1,
   "unmeasured": [
@@ -20,11 +20,6 @@
       "arena": "map3",
       "since": "2026-09-02",
       "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
-    },
-    {
-      "arena": "raid2",
-      "since": "2026-09-02",
-      "note": "RAID2 (HF-408) registered selectable on 2026-09-02. Stage 1 (legality, scripts/qa/sweep-eye-clearance-spots.ts) HAS been run against it in the lane that built it and its result is recorded in the lane report; stages 2 and 3 are BROWSER stages and were not run, so this entry stays at the -1 sentinel rather than at a stage-1-only number. The ratchet stays RED for raid2 until live seats and the runtime re-probe have actually been run and their counts written down here."
     }
   ],
   "accepted": [
@@ -55,6 +50,7 @@
     "module": "src/camera-eye-clearance.ts (resolveEyeClearance), wired at the end of the local camera seat in legacy-main",
     "behaviour": "per-frame probes push the eye so no solid-backed shot surface lies within 0.15 m; shallow volume intrusions depenetrate through the nearest face (limit 0.4 m, push cap 0.34 m); wallbang panels and breakable window panes are design-exempt",
     "verifiedAt": "2026-08-29",
+    "raid2": "MEASURED 2026-09-03 in the Lane AQ repair pass, all three stages, installed Chrome HEADLESS on this worktree's own preview (127.0.0.1:41941). Stage 1: 212 colliders (9 floor) -> 3216 legal hug spots, 4 colliders with no legal adjacent stance (test2 measures 9, map3 0). Stage 2 FIRST RUN: 3216 spots / 22434 traces / 13 VIOLATIONS (7 crouch, 6 stand) and every one of them was the same surface - `raid2 wing glazing`, a shots:true pane standing 0.3 m proud of the solid wall behind it inside the pool wing, i.e. exactly the visual-geometry-past-its-collider habitat this pipeline exists for. Stage 3 confirmed the runtime resolve could not push out of any of the 13. The pane was removed (it was also invisible from the lane its own comment said it faced, and it could not be moved flush without a 1.1 m sill collider in the forbidden 0.9-1.8 m dead band). Stage 2 RE-RUN: 3216 spots / 22512 traces / 0 violations. Stage 3 RE-RUN: sweep 0, remaining 0. Ceiling is therefore a real measured ZERO, not a sentinel.",
     "runtimeRemaining": {
       "atomic-acres": "2 (prone under interior-access-ramp, runtime distance 0.143 - 95% of the 0.15 radius, bare near plane is 0.08)",
       "skyline-terminal": "3 (airstair, 0.069 -> 0.136 runtime)",

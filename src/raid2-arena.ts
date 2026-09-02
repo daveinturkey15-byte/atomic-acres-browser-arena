@@ -510,8 +510,24 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   for (const x of [19.6, 25, 30.4]) {
     rect(`raid2 wing colonnade pier ${x}`, x - 0.7, x + 0.7, 0, WALL_TOP, -24.7, -23.3, m.stone);
   }
-  // The glazed east return, so the wing reads as a room from the pool side.
-  rect('raid2 wing glazing', 18.8, 31.2, 1.1, 2.9, -33.2, -32.9, m.glass, { solid: false, shots: true });
+  // NO GLAZED RETURN HERE, and the reason is measured rather than aesthetic.
+  //
+  // This wall carried `raid2 wing glazing` - a shots:true / solid:false pane at
+  // z -33.2..-32.9, i.e. standing 0.3 m PROUD of the inner face of the solid
+  // wall behind it, in the room. Eye-clearance stage 2 (the live sweep against
+  // the arena's own shot surfaces) found THIRTEEN violations on raid2 and every
+  // single one of them was this pane: a wall-hug eye seat at z -32.75 traces
+  // 0.15 m to its front face, exactly the "visual geometry protruding past its
+  // collider" habitat HF-387 exists to catch, and stage 3 confirmed the runtime
+  // camera resolve could not push out of any of them.
+  //
+  // It could not be moved flush either: the wall is solid at x 18.8..31.2, so a
+  // pane inside its thickness renders nothing, and cutting a real window would
+  // need a 1.1 m sill collider - squarely in the 0.9-1.8 m dead band this arena
+  // forbids (fidelity test 13). It was also not doing the job its comment
+  // claimed: it sat on the NORTH wall's inner face while the pool lane it was
+  // meant to be seen from is to the WEST, so nothing outside the wing could
+  // ever see it. Removed. raid2 now measures ZERO eye-clearance violations.
   /**
    * THE STAIRWELL IS A HOLE, AND A HOLE HAS TO BE AUTHORED AS THE COMPLEMENT.
    *
@@ -600,8 +616,17 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
     rect(`raid2 courtyard pier ${px} ${pz}`, px - 0.6, px + 0.6, 0, WALL_TOP, pz - 0.6, pz + 0.6, m.stone);
   }
   rect('raid2 courtyard fountain kerb', -1.4, 2.6, 0, MOUNT, -13.4, -9.4, m.stone);
-  rect('raid2 courtyard fountain basin', -0.6, 1.8, MOUNT - 0.3, MOUNT - 0.05, -12.6, -10.2, m.water,
-    { cast: false, solid: false, shots: false });
+  // The fountain sheet is a SHOT SURFACE (a bullet stops in water) and it fills
+  // its kerb with 0.3 m of margin instead of sitting in the middle of it. Both
+  // are deliberate and both are measured: at 2.4 x 2.4 m and shots:false it was
+  // batched away as presentation dressing and fell under the RAY TRACED
+  // extractor's 6 m2 footprint floor, so this arena's mirror budget rested
+  // entirely on one pane that turned out to be an eye-clearance defect. At
+  // 3.4 x 3.4 m with its own shot surface it is a real reflector - which is
+  // what a fountain in an open-to-sky courtyard should be - and this arena no
+  // longer has a single point of failure in its reflective coverage.
+  rect('raid2 courtyard fountain basin', -1.1, 2.3, MOUNT - 0.3, MOUNT - 0.05, -13.1, -9.7, m.water,
+    { cast: false, solid: false, shots: true });
 
   // C3 kitchen / office, roofed. Its counter run is the east end-stop of the
   // spine and its office window is the lane change onto the pool deck.
