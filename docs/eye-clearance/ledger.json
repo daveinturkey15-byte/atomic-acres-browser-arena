@@ -11,7 +11,8 @@
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": -1
+    "map3": -1,
+    "farcrysis": -1
   },
   "unmeasuredCeiling": -1,
   "unmeasured": [
@@ -19,6 +20,11 @@
       "arena": "map3",
       "since": "2026-09-02",
       "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
+    },
+    {
+      "arena": "farcrysis",
+      "since": "2026-09-02",
+      "note": "farcrysis (HF-423) was un-hidden as a PREVIEW card on 2026-09-02. It enters at the -1 sentinel rather than at a guessed number, so the ratchet stays RED for farcrysis until each stage has actually been run and its count written down here."
     }
   ],
   "accepted": [
@@ -34,7 +40,7 @@
     },
     {
       "arena": "high-seas",
-      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (±0.90, 22.15)",
+      "rows": "stern-engine-access ramp x2, stand, 0.096 m at (\u00b10.90, 22.15)",
       "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
     },
     {
@@ -57,7 +63,8 @@
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
+      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it",
+      "farcrysis": "UNMEASURED (2026-09-02) - the arena was un-hidden as a PREVIEW card today (HF-423); stage 1 legality now covers it (measured 2026-09-02 at HF-423 head: 236 colliders, 12,017 raw spots thinned to 3,005 legal hug spots, 2 colliders with no legal adjacent stance), and stages 2 and 3 have not yet teleported the player into it"
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },

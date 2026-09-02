@@ -101,9 +101,13 @@ test('every selectable arena is covered by the derived roster', () => {
   // identical guard in eye-clearance-sweep-contract.test.mjs. The floor and the
   // required set are the only things standing between a collapsed derivation and
   // a gate that reports success while browser-testing nothing.
-  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  // HF-423: ratcheted 8 -> 9 when farcrysis was un-hidden as a PREVIEW card.
+  assert.ok(selectable.length >= 9, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3', 'farcrysis']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
-  assert.ok(!selectable.includes('farcrysis'), 'farcrysis is selectable:false and must stay out of the required set');
+  // The negative pin that used to stand here - "farcrysis is selectable:false
+  // and must stay out of the required set" - is retired by HF-423. It is not
+  // dropped: farcrysis is now in the REQUIRED list above, the same fact in the
+  // stronger direction. A PREVIEW card is browser-tested like any other.
 });
