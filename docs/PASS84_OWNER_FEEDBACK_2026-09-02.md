@@ -675,3 +675,39 @@ buildMap3 gets the prepare-then-build split (stage 2 builds arenas synchronously
 map3 is code-split). Do NOT merge V at 22:20; a second finisher is on the PASS 87
 critical path now. Stray: aa-map3 carries three uncommitted HF-412 files (not
 V's); aa-map3-laneV-verify is a scratch runner to remove once V is accepted.
+
+### HF-407 Nuke Town rebuild — finisher result 22:20 BST: MERGE-READY FOR PASS 86 (ship as NUKE TOWN REBUILD · PREVIEW)
+Branch nuketown-rejig at de0840e6: full suite 5187/0 on the branch; merge probe
+clean against 6c77a662; no third-party prose (scripted scan 0 hits); the 2x core
+roof reachable by a real Rapier traversal (eye 5.72 m over the core); lawn out of
+the houses (0.000 m2 overlap, asserted in the fidelity test); real menu preview
+media committed (the pass77 provenance gate stays red on the PRE-EXISTING shared-
+generator digest broken by c25f5e32/Map 3 - not faked, owner of that gate to fix);
+rare gun landed on the rebuild via RAILGUN_ARENA_IDS + per-arena sites, shipped
+Nuke Town byte-identical (tests); eye clearance MEASURED (ceiling 18, all prone
+under the truck decks; 2 runtime rows left OPEN); 60 s headless solo run zero
+errors. **Cut instruction:** merge U into PASS 86 after J/N in the auditor's
+order; re-run the boot smoke for nuketown2 (not run since the rare-gun commit)
+and the arena-roster + channel-list checks post-merge (the "published but
+unselectable" gotcha: integration also edits test-maps.ts, release-channels.json,
+legacy-main.ts). Promotion out of PREVIEW is the owner's call after he plays it.
+
+## HF-423 — owner 22:25 BST: "get farcrysis sorted overnight too after nuke town and raid"
+**Statement (verbatim):** "ok thanks, get farcrysis sorted overnight too after nuke
+town and raid, i will sleep now see you at 6AM so i can play something good and
+hear more about it all, impress me with all the cool 3js skills etc and animation
+possibly too if time permits! night night"
+- Lane R (`docs/pass84-lanes/LANE-R-farcrysis-playable-preview.md`) is UNSHELVED
+  and launched 22:30 on Opus, priority after Nuke Town (done) and Raid (running):
+  Farcrysis admitted inside the 12 s fence on Quality (Lane C's FARCRYSIS-LOAD
+  pattern is on the integration line), spawn table + gates, art gaps closed to a
+  clean first pass, unhidden as a PREVIEW card. The publish script's
+  farcrysis-unselectable guard becomes a farcrysis-admission-evidence guard in the
+  same cut that ships it (boot smoke + admission time + tripwire 0) - the cut
+  agent applies that with roll_pass.py's help; never delete the guard.
+- Falsifier: `selectable: true` + boot smoke green headless + admission < 12 s
+  cold on Quality + tripwire 0 + spawn-quality gate + eye-clearance measured +
+  60 s solo run zero errors; targets PASS 87 by 04:30, else the next pass.
+- Owner's 06:00 ask: something good to play (Nuke Town Rebuild preview in PASS 86;
+  Raid, Farcrysis, Map 3 explore, water/lighting/animation trials in PASS 87 where
+  green) and the morning report with the skills and animation work.
