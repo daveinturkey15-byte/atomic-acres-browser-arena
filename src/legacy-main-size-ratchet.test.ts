@@ -20,6 +20,14 @@ import { describe, expect, it } from 'vitest';
  * not get BIGGER without somebody writing down why, and that when it does get
  * smaller the win is locked in.
  *
+ * IT FAILS IN BOTH DIRECTIONS, and the second one surprises people. Growth of
+ * even one line reds `npm test` until LINE_CEILING is raised with a
+ * CEILING_HISTORY entry. A net REMOVAL of more than RATCHET_SLACK (250) lines
+ * also reds it, until the ceiling is LOWERED with an entry - see "HOW TO LOWER
+ * THE CEILING" below, which is three steps and never needs review. On a pass
+ * with explicit streamline lanes, the shrink direction is the likelier
+ * collision.
+ *
  * It is deliberately NOT a style rule, a complexity metric, or a lint. It is a
  * single number with a ledger, because a single number is the only thing about
  * a 35,000-line module that every contributor can check in one second.

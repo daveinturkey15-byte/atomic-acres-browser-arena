@@ -37,7 +37,7 @@ const BASE = arg('--url', 'https://daveinturkey15-byte.github.io/atomic-acres-br
 const RENDERER = arg('--renderer', 'webgpu');
 const PER_ARENA_MS = Number(arg('--per-arena', '240000'));
 const CALLSIGN = arg('--callsign', 'qa-player');
-// PASS 85 Lane N: this default was a hardcoded six-arena literal, so Test1,
+// PASS 85 Lane N: this default was a hardcoded FIVE-arena literal, so Test1,
 // Test2 and Map 3 were never swept by it and nothing said so. It is now
 // derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
 // superset of what it covered before; `--arenas` still overrides it.

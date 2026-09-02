@@ -8,6 +8,18 @@ Every number below was **measured** by scripts run in this worktree, not
 carried over from the 2026-08-31 audit. Where this audit contradicts that one,
 this one is the later measurement and says so.
 
+> **Repaired 2026-09-02, after a skeptic pass.** Four numbers in the first
+> version of this document were wrong, and three of them were wrong in the
+> direction that flatters the tooling. They are corrected in place, each with
+> the correction NAMED rather than quietly swapped: the graphics-registry
+> counts (38/10/28 -> 40/1/39, and the 08-31 figure of 40 was right all along),
+> the hardcoded-roster count (one syntax was measured and 24 files writing the
+> other were invisible), the claim that wiring `pass84-gamepad` made CI run it
+> (no CI job executes it), and the gun-range shader-compile evidence (the run
+> it cited had failed for a different reason entirely). An audit that gets its
+> own numbers wrong in the flattering direction is the failure it exists to
+> catch, so the corrections are the most useful thing in this file.
+
 ## Method
 
 "Referenced by" is **reachability from an entry point**, not "some file
@@ -30,13 +42,24 @@ checked, not assumed.
 | | total | orphaned | share |
 |---|---:|---:|---:|
 | `tests/e2e/*.spec.ts` | 76 | 25 | 33% |
-| `scripts/qa/**` (`.mjs`/`.cjs`/`.js`/`.ts`) | 330 | 173 | 52% |
+| `scripts/qa/**` (`.mjs`/`.cjs`/`.js`/`.ts`) | 330 of 350 | 173 | 52% |
+
+**330 of 350.** `scripts/qa` holds 350 files; the closure scans the four
+JavaScript/TypeScript extensions and therefore never looked at 20 of them —
+8 `.mts`, 5 `.py`, 3 `.ps1`, 1 `.sh`, 1 `.html`, 1 `.md`, 1 `.json`. Some of
+those are real verifiers (the Python luminance/measurement tools an npm script
+invokes). Every "330" in this document means "330 of 350, JS/TS only"; the 20
+are unaudited, not absent.
 
 Both totals include the two files this lane added. The 2026-08-31 audit said
 "45 of 75 specs referenced by nothing"; **that number does not reproduce**.
 The corpus is 76 specs and 25 of them are unreachable. The likely cause of the
 gap is the looser definition plus the wiring that landed between 08-31 and
 today; either way, 33% is the current figure and 45 is not.
+
+The figure was **26 before this lane wired `pass84-gamepad`** and 25 after;
+commit `b461dd90` says 26 and `462b5687` says 25, both true at the point they
+were written, and neither said which. That is what the difference is.
 
 Other pinned findings, re-checked today:
 
@@ -488,10 +511,33 @@ The registry holds 9 arenas (`src/arena-identity.ts`), 8 of them selectable
 (`farcrysis` is `selectable: false`). Test1 and Test2 shipped 2026-08-30;
 Map 3 shipped 2026-09-02.
 
-**15 files under `scripts/qa` and `tests/e2e` wrote an arena list by hand.**
-13 of them were six-arena literals that predate Test1/Test2/Map 3, so those
-three arenas were swept by none of them, and nothing said so. This is the
-third recurrence of one failure mode in this repository:
+**13 files under `scripts/qa` and `tests/e2e` wrote a comma-joined string
+roster by hand** (the table below has 15 rows; two of them already derived and
+are listed because their private copy of the scrape was folded in, not because
+they hardcoded anything). All 13 predate Test1/Test2/Map 3, so those three
+arenas were swept by none of them, and nothing said so.
+
+**And that was one syntax out of two.** The first version of this audit — and
+the anti-regression contract it shipped — looked only for ids comma-joined
+inside a single quoted string, and said so nowhere. A skeptic pass measured the
+other form. Re-measured here (`artifacts/lane-n/arrlist2.mjs`, requiring three
+DISTINCT ids so a switch sequence is not miscounted as a roster):
+
+| roster syntax | files | reachable from an entry point |
+|---|---:|---:|
+| comma-joined string (`'a,b,c'`) — what the first guard saw | 13 | 13 |
+| array literal (`['a', 'b', 'c']`) — what it did not | 24 | 16 |
+
+Among the 16 reachable array-literal rosters were
+`scripts/qa/verify-pass77-arena-menu-preview-production.mjs` — the menu-preview
+verifier recurrence #1 below is about — and
+`tests/e2e/pass65-menu-lifecycle.spec.ts`, which runs straight out of
+`.github/workflows/verify.yml` over four ids while its own test is titled
+"twenty **all-arena** solo starts". The recurrence this lane declared closed was
+still wide open in the most-cited file. What was done about it is in
+"The second syntax" below.
+
+This is the third recurrence of one failure mode in this repository:
 
 1. Two arenas shipped another map's menu preview — the preview verifier's
    list was written by hand.
@@ -523,13 +569,83 @@ Every new default is a **strict superset** of what the script covered before,
 so no sweep lost coverage; `--arenas` still overrides.
 
 The two cross-browser scripts already derived their roster — but each carried
-its own copy of the scrape, and a third copy lives in
-`scripts/qa/eye-clearance-sweep-contract.test.mjs`. Three copies of a fragile
-regex is the original failure one level up, and it had already drifted: both
-cross-browser copies still enforced a floor of 7 that Map 3 had outgrown. The
-derivation now lives once, in `scripts/qa/arena-roster.mjs`, with the floor
-beside it. (The eye-clearance copy is Lane J's file this pass and was left
-alone; folding it in is listed as PROPOSED below.)
+its own copy of the scrape, a third copy lives in
+`scripts/qa/eye-clearance-sweep-contract.test.mjs`, and — found by the skeptic
+pass, missed here — a **fourth** copy sat in
+`scripts/qa/verify-pass77-arena-menu-preview-production.mjs:332`,
+`selectableArenaRoster(source)`, with its own regex and its own shape
+assumptions, in the file at the centre of recurrence #1. Four copies of a
+fragile regex is the original failure one level up, and it had already drifted:
+both cross-browser copies still enforced a floor of 7 that Map 3 had outgrown.
+
+The derivation now lives once, in `scripts/qa/arena-roster.mjs`, with the floor
+beside it. The pass77 copy was **folded in** (it calls the new
+`arenaRegistryEntries()`), measured before and after by running the verifier
+itself: **1 issue both times, the same pre-existing one** — its recorded
+digest for `scripts/assets/generate-pass65-runtime-menu-previews.ts` was moved
+by `c25f5e32` (Map 3's menu capture) and never re-recorded, so
+`npm run qa:pass77:menu-previews` is RED at `75a4e508` for a reason that has
+nothing to do with this lane. The shelf invariants still derive and still run.
+(The eye-clearance copy is Lane J's file this pass and was left alone; folding
+it in stays PROPOSED below.)
+
+### The second syntax — what the repair did
+
+The detector in `scripts/qa/arena-roster-contract.test.mjs` now reads **both**
+syntaxes, and a new test exercises it against an array literal, a comma-joined
+string, a multi-line array and a repeating switch sequence, so a detector that
+stops matching fails instead of reporting zero offenders. Five more files lost
+their literal entirely:
+
+| file | old literal | arenas it could never reach | now |
+|---|---|---|---|
+| `scripts/qa/verify-hf-matrix-definitive.mjs` | 6 ids, commented "every production arena x TDM and FFA" | test1, test2, map3 | `defaultBootRoster()` |
+| `scripts/qa/verify-hf390-ballistics-cdp.mjs` | 6 ids | test1, test2, map3 | `defaultBootRoster()` |
+| `scripts/qa/verify-collider-parity-live-cdp.mjs` | 6 ids | test1, test2, map3 | `defaultBootRoster()` |
+| `scripts/qa/verify-pass33-maps.mjs` | 4 ids (Pass 33) | high-seas, test1, test2, map3 | `defaultSelectableRoster()` |
+| `scripts/qa/collider-visual-parity-core.ts` | 9 ids (complete, but hand-edited twice to stay so) | — | `ARENA_IDS` itself |
+
+`verify-pass33-maps.mjs` takes the SELECTABLE roster rather than the boot
+roster on purpose: `farcrysis` is `selectable: false` precisely because its cold
+load runs to minutes, and it would blow that script's 60 s per-map budget.
+
+Every remaining array literal is named in `BOUNDED_SUBSET_ALLOWANCES` with a
+**kind** the contract enforces, because they are not the same risk:
+
+- **PINNED SET** — the ids are the subject of an equality assertion or a receipt
+  digest (`verify-pass65-support-vehicle-production.mjs` asserts the preview
+  provenance covers *exactly* three helicopter maps plus Gun Range;
+  `pass65-hardware-webgl2-receipt-contract.mjs` has the ids inside a hashed
+  receipt shape; `verify-pass64-webgpu.mjs` is a per-arena behaviour matrix
+  where only atomic-acres may show grass). Widening asserts something false.
+- **AUTHORED ORDER** — a switch/browse sequence where ids repeat and order is
+  the contract (`verify-pass65-webgpu-endurance.mjs`'s ten-step sequence,
+  `verify-pass66-atomic-sky-webgpu.mjs`'s deliberate return visit,
+  `pass66-owner-feedback-multiplayer-ui.spec.ts`'s lobby round trip).
+- **TIMING BOUNDED** — a coverage roster capped by measured cost. These are the
+  ones that rot, and each entry names what must be re-measured to widen it.
+- **REQUIRED SET** — a contract naming arenas that MUST appear in a derived
+  roster (the cross-browser and eye-clearance contracts). The opposite of a
+  frozen roster: it is what makes a collapsed derivation fail.
+- **BEHAVIOUR MAP** — ids classified by a per-arena property, over a roster that
+  is itself derived (`verify-remotes-matrix-cdp.mjs`'s TDM/FFA `modeFor`).
+
+**The worst entry, recorded as OPEN DEBT rather than closed:**
+`tests/e2e/pass65-menu-lifecycle.spec.ts`. It runs from `verify.yml`, its test
+is titled "twenty all-arena solo starts", and it covers four of nine arenas —
+high-seas, test1, test2 and map3 have never been solo-started by CI. It was NOT
+derived here: twenty starts over eight arenas doubles the cold arena compiles
+inside a 300 s test timeout on a CI runner this lane cannot measure, and
+gun-range alone exceeds 45 s cold on this machine (see the findings below).
+Widening it needs a measured CI budget first, and the literal at line 764 plus
+the local four-id `type ArenaId` at line 8 have to move together.
+
+Same-bug-class hardening while here: `tests/e2e/pass66-audio-long-run.spec.ts`
+filtered `PASS66_AUDIO_ARENA` against its own four ids and silently yielded an
+EMPTY selection for anything else — every test skipped, run reports success,
+no audio measured. Identical shape to the `pass66-browser-admission-cycles` bug
+below. It now names an unknown id against `ARENA_IDS`, names a real-but-out-of-
+budget id, and refuses an empty selection.
 
 ### Two rosters stay bounded, by name and with a reason
 
@@ -556,26 +672,59 @@ to run on an empty roster. The default is unchanged.
 
 ## Graphics controls "verified" by a source-shape grep
 
-VERIFIED, and smaller than the 08-31 figure of 40: `src/graphics-settings-registry.ts`
-holds **38** `runtimeEvidence(...)` rows. **10** carry a `liveObservation`;
-**28** are path + symbol + telemetry-path only:
+**CORRECTED 2026-09-02.** The first version of this section said 38 rows, 10
+with a live observation and 28 source-shape only, and called the 2026-08-31
+figure of 40 refuted. All three claims were wrong, and wrong in the direction
+that flatters verification. Re-measured by parsing every `runtimeEvidence(`
+call site by argument ARITY — the 4th positional argument *is*
+`liveObservation` — with the script preserved at
+`docs/evidence/pass85/lane-n/runtime-evidence-arity.mjs`:
+
+```
+rows=40 live=1 sourceShapeOnly=39
+LIVE: environmentIntensity@L592
+liveObservation textual mentions on lines: 141, 159, 531, 533, 544, 936
+```
+
+Those six textual mentions are the doc comment, the type field, the function
+parameter, the function body and the validator — **no row sets it by name**, so
+counting the string would have found zero. `src/graphics-settings-registry.ts`
+holds **40** rows. **Exactly one** — `environmentIntensity`, the row that lied
+about `scene.environment` and was repaired on 2026-08-31 — carries a
+`liveObservation`. **39** are path + symbol + telemetry-path only:
 
 `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`,
-`geometryDetail`, `shadows`, `shadowUpdateMode`, `shadowFilter`,
-`indirectLighting`, `rayTracing`, `depthOfFieldStrength`, `spatialUpscaling`,
-`volumetricQuality`, `smokeQuality`, `particleQuality`, `anisotropy`,
-`decalQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`,
-`filmGrain`, `vignette`, `rainDensity`, `windStrength`, `lightning`,
-`wetSurfaces`, `ambientLife`.
+`antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`,
+`shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`,
+`screenSpaceReflections`, `screenSpaceGi`, `rayTracing`,
+`volumetricLightShafts`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`,
+`spatialUpscaling`, `reflectionQuality`, `volumetricQuality`, `smokeQuality`,
+`particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`,
+`toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`,
+`weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`,
+`ambientLife`.
+
+The eleven this document previously omitted from that list — and therefore
+implicitly certified as observation-backed when nothing observes them — are
+`antiAliasing`, `shadowResolution`, `ambientOcclusion`,
+`screenSpaceReflections`, `screenSpaceGi`, `volumetricLightShafts`,
+`depthOfField`, `motionBlur`, `reflectionQuality`, `bloomQuality` and
+`weatherIntensity`. Several of those are the most visible controls in the
+game.
+
+**The 2026-08-31 figure of 40 is CONFIRMED, not refuted.**
 
 Worth recording precisely, because the model has already been half-corrected
 and the correction deserves to stick: the registry's own doc comment now says
 so out loud — the path/symbol check "catches a real class of drift ... It is
 NOT proof that the consumer executes, and this table no longer describes
 itself as though it were. Only a row carrying `liveObservation` claims that."
-That is the honest framing. What remains is that 28 player-visible controls
+That is the honest framing. What remains is that **39** player-visible controls
 have no observed frame behind them, which is how `scene.environment` being
-null on first load passed nine unit tests.
+null on first load passed nine unit tests. The correction above is worth
+sitting with: this document's first version made the *same class* of mistake it
+exists to expose — it presented a count derived from reading source shapes as
+though it were an observation, and the number came out flattering.
 
 Per this lane's brief, **no change was made to the runtimeEvidence model**;
 it is PROPOSED below.
@@ -584,13 +733,36 @@ it is PROPOSED below.
 
 | class | count | commits |
 |---|---:|---|
-| (a) orphaned specs wired after passing | 1 | `b461dd90` |
-| (b) rosters derived from the registry | 15 files + 1 shared module + 1 contract | `e4c812ea` |
-| (c) legacy-main line-count ratchet | 1 | `ccc8085c` |
+| (a) orphaned specs wired after passing (reachable, NOT run by CI — see below) | 1 | `b461dd90` |
+| (b) rosters derived from the registry | 13 + 5 files, 1 shared module, 1 contract, 20 named allowances | `e4c812ea`, `b30bd1aa` |
+| (c) legacy-main line-count ratchet (fails in both directions) | 1 | `ccc8085c` |
 | (d) exact duplicates deleted | 0 (none exist — measured) | — |
 
-`package.json` gained three script entries (`qa:arena-roster:contract`,
-`qa:pass84:gamepad`, and nothing else); nothing was reordered or removed.
+The two per-file inventory tables above were generated at `462b5687` and are a
+snapshot of that tree; the repair commit `b30bd1aa` changed nine more files, so
+a line count in those tables may be a few lines short of the current head.
+
+`package.json` gained **two** script entries — `qa:arena-roster:contract` and
+`qa:pass84:gamepad` — and nothing was reordered or removed. (The first version
+of this sentence said "three" and then listed two.)
+
+### (c) The legacy-main ratchet fails in BOTH directions
+
+`src/legacy-main-size-ratchet.test.ts` pins the file at its measured 35,720
+newlines with no headroom. Two things fail it, and the first version of this
+document and the lane report disclosed only one:
+
+- **Growth.** Any lane landing net-new lines in `src/legacy-main.ts` reds
+  `npm test` until it raises `LINE_CEILING` and adds a `CEILING_HISTORY` entry.
+  That is the intended friction.
+- **Shrink past the slack.** `RATCHET_SLACK` is 250, so a lane that *removes*
+  more than 250 lines also reds `npm test` until it LOWERS the ceiling and adds
+  the same entry. That is also deliberate — a ceiling left far above the file
+  decays into permanent slack and waves a later regrowth straight through — but
+  it is the likelier collision this pass: PASS 85 has explicit streamline lanes
+  and Lane W is assigned `solveRiggedArms` in this very file. The procedure is
+  the same three steps documented at the top of the test file, and lowering
+  never needs review.
 
 ### (a) Orphaned specs: measured before wiring
 
@@ -612,25 +784,106 @@ wired.
 No spec's timeout, threshold or assertion was raised to make any of these
 pass. A spec that fails stays orphaned and stays on this list.
 
+**8 of the 26 orphans were run; 18 were not, and no selection rule was written
+down at the time.** That is a defect in this audit, so here is the rule that
+was actually applied, stated after the fact: the brief named
+`pass66-viewmodel-framing`; the rest were specs under roughly 250 lines whose
+subject matter a PASS 85 lane currently owns (viewmodel framing, gamepad,
+mobile field kit, wall penetration, scoped ADS, operator visuals, frame
+pacing); and the budget was a shared machine where each run costs a cold build
+plus 30–300 s of browser time. Size and current ownership, not risk.
+
+The 18 **not run this pass**, so the next lane does not re-derive which ones
+are untested rather than failing:
+
+`pass59-visuals` (111), `pass62-graphics-refinement` (90),
+`pass65-destructible-shed` (113), `pass65-flash-authority` (159),
+`pass65-gun-range-lighting` (160), `pass65-presentation-audio-blockers` (133),
+`pass65-preview-choreography` (188), `pass65-support-visual-gate` (583),
+`pass66-carpet-shed-webgpu` (506), `pass66-gun-range-test-bay` (477),
+`pass66-real-input-ads-hitl` (437), `pass66-sky-backdrop-regressions` (288),
+`pass66-timed-map-weapons` (313), `pass70-chopper-gunner` (845),
+`pass70-flare-direct-human` (150), `pass70-gun-range-clock-authority` (1012),
+`pass70-gun-range-door-visual` (63), `rustworks-tower-overhaul` (123).
+
+Two of those are the largest specs in the corpus —
+`pass70-gun-range-clock-authority` at 1,012 lines (last touched 2026-08-31) and
+`pass70-chopper-gunner` at 845 — and neither has an entry point.
+
+### (a) is NOT closed for CI: `pass84-gamepad` still runs in no workflow
+
+Wiring the spec into `run-bounded-e2e.mjs` as `default: true` and adding
+`npm run qa:pass84:gamepad` made it **reachable**. It did not make CI execute
+it, and the first version of this document implied it had. Both browser jobs in
+`.github/workflows/verify.yml` pass `QA_E2E_GROUPS` from `classify-change`, and
+`scripts/qa/run-bounded-e2e.mjs:51-54` honours that variable *exclusively* when
+it is set (`requestedGroups.size ? filter(named) : filter(default !== false)`).
+The group lists are hardcoded strings in `scripts/release/change-impact.mjs:92-93`
+and contain neither `pass84-gamepad` nor `pass74-arena-boot-smoke`. So
+`default: true` only affects a bare `npm run test:e2e` typed by hand — the same
+operator-runs-it-manually status this lane calls the problem.
+
+`scripts/release/**` is outside this lane's ownership, so the patch is in the
+lane report for the integrator rather than applied here. It is two appends plus
+a wiring contract modelled on the `pass73`/`pass74` precedent this repository
+already uses for exactly this (`scripts/qa/pass73-ci-wiring-contract.mjs`
+imports `outputsFor` from `../release/change-impact.mjs` and asserts the group
+is in both `windows_groups` and `linux_groups`). **The same gap already exists
+for `pass74-arena-boot-smoke`** — the gate authored because a boot incident
+reached the owner. Fix both or the next lane repeats this.
+
 ## Findings that belong to other lanes
 
-1. **gun-range's cold arena compile now exceeds 45 s on this machine.** Three
-   separate orphaned specs (`pass66-viewmodel-framing`,
-   `pass65-debug-capture-viewmodel`, and by inspection every other gun-range
-   spec with a 45 s budget) die at exactly the same place: 95%, "COMPILING
-   ARENA SHADERS · 100% = IN GAME". This is the same shape as HF-417
-   (gun-range in-match switch blows the 12 s fence) and HF-411 (load-time deep
-   cut). Until that lands, roughly a third of the orphaned corpus cannot be
+1. **gun-range's cold arena compile exceeds 45 s on this machine — VERIFIED,
+   with the evidence now tracked.** The first version of this item cited page
+   snapshots that no longer existed (Playwright's `outputDir` is
+   `artifacts/pass25a/playwright-results`, which later runs overwrite), and the
+   one surviving snapshot was from a different spec failing for a different
+   reason. So it was re-run, and the re-run *corrected the diagnosis*:
+
+   - On **bundled Chromium/SwiftShader**, `pass66-viewmodel-framing` never
+     reaches the arena at all. It fails at bootstrap with "GAMEPLAY RENDERER
+     BLOCKED — WebGPU was required, but no GPU adapter was available at all".
+     That is finding 2, not a shader compile.
+     Evidence: `docs/evidence/pass85/lane-n/pass66-viewmodel-framing-bundled-chromium-swiftshader.error-context.md`.
+   - With a **real WebGPU adapter** (installed Chrome, `PASS73_NATIVE_WEBGPU=1`,
+     HEADLESS), the same spec boots, enters gun-range, and dies waiting for
+     `matchPhase === 'active'` with the page showing `progressbar "Map loading
+     progress": 95%` and `COMPILING ARENA SHADERS · 100% = IN GAME`. That is
+     the finding, and this is now the evidence for it:
+     `docs/evidence/pass85/lane-n/pass66-viewmodel-framing-native-webgpu-gunrange-95pct.error-context.md`.
+
+   Same shape as HF-417 (gun-range in-match switch blows the 12 s fence) and
+   HF-411 (load-time deep cut). Until that lands, the gun-range specs cannot be
    wired without raising a timeout, which nobody should do. **Route to Lane H.**
-2. **`?renderer=webgl2` does not appear to be honoured on the mobile/compat
-   path.** `pass70-field-kit-mobile.spec.ts` requests
-   `renderer=webgl2&render=compat` under mobile emulation and still renders
-   "GAMEPLAY RENDERER BLOCKED — WebGPU was required, but no GPU adapter was
-   available at all" when no adapter exists. The same URL shape without mobile
-   emulation (`pass84-gamepad.spec.ts`) boots fine on SwiftShader. If the
-   explicit WebGL2 escape hatch is dead on mobile, that is a real-device
-   failure mode for every phone without a WebGPU adapter. **Not verified
-   beyond this one spec; needs a renderer-lane owner.**
+2. **`?renderer=webgl2` is retired everywhere, and the failure screen still
+   tells users to use it — VERIFIED by source.** The first version of this item
+   guessed at a mobile/compat-path bug from one spec. The mechanism is in
+   `src/rendering/render-runtime.ts:623`:
+
+   ```ts
+   export function resolveRenderRuntimeRequest(search: string, webGpuAvailable = true): RenderRuntimeRequest {
+     // Owner 2026-08-30: "retire all webgl2 stuff, full webgpu, no fallback."
+     void search;
+     void webGpuAvailable;
+     return { requestedBackend: 'webgpu', requireWebGPU: true };
+   }
+   ```
+
+   The URL is discarded. `?renderer=webgl2` is honoured on **no** path, mobile
+   or desktop — by owner directive, and `src/rendering/render-runtime.test.ts`
+   pins that intent. Nothing is broken here. What IS wrong is the blocked
+   screen: `src/main.ts:15` still renders "Use `?renderer=webgl2` only for the
+   explicit rollback-compatible renderer", which is dead advice on a screen a
+   real player only sees when they are already stuck.
+
+   This also corrects a comparison the first version drew. `pass84-gamepad`
+   booting "on SwiftShader" while `pass70-field-kit-mobile` did not was never
+   about mobile: `pass84-gamepad.spec.ts:18` pins `test.use({ channel:
+   'chrome' })`, so it always runs on installed Chrome with a real adapter.
+   Both failures are one cause — no WebGPU adapter — and both are the honest
+   requirement screen doing its job. **Route the stale message text to the
+   renderer/UI owner; there is no renderer bug to fix.**
 3. **`pass65-operator-visual-gate.spec.ts` is a genuine red**, not rot: it
    boots, runs, and fails an assertion about the canonical opaque PBR operator
    in Quality and authored Performance LODs. It has been unreachable since
@@ -642,9 +895,10 @@ Everything here is out of this lane's ownership or outside its safe classes.
 
 1. **Fold `scripts/qa/eye-clearance-sweep-contract.test.mjs`'s
    `selectableArenaIdsFromSource()` into `scripts/qa/arena-roster.mjs`.** It is
-   the third copy of the same scrape. Lane J owns that file this pass, so it
-   was left alone; the import is a two-line change once Lane J lands.
-2. **Give the 28 source-shape-only graphics controls a live observation, or
+   the last remaining copy of the same scrape (the pass77 copy was folded in by
+   the repair). Lane J owns that file this pass, so it was left alone; the
+   import is a two-line change once Lane J lands.
+2. **Give the 39 source-shape-only graphics controls a live observation, or
    stop calling them verified.** The registry already documents the
    distinction honestly; the work is to add `liveObservation` rows driven by
    an actual frame. This is the mechanism that let `scene.environment` be null
@@ -661,7 +915,15 @@ Everything here is out of this lane's ownership or outside its safe classes.
    photographs the menu with the text overwritten. The visual gates that do
    exist are ROI/telemetry assertions in QA scripts, not spec-level pixels.
    Not this lane's call, but worth an owner decision.
-5. **Delete nothing in `scripts/qa` yet.** 173 unreachable scripts is a real
+5. **Derive `tests/e2e/pass65-menu-lifecycle.spec.ts`'s roster once somebody
+   measures the CI budget.** It is the one TIMING BOUNDED allowance whose gate
+   actually runs in CI and whose own test title claims a coverage it does not
+   have. Needs a measured twenty-start run over eight arenas against the 300 s
+   timeout on a hosted runner; probably needs the gun-range compile fix first.
+6. **Audit the 20 non-JS files under `scripts/qa`.** The reachability closure
+   never looked at 8 `.mts`, 5 `.py`, 3 `.ps1` and 1 `.sh`, some of which are
+   real verifiers invoked by npm scripts.
+7. **Delete nothing in `scripts/qa` yet.** 173 unreachable scripts is a real
    liability, but the sample checked here is operator tooling that still runs
    by hand. A deletion pass needs per-file provenance (last human run, not
    last commit), which this audit did not gather.
@@ -670,6 +932,12 @@ Everything here is out of this lane's ownership or outside its safe classes.
 
 The scan scripts live in this worktree under `artifacts/lane-n/` (git-ignored
 by design). They are pure reads: `audit2.mjs` builds the reachability closure,
-`rosters.mjs` finds hardcoded arena lists, `dupes.mjs` looks for duplicate
-specs, `missing.mjs` checks `package.json` targets. Nothing in them mutates
-the tree.
+`rosters.mjs` finds comma-joined arena lists, `arrlist2.mjs` finds array-literal
+ones, `dupes.mjs` looks for duplicate specs, `missing.mjs` checks `package.json`
+targets. Nothing in them mutates the tree.
+
+Two measurements are preserved as TRACKED files rather than left in
+`artifacts/`, because they are the ones this audit got wrong first time:
+`docs/evidence/pass85/lane-n/runtime-evidence-arity.mjs` (run it with
+`node docs/evidence/pass85/lane-n/runtime-evidence-arity.mjs` from the repo
+root) and the two `error-context.md` page snapshots beside it.
