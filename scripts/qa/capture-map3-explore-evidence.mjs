@@ -206,10 +206,22 @@ async function main() {
     await page.screenshot({ path: join(OUT, 'map3-menu-showcase-link.png') });
 
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
-    await page.waitForFunction(
-      () => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
-      { timeout: 180_000 },
-    );
+    // Same shape as tests/e2e/pass74-arena-boot-smoke.spec.ts, and for the same
+    // reason: waiting only on the phase turns the game's own named deployment
+    // failure ("deployment preparation failed", "renderer blocked") into a bare
+    // 180 s timeout that says nothing. On a machine where a browser window is
+    // scarce, a run that fails must say WHY the first time.
+    const bootHandle = await page.waitForFunction(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const state = api?.snapshot?.();
+      if (state?.matchPhase === 'active' && state?.gameStarted === true) return 'active';
+      const status = document.querySelector('#status')?.textContent ?? '';
+      if (/deployment preparation failed|renderer blocked/i.test(status)) return `deploy-failed: ${status}`;
+      return null;
+    }, { timeout: 180_000 });
+    const boot = await bootHandle.jsonValue();
+    receipt.boot = boot;
+    if (boot !== 'active') throw new Error(`Map 3 did not boot: ${boot}`);
     await page.waitForTimeout(6000);
 
     // ---- 1. THE EXPLORE HUD, AS THE DOM ACTUALLY HAS IT --------------------
