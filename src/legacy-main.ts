@@ -28789,11 +28789,31 @@ async function performArenaSelection(
       // createRenderPipelineAsync, which Dawn compiles on worker threads and
       // outside any fence - with frustum culling disabled so the coverage set
       // is complete; the warm frame and the committing coverage draw then
-      // find every pipeline already built. The fence itself is untouched and
-      // every other arena takes exactly the sequence it took before.
-      if (selectedArena.id === 'farcrysis' && pass64TslSystems) {
-        const farcrysisPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));
+      // find every pipeline already built. The fence itself is untouched.
+      //
+      // LOAD-CUT (pass 85, lane H, HF-417): the arena-id gate this used to
+      // carry was the bug. Lane I found gun-range UNREACHABLE by an in-match
+      // map switch on the shipped PASS 84 build - "[Gun Range map selection
+      // failed] WebGPU queue completion exceeded 12000 ms for submission 614
+      // ... fenced draws 770" - while its FIRST load was fine, so every
+      // instrument that only ever boots straight into an arena stayed green
+      // while the map could not be entered. Measured on the shipped build
+      // (docs/evidence/pass85/lane-h/): an in-session switch into gun-range
+      // creates 234-302 render pipelines, and the switch-matrix phase
+      // attribution reports how many of them are built inside THIS
+      // warm-frame-and-fence window. Whichever arena is entered second carries
+      // that cost, so nothing about it is farcrysis-specific - farcrysis was
+      // simply the first arena heavy enough to lose the race outright. The
+      // off-fence realisation therefore runs for EVERY arena. compileAsync
+      // uses createRenderPipelineAsync, which Dawn compiles on worker threads
+      // outside any submission, so this MOVES work off the fence rather than
+      // adding it: the coverage precompile below then finds the pipelines
+      // already built. THE FENCE IS UNTOUCHED at 12 s, and
+      // src/presentation-prewarm-contract.test.ts pins that this region now
+      // contains no arena-id branch at all.
+      if (pass64TslSystems) {
+        const scenePassPrecompile = pass64TslSystems;
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);
