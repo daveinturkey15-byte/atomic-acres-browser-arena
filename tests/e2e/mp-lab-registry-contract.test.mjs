@@ -108,6 +108,58 @@ test('a verdict fails on any stall over the floor, any deadlock, any page error,
   ]), false);
 });
 
+test('the join-flow gate compares every arena, not only the ones that passed', async () => {
+  const { flowsIdentical, joinFlowAudit } = await import(pathToFileURL(HARNESS).href);
+  // The defect this pins: flowsIdentical() used to filter on verdict.pass, so a
+  // sweep where nothing passed compared ZERO flows and reported a vacuous true,
+  // and a sweep with one wedged arena excluded exactly the divergent one.
+  const failing = (flow) => ({ arenaId: flow.join('-'), verdict: { pass: false }, flow });
+  assert.equal(flowsIdentical([
+    failing(['boot', 'joined', 'deployed']),
+    failing(['boot', 'joined', 'bots-select-disabled', 'deployed']),
+  ]), false, 'two failing arenas with different flows must be caught');
+  const auditAllFailed = joinFlowAudit([
+    failing(['boot', 'joined', 'deployed']),
+    failing(['boot', 'joined', 'deployed']),
+  ]);
+  assert.equal(auditAllFailed.identical, true);
+  assert.equal(auditAllFailed.comparedCount, 2, 'a sweep where nothing passed must still compare both flows');
+  // A run cut short mid-flow diverged nowhere: a strict prefix stays identical,
+  // and the artifact says which arena was truncated so the true is not silent.
+  const truncated = joinFlowAudit([
+    failing(['boot', 'joined', 'arena-synced']),
+    failing(['boot', 'joined', 'arena-synced', 'deployed']),
+  ]);
+  assert.equal(truncated.identical, true);
+  assert.deepEqual(truncated.truncatedArenas, ['boot-joined-arena-synced']);
+  assert.equal(joinFlowAudit([]).comparedCount, 0, 'an empty sweep must report that it compared nothing');
+  assert.match(harnessSource, /joinFlowComparedCount: flowAudit\.comparedCount/, 'the summary must carry the compared count beside the verdict');
+});
+
+test('the verdict counts every playable stall, not just the ones the artifact stores', async () => {
+  const { arenaVerdict } = await import(pathToFileURL(HARNESS).href);
+  const record = {
+    join: { ok: true }, arenaSync: { ok: true }, deploy: { ok: true, hostOk: true, guestOk: true },
+    // `stalls` is a worst-20 sample; `stallsWhilePlayable` is the full count.
+    host: { frames: 900, stalls: [], stallsWhilePlayable: 37, worstStallMs: 857, deadlockCount: 0 },
+    guest: { frames: 900, stalls: [], stallsWhilePlayable: 0, worstStallMs: 40, deadlockCount: 0 },
+    errors: { host: { page: [], console: [] }, guest: { page: [], console: [] } },
+    failure: null,
+  };
+  const verdict = arenaVerdict(record);
+  assert.equal(verdict.pass, false);
+  assert.ok(verdict.reasons.some((reason) => reason.includes('37 stall(s)')), `expected the full stall count in ${JSON.stringify(verdict.reasons)}`);
+});
+
+test('the stored stall and long-task evidence is the worst sample, not the first', () => {
+  // 2p-after/atomic-acres reported longTasksOver100Ms 37 next to a first-20
+  // slice containing 3 tasks over 100 ms: an artifact that cannot show what its
+  // own counter counted.
+  assert.match(harnessSource, /stalls: \[\.\.\.stalls\]\.sort\(\(a, b\) => b\.durationMs - a\.durationMs\)\.slice\(0, 20\)/);
+  assert.match(harnessSource, /longTasks: \[\.\.\.probe\.longTasks\]\.sort\(\(a, b\) => b\.durationMs - a\.durationMs\)\.slice\(0, 20\)/);
+  assert.match(harnessSource, /longTasksRecorded: probe\.longTasks\.length/, 'the artifact must say how many long tasks the sample held');
+});
+
 test('package.json exposes the harness and this contract', () => {
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts['qa:mp-lab'], 'node scripts/qa/mp-lab/run-host-guest.mjs');

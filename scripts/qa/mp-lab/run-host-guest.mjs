@@ -636,10 +636,17 @@ function stopProbe(page) {
       unplayableSamples: probe.unplayableSamples,
       worstStallMs: sorted.length ? sorted[sorted.length - 1] : null,
       stallCount: stalls.length,
-      stalls: stalls.slice(0, 20),
+      // MP-LAB: the stored evidence arrays are the WORST samples, not the first
+      // ones. 2p-after/atomic-acres shipped longTasksOver100Ms 37 beside a
+      // first-20 slice holding only 3 tasks over 100 ms, so the artifact could
+      // not show the tasks its own counter was reporting and a later reader
+      // reached the opposite conclusion. Counts stay over the full series.
+      stallsWhilePlayable: stalls.filter((stall) => stall.playable !== false).length,
+      stalls: [...stalls].sort((a, b) => b.durationMs - a.durationMs).slice(0, 20),
       worstRafGapMs: Math.round(worstRafGapMs),
+      longTasksRecorded: probe.longTasks.length,
       longTasksOver100Ms: probe.longTasks.filter((task) => task.durationMs >= 100).length,
-      longTasks: probe.longTasks.slice(0, 20),
+      longTasks: [...probe.longTasks].sort((a, b) => b.durationMs - a.durationMs).slice(0, 20),
       deadlockCount: probe.deadlocks.length,
       deadlocksFreedByTurning: probe.deadlocks.filter((entry) => entry.escape?.freed === true).length,
       deadlocksNotFreed: probe.deadlocks.filter((entry) => entry.escape?.freed === false).length,
@@ -997,7 +1004,11 @@ export function arenaVerdict(record) {
     const stats = record[side];
     if (!stats) continue;
     if (stats.frames === 0) reasons.push(`${side} presented no frames`);
-    const stallsWhilePlayable = stats.stalls.filter((stall) => stall.playable !== false).length;
+    // MP-LAB: count over the whole series. `stats.stalls` is a worst-20 sample;
+    // deciding the verdict from a truncated array is how a gate stops looking.
+    const stallsWhilePlayable = typeof stats.stallsWhilePlayable === 'number'
+      ? stats.stallsWhilePlayable
+      : (stats.stalls ?? []).filter((stall) => stall.playable !== false).length;
     if (stallsWhilePlayable > 0) reasons.push(`${side} ${stallsWhilePlayable} stall(s) > ${STALL_FLOOR_MS} ms (worst ${stats.worstStallMs} ms)`);
     if (stats.deadlockCount > 0) reasons.push(`${side} ${stats.deadlockCount} movement deadlock(s)`);
     if (record.errors[side].page.length > 0) reasons.push(`${side} ${record.errors[side].page.length} page error(s)`);
@@ -1006,9 +1017,35 @@ export function arenaVerdict(record) {
   return { pass: reasons.length === 0, reasons };
 }
 
+// MP-LAB: "the join flow is identical per map" is a falsifier line, so the gate
+// that proves it must be able to go red. It used to filter to
+// `record.verdict?.pass` before comparing, which meant that on 2026-09-02 it
+// compared ZERO flows in the two sweeps where no arena passed (returning a
+// vacuous true), and in the 4-bot post-fix sweep it excluded exactly the one
+// arena whose flow was cut short by the lobby wedge. Every recorded flow is
+// compared now. A shorter flow counts as identical only when it is a strict
+// step-wise prefix of the longest one - an arena that wedged mid-flow took no
+// different path, it just stopped - and `comparedCount` travels with the answer
+// so a true computed over nothing is visible in the artifact.
+export function joinFlowAudit(records) {
+  const flows = (records ?? [])
+    .filter((record) => Array.isArray(record?.flow) && record.flow.length > 0)
+    .map((record) => ({ arenaId: record.arenaId ?? null, steps: record.flow, flow: record.flow.join('>') }));
+  const longest = flows.reduce((best, entry) => (entry.steps.length > (best?.steps.length ?? -1) ? entry : best), null);
+  const isPrefixOfLongest = (entry) => entry.steps.every((step, index) => step === longest.steps[index]);
+  const divergent = longest ? flows.filter((entry) => !isPrefixOfLongest(entry)) : [];
+  const truncated = longest ? flows.filter((entry) => isPrefixOfLongest(entry) && entry.steps.length < longest.steps.length) : [];
+  return {
+    identical: divergent.length === 0,
+    comparedCount: flows.length,
+    longestFlow: longest?.flow ?? null,
+    truncatedArenas: truncated.map((entry) => entry.arenaId),
+    divergentFlows: divergent.map((entry) => `${entry.arenaId}=${entry.flow}`),
+  };
+}
+
 export function flowsIdentical(records) {
-  const flows = records.filter((record) => record.verdict?.pass).map((record) => record.flow.join('>'));
-  return new Set(flows).size <= 1;
+  return joinFlowAudit(records).identical;
 }
 
 function summaryTable(records) {
@@ -1056,7 +1093,8 @@ async function main() {
     if (peer.exitCode === null) peer.kill();
   }
 
-  const identical = flowsIdentical(records);
+  const flowAudit = joinFlowAudit(records);
+  const identical = flowAudit.identical;
   const summary = {
     contract: 'mp-lab-host-guest-summary-v1',
     label: LABEL,
@@ -1069,6 +1107,10 @@ async function main() {
     deadlockWindowMs: DEADLOCK_WINDOW_MS,
     roster: roster.map((arena) => arena.id),
     joinFlowIdentical: identical,
+    joinFlowComparedCount: flowAudit.comparedCount,
+    joinFlowLongest: flowAudit.longestFlow,
+    joinFlowTruncatedArenas: flowAudit.truncatedArenas,
+    joinFlowDivergent: flowAudit.divergentFlows,
     arenas: records.map((record) => ({
       arenaId: record.arenaId,
       pass: record.verdict.pass,
@@ -1084,9 +1126,9 @@ async function main() {
     pass: identical && records.length === arenas.length && records.every((record) => record.verdict.pass),
   };
   writeFileSync(join(OUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2));
-  console.log(`\n[mp-lab] ${LABEL}: ${records.filter((record) => record.verdict.pass).length}/${records.length} arenas pass; join flow identical: ${identical}`);
+  console.log(`\n[mp-lab] ${LABEL}: ${records.filter((record) => record.verdict.pass).length}/${records.length} arenas pass; join flow identical: ${identical} (compared ${flowAudit.comparedCount} flow(s)${flowAudit.truncatedArenas.length ? `, truncated: ${flowAudit.truncatedArenas.join(', ')}` : ''})`);
   console.log(summaryTable(records));
-  if (!identical) console.log('[mp-lab] join flow differed between arenas:', records.map((record) => `${record.arenaId}=${record.flow.join('>')}`).join(' | '));
+  if (!identical) console.log('[mp-lab] join flow differed between arenas:', flowAudit.divergentFlows.join(' | '), `| longest: ${flowAudit.longestFlow}`);
   console.log(`[mp-lab] verdict ${summary.pass ? 'PASS' : 'FAIL'} - ${join(OUT_DIR, 'summary.json')}`);
   process.exitCode = summary.pass ? 0 : 1;
 }
