@@ -10822,6 +10822,29 @@ let presentationObstructionBoxes: Box2[] = [];
 let presentationObstructionKey = '';
 /** Retained empty set for the probe paths that must NOT see dressing. */
 const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
+// HF-399: the test-map dressing root, resolved ONCE per arena root instead of
+// on every call. Both callers below run every frame (the pose fold and the
+// surface clip planes), and on every arena except Test1/Test2 neither name
+// exists, so each call walked the whole arena graph twice and found nothing.
+// Measured 2026-09-02 on atomic-acres at Quality: 10,108 getObjectByProperty
+// calls per frame from this one line, the single largest named JS cost in a
+// main thread that was 0.1% idle. The dressing group is attached inside the
+// arena builder (src/test-maps.ts -> applyTest1Dressing/applyTest2Dressing),
+// so it exists the moment `arena.root` does; the child-count check is the
+// guard for a root that gains its dressing later.
+let presentationDressingRootFor: THREE.Object3D | null = null;
+let presentationDressingRootChildCount = -1;
+let presentationDressingRoot: THREE.Object3D | undefined;
+
+function activePresentationDressingRoot(): THREE.Object3D | undefined {
+  const root = arena.root;
+  if (root !== presentationDressingRootFor || (presentationDressingRoot === undefined && root.children.length !== presentationDressingRootChildCount)) {
+    presentationDressingRootFor = root;
+    presentationDressingRootChildCount = root.children.length;
+    presentationDressingRoot = root.getObjectByName('test1-dressing') ?? root.getObjectByName('test2-dressing');
+  }
+  return presentationDressingRoot;
+}
 
 function activePresentationObstructionBoxes(): readonly Box2[] {
   // Measured 2026-08-31 on atomic-acres: this fed the fold ZERO boxes against
@@ -10830,7 +10853,7 @@ function activePresentationObstructionBoxes(): readonly Box2[] {
   // life layer - so on the owner's main map the dressing fold was inert and
   // the gun rendered straight through every prop. The arena's own ART root is
   // where atomic-acres keeps its dressing, so it goes in the list.
-  const dressingRoot = arena.root.getObjectByName('test1-dressing') ?? arena.root.getObjectByName('test2-dressing');
+  const dressingRoot = activePresentationDressingRoot();
   const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}:${arenaArtRoot?.uuid ?? ''}`;
   if (key !== presentationObstructionKey) {
     presentationObstructionKey = key;
