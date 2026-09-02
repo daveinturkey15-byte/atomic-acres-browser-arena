@@ -94,6 +94,16 @@ import {
   type WeatherState,
 } from './weather/weather-state';
 import { createWindField, sampleWind } from './weather/wind-field';
+// LIGHTING: time-of-day model. Pure numbers only — see the module header for
+// why it can never return a light (PASS 82 light-set freeze).
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  isLightingTimeChoice,
+  lightingConditionsAreIdentity,
+  resolveLightingConditions,
+  type LightingConditionWrites,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -3984,6 +3994,194 @@ let appliedArenaVisualPolicy: Readonly<{
   reviewCameraIds: readonly string[];
 }> | null = null;
 
+// LIGHTING: ==== time-of-day conditions (Lane AB, PASS 87) ====================
+// The light SET is frozen. buildSky() constructs the hemisphere, ambient, sun
+// and fill lights ONCE at module scope and nothing in this region ever adds,
+// removes, replaces or toggles one — that is the PASS 82 root cause and the
+// reason this whole feature is expressed as uniform writes. Everything below
+// writes colour, intensity, direction, fog colour and exposure into lights that
+// already exist. `src/rendering/lighting-conditions-light-set.test.ts` pins that
+// property against this exact source region, so a future edit that constructs a
+// light here fails a test rather than freezing the game.
+type LightingConditionBaseline = Readonly<{
+  arenaId: ArenaId;
+  sunColor: number;
+  sunIntensity: number;
+  ambientColor: number;
+  ambientIntensity: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  fillColor: number;
+  fillIntensity: number;
+  fogColor: number;
+  exposure: number;
+}>;
+
+const LIGHTING_CONDITION_DEG = Math.PI / 180;
+/**
+ * Below this the re-aimed sun is invisible and would still cost a full static
+ * shadow-map refresh, so `cycle` mode quantises to it. `fixed`/`random` resolve
+ * one hour for the whole match and therefore move the sun exactly zero times.
+ */
+const LIGHTING_CONDITION_SUN_STEP_DEGREES = 0.35;
+/** Hour movement below this writes nothing at all. */
+const LIGHTING_CONDITION_HOUR_EPSILON = 0.004;
+/** Absolute elevation clamp applied to the re-aimed sun, in degrees. */
+const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 84 });
+
+const lightingQueryParams = new URLSearchParams(window.location.search);
+const lightingQueryChoice = lightingQueryParams.get('tod');
+const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
+/** `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode. */
+const lightingCaptureFixedHour = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
+let lightingTimeChoice: LightingTimeChoice = isLightingTimeChoice(lightingQueryChoice)
+  ? lightingQueryChoice
+  : DEFAULT_LIGHTING_TIME_CHOICE;
+let lightingConditionBaseline: LightingConditionBaseline | null = null;
+let activeLightingConditions: LightingConditionWrites | null = null;
+let lightingConditionsSkyDarken = 0;
+let lightingConditionsElapsedSeconds = 0;
+let lightingConditionsAppliedHour = Number.NaN;
+let lightingConditionsAppliedElevationDegrees = Number.NaN;
+let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+let lightingConditionsSunReaims = 0;
+let lightingConditionsUniformWrites = 0;
+
+const lightingConditionScratchColor = new THREE.Color();
+
+/** Multiplies an authored colour by a bounded per-channel tint, in place. */
+function lightingConditionTint(hex: number, tint: readonly [number, number, number]): THREE.Color {
+  lightingConditionScratchColor.setHex(hex);
+  lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * tint[0]);
+  lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * tint[1]);
+  lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * tint[2]);
+  return lightingConditionScratchColor;
+}
+
+/**
+ * The fog colour every consumer should start from. The nuke charge, the flash
+ * and the arena-change restore all rewrite `scene.fog.color` from the authored
+ * value; routing them through here is what stops those three effects snapping
+ * the sky back to its authored hour for the rest of the match.
+ */
+function conditionedFogBaseColorHex(): number {
+  const authored = activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor;
+  const writes = activeLightingConditions;
+  if (!writes || lightingConditionsAreIdentity(writes)) return authored;
+  return lightingConditionTint(authored, writes.fogTint).getHex();
+}
+
+function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
+  lightingConditionBaseline = Object.freeze(baseline);
+  lightingConditionsAppliedHour = Number.NaN;
+  lightingConditionsAppliedElevationDegrees = Number.NaN;
+  lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+}
+
+function resolveActiveLightingConditions(): LightingConditionWrites {
+  return resolveLightingConditions({
+    arenaId: selectedArena.id,
+    matchSeed: weatherMatchSeed,
+    elapsedSeconds: lightingConditionsElapsedSeconds,
+    choice: lightingTimeChoice,
+    skyDarkenAmount: lightingConditionsSkyDarken,
+    ...(lightingCaptureFixedHour === null ? {} : { fixedHour: lightingCaptureFixedHour }),
+  });
+}
+
+/**
+ * Re-aims the ALREADY-EXISTING key light. `graphicsRefinement.applyArena` owns
+ * the base offset and the shadow camera; this only rotates the same vector about
+ * the same target, and only when the movement is large enough to be seen — a
+ * sun that jitters by hundredths of a degree would refresh the static shadow map
+ * every frame for no visible gain.
+ */
+function reaimConditionedSun(writes: LightingConditionWrites): void {
+  if (!sunLight) return;
+  const base = activeLighting.sunPosition;
+  const radius = Math.hypot(base[0], base[1], base[2]);
+  if (!(radius > 0)) return;
+  const baseElevation = Math.atan2(base[1], Math.hypot(base[0], base[2])) / LIGHTING_CONDITION_DEG;
+  const baseAzimuth = Math.atan2(base[2], base[0]) / LIGHTING_CONDITION_DEG;
+  const elevation = Math.min(
+    LIGHTING_CONDITION_ELEVATION_CLAMP.maximum,
+    Math.max(LIGHTING_CONDITION_ELEVATION_CLAMP.minimum, baseElevation + writes.sunElevationDeltaDegrees),
+  );
+  const azimuth = baseAzimuth + writes.sunAzimuthDeltaDegrees;
+  const movedEnough = !Number.isFinite(lightingConditionsAppliedElevationDegrees)
+    || Math.abs(elevation - lightingConditionsAppliedElevationDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES
+    || Math.abs(azimuth - lightingConditionsAppliedAzimuthDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES;
+  if (!movedEnough) return;
+  lightingConditionsAppliedElevationDegrees = elevation;
+  lightingConditionsAppliedAzimuthDegrees = azimuth;
+  const flat = Math.cos(elevation * LIGHTING_CONDITION_DEG) * radius;
+  // Same composition graphicsRefinement.applyArena uses: horizontal components
+  // are offsets from the arena centre, the vertical component is absolute.
+  sunLight.position.set(
+    sunLight.target.position.x + flat * Math.cos(azimuth * LIGHTING_CONDITION_DEG),
+    Math.sin(elevation * LIGHTING_CONDITION_DEG) * radius,
+    sunLight.target.position.z + flat * Math.sin(azimuth * LIGHTING_CONDITION_DEG),
+  );
+  sunLight.shadow.needsUpdate = true;
+  lightingConditionsSunReaims += 1;
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
+}
+
+/**
+ * The ONE place time of day reaches the renderer. Every statement below is an
+ * assignment into an existing light, an existing fog instance or the exposure
+ * uniform. No light is created, destroyed, parented or unparented.
+ */
+function applyLightingConditionUniforms(force = false): void {
+  const baseline = lightingConditionBaseline;
+  if (!baseline || baseline.arenaId !== selectedArena.id) return;
+  const writes = resolveActiveLightingConditions();
+  activeLightingConditions = writes;
+  if (!force && Math.abs(writes.hour - lightingConditionsAppliedHour) < LIGHTING_CONDITION_HOUR_EPSILON) return;
+  lightingConditionsAppliedHour = writes.hour;
+  lightingConditionsUniformWrites += 1;
+  const indirect = graphicsRuntime.indirectLightScale;
+  if (sunLight) {
+    sunLight.color.copy(lightingConditionTint(baseline.sunColor, writes.sunTint));
+    sunLight.intensity = baseline.sunIntensity * writes.sunIntensityScale;
+    reaimConditionedSun(writes);
+  }
+  if (ambientLight) {
+    ambientLight.color.copy(lightingConditionTint(baseline.ambientColor, writes.ambientTint));
+    ambientLight.intensity = baseline.ambientIntensity * indirect * writes.ambientIntensityScale;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.copy(lightingConditionTint(baseline.hemisphereSky, writes.hemisphereSkyTint));
+    hemisphereLight.groundColor.copy(lightingConditionTint(baseline.hemisphereGround, writes.hemisphereGroundTint));
+    hemisphereLight.intensity = baseline.hemisphereIntensity * indirect * writes.hemisphereIntensityScale;
+  }
+  if (fillLight) {
+    fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
+    fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
+  }
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
+  renderRuntime.setExposure(effectiveGraphicsExposure(baseline.exposure * writes.exposureScale));
+}
+
+/** Telemetry for the QA probes and the debug panel. Read-only. */
+function lightingConditionsTelemetry(): Record<string, unknown> {
+  const writes = activeLightingConditions;
+  return {
+    choice: lightingTimeChoice,
+    hour: writes ? Number(writes.hour.toFixed(3)) : null,
+    deviation: writes ? Number(writes.deviation.toFixed(4)) : null,
+    sunIntensityScale: writes ? Number(writes.sunIntensityScale.toFixed(4)) : null,
+    shadowFloorScale: writes ? Number(writes.shadowFloorScale.toFixed(4)) : null,
+    exposureScale: writes ? Number(writes.exposureScale.toFixed(4)) : null,
+    skyDarkenAmount: Number(lightingConditionsSkyDarken.toFixed(4)),
+    identity: writes ? lightingConditionsAreIdentity(writes) : true,
+    sunReaims: lightingConditionsSunReaims,
+    uniformWrites: lightingConditionsUniformWrites,
+  };
+}
+// LIGHTING: ==== end time-of-day conditions ====================================
+
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
   renderRuntime.setExposure(effectiveGraphicsExposure(definition.colorPipeline.exposure));
@@ -4034,6 +4232,23 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     budgets: definition.budgets,
     reviewCameraIds: Object.freeze(definition.reviewCameras.map((entry) => entry.id)),
   });
+  // LIGHTING: the authored values written above ARE the arena's identity anchor.
+  // Snapshot them, then compose the resolved hour on top as uniform writes.
+  captureLightingConditionBaseline({
+    arenaId: definition.id,
+    sunColor: definition.lighting.sunColor,
+    sunIntensity: definition.lighting.sunIntensity,
+    ambientColor: definition.lighting.ambientColor,
+    ambientIntensity: definition.lighting.ambientIntensity,
+    hemisphereSky: activeLighting.hemisphereSky,
+    hemisphereGround: activeLighting.hemisphereGround,
+    hemisphereIntensity: activeLighting.hemisphereIntensity,
+    fillColor: activeLighting.fillColor,
+    fillIntensity: activeLighting.fillIntensity,
+    fogColor: definition.fog.color,
+    exposure: definition.colorPipeline.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -25015,7 +25230,7 @@ function updateNuke(now: number): void {
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
     const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
     if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0x8c536f), charge * 0.24);
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -25026,14 +25241,14 @@ function updateNuke(now: number): void {
   sequence.shockwave.scale.setScalar(0.1 + blastProgress * 180);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   flash.hidden = true;
   flash.style.opacity = '0';
   nukeSequence = null;
@@ -26102,7 +26317,7 @@ function clearFieldSupport(): void {
   nukeShockwave.visible = false;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   const nukeWarning = element<HTMLElement>('#nuke-warning');
   const nukeFlash = element<HTMLElement>('#nuke-flash');
   nukeWarning.hidden = true;
@@ -29079,6 +29294,26 @@ function applyArenaLightingForSelection(): void {
   }
   arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
+  // LIGHTING: this function is the canonical "write the AUTHORED lighting into
+  // the frozen light set" path (arena selection and every graphics-settings
+  // apply land here). Re-anchor the baseline on the values it just wrote, then
+  // re-compose the resolved hour — otherwise changing a graphics setting mid
+  // match would silently snap the sky back to the arena's authored hour.
+  captureLightingConditionBaseline({
+    arenaId: selectedArena.id,
+    sunColor: definition?.lighting.sunColor ?? lighting.sunColor,
+    sunIntensity: definition?.lighting.sunIntensity ?? lighting.sunIntensity,
+    ambientColor: definition?.lighting.ambientColor ?? lighting.ambientColor,
+    ambientIntensity: definition?.lighting.ambientIntensity ?? lighting.ambientIntensity,
+    hemisphereSky: lighting.hemisphereSky,
+    hemisphereGround: lighting.hemisphereGround,
+    hemisphereIntensity: lighting.hemisphereIntensity,
+    fillColor: lighting.fillColor,
+    fillIntensity: lighting.fillIntensity,
+    fogColor: definition?.fog.color ?? lighting.fogColor,
+    exposure: definition?.colorPipeline.exposure ?? lighting.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -30582,6 +30817,15 @@ function frame(now: number, scheduleNext = true): void {
       : gameStarted
         ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
         : clearWeatherSample(selectedArena.id);
+    // LIGHTING: the hour rides the SAME clock and the SAME match seed the
+    // weather does, so two peers agree on the sun for exactly the reason they
+    // already agree on the sky — and `skyDarkenAmount` pulls the time-of-day
+    // excursion back toward the arena's authored identity as the sky closes in.
+    // This is a uniform write over the frozen light set; `fixed`/`random` write
+    // once per arena apply and `cycle` writes at most once per 0.004 h step.
+    lightingConditionsElapsedSeconds = weatherElapsedSeconds;
+    lightingConditionsSkyDarken = weatherNow.skyDarkenAmount;
+    applyLightingConditionUniforms();
     const windNow = sampleWind(
       weatherWindField,
       camera.position.x,
@@ -31629,6 +31873,9 @@ const debugWindow = window as Window & {
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
+    // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
+    sampleLightingConditions: () => Record<string, unknown>;
+    setLightingTimeChoice: (choice: string) => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
     sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
@@ -32858,6 +33105,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     rain: rainPresentation.telemetry(),
     particles: hfParticleRuntime.telemetry(),
   }),
+  // LIGHTING: read-only time-of-day telemetry. No light is touched by reading.
+  sampleLightingConditions: () => lightingConditionsTelemetry(),
+  // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
+  setLightingTimeChoice: (choice: string) => {
+    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: lightingTimeChoice };
+    lightingTimeChoice = choice;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, ...lightingConditionsTelemetry() };
+  },
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because
   // five independent conditions can freeze movement and none of them was
