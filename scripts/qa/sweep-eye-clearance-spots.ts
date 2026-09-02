@@ -33,6 +33,10 @@ import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // It is an alias of ArenaId, so the loop variable already satisfies it and the
 // casts this file used to carry are gone.
 import { shedPlacementsForArena } from '../../src/destructible-shed-registry';
+import {
+  createGunRangeTestBayDoorState,
+  gunRangeTestBayDoorDynamicColliders,
+} from '../../src/gun-range-test-bay';
 import { ARENA_IDS, type ArenaId } from '../../src/arena-identity';
 import { SELECTABLE_ARENAS } from '../../src/map-selection';
 
@@ -219,6 +223,38 @@ export function sweptArenaIds(): ArenaId[] {
   return ids;
 }
 
+/**
+ * Movement authority that no arena BUILDER emits, because it belongs to a
+ * runtime fixture whose pose is state - and which stage 2 nevertheless probes.
+ *
+ * Lane J, 2026-09-02. 51 of the 55 red gun-range rows were this single seam.
+ * The test-bay secure door leaf is authored `solid: false, shots: false`
+ * (additional-maps.ts, `gun-range-test-bay-secure-door-leaf`) because its
+ * authority is the DOOR STATE, not the mesh: `gunRangeTestBayDoorLeafBounds`
+ * feeds BOTH `gunRangeTestBayDoorDynamicColliders` (movement) and
+ * `gunRangeTestBayDoorDynamicBallisticSurfaces` (shots), and legacy-main
+ * splices the latter into `activeBallisticSurfaces` for gun-range. So stage 2
+ * traced against the closed leaf while stage 1's legality model could not see
+ * it: the sweep emitted hug spots at x = 51.10-51.12, i.e. 0.03-0.05 m west of
+ * the leaf's 51.15 face, where a 0.36-0.38 m capsule is a third of a metre
+ * INSIDE the closed door. Those eyes were 0.00-0.05 m from the leaf and were
+ * reported as clips no player can reach.
+ *
+ * The rule this encodes: whatever authority stage 2 can HIT, stage 1 must ask
+ * for legality. A stage-2 surface set that is wider than stage-1's collider
+ * view manufactures violations; the reverse hides them.
+ *
+ * The door is taken in its authored initial state (`phase: 'closed',
+ * openness: 0`) because that is what a player meets on arrival and what stage 2
+ * measured - the sweep never walks the approach trigger, so the leaf never
+ * rises. An open leaf travels +7 m in Y, clear of every stance.
+ */
+export function dynamicAuthorityColliders(arenaId: ArenaId): Box2[] {
+  if (arenaId !== 'gun-range') return [];
+  return gunRangeTestBayDoorDynamicColliders(createGunRangeTestBayDoorState())
+    .map((collider) => ({ ...collider.bounds }));
+}
+
 export function runSweep(): void {
   mkdirSync('artifacts/qa/eye-clearance', { recursive: true });
   const sweptIds = sweptArenaIds();
@@ -249,6 +285,10 @@ export function runSweep(): void {
     } catch {
       // Arena without interactive-world support keeps its static set.
     }
+    // State-posed fixtures whose authority never reaches `map.colliders`. See
+    // dynamicAuthorityColliders: stage 2 probes them, so stage 1 must too.
+    const dynamicAuthority = dynamicAuthorityColliders(arena.id);
+    colliders = [...colliders, ...dynamicAuthority];
     const groundY = 0;
     const views: StanceViews = STANCES.map((s) => stanceColliderView(colliders, groundY, s.eye));
     let spots: Spot[] = [];
@@ -286,12 +326,15 @@ export function runSweep(): void {
         arena: arena.id,
         colliders: colliders.length,
         floorColliders,
+        dynamicAuthorityColliders: dynamicAuthority.length,
         rawSpots,
         unreachableColliders,
         spots,
       }, null, 1));
     console.log(
-      `${arena.id}: ${colliders.length} colliders (${floorColliders} floor) -> ${spots.length} legal hug spots`
+      `${arena.id}: ${colliders.length} colliders (${floorColliders} floor,`
+      + ` ${dynamicAuthority.length} state-posed dynamic authority)`
+      + ` -> ${spots.length} legal hug spots`
       + ` (${unreachableColliders} colliders with no legal adjacent stance)`,
     );
   }
