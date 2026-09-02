@@ -4064,6 +4064,11 @@ let lightingConditionsAppliedHour = Number.NaN;
 let lightingConditionsAppliedElevationDegrees = Number.NaN;
 let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
 let lightingConditionsSunReaims = 0;
+let lightingConditionsGateChoice: LightingTimeChoice | null = null;
+let lightingConditionsGateSkyStep = Number.NaN;
+let lightingConditionsGateClockStep = Number.NaN;
+let lightingConditionsGateSeed = Number.NaN;
+let lightingConditionsResolves = 0;
 let lightingConditionsUniformWrites = 0;
 
 const lightingConditionScratchColor = new THREE.Color();
@@ -4093,6 +4098,7 @@ function conditionedFogBaseColorHex(): number {
 function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
   lightingConditionBaseline = Object.freeze(baseline);
   lightingConditionsAppliedHour = Number.NaN;
+  lightingConditionsGateChoice = null;
   lightingConditionsAppliedElevationDegrees = Number.NaN;
   lightingConditionsAppliedAzimuthDegrees = Number.NaN;
 }
@@ -4154,6 +4160,26 @@ function reaimConditionedSun(writes: LightingConditionWrites): void {
 function applyLightingConditionUniforms(force = false): void {
   const baseline = lightingConditionBaseline;
   if (!baseline || baseline.arenaId !== selectedArena.id) return;
+  const choice = activeLightingTimeChoice();
+  // GATE BEFORE THE RESOLVE. This runs every frame, and `resolveLightingConditions`
+  // allocates a frozen record with six frozen tints; at 144 Hz that is ~1,000
+  // short-lived objects a second bought for nothing, because in every mode except
+  // `cycle` the hour is CONSTANT for the whole match. Only two inputs can move --
+  // the weather's sky-darken and, in `cycle`, the clock -- so both are quantised
+  // and compared first. In `fixed`/`random` steady state this function costs four
+  // comparisons and returns.
+  const skyStep = Math.round(lightingConditionsSkyDarken * 256);
+  const clockStep = choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0;
+  if (!force
+    && choice === lightingConditionsGateChoice
+    && skyStep === lightingConditionsGateSkyStep
+    && clockStep === lightingConditionsGateClockStep
+    && weatherMatchSeed === lightingConditionsGateSeed) return;
+  lightingConditionsGateChoice = choice;
+  lightingConditionsGateSkyStep = skyStep;
+  lightingConditionsGateClockStep = clockStep;
+  lightingConditionsGateSeed = weatherMatchSeed;
+  lightingConditionsResolves += 1;
   const writes = resolveActiveLightingConditions();
   activeLightingConditions = writes;
   if (!force && Math.abs(writes.hour - lightingConditionsAppliedHour) < LIGHTING_CONDITION_HOUR_EPSILON) return;
@@ -4197,6 +4223,7 @@ function lightingConditionsTelemetry(): Record<string, unknown> {
     identity: writes ? lightingConditionsAreIdentity(writes) : true,
     sunReaims: lightingConditionsSunReaims,
     uniformWrites: lightingConditionsUniformWrites,
+    resolves: lightingConditionsResolves,
   };
 }
 // LIGHTING: ==== end time-of-day conditions ====================================
