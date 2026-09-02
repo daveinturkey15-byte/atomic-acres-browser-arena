@@ -31,6 +31,7 @@
 //   npm run qa:mp-lab                       -> every arena, 2 humans, no bots
 //   npm run qa:mp-lab -- --bots 4           -> every arena, 2 humans + 4 hosted bots
 //   npm run qa:mp-lab -- --map test2        -> one arena
+//   npm run qa:mp-lab -- --solo             -> one browser, solo deploy per arena (baseline)
 //   options: --sample-seconds 30  --port 41946  --peer-port 9345
 //            --out artifacts/qa/mp-lab  --label <name>  --unsafe-webgpu
 //            --render quality|performance  --renderer webgpu|webgl2
@@ -80,7 +81,10 @@ const RENDERER = arg('--renderer', 'webgpu');
 const RENDER_PROFILE = arg('--render', 'quality');
 const UNSAFE_WEBGPU = flag('--unsafe-webgpu');
 const CPU_PROFILE = flag('--cpu-profile');
-const LABEL = arg('--label', HOSTED_BOTS > 0 ? `2p-${HOSTED_BOTS}bots` : '2p');
+// --solo: ONE browser, the real map card + #solo button, same probe. The
+// baseline that says whether a stall is the map or the multiplayer path.
+const SOLO = flag('--solo');
+const LABEL = arg('--label', SOLO ? 'solo' : HOSTED_BOTS > 0 ? `2p-${HOSTED_BOTS}bots` : '2p');
 const OUT_DIR = resolve(REPO_ROOT, arg('--out', 'artifacts/qa/mp-lab'), LABEL);
 const DIST = resolve(REPO_ROOT, arg('--dist', 'dist'));
 
@@ -282,6 +286,10 @@ const snapshotOf = (page) => page.evaluate(() => {
     awaitingCanonicalGuestAuthority: snapshot.player?.awaitingCanonicalGuestAuthority ?? null,
     bootstrapStage: snapshot.bootstrap?.stage ?? null,
     bootstrapError: snapshot.bootstrap?.error ?? null,
+    matchAdmissionCadence: snapshot.bootstrap?.matchAdmissionCadence ?? null,
+    effectPrewarmProfile: snapshot.bootstrap?.effectPrewarmProfile
+      ? { durationMs: snapshot.bootstrap.effectPrewarmProfile.durationMs, groups: (snapshot.bootstrap.effectPrewarmProfile.groups ?? []).map((group) => [group.name, Math.round(group.durationMs)]) }
+      : null,
     stateAdmissionDrops: snapshot.stateAdmissionDrops ?? null,
     matchAdmissionPark: snapshot.matchAdmissionPark ?? null,
     clientWorldRepairFailures: snapshot.clientWorldRepairFailures ?? null,
@@ -655,8 +663,11 @@ async function runArena(hostBrowser, guestBrowser, arena) {
     await host.page.selectOption('#lobby-arena', arena.id);
     if (HOSTED_BOTS > 0) {
       const botsDisabled = await host.page.evaluate(() => document.querySelector('#lobby-bots')?.disabled === true);
+      // gun-range pins its practice round to zero bots (rangeLobby in
+      // renderPrivateLobby); that is the arena's contract, not a join-flow
+      // difference, so it goes in the record rather than the flow.
       if (!botsDisabled) await host.page.selectOption('#lobby-bots', String(HOSTED_BOTS));
-      else step('bots-select-disabled');
+      else record.deploy.botsSelectDisabled = true;
     }
     step('host-selected-arena');
     await Promise.all([host, guest].map(({ page }) => page.waitForFunction(
@@ -664,6 +675,25 @@ async function runArena(hostBrowser, guestBrowser, arena) {
       arena.id,
       { timeout: JOIN_TIMEOUT_MS },
     )));
+    // Sync timeline: guidance line + bootstrap stage per side while the lobby
+    // synchronises the arena. The game's 75 s watchdog retries once and then
+    // tells the player to LEAVE; this is where that shows up.
+    record.arenaSync.timeline = { host: [], guest: [] };
+    const syncStop = { done: false };
+    const syncTimeline = (async () => {
+      const last = { host: '', guest: '' };
+      while (!syncStop.done) {
+        for (const side of [host, guest]) {
+          const state = await snapshotOf(side.page).catch(() => null);
+          if (!state) continue;
+          const key = `${state.bootstrapStage}|${state.guidance}|${state.arenaId}|${state.readyDisabled}`;
+          if (key === last[side.role]) continue;
+          last[side.role] = key;
+          record.arenaSync.timeline[side.role].push({ atMs: Date.now() - syncStart, bootstrapStage: state.bootstrapStage, arenaId: state.arenaId, readyDisabled: state.readyDisabled, guidance: state.guidance });
+        }
+        await sleep(2000);
+      }
+    })();
     const syncSide = async (side) => {
       await side.page.waitForFunction(
         (arenaId) => {
@@ -675,7 +705,11 @@ async function runArena(hostBrowser, guestBrowser, arena) {
       );
       return Date.now() - syncStart;
     };
-    const [hostSyncMs, guestSyncMs] = await Promise.all([syncSide(host), syncSide(guest)]);
+    const syncSettled = await Promise.allSettled([syncSide(host), syncSide(guest)]);
+    syncStop.done = true;
+    await syncTimeline;
+    for (const settled of syncSettled) if (settled.status === 'rejected') throw settled.reason;
+    const [hostSyncMs, guestSyncMs] = syncSettled.map((settled) => settled.value);
     record.arenaSync.hostMs = hostSyncMs;
     record.arenaSync.guestMs = guestSyncMs;
     record.arenaSync.ok = true;
@@ -789,6 +823,102 @@ async function runArena(hostBrowser, guestBrowser, arena) {
   return record;
 }
 
+async function runSoloArena(browser, arena) {
+  const record = {
+    contract: 'mp-lab-solo-baseline-v1',
+    label: LABEL,
+    arenaId: arena.id,
+    arenaName: arena.displayName,
+    measuredAt: new Date().toISOString(),
+    hostedBotsRequested: 0,
+    renderer: RENDERER,
+    renderProfile: RENDER_PROFILE,
+    chromeFlags: UNSAFE_WEBGPU ? 'unsafe-webgpu' : 'stock',
+    sampleSeconds: SAMPLE_SECONDS,
+    flow: [],
+    join: { ok: true, roomMs: null, joinMs: null, note: 'solo: no lobby' },
+    arenaSync: { ok: false, hostMs: null, guestMs: null },
+    deploy: { ok: false, hostOk: false, guestOk: true, hostMs: null, guestMs: null, hostedBotsSeen: null, timeline: { host: [], guest: [] } },
+    host: null,
+    guest: null,
+    errors: { host: { page: [], console: [] }, guest: { page: [], console: [] } },
+    failure: null,
+    finalState: null,
+  };
+  const step = (name, extra = {}) => {
+    record.flow.push(name);
+    console.log(`[mp-lab solo ${arena.id}] ${name}${Object.keys(extra).length ? ` ${JSON.stringify(extra)}` : ''}`);
+  };
+  let solo = null;
+  try {
+    step('boot');
+    solo = await openPlayer(browser, 'solo', arena.id, 'SOLO');
+    step('booted', { backend: solo.backend, bootMs: solo.bootMs });
+    if (RENDERER === 'webgpu' && solo.backend !== 'webgpu') throw new Error(`renderer fell back: ${solo.backend}`);
+    const syncStart = Date.now();
+    await solo.page.click(`.map-card[data-arena-id="${arena.id}"]`);
+    await solo.page.waitForFunction((arenaId) => window.__ATOMIC_ACRES_DEBUG__?.snapshot().arenaSelection?.id === arenaId, arena.id, { timeout: JOIN_TIMEOUT_MS });
+    record.arenaSync.hostMs = Date.now() - syncStart;
+    record.arenaSync.ok = true;
+    step('map-card-selected', { ms: record.arenaSync.hostMs });
+    const deployStart = Date.now();
+    await solo.page.click('#solo');
+    step('solo-click');
+    const timelineStop = { done: false };
+    const timeline = (async () => {
+      let last = '';
+      while (!timelineStop.done) {
+        const state = await snapshotOf(solo.page).catch(() => null);
+        if (state) {
+          const key = `${state.bootstrapStage}|${state.matchPhase}|${state.gameStarted}|${state.menuHidden}`;
+          if (key !== last) {
+            last = key;
+            record.deploy.timeline.host.push({ atMs: Date.now() - deployStart, lobbyPhase: null, bootstrapStage: state.bootstrapStage, matchPhase: state.matchPhase, gameStarted: state.gameStarted, menuHidden: state.menuHidden });
+          }
+        }
+        await sleep(2000);
+      }
+    })();
+    try {
+      await solo.page.waitForFunction((arenaId) => {
+        const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+        return snapshot?.gameStarted === true && snapshot.matchPhase === 'active' && snapshot.arenaSelection?.id === arenaId
+          && document.querySelector('#menu')?.classList.contains('hidden') === true;
+      }, arena.id, { timeout: DEPLOY_TIMEOUT_MS });
+    } finally {
+      timelineStop.done = true;
+      await timeline;
+    }
+    record.deploy.hostMs = Date.now() - deployStart;
+    record.deploy.hostOk = true;
+    record.deploy.ok = true;
+    step('deployed', { ms: record.deploy.hostMs });
+    mkdirSync(OUT_DIR, { recursive: true });
+    await solo.page.screenshot({ path: join(OUT_DIR, `${arena.id}-solo.png`) }).catch(() => {});
+    const probeOptions = { stallFloorMs: STALL_FLOOR_MS, deadlockWindowMs: DEADLOCK_WINDOW_MS, deadlockDistanceM: DEADLOCK_DISTANCE_M };
+    await installProbe(solo.page, probeOptions);
+    const profiler = CPU_PROFILE ? await startCpuProfile(solo) : null;
+    step('sampling', { seconds: SAMPLE_SECONDS, cpuProfile: CPU_PROFILE });
+    await sleep(SAMPLE_SECONDS * 1000);
+    record.host = await stopProbe(solo.page);
+    if (profiler) record.host.cpuProfile = await stopCpuProfile(profiler, arena.id);
+    record.finalState = { host: await snapshotOf(solo.page), guest: null };
+    step('sampled', { fps: record.host?.meanFps, worstMs: record.host?.worstStallMs, deadlocks: record.host?.deadlockCount, bots: record.finalState.host?.bots });
+  } catch (error) {
+    record.failure = String(error?.message ?? error).slice(0, 400);
+    console.log(`[mp-lab solo ${arena.id}] FAILURE ${record.failure}`);
+    if (solo) {
+      mkdirSync(OUT_DIR, { recursive: true });
+      await solo.page.screenshot({ path: join(OUT_DIR, `${arena.id}-solo-failure.png`) }).catch(() => {});
+    }
+  } finally {
+    if (solo) record.errors.host = solo.errors;
+    await solo?.context.close().catch(() => {});
+  }
+  record.verdict = arenaVerdict(record);
+  return record;
+}
+
 export function arenaVerdict(record) {
   const reasons = [];
   if (!record.join.ok) reasons.push('join failed');
@@ -830,7 +960,7 @@ async function main() {
   const roster = multiplayerArenaRoster();
   const arenas = TARGET_MAP ? roster.filter((arena) => arena.id === TARGET_MAP) : roster;
   if (arenas.length === 0) throw new Error(`--map ${TARGET_MAP} is not a multiplayer-enabled selectable arena; roster: ${roster.map((arena) => arena.id).join(', ')}`);
-  console.log(`[mp-lab] label=${LABEL} bots=${HOSTED_BOTS} sample=${SAMPLE_SECONDS}s flags=${UNSAFE_WEBGPU ? 'unsafe-webgpu' : 'stock'} arenas=${arenas.map((arena) => arena.id).join(', ')}`);
+  console.log(`[mp-lab] label=${LABEL} mode=${SOLO ? 'solo' : 'host-guest'} bots=${HOSTED_BOTS} sample=${SAMPLE_SECONDS}s flags=${UNSAFE_WEBGPU ? 'unsafe-webgpu' : 'stock'} arenas=${arenas.map((arena) => arena.id).join(', ')}`);
   mkdirSync(OUT_DIR, { recursive: true });
 
   await assertPortFree(PORT, 'static');
@@ -842,10 +972,10 @@ async function main() {
   let guestBrowser = null;
   const records = [];
   try {
-    hostBrowser = await launchBrowser('host');
-    guestBrowser = await launchBrowser('guest');
+    hostBrowser = await launchBrowser(SOLO ? 'solo' : 'host');
+    if (!SOLO) guestBrowser = await launchBrowser('guest');
     for (const arena of arenas) {
-      const record = await runArena(hostBrowser, guestBrowser, arena);
+      const record = SOLO ? await runSoloArena(hostBrowser, arena) : await runArena(hostBrowser, guestBrowser, arena);
       records.push(record);
       writeFileSync(join(OUT_DIR, `${arena.id}.json`), JSON.stringify(record, null, 2));
     }
@@ -862,6 +992,7 @@ async function main() {
     contract: 'mp-lab-host-guest-summary-v1',
     label: LABEL,
     measuredAt: new Date().toISOString(),
+    mode: SOLO ? 'solo' : 'host-guest',
     hostedBots: HOSTED_BOTS,
     sampleSeconds: SAMPLE_SECONDS,
     chromeFlags: UNSAFE_WEBGPU ? 'unsafe-webgpu' : 'stock',
