@@ -82,14 +82,26 @@ function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   };
 }
 
+/**
+ * Authored spawns, seated on the terrain authority.
+ *
+ * The shared `spawnRecord` helper every flat-floored arena uses pins y at the
+ * 1.7 m eye height, i.e. FEET AT y = 0. farcrysis has no floor at y = 0: its
+ * ground is the analytic field `farcrysisTerrainHeight(x, z)`, and the runtime
+ * uses the authored y verbatim (`player.position.copy(spawnPoint())` then
+ * `characterPhysics.teleportEye(...)` in legacy-main). The pre-PASS-85 table
+ * sat entirely on the beach corners, where the surface runs 0.08-0.50 m, so
+ * the flat pin buried the feet by up to half a metre; anywhere on the island
+ * interior it would have buried them by up to 7.3 m. Resolving y here is what
+ * lets the table move off the beach at all.
+ */
 function spawnRecord(
   team0: readonly (readonly [number, number])[],
   team1: readonly (readonly [number, number])[],
 ): Record<Team, THREE.Vector3[]> {
-  return {
-    0: team0.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-    1: team1.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-  };
+  const seat = ([x, z]: readonly [number, number]): THREE.Vector3 =>
+    new THREE.Vector3(x, farcrysisTerrainHeight(x, z) + 1.7, z);
+  return { 0: team0.map(seat), 1: team1.map(seat) };
 }
 
 type Builder = {
@@ -915,14 +927,33 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     wall.visible = false;
   }
 
-  // Spawns — rotationally symmetric across the core (NW vs SE), off colliders,
-  // no opposing spawn line-of-sight.
+  // Spawns — PASS 85 Lane R. Solved, not authored by eye:
+  // `npx tsx scripts/qa/solve-farcrysis-spawns.ts`, which searches this
+  // arena's own geometry under the HF-402 constraint set
+  // (src/spawn-layout-constraints.ts: floor beneath, autostep route to the
+  // enemy, cover in reach, no enemy spawn in sight, wall standoff, open arc,
+  // team separation) with each candidate carrying its own terrain-resolved
+  // height. Evidence: artifacts/qa/pass85-lane-r/spawn-solve.json.
+  //
+  // What it replaces, measured: four points per team inside a 16 x 12 m
+  // beach corner of a 128 x 128 m island - the exact layout
+  // src/spawn-layout-quality.test.ts names in its own preamble - spanning
+  // 0.125 of the longer axis against that gate's 0.18 floor, with the whole
+  // interior, the ruined core and the ridge unused by either team.
+  //
+  // Measured after: 6 + 6 points, 100% in envelope (floor, route, cover,
+  // standoff, arc all pass), team spreads 0.219 and 0.344 of the longer axis,
+  // cross-team minimum 48.8 m = 0.381 of it (gate floor 0.33), nearest
+  // enemy spawn with a sightline 48.8 m away (gate floor 30 m).
+  //
+  // The NW/SE diagonal split of the old table is kept: team 0 owns
+  // (x + z) / 2 <= -17, team 1 owns >= +17.
   const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(
     [
-      [-52, -52], [-44, -48], [-48, -40], [-36, -52],
+      [-36, -22], [-8, -26], [-26, -8], [-26, -34], [-20, -20], [-32, -14],
     ],
     [
-      [52, 52], [44, 48], [48, 40], [36, 52],
+      [2, 46], [32, 2], [34, 34], [14, 30], [44, 18], [22, 46],
     ],
   );
 
