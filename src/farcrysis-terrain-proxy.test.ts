@@ -8,6 +8,8 @@ import {
   farcrysisTerrainHeight,
   farcrysisTerrainProxyChunks,
 } from './farcrysis-terrain-authority';
+import { traceBallisticPath } from './ballistics';
+import { WEAPONS } from './gameplay';
 import { SPAWN_EYE_HEIGHT, floorBeneath } from './spawn-layout-constraints';
 
 /**
@@ -32,6 +34,8 @@ function dryCells(stepM: number): Array<{ x: number; z: number; groundY: number 
   }
   return out;
 }
+
+const CARBINE_PENETRATION = WEAPONS.carbine.penetration;
 
 describe('farcrysis terrain collision proxy', () => {
   const arena = buildFarcrysis(new THREE.Scene());
@@ -144,5 +148,91 @@ describe('farcrysis terrain collision proxy', () => {
       expect(ids.has(mesh.userData.ballisticSurfaceId as string)).toBe(true);
       expect(mesh.userData.ballisticMaterial).toBe('earth');
     }
+  });
+
+  it('never puts a standing player INSIDE the ground shot box', () => {
+    // The defect this pins, found by the HF-423 registration trail and measured
+    // before it was fixed: `surfaceInterval` in src/ballistics.ts models every
+    // shot surface as a SOLID BOX. The first proxy used each chunk's tight
+    // minimum-to-maximum ground as that box, so a player standing anywhere
+    // lower than their chunk's high point had their EYE inside 'earth' and
+    // their shot died 0.21 m from the muzzle. MEASURED over 2,000 level-ish
+    // shots from a standing eye seated on the arena's own ground: 56.5 % began
+    // inside the box and only 172 of 2,000 travelled 60 m.
+    //
+    // The box ceiling is now the chunk's LOWEST ground. This is the property
+    // that makes that impossible, asserted over the whole island rather than
+    // over the shots that happened to be sampled.
+    const boxes = farcrysisTerrainProxyChunks();
+    const byFootprint = (x: number, z: number) => boxes.filter((chunk) => (
+      x >= chunk.bounds.minX && x <= chunk.bounds.maxX
+      && z >= chunk.bounds.minZ && z <= chunk.bounds.maxZ
+    ));
+    let checked = 0;
+    for (const cell of dryCells(2)) {
+      for (const eye of [cell.groundY + 1.7, cell.groundY + 1.16, cell.groundY + 0.61]) {
+        for (const chunk of byFootprint(cell.x, cell.z)) {
+          checked += 1;
+          expect(
+            eye,
+            `${chunk.id}: an eye at ${eye.toFixed(2)} m over ground ${cell.groundY.toFixed(2)} m `
+            + `is inside the shot box (ceiling ${chunk.bounds.maxY?.toFixed(2)} m)`,
+          ).toBeGreaterThan(chunk.bounds.maxY as number);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(3000);
+    // ...and the ceiling really is BELOW the surface it stands for, everywhere.
+    for (const chunk of boxes) {
+      expect(chunk.bounds.maxY as number).toBeLessThanOrEqual(chunk.visualBounds.maxY as number);
+      expect(chunk.bounds.minY as number).toBeLessThan(chunk.bounds.maxY as number);
+    }
+  });
+
+  it('still blocks a real share of the shots the ground itself blocks', () => {
+    // The ceiling above converges on the truth from BELOW: it can let a bullet
+    // through a hillside, it can never eat one at the muzzle. This pins the
+    // under-blocking so a future change cannot quietly trade the whole of the
+    // ground's shot authority away - the pre-lane value was ZERO.
+    const surfaces = arena.shotSurfaces;
+    const rc = new THREE.Raycaster();
+    rc.far = 60;
+    let rng = 12345;
+    const rand = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
+    let fired = 0;
+    let stoppedByGround = 0;
+    let groundTruth = 0;
+    let muzzleInside = 0;
+    while (fired < 600) {
+      const x = FARCRYSIS_BOUNDS.minX + rand() * (FARCRYSIS_BOUNDS.maxX - FARCRYSIS_BOUNDS.minX);
+      const z = FARCRYSIS_BOUNDS.minZ + rand() * (FARCRYSIS_BOUNDS.maxZ - FARCRYSIS_BOUNDS.minZ);
+      const groundY = farcrysisTerrainHeight(x, z);
+      if (groundY <= FARCRYSIS_WATER_LEVEL) continue;
+      fired += 1;
+      const origin = { x, y: groundY + 1.7, z };
+      const angle = rand() * Math.PI * 2;
+      const pitch = (rand() - 0.5) * 0.2;
+      const dir = {
+        x: Math.cos(angle) * Math.cos(pitch),
+        y: Math.sin(pitch),
+        z: Math.sin(angle) * Math.cos(pitch),
+      };
+      const trace = traceBallisticPath(origin, dir, 60, CARBINE_PENETRATION, surfaces);
+      if (trace.impacts.some((impact) => (
+        impact.surface.id.startsWith('farcrysis-terrain-proxy') && impact.entryDistance < 1e-6
+      ))) muzzleInside += 1;
+      if (!trace.reachedDistance && (trace.stoppedBy?.id ?? '').startsWith('farcrysis-terrain-proxy')) {
+        stoppedByGround += 1;
+      }
+      rc.set(new THREE.Vector3(origin.x, origin.y, origin.z),
+        new THREE.Vector3(dir.x, dir.y, dir.z).normalize());
+      if (rc.intersectObjects(proxies, false).length > 0) groundTruth += 1;
+    }
+    expect(muzzleInside, 'no shot may begin inside the ground').toBe(0);
+    expect(groundTruth, 'the island must really be in the way of some of these shots')
+      .toBeGreaterThan(fired * 0.2);
+    // Measured 56 % over 2,000 shots; pinned at 40 % so ordinary sampling noise
+    // does not fail it, and a collapse back toward zero does.
+    expect(stoppedByGround / groundTruth).toBeGreaterThan(0.4);
   });
 });

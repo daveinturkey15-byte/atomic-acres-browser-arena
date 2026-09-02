@@ -258,6 +258,20 @@ describe('farcrysis terrain authority', () => {
       /-c1$/,
       /-plank$/,
       /-seg-[1-9]\d*$/,
+      // HF-423: four surfaces that were authored MASS with no movement or
+      // projectile authority until this pass gave them some. Each is elevated
+      // because the thing under it is what holds it up, and each was measured
+      // as SUPPORTED by the walkable-surface parity audit in the same pass
+      // (census 26, supported 22 -> 25), so none of them is floating:
+      //   crate-*-stack-top  the lid of a crate stack, on the crates below it
+      //   tower-platform     the radio-tower lookout deck, on the tower legs
+      //   tower-dish         the dish, on that platform
+      //   cave-arch-top      the crown of the cave arch, on the arch
+      // Listed one family at a time rather than as a loose prefix, so a NEW
+      // floating collider in any of these areas still fails this case.
+      /^farcrysis-crate-[ns][we]-stack-top$/,
+      /^farcrysis-art-tower-(platform|dish)-collider$/,
+      /^farcrysis-art-cave-arch-top-collider$/,
     ];
 
     const failures: string[] = [];

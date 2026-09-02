@@ -464,18 +464,33 @@ export function farcrysisFloorGapBeneath(
  * rejects all but the one or two chunks a ray actually crosses; a single
  * 32k-triangle ground mesh would be walked in full on every hitscan.
  */
-export const TERRAIN_PROXY_CHUNKS_PER_AXIS = 8;
+export const TERRAIN_PROXY_CHUNKS_PER_AXIS = 16;
 
-/** Grid steps per chunk edge. 4 chunks x 32 steps over 128 m = a 1 m lattice. */
-export const TERRAIN_PROXY_SEGMENTS_PER_CHUNK = 24;
+/** Grid steps per chunk edge. 16 chunks x 12 steps over 128 m = a 0.667 m lattice. */
+export const TERRAIN_PROXY_SEGMENTS_PER_CHUNK = 12;
 
 export type TerrainProxyChunk = Readonly<{
   id: string;
   /** World-space triangle soup; the mesh sits at the origin untransformed. */
   positions: Float32Array;
   indices: Uint32Array;
-  /** Tight world bounds, used verbatim as the chunk's BallisticSurface box. */
+  /**
+   * The chunk's BallisticSurface box.
+   *
+   * NOT the tight bounds of the triangles. `surfaceInterval` in
+   * src/ballistics.ts models every shot surface as a SOLID BOX, and a box that
+   * spans a chunk's minimum-to-maximum ground contains the eye of any player
+   * standing lower than that chunk's high point - so their shot begins inside
+   * 'earth' and dies at the muzzle. MEASURED with the tight box over 2,000
+   * level-ish shots fired from a standing eye seated on the arena's own ground:
+   * 56.5 % began inside the box and only 172 of 2,000 travelled 60 m. The
+   * ceiling is therefore the chunk's MINIMUM ground height: everything below
+   * the whole chunk's surface is solid, and no standing player can be inside
+   * it. See TERRAIN_SHOT_BOX_CEILING below for the measured trade.
+   */
   bounds: Box2;
+  /** The tight triangle bounds, kept for tests and instruments that want them. */
+  visualBounds: Box2;
 }>;
 
 let proxyCache: readonly TerrainProxyChunk[] | null = null;
@@ -500,7 +515,7 @@ let proxyCache: readonly TerrainProxyChunk[] | null = null;
  * The same registration also makes the ground a shot blocker. It was not one:
  * the plates carry no `BallisticSurface`, so bullets passed through hillsides.
  *
- * RESOLUTION. 8 x 8 chunks of 24 steps is a 0.667 m lattice. MEASURED off-
+ * RESOLUTION. 16 x 16 chunks of 12 steps is a 0.667 m lattice. MEASURED off-
  * lattice (mid-cell samples, where linear interpolation is worst) against the
  * analytic field: maximum 0.1086 m, mean 0.0028 m. That is inside the 0.12 m
  * `PLATE_FIT_TOLERANCE_M` the physics plates themselves are fitted to, and far
@@ -510,11 +525,35 @@ let proxyCache: readonly TerrainProxyChunk[] | null = null;
  * same per-ray cost, 0.3296 m maximum error.
  *
  * COST. MEASURED over 2,000 hitscan-shaped rays across the arena's full
- * `raycastMeshes` set: 0.024 ms/ray without the proxy, 0.293 ms/ray with it.
- * The chunking is what keeps that bounded - one 73,728-triangle ground mesh
- * would be walked in full on every shot. The hit rate over those same rays
- * rises 37.1 % -> 53.3 %: that difference is bullets which used to fly through
- * the island.
+ * `raycastMeshes` set: 0.024 ms/ray without the proxy, 0.293 ms/ray with it at
+ * the original 8 x 8 layout. The chunking is what keeps that bounded - one
+ * 73,728-triangle ground mesh would be walked in full on every shot.
+ *
+ * TERRAIN_SHOT_BOX_CEILING. The BALLISTIC box is a separate question from the
+ * triangles, because `surfaceInterval` models a shot surface as a solid box.
+ * MEASURED over 2,000 level-ish shots fired from a standing eye seated on the
+ * arena's own ground, against the triangulated surface itself as ground truth
+ * (798 / 2,000 = 39.9 % of those shots really do meet the island within 60 m):
+ *
+ *   model                                   muzzle inside earth   ground stops
+ *   16 m chunk, tight minY..maxY (shipped)              56.5 %          1,543
+ *   no ballistic surface at all (pre-lane)               0.0 %              0
+ *   16 m chunk, ceiling = chunk min ground               0.0 %            194
+ *   8 m chunk,  ceiling = chunk min ground               0.0 %            445
+ *   4 m cells,  ceiling = cell min ground                0.0 %            570
+ *   2 m cells,  ceiling = cell min ground                0.0 %            628
+ *
+ * The tight box does not merely over-block, it blocks 193 % of the true rate
+ * while eating more than half of all shots at the muzzle. Finer cells converge
+ * on the truth from BELOW - under-blocking is a bullet that flies through a
+ * hillside, over-blocking is a player who cannot shoot - but src/ballistics.test.ts
+ * pins one shot surface per raycast mesh across every arena, so the cell size
+ * and the chunk size are the same number. 8 m chunks with a min-ground ceiling
+ * is what this arena ships: 0 % muzzle, 56 % of the true blocking, and a shot
+ * cost of 0.120 ms against 0.083 ms for the broken model and 0.067 ms for no
+ * ground surface at all. 4 m would reach 71 % of the truth at 0.277 ms/shot;
+ * that trade is left to a pass with frame time to spare, and the real answer is
+ * a heightfield shot-surface kind that src/ballistics.ts does not have.
  */
 export function farcrysisTerrainProxyChunks(): readonly TerrainProxyChunk[] {
   if (proxyCache) return proxyCache;
@@ -569,18 +608,20 @@ export function farcrysisTerrainProxyChunks(): readonly TerrainProxyChunk[] {
           cursor += 6;
         }
       }
+      const footprint = {
+        minX: originX,
+        maxX: originX + spanX,
+        minZ: originZ,
+        maxZ: originZ + spanZ,
+      };
       chunks.push(Object.freeze({
         id: `farcrysis-terrain-proxy-${cx}-${cz}`,
         positions,
         indices,
-        bounds: Object.freeze({
-          minX: originX,
-          maxX: originX + spanX,
-          minZ: originZ,
-          maxZ: originZ + spanZ,
-          minY,
-          maxY,
-        }) as Box2,
+        // The ballistic box stops at the chunk's LOWEST ground, so no player
+        // standing anywhere on this chunk can be inside it. See the header.
+        bounds: Object.freeze({ ...footprint, minY: FARCRYSIS_SAFETY_FLOOR_Y, maxY: minY }) as Box2,
+        visualBounds: Object.freeze({ ...footprint, minY, maxY }) as Box2,
       }));
     }
   }
