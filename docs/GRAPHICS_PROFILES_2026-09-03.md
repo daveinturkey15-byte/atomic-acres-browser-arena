@@ -32,11 +32,31 @@ geometry that is off screen — and it pays for that by *dropping* 4x
 multisampling and screen-space reflections rather than by adding to MAX.
 
 **Q: Is it just QUALITY plus a ray-traced pass?**
-**A (VERIFIED, from the control sets):** no. Against QUALITY it changes six
-controls: `antiAliasing` msaa-4x → smaa, `screenSpaceReflections` low → off,
-`ambientOcclusion` off → high, `reflectionQuality` high → ultra, `anisotropy`
-8 → 16, `rayTracing` off → reflections (plus grain/vignette/rain/air nudges).
-Two of those are reductions. It buys the trace; it does not stack it.
+**A (VERIFIED, recomputed from the literals in
+`src/graphics-settings-registry.ts`):** no — but it is not a pure trade
+either. Against QUALITY it changes **ten** controls, not six. All ten:
+
+| Control | QUALITY → RAY TRACED | Direction |
+|---|---|---|
+| `antiAliasing` | msaa-4x → smaa | **REDUCTION** — drops the 4-sample HDR target. The single biggest saving. |
+| `screenSpaceReflections` | low → off | **REDUCTION** — the trace supersedes it; running both pays for reflected light twice. |
+| `rayTracing` | off → reflections | addition — the point of the profile. |
+| `ambientOcclusion` | off → high | addition, per-frame. |
+| `reflectionQuality` | high → ultra | addition; PMREM tier 512 — load time, not per-frame. |
+| `anisotropy` | 8 → 16 | addition; sampler cost only. |
+| `rainDensity` | 1 → 1.15 | addition, and a genuine **per-frame fill-rate increase**. |
+| `ambientLife` | 1 → 1.15 | addition, and a genuine **per-frame fill-rate increase** (the registry's own PERFORMANCE comment says ambient instances are per-frame fill rate). |
+| `filmGrain` | 0.32 → 0.36 | addition; grade-chain constant, negligible. |
+| `vignette` | 0.16 → 0.17 | addition; grade-chain constant, negligible. |
+
+So: **two reductions and eight additions**, and two of the additions
+(`rainDensity`, `ambientLife`) are real per-frame cost rather than a rounding
+nudge. The honest sentence is that RAY TRACED **mostly** buys the trace — the
+two reductions are the two largest per-frame items in the delta — while still
+stacking a small amount of extra fill rate on top. An earlier draft of this
+document said "six controls, two of them reductions, it buys the trace; it
+does not stack it". That was wrong on the count and too clean on the story.
+**Corrected 2026-09-03 after review.**
 
 **Q: Does it only work on NVIDIA cards?**
 **A (VERIFIED, measured on this machine's adapter):** no. It requires the
@@ -142,7 +162,18 @@ this document does not):
 headless Chrome per row (fresh user-data dir, therefore a **cold** shader
 cache), 2560x1440, real WebGPU backend confirmed per row, the real Options
 surface driven exactly as the owner drives it (select → SAVE GRAPHICS → arena →
-solo). Frame figures come from the renderer's own presented-frame sampler
+solo).
+
+**Coverage (VERIFIED).** Three arenas were measured: `atomic-acres`,
+`skyline-terminal`, `high-seas`. The selectable roster in
+`src/map-selection.ts` has **eight** entries (`atomic-acres`,
+`skyline-terminal`, `rustworks-1v1`, `gun-range`, `high-seas`, `test1`,
+`test2`, `map3`; `farcrysis` is `selectable: false`). So this matrix covers
+**3 of 8 selectable arenas — 5 x 3 = 15 rows, not the full roster.** The brief
+asked for the registry roster; the remaining five are OPEN (§7). Do not read
+the 5 x 3 matrix as full coverage.
+
+Frame figures come from the renderer's own presented-frame sampler
 (`completionPacing`); `rateHz` is frames ÷ elapsed over the retained window,
 which is the only cadence figure that survives bursty pacing — a median gap is
 not a frame rate. Draw calls and triangles are the last *admitted* frame.
@@ -179,8 +210,9 @@ which are not noise-sensitive. Do not read a single cell.
 
 Pass `p2` is the complete ladder on one build. `quiet` in the last column means
 the row itself recorded the owner's ComfyUI queue as empty before AND after the
-run; 13 of 15 carry that stamp, and the three that say "not stamped" were taken
-before the gate existed. Every row: `backend: webgpu`, `admissionOutcome:
+run; 13 of 15 carry that stamp, and the **two** that say "not stamped"
+(`performance-atomic-acres`, `balanced-atomic-acres`) were taken before the
+gate existed. (An earlier draft said "three"; recounted from the raw JSON.) Every row: `backend: webgpu`, `admissionOutcome:
 admitted`, `errors: 0`, `pipelinesInCombat: 0`.
 
 ### The ladder, averaged over the three arenas
@@ -196,39 +228,79 @@ atomic-acres, skyline-terminal and high-seas:
 | RAY TRACED | **13.7** | 28.3 | 65.2 | 188 / 125 / 127 | 382 / 307 / 259 |
 | MAX | **21.0** | **42.8** | 43.7 | 345 / 241 / 263 | 478 / 392 / 364 |
 
+**Cold deploy range per profile (VERIFIED, from the same 15 rows).**
+PERFORMANCE 20-35 s, BALANCED 33-56 s, QUALITY 30-55 s, RAY TRACED 36-58 s,
+MAX 42-66 s. This is the ladder that is *not* gentle, and unlike the frame
+figures the separation is large enough to read.
+
+**The size of MAX'''s separation (VERIFIED).** Every rung below MAX has a mean
+median frame between 12-14 ms and a mean p95 between 27-30 ms. MAX is at
+21.0 ms and 42.8 ms. That is the one gap in this ladder wide enough to state
+as measured rather than designed.
+
 ### What the table supports
 
-1. **The cost ladder is monotone and in the designed order.** 12.2 → 12.6 →
-   13.1 → 13.7 → 21.0 ms. Every rung costs more than the one below it, and
-   BALANCED lands exactly where it was designed to: above PERFORMANCE, below
-   QUALITY, much closer to QUALITY. **VERIFIED.**
-2. **RAY TRACED is BELOW MAX and beside QUALITY.** 13.7 ms against QUALITY's
-   13.1 and MAX's 21.0 — a 0.6 ms step up from QUALITY, and 7.3 ms below MAX.
-   That is the direct, measured answer to "is RTX above or below max". It is
-   below, and not by a little. **VERIFIED.**
-3. **MAX is the only profile that separates from the pack, and by a lot.**
-   +7.3 ms median and +14.6 ms p95 over the next rung, 43.7 frames/s against
-   65-70. Its draw calls tell the same story: 345 on atomic-acres against
-   QUALITY's 189. "For very high-end machines" is a measurement, not a slogan.
+**A correction, made after review (2026-09-03).** An earlier draft of this
+section asserted items 1, 2 and 4 below as VERIFIED. They were not, and the
+refutation is on this same page: the differences among the bottom four rungs
+are 3-4.6%, and the paragraph headed "What the table does NOT support" already
+says no single-cell comparison under about 15% carries signal and records a
+21% run-to-run swing on an *identical* control set. Worse, **not one of the
+three measured arenas is monotone**: on atomic-acres RAY TRACED (12.3 ms) is
+the *fastest* cell of all five and beats PERFORMANCE (14.3 ms); on
+skyline-terminal BALANCED (10.2) is below PERFORMANCE (11.4); on high-seas
+QUALITY (11.5) is below BALANCED (12.2). The monotone ordering exists only in
+the mean of three *different workloads*, and averaging different arenas does
+not reduce within-cell noise — each cell is n=1 over one 14 s window. The
+ordering among the bottom four rungs is therefore **OPEN**, not VERIFIED.
+
+1. **MAX separates from the entire ladder, on every arena measured.**
+   +7.3 ms median and +14.6 ms p95 over the next rung down (+53% and +51%),
+   43.7 frames/s against 65-70, and ~1.8x the draw calls (345 on atomic-acres
+   against QUALITY's 189). This is not a within-noise difference and it
+   reproduces on all three arenas independently: atomic-acres 21.1 against
+   12.3-16.8, skyline-terminal 18.7 against 10.2-15.3, high-seas 23.1 against
+   11.5-13.5. "For very high-end machines" is a measurement, not a slogan.
    **VERIFIED.**
-4. **BALANCED has the best p95 and the best long-frame count in the ladder**
+2. **RAY TRACED is nowhere near MAX — it is down with QUALITY, not above it.**
+   13.7 ms mean against MAX's 21.0, and on every individual arena RAY TRACED
+   is far below that arena's MAX cell (12.3 against 21.1; 15.3 against 18.7;
+   13.5 against 23.1). This is the direct answer to "is RTX above or below
+   max": **below**, categorically, on every arena. What is NOT established is
+   the size of the step from QUALITY to RAY TRACED — see item 4.
+   **VERIFIED (the categorical ordering against MAX).**
+3. **BALANCED's p95 and long-frame counts are the best in the ladder**
    (27.0 ms mean p95, and 1-6 frames over 33 ms per window against QUALITY's
-   2-26). Dropping the 4-sample HDR target and the SSR attachments buys
-   smoothness rather than headline frame rate, which is exactly the shape the
-   owner asked for: "will run nice and look good". **VERIFIED.**
-5. **Every profile ADMITS on every arena, with zero page errors.** 15 rows.
+   2-26). This is *suggestive*, not established: the p95 spread across the
+   bottom four is 27.0-29.5 ms, the same ~8% band this section refuses to read
+   elsewhere. Only MAX's 42.8 ms p95 is outside the noise. **OPEN**, and the
+   reason it is worth stating anyway is that the long-frame count is a count
+   of events rather than a mean of a noisy quantity.
+4. **The ordering among PERFORMANCE / BALANCED / QUALITY / RAY TRACED is
+   OPEN.** The means (12.2 / 12.6 / 13.1 / 13.7 ms) are in the designed order,
+   but the gaps are 3-4.6% and no measured arena reproduces the ordering.
+   **To promote this to VERIFIED, run 3-5 repeats per cell on a quiet machine
+   and report the spread, not the mean.** Until then the honest statement to a
+   player is the one the in-game copy makes: what each profile turns on and
+   leaves off, never a frame rate.
+5. **BALANCED lands where designed in its CONTROL SET, which is the claim the
+   product actually makes.** 18 controls separate it from PERFORMANCE and 8
+   from QUALITY (recomputed from the registry literals). That is a fact about
+   the build rather than a measurement, and it is what the in-game copy
+   claims. **VERIFIED.**
+6. **Every profile ADMITS on every arena, with zero page errors.** 15 rows.
    That is the headless boot smoke for the whole ladder. **VERIFIED.**
-6. **Tripwire clean: `pipelinesInCombat` = 0 on all 15 rows.** 222-478
+7. **Tripwire clean: `pipelinesInCombat` = 0 on all 15 rows.** 222-478
    pipelines are compiled during admission; not one is compiled while a settled
    match is being played. This is the measurement that matters most for the
    owner's freeze reports. **VERIFIED.**
-7. **Nothing came close to the queue-completion fence:** peak completion
+8. **Nothing came close to the queue-completion fence:** peak completion
    latency 64.1-155.5 ms against a 12 000 ms fence. **VERIFIED.**
-8. **The PASS 78 MAX cold-compile P0 (5.17-6.54 s against a 4000 ms bound) did
+9. **The PASS 78 MAX cold-compile P0 (5.17-6.54 s against a 4000 ms bound) did
    not reproduce.** MAX admitted on all three arenas. Not a refutation —
    different head, different method — but the current state is "admits".
    **VERIFIED for these three arenas.**
-9. **Deploy time is the real cost of the top rungs, not frame time.** Cold
+10. **Deploy time is the real cost of the top rungs, not frame time.** Cold
    deploy runs 20-35 s on PERFORMANCE and 36-66 s on RAY TRACED and MAX. The
    frame ladder is gentle; the *loading* ladder is not. **VERIFIED**, and it is
    the strongest argument in this document for the menu-time precompile in
@@ -259,16 +331,42 @@ direct runtime proof that `renderScale` executes, one of the 39 controls §4
 lists as grep-verified only. It is the cheapest live observation in the whole
 registry and it came from a field the harness was already collecting.
 
-The same field raises a question: **MAX's canvas is also 2560x1440, not the
-2944x1656 its 1.15 supersample would give.** The likely mechanism is the
-adaptive valve — `configuredAdaptiveQualityLevels` builds tiers as fractions of
-the selected scale and `adaptiveResolution` is `true` on MAX by design — so
-under sustained frame pressure it settled a tier below its own cap. If that is
-right, MAX was not actually supersampling during this sweep on an RTX 5080 at
-1440p, which is worth the owner knowing, and MAX is *still* the most expensive
-profile by a wide margin without it. **OPEN:** confirm by reading the live
-pixel-ratio tier rather than inferring it from the canvas; the snapshot does not
-currently expose it, which is itself a gap.
+The same field answers a second question, and the answer is not the one an
+earlier draft of this document gave. **MAX's canvas is also 2560x1440, not the
+2944x1656 its 1.15 supersample would give.** The first draft blamed the
+adaptive valve settling a tier below its own cap under load. **That was wrong.
+It is now RESOLVED as a deterministic display clamp. VERIFIED.**
+
+Every one of the four call sites that applies the render scale reads:
+
+```
+renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+```
+
+— `src/legacy-main.ts` lines 2042, 2552, 2556 and 28108. Every one of the 15
+audit rows records `devicePixelRatio: 1`. `Math.min(1, 1.15) = 1`, at any
+load, on any frame. It is the same expression that makes PERFORMANCE's scale
+visible: `Math.min(1, 0.75) = 0.75`, which is exactly the 1920x1080 canvas
+above. A scale **below** 1 passes through the clamp; a scale **above** 1
+cannot.
+
+The valve is positively ruled out rather than merely unnecessary. Had the
+valve downshifted MAX, `configuredAdaptiveQualityLevels('blender', 1.15,
+true)` would have put it on 0.98, 0.86, 0.75 or 0.58 and the canvas would have
+been 2509x1411 or smaller. It is exactly 2560x1440 — the valve is at its top
+tier *and* the clamp is what removes the supersample.
+
+**What this means for the owner.** He runs Chrome at 2560x1440 with a device
+pixel ratio of 1, so **MAX never supersamples on his machine either.** Its
+1.15 render scale is inert on any 1:1 display and only materialises on a
+display whose device pixel ratio exceeds 1 (a HiDPI or OS-scaled panel). MAX
+is still by a wide margin the most expensive profile on this hardware, and
+every cost figure in this document was measured with the supersample inert —
+so its +7.3 ms comes entirely from the effect tiers, not from extra pixels.
+The in-game copy has been corrected to say this (§6), and
+`src/graphics-profile-contract.test.ts` now pins the `Math.min(` expression at
+all four call sites so the clamp cannot be silently removed nor the diagnosis
+silently invalidated.
 
 ### Side by side: what each profile actually buys
 
@@ -397,11 +495,35 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   the tripwire: the moment a lighting default changes,
   `graphics-profile-contract.test.ts` fails until this document is re-measured.
 - **OPEN:** 39 of 40 controls are grep-verified only (§4).
-- **OPEN:** `AGENTS.md` still says "The top-level graphics surface exposes
-  exactly Performance, Quality, Max and Custom". That sentence went stale when
-  RAY TRACED shipped (HF-398) and is now two profiles behind. It is outside
-  this lane's ownership; the integrator should re-word it to point at
-  `GRAPHICS_PROFILE_DESCRIPTIONS` as the source of the ladder.
+- **OPEN (coverage):** five of the eight selectable arenas were never measured
+  — `rustworks-1v1`, `gun-range`, `test1`, `test2`, `map3`. The brief asked
+  for the registry roster; this matrix is 3 of 8. `farcrysis` is
+  `selectable: false` and out of scope until it is unhidden. Command, one launch per cell, on a quiet GPU, one browser at a time:
+  `node scripts/qa/audit-graphics-profiles.mjs --url http://localhost:<port>
+  --preset <performance|balanced|high|raytraced|max> --arena <arena> --out
+  artifacts/graphics-audit`.
+- **OPEN (statistics):** every cell of §3 is n=1 over one 14 s window, and the
+  ordering among the bottom four rungs sits inside the noise floor this
+  document itself states (§3 "What the table supports", item 4). Promoting it
+  needs 3-5 repeats per cell and a reported spread. Nothing in the shipped
+  copy depends on it — the in-game lines claim control sets, not frame rates.
+- **RESOLVED (was OPEN): MAX's missing supersample.** Diagnosed as
+  `Math.min(window.devicePixelRatio, pixelRatioCap)` at `legacy-main.ts`
+  2042/2552/2556/28108 with `devicePixelRatio: 1` on every audit row — a
+  deterministic display clamp, not the adaptive valve. See §3. Pinned by
+  `src/graphics-profile-contract.test.ts`.
+- **CLOSED (was OPEN): `AGENTS.md` graphics-surface sentence.** It said "The
+  top-level graphics surface exposes exactly Performance, Quality, Max and
+  Custom" — stale since RAY TRACED (HF-398) and made triply false by BALANCED
+  and the RTX explainer. Re-worded in this cut to point at
+  `GRAPHICS_PROFILE_DESCRIPTIONS` as the source of the ladder rather than
+  enumerating profiles, because an enumerated contract sentence is what went
+  stale twice. Flagged as outside this lane's ownership in the lane report.
+- **OPEN (HF-418 item 3, changelog):** the RTX-explainer copy is not
+  registered in the changelog / release-identity surfaces. That file carries
+  stamped pass numbers owned by the release lane's `roll_pass.py`, so this
+  lane cannot land the row without inventing a pass number. It is an
+  explicitly OPEN brief item, not a done one.
 - **OPEN:** the MAX cold-compile P0 from PASS 78 (5.17-6.54 s against a 4000 ms
   bound) did **not** reproduce here: MAX admitted on all three arenas measured.
   The old figure is not refuted — it was measured differently, on a different
