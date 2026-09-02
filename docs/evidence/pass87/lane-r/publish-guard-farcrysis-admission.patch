@@ -251,3 +251,31 @@ NOTES FOR WHOEVER APPLIES IT
 4. If PASS 87 ends up shipping farcrysis PARKED after all, this patch is still
    the right one to take: the parked branch passes without a receipt, and the
    guard is then already in place for whichever pass does unhide it.
+5. THIS PATCH ADDS A MANDATORY CUT-NIGHT STEP. Read this before you decide the
+   receipt is already earned. The receipt is keyed to `bundle.sha256` - a sha256
+   over every dist/assets/*.js, sorted, name then bytes - so the receipt this
+   lane committed names THIS BRANCH'S dist and CANNOT match the dist built from
+   the merged PASS 87 integration tree. Any other lane's change to any bundled
+   module changes that digest. There is no circularity to worry about (the
+   receipt lives under docs/, so committing it does not change the bundle), but
+   the sequence is not optional:
+
+     a. merge the integration tree, then `npm run build` it
+     b. check the machine is quiet: `nvidia-smi` >= 3000 MiB free and
+        http://127.0.0.1:8188/queue empty (a contended run is void; the
+        collector records `contended` and refuses to claim otherwise)
+     c. node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3
+        against THAT dist (~5 minutes of headless browser, plus however long
+        the wait for a quiet GPU takes)
+     d. commit the fresh receipt to docs/evidence/pass<N>/lane-r/
+     e. only then publish
+
+   Budget 10-15 minutes of cut-night wall clock for b-d. If you skip it the
+   guard refuses with "REFUSING TO PUBLISH: the farcrysis admission receipt
+   measured bundle <a>..., but this dist is <b>.... Rebuild, then re-run
+   `node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3`." That is
+   the guard working, not a guard bug - do not reach for --force and do not
+   delete the check.
+6. If farcrysis is shipped PARKED (selectable:false) in the merged tree, none of
+   note 5 applies: the parked branch returns before the receipt is read. The
+   step is owed exactly when the unhide ships.
