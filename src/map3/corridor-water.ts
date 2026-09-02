@@ -26,8 +26,8 @@ import { MeshStandardNodeMaterial, MeshBasicNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 
 const {
-  attribute, cameraPosition, clamp, cos, cross, float, mix, normalize,
-  positionLocal, sin, smoothstep, sqrt, uniform, uv, vec2, vec3, vec4,
+  attribute, cameraPosition, clamp, cos, cross, dot, float, mix, normalize,
+  positionLocal, positionWorld, pow, sin, smoothstep, sqrt, uniform, uv, vec2, vec3, vec4,
 } = TSL as unknown as Record<string, any>;
 
 import type { Corridor } from './corridors';
@@ -131,6 +131,8 @@ export function createWaterCorridor(): Corridor {
   const LEN = CORRIDOR_LEN;
 
   const time = uniform(0);
+  const uniforms = createFoliageUniforms();
+  disposables.push({ dispose() {} });
 
   // TSL Gerstner wave expression operating on local plane coordinates
   const waveAt = (p: any) => {
@@ -151,14 +153,13 @@ export function createWaterCorridor(): Corridor {
   };
 
   /* ---------------------------------------------------------------- */
-  /* 1. Water Surface Material                                         */
+  /* 1. Polished Water Surface Material                                */
   /* ---------------------------------------------------------------- */
 
   const waterMat = new MeshStandardNodeMaterial();
-  waterMat.roughness = 0.06;
-  waterMat.metalness = 0.04;
+  waterMat.roughness = 0.04;
+  waterMat.metalness = 0.06;
   waterMat.transparent = true;
-  waterMat.opacity = 0.90;
 
   // Vertex displacement
   {
@@ -167,8 +168,7 @@ export function createWaterCorridor(): Corridor {
     waterMat.positionNode = vec3(p.x, p.y.add(w.y), p.z);
   }
 
-  // Pixel shading: normals + colors + crest foam + shoreline foam
-  // Use positionLocal so calculations align with the corridor axis regardless of world rotation!
+  // Pixel shading: normals + depth grading + Fresnel + sun specular + foam
   {
     const p = positionLocal;
     const w = waveAt(p);
@@ -180,22 +180,43 @@ export function createWaterCorridor(): Corridor {
     const slope = sqrt(w.sx.mul(w.sx).add(w.sz.mul(w.sz)));
     const norm = clamp(slope.div(float(SLOPE_MAX)), float(0), float(1));
 
-    // Depth grading: p.z in local coordinates is -6 at shore, down to -56 in deep lagoon
-    const depth = clamp(p.z.negate().sub(6.5).div(26.0), float(0.0), float(1.0));
-    const shallow = rgb(0x18929e); // Tropical turquoise
-    const mid = rgb(0x0a4c5a);     // Lagoon teal
-    const deep = rgb(0x021724);    // Deep oceanic blue
-    const body = mix(shallow, mix(mid, deep, depth), depth);
+    // Depth grading: p.z in local coordinates is -6 at shore, down to -56 in deep ocean
+    const depth = clamp(p.z.negate().sub(6.2).div(24.0), float(0.0), float(1.0));
 
-    // Crest foam on steep wave slopes
-    const crestFoam = smoothstep(float(0.72), float(0.96), norm);
-    // Shoreline foam edge right where water meets sand (p.z around -6.5 to -8.0)
-    const edge = smoothstep(float(-8.2), float(-6.6), p.z).mul(smoothstep(float(-5.2), float(-6.4), p.z));
-    const foamColour = rgb(0xeef9fb);
+    // Depth-based transparency: shallow water near shore is clear & translucent
+    waterMat.opacityNode = mix(float(0.38), float(0.96), smoothstep(float(0.0), float(0.28), depth));
 
-    const totalFoam = clamp(crestFoam.mul(0.75).add(edge.mul(0.65)), float(0), float(1));
-    waterMat.colorNode = mix(body, foamColour, totalFoam);
-    waterMat.roughnessNode = mix(float(0.05), float(0.75), totalFoam);
+    // Natural, grounded coastal palette (toned down from saturated electric cyan)
+    const shallow = rgb(0x28626a); // Natural translucent coastal turquoise-slate
+    const mid = rgb(0x0e363e);     // Deep lagoon teal
+    const deep = rgb(0x03131c);    // Dark oceanic navy
+    const waterBody = mix(shallow, mix(mid, deep, depth), depth);
+
+    // Fresnel reflection: grazing angles toward the horizon reflect the sky dome
+    const V = normalize(cameraPosition.sub(positionWorld));
+    const NdotV = clamp(dot(waveNormal, V), float(0.0), float(1.0));
+    const fresnel = pow(float(1.0).sub(NdotV), float(4.0)); // Schlick approximation
+    const skyReflection = rgb(0x94bccc); // Soft sky reflection at horizon
+    const reflectedBody = mix(waterBody, skyReflection, fresnel.mul(0.72));
+
+    // Sun specular glint on wave facets
+    const L = normalize(uniforms.sunDirection);
+    const H = normalize(V.add(L));
+    const NdotH = clamp(dot(waveNormal, H), float(0.0), float(1.0));
+    const sunGlint = pow(NdotH, float(96.0)).mul(3.2).mul(uniforms.sunColor);
+    waterMat.emissiveNode = sunGlint;
+
+    // Crest foam on steep wave slopes + dynamic shoreline lapping foam
+    const crestFoam = smoothstep(float(0.68), float(0.94), norm);
+    const shoreLap = sin(p.z.mul(2.2).add(time.mul(1.5))).mul(0.5).add(0.5);
+    const shoreEdge = smoothstep(float(-8.4), float(-6.5), p.z)
+      .mul(smoothstep(float(-4.8), float(-6.2), p.z))
+      .mul(shoreLap.mul(0.6).add(0.4));
+    const foamColor = rgb(0xf2fbfd);
+
+    const totalFoam = clamp(crestFoam.mul(0.70).add(shoreEdge.mul(0.75)), float(0.0), float(1.0));
+    waterMat.colorNode = mix(reflectedBody, foamColor, totalFoam);
+    waterMat.roughnessNode = mix(float(0.04), float(0.70), totalFoam);
   }
 
   // Expanded water plane
@@ -297,7 +318,6 @@ export function createWaterCorridor(): Corridor {
   /* 4. Marram Grass & Coastal Vegetation                              */
   /* ---------------------------------------------------------------- */
 
-  const uniforms = createFoliageUniforms();
   const grassMat = createFoliageMaterial(uniforms, SUMMER_PALETTE);
   disposables.push(grassMat);
 
