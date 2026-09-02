@@ -1089,8 +1089,26 @@ test.describe('boot and authored presentation', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveCount(5);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder,
+    // and it is the same mistake a second time - the unit pin in
+    // src/ui/pass64-shell.test.ts moved and these browser assertions did not.
+    // BALANCED joined the ladder, the list now CLIMBS instead of leading with
+    // the default, and the seventh entry is the RTX native-runtime EXPLAINER,
+    // which is NOT a preset (its value is outside GraphicsPreset) and changes
+    // no renderer setting. Three sites must move together: this one,
+    // atomic-acres.spec.ts 'legacy Quality alias', and
+    // tests/e2e/pass64-hud-menu.spec.ts.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(7);
+    await expect(page.locator('#graphics-profile option')).toHaveText([
+      'PERFORMANCE',
+      'BALANCED',
+      'QUALITY',
+      'RAY TRACED',
+      'MAX',
+      'CUSTOM',
+      'RTX — WHAT IS IT?',
+    ]);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
     expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
@@ -3120,8 +3138,26 @@ test.describe('performance and stability', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveCount(5);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder,
+    // and it is the same mistake a second time - the unit pin in
+    // src/ui/pass64-shell.test.ts moved and these browser assertions did not.
+    // BALANCED joined the ladder, the list now CLIMBS instead of leading with
+    // the default, and the seventh entry is the RTX native-runtime EXPLAINER,
+    // which is NOT a preset (its value is outside GraphicsPreset) and changes
+    // no renderer setting. Three sites must move together: this one,
+    // atomic-acres.spec.ts 'legacy Quality alias', and
+    // tests/e2e/pass64-hud-menu.spec.ts.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(7);
+    await expect(page.locator('#graphics-profile option')).toHaveText([
+      'PERFORMANCE',
+      'BALANCED',
+      'QUALITY',
+      'RAY TRACED',
+      'MAX',
+      'CUSTOM',
+      'RTX — WHAT IS IT?',
+    ]);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

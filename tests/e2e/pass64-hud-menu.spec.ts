@@ -132,7 +132,22 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder.
+    // AGENTS.md makes this spec mandatory for every HUD/menu change, so this
+    // is the site that must never go stale: BALANCED joined the ladder, the
+    // list CLIMBS, and the last entry is the RTX native-runtime EXPLAINER,
+    // which is not a preset and changes no renderer setting.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(7);
+    await expect(page.locator('#graphics-profile option')).toHaveText([
+      'PERFORMANCE',
+      'BALANCED',
+      'QUALITY',
+      'RAY TRACED',
+      'MAX',
+      'CUSTOM',
+      'RTX — WHAT IS IT?',
+    ]);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
     await expect(page.locator('#graphics-target-fps')).toBeHidden();
     await page.locator('#advanced-graphics summary').click();
