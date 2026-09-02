@@ -520,13 +520,14 @@ let proxyCache: readonly TerrainProxyChunk[] | null = null;
  * analytic field: maximum 0.1086 m, mean 0.0028 m. That is inside the 0.12 m
  * `PLATE_FIT_TOLERANCE_M` the physics plates themselves are fitted to, and far
  * inside `floorBeneath`'s 0.45 m autostep and 0.6 m drop tolerances, so proxy
- * error cannot push the probe off a real floor. The coarser 4 x 32 layout
- * (same 32,768-triangle budget, a 1 m lattice) was measured first and rejected:
- * same per-ray cost, 0.3296 m maximum error.
+ * error cannot push the probe off a real floor. That is 256 chunks of 288
+ * triangles = 73,728 triangles in total. The coarser 4 x 4 chunks of 32 steps
+ * (32,768 triangles on a 1 m lattice) was measured first and rejected: same
+ * per-ray cost, 0.3296 m maximum error.
  *
  * COST. MEASURED over 2,000 hitscan-shaped rays across the arena's full
  * `raycastMeshes` set: 0.024 ms/ray without the proxy, 0.293 ms/ray with it at
- * the original 8 x 8 layout. The chunking is what keeps that bounded - one
+ * the original 8 x 8 chunk layout (16 m chunks, 1,152 triangles each). The chunking is what keeps that bounded - one
  * 73,728-triangle ground mesh would be walked in full on every shot.
  *
  * TERRAIN_SHOT_BOX_CEILING. The BALLISTIC box is a separate question from the
@@ -536,10 +537,10 @@ let proxyCache: readonly TerrainProxyChunk[] | null = null;
  * (798 / 2,000 = 39.9 % of those shots really do meet the island within 60 m):
  *
  *   model                                   muzzle inside earth   ground stops
- *   16 m chunk, tight minY..maxY (shipped)              56.5 %          1,543
- *   no ballistic surface at all (pre-lane)               0.0 %              0
+ *   16 m chunk, tight minY..maxY  (DEFECTIVE, fixed)     56.5 %          1,543
+ *   no ballistic surface at all   (pre-lane)             0.0 %              0
  *   16 m chunk, ceiling = chunk min ground               0.0 %            194
- *   8 m chunk,  ceiling = chunk min ground               0.0 %            445
+ *   8 m chunk,  ceiling = chunk min ground  (SHIPPED)    0.0 %            445
  *   4 m cells,  ceiling = cell min ground                0.0 %            570
  *   2 m cells,  ceiling = cell min ground                0.0 %            628
  *

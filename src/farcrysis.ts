@@ -981,7 +981,9 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // (src/spawn-layout-constraints.ts: floor beneath, autostep route to the
   // enemy, cover in reach, no enemy spawn in sight, wall standoff, open arc,
   // team separation) with each candidate carrying its own terrain-resolved
-  // height. Evidence: artifacts/qa/pass85-lane-r/spawn-solve.json.
+  // height. Evidence: docs/evidence/pass85/lane-r/spawn-solve.json (committed;
+  // the solver also writes an untracked copy under artifacts/, which is
+  // git-ignored on purpose - cite the committed path).
   //
   // What it replaces, measured: four points per team inside a 16 x 12 m
   // beach corner of a 128 x 128 m island - the exact layout
@@ -1026,9 +1028,15 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // prop tops) and no ground under gunfire. Every other shipped arena pushes
   // its ground mesh into `raycastMeshes`; farcrysis simply never did.
   //
-  // Sixteen invisible chunk meshes carry the collision-only triangulation, so
-  // a ray's per-mesh bounding-box rejection leaves ~2,048 triangles to walk
-  // instead of 32,768. They stay OUT of `colliders` for the same reason the
+  // 256 invisible chunk meshes (16 x 16 over the 128 m island, 8 m each, 288
+  // triangles apiece = 73,728 in total) carry the collision-only triangulation,
+  // so a ray's per-mesh bounding-box rejection leaves ~288 triangles to walk
+  // instead of all 73,728. MEASURED at this head with
+  // `farcrysisTerrainProxyChunks()`: 256 chunks / 73,728 triangles, matching
+  // `docs/evidence/pass87/lane-r/floor-coverage-after-shotbox.json`
+  // (terrainProxyMeshes 256, terrainProxyTriangles 73728). An earlier revision
+  // of this comment described an abandoned 4 x 4 x 32 layout and was wrong.
+  // They stay OUT of `colliders` for the same reason the
   // plates do — LOS, bot avoidance and spawn validation must not read the
   // ground as walls.
   const terrainProxyGroup = new THREE.Group();

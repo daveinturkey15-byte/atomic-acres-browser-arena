@@ -162,8 +162,12 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //   - the load path (PASS 84 Lane C): every fenced WebGPU submission now completes
     //     and the arena transition COMMITS, where before it failed the first 12 s fence,
     //     rolled back, and poisoned the next arena's fence behind the same stuck
-    //     submission. Cold admission is 38-63 s against 44-57 s for atomic-acres on the
-    //     same headless instrument - comparable, not fixed at 12 s, and stated as such.
+    //     submission. Cold admission MEASURED at the shipped bundle on a quiet machine,
+    //     three paired runs against a same-window atomic-acres control
+    //     (docs/evidence/pass87/lane-r/farcrysis-admission.json): farcrysis 30.5/34.4/31.1 s
+    //     (mean 32.0), atomic-acres 25.2/26.8/24.9 s (mean 25.7), worst pair ratio 1.283
+    //     over twelve pairs. Comparable to the shipped control, NOT inside the written
+    //     12 s falsifier - no arena on this machine meets that - and stated as such.
     //   - the ground became real to the shared rules (HF-423): a terrain collision proxy
     //     in `raycastMeshes` took the HF-402 spawn floor rule from 6.44 % to 100 %
     //     coverage, and made the island stop bullets.
