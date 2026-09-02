@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MOBILE_TOUCH_ACTION_GROUPS,
+  mobileOverlayVisible,
   mobileTouchFireBypassesPointerLock,
   shouldSuppressMobileBrowserSelection,
   sustainedMobileLookDelta,
@@ -8,6 +9,13 @@ import {
 } from './mobile-touch-controls';
 
 describe('mobile touch controls', () => {
+  it('PASS 84: a connected gamepad suppresses the overlay and disconnect restores it', () => {
+    expect(mobileOverlayVisible(true, true, false)).toBe(true);
+    expect(mobileOverlayVisible(true, true, true)).toBe(false);
+    expect(mobileOverlayVisible(true, false, false)).toBe(false);
+    expect(mobileOverlayVisible(false, true, false)).toBe(false);
+  });
+
   it('allows held mobile fire while pointer lock is unavailable', () => {
     expect(mobileTouchFireBypassesPointerLock(true, true)).toBe(true);
     expect(mobileTouchFireBypassesPointerLock(false, true)).toBe(false);
