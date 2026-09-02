@@ -35,7 +35,7 @@ describe('project map', () => {
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({
-      pass: 'PASS 83', label: 'PASS 83', path: 'channels/pass83', state: 'release-candidate',
+      pass: 'PASS 84', label: 'PASS 84', path: 'channels/pass84', state: 'release-candidate',
     });
     expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
@@ -76,7 +76,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toMatch(/Live target: PASS 83 \(PASS 83\); release-candidate/);
+    expect(markdown).toMatch(/Live target: PASS 84 \(PASS 84\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

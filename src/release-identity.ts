@@ -2,24 +2,27 @@
  * What the running build calls ITSELF - the header badge, the session block and the
  * blocked-renderer notice all read this.
  *
- * Stamped to PASS 83 on 2026-09-01 (the pass83 cut) (the pass82 publish had shipped with the PASS 81
- * stamp still in place - the exact repeat of the PASS 80/PASS 81 class of failure
- * this file's rule exists to stop: stamping is part of CUTTING a release, and the
- * identity must always name the channel this source will publish to).
+ * Stamped to PASS 84 on 2026-09-02 (the pass84 cut). Stamping is part of CUTTING a
+ * release, and the identity must always name the channel this source will publish to:
+ * the pass82 publish shipped with the PASS 81 stamp still in place - the exact repeat of
+ * the PASS 80/PASS 81 class of failure this file's rule exists to stop. The publish
+ * badge check reads the `release-identity-*.js` chunk, not index.html.
  *
  * The build identity is also the multiplayer lobby gate: hosts refuse joins whose
  * stamped pass differs, so guests on an older channel can no longer connect and
  * silently play a different map.
  *
- * PASS 82 remains live at channels/pass82 as the previous version; PASS 73 remains
- * live at channels/the-big-one. Both untouched.
+ * HF-400 (owner, 2026-09-02: "pin this version and remove all past versions, this can
+ * be the safe backup"): once this pass publishes, gh-pages carries exactly
+ * channels/pass84 (this build, live) and channels/pass83 (the pinned safe backup).
+ * Every older tree is retired by scripts/orchestration/publish_pass84.py.
  */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 83',
-  label: 'PASS 83',
+  pass: 'PASS 84',
+  label: 'PASS 84',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/pass83',
-  runtimeLabel: 'PASS 83',
+  route: 'channels/pass84',
+  runtimeLabel: 'PASS 84',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

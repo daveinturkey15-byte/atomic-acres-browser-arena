@@ -10,28 +10,33 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 83 release topology', () => {
-  // Re-pinned from PASS 82 on 2026-09-01. The pass82 publish shipped with the PASS 81
-  // stamp still in place - the same never-stamped-the-new-pass failure this test was
-  // written for on PASS 80. Re-pinned at EQUAL strictness - every field still exact -
-  // and the protected fallback pins below are untouched.
-  it('identifies this source as Pass 83 without moving any protected fallback pin', () => {
+describe('Pass 84 release topology', () => {
+  // Re-pinned from PASS 83 on 2026-09-02 (the pass84 cut). The pass82 publish shipped with
+  // the PASS 81 stamp still in place - the same never-stamped-the-new-pass failure this
+  // test was written for on PASS 80. Re-pinned at EQUAL strictness - every field still
+  // exact - and the protected fallback pins below are untouched.
+  it('identifies this source as Pass 84 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 83',
-      label: 'PASS 83',
+      pass: 'PASS 84',
+      label: 'PASS 84',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/pass83',
-      runtimeLabel: 'PASS 83',
+      route: 'channels/pass84',
+      runtimeLabel: 'PASS 84',
     });
-    expect(config.latest.label).toBe('PASS 83');
+    expect(config.latest.label).toBe('PASS 84');
     // The identity's route must be the channel the config actually stages, or the shell
     // links players at a 404 - which is exactly how a correct bundle came to announce
     // itself as the wrong pass. This assertion did not exist before.
     expect(config.experimental.path).toBe(PASS66_RELEASE_IDENTITY.route);
-    // PASS 73 must remain REACHABLE at its original path, not overwritten by the new cut.
-    expect(config.pass73Retained).toMatchObject({
-      pass: 'PASS 73', path: 'channels/the-big-one',
+    // HF-400, owner 2026-09-02: "pin this version and remove all past versions, this can
+    // be the safe backup". PASS 83 is the single pinned backup the in-build chooser
+    // (src/bootstrap.ts) falls back to; PASS 73 at channels/the-big-one is retired by the
+    // pass84 publish and must no longer be offered anywhere - a card that 404s is worse
+    // than no card. Owner policy change, not a weakened pin: the backup is still exact.
+    expect(config.pass83Backup).toMatchObject({
+      pass: 'PASS 83', path: 'channels/pass83',
     });
+    expect(config.pass73Retained).toBeUndefined();
     expect(config.previous).toMatchObject({
       pass: 'PASS 72',
       sourceSha: '5da686551d92387d08b00be40125386c391bb3ed',
@@ -257,7 +262,7 @@ describe('Pass 83 release topology', () => {
 // The cross-browser proof that a reload converges lives outside the unit suite, because it
 // needs three real browser HTTP caches; this is the structural half.
 describe('the published chooser cannot be assembled from two publishes', () => {
-  const publish = readFileSync('scripts/orchestration/publish_pass83.py', 'utf8');
+  const publish = readFileSync('scripts/orchestration/publish_pass84.py', 'utf8');
 
   it('gives index.html the substitution points publish needs, and no second cacheable list', () => {
     // The channel list is INLINED. A separate release-channel-config.js is still written
@@ -331,17 +336,77 @@ describe('the published chooser cannot be assembled from two publishes', () => {
   it('refuses to offer the newest pass with no recent predecessor beside it', () => {
     // Owner, 2026-08-30: "i dont want pass 63, stable webgl, i want the previous 1/2
     // versions we had, 73 and 71 I think? i forgot, unhide those on next publish please."
+    //
+    // HF-400, owner 2026-09-02 06:58 BST: "also when you push the next pass, pin this
+    // version and remove all past versions, this can be the safe backup". The threshold
+    // moves from two recent predecessors to ONE because the owner changed the policy - the
+    // chooser now carries exactly PASS 84 and the pinned PASS 83 backup - not because the
+    // gate was inconvenient. What it still refuses is the 2026-08-30 complaint itself: the
+    // newest pass beside nothing but an ancient fallback.
     expect(publish).toContain('def assert_predecessors_offered(channels)');
-    expect(publish).toContain('if len(predecessors) < 2');
+    expect(publish).toContain('if len(predecessors) < 1');
+    expect(publish).not.toContain('if len(predecessors) < 0');
+    expect(publish).toContain('HF-400');
+    expect(publish).toContain('pin this version and remove all past versions, this can be the safe backup');
     expect(publish).toContain('"experimental": {');
-    expect(publish).toContain('PASS 82 · PREVIOUS VERSION');
-    expect(publish).toContain('PASS 81 · RETAINED');
-    expect(publish).toContain('PASS 73 · RETAINED');
-    expect(publish).toContain('PASS 72 · RETAINED');
-    expect(publish).toContain('KEEP_AT_LEAST = {"experimental", "previous", "pass82"}');
+    expect(publish).toContain('"previous": {');
+    expect(publish).toContain('PASS 83 · SAFE BACKUP');
+    expect(publish).toContain('KEEP_AT_LEAST = {"pass83"}');
+    // The retired copy must not linger: a label for a tree this publish deletes is a card
+    // that would 404 if anyone pasted it back.
+    expect(publish).not.toContain('PASS 82 · PREVIOUS VERSION');
+    expect(publish).not.toContain('PASS 81 · RETAINED');
+    expect(publish).not.toContain('PASS 73 · RETAINED');
+    expect(publish).not.toContain('PASS 72 · RETAINED');
     // And it has to have been seen red. A gate nobody has watched fail is a gate nobody
     // has checked - this file's own history is the argument for that.
     expect(publish).toContain('the predecessor guard failed its own red test');
+  });
+
+  it('retires every other tree by enumerating gh-pages at run time and asserts the exact post-state', () => {
+    // HF-400. A hardcoded RETIRE list is how a tree survives a retirement it was meant
+    // for - the script must read channels/ off the checkout and delete everything that
+    // is not pass84 or pass83, then look at the disk again before committing.
+    expect(publish).toContain('EXPECTED_POST_STATE = {LIVE_TREE, BACKUP_TREE}');
+    expect(publish).toContain('LIVE_TREE = "pass84"');
+    expect(publish).toContain('BACKUP_TREE = "pass83"');
+    expect(publish).toContain('def enumerate_channel_trees(gh_pages_dir)');
+    expect(publish).toContain('os.listdir(channels_dir)');
+    expect(publish).toContain('def plan_retirements(gh_pages_dir)');
+    expect(publish).toContain('to_delete = [name for name in present if name not in EXPECTED_POST_STATE]');
+    expect(publish).toContain('def assert_post_state(gh_pages_dir)');
+    expect(publish).toContain('if actual != EXPECTED_POST_STATE');
+    expect(publish).not.toContain('RETIRE = {');
+    // The backup cannot be pinned if it is not there to pin.
+    expect(publish).toContain('missing = KEEP_AT_LEAST - set(present)');
+    // Every kept tree is offered and every offered card is a kept tree.
+    expect(publish).toContain('def assert_chooser_matches_post_state(channels, post_state)');
+    // The post-state is re-read from disk immediately before `git add`, not trusted from
+    // the plan: the publish path's last assert_post_state sits after the root shell is
+    // written and directly before the commit-and-push call, which is the only place
+    // `git add -A` lives.
+    const publishPath = publish.slice(publish.indexOf('def main('));
+    expect(publishPath.lastIndexOf('assert_post_state(worktree)'))
+      .toBeLessThan(publishPath.lastIndexOf('return commit_and_push(worktree, COMMIT_MESSAGE)'));
+    expect(publishPath.lastIndexOf('assert_post_state(worktree)'))
+      .toBeGreaterThan(publishPath.indexOf('publish_root_shell(worktree, channels, sources)'));
+    const commitAndPush = publish.slice(publish.indexOf('def commit_and_push('), publish.indexOf('def rollback('));
+    expect(commitAndPush).toContain('sh("git add -A", cwd=worktree)');
+    expect(publish.match(/git add -A/g)).toHaveLength(1);
+    // Rollback re-points the default without deleting a tree or needing a build.
+    expect(publish).toContain('"--rollback"');
+    expect(publish).toContain('def build_channels(rollback=False)');
+    expect(publish).toContain('def rollback(worktree, sources)');
+    const rollbackPath = publish.slice(publish.indexOf('def rollback('), publish.indexOf('def main('));
+    expect(rollbackPath).not.toContain('rmtree');
+    expect(rollbackPath).not.toContain('copytree');
+    expect(rollbackPath).toContain('assert_post_state(worktree)');
+    expect(rollbackPath).toContain('return commit_and_push(worktree, ROLLBACK_COMMIT_MESSAGE)');
+    // And the whole plan can be printed without touching git.
+    expect(publish).toContain('"--dry-run"');
+    expect(publish).toContain('"--gh-pages-dir"');
+    expect(publish).toContain('"--plan-json"');
+    expect(publish).toContain('def publish_root_shell(worktree, channels, sources, dry_run=False)');
   });
 
   it('refuses to publish while the in-build chooser links a fallback that is not on gh-pages', () => {
@@ -358,12 +423,16 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     // publish because of that stale assumption - the guard committing the exact bug it
     // was written to catch. The guard now PARSES the stableFallback expression out of
     // bootstrap.ts and resolves the ?? chain, so pin that behaviour instead of a literal.
-    expect(publish).toContain('def assert_in_game_fallback_exists(worktree)');
+    expect(publish).toContain('def assert_in_game_fallback_exists(worktree, post_state=None)');
     expect(publish).toContain('const stableFallback = ([^;]+);');
     expect(publish, 'the guard must read the real expression, not assume a key')
       .toContain('bootstrap.ts');
     expect(publish, 'and must fail loudly if it can no longer find it, not check nothing')
       .toContain('this guard can no longer tell which channel the in-build chooser offers');
     expect(publish).toContain('is NOT on gh-pages');
+    // HF-400 makes the guard STRICTER: existence is not enough when every tree but two is
+    // being deleted by the same publish. The fallback must BE the pinned backup.
+    expect(publish).toContain('BACKUP_CHANNEL = f"channels/{BACKUP_TREE}"');
+    expect(publish).toContain('if path != BACKUP_CHANNEL:');
   });
 });
