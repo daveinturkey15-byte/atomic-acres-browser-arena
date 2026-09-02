@@ -72,7 +72,21 @@ function presentationViolations(label, state) {
     const policy = presentation.riggedArms.find((arm) => arm.handPolicy)?.handPolicy;
     const activeArms = presentation.riggedArms.filter((arm) => arm.active === true);
     const stowedArms = presentation.riggedArms.filter((arm) => arm.stowed === true);
-    if (policy?.contract !== 'right-firing-hand-handgun-support-reload-only-v1') violations.push(`${label}: hand policy is missing`);
+    // HF-413 re-pin (2026-09-02), reason recorded rather than relaxed: this
+    // gate still demanded the v1 contract string
+    // ('right-firing-hand-handgun-support-reload-only-v1'), which HF-341
+    // RETIRED when it removed the handgun '+40 m support stow'. The shipped
+    // runtime has published
+    // FIRST_PERSON_HAND_POLICY_CONTRACT = 'right-firing-hand-two-hand-support-always-active-v2'
+    // (src/weapon-presentation.ts) ever since, so every row of this gate failed
+    // with "hand policy is missing" while telling nobody anything about the
+    // arms - a gate that cannot pass reports no information. Pinning the
+    // CURRENT contract restores the assertion's meaning: a silent revert to
+    // stowing, or any further unreviewed contract bump, still fails here. The
+    // one-hand stow branch below is kept deliberately: under v2 it is
+    // unreachable, and it is the falsifier that catches a regression back to
+    // v1's stow.
+    if (policy?.contract !== 'right-firing-hand-two-hand-support-always-active-v2') violations.push(`${label}: hand policy is ${policy?.contract ?? 'missing'}`);
     if (activeArms.length !== policy?.activeChainCount) violations.push(`${label}: ${activeArms.length} active chains do not match policy ${policy?.activeChainCount}`);
     if (policy?.activeChainCount === 1) {
       if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left'
