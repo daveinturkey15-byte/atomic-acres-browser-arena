@@ -146,10 +146,17 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
-// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
-import { buildMap3 } from './map3-arena';
+// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
+// imported here: Map 3 is the one lazily loaded arena (HF-409, see
+// `arenaFactories` below and `src/arena-factory-registry.ts`).
 // MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
 import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
+// MAP3 (HF-409): eager/lazy arena builders behind one registry.
+import {
+  createArenaFactoryRegistry,
+  eagerArena,
+  lazyArena,
+} from './arena-factory-registry';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3292,19 +3299,34 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
-const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
-  'atomic-acres': buildArena,
-  'rustworks-1v1': buildRustworks1v1,
-  'gun-range': buildGunRange,
-  'skyline-terminal': buildSkylineTerminal,
-  farcrysis: buildFarcrysis,
-  'high-seas': buildHighSeas,
+/**
+ * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
+ *
+ * Every arena but Map 3 is `eagerArena(...)`: the same static function
+ * reference this map has always held, resolved with no await and no behaviour
+ * change of any kind. Map 3 alone is `lazyArena(...)`, because its builder
+ * reaches the showcase corridors (~10k lines of TSL) and a static entry here
+ * would park all of it in the boot graph of a player who picked Nuke Town -
+ * directly against the live owner priority, "faster map loads".
+ *
+ * The fetch happens in `performArenaSelection`'s asynchronous preparation
+ * phase, BEFORE construction, so `constructArena` stays synchronous inside the
+ * fenced transaction between the WebGPU fence and the authority commit.
+ * `resolved()` throws rather than returning undefined if that ordering is ever
+ * broken, which is the failure mode worth being loud about.
+ */
+const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'atomic-acres': eagerArena(buildArena),
+  'rustworks-1v1': eagerArena(buildRustworks1v1),
+  'gun-range': eagerArena(buildGunRange),
+  'skyline-terminal': eagerArena(buildSkylineTerminal),
+  farcrysis: eagerArena(buildFarcrysis),
+  'high-seas': eagerArena(buildHighSeas),
   // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
-  test1: buildTest1,
-  test2: buildTest2,
-  // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
-  // architecture rather than the src/map3 showcase corridors.
-  map3: buildMap3,
+  test1: eagerArena(buildTest1),
+  test2: eagerArena(buildTest2),
+  // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
+  map3: lazyArena(async () => (await import('./map3-arena')).buildMap3),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -3334,7 +3356,7 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
   const stagingScene = new THREE.Scene();
   let candidate: ArenaMap | null = null;
   try {
-    candidate = arenaFactories[arenaId](stagingScene);
+    candidate = arenaFactories.resolved(arenaId)(stagingScene);
     candidate.root.removeFromParent();
     prepareArenaPresentation(candidate);
     if (recordConstruction) arenaConstructionHistory.push(arenaId);
@@ -28719,6 +28741,15 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    // MAP3 (HF-409): fetch a lazily loaded arena's builder chunk HERE, in the
+    // preparation phase, so the construction below stays synchronous inside the
+    // fence. The guard matters: an eager arena must not gain even a microtask
+    // boundary it did not have before, so it never touches this await at all.
+    if (!arenaFactories.isResolved(nextSelection.id)) {
+      profileArenaTransition('arena-factory-load');
+      await arenaFactories.resolve(nextSelection.id);
+      assertAdmission();
+    }
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
