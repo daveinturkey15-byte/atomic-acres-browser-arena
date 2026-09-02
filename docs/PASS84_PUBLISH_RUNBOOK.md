@@ -79,6 +79,24 @@ Until that lands, `python scripts/orchestration/publish_pass84.py --dry-run` rep
 `in-build-fallback: WOULD REFUSE` and the contract test's third case is red. That red is
 correct: it means a direct link would offer a second card that 404s.
 
+### 0b. Second precondition, also outside a lane's ownership: HF-406
+
+`src/bootstrap.ts` line 48 appends `Local HITL candidate - not yet published.` to the
+first card of that same in-build chooser whenever the newest changelog entry is still
+pending - which it is for every release candidate, including this one. That is the
+second half of what the owner read as "pass 73 HITL" (the first half, the badge, is
+fixed in source by Lane Q). Lane Q does not own `src/bootstrap.ts`, so the one-line
+change is a TRACKED patch, applied the same way and at the same time as section 0:
+
+```bash
+git apply docs/pass84-hf406-outside-ownership.patch && git add src/bootstrap.ts
+```
+
+Verified 2026-09-02: both patches apply in sequence (`0` then `0b`) to a clean tree,
+`npx tsc --noEmit` is 0 with both applied, and `node scripts/qa/verify-built-release-identity.mjs`
+goes from 1 failure to `RELEASE IDENTITY OK` on the resulting build. Without it, step 4b
+fails and the build ships the acronym on a chooser card.
+
 ## 1. Command sequence (integrated worktree; prefix every command with `cd <worktree> &&`)
 
 ```bash
@@ -105,6 +123,18 @@ python scripts/orchestration/publish_pass84.py --dry-run
 npm run build                                     # ~14 s measured 2026-09-02
 grep -l "PASS 84" dist/assets/release-identity-*.js               # must print the chunk
 grep -c "PASS 83" dist/assets/release-identity-*.js               # must print 0
+
+# 4b. HF-406: the whole identity, not just the stamp. Reads the expected pass out of
+#     src/release-identity.ts, then checks the BUILT bytes: the identity chunk names
+#     that pass and no other (PASS 64's failed-regression record excepted), the changelog
+#     chunk carries this pass's own entry title, and nothing ships the internal review
+#     acronym. This is what the owner hit on 2026-09-02: the live PASS 83 channel served
+#     `HITL CANDIDATE · NOT LIVE` and a PASS 73 notes panel out of
+#     channels/pass83/assets/changelog-CgKeduvY.js while index.html looked fine.
+node scripts/qa/verify-built-release-identity.mjs
+#   expected: "RELEASE IDENTITY OK: ... calls itself PASS 84, opens its notes on Pass 84,
+#   ships no HITL string"; exit 0. It exits 1 with the offending file and the surrounding
+#   60 characters otherwise. It FAILS until the HF-406 section-0 patch is applied.
 
 # 5. Hand-copy the build IMMEDIATELY after the build. Do not edit or touch any source
 #    afterwards: the freshness guard compares the newest dist-pass84 mtime against the
@@ -144,6 +174,14 @@ curl -sI "$BASE/channels/pass82/" | head -1                        # HTTP/2 404 
 CHUNK=$(curl -s "$BASE/channels/pass84/" | grep -o 'assets/release-identity-[^"]*\.js' | head -1)
 curl -s "$BASE/channels/pass84/$CHUNK" | grep -c "PASS 84"         # >= 1
 curl -s "$BASE/channels/pass84/$CHUNK" | grep -c "PASS 83"         # 0
+
+# c2. HF-406: the live changelog chunk must carry THIS pass's notes and no review acronym.
+#     (On 2026-09-02 the live pass83 chunk failed both halves of this.)
+CL=$(curl -s "$BASE/channels/pass84/" | grep -o 'assets/changelog-[^"]*\.js' | head -1)
+curl -s "$BASE/channels/pass84/$CL" | grep -c "Pass 84"            # >= 1  (this pass's entry title)
+curl -s "$BASE/channels/pass84/$CL" | grep -c "HITL"               # 0
+#     and the root chooser must offer only the two live passes:
+node scripts/qa/verify-built-release-identity.mjs --dist dist-pass84   --shell .gh-pages-publish/index.html --allow-pass "PASS 84,PASS 83"
 
 # d. Chooser check: the generation pointer names a manifest whose channel set is exactly the two cards
 GEN=$(curl -s -H 'Cache-Control: no-store' "$BASE/release-index.json")
