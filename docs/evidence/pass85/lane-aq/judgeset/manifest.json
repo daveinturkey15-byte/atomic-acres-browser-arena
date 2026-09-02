@@ -1,0 +1,64 @@
+{
+  "arena": "raid2",
+  "backend": {
+    "renderer": null
+  },
+  "capturedAt": "2026-09-02T22:49:22.302Z",
+  "viewport": "1600x900",
+  "note": "Lane AQ HF-408 judgeset, docs/raid-rebuild/SPATIAL_PLAN.md section 5, in authored order.",
+  "shots": [
+    {
+      "cameraId": "raid2-estate-overview",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-estate-overview.png"
+    },
+    {
+      "cameraId": "raid2-west-apron",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-west-apron.png"
+    },
+    {
+      "cameraId": "raid2-garage-fan",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-garage-fan.png"
+    },
+    {
+      "cameraId": "raid2-defining-lane",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-defining-lane.png"
+    },
+    {
+      "cameraId": "raid2-pool-deck-return",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-pool-deck-return.png"
+    },
+    {
+      "cameraId": "raid2-courtyard",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-courtyard.png"
+    },
+    {
+      "cameraId": "raid2-house-spine",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-house-spine.png"
+    },
+    {
+      "cameraId": "raid2-upper-bedroom",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-upper-bedroom.png"
+    },
+    {
+      "cameraId": "raid2-drive-balcony",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-drive-balcony.png"
+    },
+    {
+      "cameraId": "raid2-drive-approach",
+      "ok": true,
+      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-drive-approach.png"
+    }
+  ],
+  "halved": "raid2-drive-approach, raid2-estate-overview, raid2-pool-deck-return and raid2-upper-bedroom were captured at 1600x900 and resized to 800x450 because they exceeded the 600 KB tracked-evidence ceiling. The other six are the captured pixels.",
+  "harness": "artifacts/raid2/capture-judgeset.mjs (git-ignored), NOT scripts/qa/capture-arena-viewpoints.mjs. The shared script FAILS 0/10 on this arena because it calls selectArena the moment the debug API appears, and performArenaSelection silently returns while arenaSelectionReady is false; the run then reports \"authored camera missing\", which is a misleading error for a selection that never took. Verified not raid2-specific in kind: with a 10 s settle before selectArena, setArenaReviewCamera(\"raid2-estate-overview\") returns true. The exact patch is in the lane report; the shared script is another lane's file and was not edited here.",
+  "renderer": "WebGPU. The boot smoke on the same bundle reports backend=webgpu, adapter nvidia/blackwell; the snapshot field this manifest tried to read is not exposed, so the renderer field above is null rather than guessed."
+}
