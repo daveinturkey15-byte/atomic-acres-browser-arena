@@ -106,8 +106,16 @@ try {
     walk.bounds.maxX - walk.end[0], walk.end[0] - walk.bounds.minX,
     walk.bounds.maxZ - walk.end[2], walk.end[2] - walk.bounds.minZ,
   );
+  // MP-LAB: the probe only proves anything if the host actually entered the
+  // band the fix opened. The pre-fix admission margin was 0.44 m; a run that
+  // ends further from the wall than that never exercised the drop and must NOT
+  // report PASS. Observed 2026-09-02: test2 stopped 0.805 m short (geometry in
+  // the way) and reported zero drops - a green that tested nothing.
+  const OLD_BOUNDS_MARGIN_M = 0.44;
+  const reachedRejectBand = distanceToWall < OLD_BOUNDS_MARGIN_M;
+  const noDrops = (guestRemoteView.drops?.total ?? 1) === 0 && (hostState?.stateAdmissionDrops?.total ?? 1) === 0;
   const result = {
-    contract: 'mp-lab-perimeter-replication-v1',
+    contract: 'mp-lab-perimeter-replication-v2',
     measuredAt: new Date().toISOString(),
     arenaId: MAP,
     holdSeconds: HOLD_SECONDS,
@@ -119,11 +127,16 @@ try {
     trail: walk.trail,
     guestDrops: guestRemoteView.drops,
     hostDrops: hostState?.stateAdmissionDrops ?? null,
-    pass: (guestRemoteView.drops?.total ?? 1) === 0 && (hostState?.stateAdmissionDrops?.total ?? 1) === 0,
+    oldBoundsMarginM: OLD_BOUNDS_MARGIN_M,
+    reachedRejectBand,
+    inconclusive: reachedRejectBand ? null : `host stopped ${distanceToWall.toFixed(3)} m from the ${walk.wall} wall, outside the ${OLD_BOUNDS_MARGIN_M} m band this probe exists to exercise`,
+    noDrops,
+    pass: reachedRejectBand && noDrops,
   };
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, `${MAP}.json`), JSON.stringify(result, null, 2));
   console.log(`[perimeter ${MAP}] wall ${walk.wall} host end x=${walk.end[0].toFixed(3)} z=${walk.end[2].toFixed(3)} (wall gap ${distanceToWall.toFixed(3)} m) guest drops ${JSON.stringify(guestRemoteView.drops)} host drops ${JSON.stringify(hostState?.stateAdmissionDrops)}`);
+  if (result.inconclusive) console.log(`[perimeter ${MAP}] INCONCLUSIVE - ${result.inconclusive}`);
   console.log(`[perimeter ${MAP}] ${result.pass ? 'PASS' : 'FAIL'} - ${join(OUT, `${MAP}.json`)}`);
   exitCode = result.pass ? 0 : 1;
   await guest.context.close().catch(() => {});

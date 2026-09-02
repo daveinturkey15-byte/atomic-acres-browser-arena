@@ -55,3 +55,15 @@ test('the perimeter probe drives the host into a wall and reads the guest drop t
   assert.match(probe, /stateAdmissionDrops/);
   assert.match(probe, /\(guestRemoteView\.drops\?\.total \?\? 1\) === 0/);
 });
+
+test('the perimeter probe cannot report PASS without entering the band the fix opened', () => {
+  // A run that stops short of the wall never exercises the drop. test2 did
+  // exactly that on 2026-09-02 (0.805 m short) and reported zero drops, so the
+  // probe now requires the host inside the pre-fix 0.44 m margin before PASS.
+  const probe = readFileSync(resolve(ROOT, 'scripts/qa/mp-lab/probe-perimeter-replication.mjs'), 'utf8');
+  const declared = probe.match(/const OLD_BOUNDS_MARGIN_M = ([0-9.]+);/);
+  assert.ok(declared, 'the probe must name the pre-fix margin it has to enter');
+  assert.equal(Number(declared[1]), 0.44, 'the pre-fix admission margin was 0.44 m');
+  assert.match(probe, /const reachedRejectBand = distanceToWall < OLD_BOUNDS_MARGIN_M;/);
+  assert.match(probe, /pass: reachedRejectBand && noDrops,/);
+});
