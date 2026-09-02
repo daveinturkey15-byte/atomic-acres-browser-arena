@@ -157,3 +157,25 @@ and interior -> Lane K; Raid art pass -> Lane L; chopper pilot verification
 (HF-401 visual half) -> Lane M; QA corpus streamline -> Lane N; real-device
 mobile -> emulated pass plus an owner phone checklist (wave 3); dynamic
 time-of-day and weather lighting -> wave 3 after Lane I lands.
+
+## HF-406 — top-right release badge and the map button must show the CURRENT pass, its features, and the real project map
+
+- **Owner lane:** menu shell / release identity; all channels.
+- **Statement (verbatim, 2026-09-02 ~12:10 BST):** "ensure the top right thing
+  is an accurate update of both the current pass number and features, and
+  the map button contains the proper project map too. Currently it says
+  pass 73 HITL?!"
+- **History:** the same class shipped three times before (a PASS 82 publish
+  still called itself PASS 81; the identity lives in the
+  `release-identity-*.js` chunk, not index.html). The owner is seeing
+  "PASS 73 HITL" on the live site, so at least one surface still reads a
+  stale source.
+- **Mechanical falsifier:** on the built menu (headless capture) and on the
+  live channel after publish, every rendered identity surface (top-right
+  badge, features/changelog panel, map/project-map button and its contents)
+  carries the current pass number and the current pass's feature list from a
+  single source; a test fails if any rendered identity text contains a pass
+  number other than the current one or the word HITL outside the HITL
+  checklist itself.
+- **Plan:** Lane Q (`docs/pass84-lanes/LANE-Q-menu-identity-project-map.md`)
+  on the release-prep branch; part of the PASS 84 publish gate.
