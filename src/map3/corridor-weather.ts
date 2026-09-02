@@ -301,9 +301,11 @@ export function createWeatherCorridor(seed = 21): Corridor {
     const s = attribute('aSeed', 'float');
     const t = time;
 
-    // Expanding cyclic animation: 0 -> 1 over 0.28s
+    // Expanding cyclic animation: 0 -> 1 over 0.28s. A raindrop ring on
+    // ground is a hand's width at most; 0.45 m read as hoops on the grass
+    // (polish pass, Lane P), so the quad now grows to 0.16 m.
     const progress = t.mul(3.6).add(s).sub(t.mul(3.6).add(s).floor());
-    const radius = progress.mul(0.45);
+    const radius = progress.mul(0.16);
 
     splashRingMat.positionNode = c.add(positionLocal.mul(radius));
 

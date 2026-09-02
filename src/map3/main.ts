@@ -17,7 +17,10 @@
  */
 import * as THREE from 'three';
 import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
-import { vec3 } from 'three/tsl';
+import * as TSL from 'three/tsl';
+import { fbm2, xz } from './noise';
+
+const { abs, atan, float, fract, length, max, mix, positionWorld, smoothstep, vec3 } = TSL as unknown as Record<string, any>;
 
 import {
   createNatureCorridor, createMathsCorridor, createGrammarCorridor, type Corridor,
@@ -254,7 +257,27 @@ async function main(): Promise<void> {
   // --- hub ------------------------------------------------------------
   const hubMat = new MeshStandardNodeMaterial();
   hubMat.roughness = 0.94;
-  hubMat.colorNode = vec3(0.29, 0.3, 0.29);
+  // Hub vista polish (Lane P): the hub was one flat grey value from every
+  // corridor mouth. It is now radially paved - concentric courses every
+  // 2.4 m, 48 radial joints, a lighter medallion at the centre - with a
+  // low-frequency fBM tone drift so the slabs are not all the same stone.
+  {
+    const p = positionWorld;
+    const r = length(xz(p));
+    const ang = atan(p.z, p.x).div(Math.PI * 2);
+    const course = abs(fract(r.div(2.4)).sub(0.5));
+    const radial = abs(fract(ang.mul(48)).sub(0.5));
+    const joint = max(smoothstep(float(0.44), float(0.485), course), smoothstep(float(0.40), float(0.47), radial))
+      .mul(smoothstep(float(1.6), float(2.4), r));
+    const tone = fbm2(xz(p, 0.23), 3).mul(0.08);
+    const medallion = smoothstep(float(2.4), float(1.9), r).mul(0.06);
+    // Base value chosen from the capture, not from taste: at 0.31 the plaza
+    // rendered as blown white concrete under this sun and the joints were the
+    // only thing readable in it. 0.20 puts the paving back in stone range and
+    // leaves headroom for the sunlit half of the hub.
+    const slab = vec3(0.20, 0.205, 0.193).add(tone).add(medallion);
+    hubMat.colorNode = mix(slab, vec3(0.105, 0.108, 0.10), joint);
+  }
   const hubGeo = new THREE.CircleGeometry(19, 64);
   hubGeo.rotateX(-Math.PI / 2);
   const hub = new THREE.Mesh(hubGeo, hubMat);
@@ -270,7 +293,8 @@ async function main(): Promise<void> {
   // Ground plane beyond the hub so the world does not end in void.
   const groundMat = new MeshStandardNodeMaterial();
   groundMat.roughness = 1;
-  groundMat.colorNode = vec3(0.23, 0.26, 0.2);
+  // Dry scrub, not a flat green: two octaves of tone drift at 12 m and 3 m.
+  groundMat.colorNode = mix(vec3(0.21, 0.23, 0.17), vec3(0.28, 0.29, 0.22), fbm2(xz(positionWorld, 0.085), 3));
   const groundGeo = new THREE.PlaneGeometry(600, 600);
   groundGeo.rotateX(-Math.PI / 2);
   const ground = new THREE.Mesh(groundGeo, groundMat);

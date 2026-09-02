@@ -157,8 +157,11 @@ export function createWaterCorridor(): Corridor {
   /* ---------------------------------------------------------------- */
 
   const waterMat = new MeshStandardNodeMaterial();
-  waterMat.roughness = 0.04;
-  waterMat.metalness = 0.06;
+  // Polish pass (Lane P): 0.04/0.06 gave a plastic sheet with one blown
+  // highlight the size of a rowing boat. Sea water is a dielectric; a little
+  // roughness spreads the sun into a glitter field instead.
+  waterMat.roughness = 0.10;
+  waterMat.metalness = 0.0;
   waterMat.transparent = true;
 
   // Vertex displacement
@@ -173,8 +176,18 @@ export function createWaterCorridor(): Corridor {
     const p = positionLocal;
     const w = waveAt(p);
 
-    // Analytic normal from wave derivatives
-    const waveNormal = normalize(vec3(w.sx.negate(), float(1.0), w.sz.negate()));
+    // Analytic normal from wave derivatives, plus three short capillary
+    // sines in the NORMAL only (no displacement): the Gerstner bands bottom
+    // out at 2.9 m, which is why the surface read as smooth blobs of dye.
+    // Sea has texture between the swells; this is that texture, for the cost
+    // of three cos() per pixel.
+    const capX = cos(p.x.mul(7.1).add(p.z.mul(2.3)).add(time.mul(2.4))).mul(0.055)
+      .add(cos(p.x.mul(11.7).sub(p.z.mul(6.1)).sub(time.mul(3.1))).mul(0.032))
+      .add(cos(p.x.mul(15.9).add(p.z.mul(13.2)).add(time.mul(3.9))).mul(0.018));
+    const capZ = cos(p.z.mul(6.6).sub(p.x.mul(1.9)).add(time.mul(2.1))).mul(0.055)
+      .add(cos(p.z.mul(12.4).add(p.x.mul(5.3)).sub(time.mul(2.8))).mul(0.032))
+      .add(cos(p.z.mul(14.1).sub(p.x.mul(12.7)).add(time.mul(4.2))).mul(0.018));
+    const waveNormal = normalize(vec3(w.sx.add(capX).negate(), float(1.0), w.sz.add(capZ).negate()));
     waterMat.normalNode = waveNormal;
 
     const slope = sqrt(w.sx.mul(w.sx).add(w.sz.mul(w.sz)));
@@ -184,39 +197,45 @@ export function createWaterCorridor(): Corridor {
     const depth = clamp(p.z.negate().sub(6.2).div(24.0), float(0.0), float(1.0));
 
     // Depth-based transparency: shallow water near shore is clear & translucent
-    waterMat.opacityNode = mix(float(0.38), float(0.96), smoothstep(float(0.0), float(0.28), depth));
+    // Shallow water stays translucent over the wet sand, but never so thin
+    // that the beach colour makes the sea read as milk.
+    waterMat.opacityNode = mix(float(0.58), float(0.97), smoothstep(float(0.0), float(0.28), depth));
 
-    // Natural, grounded coastal palette (toned down from saturated electric cyan)
-    const shallow = rgb(0x28626a); // Natural translucent coastal turquoise-slate
-    const mid = rgb(0x0e363e);     // Deep lagoon teal
-    const deep = rgb(0x03131c);    // Dark oceanic navy
+    // Sea, not dye: a green-teal shelf falling to blue-black, with the mid
+    // tone kept saturated so the surface still has colour under the sky term.
+    const shallow = rgb(0x2b7c78);
+    const mid = rgb(0x0e4d5e);
+    const deep = rgb(0x062a3c);
     const waterBody = mix(shallow, mix(mid, deep, depth), depth);
 
-    // Fresnel reflection: grazing angles toward the horizon reflect the sky dome
+    // Fresnel: the horizon reflects a sky that is darker than the one the
+    // previous pass used, and reflects less of it, so the far water keeps
+    // its body instead of turning to a pale sheet.
     const V = normalize(cameraPosition.sub(positionWorld));
     const NdotV = clamp(dot(waveNormal, V), float(0.0), float(1.0));
-    const fresnel = pow(float(1.0).sub(NdotV), float(4.0)); // Schlick approximation
-    const skyReflection = rgb(0x94bccc); // Soft sky reflection at horizon
-    const reflectedBody = mix(waterBody, skyReflection, fresnel.mul(0.72));
+    const fresnel = pow(float(1.0).sub(NdotV), float(5.0));
+    const skyReflection = rgb(0x6f9bb4);
+    const reflectedBody = mix(waterBody, skyReflection, fresnel.mul(0.60));
 
-    // Sun specular glint on wave facets
+    // Sun glitter: a tight lobe on the capillary-perturbed normal gives a
+    // field of small sparkles rather than one blown sheet.
     const L = normalize(uniforms.sunDirection);
     const H = normalize(V.add(L));
     const NdotH = clamp(dot(waveNormal, H), float(0.0), float(1.0));
-    const sunGlint = pow(NdotH, float(96.0)).mul(3.2).mul(uniforms.sunColor);
+    const sunGlint = pow(NdotH, float(180.0)).mul(1.6).mul(uniforms.sunColor);
     waterMat.emissiveNode = sunGlint;
 
     // Crest foam on steep wave slopes + dynamic shoreline lapping foam
-    const crestFoam = smoothstep(float(0.68), float(0.94), norm);
+    const crestFoam = smoothstep(float(0.55), float(0.90), norm);
     const shoreLap = sin(p.z.mul(2.2).add(time.mul(1.5))).mul(0.5).add(0.5);
     const shoreEdge = smoothstep(float(-8.4), float(-6.5), p.z)
       .mul(smoothstep(float(-4.8), float(-6.2), p.z))
       .mul(shoreLap.mul(0.6).add(0.4));
     const foamColor = rgb(0xf2fbfd);
 
-    const totalFoam = clamp(crestFoam.mul(0.70).add(shoreEdge.mul(0.75)), float(0.0), float(1.0));
+    const totalFoam = clamp(crestFoam.mul(0.85).add(shoreEdge.mul(0.75)), float(0.0), float(1.0));
     waterMat.colorNode = mix(reflectedBody, foamColor, totalFoam);
-    waterMat.roughnessNode = mix(float(0.04), float(0.70), totalFoam);
+    waterMat.roughnessNode = mix(float(0.10), float(0.70), totalFoam);
   }
 
   // Expanded water plane
