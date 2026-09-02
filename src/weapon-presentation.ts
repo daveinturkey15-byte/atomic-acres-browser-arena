@@ -540,9 +540,53 @@ export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.04,
   // Ordinary hip/fire poses need the closed proximal sleeve safely below the
   // crop. Raised/ADS/heavy poses use the lifted lane below instead.
-  right: -0.97,
+  //
+  // HF-413 (2026-09-02). MEASURED at base 75a4e508 by
+  // `npm run qa:pass65:first-person-arms-visual` (headless Chrome, WebGPU,
+  // 1600x900 and 2560x1440, gun-range): the FIRING shoulder joint was reported
+  // at NDC y -0.8304 (m4a1 prone/wall ADS), -0.8309 (m4a1 ADS), -0.8316
+  // (minigun hip), -0.8393 (m4a1 prone/wall hip) and -0.9734 (m4a1 reload) -
+  // every one of them INSIDE the frame, and every one of them a gate violation
+  // ("sleeve entry ... does not continue below frame", floor -0.98). A shoulder
+  // joint inside the frame is exactly the owner's "arms ... strange": the
+  // proximal sleeve terminates in mid-air instead of running off the bottom
+  // edge, so the firing arm reads as a detached floating stub.
+  //
+  // The comment this replaces claimed -0.97 was "comfortably past the -0.98
+  // below-frame continuation requirement". It is not past it at all - it is
+  // 0.01 short, on the wrong side - and the solver's own reach adjustment
+  // moves the reported entry by only a few thousandths, so the shipped lane
+  // could never clear the contract. Both lanes now sit past -0.98 with real
+  // margin, and the palm stays welded to the authored socket (contact error
+  // 1e-9 m) either way.
+  //
+  // HF-413 review correction (2026-09-02). A first attempt used right -1.02 /
+  // raised -1.00, which left HF-388's two lanes 0.02 apart where they had been
+  // 0.15 apart. `placeRiggedShoulderEntryBelowFrame` PINS the shoulder to
+  // exactly `lane - 0.01` NDC, so the gap between the lanes IS the on-screen
+  // pose difference: 0.02 NDC is 9 pixels at 900p and encodes nothing.
+  //
+  // The 0.15 spread is arithmetically unrecoverable, and that is worth writing
+  // down rather than faking. The lifted lane must itself clear the -0.98
+  // continuation floor (that is the defect being fixed), so it can be no
+  // shallower than about -0.99; restoring a 0.15 spread would put the ordinary
+  // firing lane at -1.14, deeper than the -1.12 HF-365 explicitly walked BACK
+  // from after it produced "an almost vertical support arm - a pale post". The
+  // widest honest band is therefore:
+  //
+  //   raised -0.99  (as shallow as the -0.98 floor permits, with margin)
+  //   right  -1.04  (exactly the depth HF-365 reviewed and accepted for the
+  //                  support lane, and never deeper than it)
+  //
+  // 0.05 NDC apart - one third of the original distinction, kept as wide as
+  // the contract allows, with both ends now pinned by
+  // src/hf413-arms-handedness.test.ts rather than by a nominal `raised >
+  // right`. Recovering the full HF-388 pose difference needs a lever other
+  // than lane depth (the elbow pole already carries the raised-pose fold);
+  // that is recorded as an OPEN item, not silently claimed here.
+  right: -1.04,
 });
-export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.82;
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.99;
 export function firstPersonArmShoulderEntryNdc(
   side: 'left' | 'right',
   gripFamily: ViewmodelGripFamily,
@@ -1207,6 +1251,69 @@ export function viewmodelMeleeLateralOffset(aspect: number): number {
   return THREE.MathUtils.clamp(1.37 * aspectRatio + Math.max(0, aspectRatio - 1) * 0.58, 1.18, 2.05);
 }
 
+/**
+ * HF-413. The depth and field of view the lane above was calibrated at.
+ *
+ * `viewmodelMeleeLateralOffset` returns METRES, and a metric camera-space
+ * offset only holds a screen-space lane while the viewmodel stays at the depth
+ * it was calibrated for. That assumption broke.
+ *
+ * MEASURED at base 75a4e508 (`qa:pass65:first-person-arms-visual`, headless
+ * Chrome/WebGPU, gun-range, 1600x900): the live viewmodel root sits at
+ * z = -0.407 m with the camera at fov 82, not at the authored hip z = -1.08 m
+ * with fov 75. Half the frustum width at the live depth is 0.629 m, so the
+ * 1.37 m melee offset displaced the root by 2.18 NDC and parked it at NDC
+ * x = 2.51 - two and a half half-widths PAST the right edge. The captured
+ * frames say the same thing: `melee-knife-0_42.png` shows the whole knife arm
+ * jammed against the right edge with no readable blade, and
+ * `melee-knife-0_12.png` / `_0_82.png` show a detached floating sleeve
+ * fragment. That is the owner's "animations ... for ... knife ... strange".
+ *
+ * The fix keeps the authored SCREEN displacement and re-derives the metres for
+ * whatever depth and fov the viewmodel is actually presenting at. The aspect
+ * term cancels between the two frustum widths, so the calibrated ultrawide
+ * behaviour of the lane above is preserved exactly and only the depth/fov
+ * compensation is new. Placement of the viewmodel itself (that z = -0.407,
+ * which is Lane W's HF-410 territory) is deliberately NOT touched here.
+ */
+export const VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS = 1.08;
+
+/** Half the camera frustum width at `depthMeters`, in metres. */
+function cameraHalfWidthMeters(depthMeters: number, fovDegrees: number, aspect: number): number {
+  return Math.abs(depthMeters) * Math.tan(THREE.MathUtils.degToRad(fovDegrees) / 2) * aspect;
+}
+
+/**
+ * Metres of camera-space melee entry travel that reproduce the authored
+ * screen-space lane at the presented depth and field of view.
+ */
+export function viewmodelMeleeEntryMeters(
+  aspect: number,
+  fovDegrees: number,
+  depthMeters: number,
+): number {
+  const normalizedAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : VIEWMODEL_REFERENCE_ASPECT;
+  const normalizedFov = Number.isFinite(fovDegrees) && fovDegrees > 1 && fovDegrees < 179
+    ? fovDegrees
+    : VIEWMODEL_REFERENCE_FOV_DEGREES;
+  const authoredMeters = viewmodelMeleeLateralOffset(normalizedAspect);
+  const referenceHalfWidth = cameraHalfWidthMeters(
+    VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    VIEWMODEL_REFERENCE_FOV_DEGREES,
+    normalizedAspect,
+  );
+  const presentedHalfWidth = cameraHalfWidthMeters(
+    Number.isFinite(depthMeters) && Math.abs(depthMeters) > 1e-4
+      ? depthMeters
+      : VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    normalizedFov,
+    normalizedAspect,
+  );
+  if (!(referenceHalfWidth > 1e-6) || !Number.isFinite(presentedHalfWidth)) return authoredMeters;
+  // The authored screen displacement, replayed at the presented frustum.
+  return authoredMeters * (presentedHalfWidth / referenceHalfWidth);
+}
+
 function viewmodelScreenScale(camera: THREE.Camera): number {
   if (!(camera instanceof THREE.PerspectiveCamera)) return 1;
   return viewmodelViewportScale(camera.aspect, camera.fov);
@@ -1216,8 +1323,29 @@ function viewmodelScreenDrop(camera: THREE.Camera): number {
   return THREE.MathUtils.clamp((viewmodelScreenScale(camera) - 1) * 0.18, -0.025, 0.14);
 }
 
-function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
-  return viewmodelMeleeLateralOffset(camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT);
+/**
+ * HF-413. Two properties of this call that a later change can silently break,
+ * written down because neither is visible from the call site:
+ *
+ * 1. ONE-FRAME LAG. The caller passes `this.root.position.z`, which is the
+ *    depth the viewmodel was lerped to on the PREVIOUS frame - `root.position`
+ *    is only updated further down `update()`. That is harmless today because
+ *    the Z composition does not read the melee X term, so the two never form a
+ *    feedback loop, and the depth moves by millimetres per frame. If Z is ever
+ *    made to depend on the melee lane, re-derive this from the depth being
+ *    composed on THIS frame instead.
+ * 2. FOV SOURCE. `camera` here is the world camera. If Lane W's HF-410 rework
+ *    introduces a dedicated viewmodel field of view (its own falsifier proposes
+ *    exactly that), this compensation must be handed the camera/FOV that
+ *    actually renders the viewmodel. Reading the world FOV against a viewmodel
+ *    frustum silently returns the wrong metres and the knife leaves the frame
+ *    again, with no test failing.
+ */
+function viewmodelMeleeScreenOffset(camera: THREE.Camera, depthMeters: number): number {
+  if (!(camera instanceof THREE.PerspectiveCamera)) {
+    return viewmodelMeleeEntryMeters(VIEWMODEL_REFERENCE_ASPECT, VIEWMODEL_REFERENCE_FOV_DEGREES, depthMeters);
+  }
+  return viewmodelMeleeEntryMeters(camera.aspect, camera.fov, depthMeters);
 }
 
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
@@ -5008,11 +5136,57 @@ export class WeaponPresentation {
     const candidate = scratch.shoulderReachCandidate;
     const blended = scratch.shoulderBlendedDirection;
     let projected = scratch.shoulderProjected;
-    for (let step = 0; step <= 16; step += 1) {
-      blended.copy(initialDirection).lerp(anatomicalDirection, step / 16).normalize();
+    // HF-413. Arc 0 is the historical search and is unchanged: walk from the
+    // pinned lane direction toward the ANATOMICAL direction (HF-365 gave that
+    // a shoulder-width lateral component so the arm enters diagonally instead
+    // of as a vertical "pale post") and stop at the FIRST step that clears the
+    // lane. Any pose that clears the lane on arc 0 - the overwhelming majority
+    // - resolves exactly as it did before this block existed.
+    //
+    // MEASURED problem being fixed: when the grip is high and close (Railgun at
+    // hip, sidearm and flare gun at ADS) the anatomical terminal itself
+    // projects ABOVE the lane. Arc 0 exhausted and its LAST candidate was
+    // accepted unchecked, leaving the support shoulder inside the frame at NDC
+    // y -0.975..-0.983 against the -0.98 floor: a proximal sleeve ending in
+    // mid-air, the same defect class as the firing-side one.
+    //
+    // Arcs 1 and 2 are only ever reached when arc 0 exhausted. They sample two
+    // further families of direction, and if nothing clears the lane the search
+    // falls back to the LOWEST candidate it saw anywhere rather than to
+    // whichever candidate happened to be last. Direction is deliberately not
+    // assumed: an earlier attempt at this walked straight down and made the
+    // reading WORSE (-0.980 -> -0.917), because pure camera-down drops the
+    // anatomical direction's camera-back component, pushing the joint further
+    // from the eye where the same metres project to a smaller screen offset.
+    // Choosing by measured projection instead of by assumed direction cannot
+    // make a pose worse than the old "accept the last candidate" behaviour.
+    let clearedLane = false;
+    let bestNdcY = Number.POSITIVE_INFINITY;
+    let bestArc = 0;
+    let bestStep = 0;
+    for (let arc = 0; arc < 3 && !clearedLane; arc += 1) {
+      for (let step = 0; step <= 16; step += 1) {
+        if (arc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, step / 16);
+        else if (arc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, step / 16);
+        else blended.copy(initialDirection).lerp(cameraDown, step / 16);
+        blended.normalize();
+        candidate.copy(socketTarget).addScaledVector(blended, safeReach);
+        projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
+        if (projected.y < bestNdcY) {
+          bestNdcY = projected.y;
+          bestArc = arc;
+          bestStep = step;
+        }
+        if (projected.y <= targetNdcY - 0.005) { clearedLane = true; break; }
+      }
+    }
+    if (!clearedLane) {
+      if (bestArc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, bestStep / 16);
+      else if (bestArc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, bestStep / 16);
+      else blended.copy(initialDirection).lerp(cameraDown, bestStep / 16);
+      blended.normalize();
       candidate.copy(socketTarget).addScaledVector(blended, safeReach);
       projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
-      if (projected.y <= targetNdcY - 0.005) break;
     }
 
     parent.updateWorldMatrix(true, false);
@@ -5911,7 +6085,7 @@ export class WeaponPresentation {
     }
     const stanceHip = (1 - this.adsBlend) * (1 - this.sprintBlend) * (1 - meleeArc);
     const targetPosition = this.frameTargetPosition.set(
-      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral
+      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera, this.root.position.z) + grenadeArc * 0.18 + reloadStage.lateral
         + this.stancePose.lateralMeters * stanceHip,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters - this.contactResponse.additionalDropMeters
