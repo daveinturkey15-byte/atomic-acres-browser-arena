@@ -61,6 +61,16 @@ export const ARENA_WATER_SURFACES: readonly Readonly<{ namePattern: RegExp; reas
     reason: 'horizon vista sea — open water to the sky',
   },
   {
+    // MAP3 (HF-409): the showcase shoreline's Gerstner sea (corridor-water.ts).
+    // Same class as the shared ocean below and registered for the same reason:
+    // its gloss is a TSL Fresnel/specular chain over a displaced surface, so
+    // `material.roughness` sees none of it and the extractor would classify a
+    // 41 x 54 m sea as matte stone. It is the one genuinely mirror-like
+    // surface Map 3 has.
+    namePattern: /map3-shoreline-water-surface/,
+    reason: 'showcase Gerstner shoreline sea - Fresnel water by design',
+  },
+  {
     // The SHARED ocean (water-authoring registry, presentationOwner
     // 'shared-ocean'): High Seas' surrounding sea AND RustRig's -19.5 m
     // rig sea. Built by pass64-tsl-scene.makeWater / ocean-tsl, whose slope-

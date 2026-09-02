@@ -62,7 +62,22 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   test2: [],
   // MAP3 (owner 2026-09-02, HF-405): same rule - a new arena starts with an
   // EMPTY accepted ledger. Anything the audit finds is a bug in the arena.
-  map3: [],
+  map3: [
+    // MAP3 (HF-409, 2026-09-02): Map 3 became the corridor SHOWCASE, and every
+    // row below is a body that MOVES. A BallisticSurface is a static world
+    // rectangle; rating a thing that drives, rolls or bobs would put its shot
+    // authority where the object stood at t=0 and nowhere near where it is,
+    // which is worse than no rating - a bullet would stop in open air and pass
+    // through the object itself. Every STATIC solid in these corridors is
+    // rated: 209 surfaces, authored from `src/map3/corridor-solids.ts`.
+    // Only the FRAME is listed for the forest rover: its body panels sit
+    // inside the frame's footprint and the census already explains them there.
+    { name: 'map3-forest-rover-frame', count: 1, reason: 'self-driving rover: an autonomous vehicle whose pose changes every frame; a static surface would rate empty ground' },
+    { name: 'map3-shoreline-rover-body', count: 1, reason: 'self-driving rover fording the shallows; pose changes every frame' },
+    { name: 'map3-godrays-rolling-body', count: 2, reason: 'the two marched bodies that roll through the light shafts; their whole purpose is to move, and they are the volumetric exhibit, not cover' },
+    { name: 'map3-shoreline-floating-barrel', count: 3, reason: 'floats on the Gerstner surface: heaves and drifts with the waves every frame' },
+    { name: 'map3-shoreline-floating-buoy', count: 2, reason: 'moored buoy riding the swell; bobs every frame' },
+  ],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
