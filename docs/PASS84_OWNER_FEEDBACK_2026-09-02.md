@@ -363,3 +363,27 @@ page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
   host's body play a prone transition rather than snap.
 - **Plan:** Lane Y (`docs/pass84-lanes/LANE-Y-drop-shot.md`); Lane W owns
   the viewmodel's prone pose in parallel.
+
+## HF-413 — first-person arms and animations correct: guns, reload, knife not inverted or strange
+
+- **Statement (verbatim, 2026-09-02 ~16:55 BST):** "also please ensure the
+  arms and animations for guns, reloading, knife are fixed and not inverted
+  or strange etc, hopefully an easy fix."
+- **History:** August's arms work burned 13 GLB regenerations and 11 .blend
+  rewrites on mirroring, near-plane penetration and material response; the
+  mirroring class recurs.
+- **Mechanical falsifier:** every arms and weapon node has a positive scale
+  determinant, reload and melee clips play in the authored direction from
+  the authored hand, sockets sit on the authored side, the pass65 arms visual
+  verifier passes, and before/after frame strips per weapon show the
+  defects gone.
+- **Plan:** Lane Z (`docs/pass84-lanes/LANE-Z-arms-animations.md`), in
+  parallel with Lane W (placement/FOV); Z owns rig and clips, W owns placement.
+
+### HF-409 addendum (owner, ~16:55): "Just keep the showcase in and it's not
+about combat, it's a mode you can explore."
+Map 3 is an EXPLORE mode: the showcase corridors are the content; solo,
+0 bots, no combat requirement, no multiplayer. Collision parity still
+applies to walkable and blocking surfaces (the player must not fall through
+or walk through the showcase), but Lane V should not spend budget on
+combat systems, spawn-vs-enemy constraints or field support for map3.

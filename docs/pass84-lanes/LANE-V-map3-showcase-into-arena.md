@@ -82,3 +82,16 @@ Per step done/partial with evidence; bundle sizes before/after; hook test
 name; collider coverage numbers from the parity audit; frames of the in-game
 corridors animated (two captures a few seconds apart proving motion); gate
 results; commits. Claim-state every line.
+
+## OWNER UPDATE (2026-09-02 ~16:55 BST) — read this before step 6
+"Just keep the showcase in and it's not about combat, it's a mode you can
+explore." Map 3 is an EXPLORE mode: the showcase corridors ARE the content.
+Register it solo with `soloBotCount: 0`, `maximumSoloBots: 0`,
+`multiplayer: false`, `fieldSupport: false`, label it as an explore preview,
+and do not spend budget on combat: no enemy-spawn constraints (a single
+player spawn table at the hub is enough; the spawn-quality gate's
+team-separation rules do not apply to a 0-bot arena - if the gate cannot
+express that, put the exact gate patch in your report rather than authoring
+fake enemy spawns), no field support, no overdrive. Collision parity for
+walkable and blocking surfaces still applies: the player must not fall
+through or walk through the showcase.
