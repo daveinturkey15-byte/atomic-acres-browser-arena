@@ -45,7 +45,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
-import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -342,9 +342,9 @@ mkdirSync(resolve(SHOT_DIR), { recursive: true });
 // A shared browser makes later lanes measure GPU-heap history, not the game,
 // and silently poisoned the movement/HF-323 rollups with missing data.
 const launchBrowser = () => chromium.launch({
-    headless: false,
+    headless: true,
     channel: 'chrome',
-    args: [...OFFSCREEN_ARGS,
+    args: [...SILENT_ARGS,
     '--use-angle=d3d11',
       '--enable-unsafe-webgpu',
       '--ignore-gpu-blocklist',

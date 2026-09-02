@@ -12,7 +12,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const arg = (name, fallback) => {
   const index = process.argv.indexOf(name);
@@ -37,9 +37,9 @@ const SEGMENTS = [
 ];
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: [...OFFSCREEN_ARGS,
+  args: [...SILENT_ARGS,
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',

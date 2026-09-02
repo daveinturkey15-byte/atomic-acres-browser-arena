@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
-import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
+import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const BASE = 'http://127.0.0.1:41911/';
 const PEER_PORT = 9337;
@@ -41,9 +41,9 @@ async function ensurePeerServer() {
 
 const peerProcess = await ensurePeerServer();
 const browser = await chromium.launch({
-  headless: false,
+  headless: true,
   channel: 'chrome',
-  args: [...OFFSCREEN_ARGS,
+  args: [...SILENT_ARGS,
       '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',
