@@ -55,6 +55,7 @@ import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additi
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { buildTest1, buildTest2 } from './test-maps';
+import { buildMap3 } from './map3-arena';
 import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 import { validArenaSpawnPoint } from './spawn-safety';
 
@@ -75,6 +76,8 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   'high-seas': ((scene: THREE.Scene) => buildHighSeas(scene)) as ArenaBuilder,
   test1: buildTest1 as ArenaBuilder,
   test2: buildTest2 as ArenaBuilder,
+  // HF-405: Map 3 (PREVIEW) registered 2026-09-02; the exhaustive record caught it at integration.
+  map3: buildMap3 as ArenaBuilder,
 });
 
 /** `[id, builder]` for every arena the menu offers. */

@@ -482,11 +482,22 @@ export function buildMap3(scene: THREE.Scene): ArenaMap {
   // the layout is built on, so bay 0's mouth and bay 4's mouth are the same
   // position in each team's own frame. Six per team, spread over the bay's
   // width and its neighbouring corner court, so one grenade cannot cover a set.
+  // HF-402 x HF-405 (integration 2026-09-02): the first table put both teams
+  // at the bay mouths beside the hub, 6.4 m apart across it, and failed the
+  // spawn-layout quality gate (enemy spawn in sight, wall in the face, teams
+  // 3.8% of the axis apart). These points are the gate's own validated
+  // candidates from scripts/qa/solve-spawn-layouts.ts --arenas map3: the
+  // south bay mouth plus the deep ends of the three southern corridors, so
+  // the nearest cross-team pair is 60 m of the 168 m axis (36%).
   const team0: [number, number][] = [
-    bayPoint(MAP3_BAYS[0]!, -3.2, 30), bayPoint(MAP3_BAYS[0]!, 0, 34), bayPoint(MAP3_BAYS[0]!, 3.2, 30),
-    bayPoint(MAP3_BAYS[0]!, 0, 24), bayPoint(MAP3_BAYS[1]!, -3.2, 26), bayPoint(MAP3_BAYS[3]!, 3.2, 26),
+    [-12.7, -30], [-6.3, -30], [17, -80], [-20, -68], [20, -51],
   ];
-  const team1: [number, number][] = team0.map(([x, z]) => [-x, -z] as [number, number]);
+  // Not a negation of team 0: the bays are not left-right symmetric, so team 1
+  // uses the solver's own north-side candidates (the three nearest the hub,
+  // (9.5, 24), (-9.5, 24) and (-26, 12.7), dropped for cross-team separation).
+  const team1: [number, number][] = [
+    [12.7, 30], [9.5, 34], [6.3, 30], [-20, 68], [20, 51],
+  ];
 
   return {
     id: 'map3',
