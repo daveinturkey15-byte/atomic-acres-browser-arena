@@ -145,7 +145,8 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
     intendedFor: 'Top-end desktop GPUs. If your frame rate drops when you select it, that is the profile working as intended, not a bug.',
     costClass: 'highest',
     turnsOn: Object.freeze([
-      'Renders at 115% of your window and downsamples, on top of 4x multisampling.',
+      'Asks for 115% of your window and downsamples, on top of 4x multisampling. '
+      + 'Under sustained load the adaptive valve may hold it at or below native — that is the valve working, not the setting failing.',
       'Screen-space reflections and screen-space global illumination at high, sun shafts at high, ambient occlusion at ultra.',
       'Dynamic shadow updates, depth of field, and a low bounded amount of motion blur.',
       'Rain at 135% of authored density and the thickest ambient air.',
