@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-09-02T23:05:04.479Z",
+  "capturedAt": "2026-09-02T23:21:40.407Z",
   "machine": {
-    "freeVramMib": 6533,
+    "freeVramMib": 8701,
     "comfyQueueDepth": 0,
     "waitedAttempts": 0
   },
@@ -156,6 +156,10 @@
   "failedRequests": [
     {
       "url": "http://127.0.0.1:4195/assets/original/menu-previews/atomic-acres.webm?v=pass66-runtime-preview-v15",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:4195/assets/original/menu-previews/map3.webm?v=pass84-map3-preview-v1",
       "failure": "net::ERR_ABORTED"
     },
     {
