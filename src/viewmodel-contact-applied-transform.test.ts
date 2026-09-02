@@ -66,8 +66,8 @@ import {
 import { VIEWMODEL_SURFACE_CLIP_PLANE_COUNT } from './systems/viewmodel-surface-clip';
 import { type WeaponPose } from './weapon-presentation';
 import {
+  FIRST_PERSON_CAMERA_NEAR_METERS,
   VIEWMODEL_BODY_FIT_SCALE,
-  VIEWMODEL_OVERLAY_NEAR_METERS,
   viewmodelRigToWorldMeters,
 } from './viewmodel-body-fit';
 
@@ -269,10 +269,21 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
       ).toBeLessThanOrEqual(0);
 
       // And it must not have solved the wall by putting the rig in the camera.
-      // HF-410: the plane that can actually clip the rig is the overlay's, not
-      // the gameplay camera's - the first-person layer is a separate
-      // depth-cleared submission with its own near plane.
-      expect(rigExtent(rig).nearest).toBeGreaterThanOrEqual(VIEWMODEL_OVERLAY_NEAR_METERS);
+      //
+      // HF-410 REPAIR. This line used to read VIEWMODEL_OVERLAY_NEAR_METERS
+      // (0.002 m) and that was wrong: the depth-cleared first-person overlay
+      // does not run on the shipped WebGPU route (atomicSignal is hardcoded
+      // null in legacy-main), so the plane the rig is really drawn against is
+      // the on-foot gameplay camera's, FIRST_PERSON_CAMERA_NEAR_METERS =
+      // 0.02 m. A 25x more permissive plane pinned to a submission that never
+      // runs is a gate pinned to a fiction, so it is graded at the real plane.
+      //
+      // `rigExtent(rig).nearest` is the nearest visible point of the WHOLE rig,
+      // off-screen sleeve included, so this is the strict whole-object form.
+      // The on-screen form - no VISIBLE vertex inside the plane - is graded per
+      // weapon and per pose by presentationState().armFraming /
+      // weaponFraming, via src/viewmodel-near-plane-framing.ts.
+      expect(rigExtent(rig).nearest).toBeGreaterThanOrEqual(FIRST_PERSON_CAMERA_NEAR_METERS);
     });
   }
 
