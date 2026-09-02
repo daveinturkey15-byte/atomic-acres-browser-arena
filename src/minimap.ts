@@ -156,6 +156,41 @@ export function playerUpScaleX(): -1 {
   return -1;
 }
 
+/**
+ * HF-399: closed form of the player-centred minimap transform the 2D context is
+ * given every frame, which is exactly
+ *
+ *   translate(width / 2, height / 2)
+ *   rotate(playerUpRotationRadians(yaw))
+ *   scale(playerUpScaleX(), 1)
+ *   translate(-playerX, -playerY)
+ *
+ * applied to a point already in minimap pixel space. Nuke Town's static
+ * landmark layer is now painted once into an offscreen canvas and composited
+ * under that transform, so the landmark LABELS - which must stay upright and
+ * therefore cannot ride the rotated context - need the same mapping in scalar
+ * form. Before HF-399 that mapping came free from `context.getTransform()
+ * .transformPoint(new DOMPoint(x, y))`, once per landmark per frame.
+ *
+ * Exported (rather than inlined at the call site) so the algebra has an
+ * automated guard: `src/minimap-player-view-transform.test.ts` checks it
+ * against an independently composed affine matrix chain.
+ */
+export function minimapPlayerViewPoint(
+  anchorX: number,
+  anchorY: number,
+  view: Readonly<{ width: number; height: number; playerX: number; playerY: number; rotation: number; scaleX: number }>,
+): [number, number] {
+  const dx = (anchorX - view.playerX) * view.scaleX;
+  const dy = anchorY - view.playerY;
+  const cos = Math.cos(view.rotation);
+  const sin = Math.sin(view.rotation);
+  return [
+    view.width / 2 + dx * cos - dy * sin,
+    view.height / 2 + dx * sin + dy * cos,
+  ];
+}
+
 /** Screen-space offset where camera-forward is up and camera-right is right. */
 export function playerRelativeMinimapOffset(dx: number, dz: number, yaw: number): [number, number] {
   const forwardX = -Math.sin(yaw);
