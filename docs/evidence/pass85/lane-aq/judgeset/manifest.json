@@ -1,64 +1,25 @@
 {
   "arena": "raid2",
-  "backend": {
-    "renderer": null
-  },
-  "capturedAt": "2026-09-02T22:49:22.302Z",
-  "viewport": "1600x900",
-  "note": "Lane AQ HF-408 judgeset, docs/raid-rebuild/SPATIAL_PLAN.md section 5, in authored order.",
+  "lane": "AQ (HF-408) - Raid layout rethink",
+  "capturedBy": "scripts/qa/capture-arena-viewpoints.mjs - the SANCTIONED harness, unmodified",
+  "verdict": "PASS 10/10",
+  "backend": "webgpu",
+  "adapter": "nvidia / blackwell, installed Chrome HEADLESS",
+  "commit": "b2abed4d",
+  "judgeset": "docs/raid-rebuild/SPATIAL_PLAN.md section 5, in authored order; ids mirrored in scripts/qa/viewpoint-catalog.mjs",
+  "note": "These are the sanctioned harness's own frames (its .s1/.s2 persistence samples are left in the git-ignored artifacts/raid2/shared-harness/ run directory). All ten are under the 600 KB tracked-evidence ceiling, so none was resized.",
+  "correction": "An earlier commit in this lane (b2abed4d) recorded that this harness FAILED 0/10 on raid2 and attributed it to a race in selectArena. THAT DIAGNOSIS WAS WRONG and is corrected here. The harness hardcodes `const PORT = 41931` and spawns its preview with --strictPort. On this machine another lane's worktree (aa-claude-farcrysis) already held 41931 with an orphaned vite preview, so the spawn failed and the script drove THAT WORKTREE'S BUILD - a build with no raid2 in it - which is why every camera came back 'authored camera missing'. Two of the probes used to diagnose it were themselves pointed at other lanes' orphaned servers on 41932 (aa-claude-nuketown) and 41933 (aa-claude-lighting), which is why they appeared to show a selection race. Re-run against this worktree's own preview on a free port (--url http://127.0.0.1:41941), the UNMODIFIED sanctioned harness reports OK 10/10. There is no race and no raid2 defect.",
+  "harnessFinding": "Still a real and reportable defect in the shared harness, just a different one: it has no port-collision detection. With several lane worktrees live on one machine it will silently measure another lane's build and report a confident FAIL against your arena. The exact patch is in the lane report; the file belongs to another lane and was not edited here.",
   "shots": [
-    {
-      "cameraId": "raid2-estate-overview",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-estate-overview.png"
-    },
-    {
-      "cameraId": "raid2-west-apron",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-west-apron.png"
-    },
-    {
-      "cameraId": "raid2-garage-fan",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-garage-fan.png"
-    },
-    {
-      "cameraId": "raid2-defining-lane",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-defining-lane.png"
-    },
-    {
-      "cameraId": "raid2-pool-deck-return",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-pool-deck-return.png"
-    },
-    {
-      "cameraId": "raid2-courtyard",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-courtyard.png"
-    },
-    {
-      "cameraId": "raid2-house-spine",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-house-spine.png"
-    },
-    {
-      "cameraId": "raid2-upper-bedroom",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-upper-bedroom.png"
-    },
-    {
-      "cameraId": "raid2-drive-balcony",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-drive-balcony.png"
-    },
-    {
-      "cameraId": "raid2-drive-approach",
-      "ok": true,
-      "file": "docs/evidence/pass85/lane-aq/judgeset/raid2-drive-approach.png"
-    }
-  ],
-  "halved": "raid2-drive-approach, raid2-estate-overview, raid2-pool-deck-return and raid2-upper-bedroom were captured at 1600x900 and resized to 800x450 because they exceeded the 600 KB tracked-evidence ceiling. The other six are the captured pixels.",
-  "harness": "artifacts/raid2/capture-judgeset.mjs (git-ignored), NOT scripts/qa/capture-arena-viewpoints.mjs. The shared script FAILS 0/10 on this arena because it calls selectArena the moment the debug API appears, and performArenaSelection silently returns while arenaSelectionReady is false; the run then reports \"authored camera missing\", which is a misleading error for a selection that never took. Verified not raid2-specific in kind: with a 10 s settle before selectArena, setArenaReviewCamera(\"raid2-estate-overview\") returns true. The exact patch is in the lane report; the shared script is another lane's file and was not edited here.",
-  "renderer": "WebGPU. The boot smoke on the same bundle reports backend=webgpu, adapter nvidia/blackwell; the snapshot field this manifest tried to read is not exposed, so the renderer field above is null rather than guessed."
+    "raid2-estate-overview",
+    "raid2-west-apron",
+    "raid2-garage-fan",
+    "raid2-defining-lane",
+    "raid2-pool-deck-return",
+    "raid2-courtyard",
+    "raid2-house-spine",
+    "raid2-upper-bedroom",
+    "raid2-drive-balcony",
+    "raid2-drive-approach"
+  ]
 }
