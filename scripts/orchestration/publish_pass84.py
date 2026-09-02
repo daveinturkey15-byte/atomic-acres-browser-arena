@@ -1,0 +1,862 @@
+#!/usr/bin/env python3
+"""Publish the Pass 84 candidate as its own gh-pages channel and retire every other tree.
+
+Sibling of publish_pass83.py, with one policy change from the owner (HF-400).
+
+Owner, 2026-09-02 06:58 BST, verbatim: "also when you push the next pass, pin this version
+and remove all past versions, this can be the safe backup"
+
+So after this script runs, gh-pages carries EXACTLY two channel trees:
+
+    channels/pass84   the live default (this cut)
+    channels/pass83   the pinned safe backup (what was live when he said it)
+
+Every other tree under channels/ (pass81, pass82, pass72-retained, the-big-one,
+recent-stable, and anything else that turns up) is deleted from gh-pages and from the
+chooser. The retirement list is ENUMERATED AT RUN TIME from what is actually on gh-pages,
+never hardcoded - a hardcoded list is how a tree survives a retirement it was meant for -
+and the post-state is asserted to be exactly {pass84, pass83} before anything is committed.
+
+Gated BEFORE this runs, never after: tsc 0, full vitest floor, the arenas verified through
+the REAL player path, and a COLD visitor with an empty profile launching on the first click.
+
+Guards kept from publish_pass83.py, unchanged in strictness: the build freshness guard
+(refuses a stale hand-copied dist), the farcrysis-unselectable guard (checked against the
+bytes the minifier emits, with its own red test), the content-addressed root chooser with
+its inline-escape self-test, and the in-build fallback guard - which is now STRICTER: it
+must resolve to the PASS 83 backup, not merely to something that exists.
+
+`--dry-run` prints the complete plan (trees to delete, files to write, the chooser that
+would be inlined, the fallback the in-build chooser would draw, and every guard's verdict)
+and touches nothing. Pass `--gh-pages-dir <path>` to plan against a local clone or worktree
+of gh-pages without running git at all; `--plan-json <path>` writes the plan as JSON for
+the contract test (scripts/orchestration/publish_pass84_plan.test.mjs).
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+SRC = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DIST = os.path.join(SRC, "dist-pass84")
+WORKTREE = os.path.join(SRC, ".gh-pages-publish")
+CHANNEL = "channels/pass84"
+LIVE_TREE = "pass84"
+BACKUP_TREE = "pass83"
+BACKUP_CHANNEL = f"channels/{BACKUP_TREE}"
+POLICY = "HF-400"
+
+# HF-400. The ONLY tree the owner asked to keep beside the new pass. Everything else under
+# channels/ is retired by enumeration below. A publish that would drop this one is a bug;
+# a publish that would keep anything else is a policy violation.
+KEEP_AT_LEAST = {"pass83"}
+
+# HF-400. What channels/ must contain, exactly, when this script commits. Asserted against
+# the directory listing after retirement, not against a list of what was meant to happen.
+EXPECTED_POST_STATE = {LIVE_TREE, BACKUP_TREE}
+
+DESCRIPTION = (
+    "Pass 84: the freeze fixes of Pass 82/83 plus the 2026-09-02 owner list - viewmodel "
+    "wall and floor clipping, rail/scope attachment, halved wall pullback, EBR +40% damage "
+    "and +25% fire rate, chopper pilot lag, reasonable spawns on every map, lobby "
+    "host/guest reliability, gamepad and aim assist, and the Quality-profile frame-rate "
+    "regression. Farcrysis hidden until ready."
+)
+
+# HF-400. The chooser now carries exactly two cards. Keys are load-bearing for the release
+# shell's alias table (release-shell/release-shell.js): `latest`, `normal` and every room
+# invite route to `experimental`; `previous`, `stable`, `rollback` and `pass72` route to
+# `previous`. So the live cut is keyed `experimental` and the safe backup is keyed
+# `previous` - which is exactly the alias the owner's policy needs: ?release=previous -> PASS 83.
+BACKUP_COPY = {
+    "label": "PASS 83 · SAFE BACKUP",
+    "description": (
+        "The build that was live before this one, pinned as the single safe backup "
+        "(owner, 2026-09-02). Pick this if the newest pass misbehaves."
+    ),
+}
+
+
+def build_channels(rollback=False):
+    """The two-card chooser HF-400 asks for. Pure: no disk, no git.
+
+    With rollback=True the SAME two trees stay published but the default flips: the shell
+    routes `latest`, `normal` and every room invite to `experimental`, so the PASS 83 backup
+    takes that key and PASS 84 moves to `previous` for investigation. No tree is deleted by
+    a rollback; nothing has to be rebuilt; the only thing that changes is which card is
+    the default.
+    """
+    if rollback:
+        return {
+            "experimental": {
+                "label": "PASS 83 · SAFE BACKUP · DEFAULT AFTER ROLLBACK",
+                "description": (
+                    "PASS 84 was rolled back; this is the pinned PASS 83 safe backup "
+                    "(owner, 2026-09-02), now the default again."
+                ),
+                "pass": "PASS 83",
+                "path": BACKUP_CHANNEL,
+                "deploymentState": "live",
+            },
+            "previous": {
+                "label": "PASS 84 · ROLLED BACK",
+                "description": (
+                    "The PASS 84 cut, rolled back from the default. Still published here "
+                    "for investigation; not recommended until it is re-promoted."
+                ),
+                "pass": "PASS 84",
+                "path": CHANNEL,
+            },
+        }
+    return {
+        "experimental": {
+            "label": "PASS 84",
+            "description": DESCRIPTION,
+            "pass": "PASS 84",
+            "path": CHANNEL,
+            "deploymentState": "live",
+        },
+        "previous": {
+            "label": BACKUP_COPY["label"],
+            "description": BACKUP_COPY["description"],
+            "pass": "PASS 83",
+            "path": BACKUP_CHANNEL,
+        },
+    }
+
+
+COMMIT_MESSAGE = """publish: PASS 84 - owner list of 2026-09-02, PASS 83 pinned as the single safe backup
+
+Owner, 2026-09-02 06:58 BST: "also when you push the next pass, pin this version
+and remove all past versions, this can be the safe backup" (HF-400). gh-pages now
+carries exactly channels/pass84 (live) and channels/pass83 (safe backup); every
+older tree was retired by run-time enumeration and the post-state was asserted
+to be exactly those two before this commit.
+
+Gated before publish: tsc 0, full vitest floor, real-player-path arena checks,
+cold-visitor first-click launch, build freshness guard, farcrysis-unselectable
+guard, in-build fallback resolves to channels/pass83.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"""
+
+ROLLBACK_COMMIT_MESSAGE = """rollback: default re-pointed to PASS 83 safe backup, PASS 84 kept for investigation
+
+HF-400 rollback path (scripts/orchestration/publish_pass84.py --rollback). No tree
+was deleted and nothing was rebuilt: channels/pass84 and channels/pass83 are both
+still published; the root chooser now routes latest, normal and room invites to
+channels/pass83 and offers PASS 84 as the rolled-back previous card.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"""
+
+
+def sh(cmd, cwd=SRC, check=True, timeout=3600):
+    p = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    if check and p.returncode != 0:
+        sys.exit(f"FAILED: {cmd}\n{p.stdout}{p.stderr}")
+    return p.stdout + p.stderr
+
+
+def assert_farcrysis_not_selectable(dist_dir):
+    """Owner, 2026-08-28: farcrysis stays unselectable in ANY live published version.
+
+    Checked against the BYTES the minifier actually emits, not the bytes one imagines.
+    The first version of this guard searched for data-arena-id="farcrysis" and passed
+    green on every bundle - including ones with farcrysis selectable - because the menu
+    interpolates arena ids at runtime and that byte sequence never exists. A guard is
+    only as good as its red test; this one has one below in main().
+
+    Real shape (verified in dist bytes): the arena registry serializes as
+    routeId:`farcrysis`,selectable:!1 (template quotes survive esbuild; !1 is false).
+    The rule: every farcrysis registry entry in every chunk must carry selectable:!1
+    within its entry window; an entry without it means the menu will offer the arena.
+    No farcrysis entry at all is also acceptable (arena fully removed).
+    """
+    entry_rx = re.compile(rb"routeId:[`'\"]farcrysis[`'\"]")
+    ok_rx = re.compile(rb"selectable:(?:!1|false)")
+    entries_seen = 0
+    for path in glob.glob(os.path.join(dist_dir, "assets", "*.js")):
+        with open(path, "rb") as fh:
+            data = fh.read()
+        for match in entry_rx.finditer(data):
+            entries_seen += 1
+            window = data[max(0, match.start() - 100):match.end() + 200]
+            if not ok_rx.search(window):
+                sys.exit("REFUSING TO PUBLISH: a farcrysis registry entry in "
+                         f"{os.path.basename(path)} does not carry selectable:false - "
+                         "the menu would offer the parked arena. Fix src/map-selection.ts.")
+    print(f"  farcrysis-unselectable guard: OK ({entries_seen} registry entr"
+          f"{'y' if entries_seen == 1 else 'ies'} checked, all selectable:false)")
+
+
+def farcrysis_guard_red_test():
+    """Prove the farcrysis guard can fire before trusting its pass (it shipped vacuous once)."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as red_dir:
+        os.makedirs(os.path.join(red_dir, "assets"))
+        with open(os.path.join(red_dir, "assets", "red.js"), "wb") as fh:
+            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,legacyAliases:[]")
+        fired = False
+        try:
+            assert_farcrysis_not_selectable(red_dir)
+        except SystemExit:
+            fired = True
+        if not fired:
+            sys.exit("REFUSING: the farcrysis guard failed its own red test - it cannot fire")
+
+
+def canonical_channel_bytes(channels):
+    """The exact bytes whose digest names a generation. Sorted, so key order cannot move it."""
+    return json.dumps(channels, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def read_shell_sources():
+    """The three root-shell files, read once, as bytes."""
+    sources = {}
+    for name in ("index.html", "release-shell.js", "release-shell.css"):
+        path = os.path.join(SRC, "release-shell", name)
+        if not os.path.isfile(path):
+            sys.exit(f"release-shell/{name} missing from the repo")
+        with open(path, "rb") as fh:
+            sources[name] = fh.read()
+    return sources
+
+
+def generation_id(channels, sources):
+    """Content address for one published chooser: its channel list AND its code.
+
+    Both halves matter. A generation that only hashed the channels would keep serving the
+    old script filename after a shell fix, and the old script is exactly the thing that
+    cannot be evicted from a browser inside its ten-minute freshness window.
+    """
+    digest = hashlib.sha256()
+    digest.update(canonical_channel_bytes(channels))
+    for name in sorted(sources):
+        digest.update(name.encode("utf-8"))
+        digest.update(sources[name])
+    return digest.hexdigest()[:12]
+
+
+def publish_root_shell(worktree, channels, sources, dry_run=False):
+    """Write the chooser so no client can assemble a channel list that never existed.
+
+    Measured against https://daveinturkey15-byte.github.io on 2026-08-31 rather than
+    assumed, because every plausible assumption here turned out to be wrong:
+
+      * every root file is served `Cache-Control: max-age=600`. GitHub Pages provides no
+        way to change that - it has no _headers support and no per-file directives - so
+        "serve the manifest no-store" is not available at the origin;
+      * a request-side `Cache-Control: no-cache` does NOT force revalidation at the Fastly
+        edge: the same object came back with `Age: 109`;
+      * the query string is STRIPPED from the edge cache key. `?ts=<random>` returned
+        `Age: 82` - the byte-identical cached object. Query cache-busting works on the
+        browser cache and does nothing at the CDN;
+      * a path never requested before is always an edge miss (`Age: 0`);
+      * four consecutive requests were served by four different Fastly nodes
+        (cache-lhr-...068 / ...097 / ...027 / ...047), so two clients can legitimately sit
+        on different generations of the same URL for up to the full 600 s.
+
+    Therefore: a NEW PATH is the only reliable freshness primitive on this host, and the
+    publish uses it three ways.
+
+      1. index.html carries the channel list INLINE. There is no longer a second cacheable
+         URL whose generation can disagree with the document's. This alone kills the
+         unbounded failure - the one where a browser mixes a shell from publish A with a
+         channel list from publish B and draws a set that was never published.
+      2. release-shell.<generation>.js/.css are content-addressed. A given index.html can
+         only ever execute the code it shipped with, at either cache layer.
+      3. release-manifest.<generation>.json is written at a fresh path every generation and
+         named by a small stable pointer, release-index.json. The shell fetches the pointer
+         no-store on every load; if it names a generation this document does not carry, it
+         fetches that manifest - over a path no cache has ever seen - and redraws. So even
+         a client holding a stale index.html converges to the true set without touching a
+         button, and the only remaining staleness is the pointer's own <=600 s, which
+         expires on its own.
+
+    The legacy unhashed release-shell.js / release-shell.css / release-channel-config.js
+    are still written, unchanged in name, because index.html generations cached before this
+    change still request them. Dropping them would 404 those clients into a blank chooser -
+    a worse failure than the one being fixed.
+
+    With dry_run=True nothing is written or removed; the function returns the generation
+    plus the list of files it WOULD write and the superseded assets it WOULD sweep.
+    """
+    generation = generation_id(channels, sources)
+    manifest_name = f"release-manifest.{generation}.json"
+    shell_js = f"release-shell.{generation}.js"
+    shell_css = f"release-shell.{generation}.css"
+
+    # Which generation is currently live? Its assets have to survive this publish: a client
+    # that loaded the previous index.html seconds ago must still be able to fetch its
+    # script. Anything older than that is unreachable and gets swept.
+    keep_generations = {generation}
+    pointer_path = os.path.join(worktree, "release-index.json")
+    if os.path.isfile(pointer_path):
+        try:
+            previous = json.load(open(pointer_path, encoding="utf-8")).get("generation")
+            if isinstance(previous, str) and re.fullmatch(r"[0-9a-f]{6,64}", previous):
+                keep_generations.add(previous)
+        except (ValueError, OSError):
+            pass
+
+    html = sources["index.html"].decode("utf-8")
+    # Inlining puts authored channel strings inside a <script> block, which is an HTML sink
+    # the separate config file never was. json.dumps with ensure_ascii already escapes every
+    # non-ASCII codepoint (so U+2028/U+2029 are safe), but it does NOT escape '<' - and a
+    # description containing "</script>" would close the block and spill the rest of the
+    # channel list into the document as markup. A backslash-u escape is the standard
+    # defence and reads back as a plain '<' once the JS string is parsed. The r"" prefix
+    # is load-bearing: a plain Python "\\u003c" literal IS the '<' character, so the
+    # first draft of this was a silent no-op.
+    def script_safe(text):
+        return text.replace("<", r"\u003c")
+
+    # Self-test, because the first draft of script_safe was a no-op that nothing noticed.
+    if script_safe("</script>") != r"\u003c/script>":
+        sys.exit("REFUSING: script_safe is not escaping - it shipped as a silent no-op once")
+
+    emitted = script_safe(json.dumps(channels, separators=(",", ":")))
+    # Round-trip the BYTES that will be written, not the object they came from: the escaped
+    # form must still parse back to exactly this channel list, and must not contain anything
+    # that could close the script block it is about to sit inside.
+    if "</script" in emitted.lower() or json.loads(emitted) != channels:
+        sys.exit("REFUSING: the inline channel list did not survive script-safe escaping")
+
+    inline = (
+        "/*__RELEASE_GENERATION__*/"
+        f"window.__ATOMIC_ACRES_RELEASE_GENERATION__={json.dumps(generation)};"
+        "window.__ATOMIC_ACRES_RELEASE_CHANNELS__=" + emitted + ";"
+    )
+    html, inline_hits = re.subn(
+        r"/\*__RELEASE_GENERATION__\*/[^\n]*?(?=</script>)", lambda _: inline, html, count=1)
+    html, css_hits = re.subn(r'(?<=href=")\./release-shell\.css(?=")', lambda _: f"./{shell_css}", html, count=1)
+    html, js_hits = re.subn(r'(?<=src=")\./release-shell\.js(?=")', lambda _: f"./{shell_js}", html, count=1)
+    # Drop the legacy config script tag. It has to exist in the TEMPLATE, because
+    # scripts/release/stage-release-topology.mjs publishes that file verbatim and supplies
+    # the channel list through it - but on this path it is the second separately cached URL
+    # whose generation could disagree with the document's, which is the defect itself. It is
+    # also a deferred script, so it would run AFTER the inline list and overwrite it.
+    html, tag_hits = re.subn(
+        r'\n\s*<script defer src="\./release-channel-config\.js"></script>', lambda _: "", html, count=1)
+    if not (inline_hits and css_hits and js_hits and tag_hits):
+        sys.exit("REFUSING: release-shell/index.html no longer carries the four publish "
+                 "substitution points (/*__RELEASE_GENERATION__*/, ./release-shell.css, "
+                 "./release-shell.js, the legacy release-channel-config.js tag). Publishing "
+                 "it unsubstituted would ship a chooser with no channels at all.")
+    # Prove the substitution landed against the BYTES, not against the return of re.subn.
+    # A chooser that ships with an empty channel list throws before it draws anything, and
+    # the owner would see a blank page - which is how this class of defect always presents.
+    for key, channel in channels.items():
+        if script_safe(json.dumps(channel["label"], separators=(",", ":"))[1:-1]) not in html:
+            sys.exit(f"REFUSING: channel '{key}' did not survive inlining into index.html")
+    if f"./{shell_js}" not in html or f"./{shell_css}" not in html:
+        sys.exit("REFUSING: index.html does not reference this generation's shell assets")
+
+    written = []
+
+    def write(name, data):
+        written.append(name)
+        if dry_run:
+            return
+        mode, encoding, newline = ("w", "utf-8", "\n") if isinstance(data, str) else ("wb", None, None)
+        with open(os.path.join(worktree, name), mode, encoding=encoding, newline=newline) as fh:
+            fh.write(data)
+
+    write("index.html", html)
+    write(shell_js, sources["release-shell.js"])
+    write(shell_css, sources["release-shell.css"])
+    write(manifest_name, json.dumps(
+        {"generation": generation, "channels": channels}, separators=(",", ":")) + "\n")
+    write("release-index.json", json.dumps(
+        {"generation": generation, "manifest": manifest_name}, separators=(",", ":")) + "\n")
+
+    # Legacy names, for index.html generations cached before this change.
+    write("release-shell.js", sources["release-shell.js"])
+    write("release-shell.css", sources["release-shell.css"])
+    write("release-channel-config.js",
+          "window.__ATOMIC_ACRES_RELEASE_CHANNELS__="
+          + json.dumps(channels, separators=(",", ":")) + ";\n")
+
+    swept = []
+    for path in glob.glob(os.path.join(worktree, "release-shell.*.js")) \
+            + glob.glob(os.path.join(worktree, "release-shell.*.css")) \
+            + glob.glob(os.path.join(worktree, "release-manifest.*.json")):
+        stamp = os.path.basename(path).split(".")[1]
+        if stamp not in keep_generations:
+            swept.append(os.path.basename(path))
+            if not dry_run:
+                os.remove(path)
+
+    verb = "would be published" if dry_run else "published"
+    print(f"  root chooser {verb} as generation {generation}"
+          f" ({len(channels)} channels inlined, {len(swept)} superseded asset(s) swept,"
+          f" keeping {sorted(keep_generations)})")
+    return generation, written, sorted(swept), sorted(keep_generations)
+
+
+def assert_predecessors_offered(channels):
+    """The newest pass must not be the only recent thing on offer.
+
+    Owner, 2026-08-30: "i dont want pass 63, stable webgl, i want the previous 1/2 versions
+    we had". The failure mode this blocks is a chooser that carries the newest pass plus
+    one ancient fallback, which is what he was looking at.
+
+    HF-400, owner 2026-09-02 06:58 BST, verbatim:
+    "also when you push the next pass, pin this version and remove all past versions, this can be the safe backup"
+    That is a policy change by the owner, not a weakened gate: the chooser now carries the
+    newest pass and EXACTLY ONE pinned recent predecessor, so the threshold moves from two
+    predecessors to one. What the guard still refuses is the original complaint - the
+    newest pass beside nothing but an ancient fallback.
+    """
+    def number(channel):
+        match = re.search(r"\d+(?:\.\d+)?", str(channel.get("pass", "")))
+        return float(match.group()) if match else float("-inf")
+
+    ranked = sorted(channels.values(), key=number, reverse=True)
+    if not ranked:
+        sys.exit("REFUSING: no channels at all")
+    newest = number(ranked[0])
+    predecessors = [c for c in ranked[1:] if number(c) > newest - 12]
+    if len(predecessors) < 1:
+        sys.exit(
+            "REFUSING: this chooser would offer PASS "
+            f"{newest:g} and no recent predecessor. HF-400 pins exactly one safe backup "
+            "(PASS 83) beside the newest pass; publishing the newest pass beside nothing "
+            "but an ancient fallback is the exact complaint of 2026-08-30. Present: "
+            + ", ".join(str(c.get("pass")) for c in ranked))
+    print("  predecessor guard: OK (offering "
+          + ", ".join(str(c.get("pass")) for c in ranked[:2]) + ")")
+
+
+def predecessor_guard_red_test():
+    """A gate that has never been seen red is a gate nobody has checked can fail."""
+    fired = False
+    try:
+        assert_predecessors_offered({
+            "pass84": {"pass": "PASS 84", "path": "channels/pass84"},
+            "stable": {"pass": "PASS 63", "path": "channels/pass63-rollback"},
+        })
+    except SystemExit:
+        fired = True
+    if not fired:
+        sys.exit("REFUSING: the predecessor guard failed its own red test - it cannot fire")
+
+
+def resolve_in_game_fallback():
+    """Which channel the in-build chooser (src/bootstrap.ts) draws as its second card.
+
+    src/bootstrap.ts renders its own two-card chooser from release-channels.json whenever a
+    visitor lands on a channel URL with no ?release= - a direct link, or a bookmark. Its
+    second card is whatever `const stableFallback = a ?? b ?? ...` resolves to.
+
+    2026-08-31: this used to ASSUME the fallback was `rollback ?? stable`. That is exactly
+    the class of bug this repo has spent the week removing - a checker that hardcodes what
+    it thinks the code does, and then passes or fails for the wrong reason when the code
+    changes. So read the key list out of the source and resolve whichever one actually
+    wins, as JS would.
+    """
+    config_path = os.path.join(SRC, "release-channels.json")
+    config = json.load(open(config_path, encoding="utf-8"))
+    bootstrap_src = open(os.path.join(SRC, "src", "bootstrap.ts"), encoding="utf-8").read()
+    match = re.search(r"const stableFallback = ([^;]+);", bootstrap_src)
+    if not match:
+        sys.exit("REFUSING: cannot find `const stableFallback = ...` in src/bootstrap.ts, so "
+                 "this guard can no longer tell which channel the in-build chooser offers. "
+                 "Fix the guard rather than removing it.")
+    candidates = re.findall(r"releaseChannels\.([A-Za-z0-9_]+)", match.group(1))
+    if not candidates:
+        sys.exit(f"REFUSING: could not read any channel key from `{match.group(1).strip()}`")
+    for candidate in candidates:          # `a ?? b` - first one present wins, as in JS
+        if config.get(candidate):
+            return candidate, config[candidate], candidates
+    sys.exit("REFUSING: release-channels.json has none of the channels the in-build "
+             f"chooser would fall back to ({', '.join(candidates)}), so it has no "
+             "second card to draw")
+
+
+def assert_in_game_fallback_exists(worktree, post_state=None):
+    """The chooser INSIDE each build must link the PASS 83 safe backup, and it must exist.
+
+    HF-400 makes this guard stricter than its pass83 ancestor. It is no longer enough for
+    the fallback to point at SOME tree on gh-pages: every tree except pass84 and pass83 is
+    being retired by this very publish, so a fallback that resolves to the-big-one or
+    recent-stable would exist while this guard ran and 404 the moment the commit landed.
+    The fallback must resolve to channels/pass83 - the one backup the owner asked for.
+
+    `post_state` is the set of channel trees that will exist AFTER retirement (used by the
+    dry run, where nothing has been deleted yet); without it the tree is checked on disk.
+    """
+    key, fallback, candidates = resolve_in_game_fallback()
+    path = fallback.get("path", "")
+    if path != BACKUP_CHANNEL:
+        sys.exit(
+            f"REFUSING: the in-build chooser (src/bootstrap.ts) draws its fallback card from "
+            f"release-channels.json '{key}' -> {path or '<no path>'}. HF-400 pins "
+            f"{BACKUP_CHANNEL} as the ONLY backup and retires every other tree, so that card "
+            "would 404 as soon as this publish landed. Re-pin src/bootstrap.ts "
+            f"(`const stableFallback = ...`, candidates: {', '.join(candidates)}) and "
+            f"release-channels.json so the fallback resolves to {BACKUP_CHANNEL}.")
+    tree = path.split("/")[-1]
+    present = (tree in post_state) if post_state is not None \
+        else os.path.isdir(os.path.join(worktree, *path.split("/")))
+    if not present:
+        sys.exit(f"REFUSING: the in-build fallback {path} is NOT on gh-pages. Every visitor "
+                 f"opening a channel URL directly would be offered {fallback.get('pass')} and "
+                 "get a 404.")
+    print(f"  in-build fallback guard: OK ({key} -> {path} is the HF-400 safe backup and is on gh-pages)")
+
+
+def assert_build_is_not_stale():
+    """The build being published must be newer than the sources it was built from.
+
+    THE DEFECT THIS CLOSES. `dist-passNN` is not produced by any npm script - it is a
+    directory someone populates by hand from `dist`. The only check here was
+    `os.path.isdir`, so on 2026-08-31 a publish ran against a tree built BEFORE that
+    session's changes, printed every guard OK, printed PUBLISHED, and put a stale bundle
+    on the channel. The owner would have loaded a build with none of the fixes in it and
+    reasonably concluded they were never made.
+
+    Existence is not freshness. This compares the newest file in the build against the
+    newest tracked source file and refuses a build that is older.
+    """
+    newest_source = 0.0
+    newest_source_path = None
+    for root, dirs, files in os.walk(SRC):
+        dirs[:] = [d for d in dirs if d not in {
+            "node_modules", ".git", "dist", "dist-pass83", "dist-pass84", ".gh-pages-publish",
+            ".qa-dist", "source-assets", "public", "docs", "baselines", "artifacts",
+        } and not d.startswith(".") and not d.startswith("dist-")]
+        for name in files:
+            if not name.endswith((".ts", ".tsx", ".css", ".html", ".json")):
+                continue
+            path = os.path.join(root, name)
+            try:
+                stamp = os.path.getmtime(path)
+            except OSError:
+                continue
+            if stamp > newest_source:
+                newest_source, newest_source_path = stamp, path
+
+    newest_build = 0.0
+    for root, _dirs, files in os.walk(DIST):
+        for name in files:
+            try:
+                newest_build = max(newest_build, os.path.getmtime(os.path.join(root, name)))
+            except OSError:
+                continue
+
+    if newest_build < newest_source:
+        import datetime
+        fmt = lambda t: datetime.datetime.fromtimestamp(t).strftime("%H:%M:%S")
+        sys.exit(
+            f"STALE BUILD: {DIST} is older than the sources it should contain.\n"
+            f"  newest build file:  {fmt(newest_build)}\n"
+            f"  newest source file: {fmt(newest_source)}  ({newest_source_path})\n"
+            f"Run `npm run build` and refresh {DIST} from dist/, then publish again.\n"
+            f"Publishing anyway would ship a bundle without the changes just made.")
+    print(f"  build freshness guard: OK (build newer than newest source)")
+
+
+def read_live_config(gh_pages_dir):
+    """The chooser config currently on gh-pages, or {} when there is none yet."""
+    cfg_path = os.path.join(gh_pages_dir, "release-channel-config.js")
+    if not os.path.isfile(cfg_path):
+        return {}
+    raw = open(cfg_path, encoding="utf-8").read()
+    m = re.search(r"=\s*(\{.*\})\s*;?\s*$", raw.strip(), re.S)
+    if not m:
+        sys.exit("release-channel-config.js is not in the shape this script understands")
+    return json.loads(m.group(1))
+
+
+def enumerate_channel_trees(gh_pages_dir):
+    """Every directory under channels/ on gh-pages, read from disk at run time."""
+    channels_dir = os.path.join(gh_pages_dir, "channels")
+    if not os.path.isdir(channels_dir):
+        return []
+    return sorted(name for name in os.listdir(channels_dir)
+                  if os.path.isdir(os.path.join(channels_dir, name)))
+
+
+def plan_retirements(gh_pages_dir):
+    """HF-400: everything on gh-pages except {pass84, pass83} goes. Enumerated, not listed.
+
+    Returns (present, to_delete). Refuses if the backup the owner asked to pin is not there
+    to be pinned: retiring the rest and leaving pass84 alone would be the opposite of what
+    he said.
+    """
+    present = enumerate_channel_trees(gh_pages_dir)
+    missing = KEEP_AT_LEAST - set(present)
+    if missing:
+        sys.exit(f"REFUSING: gh-pages has no {sorted(missing)} tree to pin as the safe backup "
+                 f"(present: {present}). HF-400 pins PASS 83 beside PASS 84; it cannot be "
+                 "pinned if it is not there.")
+    to_delete = [name for name in present if name not in EXPECTED_POST_STATE]
+    return present, to_delete
+
+
+def assert_post_state(gh_pages_dir):
+    """After retirement, channels/ must be EXACTLY {pass84, pass83}. Read from disk."""
+    actual = set(enumerate_channel_trees(gh_pages_dir))
+    if actual != EXPECTED_POST_STATE:
+        sys.exit(f"REFUSING: channels/ post-state is {sorted(actual)}, expected exactly "
+                 f"{sorted(EXPECTED_POST_STATE)} ({POLICY}). Nothing was committed.")
+    print(f"  post-state guard: OK (channels/ is exactly {sorted(actual)})")
+
+
+def assert_chooser_matches_post_state(channels, post_state):
+    """Every card the chooser will DRAW must be a tree that exists after retirement.
+
+    The chooser now renders whatever the config carries, so a stale key is a card that
+    404s in front of a player. And the inverse: every kept tree must be offered, or the
+    owner's backup is published but unselectable (the pass80 failure).
+    """
+    offered = {}
+    for key, channel in channels.items():
+        path = channel.get("path")
+        if not path:
+            sys.exit(f"REFUSING: channel {key} has no path")
+        offered[path.split("/")[-1]] = key
+    if set(offered) != set(post_state):
+        sys.exit(f"REFUSING: chooser offers trees {sorted(offered)} but gh-pages would carry "
+                 f"{sorted(post_state)}; the two must be identical under {POLICY}")
+
+
+def add_to_worktree(gh_pages_dir, dry_run):
+    """Copy dist-pass84 into channels/pass84 (or say that it would)."""
+    target = os.path.join(gh_pages_dir, *CHANNEL.split("/"))
+    if dry_run:
+        print(f"  would write {CHANNEL}/ <- {os.path.relpath(DIST, SRC)}/ (replacing any existing tree)")
+        return
+    shutil.rmtree(target, ignore_errors=True)
+    shutil.copytree(DIST, target)
+    print(f"  {CHANNEL} <- {os.path.relpath(DIST, SRC)}")
+
+
+def retire(gh_pages_dir, to_delete, dry_run):
+    for name in to_delete:
+        retired_dir = os.path.join(gh_pages_dir, "channels", name)
+        if dry_run:
+            print(f"  would delete channels/{name}/")
+            continue
+        shutil.rmtree(retired_dir)
+        print(f"  retired channels/{name}/")
+
+
+def checkout_gh_pages():
+    """Fresh detached worktree of ORIGIN's gh-pages, never the local ref.
+
+    The local gh-pages was once 23 commits behind, and publishing from it would have
+    silently deleted four retained builds.
+    """
+    sh(f'git worktree remove --force "{WORKTREE}"', check=False)
+    shutil.rmtree(WORKTREE, ignore_errors=True)
+    sh("git fetch --no-tags origin gh-pages")
+    sh(f'git worktree add --detach "{WORKTREE}" FETCH_HEAD')
+    print("gh-pages at", sh("git rev-parse --short HEAD", cwd=WORKTREE).strip())
+    return WORKTREE
+
+
+def run_guard(name, verdicts, fn, *args, **kwargs):
+    """Dry run only: record a guard's verdict instead of exiting on the first refusal."""
+    try:
+        fn(*args, **kwargs)
+        verdicts[name] = {"ok": True, "detail": "OK"}
+    except SystemExit as exc:
+        detail = str(exc.code) if exc.code not in (None, 0) else "OK"
+        verdicts[name] = {"ok": exc.code in (None, 0), "detail": detail}
+        print(f"  {name}: WOULD REFUSE - {detail.splitlines()[0]}")
+
+
+def dry_run(gh_pages_dir, plan_json, rollback=False):
+    mode = "ROLLBACK" if rollback else "PUBLISH"
+    print(f"DRY RUN {mode} ({POLICY}) against {gh_pages_dir} - nothing will be written, added, committed or pushed")
+    verdicts = {}
+
+    if rollback:
+        # A rollback needs no build: both trees are already on gh-pages, or there is
+        # nothing to roll back to / from.
+        present = enumerate_channel_trees(gh_pages_dir)
+        run_guard("rollback-state", verdicts, assert_post_state, gh_pages_dir)
+        to_delete, kept = [], [name for name in present if name in EXPECTED_POST_STATE]
+        post_state = sorted(present)
+    else:
+        # Build guards. Reported, not fatal, so a plan can be printed before dist-pass84 exists.
+        if os.path.isdir(DIST):
+            run_guard("build-freshness", verdicts, assert_build_is_not_stale)
+            run_guard("farcrysis-red-test", verdicts, farcrysis_guard_red_test)
+            run_guard("farcrysis-unselectable", verdicts, assert_farcrysis_not_selectable, DIST)
+        else:
+            verdicts["build-present"] = {"ok": False, "detail": f"no build at {DIST}"}
+            print(f"  build-present: WOULD REFUSE - no build at {DIST}")
+        present, to_delete = [], []
+        run_guard("backup-present", verdicts, lambda: plan_retirements(gh_pages_dir))
+        if verdicts["backup-present"]["ok"]:
+            present, to_delete = plan_retirements(gh_pages_dir)
+        post_state = sorted((set(present) - set(to_delete)) | {LIVE_TREE})
+        kept = [name for name in present if name in EXPECTED_POST_STATE and name != LIVE_TREE]
+    run_guard("predecessor-red-test", verdicts, predecessor_guard_red_test)
+    live_config = read_live_config(gh_pages_dir)
+    channels = build_channels(rollback=rollback)
+
+    print("\nPLAN")
+    print(f"  channel trees on gh-pages now: {present}")
+    for name in to_delete:
+        print(f"  would delete channels/{name}/")
+    print(f"  would keep   {['channels/' + name + '/' for name in kept]}")
+    if not rollback:
+        add_to_worktree(gh_pages_dir, dry_run=True)
+    print(f"  channels/ post-state would be: {post_state}")
+    dropped_keys = [k for k in live_config if k not in channels or live_config[k].get("path") != channels[k].get("path")]
+    print(f"  chooser keys live now: {list(live_config)}; would become: {list(channels)} "
+          f"(dropped/re-keyed: {dropped_keys})")
+    for key, channel in channels.items():
+        print(f"    {key}: {channel['pass']} -> {channel['path']}  \"{channel['label']}\"")
+
+    run_guard("predecessors-offered", verdicts, assert_predecessors_offered, channels)
+    run_guard("chooser-matches-post-state", verdicts, assert_chooser_matches_post_state, channels, post_state)
+    run_guard("post-state-exact", verdicts,
+              lambda: None if set(post_state) == EXPECTED_POST_STATE else sys.exit(
+                  f"post-state would be {post_state}, expected {sorted(EXPECTED_POST_STATE)}"))
+    run_guard("in-build-fallback", verdicts, assert_in_game_fallback_exists, gh_pages_dir, set(post_state))
+    fallback_key, fallback, _ = resolve_in_game_fallback()
+
+    sources = read_shell_sources()
+    generation, root_files, swept, keep_generations = publish_root_shell(
+        gh_pages_dir, channels, sources, dry_run=True)
+    for name in root_files:
+        print(f"  would write {name}")
+    for name in swept:
+        print(f"  would sweep {name}")
+
+    would_publish = all(v["ok"] for v in verdicts.values())
+    plan = {
+        "policy": POLICY,
+        "mode": mode.lower(),
+        "ghPagesDir": gh_pages_dir,
+        "channel": CHANNEL,
+        "backup": BACKUP_CHANNEL,
+        "treesPresent": present,
+        "treesToDelete": to_delete,
+        "treesKept": kept,
+        "treeAdded": None if rollback else LIVE_TREE,
+        "postState": post_state,
+        "chooser": {"keys": list(channels), "channels": channels, "droppedLiveKeys": dropped_keys},
+        "fallback": {"key": fallback_key, "path": fallback.get("path"), "pass": fallback.get("pass"),
+                     "ok": verdicts["in-build-fallback"]["ok"]},
+        "generation": generation,
+        "keepGenerations": keep_generations,
+        "rootFilesToWrite": root_files,
+        "rootAssetsToSweep": swept,
+        "guards": verdicts,
+        "wouldPublish": would_publish,
+    }
+    if plan_json:
+        with open(plan_json, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(plan, fh, indent=2)
+            fh.write("\n")
+        print(f"  plan written to {plan_json}")
+
+    refused = [name for name, v in verdicts.items() if not v["ok"]]
+    if refused:
+        print(f"\nDRY RUN: {mode.lower()} WOULD REFUSE ({len(refused)} guard(s) red: {', '.join(refused)})")
+        return 2
+    print(f"\nDRY RUN: every guard green; a real run would commit and push the {mode.lower()} plan above")
+    return 0
+
+
+def commit_and_push(worktree, message):
+    sh("git add -A", cwd=worktree)
+    out = sh(["git", "commit", "-m", message], cwd=worktree, check=False)
+    if "nothing to commit" in out:
+        print("nothing to commit")
+        return 0
+    sh("git push origin HEAD:gh-pages", cwd=worktree)
+    print("\nPUBLISHED: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/")
+    return 0
+
+
+def rollback(worktree, sources):
+    """Re-point the default at the PASS 83 safe backup. Deletes nothing, rebuilds nothing."""
+    assert_post_state(worktree)
+    channels = build_channels(rollback=True)
+    assert_chooser_matches_post_state(channels, enumerate_channel_trees(worktree))
+    assert_predecessors_offered(channels)
+    assert_in_game_fallback_exists(worktree)
+    publish_root_shell(worktree, channels, sources)
+    print("  default now:", channels["experimental"]["pass"], "->", channels["experimental"]["path"])
+    assert_post_state(worktree)
+    return commit_and_push(worktree, ROLLBACK_COMMIT_MESSAGE)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--dry-run", action="store_true",
+                        help="print the full plan and every guard verdict; touch nothing")
+    parser.add_argument("--rollback", action="store_true",
+                        help="re-point the chooser default at channels/pass83 (PASS 84 stays "
+                             "published as the previous card); no tree is deleted, no build needed")
+    parser.add_argument("--gh-pages-dir", default=None,
+                        help="dry run only: plan against this local gh-pages checkout instead of "
+                             "fetching origin/gh-pages into a temp worktree")
+    parser.add_argument("--plan-json", default=None,
+                        help="dry run only: also write the plan as JSON to this path")
+    args = parser.parse_args(argv)
+    if not args.dry_run and (args.gh_pages_dir or args.plan_json):
+        parser.error("--gh-pages-dir and --plan-json are dry-run options")
+
+    if args.dry_run:
+        gh_pages_dir = args.gh_pages_dir
+        if gh_pages_dir is None:
+            gh_pages_dir = checkout_gh_pages()
+        elif not os.path.isdir(gh_pages_dir):
+            sys.exit(f"--gh-pages-dir {gh_pages_dir} is not a directory")
+        return dry_run(os.path.abspath(gh_pages_dir), args.plan_json, rollback=args.rollback)
+
+    if args.rollback:
+        return rollback(checkout_gh_pages(), read_shell_sources())
+
+    if not os.path.isdir(DIST):
+        sys.exit(f"no build at {DIST}")
+    assert_build_is_not_stale()
+    farcrysis_guard_red_test()
+    assert_farcrysis_not_selectable(DIST)
+    predecessor_guard_red_test()
+    sources = read_shell_sources()
+
+    worktree = checkout_gh_pages()
+
+    present, to_delete = plan_retirements(worktree)
+    print(f"  channel trees on gh-pages: {present}")
+    add_to_worktree(worktree, dry_run=False)
+    retire(worktree, to_delete, dry_run=False)
+    assert_post_state(worktree)
+
+    channels = build_channels()
+    live_config = read_live_config(worktree)
+    dropped = sorted(set(live_config) - set(channels))
+    if dropped:
+        print(f"  chooser keys retired under {POLICY}: {dropped}")
+    missing = KEEP_AT_LEAST - {c["path"].split("/")[-1] for c in channels.values()}
+    if missing:
+        sys.exit(f"REFUSING: would drop the tree the owner asked to keep: {sorted(missing)}")
+    assert_chooser_matches_post_state(channels, enumerate_channel_trees(worktree))
+    assert_predecessors_offered(channels)
+    assert_in_game_fallback_exists(worktree)
+    publish_root_shell(worktree, channels, sources)
+    print("  channels now:", ", ".join(v["pass"] for v in channels.values()))
+
+    # Last look before the commit: the tree on disk, not the plan, is what ships.
+    assert_post_state(worktree)
+    return commit_and_push(worktree, COMMIT_MESSAGE)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
