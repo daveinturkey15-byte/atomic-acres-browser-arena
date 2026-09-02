@@ -711,3 +711,22 @@ possibly too if time permits! night night"
 - Owner's 06:00 ask: something good to play (Nuke Town Rebuild preview in PASS 86;
   Raid, Farcrysis, Map 3 explore, water/lighting/animation trials in PASS 87 where
   green) and the morning report with the skills and animation work.
+
+### Gate repairs merged 22:40 BST (branch pass86-gate-repairs, a94ea6db)
+- pass65 arms visual gate no longer ABORTS on the fitted rig: its 0.15/0.25
+  retreat thresholds are kept verbatim on `requestedSurfaceRetreat` (the probe
+  demand HF-410 leaves intact; the applied retreat is zero by design), wall pose
+  asserted via wallBlend, penetration asserted directly on the fit's own margins
+  (capsule margin > 0, floor clearance > 0, bodyFitScale pinned). Result on the
+  fitted rig: 2 violations, both the LEFT support sleeve in prone-against-wall
+  poses - a real defect, kept RED honestly. Cause measured: the contact fold
+  scales the whole viewmodel root, arms included (14% reach loss), and the
+  support socket sits further forward; no lane constant or elbow pole can move
+  it. Proposed fixes (PASS 87 residuals): exempt the arm chains from the fold
+  scale, or add a fourth reach arc toward the eye with a near-plane guard.
+- pass69-3 near-plane catalog spec: the 20-vs-21 setup defect is fixed with the
+  MEASURED runtime identity of crimson-flamethrower (a livery over the
+  flamethrower asset); the full run still stops at deploy() on this loaded box
+  (matchPhase wait) - unverified, re-run on a quiet machine through the committed
+  harness (build+stage exceeds the 180 s webServer timeout under load; not
+  changed).
