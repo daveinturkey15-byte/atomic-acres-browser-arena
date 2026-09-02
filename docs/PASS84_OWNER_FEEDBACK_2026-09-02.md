@@ -493,3 +493,26 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   after its audit; Lane AL (`docs/pass84-lanes/LANE-AL-lighting-quality-tiers.md`)
   builds the lighting features and tiers; in-game path tracing is research
   only for now.
+
+### HF-413 status (Lane Z merged 19:08 BST, 87fe7958) — PARTIAL, skeptic ACCEPT_WITH_FIXES, repair landed
+- Landed: firing-shoulder entry now continues below the frame on every captured
+  pose (right lane -0.97 -> -1.04, raised -0.82 -> -0.99; contract floor -0.98);
+  knife swing re-derived from the presented depth/FOV so the arm is back in
+  frame (root NDC x 2.51 -> 1.39 at peak); pass65 arms visual gate re-pinned to
+  the shipped v2 hand-policy contract and STRENGTHENED (ADS per family, six-frame
+  reload and melee strips, support-palm liveness floor); new static GLB
+  handedness gate `qa:pass85:arms-handedness` (136 files, 4989 nodes, 485
+  sockets, 0 violations at the merged head; local node transforms only).
+- Corpus finding: nothing is mirrored; the M134 "cross-body" reload is that
+  weapon reaching its side drum and is correct (the lane's first fix was reverted
+  byte-exact by the repair after the skeptic refuted it).
+- OPEN (blocked on Lane W / HF-410): the pass65 arms visual gate is still RED at
+  head, 11 violations, all "clipped by the near plane" because the viewmodel
+  root presents at z=-0.407 against an authored -1.08; mid-swing knife frames
+  0.40-0.72 smear for the same reason. Do not report that gate green.
+- OPEN: the raised/ordinary shoulder-lane spread is 0.05 not HF-388's 0.15
+  (needs a lever other than lane depth); the new handedness gate is registered
+  but no aggregate invokes it (wire into the publish preflight at the 22:20
+  cut); 12 of 19 weapons still covered only by their family representative;
+  strafe capture needs a lateral debug hook in legacy-main (patch in the lane
+  report). Evidence: `docs/evidence/pass85/hf413/` (31 MB).
