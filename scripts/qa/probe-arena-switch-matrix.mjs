@@ -57,7 +57,7 @@
 //        --targets gun-range --sources atomic-acres,test1   (focused repro)
 // ===========================================================================
 import { chromium } from '@playwright/test';
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
@@ -208,10 +208,19 @@ const browser = await chromium.launch({
 });
 
 const gitSha = await execFileAsync('git', ['rev-parse', 'HEAD']).then((r) => r.stdout.trim()).catch(() => null);
+// A dist built from an uncommitted tree carries a HEAD sha that does NOT
+// describe the measured code. PASS 85 lane H shipped exactly that receipt (its
+// after-run stamped b082bc83 while measuring two later commits' source), so the
+// header now names the dirt instead of leaving a reviewer to discover it.
+const gitDirtyFiles = await execFileAsync('git', ['status', '--porcelain'])
+  .then((r) => r.stdout.split('\n').map((line) => line.trim()).filter(Boolean))
+  .catch(() => null);
 const report = {
   contract: 'arena-switch-matrix-v1',
   measuredAt: new Date().toISOString(),
   label: LABEL, dist: DIST, gitSha,
+  gitDirty: gitDirtyFiles === null ? null : gitDirtyFiles.length > 0,
+  gitDirtyFiles: gitDirtyFiles === null ? null : gitDirtyFiles.slice(0, 40),
   viewport: { width: WIDTH, height: HEIGHT },
   machine: {
     comfyUi: comfy.comfy, gpuFreeMiB: gpu.free, gpuTotalMiB: gpu.total,
@@ -219,12 +228,26 @@ const report = {
     // least part of the sweep; treat every duration in the report as an upper
     // bound and do not set it beside a quiet-machine run.
     rivalPlaywrightBrowsersAtLaunch: rivalBrowsers,
+    // Sampled every 60 s FOR THE WHOLE RUN and filled in at the end. A
+    // launch-only check is how lane H's baseline sweep was reported "quiet"
+    // while eight of another lane's headless Chromes were live through the
+    // middle of it. `self` is this probe's own Chrome process family, measured
+    // once its first page is up, so the excess over it is other people's work.
+    playwrightChromeProcessesSelf: null,
+    playwrightChromeProcessesMax: null,
+    playwrightChromeProcessSamples: null,
+    rivalPlaywrightBrowsersMaxDuringRun: null,
   },
   roster: null, edges: [], firstLoads: [], invalidated: null,
 };
 
 const COUNT_HOOK = () => {
-  const state = { pipelines: [], shaderModules: [], hooked: false };
+  // SYNC AND ASYNC ARE DIFFERENT MEASUREMENTS. `createRenderPipeline` blocks the
+  // calling frame and is what a 12 s fence dies on; `createRenderPipelineAsync`
+  // hands the compile to the driver and returns. PASS 85 lane H's first cut
+  // pushed both into one array and then derived an "in-fence" figure from it,
+  // which counted its own off-fence precompile as fenced work. Separate sinks.
+  const state = { pipelines: [], pipelinesAsync: [], shaderModules: [], hooked: false };
   window.__SWITCH_PROBE__ = state;
   const install = () => {
     if (state.hooked) return;
@@ -240,7 +263,7 @@ const COUNT_HOOK = () => {
       };
     };
     wrap('createRenderPipeline', state.pipelines);
-    wrap('createRenderPipelineAsync', state.pipelines);
+    wrap('createRenderPipelineAsync', state.pipelinesAsync);
     wrap('createShaderModule', state.shaderModules);
   };
   install();
@@ -272,7 +295,12 @@ async function openPage() {
 }
 
 const counters = (page) => page.evaluate(() => ({
-  pipelines: window.__SWITCH_PROBE__?.pipelines.length ?? -1,
+  pipelinesSync: window.__SWITCH_PROBE__?.pipelines.length ?? -1,
+  pipelinesAsync: window.__SWITCH_PROBE__?.pipelinesAsync.length ?? -1,
+  // `pipelines` stays the sync+async total so every historical field keeps its
+  // meaning; the fenced-cost question is answered by the sync figure alone.
+  pipelines: (window.__SWITCH_PROBE__?.pipelines.length ?? 0)
+    + (window.__SWITCH_PROBE__?.pipelinesAsync.length ?? 0),
   shaderModules: window.__SWITCH_PROBE__?.shaderModules.length ?? -1,
 }));
 
@@ -282,10 +310,11 @@ const counters = (page) => page.evaluate(() => ({
  * Totals alone cannot answer the question HF-417 actually asks, which is not
  * "how many pipelines" but "how many were built INSIDE a fenced submission".
  */
-const creationTimeline = (page, fromPipelines, fromModules) => page.evaluate(({ p, m }) => ({
+const creationTimeline = (page, from) => page.evaluate(({ p, a, m }) => ({
   pipelines: (window.__SWITCH_PROBE__?.pipelines ?? []).slice(p),
+  pipelinesAsync: (window.__SWITCH_PROBE__?.pipelinesAsync ?? []).slice(a),
   shaderModules: (window.__SWITCH_PROBE__?.shaderModules ?? []).slice(m),
-}), { p: fromPipelines, m: fromModules });
+}), { p: from.pipelinesSync, a: from.pipelinesAsync, m: from.shaderModules });
 
 /** Buckets creation timestamps into the transition phases that contain them. */
 function attributeToPhases(phases, timestamps) {
@@ -402,7 +431,7 @@ async function switchEdge(page, errors, source, target) {
     && state.committedArenaId === target;
   // Read the timeline BEFORE deploying: the deploy submits its own frames and
   // would fold match-start compiles into the switch's attribution.
-  const timeline = await creationTimeline(page, before.pipelines, before.shaderModules);
+  const timeline = await creationTimeline(page, before);
   const switchCounters = await counters(page);
   const deployed = committed ? await deploy(page, target) : { deployMs: null, matchActive: false, matchArenaId: state.committedArenaId, requested: target };
   const after = await counters(page);
@@ -417,13 +446,20 @@ async function switchEdge(page, errors, source, target) {
     residentArenaRoots: state.residentArenaRoots,
     effectPrewarm: state.effectPrewarm,
     pipelinesCreated: switchCounters.pipelines - before.pipelines,
+    pipelinesCreatedSync: switchCounters.pipelinesSync - before.pipelinesSync,
+    pipelinesCreatedAsync: switchCounters.pipelinesAsync - before.pipelinesAsync,
     shaderModulesCreated: switchCounters.shaderModules - before.shaderModules,
     pipelinesCreatedDuringDeploy: after.pipelines - switchCounters.pipelines,
     // WHERE the compiles landed. `visual-definition` holds the warm frame and
     // its 12 s fence; `coverage-submit-fence` holds the committing coverage
-    // draw and its own. Pipelines counted in either were built inside a fenced
-    // submission, which is the HF-417 failure mechanism.
-    pipelinesByPhase: attributeToPhases(state.phases, timeline.pipelines),
+    // draw and its own. A SYNCHRONOUS pipeline created inside either was built
+    // inside a fenced submission, which is the HF-417 failure mechanism. An
+    // ASYNC one was not: it is exactly the work an off-fence precompile moves
+    // out of the fence, and it lands in the same wall-clock window, so the two
+    // must never be summed and called "in-fence" (they were, in the first cut).
+    pipelinesByPhase: attributeToPhases(state.phases, [...timeline.pipelines, ...timeline.pipelinesAsync]),
+    pipelinesSyncByPhase: attributeToPhases(state.phases, timeline.pipelines),
+    pipelinesAsyncByPhase: attributeToPhases(state.phases, timeline.pipelinesAsync),
     shaderModulesByPhase: attributeToPhases(state.phases, timeline.shaderModules),
     phases: state.phases,
     selectionError,
@@ -432,9 +468,22 @@ async function switchEdge(page, errors, source, target) {
 }
 
 let exitCode = 0;
+// Every 60 s for the whole sweep. `self` is this probe's own Chrome family
+// once its first page exists, so anything above it is another lane's browser
+// competing for the SAME GPU submission queue the fence is timed against.
+let playwrightSamples = [];
+let selfPlaywrightProcesses = null;
+const rivalSampler = setInterval(() => {
+  countRivalPlaywrightBrowsers()
+    .then((count) => playwrightSamples.push(count))
+    .catch(() => {});
+}, 60_000);
+rivalSampler.unref?.();
 try {
   const registryIds = registryArenaIds();
   const { page: rosterPage } = await openPage();  // eslint-disable-line
+  selfPlaywrightProcesses = await countRivalPlaywrightBrowsers().catch(() => null);
+  report.machine.playwrightChromeProcessesSelf = selfPlaywrightProcesses;
   const backend = await rosterPage.evaluate(() => document.documentElement.dataset.renderBackend ?? null);
   const device = await rosterPage.evaluate(async () => {
     if (!navigator.gpu) return { gpu: false };
@@ -499,6 +548,8 @@ try {
             // to the first live match frame — the number the owner feels as
             // "how long until I am playing".
             pipelinesBeforeAdmission: beforeAdmission.pipelines,
+            pipelinesSyncBeforeAdmission: beforeAdmission.pipelinesSync,
+            pipelinesAsyncBeforeAdmission: beforeAdmission.pipelinesAsync,
             shaderModulesBeforeAdmission: beforeAdmission.shaderModules,
             pipelinesDuringAdmission: afterAdmission.pipelines - beforeAdmission.pipelines,
             census,
@@ -535,6 +586,15 @@ try {
   report.error = String(error).slice(0, 600);
   exitCode = report.invalidated ? 2 : 1;
 } finally {
+  clearInterval(rivalSampler);
+  const maxObserved = playwrightSamples.length ? Math.max(...playwrightSamples) : null;
+  report.machine.playwrightChromeProcessesMax = maxObserved;
+  report.machine.playwrightChromeProcessSamples = playwrightSamples.length;
+  // Never negative, and null when the self baseline could not be taken: a
+  // number that cannot be justified is worse than an honest gap.
+  report.machine.rivalPlaywrightBrowsersMaxDuringRun =
+    maxObserved === null || selfPlaywrightProcesses === null
+      ? null : Math.max(0, maxObserved - selfPlaywrightProcesses);
   await browser.close().catch(() => {});
   await new Promise((done) => server.close(done));
   mkdirSync(dirname(OUT), { recursive: true });
@@ -542,8 +602,15 @@ try {
   console.error(`[switch-matrix] wrote ${OUT}`);
   if (report.summary) console.error(`[switch-matrix] ${report.summary.edges - report.summary.failed}/${report.summary.edges} edges committed`);
   if (report.error) console.error(`[switch-matrix] ${report.error}`);
-  // Playwright's chrome child can outlive close() on Windows; make sure the
-  // probe never leaves a browser behind on the owner's machine.
-  if (process.platform === 'win32') spawnSync('cmd', ['/c', 'exit', '0'], { stdio: 'ignore' });
+  // Playwright's Chrome child can outlive close() on Windows. This REPORTS an
+  // orphan and never kills anything: the machine rule is absolute (never kill a
+  // process you did not start) and this probe cannot prove which are its own.
+  // What stood here was `spawnSync('cmd', ['/c', 'exit', '0'])` - a no-op
+  // wearing a cleanup comment, the same defect class this gate exists to catch.
+  const leftBehind = await countRivalPlaywrightBrowsers().catch(() => null);
+  if (leftBehind !== null && leftBehind > rivalBrowsers) {
+    console.error(`[switch-matrix] WARNING: ${leftBehind} Playwright Chrome processes remain `
+      + `(${rivalBrowsers} before this run). Killing none; check for an orphan.`);
+  }
   process.exit(exitCode);
 }
