@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { createBallisticSurface, type BallisticMaterialId, type BallisticSurface } from './ballistics';
 import { classifyImpactSurface } from './combat-feedback';
 import type { Box2 } from './collision';
@@ -553,11 +554,11 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     const trunkGeom = new THREE.CylinderGeometry(0.52, 0.72, 2.8, 9);
     trunkGeom.translate(0, 1.4, 0);
     const lobeGeom = lumpify(new THREE.SphereGeometry(1.0, 10, 7), 0.2, 0xca90);
-    const canopyTrunks = new THREE.InstancedMesh(trunkGeom, standard(0x5f4630, 0.92, 0.02), count);
+    const canopyTrunks = farcrysisInstancedMesh(trunkGeom, standard(0x5f4630, 0.92, 0.02), count);
     canopyTrunks.name = 'farcrysis-canopy-trunk-visuals';
-    const canopyLower = new THREE.InstancedMesh(lobeGeom, standard(0x3a6b2e, 0.9, 0.01), count);
+    const canopyLower = farcrysisInstancedMesh(lobeGeom, standard(0x3a6b2e, 0.9, 0.01), count);
     canopyLower.name = 'farcrysis-canopy-crown-lower';
-    const canopyUpper = new THREE.InstancedMesh(lobeGeom, standard(0x458036, 0.88, 0.01), count);
+    const canopyUpper = farcrysisInstancedMesh(lobeGeom, standard(0x458036, 0.88, 0.01), count);
     canopyUpper.name = 'farcrysis-canopy-crown-upper';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -592,7 +593,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   {
     const count = canopyTrees.length;
     const shrubGeom = lumpify(new THREE.IcosahedronGeometry(1.0, 1), 0.16, 0xd11);
-    const shrubs = new THREE.InstancedMesh(shrubGeom, jungleLeafMat, count);
+    const shrubs = farcrysisInstancedMesh(shrubGeom, jungleLeafMat, count);
     shrubs.name = 'farcrysis-canopy-undergrowth';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -857,7 +858,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   {
     const count = bushPositions.length;
     const bushGeom = lumpify(new THREE.IcosahedronGeometry(0.62, 1), 0.12, 0xb0511);
-    const bushes = new THREE.InstancedMesh(bushGeom, jungleLeafMat, count);
+    const bushes = farcrysisInstancedMesh(bushGeom, jungleLeafMat, count);
     bushes.name = 'farcrysis-jungle-bushes';
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -883,7 +884,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   const fernPlacements = FARCRYSIS_LANDMARKS.flatMap((frame) => landmarkFernPositions(frame));
   const fernGeom = new THREE.BoxGeometry(0.5, 0.9, 0.18);
   const fernMat = standard(0x3d7a35, 0.85, 0.02);
-  const ferns = new THREE.InstancedMesh(fernGeom, fernMat, fernPlacements.length);
+  const ferns = farcrysisInstancedMesh(fernGeom, fernMat, fernPlacements.length);
   ferns.name = 'farcrysis-instanced-ferns';
   const fernMatrix = new THREE.Matrix4();
   fernPlacements.forEach(([x, z], i) => {

@@ -49,6 +49,41 @@
  *     layer keeps its authored hue (and its per-instance colour variation)
  *     without splitting the graph.
  *
+ * PASS 84 — WHY THE REMAINING BUCKET SPLIT IS NOT COLLAPSED WITH
+ * `materialReference()`. DO NOT REINTRODUCE IT.
+ *
+ * The obvious next step is to move the dapple strength and the three sway
+ * numbers off the graph and into module-level `materialReference(...)`
+ * singletons, so every layer shares one node object and one pipeline. It was
+ * tried, measured (9 live graphs -> 4, 326 -> 298 render pipelines, and NO
+ * wall-clock saving above run-to-run noise) and REVERTED, because it silently
+ * breaks foliage shadows:
+ *
+ *   three r185 renders every shadow caster through
+ *   `scene.overrideMaterial = getShadowMaterial(light)` — one bare shared
+ *   `NodeMaterial` per light (nodes/lighting/ShadowNode.js). `Renderer.
+ *   _renderObjectDirect` copies the SOURCE material's `positionNode` onto that
+ *   shadow material and renders with it, and `NodeManager.
+ *   getNodeFrameForRender` sets `nodeFrame.material` to the material actually
+ *   being rendered. `MaterialReferenceNode.updateReference` therefore resolves
+ *   against the SHADOW material, which has no arena properties on it;
+ *   `ReferenceNode.updateValue` writes the resulting `undefined` straight into
+ *   a `Float32Array` uniform, which stores NaN, and every swaying shadow-caster
+ *   vertex becomes NaN. Nothing in three warns. The arena keeps rendering; it
+ *   just loses its foliage shadows, which measured as a reproducible
+ *   +3.2..+6.5 luminance brightening across the vegetation band.
+ *
+ * `materialColor` above is safe only because it is read in the COLOR node,
+ * which three replaces for shadow-pass materials. Anything read in the
+ * POSITION node must survive the override material.
+ * `src/farcrysis-tsl-foliage.test.ts` pins this.
+ *
+ * The bucket split is therefore the deliberate cost of correct shadows. If the
+ * remaining graphs ever have to collapse, the values must travel on something
+ * three carries into the shadow pass — a per-instance
+ * `InstancedBufferAttribute` or data baked into the geometry — never a
+ * reference bound to the rendered material.
+ *
  * Presentation only — never adds colliders, never changes sightlines.
  */
 

@@ -28771,6 +28771,26 @@ async function performArenaSelection(
     // keep the pinned coverage-frame sequence in the committing phase below
     // untouched; its resetRenderInfo still scopes readiness to real coverage.
     if (renderRuntime.backend === 'webgpu') {
+      // FARCRYSIS-LOAD (pass 84, lane C): the warm frame below is the FIRST
+      // WebGPU submission of a cold session, and it is fenced at 12 s. For
+      // farcrysis it realised 134-217 cold render pipelines (196 distinct
+      // vertex modules before the instancing fix) synchronously inside that
+      // one submission, the GPU process did not finish compiling them within
+      // the fence ("WebGPU queue completion exceeded 12000 ms for submission
+      // 1 ... fenced draws 1017"), the selection rolled back, and the stuck
+      // submission then failed the next arena's 4 s fence as well. Atomic
+      // Acres compiles 75 here and passes. So for this arena the exact
+      // ScenePass vocabulary is realised FIRST through compileAsync -
+      // createRenderPipelineAsync, which Dawn compiles on worker threads and
+      // outside any fence - with frustum culling disabled so the coverage set
+      // is complete; the warm frame and the committing coverage draw then
+      // find every pipeline already built. The fence itself is untouched and
+      // every other arena takes exactly the sequence it took before.
+      if (selectedArena.id === 'farcrysis' && pass64TslSystems) {
+        const farcrysisPrecompile = pass64TslSystems;
+        await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));
+        assertAdmission();
+      }
       requestStaticShadowRefresh(true);
       await submitForegroundWebGpuFrame(true);
       await flushWebGpuFrames(12_000);

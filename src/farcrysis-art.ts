@@ -11,6 +11,7 @@
  * the art layer.
  */
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import {
   applyFarcrysisGroundMaterial,
   FARCRYSIS_GROUND_EXTENT_M,
@@ -378,7 +379,7 @@ function addInstancedBushes(root: THREE.Group): void {
     distributeAlongAxis(localToWorld(frame, LANDMARK_FRINGE_OUTWARD, 0), frame.tangent, 2.0, 5)
       .map(([x, z], i) => ({ x, z, seed: frame.tag.charCodeAt(0) + i })),
   );
-  const instances = new THREE.InstancedMesh(bushGeom, mat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), placements.length);
+  const instances = farcrysisInstancedMesh(bushGeom, mat(FARCRYSIS_ART_FEEL.bushGreen, 0.9, 0.01), placements.length);
   instances.name = 'farcrysis-art-instanced-bushes';
   instances.castShadow = true;
   instances.receiveShadow = true;
@@ -419,7 +420,7 @@ function addInstancedFernClusters(root: THREE.Group): void {
   const fernGeom = new THREE.BoxGeometry(0.42, 1.1, 0.05);
   fernGeom.translate(0, 0.55, 0); // pivot at the root so tilts arch outward
 
-  const instances = new THREE.InstancedMesh(fernGeom, mat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
+  const instances = farcrysisInstancedMesh(fernGeom, mat(FARCRYSIS_ART_FEEL.fernGreen, 0.85, 0.02), count);
   instances.name = 'farcrysis-art-instanced-fern-clusters';
   instances.castShadow = true;
   instances.receiveShadow = true;
@@ -635,7 +636,7 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     seed: number,
     place: (rng: () => number, index: number) => [number, number, number], // x, z, scale
   ): void => {
-    const rocks = new THREE.InstancedMesh(boulderGeometry, makeRockMaterial(color), count);
+    const rocks = farcrysisInstancedMesh(boulderGeometry, makeRockMaterial(color), count);
     rocks.name = name;
     const rng = mulberry32(seed);
     const m = new THREE.Matrix4();
@@ -1029,7 +1030,7 @@ function addJungleUndergrowth(group: THREE.Group): void {
   const clumpCount = 36; // HF-396: 4x area, same single instanced draw
   const cardGeom = new THREE.BoxGeometry(0.85, 0.62, 0.035);
   cardGeom.translate(0, 0.31, 0); // pivot at the root so tilts arch outward
-  const cards = new THREE.InstancedMesh(cardGeom, undergrowthMat, clumpCount * cardsPerClump);
+  const cards = farcrysisInstancedMesh(cardGeom, undergrowthMat, clumpCount * cardsPerClump);
   cards.name = 'farcrysis-undergrowth-leaf-cards';
   cards.castShadow = true;
   cards.receiveShadow = true;

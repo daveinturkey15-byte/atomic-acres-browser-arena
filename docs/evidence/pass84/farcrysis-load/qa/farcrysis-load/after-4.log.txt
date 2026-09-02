@@ -1,0 +1,8 @@
+[farcrysis-boot] menu ready at 1851 ms
+[farcrysis-boot] selectArena(farcrysis) -> ok in 51560 ms
+[farcrysis-boot] startSolo -> active in 20277 ms
+[farcrysis-boot] screenshot C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\after-4-admitted.png
+[farcrysis-boot] outcome=admitted selectToAdmitted=51547 ms, selectToActive=71837 ms
+[farcrysis-boot] pipelines: menu 0, during load 298; shader modules during load 311; long tasks 259 = 30987 ms (max 4685)
+[farcrysis-boot] scene: 6666 meshes (164 instanced, 93630 instances), 1757 unique materials (184 in arena root), 2903 geometries
+Wrote C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\after-4.json

@@ -30,6 +30,7 @@
  * function bodies, never at module evaluation time.
  */
 import * as THREE from 'three';
+import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
 import { FARCRYSIS_LANDMARKS } from './farcrysis-midmap-landmarks';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
@@ -351,19 +352,19 @@ export function buildPalmStandInstances(
     metalness: 0.05,
   });
 
-  const trunkInstances = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, count);
+  const trunkInstances = farcrysisInstancedMesh(trunkGeometry, trunkMaterial, count);
   trunkInstances.name = `${namePrefix}-trunks`;
   trunkInstances.castShadow = true;
   trunkInstances.receiveShadow = true;
   trunkInstances.userData.farcrysisArt = true;
 
-  const frondInstances = new THREE.InstancedMesh(crownGeometry, frondMaterial, count);
+  const frondInstances = farcrysisInstancedMesh(crownGeometry, frondMaterial, count);
   frondInstances.name = `${namePrefix}-fronds`;
   frondInstances.castShadow = true;
   frondInstances.receiveShadow = true;
   frondInstances.userData.farcrysisArt = true;
 
-  const coconutInstances = new THREE.InstancedMesh(coconutGeometry, coconutMaterial, count * 3);
+  const coconutInstances = farcrysisInstancedMesh(coconutGeometry, coconutMaterial, count * 3);
   coconutInstances.name = `${namePrefix}-coconuts`;
   coconutInstances.castShadow = true;
   coconutInstances.receiveShadow = true;
