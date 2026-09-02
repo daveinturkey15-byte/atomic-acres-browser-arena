@@ -9,6 +9,7 @@ import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
 import { DEFAULT_KILLSTREAK_LOADOUT } from '../killstreak-loadout';
 import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
+import { gamepadSettingsMarkup } from '../input/gamepad/settings-panel'; // PASS 84 Lane E
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 import { PASS66_RELEASE_IDENTITY } from '../release-identity';
@@ -260,8 +261,9 @@ function optionsPanelMarkup(): string {
       <div class="settings-grid">
         <label class="setting-check"><input id="mobile-touch-controls-toggle" type="checkbox"> ENABLE MOBILE TOUCH CONTROLS</label>
       </div>
-      <p>Shows a left movement thumbstick, a right look/aim thumbstick, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off.</p>
+      <p>Shows a left movement thumbstick, a right look/aim thumbstick, and FIRE / JUMP / ADS / RELOAD / CROUCH / GRENADE / KNIFE buttons. Auto-detected on touch devices; toggle here to force it on or off. A connected gamepad hides the overlay until it disconnects.</p>
     </section>
+    ${gamepadSettingsMarkup()}
     <section id="game-refresh-settings" class="settings-section" aria-labelledby="game-refresh-settings-title">
       <header><b id="game-refresh-settings-title">GAME REFRESH</b><span>FORCE THE LATEST BUILD</span></header>
       <div class="game-refresh-row">

@@ -17,6 +17,22 @@ import {
   verifiedStickyAttachment,
 } from './legacy-pure-helpers-2'; // HF-355 round 2
 import './style.css';
+// GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
+import {
+  GamepadInputRuntime,
+  NO_AIM_ASSIST,
+  applyHudInputScheme,
+  applyTriggerSnap,
+  bindGamepadSettingsPanel,
+  evaluateAimAssist,
+  interactLabel,
+  promptLabel,
+  type AimAssistResult,
+  type AimAssistTarget,
+  type AimAssistTier,
+  type GamepadLike,
+  type GamepadSettingsPanel,
+} from './input/gamepad';
 import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
 import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
 import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
@@ -355,7 +371,6 @@ import {
   WEAPONS,
   advanceMatch,
   advanceFreeForAllMatch,
-  applyRadialDeadzone,
   beginReload,
   botScaledDamage,
   cancelReload,
@@ -6366,9 +6381,86 @@ let gamepadSprint = false;
 let gamepadTriggerArmed = true;
 let gamepadAdsArmed = true;
 
-let previousGamepadButtons: boolean[] = [];
 let gamepadSupportSelection: FieldSupportId = 'scout-sweep';
 let mobileTouchControls: MobileTouchControls | null = null;
+let mobilePresentationActive = false;
+
+// GAMEPAD: PASS 84 Lane E. Hot-plug, per-model mapping, deadzones/curves, the
+// remap profile, rumble and the keyboard-vs-pad scheme tracker live in
+// ./input/gamepad; this block and pollGamepad() are the only wiring into
+// gameplay state. Pad look and fire never need pointer lock. Declared with the
+// input state because the Options panel binds it during module init.
+const gamepadRuntime = new GamepadInputRuntime({
+  getGamepads: () => (typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : []) as (GamepadLike | null)[],
+});
+gamepadRuntime.attach(window);
+let gamepadTriggerHeld = false;
+let gamepadOverlaySuppressed = false;
+let lastGamepadAssist: AimAssistResult = NO_AIM_ASSIST;
+let lastTouchAssist: AimAssistResult = NO_AIM_ASSIST;
+let lastTouchSnapDeg = 0;
+let gamepadSettingsPanel: GamepadSettingsPanel | null = null;
+/** Aim points sit this far above the body proxy centre (≈ upper chest, 1.28 m standing). */
+const AIM_ASSIST_POINT_LIFT_M = 0.3;
+
+/** Which assist tier the player is currently driving the view with (settings read-out). */
+function activeAimAssistTier(): AimAssistTier {
+  if (gamepadRuntime.connected() && gamepadRuntime.currentScheme() === 'gamepad') return 'pad';
+  if (mobilePresentationActive) return 'touch';
+  return 'mouse';
+}
+
+/**
+ * Every live hostile combatant — bots and remote players alike — as an aim
+ * point. Reads presentation-side positions only; never touches hit proxies
+ * used for registration.
+ */
+function collectAimAssistTargets(): readonly AimAssistTarget[] {
+  const targets: AimAssistTarget[] = [];
+  for (const bot of bots.values()) {
+    if (!bot.alive || bot.hp <= 0) continue;
+    if (!areCombatantsHostile(player.id, player.team, bot.id, bot.team)) continue;
+    const stance = ((bot.root.userData.operatorStance as Stance | undefined) ?? 'stand');
+    const centre = hitProxyZoneCentre('body', stance);
+    targets.push({
+      id: bot.id,
+      point: { x: bot.position.x + centre[0], y: bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, z: bot.position.z + centre[2] },
+    });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team)) continue;
+    const centre = hitProxyZoneCentre('body', remote.snapshot.stance ?? 'stand');
+    const feet = remote.root.position;
+    targets.push({
+      id: remote.snapshot.id,
+      point: { x: feet.x + centre[0], y: feet.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, z: feet.z + centre[2] },
+    });
+  }
+  return targets;
+}
+
+function evaluateLocalAimAssist(tier: AimAssistTier, dt: number): AimAssistResult {
+  if (!gameplayInputEnabled() || localKillstreakActorSnapshot()?.possession) return Object.freeze({ ...NO_AIM_ASSIST, tier });
+  return evaluateAimAssist({
+    tier,
+    eye: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    ads: adsHeld,
+    velocity: { x: player.velocity.x, z: player.velocity.z },
+    dt,
+    targets: collectAimAssistTargets(),
+  });
+}
+
+function syncHudInputGlyphs(): void {
+  applyHudInputScheme(document, {
+    scheme: gamepadRuntime.currentScheme(),
+    layout: gamepadRuntime.activeLayout(),
+    keyProfile: activeKeyBindingProfile(),
+  });
+}
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
@@ -10617,7 +10709,7 @@ function renderFieldKitSelection(): void {
     const title = document.createElement('strong');
     title.textContent = 'PICK UP YOUR WEAPON INSIDE';
     const detail = document.createElement('b');
-    detail.textContent = `${equipped} · PRESS F AT A BENCH`;
+    detail.textContent = `${equipped} · PRESS ${interactLabel()} AT A BENCH`; // GAMEPAD: glyph follows the active input
     summary.append(label, title, detail);
     return;
   }
@@ -13942,6 +14034,7 @@ function applyDamage(
   else if (network.role === 'offline' || attacker === player.id) addFeed('DAMAGE TAKEN +' + Math.round(appliedDamage), 'coral', { damageTaken: appliedDamage });
   lastDamageAt = now;
   audio.damage();
+  gamepadRuntime.rumble('damage', now); // GAMEPAD: damage-taken pulse
   showDamageDirection(attacker, appliedDamage, now);
   // HF-352: Camera shake impulse from taking damage
   if (appliedDamage > 0) {
@@ -18157,8 +18250,10 @@ function tryFire(now: number): void {
     mobilePresentationActive,
     mobileTouchControls?.state.firing === true,
   );
+  // GAMEPAD: a held pad trigger fires without pointer lock, exactly like touch.
+  const padFireActive = gamepadRuntime.connected() && gamepadTriggerHeld;
   if (!player.alive || !gameStarted
-    || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive)
+    || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive && !padFireActive)
     || matchState.phase !== 'active') {
     refuseFire(!player.alive ? 'dead'
       : !gameStarted ? 'match-not-started'
@@ -18300,6 +18395,7 @@ function tryFire(now: number): void {
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
   fireBlockTelemetry.lastFiredAtMs = Math.round(now);
+  gamepadRuntime.rumble('fire', now); // GAMEPAD: fire pulse on every committed shot
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   const shotActionNonce = randomNonce();
   if (isTimedMapWeaponId(player.weapon) && network.role !== 'client') {
@@ -22063,6 +22159,7 @@ function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): v
 }
 
 function showHitmarker(headshot = false, wasElimination = false): void {
+  gamepadRuntime.rumble('hit'); // GAMEPAD: hit-confirm pulse (no-op without a pad or with rumble off)
   const marker = element<HTMLElement>('#hitmarker');
   marker.classList.remove('show', 'headshot', 'kill-confirm');
   if (headshot) marker.classList.add('headshot');
@@ -22141,6 +22238,7 @@ function syncFieldSupportRows(loadout: KillstreakLoadoutV1): void {
     if (threshold) threshold.textContent = `${definition.eliminations} KILLS`;
     if (name) name.textContent = definition.name.toUpperCase();
   });
+  syncHudInputGlyphs(); // GAMEPAD: re-apply pad glyphs after the caps were reset to key numbers
 }
 
 function updateFieldSupportHud(): void {
@@ -22435,7 +22533,12 @@ function updateFInteractionPrompt(now = performance.now()): void {
     delete supportPrompt.dataset.interactionKind;
     delete supportPrompt.dataset.targetId;
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel';
+    // GAMEPAD: on a pad, name the buttons in the player's hands (fire/interact
+    // confirm, the crouch face cancels); the keyboard sentence is the pinned
+    // Pass 65 care-package contract and stays byte-identical.
+    if (label && gamepadRuntime.currentScheme() === 'gamepad') {
+      label.textContent = `${promptLabel('fire')} or ${promptLabel('interact')} to confirm target  ${promptLabel('crouch')} to cancel`;
+    } else if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel';
     return;
   }
   advanceFInteractionPress(now);
@@ -22451,7 +22554,7 @@ function updateFInteractionPrompt(now = performance.now()): void {
     supportPrompt.dataset.holdActive = 'true';
     supportPrompt.style.setProperty('--f-hold-progress', `${((activeCareCrate.captureProgress ?? 0) * 100).toFixed(1)}%`);
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = 'HOLD F · STEAL KILLSTREAK';
+    if (label) label.textContent = `HOLD ${interactLabel()} · STEAL KILLSTREAK`;
     return;
   }
   const pressedCandidate = fInteractionPressState.phase === 'pressed'
@@ -22476,9 +22579,10 @@ function updateFInteractionPrompt(now = performance.now()): void {
     const pinnedTap = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.tapCandidate : null;
     const pinnedHold = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.holdCandidate : null;
     const dualIntent = pinnedTap && pinnedHold;
+    const interactKey = interactLabel(); // GAMEPAD: "F" on keyboard, the pad face glyph on a pad
     if (label) label.textContent = dualIntent
-      ? `TAP F · ${pinnedTap.prompt} / HOLD F · ${pinnedHold.prompt}`
-      : `${holdInteraction ? 'HOLD F' : 'TAP F'} · ${selected.prompt}`;
+      ? `TAP ${interactKey} · ${pinnedTap.prompt} / HOLD ${interactKey} · ${pinnedHold.prompt}`
+      : `${holdInteraction ? `HOLD ${interactKey}` : `TAP ${interactKey}`} · ${selected.prompt}`;
     if (holdInteraction && fInteractionPressState.phase === 'pressed') {
       supportPrompt.dataset.holdActive = 'true';
       supportPrompt.style.setProperty('--f-hold-progress', `${(fInteractionHoldProgress(fInteractionPressState, now) * 100).toFixed(1)}%`);
@@ -26999,6 +27103,7 @@ function renderKeyBindingRows(): void {
     </div>`;
   }).join('');
   element<HTMLElement>('#key-bindings-status').textContent = isDefaultProfile(profile) ? 'DEFAULT PROFILE' : 'CUSTOM PROFILE';
+  if (gamepadSettingsPanel) syncHudInputGlyphs(); // GAMEPAD: a key rebind changes the keyboard-scheme prompt labels
 }
 function bindKeyBindingRowEvents(): void {
   element<HTMLElement>('#key-binding-rows').addEventListener('click', (event) => {
@@ -27043,6 +27148,13 @@ window.addEventListener('keydown', (event) => {
 });
 renderKeyBindingRows();
 bindKeyBindingRowEvents();
+
+// GAMEPAD: settings section (deadzones, curves, invert-Y, rumble, remap) and
+// the HUD glyph scheme that follows the pad in the player's hands.
+gamepadSettingsPanel = bindGamepadSettingsPanel(document, gamepadRuntime, { currentTier: activeAimAssistTier });
+gamepadRuntime.onSchemeChange(() => syncHudInputGlyphs());
+gamepadRuntime.onPadChange(() => syncHudInputGlyphs());
+syncHudInputGlyphs();
 
 function persistPass65Settings(next: Pass65Settings): boolean {
   const result = playerProfileStore.update({ settings: next }, { sessionOnFailure: true });
@@ -27518,84 +27630,130 @@ function selectFieldSupport(direction: -1 | 1, source: 'PAD' | 'TOUCH'): void {
   updateFieldSupportHud();
 }
 
+// GAMEPAD: pad poll (runtime + helpers are declared with the input state above).
 function pollGamepad(dt: number): void {
-  const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
-  if (!pad) {
+  const now = performance.now();
+  const frame = gamepadRuntime.poll(now);
+  gamepadSettingsPanel?.poll();
+  if (frame.connected !== gamepadOverlaySuppressed) {
+    gamepadOverlaySuppressed = frame.connected;
+    mobileTouchControls?.setGamepadSuppressed(frame.connected);
+  }
+  if (!frame.connected) {
     gamepadMove = { x: 0, y: 0 };
     gamepadLookRate = { yaw: 0, pitch: 0 };
     gamepadDroneVertical = 0;
     gamepadSprint = false;
-    previousGamepadButtons = [];
+    gamepadTriggerHeld = false;
+    lastGamepadAssist = NO_AIM_ASSIST;
     setLocalTriggerHeld(mouseTriggerHeld);
     adsHeld = admittedAdsHeld(debugAdsOverride ?? mouseAdsHeld);
     return;
   }
-  const shapedMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
-  const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
-  const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
-  const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
-  const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
-  const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
+  const padAds = frame.held('ads');
+  const padTrigger = frame.held('fire');
   const canControlPlayer = gameplayInputEnabled();
   const possession = localKillstreakActorSnapshot()?.possession ?? null;
   const pilotedDronePossessed = possession?.kind === 'piloted-drone';
+  // Pause/resume must work while gameplay input is closed; a pad player has
+  // no Escape key and no pointer to click the match with.
+  if (frame.pressed('pause') && gameStarted && player.alive && !matchFinished && !isTextChatTyping()) {
+    if (menuLifecycle.surface === 'paused-match') resumeActiveMatchFromMenu(false);
+    else if (menuLifecycle.surface === 'hidden') openActiveMatchPause('mobile-pause');
+  }
   if (!padTrigger) gamepadTriggerArmed = true;
   else if (!canControlPlayer) gamepadTriggerArmed = false;
   if (!padAds) gamepadAdsArmed = true;
   else if (!canControlPlayer) gamepadAdsArmed = false;
   const padTriggerActive = canControlPlayer && padTrigger && gamepadTriggerArmed;
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
-  gamepadSprint = canControlPlayer && Boolean(buttons[10]);
+  gamepadTriggerHeld = padTriggerActive;
+  gamepadSprint = canControlPlayer && frame.held('sprint');
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
-  gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
+  gamepadMove = canControlPlayer ? { x: frame.move.x, y: frame.move.y } : { x: 0, y: 0 };
   gamepadDroneVertical = canControlPlayer && pilotedDronePossessed
-    ? THREE.MathUtils.clamp(Number(buttons[0]) - Number(buttons[1]), -1, 1)
+    ? THREE.MathUtils.clamp(Number(frame.held('jump')) - Number(frame.held('crouch')), -1, 1)
     : 0;
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
-    canControlPlayer ? look : { x: 0, y: 0 },
+    canControlPlayer ? frame.look : { x: 0, y: 0 },
     dt,
     adsHeld,
     controllerSensitivity,
   );
+  // Tiered aim assist, PAD = medium. A look-rate modifier only: the rate the
+  // stick produced is scaled inside the target zone and strafe friction is
+  // added as a yaw rate. Damage, spread and hit registration are untouched.
+  const assist = evaluateLocalAimAssist('pad', dt);
+  lastGamepadAssist = assist;
   if (canControlPlayer) {
+    const yawDelta = gamepadLookRate.yaw * assist.lookRateScale * dt;
+    const pitchDelta = gamepadLookRate.pitch * assist.lookRateScale * dt;
     if (pilotedDronePossessed) {
       const pose = applyPilotedDroneScreenLookDelta({
         yaw: player.yaw,
         pitch: player.pitch,
-        horizontalLookDelta: gamepadLookRate.yaw * dt,
-        verticalLookDelta: gamepadLookRate.pitch * dt,
+        horizontalLookDelta: yawDelta,
+        verticalLookDelta: pitchDelta,
       });
       player.yaw = pose.yaw;
       player.pitch = pose.pitch;
     } else {
-      player.yaw -= gamepadLookRate.yaw * dt;
-      player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
+      player.yaw -= yawDelta;
+      player.yaw += assist.frictionYawRadPerSec * dt;
+      player.pitch = THREE.MathUtils.clamp(player.pitch - pitchDelta, -1.42, 1.42);
     }
-    if (!possession) {
-      if (pressed(0)) {
+    // Semi-automatic weapons fire on the trigger's press edge (the frame loop
+    // only re-fires held automatics), so a pad shot never waits on pointer lock.
+    if (padTriggerActive && frame.pressed('fire')) tryFire(now);
+    if (possession?.kind === 'chopper-gunner' && frame.pressed('ads')) requestPossessedChopperMissile(now);
+    if (pointSupportTargeting && !tacticalMapOpen) {
+      if (frame.pressed('fire') || frame.pressed('interact')) confirmCrosshairSupportTarget(now);
+      else if (frame.pressed('crouch')) cancelSupportTargeting(true);
+    } else if (!possession) {
+      if (frame.pressed('jump')) {
         if (player.stance !== 'stand') requestStance('stand');
-        jumpQueuedAt = performance.now();
+        jumpQueuedAt = now;
       }
-      if (pressed(1)) requestStance('toggle-crouch');
-      if (pressed(13)) requestStance('toggle-prone');
-      if (pressed(2)) reload();
-      if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
-      if (pressed(4)) throwGrenade();
-      if (pressed(5)) melee();
-      if (pressed(14)) selectFieldSupport(-1, 'PAD');
-      if (pressed(15)) selectFieldSupport(1, 'PAD');
-      if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
+      if (frame.pressed('crouch')) requestStance('toggle-crouch');
+      if (frame.pressed('prone')) requestStance('toggle-prone');
+      // Reload and interact may share one face button: interact wins while a
+      // prompt is showing, otherwise the press reloads.
+      const sharedFace = frame.layout !== null && frame.layout.buttons.interact !== null
+        && frame.layout.buttons.interact === frame.layout.buttons.reload;
+      if (frame.pressed('interact')) {
+        const promptVisible = !element<HTMLElement>('#support-interaction-prompt').hidden || !element<HTMLElement>('#pickup-prompt').hidden;
+        if (!sharedFace || promptVisible) beginFInteractionPress(now);
+        else reload();
+      } else if (frame.pressed('reload')) {
+        reload();
+      }
+      if (frame.released('interact')) {
+        releaseFInteractionPress(now);
+        if (localCareCaptureRequiresHold) releaseCareCapture(now);
+      }
+      if (frame.pressed('switch-weapon')) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
+      if (frame.pressed('grenade')) throwGrenade();
+      if (frame.pressed('melee')) melee();
+      if (frame.pressed('emote')) performEmote();
+      if (frame.pressed('support-prev')) selectFieldSupport(-1, 'PAD');
+      if (frame.pressed('support-next')) selectFieldSupport(1, 'PAD');
+      if (frame.pressed('support-activate')) activateFieldSupport(gamepadSupportSelection);
     }
+    if (frame.pressed('scoreboard')) {
+      updateRoster();
+      element<HTMLElement>('#roster').hidden = false;
+    }
+    if (frame.released('scoreboard')) element<HTMLElement>('#roster').hidden = true;
   }
-  previousGamepadButtons = buttons;
 }
 
 function initMobileTouchControls(): void {
   if (mobileTouchControls) return;
   mobileTouchControls = new MobileTouchControls({
     onFireDown: () => {
+      applyTouchTriggerSnap(); // GAMEPAD: touch-tier micro-snap before the shot ray is taken
       setLocalTriggerHeld(true);
       tryFire(performance.now());
     },
@@ -27628,6 +27786,7 @@ function initMobileTouchControls(): void {
   });
   mobileTouchControls.mount(document.body);
   mobileTouchControls.setEnabled(readMobileControlsPreference());
+  mobileTouchControls.setGamepadSuppressed(gamepadOverlaySuppressed); // GAMEPAD: pad may already be connected
 }
 
 function setMobileControlsEnabled(enabled: boolean): void {
@@ -27636,7 +27795,7 @@ function setMobileControlsEnabled(enabled: boolean): void {
   writeMobileControlsPreference(enabled);
 }
 
-function pollMobileTouch(): void {
+function pollMobileTouch(dt: number): void {
   const touch = mobileTouchControls;
   if (!touch) return;
   // The overlay only ever intercepts input while a match is live and the menu
@@ -27651,17 +27810,41 @@ function pollMobileTouch(): void {
     if (live) requestMobilePresentation();
     else releaseMobilePresentation();
   }
-  if (!touch.isEnabled()) return;
+  if (!touch.isEnabled() || touch.isGamepadSuppressed()) return;
   if (touch.state.firing) setLocalTriggerHeld(true);
   if (touch.state.ads) adsHeld = admittedAdsHeld(true);
   const look = touch.consumeLookDelta();
-  if (!gameplayInputEnabled() || (look.x === 0 && look.y === 0)) return;
-  const lookScale = sensitivity * (adsHeld ? 0.62 : 1);
+  if (!gameplayInputEnabled()) return;
+  // GAMEPAD: tiered aim assist, TOUCH = strongest. Same look-rate-only
+  // contract as the pad path: the held-stick delta is scaled inside the
+  // target zone and strafe friction is added as a yaw rate.
+  const assist = evaluateLocalAimAssist('touch', dt);
+  lastTouchAssist = assist;
+  if (assist.frictionYawRadPerSec !== 0) player.yaw += assist.frictionYawRadPerSec * dt;
+  if (look.x === 0 && look.y === 0) return;
+  const lookScale = sensitivity * (adsHeld ? 0.62 : 1) * assist.lookRateScale;
   player.yaw -= look.x * lookScale;
   player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * lookScale, -1.42, 1.42);
 }
 
-let mobilePresentationActive = false;
+/** GAMEPAD: touch-only trigger micro-snap (see aim-assist.ts); a view nudge, never a hit-model change. */
+function applyTouchTriggerSnap(): void {
+  lastTouchSnapDeg = 0;
+  if (!gameplayInputEnabled() || localKillstreakActorSnapshot()?.possession) return;
+  const snapped = applyTriggerSnap({
+    tier: 'touch',
+    eye: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    targets: collectAimAssistTargets(),
+  });
+  if (snapped.snappedDeg <= 0) return;
+  player.yaw = snapped.yaw;
+  player.pitch = snapped.pitch;
+  lastTouchSnapDeg = snapped.snappedDeg;
+}
+
+// GAMEPAD: `mobilePresentationActive` is declared with the input state above.
 
 /**
  * Mobile play uses the available viewport in either orientation. Fullscreen
@@ -27769,6 +27952,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keydown', (event) => {
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: keyboard use hands HUD prompts back to key labels
   if (isTextChatTyping()) return;
   if (
     event.code === 'Escape'
@@ -27882,6 +28066,7 @@ window.addEventListener('focus', () => {
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: captured mouse look = keyboard/mouse scheme
   const aimScale = mouseSensitivityMultiplier(adsHeld, currentSprinting);
   if (localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
     const pose = applyPilotedDronePointerDelta({
@@ -27903,6 +28088,7 @@ window.addEventListener('mousemove', (event) => {
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {
   if (isTextChatTyping()) return;
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: mouse click = keyboard/mouse scheme
   if (document.pointerLockElement !== canvas) {
     requestGamePointerLock('canvas');
     return;
@@ -28704,14 +28890,16 @@ function returnToMainMenu(): void {
   }
 }
 
-function resumeActiveMatchFromMenu(): void {
+function resumeActiveMatchFromMenu(requestLock = true): void {
   if (!gameStarted || !player.alive || matchFinished) return;
   // One explicit transaction owns every pending Options edit. Switching the
   // visible panel after it must not perform a second persistence operation.
   flushPendingGraphics();
   if (activeMenuTabId === 'options') setMenuTab('deploy', false);
   applyMenuLifecycle({ type: 'resume' });
-  requestGamePointerLock('resume');
+  // GAMEPAD: a pad resume needs no mouse capture; asking for it outside a
+  // click gesture only produces the "capture was blocked" warning.
+  if (requestLock) requestGamePointerLock('resume');
 }
 
 resumeButton.addEventListener('click', () => {
@@ -29475,7 +29663,7 @@ function frame(now: number, scheduleNext = true): void {
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;
     pollGamepad(frameDt);
-    pollMobileTouch();
+    pollMobileTouch(frameDt);
     accumulator += frameDt;
     const step = 1 / SIMULATION_HZ;
     let iterations = 0;
@@ -30592,6 +30780,14 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
+    /** GAMEPAD: pad runtime + assist telemetry for the PASS 84 e2e. */
+    sampleGamepad: () => Record<string, unknown> & {
+      assist: AimAssistResult;
+      touchAssist: AimAssistResult;
+      touchSnapDeg: number;
+      tier: AimAssistTier;
+      overlaySuppressed: boolean;
+    };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     sampleViewmodelPenetration: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
@@ -31787,6 +31983,16 @@ function debugRiggedOperatorJointScreenPositions(
 })();
 
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  // GAMEPAD: pad runtime + tiered-assist telemetry (PASS 84 Lane E e2e).
+  sampleGamepad: () => ({
+    ...gamepadRuntime.telemetry(),
+    assist: lastGamepadAssist,
+    touchAssist: lastTouchAssist,
+    touchSnapDeg: lastTouchSnapDeg,
+    tier: activeAimAssistTier(),
+    overlaySuppressed: gamepadOverlaySuppressed,
+    triggerHeld: gamepadTriggerHeld,
+  }),
   sampleViewmodelPenetration,
   // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
   // runtime coefficient revert). This probe ends the guessing: live bus
