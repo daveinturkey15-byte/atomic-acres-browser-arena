@@ -16,6 +16,20 @@ import {
   stanceEyeHeight,
   verifiedStickyAttachment,
 } from './legacy-pure-helpers-2'; // HF-355 round 2
+// HF-412: the Black Ops 2 drop shot - a fixed-duration prone transition that
+// never takes the trigger away. Every timing constant lives in that module.
+import {
+  IDLE_CROUCH_HOLD,
+  beginStanceTransition,
+  crouchHeld,
+  crouchPressed,
+  crouchReleased,
+  restingStanceTransitionSample,
+  sampleStanceTransition,
+  type CrouchHoldState,
+  type StanceTransition,
+  type StanceTransitionSample,
+} from './prone-transition';
 import './style.css';
 // GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
 import {
@@ -876,7 +890,7 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorStanceSample, riggedOperatorTelemetry } from './operator-model';
 import { OPERATOR_SKIN_CATALOG, OPERATOR_SKIN_SOURCES, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 import {
   DEFAULT_OPERATOR_EMOTE,
@@ -6075,6 +6089,15 @@ let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
 let stanceRecoveryUntil = 0;
+// HF-412: the in-flight stance transition and this frame's sample of it. The
+// CAPSULE commits to the new stance on the press (authority never lags); only
+// the rendered eye and the third-person body catch up over the fixed window.
+let stanceTransition: StanceTransition | null = null;
+let stanceTransitionSample: StanceTransitionSample = restingStanceTransitionSample('stand');
+// HF-412: hold-crouch-to-prone. The reference's console control, offered on the
+// keyboard too, so the drop shot is reachable from the crouch input alone.
+let crouchHoldState: CrouchHoldState = IDLE_CROUCH_HOLD;
+let gamepadCrouchHeld = false;
 let sprintRecoveryUntil = 0;
 let deferredFireAt = 0;
 let lastGroundedAt = 0;
@@ -8197,6 +8220,11 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
   player.selectedGrenade = hostState.grenade;
   player.weapon = hostState.weapon;
   player.stance = hostState.stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.grenades = hostState.grenades;
   player.ammo = { ...hostState.ammo };
   player.reserve = { ...hostState.reserve };
@@ -8973,6 +9001,11 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.selectedGrenade = canonical.grenade;
   player.weapon = canonical.weapon;
   player.stance = stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.seq = Math.max(player.seq, canonical.seq);
   for (const weapon of ORDINARY_WEAPON_IDS) {
     player.ammo[weapon] = projection.combatInventory.ammo[weapon];
@@ -16341,20 +16374,52 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   if (!playerGrounded && target !== 'crouch') return false;
   if (target === player.stance) return true;
   const previous = player.stance;
-  const before = characterPhysics.eyePosition();
   if (!characterPhysics.setStance(target)) {
     setStatus('Low clearance — stance change blocked.', 'warn');
     return false;
   }
   const after = characterPhysics.eyePosition();
-  // Keep the rendered camera inside the newly authoritative capsule. A large
-  // cosmetic eye-height lag could leave the camera in ceilings/walls on prone.
-  cameraHeightOffset = THREE.MathUtils.clamp(cameraHeightOffset + before.y - after.y, -0.12, 0.12);
+  // HF-412: the DROP SHOT. What used to happen here was a teleport plus a fire
+  // block: the eye moved the whole 1.09 m in one frame (only 0.12 m of it was
+  // ever smoothed) and `stanceRecoveryUntil` refused the trigger for 260 ms
+  // going down and 290 ms coming up. Measured on the shipped build (75a4e508),
+  // that was 30 consecutive refused shots across one drop - the tracked receipt
+  // is docs/evidence/pass85/hf412/before-test1-quiet.json, and an independent
+  // re-measurement of the same base reported 29. (Commit 98f88e4e's message and
+  // three source comments quoted 54 from an earlier noisy run that was
+  // discarded; that run is not in the tree and is superseded by the receipt
+  // named here.) Black Ops 2's drop shot is the opposite of both: the body
+  // falls over a short FIXED window and the trigger is never taken away.
+  //
+  // The capsule, the hit proxies, the replicated stance and every authority
+  // decision still commit on the press - only the presented eye and the visible
+  // body catch up - so nothing about hit registration or netcode moves.
+  const now = performance.now();
+  stanceTransition = beginStanceTransition(previous, target, now);
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, target);
+  // The generic bob/land offset is deliberately left alone: it used to absorb a
+  // clamped 0.12 m of the stance change, which is why the shipped drop still
+  // read as a teleport. The transition above owns the whole height delta now,
+  // and adding a second copy of it here would double-count the fall.
   player.position.set(after.x, after.y, after.z);
   player.stance = target;
-  stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
+  // A plain crouch step keeps its small readiness cost; a prone transition -
+  // the drop shot itself - deliberately sets NONE, which is what makes firing
+  // continuous across the drop. `src/prone-transition.test.ts` pins that both
+  // prone arms of the old expression stay gone.
+  if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
   currentSprinting = false;
   return true;
+}
+
+/**
+ * HF-412: go prone, never toggle back out. `requestStance('toggle-prone')` is a
+ * toggle, so the hold-crouch control needs an absolute "get down" so that
+ * holding crouch while already prone does not stand the player up mid-burst.
+ */
+function dropToProne(): boolean {
+  if (player.stance === 'prone') return true;
+  return requestStance('toggle-prone');
 }
 
 function respawn(
@@ -16406,6 +16471,12 @@ function respawn(
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
   stanceRecoveryUntil = 0;
+  // HF-412: a respawned player is standing, not mid-drop, and is not holding
+  // the crouch button they may have died with down.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample('stand');
+  crouchHoldState = IDLE_CROUCH_HOLD;
+  gamepadCrouchHeld = false;
   sprintRecoveryUntil = 0;
   deferredFireAt = 0;
   cameraHeightOffset = 0;
@@ -18606,7 +18677,20 @@ function tryFire(now: number): void {
   // is still exactly camera-forward and the shot is still cast this same frame,
   // so neither the authoritative ray nor hit timing moves. Open space reports a
   // zero penalty, which leaves this byte-for-byte identical to the old cone.
-  const admittedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
+  const obstructedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
+  // HF-412: the reference's drop-shot cost. Players describe drop shotting as a
+  // close-range technique precisely because the rounds that go out WHILE you
+  // are falling are inaccurate - the answer is a wider cone, never a refused
+  // shot. Applies only during a prone transition (1.0 otherwise), peaks at the
+  // middle of the fall and is back to 1.0 the instant the body is down.
+  //
+  // HIP FIRE ONLY. `computeSpread` has already resolved the ads/moving/stance
+  // inputs above, so multiplying its output unconditionally would also widen
+  // the ADS cone - an accuracy penalty nobody documented or asked for. A shot
+  // taken with the sights settled therefore keeps the cone it earned.
+  const dropShotSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  const dropShotSpreadMultiplier = adsSettled ? 1 : dropShotSample.spreadMultiplier;
+  const admittedSpread = obstructedSpread * dropShotSpreadMultiplier;
   const shotTimeline = network.role === 'client'
     ? freezeAuthoredShotTimeline(
         currentHostTimeMs(),
@@ -19516,6 +19600,11 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
+    // HF-412: 'stand' is hardcoded because BotPlayer carries no stance at all -
+    // the bot AI never crouches or goes prone, so there is no stance to pose
+    // from. Remote PEERS do carry a replicated stance and do play the prone
+    // transition (see the remote pose call in renderRemotes). Giving bots a
+    // simulated stance is its own ledger row, not part of this one.
     poseOperator(bot.root, 'stand', speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
@@ -20208,6 +20297,9 @@ function updateBots(dt: number, now: number): void {
     const lookPitch = lineOfSight
       ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
       : 0;
+    // HF-412: as above - bots have no stance state, so this is the honest pose,
+    // not a drop-shot omission. Only the QA presentation override can put a bot
+    // body prone.
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
@@ -25800,6 +25892,18 @@ function updatePhysics(dt: number): void {
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
+  // HF-412: hold-crouch-to-prone, polled here because a held key produces no
+  // further keydown events and a pad button produces no edge. Tapping crouch
+  // crouches (handled on the press edge); keeping it down past
+  // DROP_SHOT_TIMING.holdCrouchToProneMs drops to prone, once per hold.
+  const crouchInputDown = actionHeld('crouch', keys, keyProfile) || gamepadCrouchHeld;
+  if (crouchInputDown) {
+    const held = crouchHeld(crouchHoldState, now);
+    crouchHoldState = held.state;
+    if (held.action === 'prone') dropToProne();
+  } else if (crouchHoldState.pressedAtMs !== null) {
+    crouchHoldState = crouchReleased().state;
+  }
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
   const wantsSprint = (
@@ -26082,8 +26186,15 @@ function updatePhysics(dt: number): void {
     baseFovDegrees: preferredFov,
     cameraFovDegrees: camera.fov,
   }));
+  // HF-412: sample the drop-shot transition once per frame. The authoritative
+  // eye (player.position) is already at the new stance; this is the lag the
+  // PLAYER sees, and it eases to exactly zero, so the camera lands on the
+  // authoritative seat rather than settling near it.
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  if (!stanceTransitionSample.active) stanceTransition = null;
   camera.position.copy(player.position);
-  camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
+  camera.position.y += stanceTransitionSample.eyeOffsetMeters
+    + cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
   camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
   camera.rotation.z = cameraRoll * accessibilityRuntime.weaponMotionScale;
@@ -26121,7 +26232,11 @@ function updatePhysics(dt: number): void {
   // across-all-maps answer the per-arena geometry fixes kept missing (see
   // docs/eye-clearance/ledger.json deferred classes).
   // Floor and terrain near-plane standoff: prevent camera frustum from dipping below floor
-  camera.position.y = Math.max(player.position.y + 0.14, camera.position.y);
+  // HF-412: measured from the RENDERED eye. Taken from the authoritative eye
+  // it clamped the whole prone->stand transition away in one frame, because
+  // during that rise the presented camera is deliberately BELOW the standing
+  // seat it is climbing toward.
+  camera.position.y = Math.max(player.position.y + stanceTransitionSample.eyeOffsetMeters + 0.14, camera.position.y);
   // ... and the surface resolve runs LAST with the final say: when the fixed
   // standoff shoves the eye into a sloped underside (skyline airstair belly,
   // ramp bellies), the resolve's own down probe still keeps it off floors
@@ -27370,8 +27485,14 @@ function renderKeyBindingRows(): void {
   rows.innerHTML = GAMEPLAY_ACTIONS.map((action) => {
     const keysLabel = profile[action].map(prettyKeyCode).join(' / ');
     const capturing = keyBindingCaptureAction === action;
+    // HF-412: the drop shot's second control is a HOLD of an existing bind, so
+    // it has no row of its own. Say so on the row it actually belongs to,
+    // reading the live crouch bind rather than a hardcoded key.
+    const proneHint = action === 'prone'
+      ? ` <span class="binding-hint">or hold ${profile.crouch.map(prettyKeyCode).join(' / ')}</span>`
+      : '';
     return `<div class="key-binding-row${capturing ? ' capturing' : ''}" data-action="${action}">
-      <span class="binding-action">${ACTION_LABELS[action]}</span>
+      <span class="binding-action">${ACTION_LABELS[action]}${proneHint}</span>
       <kbd>${capturing ? 'PRESS A KEY…' : keysLabel}</kbd>
       <button type="button" data-rebind="${action}">${capturing ? 'CANCEL' : 'REBIND'}</button>
     </div>`;
@@ -27947,6 +28068,8 @@ function pollGamepad(dt: number): void {
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
   gamepadTriggerHeld = padTriggerActive;
   gamepadSprint = canControlPlayer && frame.held('sprint');
+  // HF-412: published for the hold-crouch poll in updatePhysics.
+  gamepadCrouchHeld = canControlPlayer && frame.held('crouch');
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
   gamepadMove = canControlPlayer ? { x: frame.move.x, y: frame.move.y } : { x: 0, y: 0 };
@@ -27998,7 +28121,16 @@ function pollGamepad(dt: number): void {
         if (player.stance !== 'stand') requestStance('stand');
         jumpQueuedAt = now;
       }
-      if (frame.pressed('crouch')) requestStance('toggle-crouch');
+      // HF-412: same control as the keyboard. The pad's dedicated prone
+      // button still works and stays remappable; holding the crouch button is
+      // the reference's own console drop-shot control.
+      if (frame.pressed('crouch')) {
+        // The stance AT THE PRESS decides whether the hold may deepen to prone:
+        // from prone this press is how the player gets up.
+        const pressed = crouchPressed(crouchHoldState, now, player.stance);
+        crouchHoldState = pressed.state;
+        if (pressed.action === 'crouch') requestStance('toggle-crouch');
+      }
       if (frame.pressed('prone')) requestStance('toggle-prone');
       // Reload and interact may share one face button: interact wins while a
       // prompt is showing, otherwise the press reloads.
@@ -28300,7 +28432,15 @@ window.addEventListener('keydown', (event) => {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
     }
-    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) requestStance('toggle-crouch');
+    // HF-412: the press still toggles crouch exactly as it always has; holding
+    // it past DROP_SHOT_TIMING.holdCrouchToProneMs converts to prone (the
+    // reference's console control, offered on the keyboard too). The hold is
+    // polled in the frame loop, which is where key-repeat cannot reach it.
+    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) {
+      const pressed = crouchPressed(crouchHoldState, performance.now(), player.stance);
+      crouchHoldState = pressed.state;
+      if (pressed.action === 'crouch') requestStance('toggle-crouch');
+    }
     if (actionMatchesCode('prone', event.code, keyProfile) && !event.repeat) requestStance('toggle-prone');
     if (actionMatchesCode('weapon-1', event.code, keyProfile)) switchWeapon(0);
     if (actionMatchesCode('weapon-2', event.code, keyProfile)) switchWeapon(1);
@@ -30782,6 +30922,50 @@ function sampleDmrThermalReadiness() {
   });
 }
 
+/**
+ * HF-412: the CHEAP per-frame read of a third-person body's stance blend, for
+ * the drop-shot body and guest harnesses.
+ *
+ * `snapshot()` rebuilds the whole operator report (every bone chain in the
+ * scene) and stretched the body harness's sampling frame to ~65 ms, which made
+ * its "single frame" numbers sample deltas rather than frames. This walks
+ * nothing: it reads the rig runtime's five stance fields directly.
+ *
+ * `kind: 'remote'` is the guest's view of another PLAYER (the path that matters
+ * for the ledger's two-client falsifier); `kind: 'bot'` is the local rig the
+ * QA presentation override drives.
+ */
+function sampleBodyStancePose(kind: 'bot' | 'remote' = 'bot') {
+  let id: string | null = null;
+  let operator: THREE.Object3D | undefined;
+  if (kind === 'remote') {
+    for (const [remoteId, remote] of remotes) {
+      id = remoteId;
+      operator = remote.root.userData.operator as THREE.Object3D | undefined;
+      break;
+    }
+  } else {
+    for (const [botId, bot] of bots) {
+      id = botId;
+      operator = bot.root;
+      break;
+    }
+  }
+  const sample = riggedOperatorStanceSample(operator);
+  return Object.freeze({
+    kind,
+    id,
+    found: sample !== null,
+    atMs: performance.now(),
+    stance: sample?.stance ?? null,
+    blendFrom: sample?.blendFrom ?? null,
+    blendProgress: sample?.blendProgress ?? null,
+    crouchBlend: sample?.crouchBlend ?? null,
+    proneBlend: sample?.proneBlend ?? null,
+    pivotHeight: sample?.pivotHeight ?? null,
+  });
+}
+
 function sampleWeaponActionReadiness() {
   const now = performance.now();
   return Object.freeze({
@@ -30797,6 +30981,18 @@ function sampleWeaponActionReadiness() {
     possessed: localKillstreakActorSnapshot()?.possession?.kind ?? null,
     stanceRecoveryRemainingMs: Math.max(0, stanceRecoveryUntil - now),
     sprintRecoveryRemainingMs: Math.max(0, sprintRecoveryUntil - now),
+    // HF-412: the drop-shot transition, so a harness can assert the shape of
+    // the fall instead of inferring it from camera samples alone.
+    dropShot: {
+      active: stanceTransitionSample.active,
+      from: stanceTransitionSample.from,
+      to: stanceTransitionSample.to,
+      progress: stanceTransitionSample.progress,
+      eyeOffsetMeters: stanceTransitionSample.eyeOffsetMeters,
+      spreadMultiplier: stanceTransitionSample.spreadMultiplier,
+      dropping: stanceTransitionSample.dropping,
+      durationMs: stanceTransition?.durationMs ?? 0,
+    },
     nextShotRemainingMs: Math.max(0, player.nextShotAt - now),
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
@@ -31125,6 +31321,8 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    /** HF-412: cheap third-person stance-blend read; see sampleBodyStancePose. */
+    sampleBodyStancePose: (kind?: 'bot' | 'remote') => ReturnType<typeof sampleBodyStancePose>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
     traceBallistics: (
       weapon: WeaponId,
@@ -32423,6 +32621,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleBodyStancePose,
   sampleGrenadeColdPathTelemetry,
   // MP-LAB: see the type; nothing here allocates beyond the returned object.
   samplePlayerPose: () => ({
