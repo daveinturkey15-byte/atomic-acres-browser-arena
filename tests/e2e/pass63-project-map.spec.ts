@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { PASS66_RELEASE_IDENTITY } from '../../src/release-identity';
 
 test('Project Map exposes one current-first tree and human/agent downloads', async ({ page }) => {
   const browserErrors: string[] = [];
@@ -13,7 +14,15 @@ test('Project Map exposes one current-first tree and human/agent downloads', asy
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
 
   await expect(page.locator('#menu-meta-actions')).toBeVisible();
-  await expect(page.locator('#last-updated-btn')).toContainText('LAST RELEASE');
+  // HF-406: the badge used to be pinned to the literal copy 'LAST RELEASE', which named
+  // no version at all - it could not tell PASS 84 from PASS 73, and the label no longer
+  // contains that phrase in any release state. It is now pinned to the stamped pass, and
+  // to the shape `<PASS n> · <state or publication instant>`, which is the identity this
+  // surface exists to carry. The internal review acronym must never appear here again.
+  const releaseBadge = page.locator('#last-updated-btn');
+  await expect(releaseBadge).toContainText(PASS66_RELEASE_IDENTITY.pass);
+  await expect(releaseBadge).toContainText(/^PASS \d+ · \S/u);
+  await expect(releaseBadge).not.toContainText('HITL');
   await expect(page.locator('#project-map-btn')).toHaveText('PROJECT MAP');
   const actionOrder = await page.locator('#menu-meta-actions > button').evaluateAll((buttons) => buttons.map((button) => button.id));
   expect(actionOrder).toEqual(['last-updated-btn', 'project-map-btn']);

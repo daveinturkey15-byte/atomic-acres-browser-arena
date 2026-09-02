@@ -267,9 +267,17 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const lastReleaseLabel = (await page.locator('#last-updated-btn').textContent())?.trim() ?? '';
     const isCurrentCandidate = expectedPath === channelConfig.experimental.path;
     const expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt;
-    if (expectsPendingCandidate
-      ? lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'
-      : !lastReleaseLabel.includes('LAST RELEASE') || lastReleaseLabel.includes('PENDING_PRODUCTION')) {
+    // HF-406: the badge used to lead with an internal review acronym when pending and
+    // with the words `LAST RELEASE` when published - neither named a pass, which is how
+    // the owner read the live site as an eleven-pass-old version and how PASS 82
+    // published still stamped PASS 81. Both branches now REQUIRE the badge to lead with
+    // the pass of the channel under test, so a stale stamp fails here too, not only in
+    // the runtime eyebrow. The acronym must never return to this file as a pinned label.
+    const badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`);
+    if (!badgeLeadsWithItsPass
+      || (expectsPendingCandidate
+        ? !lastReleaseLabel.includes('RELEASE CANDIDATE')
+        : lastReleaseLabel.includes('PENDING_PRODUCTION') || lastReleaseLabel.includes('RELEASE CANDIDATE'))) {
       throw new Error(`Invalid Last Release label for ${expectedPass}: ${JSON.stringify(lastReleaseLabel)}`);
     }
     await page.locator('#last-updated-btn').click();
@@ -285,9 +293,12 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     const releasedAt = await time.getAttribute('datetime');
     const timeText = (await time.textContent())?.replace(/\s+/g, ' ').trim() ?? '';
     if (expectsPendingCandidate) {
+      // HF-406: the entry's time block used to carry the internal review acronym. It now
+      // says `RELEASE CANDIDATE` - same meaning, no internal shorthand in a player-facing
+      // surface. `NOT PUBLISHED` and the absent datetime still carry the not-live fact.
       if (releaseState !== 'LOCAL CANDIDATE' || releasedAt !== null
-        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('AWAITING OWNER HITL')) {
-        throw new Error(`${expectedPass} candidate is not explicitly pending owner HITL: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
+        || !timeText.includes('NOT PUBLISHED') || !timeText.includes('RELEASE CANDIDATE')) {
+        throw new Error(`${expectedPass} candidate is not explicitly an unpublished release candidate: ${JSON.stringify({ releaseState, releasedAt, timeText })}`);
       }
     } else if (!releasedAt || Number.isNaN(Date.parse(releasedAt)) || timeText.includes('NOT PUBLISHED')) {
       throw new Error(`${expectedPass} Last Release timestamp is not a published instant: ${JSON.stringify(releasedAt)}`);
@@ -297,6 +308,7 @@ async function verifyRuntime(page, expectedPath, expectedPass, expectedChangelog
     if (exactExpectedReleasedAt) {
       verifyProductionReleaseTimestamp({
         expectedReleasedAt: exactExpectedReleasedAt,
+        expectedPass,
         observedReleasedAt: releasedAt,
         observedLabel: lastReleaseLabel,
         observedState: releaseState,
