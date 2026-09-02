@@ -546,3 +546,31 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   and running the release-topology test AFTER the build writes
   artifacts/pipeline/release-topology.json and trips the freshness guard - build
   last, copy immediately.
+
+### HF-410 decision (21:17 BST) — Lane W viewmodel fit MERGED for PASS 86 with the 0.02 m near plane (option a)
+- Evidence (worker, branch hf410-integration-prep, docs/evidence/pass86/hf410-prep/NEAR-PLANE-DECISION.md):
+  three headless native-WebGPU capture runs x 14 authored review cameras in High Seas,
+  Map 3 and Skyline Terminal at 2560x1440; the 0.02-vs-0.08 far-half pixel delta
+  (10,924 px > 8) is 2.5x SMALLER than the same build's run-to-run noise (27,410);
+  sign-flip rate 0.0-3.5% where z-fighting would be ~50%; the only above-noise effect
+  is a ~1% uniform luminance shift on sunlit ground from depth linearisation. The
+  renderer has no reversed-depth option in use and it would not help (24-bit
+  fixed-point depth: reversed-z is a linear remap). Keeping 0.08 would give back
+  the fit's justification (42/60 poses cut by the near plane at 0.08 vs 0/60 at 0.02).
+- Arms visual gate on the fitted rig: 11 -> 2 violations, zero near-plane class left;
+  the two left are the left-sleeve shoulder entry in prone-against-wall poses.
+- Also landed: Map 3's four review cameras in the viewpoint catalog (Map 3 had shipped
+  in PASS 85 with no viewpoint coverage); pass69-3 near-plane spec + runner now derive
+  from FIRST_PERSON_CAMERA_NEAR_METERS (margin unchanged); chopper spec green headless.
+- Refuted: Lane W's "deepFreeze walk" residual - a force=true parent walk touches 0
+  nodes inside a frozen subtree (static-matrix-freeze override, measured on three r185).
+- OPEN, being fixed before the 22:20 cut (worker on branch pass86-gate-repairs): the
+  committed pass65 arms visual gate ABORTS on the fitted rig (its precondition waits for
+  the wall-pullback symptom HF-410 removes) - re-pin to the rig's contract, never weaken;
+  the pass69-3 spec fails in setup because crimson-flamethrower has no authored design
+  identity (pre-existing since it joined the roster); the two left-sleeve violations.
+- OPEN: the near-plane sweep did not cover Farcrysis, Raid, Gun Range, Nuke Town,
+  Firing Range; review cameras hardcode near 0.08 and never see a near-plane regression.
+- PROCESS: PASS 85 shipped with src/presentation-prewarm-contract.test.ts RED (a Lane Y
+  doc comment put "snapshot()" inside the endurance-telemetry region; not in any lane's
+  focused set). Fixed on integration; the PASS 86 cut runs the FULL suite.
