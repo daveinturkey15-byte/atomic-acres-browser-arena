@@ -557,14 +557,36 @@ export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   // 0.01 short, on the wrong side - and the solver's own reach adjustment
   // moves the reported entry by only a few thousandths, so the shipped lane
   // could never clear the contract. Both lanes now sit past -0.98 with real
-  // margin. Nothing else about the pose changes: the palm stays welded to the
-  // authored socket (contact error 1e-9 m), the elbow pole still supplies the
-  // raised-pose fold that HF-388 added the lifted lane for, and the raised lane
-  // is still higher than the ordinary lane so the distinction it encodes
-  // survives.
-  right: -1.02,
+  // margin, and the palm stays welded to the authored socket (contact error
+  // 1e-9 m) either way.
+  //
+  // HF-413 review correction (2026-09-02). A first attempt used right -1.02 /
+  // raised -1.00, which left HF-388's two lanes 0.02 apart where they had been
+  // 0.15 apart. `placeRiggedShoulderEntryBelowFrame` PINS the shoulder to
+  // exactly `lane - 0.01` NDC, so the gap between the lanes IS the on-screen
+  // pose difference: 0.02 NDC is 9 pixels at 900p and encodes nothing.
+  //
+  // The 0.15 spread is arithmetically unrecoverable, and that is worth writing
+  // down rather than faking. The lifted lane must itself clear the -0.98
+  // continuation floor (that is the defect being fixed), so it can be no
+  // shallower than about -0.99; restoring a 0.15 spread would put the ordinary
+  // firing lane at -1.14, deeper than the -1.12 HF-365 explicitly walked BACK
+  // from after it produced "an almost vertical support arm - a pale post". The
+  // widest honest band is therefore:
+  //
+  //   raised -0.99  (as shallow as the -0.98 floor permits, with margin)
+  //   right  -1.04  (exactly the depth HF-365 reviewed and accepted for the
+  //                  support lane, and never deeper than it)
+  //
+  // 0.05 NDC apart - one third of the original distinction, kept as wide as
+  // the contract allows, with both ends now pinned by
+  // src/hf413-arms-handedness.test.ts rather than by a nominal `raised >
+  // right`. Recovering the full HF-388 pose difference needs a lever other
+  // than lane depth (the elbow pole already carries the raised-pose fold);
+  // that is recorded as an OPEN item, not silently claimed here.
+  right: -1.04,
 });
-export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -1;
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.99;
 export function firstPersonArmShoulderEntryNdc(
   side: 'left' | 'right',
   gripFamily: ViewmodelGripFamily,
@@ -1301,6 +1323,24 @@ function viewmodelScreenDrop(camera: THREE.Camera): number {
   return THREE.MathUtils.clamp((viewmodelScreenScale(camera) - 1) * 0.18, -0.025, 0.14);
 }
 
+/**
+ * HF-413. Two properties of this call that a later change can silently break,
+ * written down because neither is visible from the call site:
+ *
+ * 1. ONE-FRAME LAG. The caller passes `this.root.position.z`, which is the
+ *    depth the viewmodel was lerped to on the PREVIOUS frame - `root.position`
+ *    is only updated further down `update()`. That is harmless today because
+ *    the Z composition does not read the melee X term, so the two never form a
+ *    feedback loop, and the depth moves by millimetres per frame. If Z is ever
+ *    made to depend on the melee lane, re-derive this from the depth being
+ *    composed on THIS frame instead.
+ * 2. FOV SOURCE. `camera` here is the world camera. If Lane W's HF-410 rework
+ *    introduces a dedicated viewmodel field of view (its own falsifier proposes
+ *    exactly that), this compensation must be handed the camera/FOV that
+ *    actually renders the viewmodel. Reading the world FOV against a viewmodel
+ *    frustum silently returns the wrong metres and the knife leaves the frame
+ *    again, with no test failing.
+ */
 function viewmodelMeleeScreenOffset(camera: THREE.Camera, depthMeters: number): number {
   if (!(camera instanceof THREE.PerspectiveCamera)) {
     return viewmodelMeleeEntryMeters(VIEWMODEL_REFERENCE_ASPECT, VIEWMODEL_REFERENCE_FOV_DEGREES, depthMeters);
