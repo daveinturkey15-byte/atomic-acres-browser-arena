@@ -14,7 +14,9 @@
 
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readLedger, resolveArenaRoster, UNMEASURED_CEILING } from './eye-clearance-roster.mjs';
+import {
+  partitionAnnotatedViolations, readLedger, resolveArenaRoster, UNMEASURED_CEILING,
+} from './eye-clearance-roster.mjs';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
@@ -32,6 +34,9 @@ const BASE = arg('--url', process.env.QA_BASE_URL ?? 'http://127.0.0.1:41975');
 const ROSTER = resolveArenaRoster(arg('--arenas', null));
 const ARENAS = ROSTER.ids;
 const PROBE_M = Number(arg('--probe', '0.15'));
+// Read once, up front: the annotations partition rows during measurement, not
+// only during the ratchet, so an exempt row is visible in every run's log.
+const LEDGER = readLedger();
 
 if (argv.includes('--check') && ROSTER.narrowed) {
   console.error(
@@ -119,12 +124,43 @@ for (const [index, arena] of ARENAS.entries()) {
     return { traces, violations };
   }, { spotList: spots, probe: PROBE_M, arenaId: arena });
 
+  // Named per-spot exemptions. The rows are still MEASURED and still written to
+  // the artifact; the annotation only decides which of them the arena ceiling
+  // is allowed to ignore, and every matched row is printed under its id so an
+  // exemption can never be silent. See annotationsForArena in the roster module.
+  const { annotations, matched, unannotated } =
+    partitionAnnotatedViolations(LEDGER, arena, result.violations);
   writeFileSync(`artifacts/qa/eye-clearance/${arena}-violations.json`,
-    JSON.stringify({ arena, probeM: PROBE_M, spotCount: spots.length, ...result }, null, 1));
+    JSON.stringify({
+      arena,
+      probeM: PROBE_M,
+      spotCount: spots.length,
+      ...result,
+      annotated: Object.fromEntries([...matched].map(([id, rows]) => [id, rows])),
+      unannotatedViolations: unannotated.length,
+    }, null, 1));
   const byStance = {};
   for (const v of result.violations) byStance[v.stance] = (byStance[v.stance] ?? 0) + 1;
-  console.log(`${arena.padEnd(18)} spots=${spots.length} traces=${result.traces} VIOLATIONS=${result.violations.length} ${JSON.stringify(byStance)}`);
-  summary.push({ arena, spots: spots.length, violations: result.violations.length, byStance });
+  console.log(
+    `${arena.padEnd(18)} spots=${spots.length} traces=${result.traces}`
+    + ` VIOLATIONS=${result.violations.length}`
+    + ` (unannotated ${unannotated.length}) ${JSON.stringify(byStance)}`,
+  );
+  for (const annotation of annotations) {
+    const rows = matched.get(annotation.id);
+    console.log(`  [annotation ${annotation.id}] ${rows.length}/${annotation.maxRows} rows - ${annotation.class}`);
+    for (const row of rows) {
+      console.log(`      ${row.surface} ${row.stance} d=${row.distance} at (${row.x}, ${row.eyeY}, ${row.z})`);
+    }
+  }
+  summary.push({
+    arena,
+    spots: spots.length,
+    violations: result.violations.length,
+    unannotated: unannotated.length,
+    annotated: Object.fromEntries([...matched].map(([id, rows]) => [id, rows.length])),
+    byStance,
+  });
 
   // Back to menu for the next arena.
   await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=eyesweep&previewTime=0`,
@@ -138,8 +174,40 @@ await browser.close();
 // Ratchet: measured violation counts may only hold or shrink against the committed
 // ledger. Growth is a regression in collider/visual agreement and fails loudly.
 if (argv.includes('--check')) {
-  const ledger = readLedger();
+  const ledger = LEDGER;
   let failed = false;
+
+  // Annotations first, because an exemption that is stale, over-subscribed or
+  // pointed at an arena nobody measures is itself a gate failure - the "frozen
+  // list quietly outlives the thing it described" trap this file has hit three
+  // times. Checked against the FULL roster, not the rows that happened to run.
+  const measuredRows = new Map(summary.map((row) => [row.arena, row]));
+  for (const annotation of ledger.annotations ?? []) {
+    if (!ROSTER.full.includes(annotation.arena)) {
+      console.error(
+        `[eye-clearance] annotation ${annotation.id} names arena ${annotation.arena}, which is not selectable`,
+      );
+      failed = true;
+      continue;
+    }
+    const row = measuredRows.get(annotation.arena);
+    if (!row) continue; // the coverage check below already fails this arena.
+    const hits = row.annotated?.[annotation.id] ?? 0;
+    if (hits === 0) {
+      console.error(
+        `[eye-clearance] annotation ${annotation.id} matched NO measured row on ${annotation.arena}. `
+        + 'A per-spot exemption that describes nothing is stale: delete it, or explain what changed. '
+        + 'It must never sit here quietly forgiving rows that no longer exist.',
+      );
+      failed = true;
+    } else if (hits > annotation.maxRows) {
+      console.error(
+        `[eye-clearance] annotation ${annotation.id}: ${hits} rows > maxRows ${annotation.maxRows} - REGRESSED. `
+        + 'An annotation is a ratchet too; it may hold or shrink, never grow.',
+      );
+      failed = true;
+    }
+  }
 
   // A ratchet that only inspects the rows it happened to measure can never
   // notice the rows it skipped. Coverage is checked against the roster first.
@@ -164,8 +232,13 @@ if (argv.includes('--check')) {
       failed = true;
       continue;
     }
-    if (row.violations > ceiling) {
-      console.error(`[eye-clearance] ${row.arena}: ${row.violations} violations > ceiling ${ceiling} - REGRESSED`);
+    // The ceiling judges the rows nothing explains. Annotated rows were already
+    // capped and staleness-checked above, by surface name, under their own id.
+    if (row.unannotated > ceiling) {
+      console.error(
+        `[eye-clearance] ${row.arena}: ${row.unannotated} unannotated violations > ceiling ${ceiling}`
+        + ` (${row.violations} measured, ${row.violations - row.unannotated} annotated) - REGRESSED`,
+      );
       failed = true;
     }
   }

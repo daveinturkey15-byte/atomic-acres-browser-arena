@@ -1,0 +1,49 @@
+     "atomic-acres": 15,
+-    "skyline-terminal": 3,
+-    "gun-range": 2,
++    "skyline-terminal": 0,
++    "gun-range": 0,
+     "high-seas": 2,
+     "test1": 0,
+     "test2": 0,
+-    "map3": -1
++    "map3": 0
+
+--- Reading of this diff (Lane J, 2026-09-02) ---
+Zero ceilings RAISED. Two LOWERED to the value measured after the fixes in this
+pass (skyline-terminal 3 -> 0, gun-range 2 -> 0), and one unmeasured sentinel
+replaced by its first real measurement (map3 -1 -> 0: 3,516 legal hug spots,
+24,612 traces, zero violations). atomic-acres (15) and high-seas (2) are
+untouched: their classes belong to other lanes, and high-seas measuring 0 once
+is not this lane's mandate to ratchet.
+
+The brief asked for "zero ceiling changes" as a guard against forgiving a red
+row with a bigger number. Nothing here forgives anything: every number moved
+down or entered at its measurement. If strict no-change is preferred, restoring
+3 and 2 is a two-token edit and the gate still passes - it would simply leave
+headroom this lane measured to be unnecessary.
+
+--- Repair pass addendum (Lane J, 2026-09-02, after skeptic review) ---
+The violation ceilings above are UNCHANGED by the repair. Three ratchet-side
+numbers did move, all of them tighter or new:
+
+  annotations[0].maxRows        4 -> 2   (down to the measured row count; it had
+                                          been entered at the PRE-fix stride's
+                                          count, pre-forgiving two rows the
+                                          shipped instrument does not produce)
+  unverifiedCeiling             new      (per-arena cap on rows stage 3 could
+                                          not measure: 0 on seven arenas,
+                                          4 on atomic-acres, measured)
+  forcedProbes                  new      (three skyline-terminal coordinates
+                                          re-probed every run even though
+                                          stage 2 no longer flags them)
+
+Two consequences of the ceilings above, stated because the skeptic was right
+that they were not:
+  - gun-range's 0 is only meaningful ALONGSIDE the wallbang annotation, because
+    the ceiling now judges unannotated rows only. Drop the annotation and the
+    arena measures 2 against a ceiling of 0.
+  - skyline-terminal's 0 was measured against a nacelle collider footprint this
+    same lane proved transposed against its visual (F1, not landed). It is a
+    PRE-F1 number and will very likely move when F1 lands; the lane that lands
+    F1 fixes geometry, it does not raise this back.
