@@ -228,3 +228,23 @@ worktree's `artifacts/lane-report.md`, skeptic verdicts alongside, and
 - Farcrysis load path (Lane C): **VERIFIED, hidden** — admits in 38-39 s
   (was: never), 0 in-combat pipelines; still not inside the 12 s fence;
   Lane R makes it a playable preview.
+
+### Live smoothness, like-for-like (headless gate, atomic-acres, 120 s, same quiet window, 15:39-15:57 BST)
+
+| channel | browser | mean fps | 5% low | worst stall | frozen % | stalls/min · median |
+|---|---|---|---|---|---|---|
+| PASS 83 | Chrome | 74.6 | 36.6 | 114 ms | 1.94 | 15.5 · 74 ms |
+| PASS 83 | Edge | 76.7 | 36.5 | 104 ms | 1.85 | 15 · 70 ms |
+| PASS 84 | Chrome | 80.6 | 40.7 | 114 ms | 1.88 | 15 · 71 ms |
+| PASS 84 | Edge | 81.0 | 39.4 | 105 ms | 1.85 | 15.5 · 69 ms |
+
+PASS 84 is equal or better than PASS 83 on every metric (+8% mean fps, +11%
+5% low, same worst stall, same frozen fraction): **no regression, PASS 84
+stays live.** Both channels fail the gate's 0.5% frozen ceiling on a
+pre-existing class: a ~70 ms main-thread hitch about every 2-4 s (15/min) in
+both Chromium engines. Lane T (`docs/pass84-lanes/LANE-T-periodic-stall-root-cause.md`)
+owns its root cause for PASS 85. The earlier contested window (38 fps, 322 ms,
+8.75% frozen) ran while the owner's ComfyUI was generating and the chopper lane
+was riding; it is void. "errors 1+0" in every row is the gate's death-induction
+hook (`damageLocalPlayer`) not being present in the shipped debug API, not a
+page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
