@@ -13,6 +13,7 @@
 //
 // Usage: node scripts/qa/measure-arena-fps.mjs [--arenas a,b] [--seconds 8]
 import { chromium } from '@playwright/test';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -21,7 +22,11 @@ const arg = (name, fallback) => {
 };
 
 const BASE = arg('--url', 'http://127.0.0.1:41876');
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas')
+// PASS 85 Lane N: this default was a hardcoded six-arena literal, so Test1,
+// Test2 and Map 3 were never swept by it and nothing said so. It is now
+// derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
+// superset of what it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 const SECONDS = Number(arg('--seconds', '8'));
 const WIDTH = Number(arg('--width', '1920'));

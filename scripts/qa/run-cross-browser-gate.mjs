@@ -42,32 +42,13 @@ const arg = (name, fallback) => {
 };
 const list = (value) => value.split(',').map((entry) => entry.trim()).filter(Boolean);
 
-// Owner 2026-08-30: same fix as verify-cross-browser-matrix.mjs. A hardcoded
-// arena list here meant test1/test2 were never opened in any browser by the
-// gate; deriving it from the source roster makes new arenas covered by default.
-const MINIMUM_SELECTABLE_ARENAS = 7;
-
-function selectableArenaIds() {
-  const source = readFileSync(resolve(HERE, '../../src/map-selection.ts'), 'utf8');
-  const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
-  const found = [...body.matchAll(/id:\s*'([a-z0-9-]+)'\s*as const/g)];
-  const ids = [];
-  for (let i = 0; i < found.length; i += 1) {
-    const start = found[i].index;
-    const end = i + 1 < found.length ? found[i + 1].index : body.length;
-    if (!/selectable:\s*false/.test(body.slice(start, end))) ids.push(found[i][1]);
-  }
-  // Floor, not just a non-empty check. A regex that PARTIALLY stops matching -
-  // say the entry shape changes for newly added arenas only - yields a SHORT
-  // roster, which an `ids.length === 0` guard waves straight through while the
-  // gate quietly stops covering the newest maps. That is the exact failure this
-  // derivation exists to prevent, so the floor tracks the real roster size.
-  if (ids.length < MINIMUM_SELECTABLE_ARENAS) {
-    throw new Error(`cross-browser gate: derived only ${ids.length} selectable arenas from src/map-selection.ts (expected at least ${MINIMUM_SELECTABLE_ARENAS}); the scrape is stale`);
-  }
-  return ids;
-}
-
+// Owner 2026-08-30 fixed a hardcoded six-arena list here. PASS 85 Lane N moved
+// the derivation into scripts/qa/arena-roster.mjs, because the same scrape had
+// been copy-pasted into three files and three copies of a fragile regex is the
+// original failure one level up. The floor now lives with the derivation and
+// tracks the real roster (8 selectable arenas since Map 3 shipped; this file
+// still said 7).
+import { selectableArenaIds } from './arena-roster.mjs';
 
 const BASE = arg('--url', 'http://127.0.0.1:41876');
 const ARENAS = arg('--arenas', selectableArenaIds().join(','));
