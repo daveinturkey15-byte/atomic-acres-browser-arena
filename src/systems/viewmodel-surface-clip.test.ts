@@ -3,11 +3,14 @@ import type { Box2, Point3 } from '../collision';
 import {
   VIEWMODEL_SURFACE_CLIP_BIAS_METERS,
   VIEWMODEL_SURFACE_CLIP_BOTTOM_FACE_MINIMUM_RISE_METERS,
+  VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION,
+  VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS,
   VIEWMODEL_SURFACE_CLIP_GROUND_REACH_METERS,
   VIEWMODEL_SURFACE_CLIP_PLANE_COUNT,
   VIEWMODEL_SURFACE_CLIP_REACH_METERS,
   VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS,
   separatingFaceFor,
+  viewmodelSurfaceClipAppliedBias,
   viewmodelSurfaceClipPlanes,
 } from './viewmodel-surface-clip';
 
@@ -257,11 +260,33 @@ describe('the ground plane, which no collider box can describe', () => {
     })).toHaveLength(0);
   });
 
-  it('ignores a ground reference level with the rig', () => {
-    // Mid-jump the eye can be within the rig's own hang of the last floor; a
-    // plane there would cut the weapon's underside in open air.
+  it('has its own minimum drop, not the box-top constant it used to borrow', () => {
+    // REVIEW REPAIR (HF-395). The ground gate used
+    // VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS (0.5 m), a number
+    // measured for BOX TOPS beside the rig. It is the wrong question for the
+    // standing surface: a box top level with the rig is not a separating face,
+    // while the floor is a fixed world height that cuts exactly what is under
+    // it however low the eye gets. Measured prone eye is 0.762 m above its
+    // floor, so the borrowed 0.5 m left only 0.26 m before a landing dip, view
+    // bob or camera shake silently DROPPED the floor plane for those frames.
+    expect(VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS)
+      .toBeLessThan(VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS);
+    // A dip to 0.45 m - inside the old gate's dead zone - now keeps its floor.
+    const dipped = viewmodelSurfaceClipPlanes({ eye: { x: 0, y: 0.45, z: 0 }, colliders: [], groundPlaneY: 0 });
+    expect(dipped, 'the floor plane survives a landing dip').toHaveLength(1);
+    expect(dipped[0]!.normal).toEqual({ x: 0, y: 1, z: 0 });
+    // ...and it still cuts under the floor rather than through the rig.
+    expect(signedDistance(dipped[0]!, { x: 0, y: -0.05, z: 0 })).toBeLessThan(0);
+    expect(signedDistance(dipped[0]!, { x: 0, y: 0.2, z: 0 })).toBeGreaterThan(0);
+  });
+
+  it('ignores a ground reference the eye has all but reached', () => {
+    // Below the minimum drop the reference is level with the eye and stale:
+    // a plane there is describing a floor the player is no longer above.
     expect(viewmodelSurfaceClipPlanes({
-      eye: { x: 0, y: VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS - 0.05, z: 0 }, colliders: [], groundPlaneY: 0,
+      eye: { x: 0, y: VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS - 0.02, z: 0 },
+      colliders: [],
+      groundPlaneY: 0,
     })).toHaveLength(0);
   });
 
@@ -283,5 +308,89 @@ describe('the ground plane, which no collider box can describe', () => {
     // Four walls and the floor: five distinct normals, all kept.
     expect(planes.length).toBe(5);
     expect(planes.some((plane) => plane.normal.y === 1), 'the floor survives the cull').toBe(true);
+  });
+});
+
+describe('no returned plane may ever cut the eye - the rig-erasure guard', () => {
+  // REVIEW REPAIR (HF-395, 2026-09-02). The measured failure this exists for:
+  // 72 of 327 poses in the after-run reported clippedVertices 15577 of 15577 -
+  // the ENTIRE viewmodel discarded. The instrument cannot tell that apart from
+  // a perfect clip: a rig that is not drawn at all reports 0 m penetration and
+  // 0 m below the floor. Nearly every vertex of the rig sits within a metre of
+  // the eye, so the cheap sufficient condition is that the eye itself is always
+  // strictly on the kept side of every plane, with clearance.
+
+  it('applies the full bias when there is room and never more than half the clearance', () => {
+    expect(viewmodelSurfaceClipAppliedBias(1)).toBeCloseTo(VIEWMODEL_SURFACE_CLIP_BIAS_METERS, 9);
+    expect(viewmodelSurfaceClipAppliedBias(0.5)).toBeCloseTo(VIEWMODEL_SURFACE_CLIP_BIAS_METERS, 9);
+    // Below twice the bias the clamp takes over, in proportion.
+    expect(viewmodelSurfaceClipAppliedBias(0.005))
+      .toBeCloseTo(0.005 * VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION, 9);
+    expect(viewmodelSurfaceClipAppliedBias(0)).toBe(0);
+  });
+
+  it('keeps the eye when a wall is closer to it than the z-fight bias', () => {
+    // THE DEFECT, stated as geometry. The eye is 5 mm outside the wall's face;
+    // an unclamped 12 mm bias put the plane 7 mm PAST the eye, so the kept
+    // half-space contained neither the eye nor any of the rig hanging round it.
+    const brushing: Box2 = { minX: 0.005, maxX: 0.4, minZ: -20, maxZ: 20, minY: 0, maxY: 3 };
+    const plane = separatingFaceFor(brushing, EYE)!;
+    expect(plane.normal).toEqual({ x: -1, y: 0, z: 0 });
+    expect(signedDistance(plane, EYE), 'the eye is on the kept side').toBeGreaterThan(0);
+    // ...and the plane still sits between the eye and the wall face, so the
+    // geometry genuinely inside the wall is still cut.
+    expect(signedDistance(plane, { x: 0.2, y: 1.7, z: 0 })).toBeLessThan(0);
+  });
+
+  it('holds the eye clearance for every face, at every approach distance', () => {
+    for (const gap of [0.0001, 0.001, 0.005, 0.011, 0.012, 0.013, 0.05, 0.3, 1.0]) {
+      for (const box of [
+        { minX: gap, maxX: gap + 0.3, minZ: -20, maxZ: 20, minY: 0, maxY: 3 },
+        { minX: -20, maxX: -gap, minZ: -20, maxZ: 20, minY: 0, maxY: 3 },
+        { minX: -20, maxX: 20, minZ: gap, maxZ: gap + 0.3, minY: 0, maxY: 3 },
+        { minX: -20, maxX: 20, minZ: -20, maxZ: -gap, minY: 0, maxY: 3 },
+      ] as Box2[]) {
+        const eye: Point3 = { x: 0, y: 1.7, z: 0 };
+        const plane = separatingFaceFor(box, eye);
+        if (!plane) continue;
+        expect(signedDistance(plane, eye), `gap ${gap} m, normal ${normalKey(plane)}`)
+          .toBeGreaterThanOrEqual(plane.eyeDistanceMeters * VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION - 1e-12);
+      }
+    }
+  });
+
+  it('keeps a ball around the eye whatever the frame throws at it', () => {
+    // Deterministic pseudo-random boxes: the point is coverage of the plane
+    // SET, including opposed normals that could otherwise empty the frame.
+    let seed = 20260902;
+    const random = (): number => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    const eye: Point3 = { x: 0, y: 1.7, z: 0 };
+    for (let trial = 0; trial < 400; trial += 1) {
+      const colliders: Box2[] = Array.from({ length: 1 + Math.floor(random() * 6) }, () => {
+        const cx = (random() - 0.5) * 3;
+        const cz = (random() - 0.5) * 3;
+        const cy = random() * 3;
+        return {
+          minX: cx, maxX: cx + 0.1 + random(),
+          minZ: cz, maxZ: cz + 0.1 + random(),
+          minY: cy, maxY: cy + 0.1 + random() * 2,
+        };
+      });
+      const groundPlaneY = random() < 0.5 ? (random() * 2.4) : null;
+      const planes = viewmodelSurfaceClipPlanes({ eye, colliders, groundPlaneY });
+      expect(planes.length).toBeLessThanOrEqual(VIEWMODEL_SURFACE_CLIP_PLANE_COUNT);
+      let smallest = Number.POSITIVE_INFINITY;
+      for (const plane of planes) {
+        const distance = signedDistance(plane, eye);
+        expect(distance, `trial ${trial}: a plane cut the eye`).toBeGreaterThan(0);
+        smallest = Math.min(smallest, distance);
+      }
+      // The eye survives with clearance, so a ball of that radius round it
+      // survives too: the frame is never empty at the camera.
+      if (planes.length > 0) expect(smallest).toBeGreaterThan(0);
+    }
   });
 });

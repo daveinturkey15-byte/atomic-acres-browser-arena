@@ -58,11 +58,23 @@
  *    was dropped. Planes with the same normal are nested half-spaces, so only
  *    the nearest one can ever matter: one plane per axis-aligned normal, and
  *    six slots so nothing is ever dropped. Six is still a FIXED count.
+ *
+ * HF-395 REPAIR (2026-09-02), after review: the z-fight bias was applied at its
+ * full 12 mm however close the face was, so a face the eye was 5 mm outside of
+ * produced a plane 7 mm PAST the eye. The kept half-space then excluded the eye
+ * itself, and with it every vertex of a rig that hangs around the eye - the
+ * whole weapon vanishes while brushing a wall. The bias is now clamped to half
+ * the eye's own distance outside the face, which makes
+ *
+ *     signedDistance(plane, eye) >= eyeDistanceMeters / 2 > 0
+ *
+ * an invariant of every plane this module returns, for every input. See
+ * `viewmodel-surface-clip.test.ts`, "never returns a plane that cuts the eye".
  */
 
 import type { Box2, Point3 } from '../collision';
 
-export const VIEWMODEL_SURFACE_CLIP_CONTRACT = 'viewmodel-surface-aligned-clip-v2' as const;
+export const VIEWMODEL_SURFACE_CLIP_CONTRACT = 'viewmodel-surface-aligned-clip-v3' as const;
 
 /**
  * How many surface planes the rig can be cut by at once.
@@ -123,6 +135,49 @@ export const VIEWMODEL_SURFACE_CLIP_BOTTOM_FACE_MINIMUM_RISE_METERS = 0.12;
  * which z-fights. A small bias also hides the seam where the cut meets the wall.
  */
 export const VIEWMODEL_SURFACE_CLIP_BIAS_METERS = 0.012;
+
+/**
+ * The most of the eye's own distance outside a face the bias may consume.
+ *
+ * A plane must never cross the eye. Every vertex of the rig sits within about a
+ * metre of the eye and the great majority of them hang directly around it, so a
+ * half-space that excludes the eye excludes essentially the whole weapon: this
+ * is the "the gun disappeared" failure, not a clip. Taking at most half of the
+ * measured clearance leaves the eye on the kept side by at least the other half,
+ * whatever the geometry, while still biasing the cut out of the solid in every
+ * case where there is room for the full 12 mm.
+ */
+export const VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION = 0.5;
+
+/**
+ * How far the eye must have risen above the tracked standing surface before
+ * that surface is treated as the floor the rig can reach.
+ *
+ * This used to borrow `..._TOP_FACE_MINIMUM_DEPTH_METERS` (0.5 m), a number
+ * measured for BOX TOPS beside the rig, which is a different question: a box
+ * top level with the rig is not a separating face at all, whereas the standing
+ * surface is a horizontal plane at a fixed world height and cuts exactly what
+ * is under the floor no matter how low the eye is. The only thing the minimum
+ * has to exclude is a STALE reference - a floor the player has left. Measured
+ * (`artifacts/qa/hf395/diagnose-after-v2-carbine.json`) the lowest real eye is
+ * prone at 0.762 m above its floor, so 0.15 m keeps 0.6 m of margin for a
+ * landing dip, view bob or camera shake that the borrowed 0.5 m did not have.
+ */
+export const VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS = 0.15;
+
+/**
+ * The plane offset actually applied for a face the eye is `outside` metres
+ * clear of: the z-fight bias, never more than half that clearance.
+ *
+ * Returned separately from the plane so the tests can state the invariant in
+ * the same terms the module computes it.
+ */
+export function viewmodelSurfaceClipAppliedBias(outsideMeters: number): number {
+  return Math.min(
+    VIEWMODEL_SURFACE_CLIP_BIAS_METERS,
+    outsideMeters * VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION,
+  );
+}
 
 export type ViewmodelSurfacePlane = Readonly<{
   /** Unit outward normal of the chosen face; the KEPT half-space contains the eye. */
@@ -205,7 +260,10 @@ export function separatingFaceFor(box: Box2, eye: Point3): ViewmodelSurfacePlane
     // The plane sits on the face, biased toward the eye by the z-fight margin.
     // normal . p + constant = 0 with the kept side positive, so the constant is
     // the negated face coordinate along the normal.
-    const facePosition = bound + sign * VIEWMODEL_SURFACE_CLIP_BIAS_METERS;
+    // Clamped so the plane can never reach the eye: see
+    // VIEWMODEL_SURFACE_CLIP_EYE_CLEARANCE_FRACTION. Full 12 mm whenever the
+    // face is more than 24 mm away, which is every ordinary frame.
+    const facePosition = bound + sign * viewmodelSurfaceClipAppliedBias(outside);
     best = Object.freeze({
       normal: Object.freeze(normal),
       constant: -(sign * facePosition),
@@ -285,12 +343,13 @@ export function viewmodelSurfaceClipPlanes(input: Readonly<{
   if (groundY !== null && groundY !== undefined && Number.isFinite(groundY)) {
     const above = input.eye.y - groundY;
     // Below its own floor means the reference is stale - walked downstairs,
-    // dropped off a ledge. A plane there would cut the whole rig. Nearer than
-    // the rig's hang means the reference is level with the rig, same answer.
-    if (above >= VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS && above <= groundReach) {
+    // dropped off a ledge. A plane there would cut the whole rig. The minimum
+    // is the ground's OWN (see VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS),
+    // not the box-top constant it used to borrow.
+    if (above >= VIEWMODEL_SURFACE_CLIP_GROUND_MINIMUM_DROP_METERS && above <= groundReach) {
       offer(Object.freeze({
         normal: Object.freeze({ x: 0, y: 1, z: 0 }),
-        constant: -(groundY - VIEWMODEL_SURFACE_CLIP_BIAS_METERS),
+        constant: -(groundY - viewmodelSurfaceClipAppliedBias(above)),
         eyeDistanceMeters: above,
       }));
     }
