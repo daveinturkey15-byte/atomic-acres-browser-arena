@@ -182,8 +182,13 @@ export function measureLayout(id: string, arena: ArenaMap): LayoutMetrics {
     open[index] = 1;
     queue.push(index);
   };
+  // SPAWNS ONLY. Seeding from patrol points as well was a hole in the
+  // falsifier: a walled-off pocket that happened to contain a patrol point
+  // would have been counted accessible and would have flattered fillFraction,
+  // roofedFraction and pocketFraction. Patrol points are an ASSERTION TARGET
+  // instead: scripts/qa/raid2-reachability.ts asserts that every patrol point
+  // lands on a surface a real traversal reaches, and the fidelity test gates it.
   for (const team of Object.values(arena.spawns)) for (const point of team) seed(point);
-  for (const point of arena.patrolPoints) seed(point);
   while (queue.length > 0) {
     const index = queue.pop()!;
     const i = Math.floor(index / nz);
