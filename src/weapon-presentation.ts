@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { VIEWMODEL_SHADOW_BUDGET_SCOPE } from './rendering/runtime-shadow-budget';
 import { presentationRandom } from './runtime-random';
+import {
+  VIEWMODEL_BODY_FIT_CONTRACT,
+  VIEWMODEL_BODY_FIT_SCALE,
+  VIEWMODEL_OVERLAY_NEAR_METERS,
+  viewmodelBodyFitLightDistance,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+  viewmodelWorldToRigMeters,
+} from './viewmodel-body-fit';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
 import {
@@ -715,8 +724,20 @@ export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
  * HF-397 (2026-09-02): the owner asked for the near-wall pullback to be
  * halved. Multiplies the clamped surface retreat at its single application
  * site; the raw probed value still feeds telemetry and the clip planes.
+ *
+ * HF-410 (2026-09-02, owner: "holding it up when near floor or prone or walls
+ * is super bad, needs a re work"): halving it was not enough, and the reason is
+ * that the pullback was never the right instrument. It existed to drag a rig
+ * that hung up to 1.6 m outside the player's own 0.38 m collision capsule back
+ * out of the wall it was necessarily inside - a job that needed ~1.6 m of
+ * travel and had 0.28 m of budget. The rig is now fitted INSIDE that capsule
+ * (src/viewmodel-body-fit.ts), measured at 0.316 m radial against a 0.38 m
+ * radius, so there is no wall for it to be pulled out of and the pullback is
+ * zero. The retreat is still probed, still reported in telemetry, and the
+ * clamp above it is untouched, so nothing here is a weakened bound: the
+ * multiplier is zero because the geometry no longer needs it.
  */
-export const VIEWMODEL_WALL_PULLBACK_SCALE = 0.5;
+export const VIEWMODEL_WALL_PULLBACK_SCALE = 0;
 
 /**
  * Maximum camera-space wall retreat that still keeps the armed hands/stock
@@ -954,16 +975,6 @@ export type ViewmodelContactFold = Readonly<{
    */
   clipPlaneDistanceMeters: number | null;
 }>;
-
-/**
- * The camera's near plane where the camera has one. A viewmodel is always
- * mounted on a perspective camera in the live runtime; headless tests hand in
- * a bare Camera, and a conservative default keeps the solve honest there.
- */
-function viewmodelCameraNearMeters(camera: THREE.Camera): number {
-  const near = (camera as THREE.PerspectiveCamera).near;
-  return Number.isFinite(near) && near > 0 ? near : 0.05;
-}
 
 // Retained scratch for the once-per-weapon bounds measurement.
 const rigBoundsToRoot = new THREE.Matrix4();
@@ -1777,6 +1788,16 @@ export class WeaponPresentation {
     'explosive-crossbow',
     'railgun',
   ]);
+  /**
+   * HF-410: the body fit. One uniform scale about the eye, sitting between
+   * the camera and the rig, so that every pose the presentation composes -
+   * bob, sway, recoil, reload, melee, stance, contact - stays authored in
+   * the frame it was measured and tuned in, and the whole composed result
+   * lands inside the player's own collision capsule. A perspective
+   * projection is invariant under a uniform scale about its centre, so the
+   * rendered image does not move; see src/viewmodel-body-fit.ts.
+   */
+  readonly bodyFitRoot = new THREE.Group();
   readonly root = new THREE.Group();
   /**
    * The single camera-facing plane that cuts the rig at the contacting
@@ -2087,8 +2108,15 @@ export class WeaponPresentation {
     clippingRoot.clipShadows = false;
     clippingRoot.clippingPlanes = [this.contactClipPlane, ...this.surfaceClipPlanes];
     this.root.userData.viewmodelContactClipContract = VIEWMODEL_CONTACT_CLIP_CONTRACT;
-    camera.add(this.root);
-    this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, 3.2, 2);
+    this.bodyFitRoot.name = 'viewmodel-body-fit';
+    this.bodyFitRoot.userData.viewmodelBodyFitContract = VIEWMODEL_BODY_FIT_CONTRACT;
+    this.bodyFitRoot.scale.setScalar(VIEWMODEL_BODY_FIT_SCALE);
+    camera.add(this.bodyFitRoot);
+    this.bodyFitRoot.add(this.root);
+    // HF-410: viewmodel-only lights live inside the fit, so their world
+    // radius and physical intensity move with it. Without this the rig
+    // would be lit as though the fill lamp were 1/k times closer.
+    this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, viewmodelBodyFitLightDistance(3.2), 2);
     this.viewmodelFill.name = 'first-person-viewmodel-fill';
     this.viewmodelFill.position.set(0.12, 0.66, 0.4);
     this.viewmodelFill.castShadow = false;
@@ -2101,7 +2129,7 @@ export class WeaponPresentation {
     // without flattening the metal/fabric response or touching world lighting.
     this.viewmodelFill.userData.authoredIntensity = flattenMaterials
       ? 0
-      : FIRST_PERSON_VIEWMODEL_FILL_INTENSITY;
+      : viewmodelBodyFitLightIntensity(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY);
     this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -2404,7 +2432,7 @@ export class WeaponPresentation {
     this.passiveKnife.add(passiveKnifeModel);
     this.passiveKnife.visible = false;
     this.root.add(this.passiveKnife);
-    this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
+    this.muzzleLight = new THREE.PointLight(0xffc36a, 0, viewmodelBodyFitLightDistance(4.5), 2);
     this.muzzleLight.name = 'first-person-muzzle-light';
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
@@ -2862,7 +2890,7 @@ export class WeaponPresentation {
       updateImportedWeapon(model, 1 / 60);
       this.muzzleFlash.visible = true;
       this.muzzleLight.visible = true;
-      this.muzzleLight.intensity = 1;
+      this.muzzleLight.intensity = viewmodelBodyFitLightIntensity(1);
       if (id === 'flamethrower') {
         this.enforceNearPlaneClearance(model, this.root.getObjectByName('first-person-arms'));
         this.flamethrowerHeldFireClearancePrewarmChecks += 1;
@@ -3554,7 +3582,12 @@ export class WeaponPresentation {
 
   private applyViewmodelContactClip(): void {
     const clippingRoot = this.root as ViewmodelClippingRoot;
-    const surfaceMeters = this.contactFold.clipPlaneDistanceMeters;
+    // HF-410: the solve now works in rig metres (its depth inputs are
+    // converted on the way in), and this plane is placed in world space.
+    const solvedMeters = this.contactFold.clipPlaneDistanceMeters;
+    const surfaceMeters = solvedMeters === null || !Number.isFinite(solvedMeters)
+      ? solvedMeters
+      : viewmodelRigToWorldMeters(solvedMeters);
     if (surfaceMeters === null || !Number.isFinite(surfaceMeters)) {
       // Park the plane instead of disarming the group - see the constructor.
       // Disabling would flip every viewmodel material's shader permutation and
@@ -3562,9 +3595,12 @@ export class WeaponPresentation {
       this.parkViewmodelContactClip();
       return;
     }
-    const nearPlane = viewmodelCameraNearMeters(this.camera);
+    // HF-410: this plane is placed in WORLD metres, and the plane that can
+    // actually clip the rig is the overlay's, not the gameplay camera's.
+    // The clearance is authored in rig metres, so it converts.
+    const nearPlane = VIEWMODEL_OVERLAY_NEAR_METERS;
     const cutMeters = Math.max(
-      nearPlane + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+      nearPlane + viewmodelRigToWorldMeters(VIEWMODEL_NEAR_PLANE_CLEARANCE),
       surfaceMeters - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS,
     );
     this.camera.updateWorldMatrix(true, false);
@@ -3670,14 +3706,23 @@ export class WeaponPresentation {
     const y = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
     const z = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend)
       - VIEWMODEL_NEAR_PLANE_CLEARANCE;
+    // HF-410: THE ENVELOPE IS THE PROBE'S REACH, AND THE PROBE IS WORLD SPACE.
+    //
+    // Every number above is composed in the rig's own frame; the body fit
+    // then scales that frame about the eye. The consumer (the contact probe
+    // lattice in legacy-main) casts real world rays, so it must be handed
+    // the volume the rig REALLY occupies. This conversion is the whole
+    // reason the wall lift and the high-ready fold stop appearing on normal
+    // poses: with the rig inside the capsule, a probe sized to it cannot
+    // reach a surface the capsule is allowed to stand next to.
     return Object.freeze({
       contract: VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
       weapon: this.active,
-      minX: x + bounds.minX * scale,
-      maxX: x + bounds.maxX * scale,
-      minY: y + bounds.minY * scale,
-      maxY: y + bounds.maxY * scale,
-      forwardReachMeters: -(z + bounds.minZ * scale),
+      minX: viewmodelRigToWorldMeters(x + bounds.minX * scale),
+      maxX: viewmodelRigToWorldMeters(x + bounds.maxX * scale),
+      minY: viewmodelRigToWorldMeters(y + bounds.minY * scale),
+      maxY: viewmodelRigToWorldMeters(y + bounds.maxY * scale),
+      forwardReachMeters: viewmodelRigToWorldMeters(-(z + bounds.minZ * scale)),
     });
   }
 
@@ -4150,7 +4195,9 @@ export class WeaponPresentation {
     this.shotsPresented += 1;
     this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
     this.shotStarted = performance.now();
-    this.muzzleLight.intensity = this.flattenMaterials ? 0 : 4.8 * WEAPONS[this.active].muzzleFlashScale;
+    this.muzzleLight.intensity = this.flattenMaterials
+      ? 0
+      : viewmodelBodyFitLightIntensity(4.8 * WEAPONS[this.active].muzzleFlashScale);
     this.muzzleFlash.visible = true;
     this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;
@@ -4523,7 +4570,11 @@ export class WeaponPresentation {
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
-      raycaster.near = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0;
+      // HF-410: the fitted rig spans roughly 0.02-0.32 m from the eye, well
+      // inside the gameplay camera's 0.08 m near plane. This probe measures the
+      // rig, so it uses the plane the rig is actually drawn with - the
+      // overlay's - or it would report every aperture as empty.
+      raycaster.near = VIEWMODEL_OVERLAY_NEAR_METERS;
       raycaster.far = this.camera instanceof THREE.PerspectiveCamera ? this.camera.far : Number.POSITIVE_INFINITY;
       const samples = offsets.map(([label, x, y]) => {
         raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
@@ -4678,10 +4729,14 @@ export class WeaponPresentation {
         weapon: weaponWorldBounds,
       },
       armFraming: arms?.visible
-        ? measureCameraFraming(arms, this.camera, isAuthoredArmMesh)
+        ? measureCameraFraming(arms, this.camera, isAuthoredArmMesh, VIEWMODEL_OVERLAY_NEAR_METERS)
         : null,
-      weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
-      meleeKnifeFraming: this.meleeKnife.visible ? measureCameraFraming(this.meleeKnife, this.camera) : null,
+      weaponFraming: model?.visible
+        ? measureCameraFraming(model, this.camera, undefined, VIEWMODEL_OVERLAY_NEAR_METERS)
+        : null,
+      meleeKnifeFraming: this.meleeKnife.visible
+        ? measureCameraFraming(this.meleeKnife, this.camera, undefined, VIEWMODEL_OVERLAY_NEAR_METERS)
+        : null,
       viewmodelViewport: {
         aspect: this.camera instanceof THREE.PerspectiveCamera ? this.camera.aspect : null,
         fov: this.camera instanceof THREE.PerspectiveCamera ? this.camera.fov : null,
@@ -5490,7 +5545,49 @@ export class WeaponPresentation {
     if (diagnostics) this.riggedArmDiagnostics = diagnostics;
   }
 
+  /**
+   * HF-410 - THE FIT IS A PRESENTATION TRANSFORM, AND THE SOLVE IS NOT INSIDE IT.
+   *
+   * The body fit (src/viewmodel-body-fit.ts) is a uniform scale about the eye
+   * carried by `bodyFitRoot`. Everything below solves in WORLD space against
+   * AUTHORED METRE CONSTANTS - the arm IK's 0.1 m shoulder drop and its socket
+   * reach, the near-plane clearance push, the ADS sight centring - and those
+   * constants were measured against an unfitted rig. Solving inside the fit
+   * would silently multiply every one of them by 1/k.
+   *
+   * So the rig is posed in exactly the frame it was authored and tuned in, and
+   * the fit is applied to the finished result. `finally`, not a trailing
+   * statement: an early return or a throw must never leave the rig rendering a
+   * frame at full size, which is a visible pop.
+   */
   update(pose: WeaponPose): WeaponActionEvent[] {
+    this.applyBodyFit(1);
+    try {
+      return this.updateSolvedPose(pose);
+    } finally {
+      this.applyBodyFit(VIEWMODEL_BODY_FIT_SCALE);
+    }
+  }
+
+  /**
+   * Sets the fit AND republishes the node's own world matrix, in constant time.
+   *
+   * `Object3D.updateMatrixWorld` does not walk UP the tree, so a consumer that
+   * calls it on the rig root - the renderer does not, but the regression gates
+   * and several probes do - composes against whatever this node's `matrixWorld`
+   * happens to hold. Flipping `scale` without republishing left that matrix
+   * describing a different fit from the one in force, and the rig then measured
+   * as though it had drifted off its own mount. Two matrix composes per frame.
+   */
+  private applyBodyFit(scale: number): void {
+    this.bodyFitRoot.scale.setScalar(scale);
+    this.bodyFitRoot.updateMatrix();
+    const parent = this.bodyFitRoot.parent;
+    if (parent) this.bodyFitRoot.matrixWorld.multiplyMatrices(parent.matrixWorld, this.bodyFitRoot.matrix);
+    else this.bodyFitRoot.matrixWorld.copy(this.bodyFitRoot.matrix);
+  }
+
+  private updateSolvedPose(pose: WeaponPose): WeaponActionEvent[] {
     // Owner 2026-08-30 ("randomly top of shotgun detached ... m14 scope part
     // is flying in the air above the gun"). Hidden weapon models have their
     // subtree matrices DEEP-FROZEN (matrixAutoUpdate off) so a parked model
@@ -5595,7 +5692,10 @@ export class WeaponPresentation {
     // materials are clear from model instantiation onward.
     this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
-    this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
+    // HF-410: this gate is a threshold on a PHYSICAL light intensity, and the
+    // body fit divides every viewmodel-only intensity by k^2. Left as a bare
+    // 0.45 the muzzle flash mesh would never appear again.
+    this.muzzleFlash.visible = this.muzzleLight.intensity > viewmodelBodyFitLightIntensity(0.45);
     const arms = this.root.getObjectByName('first-person-arms');
     if (arms) {
       // Keep the licensed chains close to physical scale in ADS. The previous
@@ -5854,19 +5954,32 @@ export class WeaponPresentation {
       - VIEWMODEL_NEAR_PLANE_CLEARANCE - authoredContactRetreat;
     this.contactFold = solveViewmodelContactFold({
       bounds: this.measureRigBounds(),
-      contactDepthMeters: pose.surfaceContactDepth ?? null,
+      // HF-410: the solve compares the rig's ROOT-LOCAL bounds against this
+      // depth, and the body fit means one rig metre is now
+      // VIEWMODEL_BODY_FIT_SCALE world metres. Converting here is what makes
+      // the fold measure the fitted rig instead of the rig that used to hang
+      // outside the body: it disengages because the geometry genuinely no
+      // longer reaches the surface, not because a threshold was moved.
+      contactDepthMeters: pose.surfaceContactDepth === null || pose.surfaceContactDepth === undefined
+        ? null
+        : viewmodelWorldToRigMeters(pose.surfaceContactDepth),
       // The fold keeps the conservative minimum above; the cut is placed by
       // the on-axis depth. Passed through UNDEFAULTED on purpose: `undefined`
       // has to keep meaning "this caller has no separate cut depth", which the
       // solve answers by falling back to `contactDepthMeters` exactly as
       // before, while an explicit `null` means "nothing a plane can represent"
       // and correctly disarms the cut.
-      contactCutDepthMeters: pose.surfaceContactCutDepth,
+      contactCutDepthMeters: pose.surfaceContactCutDepth === undefined
+        ? undefined
+        : (pose.surfaceContactCutDepth === null
+          ? null
+          : viewmodelWorldToRigMeters(pose.surfaceContactCutDepth)),
       baseRootZ: contactFoldBaseZ,
       authoredRootZ: contactFoldBaseZ + surfaceRetreatDemand,
       basePitchRadians: this.contactResponse.pitchRadians,
       baseScale: this.unsuppressedViewmodelScale(),
-      nearPlaneMeters: viewmodelCameraNearMeters(this.camera) + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+      nearPlaneMeters: viewmodelWorldToRigMeters(VIEWMODEL_OVERLAY_NEAR_METERS)
+        + VIEWMODEL_NEAR_PLANE_CLEARANCE,
     });
     this.applyViewmodelContactClip();
     this.applyViewmodelSurfaceClip(pose.surfaceClipPlanes);

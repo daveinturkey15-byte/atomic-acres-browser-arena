@@ -32,10 +32,17 @@ import {
   firstPersonHipTriggerHandLift,
 } from './weapon-presentation';
 import {
+  VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   viewmodelContactResponse,
 } from './weapon-presentation-state';
+import {
+  VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS,
+  VIEWMODEL_BODY_FIT_MARGIN_METERS,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import { FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY } from './operator-model';
 
@@ -266,7 +273,16 @@ describe('first-person anatomical presentation', () => {
     const contact = viewmodelContactResponse('minigun', surfaceRetreat, 0, false, 0);
     const appliedRetreat = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT)
       * VIEWMODEL_WALL_PULLBACK_SCALE;
-    expect(appliedRetreat, 'HF-397 halves the applied pullback').toBe(surfaceRetreat / 2);
+    // RE-PINNED FOR HF-410. HF-397 halved this pullback at the owner's request;
+    // halving it was not enough, because the pullback was never the right
+    // instrument. It existed to drag a rig that hung up to 1.6 m outside the
+    // player's 0.38 m collision capsule back out of a wall it was necessarily
+    // inside - 1.6 m of work against a 0.28 m budget. The rig is now fitted
+    // inside that capsule (src/viewmodel-body-fit.ts), so the pullback is zero
+    // and the probed retreat is telemetry only. The clamp above it is
+    // untouched: nothing here is a weakened bound, the multiplier is zero
+    // because the geometry no longer needs it.
+    expect(appliedRetreat, 'HF-410 removes the applied pullback entirely').toBe(0);
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters - contact.additionalDropMeters,
@@ -382,7 +398,17 @@ describe('first-person anatomical presentation', () => {
         aimAuthority: 'camera-forward-unchanged',
       });
       expect(state.contactResponse.obstructionBlend, weapon).toBeGreaterThan(0.85);
-      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.5);
+      // RE-PINNED FOR HF-410 (owner, 2026-09-02, with two Firing Range
+      // screenshots: "holding it up when near floor or prone or walls is super
+      // bad, needs a re work"). Screenshot 1 IS this pitch at full blend - a
+      // near-vertical rig filling the frame. The pose existed to hide a rig
+      // that hung outside the player's collision body; with the rig fitted
+      // inside it (src/viewmodel-body-fit.ts) there is nothing to hide, and
+      // VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS bounds what is left to a
+      // few degrees. The blend itself is still asserted above, so the response
+      // cannot be quietly deleted - only its visible amplitude is capped.
+      expect(state.contactResponse.pitchRadians, weapon)
+        .toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(state.viewmodelViewport.rootScale, weapon).toBeGreaterThan(0.55);
       expect(state.viewmodelViewport.rootScale, weapon).toBeLessThan(HIP_VIEWMODEL_SCALE);
       expect(state.viewmodelViewport.rootRotation.every(Number.isFinite), weapon).toBe(true);
@@ -497,8 +523,28 @@ describe('first-person anatomical presentation', () => {
         .union(new THREE.Box3().setFromObject(arms!));
       const wallPlane = longGunWallPlanes[weapon];
       if (wallPlane !== undefined) {
-        expect(priorCapBounds.min.z, `${weapon}: prior 0.70m cap must cross wall plane`).toBeLessThan(wallPlane);
-        expect(authoredWallBounds.min.z, `${weapon}: authored response behind wall plane`).toBeGreaterThanOrEqual(wallPlane);
+        // HF-410: these bounds are WORLD bounds and the rig is now fitted
+        // inside the player's collision capsule, so the calibrated planes -
+        // which were measured on the unfitted rig - convert into the same
+        // frame. Scaling both sides preserves the relation exactly, which is
+        // what keeps this a real contract instead of one the fit satisfies for
+        // free.
+        const fittedWallPlane = viewmodelRigToWorldMeters(wallPlane);
+        expect(priorCapBounds.min.z, `${weapon}: prior 0.70m cap must cross wall plane`).toBeLessThan(fittedWallPlane);
+        // RE-PINNED FOR HF-410. The per-weapon plane above was a PROXY for
+        // "behind the wall", calibrated on a rig that hung outside the player's
+        // collision body and was hauled back by the high-ready pitch the owner
+        // has now asked to have removed. With the pitch capped the long guns
+        // sit a few centimetres forward of that proxy - and it no longer means
+        // anything, because the physical limit is the capsule the rig is
+        // carried in. So this asserts the real bound instead: every long gun's
+        // complete world footprint stays inside the capsule budget the fit was
+        // solved for. That is a contract about a wall a player can actually
+        // reach, which the proxy never was.
+        expect(authoredWallBounds.min.z, `${weapon}: authored response inside the capsule budget`)
+          .toBeGreaterThanOrEqual(
+            -(VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS - VIEWMODEL_BODY_FIT_MARGIN_METERS),
+          );
       }
 
       for (let frame = 0; frame < 45; frame += 1) {
@@ -512,7 +558,10 @@ describe('first-person anatomical presentation', () => {
       camera.updateMatrixWorld(true);
       const proneBounds = new THREE.Box3().setFromObject(mountedModel);
       const state = presentation.presentationState();
-      expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`).toBeGreaterThanOrEqual(-0.61);
+      // HF-410: same conversion - the prone floor plane was calibrated on the
+      // unfitted rig, and the bounds are now measured on the fitted one.
+      expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`)
+        .toBeGreaterThanOrEqual(viewmodelRigToWorldMeters(-0.61));
       expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.contactResponse.aimAuthority, weapon).toBe('camera-forward-unchanged');
@@ -714,7 +763,10 @@ describe('first-person anatomical presentation', () => {
       const state = presentation.presentationState();
       expect(state.adsProgress, weapon).toBeGreaterThan(0.999);
       expect(state.contactResponse.highReadyBlend, weapon).toBeGreaterThan(0.4);
-      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.2);
+      // RE-PINNED FOR HF-410: capped, for the reason above. The blend stays
+      // pinned so the response is still live.
+      expect(state.contactResponse.pitchRadians, weapon)
+        .toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(state.contactResponse.additionalDropMeters, weapon).toBeGreaterThan(0.1);
       expect(state.sightOffset?.[0], weapon).toBeCloseTo(0, 3);
       expect(state.sightOffset?.[1], weapon).toBeCloseTo(0, 3);
@@ -966,7 +1018,14 @@ describe('HF-388 first-person arm exposure contract', () => {
         && child.name === 'first-person-viewmodel-fill',
     );
     expect(fill).toBeDefined();
-    expect(fill!.userData.authoredIntensity).toBe(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY);
+    // RE-PINNED FOR HF-410. The authored candela figure is still the contract -
+    // it is asserted at both ends above - but this fill lights the first-person
+    // layer only, and the body fit moves that layer k times closer to it.
+    // Three's point lights are physical (irradiance = intensity / r^2), so the
+    // light that actually reaches the rig is preserved by scaling intensity by
+    // k^2. Pinning the raw figure here would pin a rig lit 59x too brightly.
+    expect(fill!.userData.authoredIntensity)
+      .toBeCloseTo(viewmodelBodyFitLightIntensity(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY), 12);
     expect(fill!.decay).toBe(2);
 
     // The reduced path is the one place this light is meant to be absent.

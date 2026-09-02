@@ -102,6 +102,15 @@ export function measureCameraFraming(
   object: THREE.Object3D,
   camera: THREE.Camera,
   includeMesh: (mesh: THREE.Mesh) => boolean = () => true,
+  /**
+   * HF-410: the plane this object is actually drawn against, when that is not
+   * the camera's own. The first-person viewmodel is a separate depth-cleared
+   * submission with its own near plane, and it is fitted inside the player's
+   * collision capsule, so grading it against the gameplay camera's 0.08 m
+   * plane would report every pose as clipped. Omitted everywhere else, where
+   * the camera's own plane is the right and only answer.
+   */
+  nearPlaneMeters?: number,
 ): CameraFramingTelemetry | null {
   object.updateWorldMatrix(true, true);
   camera.updateWorldMatrix(true, false);
@@ -135,7 +144,12 @@ export function measureCameraFraming(
     minX = Math.min(minX, projected.x); minY = Math.min(minY, projected.y);
     maxX = Math.max(maxX, projected.x); maxY = Math.max(maxY, projected.y);
   }
-  const near = camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera ? camera.near : 0;
+  const cameraNear = camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera
+    ? camera.near
+    : 0;
+  const near = Number.isFinite(nearPlaneMeters) && (nearPlaneMeters as number) > 0
+    ? (nearPlaneMeters as number)
+    : cameraNear;
   return {
     finite,
     nearPlaneClear: finite && nearestDepth > near,

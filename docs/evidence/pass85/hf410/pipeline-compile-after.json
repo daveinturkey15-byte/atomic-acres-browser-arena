@@ -1,0 +1,148 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-02T16:46:28.813Z",
+  "label": "run",
+  "arena": "atomic-acres",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-hf395\\dist",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.044,
+    "rafCallbacks": 2626,
+    "stallCount": 15,
+    "stallsPerMinute": 11.99,
+    "frozenFractionPercent": 2.36,
+    "medianStallMs": 105.6,
+    "maxStallMs": 205.5
+  },
+  "pipelines": {
+    "beforeWindow": 374,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 2.36,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 431,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 2.36,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 89406,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 89145,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": [
+    {
+      "startMs": 90158.4,
+      "endMs": 90264,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 92119.5,
+      "endMs": 92264,
+      "durationMs": 144.5
+    },
+    {
+      "startMs": 95848.1,
+      "endMs": 95959,
+      "durationMs": 110.9
+    },
+    {
+      "startMs": 97364,
+      "endMs": 97464,
+      "durationMs": 100
+    },
+    {
+      "startMs": 99097.3,
+      "endMs": 99203,
+      "durationMs": 105.7
+    },
+    {
+      "startMs": 99598,
+      "endMs": 99698,
+      "durationMs": 100
+    },
+    {
+      "startMs": 103353.1,
+      "endMs": 103492,
+      "durationMs": 138.9
+    },
+    {
+      "startMs": 109353,
+      "endMs": 109453,
+      "durationMs": 100
+    },
+    {
+      "startMs": 114297.9,
+      "endMs": 114420,
+      "durationMs": 122.1
+    },
+    {
+      "startMs": 114681,
+      "endMs": 114781,
+      "durationMs": 100
+    },
+    {
+      "startMs": 130336.3,
+      "endMs": 130464,
+      "durationMs": 127.7
+    },
+    {
+      "startMs": 131814.4,
+      "endMs": 131920,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 151542.5,
+      "endMs": 151748,
+      "durationMs": 205.5
+    },
+    {
+      "startMs": 152858.8,
+      "endMs": 152959,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 163336.5,
+      "endMs": 163442,
+      "durationMs": 105.5
+    }
+  ]
+}

@@ -65,6 +65,11 @@ import {
 } from './systems/viewmodel-contact-probe';
 import { VIEWMODEL_SURFACE_CLIP_PLANE_COUNT } from './systems/viewmodel-surface-clip';
 import { type WeaponPose } from './weapon-presentation';
+import {
+  VIEWMODEL_BODY_FIT_SCALE,
+  VIEWMODEL_OVERLAY_NEAR_METERS,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
 
 const REST_POSE: WeaponPose = Object.freeze({
   dt: 1 / 60,
@@ -110,10 +115,18 @@ async function mountedRig(weapon: WeaponId): Promise<Rig> {
   const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
   const presentation = new WeaponPresentation(camera, false);
   await presentation.load();
-  // The runtime parents the viewmodel to the camera; camera space and the
-  // root's parent space are then the same space, which is what every number
-  // below is expressed in.
-  camera.add(presentation.root);
+  // HF-410: THE HARNESS MUST NOT RE-MOUNT THE RIG.
+  //
+  // This used to call `camera.add(presentation.root)`, on the reasoning that
+  // camera space and the root's parent space are the same space. They are not
+  // any more: the presentation mounts itself as camera -> bodyFitRoot -> root,
+  // and bodyFitRoot carries the uniform scale that puts the rig inside the
+  // player's collision capsule (src/viewmodel-body-fit.ts). Re-parenting the
+  // root here orphaned that node, so every number below would have been
+  // measured on the UNFITTED rig - the exact defect this file grades.
+  expect(presentation.root.parent, 'the rig mounts through the body-fit node')
+    .toBe(presentation.bodyFitRoot);
+  expect(presentation.bodyFitRoot.parent, 'and that node mounts on the camera').toBe(camera);
   presentation.setWeapon(weapon, true);
   return { camera, presentation };
 }
@@ -205,7 +218,11 @@ function visibleForwardMeters(rig: Rig): number {
   const extent = rigExtent(rig);
   const cut = rig.presentation.contactFoldState().clipPlaneDistanceMeters;
   if (cut === null) return extent.furthest;
-  return Math.min(extent.furthest, cut - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS);
+  // HF-410: the fold solve compares the rig's ROOT-LOCAL bounds against a depth
+  // handed to it in the same frame, so every metre it reports back is a rig
+  // metre. `extent` is measured through the camera and is therefore in world
+  // metres. Convert, or this compares two different units.
+  return Math.min(extent.furthest, viewmodelRigToWorldMeters(cut) - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS);
 }
 
 describe('applied transform: no VISIBLE geometry finishes past the surface (owner 2026-08-31)', () => {
@@ -215,11 +232,30 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
       const envelope = rig.presentation.contactProbeEnvelope();
       expect(envelope, 'the rig must be measurable, or the fold has nothing to solve').not.toBeNull();
 
-      // Establish the pre-contact reach. This is the whole reason retreat alone
-      // cannot work: the rig starts metres in front of a wall 0.40 m away.
+      // RE-PINNED FOR HF-410 (owner, 2026-09-02: "gun clipping through walls and
+      // floor aswell as holding it up ... is super bad, needs a re work").
+      //
+      // This used to assert the OPPOSITE - `open.furthest > 0.40` - and it was
+      // right to, because it was pinning the defect: the rig started metres in
+      // front of a wall it was already inside, which is why retreat alone could
+      // never work and why a fold and a cut were bolted on afterwards. The rig
+      // is now fitted inside the player's own collision capsule
+      // (src/viewmodel-body-fit.ts), so at rest it no longer reaches the
+      // owner's failing distance at all. That is the fix, so it is what this
+      // line pins.
+      //
+      // The capsule number itself (0.316 m radial against a 0.38 m radius) is
+      // graded by the browser instrument on the real GLB rig -
+      // scripts/qa/measure-viewmodel-body-fit-cdp.mjs, evidence under
+      // docs/evidence/pass85/hf410/. This harness runs the headless fallback
+      // rig, which is a different and larger mesh, so pinning the capsule
+      // figure HERE would be pinning a number about the wrong geometry.
       settle(rig, {});
       const open = rigExtent(rig);
-      expect(open.furthest).toBeGreaterThan(WALL_DISTANCE_METERS);
+      expect(rig.presentation.bodyFitRoot.scale.x, 'the fit must be in force')
+        .toBeCloseTo(VIEWMODEL_BODY_FIT_SCALE, 9);
+      expect(open.furthest, `${weapon} at rest must not reach the owner's 0.40 m wall`)
+        .toBeLessThan(WALL_DISTANCE_METERS);
 
       settle(rig, {
         surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, weapon),
@@ -233,39 +269,65 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
       ).toBeLessThanOrEqual(0);
 
       // And it must not have solved the wall by putting the rig in the camera.
-      expect(rigExtent(rig).nearest).toBeGreaterThanOrEqual(rig.camera.near);
+      // HF-410: the plane that can actually clip the rig is the overlay's, not
+      // the gameplay camera's - the first-person layer is a separate
+      // depth-cleared submission with its own near plane.
+      expect(rigExtent(rig).nearest).toBeGreaterThanOrEqual(VIEWMODEL_OVERLAY_NEAR_METERS);
     });
   }
 
-  it('the fold does the work, and the cut only covers what physics leaves', async () => {
-    // The cut must not quietly become the fix. Two things are pinned here.
+  it('the fit does the work, and the fold stays a live last resort', async () => {
+    // RE-PINNED FOR HF-410, and this is the honest statement of what changed.
     //
-    // FIRST, honestly: the fold does NOT close a 0.40 m wall on its own, and no
-    // parameter in this design can make it. The forward-most point is bounded
-    // below by nearPlane + rigDepth; measured on the carbine at 0.40 m the fold
-    // gets the silhouette to ~0.52 m and the remaining ~0.12 m is cut. Pinning
-    // residual <= 0 here would be pinning a physical impossibility, and the way
-    // to pass it would be to weaken something.
+    // This test used to pin that the FOLD carried at least 85% of the travel at
+    // the owner's 0.40 m wall, with a bounded residual for the cut to remove.
+    // That was the right guard for the design it graded - one where the rig hung
+    // 1.2-1.6 m outside the player's own 0.38 m collision capsule and something
+    // had to drag it back every time the player walked up to anything.
     //
-    // SECOND, and this is the guard that matters: the residual is bounded, and
-    // the fold must still be carrying the overwhelming majority of the travel.
+    // With the rig fitted inside the capsule there is nothing to drag: the
+    // 0.40 m wall is outside the rig, so the fold correctly does not engage,
+    // and a percentage-of-travel assertion has no travel to measure. Replacing
+    // it with `engaged === false` is not a relaxation - it is a STRICTER claim
+    // than the old one, because the old test tolerated a rig that reached the
+    // wall provided something pulled it back.
+    //
+    // The second block is what stops that being a way to pass by disarming the
+    // safety net: with a surface genuinely INSIDE the fitted rig, the fold must
+    // still engage, still be bounded, and still be measured on the silhouette
+    // rather than the muzzle socket. Its 1.5 rad ceiling is untouched.
+    const INSIDE_THE_FITTED_RIG_METERS = 0.12;
     for (const weapon of ['carbine', 'sniper'] as const) {
       const rig = await mountedRig(weapon);
       settle(rig, {});
       const openReach = rigExtent(rig).furthest;
+      expect(openReach, `${weapon} must already clear the owner's wall`).toBeLessThan(WALL_DISTANCE_METERS);
+
       settle(rig, {
         surfaceRetreat: viewmodelSurfaceRetreat(WALL_DISTANCE_METERS, false, weapon),
         surfaceContactDepth: WALL_DISTANCE_METERS,
       });
-      const fold = rig.presentation.contactFoldState();
-      expect(fold.engaged, weapon).toBe(true);
-      // The residual is what the cut removes. It is small, and it is bounded.
-      expect(fold.residualMeters, `${weapon} residual after the fold`).toBeLessThanOrEqual(0.2);
-      // The fold closed at least 85% of the distance on its own.
-      const closedByFold = openReach - fold.forwardReachMeters;
-      expect(closedByFold / (openReach - WALL_DISTANCE_METERS), weapon).toBeGreaterThan(0.85);
+      // `engaged` means "the solve produced this result", not "a fold was
+      // applied" - it is deliberately non-flickering because the renderer picks
+      // its translation source from it. The properties that say whether the rig
+      // was MOVED are the pitch, the retreat and the residual, and all three
+      // must be exactly zero: at the owner's failing distance the fitted rig
+      // needs no help at all.
+      const clear = rig.presentation.contactFoldState();
+      expect(clear.foldPitchRadians, `${weapon}: no high-ready pose at a 0.40 m wall`).toBe(0);
+      expect(clear.retreatMeters, `${weapon}: no pullback at a 0.40 m wall`).toBe(0);
+      expect(clear.residualMeters, `${weapon}: nothing left for the cut to remove`).toBe(0);
+
+      settle(rig, {
+        surfaceRetreat: viewmodelSurfaceRetreat(INSIDE_THE_FITTED_RIG_METERS, false, weapon),
+        surfaceContactDepth: INSIDE_THE_FITTED_RIG_METERS,
+      });
+      const contact = rig.presentation.contactFoldState();
+      expect(contact.foldPitchRadians, `${weapon}: the last resort must still arm`)
+        .toBeGreaterThan(0);
+      expect(contact.residualMeters, `${weapon} residual after the fold`).toBeLessThanOrEqual(0.2);
       // ... and the residual must be measured on the silhouette, not the socket.
-      expect(fold.forwardReachMeters).toBeGreaterThanOrEqual(fold.muzzleForwardMeters - 1e-9);
+      expect(contact.forwardReachMeters).toBeGreaterThanOrEqual(contact.muzzleForwardMeters - 1e-9);
     }
   });
 
@@ -318,8 +380,11 @@ describe('applied transform: no VISIBLE geometry finishes past the surface (owne
     // ones it is not using.
     const EXPECTED_PLANES = 1 + VIEWMODEL_SURFACE_CLIP_PLANE_COUNT;
     expect(clippingRoot.clippingPlanes).toHaveLength(EXPECTED_PLANES);
-    expect(rig.presentation.contactFoldState().clipPlaneDistanceMeters)
-      .toBeCloseTo(WALL_DISTANCE_METERS, 6);
+    // HF-410: the solve reports rig metres (its depth inputs are converted into
+    // the rig's frame on the way in); the wall is a world distance.
+    expect(viewmodelRigToWorldMeters(
+      rig.presentation.contactFoldState().clipPlaneDistanceMeters as number,
+    )).toBeCloseTo(WALL_DISTANCE_METERS, 6);
 
     // The kept half-space is camera-side: the eye must be inside it and a point
     // beyond the surface must not be.
@@ -640,8 +705,11 @@ describe('the cut is placed by what a plane can represent (owner 2026-08-31)', (
     });
     const fold = rig.presentation.contactFoldState();
     expect(fold.engaged).toBe(true);
-    expect(fold.clipPlaneDistanceMeters, 'the plane follows the on-axis depth')
-      .toBeCloseTo(WALL_DISTANCE_METERS, 9);
+    // HF-410: rig metres out of the solve, world metres for the wall.
+    expect(
+      viewmodelRigToWorldMeters(fold.clipPlaneDistanceMeters as number),
+      'the plane follows the on-axis depth',
+    ).toBeCloseTo(WALL_DISTANCE_METERS, 9);
 
     const extent = rigExtent(rig);
     const cutAt = WALL_DISTANCE_METERS - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS;
