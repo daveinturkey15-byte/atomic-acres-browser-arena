@@ -661,3 +661,17 @@ asked; the rebuild ships a clean first-pass style.
 HUD/menu overflow with 8+ cards (red since PASS 84), minimap 30 Hz, bot stance,
 line-ceiling one-direction ratchet, overdrive roof claim, review-camera near
 plane, stale webgl2 copy, operator visual gate. Launches after the 22:20 cut.
+
+### HF-409 Map 3 explore — finisher result 22:15 BST: MERGE-READY FOR PASS 87, NOT PASS 86
+Landed on branch map3-demo-showcase (9847a7e9): the card is back as an EXPLORE
+arena KIND (required `kind: 'team' | 'explore'` on every registry row; the
+explore branch of the spawn-quality gate is stricter, not an exemption; all four
+roster ratchets restored 7 -> 8; map3 in the cross-browser required set); full
+suite 5168/0 on that change set; merges clean. NOT yet: the in-match HUD still
+says TEAM DEATHMATCH with a countdown in explore (legacy-main :16976/:27305),
+/map3.html is dead on every published channel until the stage-release-topology
+patch lands with proof, and the eye-clearance ceiling cannot be measured until
+buildMap3 gets the prepare-then-build split (stage 2 builds arenas synchronously;
+map3 is code-split). Do NOT merge V at 22:20; a second finisher is on the PASS 87
+critical path now. Stray: aa-map3 carries three uncommitted HF-412 files (not
+V's); aa-map3-laneV-verify is a scratch runner to remove once V is accepted.
