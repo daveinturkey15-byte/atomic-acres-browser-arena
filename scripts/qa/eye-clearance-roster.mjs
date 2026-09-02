@@ -125,15 +125,53 @@ export function annotationsForArena(ledger, arena) {
  * Split one arena's measured violations into annotated and unannotated rows.
  * Only the unannotated ones reach the ceiling comparison; the annotated ones
  * are printed, capped and checked for staleness by the caller.
+ *
+ * `surfaceOf` exists because the two stages do not necessarily measure the same
+ * surface at the same spot. Stage 2 traces from the AUTHORED eye seat; stage 3
+ * traces from the seat the runtime actually gave the player, which can be a
+ * third of a metre away after `resolveEyeClearance` and the character
+ * depenetration have both had their say - and a fan from there can land on a
+ * different surface entirely. Forgiving such a row under an annotation that
+ * names only the stage-2 surface would exempt a clip nobody examined, so stage
+ * 3 passes the RUNTIME surface here. Default keeps stage 2's own behaviour.
  */
-export function partitionAnnotatedViolations(ledger, arena, violations) {
+export function partitionAnnotatedViolations(ledger, arena, violations, surfaceOf = (row) => row.surface) {
   const annotations = annotationsForArena(ledger, arena);
   const matched = new Map(annotations.map((entry) => [entry.id, []]));
   const unannotated = [];
   for (const row of violations) {
-    const hit = annotations.find((entry) => entry.surfaces.includes(row.surface));
+    const hit = annotations.find((entry) => entry.surfaces.includes(surfaceOf(row)));
     if (hit) matched.get(hit.id).push(row);
     else unannotated.push(row);
   }
   return { annotations, matched, unannotated };
+}
+
+/**
+ * Rows stage 3 must re-probe at runtime even when stage 2 flags nothing there.
+ *
+ * Lane J repair, 2026-09-02. Stage 3 only teleports to spots stage 2 flagged,
+ * so FIXING an arena's analytic clearance removes the pipeline's only view of
+ * that arena's runtime behaviour: skyline-terminal went to zero analytic
+ * violations and stage 3 stopped visiting the nacelles entirely, on exactly the
+ * geometry this lane had just moved. A forced probe is the standing counter to
+ * that: a named coordinate that is measured on every run, judged by the same
+ * near-plane verdict, and reported UNVERIFIED (never silently dropped) when the
+ * runtime refuses the stance or the body has not settled.
+ */
+export function forcedProbesForArena(ledger, arena) {
+  return (ledger.forcedProbes ?? []).filter((entry) => entry.arena === arena);
+}
+
+/**
+ * The per-arena cap on rows stage 3 could not measure.
+ *
+ * A row whose stance the runtime refused carries no probe, so it is neither
+ * clean nor a clip - but "reported and never judged" with no cap is a green
+ * gate that can measure nothing at all, which is the failure class this whole
+ * pipeline exists to catch. The count is ratcheted like the violation ceiling:
+ * an arena with no recorded allowance may have none.
+ */
+export function unverifiedCeilingFor(ledger, arena) {
+  return (ledger.unverifiedCeiling ?? {})[arena];
 }
