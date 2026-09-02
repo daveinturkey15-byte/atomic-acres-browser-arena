@@ -26655,10 +26655,22 @@ function updateMinimap(now: number): void {
   context.strokeRect(4, 4, width - 8, height - 8);
 
   const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
+  // HF-399 streamline: one description of the player-up view, shared by the
+  // canvas transform below and by every upright label that has to be mapped
+  // through the same transform in closed form. Previously each landmark branch
+  // recomputed the rotation and the reflection for itself.
+  const labelView = {
+    width,
+    height,
+    playerX: worldPlayerX,
+    playerY: worldPlayerY,
+    rotation: playerUpRotationRadians(player.yaw),
+    scaleX: playerUpScaleX(),
+  };
   context.save();
   context.translate(width / 2, height / 2);
-  context.rotate(playerUpRotationRadians(player.yaw));
-  context.scale(playerUpScaleX(), 1);
+  context.rotate(labelView.rotation);
+  context.scale(labelView.scaleX, 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
   let renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
@@ -26677,14 +26689,6 @@ function updateMinimap(now: number): void {
     // so the labels stay upright exactly as before.
     const layer = activeMinimapStaticLayer(width, height, bounds);
     context.drawImage(layer.canvas, 0, 0);
-    const labelView = {
-      width,
-      height,
-      playerX: worldPlayerX,
-      playerY: worldPlayerY,
-      rotation: playerUpRotationRadians(player.yaw),
-      scaleX: playerUpScaleX(),
-    };
     for (const anchor of layer.labelAnchors) {
       const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
       landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
@@ -26728,11 +26732,16 @@ function updateMinimap(now: number): void {
       const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
       drawMinimapLandmark(context, cover.id, kind, footprint);
       const label = minimapLandmarkLabel(kind);
-      const centre = context.getTransform().transformPoint(new DOMPoint(
+      // HF-399 streamline: the same mapping the atomic-acres branch uses, so no
+      // arena reads back the live canvas matrix and allocates a DOMPoint per
+      // landmark per frame any more. Guarded by
+      // src/minimap-player-view-transform.test.ts.
+      const [labelX, labelY] = minimapPlayerViewPoint(
         footprint.x + footprint.width / 2,
         footprint.y + footprint.height / 2,
-      ));
-      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
+        labelView,
+      );
+      landmarkLabels.push({ label, x: labelX, y: labelY - 10 });
       renderedLandmarks.push({ id: cover.id, kind, label });
     }
     for (const target of arena.targets) {
@@ -26742,16 +26751,19 @@ function updateMinimap(now: number): void {
     }
   }
   minimapLandmarksRendered = renderedLandmarks;
+  // HF-399 streamline: loop-invariant in both entity loops below (it reads only
+  // `now` and `scoutSweepUntil`), and was being re-evaluated once per remote and
+  // once per bot every minimap frame.
+  const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
   for (const remote of remotes.values()) {
     const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
-    const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
     if (!friendly && !scoutActive && !shouldRevealEnemy(remote.target.distanceTo(player.position), now, remoteRadarFireRevealAt.get(remote.snapshot.id) ?? 0)) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || !scoutSweepPulseVisible(now, scoutSweepUntil) && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || !scoutActive && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
@@ -26794,7 +26806,7 @@ function updateMinimap(now: number): void {
   // while the pulse is visible, so the sweep reads as active radar motion on
   // the minimap instead of a silent state change (and demo clips of the
   // sweep carry genuine motion for the cadence gate).
-  if (scoutSweepPulseVisible(now, scoutSweepUntil)) {
+  if (scoutActive) {
     const pulseStartedAt = scoutSweepUntil - SCOUT_SWEEP_DURATION_MS;
     const pulseElapsed = Math.max(0, now - pulseStartedAt) % SCOUT_SWEEP_PULSE_INTERVAL_MS;
     const pulseProgress = Math.min(1, pulseElapsed / SCOUT_SWEEP_PULSE_VISIBLE_MS);
