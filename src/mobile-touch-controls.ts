@@ -172,6 +172,15 @@ export function mobileTouchFireBypassesPointerLock(presentationActive: boolean, 
   return presentationActive && firing;
 }
 
+/**
+ * PASS 84 Lane E: the overlay shows only while the toggle is on, a match is
+ * live and no gamepad is connected. A connected pad suppresses the overlay
+ * instead of fighting it for the same thumbs; disconnecting restores it.
+ */
+export function mobileOverlayVisible(enabled: boolean, inMatch: boolean, gamepadSuppressed: boolean): boolean {
+  return enabled && inMatch && !gamepadSuppressed;
+}
+
 export function shouldSuppressMobileBrowserSelection(presentationActive: boolean, editableTarget: boolean): boolean {
   return presentationActive && !editableTarget;
 }
@@ -235,6 +244,7 @@ export class MobileTouchControls {
 
   private enabled = false;
   private inMatch = false;
+  private gamepadSuppressed = false;
   private disposed = false;
 
   constructor(private readonly callbacks: MobileTouchCallbacks) {}
@@ -282,6 +292,22 @@ export class MobileTouchControls {
     return this.enabled;
   }
 
+  /**
+   * PASS 84 Lane E: a connected gamepad hides the overlay and releases every
+   * held touch so the pad and the thumbsticks never fight; disconnecting
+   * restores the overlay in the same match.
+   */
+  setGamepadSuppressed(suppressed: boolean): void {
+    if (this.gamepadSuppressed === suppressed) return;
+    this.gamepadSuppressed = suppressed;
+    if (suppressed) this.resetInput();
+    this.applyVisibility();
+  }
+
+  isGamepadSuppressed(): boolean {
+    return this.gamepadSuppressed;
+  }
+
   /** Releases every owned pointer before viewport/orientation geometry changes. */
   resetForViewportChange(): void {
     this.resetInput();
@@ -304,7 +330,7 @@ export class MobileTouchControls {
   }
 
   private applyVisibility(): void {
-    if (this.root) this.root.hidden = !(this.enabled && this.inMatch);
+    if (this.root) this.root.hidden = !mobileOverlayVisible(this.enabled, this.inMatch, this.gamepadSuppressed);
   }
 
   private resetInput(): void {
