@@ -67,6 +67,13 @@ async function main() {
       pitch: -0.05,
     },
     {
+      name: 'corridor-1-nature-vehicle',
+      angle: 0,
+      dist: 8,
+      y: 1.6,
+      pitch: -0.08,
+    },
+    {
       name: 'corridor-2-maths',
       angle: Math.PI / 4,
       dist: 20,
