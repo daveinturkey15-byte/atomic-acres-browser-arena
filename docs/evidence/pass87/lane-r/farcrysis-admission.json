@@ -1,7 +1,12 @@
 {
   "contract": "farcrysis-admission-evidence-v1",
-  "measuredAt": "2026-09-02T22:11:31.060Z",
-  "sha": "e5f1b1b9122d730ba7e94ed0edf574713cc597ad",
+  "measuredAt": "2026-09-02T22:18:45.692Z",
+  "sha": "13a97e26a7017c4d7e2589ba534b729e86f97b08",
+  "shaNote": "informational only - committing this receipt changes HEAD, so a guard must key on bundle.sha256, which names the bytes the probe actually loaded",
+  "bundle": {
+    "sha256": "bed3eb57d9a925f541eb2c3621d3c4318d4e999d5cc53209a32a4f2d2897ab8c",
+    "files": 36
+  },
   "dist": "C:\\Users\\david\\projects\\aa-claude-farcrysis\\dist",
   "runs": 3,
   "arenas": [
@@ -16,19 +21,19 @@
     "anyPageErrors": false,
     "maxMenuPipelines": 0,
     "farcrysisSelectToAdmittedMs": {
-      "mean": 37667,
-      "max": 39066
+      "mean": 36402,
+      "max": 38781
     },
     "atomicSelectToAdmittedMs": {
-      "mean": 32829,
-      "max": 37531
+      "mean": 29593,
+      "max": 31189
     },
     "pairRatios": [
-      1.0126,
-      1.2875,
-      1.1737
+      1.2434,
+      1.244,
+      1.2018
     ],
-    "worstPairRatio": 1.2875
+    "worstPairRatio": 1.244
   },
   "runsDetail": [
     {
@@ -40,20 +45,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 38003,
-      "selectToActiveMs": 56583,
-      "totalToActiveMs": 58686,
+      "selectToAdmittedMs": 38781,
+      "selectToActiveMs": 57105,
+      "totalToActiveMs": 59116,
       "gpuAtLaunch": {
-        "usedMiB": 12880,
+        "usedMiB": 13024,
         "totalMiB": 16303,
-        "freeMiB": 3423
+        "freeMiB": 3279
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:05:24.709Z"
+      "measuredAt": "2026-09-02T22:13:01.733Z"
     },
     {
       "run": 1,
@@ -64,20 +69,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 37531,
-      "selectToActiveMs": 60256,
-      "totalToActiveMs": 62372,
+      "selectToAdmittedMs": 31189,
+      "selectToActiveMs": 50652,
+      "totalToActiveMs": 52607,
       "gpuAtLaunch": {
-        "usedMiB": 9810,
+        "usedMiB": 12868,
         "totalMiB": 16303,
-        "freeMiB": 6493
+        "freeMiB": 3435
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:06:27.483Z"
+      "measuredAt": "2026-09-02T22:14:04.427Z"
     },
     {
       "run": 2,
@@ -88,20 +93,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 39066,
-      "selectToActiveMs": 57516,
-      "totalToActiveMs": 59600,
+      "selectToAdmittedMs": 35762,
+      "selectToActiveMs": 54080,
+      "totalToActiveMs": 55938,
       "gpuAtLaunch": {
-        "usedMiB": 10170,
+        "usedMiB": 12926,
         "totalMiB": 16303,
-        "freeMiB": 6133
+        "freeMiB": 3377
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:07:34.503Z"
+      "measuredAt": "2026-09-02T22:15:00.687Z"
     },
     {
       "run": 2,
@@ -112,20 +117,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 30343,
-      "selectToActiveMs": 51308,
-      "totalToActiveMs": 53230,
+      "selectToAdmittedMs": 28748,
+      "selectToActiveMs": 47930,
+      "totalToActiveMs": 49859,
       "gpuAtLaunch": {
-        "usedMiB": 12824,
+        "usedMiB": 12932,
         "totalMiB": 16303,
-        "freeMiB": 3479
+        "freeMiB": 3371
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:08:39.022Z"
+      "measuredAt": "2026-09-02T22:16:00.254Z"
     },
     {
       "run": 3,
@@ -136,20 +141,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 35931,
-      "selectToActiveMs": 53955,
-      "totalToActiveMs": 55796,
+      "selectToAdmittedMs": 34662,
+      "selectToActiveMs": 52935,
+      "totalToActiveMs": 54945,
       "gpuAtLaunch": {
-        "usedMiB": 12786,
+        "usedMiB": 12960,
         "totalMiB": 16303,
-        "freeMiB": 3517
+        "freeMiB": 3343
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:09:35.811Z"
+      "measuredAt": "2026-09-02T22:16:53.591Z"
     },
     {
       "run": 3,
@@ -160,20 +165,20 @@
       "pageErrors": [],
       "consoleErrors": [],
       "menuPipelines": 0,
-      "selectToAdmittedMs": 30614,
-      "selectToActiveMs": 50939,
-      "totalToActiveMs": 52935,
+      "selectToAdmittedMs": 28842,
+      "selectToActiveMs": 48633,
+      "totalToActiveMs": 50548,
       "gpuAtLaunch": {
-        "usedMiB": 12992,
+        "usedMiB": 12958,
         "totalMiB": 16303,
-        "freeMiB": 3311
+        "freeMiB": 3345
       },
       "comfyAtLaunch": {
         "reachable": true,
         "running": 1,
         "pending": 0
       },
-      "measuredAt": "2026-09-02T22:10:35.104Z"
+      "measuredAt": "2026-09-02T22:17:52.098Z"
     }
   ]
 }

@@ -24,8 +24,9 @@
 // One browser at a time: the probe launches and closes its own, and this
 // script runs them strictly in sequence.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -68,7 +69,29 @@ function probe(arena, label) {
   return JSON.parse(readFileSync(resolve(out), 'utf8'));
 }
 
+/**
+ * A digest of the BUILT BUNDLE this receipt measured.
+ *
+ * The obvious identifier is the git SHA, and it is recorded below, but it
+ * cannot be what a publish guard checks: committing the receipt changes HEAD,
+ * so a receipt pinned to HEAD can never match the tree that contains it. The
+ * bundle bytes have no such circularity - they are what actually gets served,
+ * they are what the probe actually loaded, and they do not move when a doc
+ * file is committed beside them.
+ */
+function distDigest(distDir) {
+  const assets = join(resolve(distDir), 'assets');
+  const files = readdirSync(assets).filter((name) => name.endsWith('.js')).sort();
+  const hash = createHash('sha256');
+  for (const name of files) {
+    hash.update(name);
+    hash.update(readFileSync(join(assets, name)));
+  }
+  return { sha256: hash.digest('hex'), files: files.length };
+}
+
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const bundle = distDigest(DIST);
 const runs = [];
 for (let i = 1; i <= RUNS; i += 1) {
   for (const arena of ARENAS) {
@@ -127,6 +150,9 @@ const receipt = {
   contract: 'farcrysis-admission-evidence-v1',
   measuredAt: new Date().toISOString(),
   sha,
+  shaNote: 'informational only - committing this receipt changes HEAD, so a guard '
+    + 'must key on bundle.sha256, which names the bytes the probe actually loaded',
+  bundle,
   dist: resolve(DIST),
   runs: RUNS,
   arenas: ARENAS,

@@ -85,6 +85,22 @@ immune to that, because a busy machine slows the control too.
 +    return entries_seen, selectable_entries
 +
 +
++def farcrysis_admission_bundle_digest(dist_dir):
++    """sha256 over the built JS bundle, byte-identical to the collector's own digest.
++
++    Same recipe as scripts/qa/collect-farcrysis-admission-evidence.mjs: every
++    assets/*.js file, sorted by name, each contributing its NAME then its BYTES.
++    The name is hashed too so that a rename alone cannot leave the digest equal.
++    """
++    digest = hashlib.sha256()
++    for name in sorted(os.path.basename(p) for p in
++                       glob.glob(os.path.join(dist_dir, "assets", "*.js"))):
++        digest.update(name.encode("utf-8"))
++        with open(os.path.join(dist_dir, "assets", name), "rb") as fh:
++            digest.update(fh.read())
++    return digest.hexdigest()
++
++
 +def assert_farcrysis_admission_evidence(dist_dir):
 +    """HF-423: farcrysis may enter the menu ONLY behind measured admission evidence.
 +
@@ -114,11 +130,18 @@ immune to that, because a busy machine slows the control too.
 +        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt is not a "
 +                 f"farcrysis-admission-evidence-v1 document ({receipt.get('contract')!r}).")
 +
-+    head = sh(["git", "rev-parse", "HEAD"]).strip()
-+    if receipt.get("sha") != head:
-+        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt was measured on "
-+                 f"{receipt.get('sha')!r}, not on the tree being published ({head!r}). "
-+                 "A receipt from another commit is not evidence about this one.")
++    # The receipt must describe THIS build. Keyed on the bundle bytes, not on the
++    # git SHA: committing the receipt changes HEAD, so a receipt pinned to HEAD
++    # could never match the tree that contains it, and a guard that cannot be
++    # satisfied gets deleted. The bundle digest has no such circularity - it is
++    # what the probe loaded and what gh-pages will serve.
++    built = farcrysis_admission_bundle_digest(dist_dir)
++    claimed = (receipt.get("bundle") or {}).get("sha256")
++    if claimed != built:
++        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt measured bundle "
++                 f"{str(claimed)[:12]}..., but this dist is {built[:12]}.... Rebuild, then "
++                 "re-run `node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3`. "
++                 "A receipt for other bytes is not evidence about these.")
 +
 +    summary = receipt.get("summary") or {}
 +    runs = receipt.get("runs") or 0
@@ -166,8 +189,10 @@ immune to that, because a busy machine slows the control too.
 +            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,legacyAliases:[]")
 +        bad = os.path.join(red_dir, "bad-receipt.json")
 +        with open(bad, "w", encoding="utf-8") as fh:
++            # The digest MATCHES on purpose, so the refusal below can only come from
++            # the ratio. A red test that fails for an incidental reason proves nothing.
 +            json.dump({"contract": "farcrysis-admission-evidence-v1",
-+                       "sha": sh(["git", "rev-parse", "HEAD"]).strip(),
++                       "bundle": {"sha256": farcrysis_admission_bundle_digest(red_dir)},
 +                       "runs": 3,
 +                       "summary": {"allAdmitted": True, "anyCrashed": False,
 +                                   "anyPageErrors": False, "maxMenuPipelines": 0,
@@ -215,11 +240,14 @@ immune to that, because a busy machine slows the control too.
 
 NOTES FOR WHOEVER APPLIES IT
 ----------------------------
-1. `json` is already imported in publish_pass85.py; `glob`, `os`, `re`, `sys` too.
-   No new imports are needed.
+1. `glob`, `hashlib`, `json`, `os`, `re` and `sys` are all already imported in
+   publish_pass85.py. No new imports are needed.
 2. The receipt path is pinned to this lane's evidence directory on purpose: it is
    a tracked file, so the receipt travels with the commit it describes and the
    sha check above cannot be satisfied by a stale local artifact.
-3. If PASS 87 ends up shipping farcrysis PARKED after all, this patch is still
+3. The receipt's `sha` field is informational and is NOT checked: it names the
+   commit the collector ran on, which is by construction the commit BEFORE the
+   one that carries the receipt. `bundle.sha256` is the field with authority.
+4. If PASS 87 ends up shipping farcrysis PARKED after all, this patch is still
    the right one to take: the parked branch passes without a receipt, and the
    guard is then already in place for whichever pass does unhide it.
