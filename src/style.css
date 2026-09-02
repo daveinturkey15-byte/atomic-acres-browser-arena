@@ -217,6 +217,12 @@ html[data-reduced-motion=true] *,html[data-reduced-motion=true] *::before,html[d
 
 .curated-kit-grid,.custom-kit-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.custom-kit-grid{margin-top:10px}.custom-kit-grid .kit-card,.curated-kit-grid .kit-card{min-height:184px}.manage-kit-card{border-style:dashed;background:linear-gradient(150deg,rgba(88,227,220,.08),rgba(0,0,0,.24))}.loadout-manager{margin-top:12px;padding:14px;border:1px solid rgba(88,227,220,.32);background:rgba(4,16,20,.82)}.loadout-manager header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.loadout-manager header span{font:700 9px/1 Inter;letter-spacing:.14em;color:var(--aqua)}.loadout-manager header strong{font:900 18px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em}.loadout-manager-grid{display:grid;grid-template-columns:.7fr 1.2fr repeat(3,1fr) auto;gap:8px;align-items:end}.loadout-manager-grid label{font:700 8px/1 Inter;letter-spacing:.12em;color:#9eb6b1}.loadout-manager-grid input,.loadout-manager-grid select{width:100%;margin-top:5px;min-height:34px;border:1px solid rgba(255,255,255,.16);background:#0d1c20;color:#fff}.loadout-manager-grid button{min-height:34px;padding:0 15px;border:1px solid var(--gold);background:rgba(244,196,79,.12);color:#fff;font:800 10px/1 Inter;letter-spacing:.1em}@media(max-width:900px){.curated-kit-grid,.custom-kit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.loadout-manager-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.curated-kit-grid,.custom-kit-grid,.loadout-manager-grid{grid-template-columns:1fr}}
 
+/* HF-406: the badge carries two derived lines - the stamped pass, then this pass's
+   feature line. The feature line is set explicitly so the UA `small` shrink cannot
+   push it under the 10px microcopy floor. */
+#last-updated-btn{display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px}
+#last-updated-btn>b{font:inherit;letter-spacing:inherit}
+#last-updated-btn>small{font:700 10px/1.1 Inter,sans-serif;letter-spacing:.1em;opacity:.82;max-width:42ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #last-updated-btn:hover{transform:translateY(-1px);border-color:var(--gold);background:linear-gradient(135deg,rgba(244,196,79,.16),rgba(12,21,25,.94))}
 #last-updated-btn:active{transform:translateY(0)}
 #menu.hidden ~ #last-updated-btn,
