@@ -139,6 +139,12 @@ describe('collider/visual parity gate (all six arenas)', () => {
       // Owner 2026-08-30: new arenas enter at ceiling 0 - the strictest floor.
       test1: 0,
       test2: 0,
+      // MAP3 (owner 2026-09-02, HF-405): same rule, same floor. This is the
+      // mirror pin of scripts/qa/ballistic-parity-ledger.ts, and it is here so
+      // that raising a ceiling has to be done TWICE, in two files, in review.
+      // Adding a row at 0 is the strictest possible entry, not a relaxation:
+      // it means every ghost shot surface Map 3 has is a failure.
+      map3: 0,
       'gun-range': 0,
       farcrysis: 0,
     });

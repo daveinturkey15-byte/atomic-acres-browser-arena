@@ -37,6 +37,23 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   test2: 'pass79-test-arena-preview-v1',
 });
 
+/**
+ * MAP3 (owner 2026-09-02, HF-405). Arenas that are registered and selectable
+ * but whose offline flyover has NOT been captured yet, and which therefore
+ * render the PREVIEW STANDBY card.
+ *
+ * This is an ALLOWLIST, not a relaxation. Everything below still asserts, for
+ * every arena outside it, exactly what it asserted before: real media, its own
+ * cache key, distinct URLs, real bytes on disk. What the list adds is a second,
+ * different obligation for the arenas inside it - empty URLs, mediaAvailable
+ * false, and the standby markup - so a pending arena cannot quietly point at
+ * another arena's bytes, which is the failure Test1 and Test2 actually shipped
+ * for a few hours on 2026-08-30. Adding an id here is a deliberate, reviewable
+ * act; forgetting to remove one fails `has no arena stuck in standby that
+ * already ships media` below.
+ */
+const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set(['map3']);
+
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
 
@@ -55,6 +72,14 @@ describe('prerecorded map-selection previews', () => {
       expect(definition.width / definition.height).toBeCloseTo(16 / 9, 5);
       expect(definition.width).toBe(2560);
       expect(definition.height).toBe(1440);
+      if (MEDIA_PENDING_ARENAS.has(id)) {
+        // A pending arena must declare NO media at all. An empty string can
+        // never collide with a shipped path, so it cannot become another
+        // arena's flyover by accident.
+        expect(definition.mediaAvailable).toBe(false);
+        expect([definition.webm, definition.mp4, definition.poster]).toEqual(['', '', '']);
+        return [];
+      }
       // HF-372 (Pass 77): every selectable arena now ships real media. The two
       // arenas authored after the Pass 66 family carry their own cache key --
       // reusing v15 for new bytes is exactly what the cache-family lock forbids.
@@ -73,8 +98,38 @@ describe('prerecorded map-selection previews', () => {
       return [definition.webm, definition.mp4, definition.poster];
     });
     expect(new Set(assets).size).toBe(assets.length);
-    // owner 2026-08-30: Test1/Test2 arenas added — six arenas became eight.
+    // owner 2026-08-30: Test1/Test2 arenas added. owner 2026-09-02 (HF-405):
+    // Map 3 added and pending capture, so the count is derived from the two
+    // rosters rather than written down again.
+    expect(assets).toHaveLength((ARENA_SELECTIONS.length - MEDIA_PENDING_ARENAS.size) * 3);
     expect(assets).toHaveLength(24);
+  });
+
+  // MAP3 (HF-405). Two obligations the allowlist above would otherwise leave
+  // unguarded: a pending arena must actually render the standby card, and an
+  // arena that ships media must never be left on the list.
+  it('renders the standby card for every arena whose flyover is still pending', () => {
+    for (const id of MEDIA_PENDING_ARENAS) {
+      const markup = menuPreviewVideoMarkup(id as Parameters<typeof menuPreviewVideoMarkup>[0]);
+      expect(markup).toContain(`data-arena="${id}"`);
+      expect(markup).toContain('data-media-state="poster-fallback"');
+      expect(markup).toContain('PREVIEW STANDBY');
+      expect(markup).not.toContain('<source');
+      expect(markup).toContain('data-renderer-submissions="0"');
+      expect(markup).not.toContain('<canvas');
+    }
+  });
+
+  it('has no arena stuck in standby that already ships media', () => {
+    for (const id of MEDIA_PENDING_ARENAS) {
+      expect(ARENA_SELECTIONS.map((arena) => String(arena.id))).toContain(id);
+      expect(menuPreviewVideoDefinition(id as Parameters<typeof menuPreviewVideoDefinition>[0]).mediaAvailable)
+        .toBe(false);
+    }
+    for (const arena of ARENA_SELECTIONS) {
+      if (MEDIA_PENDING_ARENAS.has(arena.id)) continue;
+      expect(menuPreviewVideoDefinition(arena.id).mediaAvailable).toBe(true);
+    }
   });
 
   it('keeps helicopter flyovers and the cat POV semantically explicit', () => {

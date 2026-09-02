@@ -79,6 +79,13 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   'test2': definition('test2', 63, [
     { id: 'estate-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
   ]),
+  // MAP3 (PREVIEW): nothing on this map is taller than the 5.2 m gantry beams,
+  // so the ceiling is set by sightline rather than by clearance. The hub is the
+  // one portal: it is the only place a support aircraft can descend without a
+  // pier line under it.
+  'map3': definition('map3', 58, [
+    { id: 'map3-hub-overflight', xQ: 0, zQ: 0, altitudeM: 24 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

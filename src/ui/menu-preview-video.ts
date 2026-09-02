@@ -166,6 +166,30 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  // MAP3 (PREVIEW), owner 2026-09-02 via HF-405. mediaAvailable is FALSE and
+  // that is the honest state, not an oversight: the shipped preview contract
+  // says a card's video is "a distinct prerecorded, compressed, locally hosted
+  // video of the actual selected production arena", and Map 3 has no such
+  // capture yet. Test1 and Test2 once shipped byte-copies of the Gun Range and
+  // High Seas media as placeholders, which meant hovering Test1 played another
+  // arena's flyover; the standby path below exists precisely so a new arena
+  // does not have to do that. The card renders PREVIEW STANDBY until the
+  // offline flyover recipe has been run against this arena.
+  'map3': Object.freeze({
+    arenaId: 'map3',
+    frame: 'helicopter',
+    label: 'PREVIEW // MAP 3',
+    motionLabel: 'FLYOVER NOT YET CAPTURED',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-map3-standby-v1',
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

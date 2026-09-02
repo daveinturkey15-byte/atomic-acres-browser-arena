@@ -223,6 +223,10 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   'test1': profile('test1', 'dry-range-gusty-crosswind', 0.94, 4.6, 3.8, 20, 0.8, false),
   // Hillside garden air: soft late-afternoon breeze, lazy broad fronts.
   'test2': profile('test2', 'hillside-garden-soft-breeze', -1.18, 2.2, 1.8, 18, 1.1, false),
+  // MAP3 (PREVIEW): open scrub with eight walled bays cut through it. The
+  // gust scale is the largest on the board (34 m) because the pier lines are
+  // what break the wind up, and they are 6.4 m apart down a 54 m lane.
+  'map3': profile('map3', 'open-scrub-gallery-crossbreeze', 0.62, 2.9, 2.6, 34, 1.0, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

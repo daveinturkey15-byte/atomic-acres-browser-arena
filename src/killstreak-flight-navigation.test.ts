@@ -53,8 +53,9 @@ describe('support flight navigation', () => {
 
   it('declares arena-owned nav data for every stable arena identity', () => {
     // owner 2026-08-30: Test1/Test2 arenas added.
+    // owner 2026-09-02 (HF-405): Map 3 added.
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
+      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');

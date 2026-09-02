@@ -44,6 +44,10 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // longer diagonal (125.7 m against 95.6 m). The map's tallest authored mass
   // is the 4.8 m house parapet, so nothing needs more depth than that.
   'test2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
+  // MAP3 (PREVIEW): the gallery is 168 x 168 m of playfield, so the volume is
+  // square and large. 176 x 176 at mapSize 2048 is 86 mm per texel, which is
+  // where arenas/map3.ts derives its 0.085 normal bias from.
+  'map3': Object.freeze({ halfWidth: 88, halfHeight: 88, near: 4, far: 300 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -64,6 +68,9 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // pool, in the same proportions the 0.22 was fitted to.
   'test1': 0.16,
   'test2': 0.22,
+  // MAP3 (PREVIEW): matte paving and stone piers with one shallow water basin
+  // - between Test1's dry range (0.16) and Test2's travertine-and-pool (0.22).
+  'map3': 0.18,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

@@ -18,6 +18,8 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
   'test1': () => import('./arenas/test1'),
   'test2': () => import('./arenas/test2'),
+  // MAP3 (PREVIEW), owner 2026-09-02 via HF-405.
+  'map3': () => import('./arenas/map3'),
 });
 
 export async function loadArenaVisualModule(

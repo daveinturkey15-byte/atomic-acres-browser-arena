@@ -39,6 +39,8 @@ describe('shared automatic match diagnostic schema', () => {
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(validateMatchDiagnosticEnvelope({ ...base, arena: 'test1' }).error).toBeNull();
     expect(validateMatchDiagnosticEnvelope({ ...base, arena: 'test2' }).error).toBeNull();
+    // MAP3 (HF-405).
+    expect(validateMatchDiagnosticEnvelope({ ...base, arena: 'map3' }).error).toBeNull();
     expect(validateMatchDiagnosticEnvelope({ ...base, rawPeerId: 'peer-real' }).error).toBe('invalid envelope shape');
     expect(validateMatchDiagnosticEnvelope({ ...base, pass: 'version sixty-four' }).error).toBe('invalid build identity');
     expect(validateMatchDiagnosticEnvelope({ ...base, completedAtEpochMinute: 1_800_001 }).error).toBe('invalid completion time');

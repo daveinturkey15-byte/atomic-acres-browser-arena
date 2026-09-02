@@ -53,8 +53,12 @@ describe('spatial audio contracts', () => {
 
   it('covers all arenas with distinct original beds inside continuous budgets', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
-    // owner 2026-08-30: Test1/Test2 arenas added — six distinct beds became eight.
-    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(8);
+    // owner 2026-08-30: Test1/Test2 arenas added; owner 2026-09-02 (HF-405)
+    // Map 3. Written against the registry rather than a literal so the
+    // property under test stays "every arena's bed is distinct" - which is the
+    // thing that matters - instead of a number that has now gone stale twice.
+    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size)
+      .toBe(Object.keys(ARENA_AUDIO_DEFINITIONS).length);
     expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });

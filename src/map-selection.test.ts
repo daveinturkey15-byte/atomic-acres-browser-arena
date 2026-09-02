@@ -9,11 +9,16 @@ import {
   hostedArenaDurationMs,
   isArenaId,
   soloLaunchLabel,
+  SELECTABLE_ARENAS,
 } from './map-selection';
 
 describe('opening arena selection', () => {
-  // owner 2026-08-30: Test1/Test2 arenas added — six maps became eight.
-  it('publishes eight unique, fully described maps', () => {
+  // owner 2026-08-30: Test1/Test2 arenas added. owner 2026-09-02 (HF-405):
+  // Map 3 registered as a PREVIEW arena. The count is deliberately not in the
+  // title any more - the same reason pass74-arena-boot-smoke.spec.ts stopped
+  // writing "all six arenas" down: a title that names a number goes stale
+  // silently, and the roster below is the assertion that matters.
+  it('publishes a unique, fully described map for every registered arena', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
       'atomic-acres',
       'skyline-terminal',
@@ -23,9 +28,10 @@ describe('opening arena selection', () => {
       'high-seas',
       'test1',
       'test2',
+      'map3',
     ]);
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Test1', 'Test2']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(8);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Test1', 'Test2', 'Map 3']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(ARENA_SELECTIONS.length);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -114,7 +120,7 @@ describe('opening arena selection', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -124,6 +130,7 @@ describe('opening arena selection', () => {
       'High Seas multiplayer arena',
       'Test1 multiplayer arena',
       'Test2 multiplayer arena',
+      'Map 3 multiplayer arena',
     ]);
   });
 
@@ -139,6 +146,10 @@ describe('opening arena selection', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       'test1': true,
       'test2': true,
+      // MAP3 (HF-405): field support is OFF while the arena is a solo preview.
+      // Support rewards are hosted-authoritative and this arena has had no
+      // two-client lane run against it.
+      'map3': false,
     });
   });
 
@@ -168,7 +179,30 @@ describe('opening arena selection', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
+      // MAP3 (HF-405).
+      '2 BOTS SKIRMISH',
     ]);
+  });
+
+  // MAP3 (owner 2026-09-02, HF-405). Map 3 ships selectable and SOLO. The
+  // failure this pins is the one the repo has already had twice: an arena that
+  // is registered but not offered ("published but unselectable"), or one that
+  // advertises hosted lobbies nobody has run a two-client lane against.
+  it('offers Map 3 as a selectable solo preview and never as a hosted lobby', () => {
+    const map3 = arenaSelection('map3');
+    expect(map3.id).toBe('map3');
+    expect(map3.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    expect(map3.multiplayer).toBe(false);
+    expect(map3.fieldSupport).toBe(false);
+    expect(map3.overdrive).toBe(false);
+    // The card has to SAY preview, or "solo only" is a surprise at the lobby.
+    expect(map3.selectorLabel).toContain('PREVIEW');
+    expect(map3.rulesLabel).toContain('SOLO PREVIEW');
+    // Stable id is the network/storage boundary from the first commit.
+    expect(decodeArenaId('map3')).toBe('map3');
+    expect(isArenaId('map3')).toBe(true);
+    expect(ARENA_IDS).toContain('map3');
   });
 
   it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {

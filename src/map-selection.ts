@@ -5,7 +5,7 @@ import type { ArenaId } from './arena-identity';
 
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -195,6 +195,37 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // MAP3 (owner 2026-09-02, HF-405): Map 3 registered as a real arena, and
+  // labelled PREVIEW in the menu because that is exactly what it is.
+  //
+  // `multiplayer: false` is the load-bearing field. Every other arena here
+  // ships hosted lobbies, and this one has not had a two-client lane run
+  // against it, so offering "HOST UP TO 6" would be a claim nobody has
+  // measured. It is selectable and it boots solo; the id is already the
+  // network and storage boundary, so promoting it later is one field.
+  //
+  // Solo bot count matches Test1/Test2 rather than Atomic Acres' escalating
+  // ladder: `activeSoloBotTarget` only escalates for 'atomic-acres', so 2 is
+  // both the start and the cap.
+  Object.freeze({
+    id: 'map3' as const,
+    routeId: 'map3' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'MAP 3 · PREVIEW',
+    displayName: 'Map 3',
+    titleLead: 'MAP',
+    titleAccent: '3',
+    menuLede: 'Walk an original stone gallery — a paved hub with eight walled bays running off it, each built around one idea, every bay flankable through the gaps in its pier lines. Solo preview.',
+    summary: 'Corridor gallery · solo preview · 2 bots',
+    rulesLabel: '5 MIN · SOLO PREVIEW · 2 BOTS',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: false,
+    fieldSupport: false,
+    overdrive: false,
+    selectable: true,
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);

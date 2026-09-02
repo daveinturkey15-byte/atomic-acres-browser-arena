@@ -118,6 +118,9 @@ export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = O
   // Test2 plays outdoors but between travertine walls, hedges and the pool
   // court — a step more reflective than bare open ground.
   'test2': 'urban-yard',
+  // MAP3 (PREVIEW): 4.2 m pier canyons on stone paving. Not a hall - the bays
+  // are open to the sky - so it is the yard response, not the industrial one.
+  'map3': 'urban-yard',
 });
 
 export const DEFAULT_ACOUSTIC_SPACE: AcousticSpace = 'open-field';

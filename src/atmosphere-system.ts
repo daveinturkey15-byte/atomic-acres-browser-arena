@@ -119,6 +119,18 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 14, 2.2, 3.8, 0.9], [18, -14, 2.2, 3.8, 3.2],
     ] as SmokeCard[]),
   }),
+  // MAP3 (PREVIEW): mist sits in the outdoor wedges between the bays, which is
+  // where the ground is open and the air is not walled in; the bays themselves
+  // stay clear so a 54 m lane reads to its end.
+  'map3': Object.freeze({
+    mist: Object.freeze([
+      [26, 26, 16, 4.4], [-26, -26, 16, 4.4], [-26, 26, 14, 4.0],
+      [26, -26, 14, 4.0], [0, 46, 15, 4.2], [0, -46, 15, 4.2],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-40, 12, 2.4, 4.2, 1.4], [40, -12, 2.4, 4.2, 3.9],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
