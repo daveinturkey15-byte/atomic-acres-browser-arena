@@ -96,6 +96,16 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // measurement rather than left at the old one, so this coverage cannot be
   // silently spent later.
   test2: { meshes: 5, footprintM2: 280 },
+  // MAP3 (owner 2026-09-02, HF-405). MEASURED on the authored build, not
+  // guessed: the water bay's two sunken basins either side of its walkway are
+  // the arena's whole reflective budget, authored at roughness 0.10 against
+  // the 0.22 mirror ceiling. 2 meshes / 272.0 m2 (3.4 m x 40 m each), so the
+  // floor is pinned at 272. A stone gallery is a VALUE map and is never going
+  // to be a chrome one, but "never zero anywhere" is the contract this file
+  // exists to hold, and the basins are what holds it here: deleting them
+  // silently would put Map 3 in the exact pass79 state this gate was written
+  // for - a correctly-implemented reflection layer rendering nothing.
+  map3: { meshes: 2, footprintM2: 272 },
 };
 
 type Coverage = {
@@ -155,6 +165,8 @@ beforeAll(async () => {
     { buildFarcrysis },
     { buildHighSeas },
     { buildTest1, buildTest2 },
+    // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the proxy-coverage sweep.
+    { buildMap3 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -164,6 +176,7 @@ beforeAll(async () => {
     import('../../farcrysis'),
     import('../../high-seas'),
     import('../../test-maps'),
+    import('../../map3-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -179,6 +192,8 @@ beforeAll(async () => {
     // Owner 2026-08-30: Test1/Test2 join the proxy-coverage sweep.
     test1: buildTest1,
     test2: buildTest2,
+    // MAP3 (owner 2026-09-02, HF-405).
+    map3: buildMap3,
   };
 
   for (const id of ALL_ARENA_IDS) {

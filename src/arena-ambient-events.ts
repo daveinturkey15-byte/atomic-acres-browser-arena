@@ -169,6 +169,19 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('t2.gate-clink', 'clank', 2, [1_600, 1_250], 0.12, 0.013, 0, 27),
     event('t2.distant-songbird', 'call', 2, [1_900, 2_500], 0.45, 0.015, 0, 50),
   ]),
+  // MAP3 (PREVIEW): a stone gallery on open scrub. Everything here is either
+  // the building settling or the wind finding an edge of it - there is no
+  // wildlife bed, because eight walled bays radiating off a paved hub is the
+  // one arena where the ambience should be architecture, not habitat.
+  'map3': profile('map3', 'stone-gallery-and-open-scrub', [7, 16], [
+    event('m3.pier-echo', 'clank', 5, [820, 640], 0.22, 0.017, 0, 24),
+    event('m3.wind-through-gap', 'whoosh', 6, [340, 150], 1.70, 0.019, 0.9, 16),
+    event('m3.grit-skitter', 'rustle', 4, [2_400, 1_500], 0.55, 0.014, 1.4, 11),
+    event('m3.lintel-creak', 'creak', 3, [190, 120], 1.00, 0.013, 0, 21),
+    event('m3.basin-lap', 'whoosh', 3, [400, 180], 0.90, 0.016, 1.1, 30),
+    event('m3.scrub-bird', 'chirp', 3, [2_200, 2_900], 0.12, 0.020, 0, 44),
+    event('m3.distant-hail', 'call', 2, [560, 430], 0.36, 0.016, 0, 58),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */

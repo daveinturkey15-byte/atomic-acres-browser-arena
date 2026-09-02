@@ -60,6 +60,9 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // shoot-through rows; anything the audit finds must be fixed, not accepted.
   test1: [],
   test2: [],
+  // MAP3 (owner 2026-09-02, HF-405): same rule - a new arena starts with an
+  // EMPTY accepted ledger. Anything the audit finds is a bug in the arena.
+  map3: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -88,6 +91,9 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   'high-seas': 0,
   test1: 0,
   test2: 0,
+  // MAP3 (HF-405): enters at the strictest possible ceiling, not at whatever
+  // it happens to measure.
+  map3: 0,
   'gun-range': 0,
   farcrysis: 0,
 });

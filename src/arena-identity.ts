@@ -14,6 +14,10 @@ export const ARENA_IDS = Object.freeze([
   'high-seas',
   'test1',
   'test2',
+  // MAP3 (owner 2026-09-02, HF-405). Ships PREVIEW and solo-only, but the
+  // id is the network, replay and storage boundary from the first commit:
+  // promoting it later must never require moving it.
+  'map3',
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];

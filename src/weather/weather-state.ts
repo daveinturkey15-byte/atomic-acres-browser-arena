@@ -224,6 +224,10 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   'test1': arenaProfile('test1', 'dry-range-hard-sun', false, ['clear']),
   // Golden-hour hillside estate: pinned clear by design.
   'test2': arenaProfile('test2', 'golden-hour-hillside-clear', false, ['clear']),
+  // MAP3 (PREVIEW): the bays are open to the sky, so weather is real here, but
+  // the arena is authored for hard midmorning light and rain would contradict
+  // the whole grade. Clear and overcast only until it leaves preview.
+  'map3': arenaProfile('map3', 'open-scrub-midmorning-clear', false, ['clear', 'overcast']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

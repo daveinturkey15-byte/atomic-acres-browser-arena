@@ -665,13 +665,14 @@ let factoriesPromise: Promise<ArenaFactories> | null = null;
 async function loadFactories(): Promise<ArenaFactories> {
   if (!factoriesPromise) {
     factoriesPromise = (async () => {
-      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }] = await Promise.all([
+      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }] = await Promise.all([
         import('../../src/map'),
         import('../../src/additional-maps'),
         import('../../src/farcrysis'),
         import('../../src/high-seas'),
         import('../../src/environment-assets'),
         import('../../src/test-maps'),
+        import('../../src/map3-arena'),
       ]);
       return {
         'atomic-acres': {
@@ -689,6 +690,8 @@ async function loadFactories(): Promise<ArenaFactories> {
         // Owner 2026-08-30: Test1/Test2 join the audit.
         test1: { build: buildTest1 },
         test2: { build: buildTest2 },
+        // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the audit.
+        map3: { build: buildMap3 },
       } satisfies ArenaFactories;
     })();
   }
@@ -696,7 +699,9 @@ async function loadFactories(): Promise<ArenaFactories> {
 }
 
 // Owner 2026-08-30: Test1/Test2 join the mechanical parity audit.
-export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2'] as const;
+// MAP3 (owner 2026-09-02, HF-405): Map 3 joins it too. A roster that does not
+// name a shipped arena is a gate that never looked at it.
+export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3'] as const;
 
 /**
  * Runs the mechanical audit for the requested arenas inside plain Node/vitest.

@@ -41,6 +41,9 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'high-seas': 8,
   'test1': 7,
   'test2': 7,
+  // MAP3 (PREVIEW): a bay is 9 m of clear width between pier lines, so a trap
+  // radius wider than that would call every legal bay spawn trapped.
+  'map3': 8,
 });
 
 export const FFA_MINIMUM_SPAWN_SEPARATION = 8;

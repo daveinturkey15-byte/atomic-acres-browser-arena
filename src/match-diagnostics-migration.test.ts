@@ -17,6 +17,12 @@ const testArenaExpansionMigration = readFileSync(
   new URL('../worker/migrations/0006_add_test_arenas.sql', import.meta.url),
   'utf8',
 );
+// MAP3 (owner 2026-09-02, HF-405): 0007 rebuilds the CHECK to the nine-arena
+// set. Same pattern, same reason - SQLite cannot alter a CHECK in place.
+const map3ArenaExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0007_add_map3_arena.sql', import.meta.url),
+  'utf8',
+);
 
 const insertDiagnostic = (database: DatabaseSync, receiptId: string, arena: string): void => {
   database.prepare(`
@@ -51,6 +57,7 @@ describe('match diagnostics arena expansion migration', () => {
 
       database.exec(arenaExpansionMigration);
       database.exec(testArenaExpansionMigration);
+      database.exec(map3ArenaExpansionMigration);
 
       for (const arena of ARENA_IDS) insertDiagnostic(database, `new-${arena}`, arena);
 

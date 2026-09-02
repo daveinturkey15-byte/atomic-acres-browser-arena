@@ -285,6 +285,15 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.085, modulationDepth: 0.09,
     bedPosition: Object.freeze({ x: -20, y: 3, z: 12 }), airPosition: Object.freeze({ x: 22, y: 5, z: -16 }),
   }),
+  // MAP3 (PREVIEW): the bed is the wind in the colonnade bay, the air layer is
+  // the open scrub on the far side of the hub. Both are placed off-axis from
+  // the hub centre so the layer has a bearing to walk around.
+  'map3': Object.freeze({
+    arenaId: 'map3', identity: 'stone-gallery-wind-and-open-scrub', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 46, airFrequencyHz: 182, airLowpassHz: 720, airQ: 1.7, airGain: 0.0062,
+    modulationHz: 0.073, modulationDepth: 0.11,
+    bedPosition: Object.freeze({ x: -34, y: 4, z: -34 }), airPosition: Object.freeze({ x: 30, y: 6, z: 30 }),
+  }),
 });
 
 export function validateArenaAudioDefinitions(): readonly string[] {

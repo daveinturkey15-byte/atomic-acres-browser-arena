@@ -2,6 +2,7 @@ import choreographyJson from '../../source-assets/menu/pass65-preview-masters/ch
 import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
 import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
 import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
+import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -145,6 +146,14 @@ const TEST_ARENAS_CHOREOGRAPHY = testArenasChoreographyJson as unknown as Readon
   recipeId: string;
   arenas: Readonly<{ test1: HelicopterRecipe; test2: HelicopterRecipe }>;
 }>;
+// MAP3 (owner 2026-09-02, HF-405): same extension pattern again. The camera
+// recipe is authored here even though no media has been captured against it
+// yet - a card cannot leave standby without one, and authoring it now is what
+// makes the capture a mechanical step rather than a design step.
+const MAP3_CHOREOGRAPHY = map3ChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ map3: HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
@@ -154,6 +163,7 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     ...FARCRYSIS_CHOREOGRAPHY.arenas,
     ...HIGH_SEAS_CHOREOGRAPHY.arenas,
     ...TEST_ARENAS_CHOREOGRAPHY.arenas,
+    ...MAP3_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

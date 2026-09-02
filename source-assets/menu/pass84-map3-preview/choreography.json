@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass84-map3-menu-preview-v1",
+  "generatedAt": "2026-09-02",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "MAP3 (owner 2026-09-02, HF-405). Additive family, same reason as pass77 and pass79: the Pass 66 masters choreography is digest-pinned by the retained production gate, so a new arena rides beside it rather than rewriting accepted history. This is the AUTHORING recipe; the capture was run against it with AA_PREVIEW_REVIEW_ONLY=1 AA_PREVIEW_ARENAS=map3 and encoded by scripts/assets/finalize-pass84-map3-menu-preview.mjs into the pass84-map3-preview-v1 cache family.",
+  "arenas": {
+    "map3": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // MAP 3 · PREVIEW",
+      "presentationId": "menu-video-runtime-helo-map3-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 84013001,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.6,
+        0
+      ],
+      "radius": [
+        46,
+        36
+      ],
+      "altitudeM": 34,
+      "lookAt": [
+        0,
+        2.0,
+        0
+      ],
+      "phaseRadians": 1.15,
+      "safeVolume": {
+        "x": [
+          -47.5,
+          47.5
+        ],
+        "y": [
+          33,
+          35
+        ],
+        "z": [
+          -37.5,
+          37.5
+        ]
+      },
+      "reviewLabel": "Map 3 corridor gallery cockpit flyover"
+    }
+  }
+}

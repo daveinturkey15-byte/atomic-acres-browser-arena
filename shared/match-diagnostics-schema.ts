@@ -7,6 +7,10 @@ export const MATCH_DIAGNOSTIC_RETENTION_DAYS = 30;
 export const MATCH_DIAGNOSTIC_BACKENDS = ['webgpu', 'webgl-compatibility'] as const;
 export const MATCH_DIAGNOSTIC_ARENAS = [
   'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2',
+  // MAP3 (owner 2026-09-02, HF-405). Paired with worker/migrations/
+  // 0007_add_map3_arena.sql: this list and that CHECK constraint are the two
+  // halves of the same boundary and must never drift apart.
+  'map3',
 ] as const;
 // Owner 2026-08-30: Domination ships with the Test2 arena.
 export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa', 'domination'] as const;

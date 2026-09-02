@@ -288,6 +288,14 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-18, 14, 2.2, 3.8], [18, -14, 2.2, 3.8]],
     { count: 48, minX: -32, maxX: 32, minZ: -24, maxZ: 24 },
   ),
+  // MAP3 (PREVIEW): mirrors ATMOSPHERE_LAYOUTS in atmosphere-system.ts - mist
+  // in the wedges, not in the bays - and a dust box that covers the hub and the
+  // inner half of every bay, which is where a player actually is.
+  'map3': atmosphereLayout(
+    [[26, 26, 16, 4.4], [-26, -26, 16, 4.4], [-26, 26, 14, 4.0], [26, -26, 14, 4.0]],
+    [[-40, 12, 2.4, 4.2], [40, -12, 2.4, 4.2]],
+    { count: 56, minX: -46, maxX: 46, minZ: -46, maxZ: 46 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

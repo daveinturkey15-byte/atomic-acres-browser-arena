@@ -275,6 +275,15 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.5, kind: 'seed', colorWarm: 0xf6e6b8, colorCool: 0xc8c49c, radiusM: 0.045, fallMps: 0.24, windPull: 0.7, flutterMps: 0.55, spinRadiansPerSecond: 1.4, opacity: 0.12 },
     0.6, 21, 13, 4,
   ),
+  // MAP3 (PREVIEW): stone dust off the paving and dry seed blowing in off the
+  // scrub. Shaft response is the highest in the catalog because the volume bay
+  // is built to make a shaft, and this is the layer that has to be in it.
+  'map3': arena(
+    'map3', 'stone-dust-and-scrub-seed',
+    { density: 0.7, colorWarm: 0xe8e0cc, colorCool: 0xc4c6c0, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.2, windPull: 0.7, opacity: 0.09 },
+    { density: 0.4, kind: 'seed', colorWarm: 0xe0d6b0, colorCool: 0xb4b09c, radiusM: 0.042, fallMps: 0.28, windPull: 0.8, flutterMps: 0.58, spinRadiansPerSecond: 1.5, opacity: 0.1 },
+    0.8, 22, 13, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

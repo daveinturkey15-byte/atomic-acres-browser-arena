@@ -558,6 +558,49 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.8,
     },
   }),
+  // MAP3 (PREVIEW): the only COOL arena in the catalog. Every other outdoor
+  // map is warm-led - suburban sunset, sodium night, airport dawn, jungle and
+  // estate golden hour, khaki range - so the grade that makes a stone gallery
+  // read as a different place is the one that goes the other way: blue-led
+  // gain, the lowest saturation on the board, and the split tone's warmth
+  // spent entirely on the highlight so the sunlit paving still separates from
+  // the pier shade.
+  'map3': frozen({
+    id: 'map3',
+    brief: 'Stone corridor gallery under hard midmorning sun - cool paving, warm sun on the edges.',
+    cdl: {
+      // Blue-led (b > g > r): the inverse ordering of every warm arena, which
+      // is what gives it its own quadrant of the grade space rather than a
+      // slightly different amount of amber.
+      gain: [0.9, 0.98, 1.1],
+      lift: [0.0005, 0.003, 0.006],
+      gamma: [1.04, 1.03, 1.0],
+    },
+    // Stone, and nothing but stone: pushing saturation here only tints the
+    // grey. The identity is in hue ORDER and contrast, not in chroma.
+    saturationScale: 0.92,
+    contrastScale: 1.05,
+    // Positive: a slight channel bleed toward the neighbour average, which is
+    // what dusty air over pale stone actually does. Every warm arena is
+    // negative here, so this separates on that axis too.
+    crosstalkDelta: 0.06,
+    splitTone: {
+      shadowTint: 0x2e4a63,      // sky fill in a 4.2 m pier canyon
+      highlightTint: 0xffe3b4,   // low sun raking the paving and lintels
+      strengthScale: 1.3,
+      shadowBalance: 0.5,
+      highlightBalance: 0.46,
+    },
+    midtoneContrastDelta: 0.07,
+    vignette: { base: 0.06, settingScale: 1 },
+    bloom: { intensityScale: 0.92, thresholdScale: 1.08 },
+    atmosphere: {
+      mistNear: 0xc2ccd4, mistFar: 0xe6eef2,
+      smokeNear: 0x3a4048, smokeFar: 0x94a0aa,
+      dustNear: 0xd2d4cc, dustFar: 0xf0f2ee,
+      density: 0.7,
+    },
+  }),
 });
 
 // Fail closed at module init: an out-of-bounds authored value is a build

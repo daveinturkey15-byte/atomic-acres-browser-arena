@@ -10,10 +10,17 @@
     "gun-range": 2,
     "high-seas": 2,
     "test1": 0,
-    "test2": 0
+    "test2": 0,
+    "map3": -1
   },
   "unmeasuredCeiling": -1,
-  "unmeasured": [],
+  "unmeasured": [
+    {
+      "arena": "map3",
+      "since": "2026-09-02",
+      "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
+    }
+  ],
   "accepted": [
     {
       "arena": "gun-range",
@@ -49,7 +56,8 @@
       "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
-      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)"
+      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
+      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },

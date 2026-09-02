@@ -31,6 +31,14 @@ const PASS77_CACHE_KEY = 'pass77-arena-preview-v1';
 // off the placeholder family - a new byte under an old key is exactly what the
 // cache-family lock exists to prevent.
 const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
+// MAP3 (owner 2026-09-02, HF-405): the fourth additive family. Map 3's own
+// flyover, captured from its own authoritative WebGPU runtime arena by
+// scripts/assets/generate-pass65-runtime-menu-previews.ts and encoded by
+// scripts/assets/finalize-pass84-map3-menu-preview.mjs with the Pass 66
+// profiles. It gets its own key rather than riding an existing one for the
+// reason the comment above records: a new byte under an old key is exactly
+// what the cache-family lock exists to prevent.
+const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -162,6 +170,28 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     webm: `${ROOT}/test2.webm?v=${PASS79_CACHE_KEY}`,
     mp4: `${ROOT}/test2.mp4?v=${PASS79_CACHE_KEY}`,
     poster: `${ROOT}/test2.webp?v=${PASS79_CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
+  // MAP3 (PREVIEW), owner 2026-09-02 via HF-405. Map 3 shipped for exactly one
+  // commit (45f45cc2) with mediaAvailable FALSE and a labelled PREVIEW STANDBY
+  // card, which was the honest state while its flyover did not exist. It now
+  // has one: 240 frames captured from the actual Map 3 authoritative runtime
+  // arena on the canonical WebGPU route, encoded with the Pass 66 profiles into
+  // its own cache family. What it never did, at any point, was point at another
+  // arena's bytes - which is what Test1 and Test2 shipped on 2026-08-30.
+  'map3': Object.freeze({
+    arenaId: 'map3',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // MAP 3',
+    motionLabel: 'CORRIDOR GALLERY FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-map3-v1',
+    mediaAvailable: true,
+    webm: `${ROOT}/map3.webm?v=${PASS84_CACHE_KEY}`,
+    mp4: `${ROOT}/map3.mp4?v=${PASS84_CACHE_KEY}`,
+    poster: `${ROOT}/map3.webp?v=${PASS84_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

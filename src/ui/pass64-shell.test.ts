@@ -36,6 +36,8 @@ describe('Pass 66 command shell', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       'test1',
       'test2',
+      // MAP3 (owner 2026-09-02, HF-405): shipped selectable, labelled PREVIEW.
+      'map3',
     ]);
     // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
     expect(markup).not.toContain('data-arena-route="farcrysis"');
