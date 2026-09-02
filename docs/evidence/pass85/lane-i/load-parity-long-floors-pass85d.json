@@ -1,0 +1,450 @@
+{
+  "generatedAt": "2026-09-02T16:37:26.052Z",
+  "label": "pass85d",
+  "base": "http://127.0.0.1:41947",
+  "gitSha": "6be910acb5c91e9b08f1112697a56d78f93e2ae8",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "iblparity",
+  "machine": {
+    "comfyUi": "idle",
+    "gpuFreeMiB": 11183,
+    "gpuTotalMiB": 16303
+  },
+  "arenas": {
+    "farcrysis": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "farcrysis-beach-golden",
+            "farcrysis-jungle-dapple",
+            "farcrysis-core-interior",
+            "farcrysis-seaplane-throwback",
+            "farcrysis-island-topdown",
+            "farcrysis-west-shoreline"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-farcrysis-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-jungle-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "farcrysis",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-farcrysis-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-jungle-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "farcrysis-beach-golden",
+            "ok": true
+          },
+          {
+            "cameraId": "farcrysis-jungle-dapple",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1719,
+          "meanLuminanceSecond": 0.1719,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00027
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "farcrysis-beach-golden",
+            "farcrysis-jungle-dapple",
+            "farcrysis-core-interior",
+            "farcrysis-seaplane-throwback",
+            "farcrysis-island-topdown",
+            "farcrysis-west-shoreline"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-farcrysis-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-jungle-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "farcrysis",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-farcrysis-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-jungle-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "farcrysis-beach-golden",
+            "ok": true
+          },
+          {
+            "cameraId": "farcrysis-jungle-dapple",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1715,
+          "meanLuminanceSecond": 0.1715,
+          "meanLuminanceDeltaPercent": -0.02,
+          "pixelsMovedPercent": 0.1,
+          "meanAbsDelta": 0.00027
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "farcrysis",
+        "second": "farcrysis"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "farcrysis-beach-golden",
+          "ok": true,
+          "meanLuminanceFirst": 0.2887,
+          "meanLuminanceSecond": 0.2902,
+          "meanLuminanceDeltaPercent": 0.54,
+          "pixelsMovedPercent": 16.6,
+          "meanAbsDelta": 0.01408,
+          "cameraNoisePercent": 0.02,
+          "cameraNoiseMovedPercent": 0,
+          "longFloorMs": 15000,
+          "longNoisePercent": 3.9,
+          "longNoiseMovedPercent": 6.8,
+          "withinCameraNoise": false,
+          "withinLongFloor": false
+        },
+        {
+          "cameraId": "farcrysis-jungle-dapple",
+          "ok": true,
+          "meanLuminanceFirst": 0.1724,
+          "meanLuminanceSecond": 0.1715,
+          "meanLuminanceDeltaPercent": -0.53,
+          "pixelsMovedPercent": 19.9,
+          "meanAbsDelta": 0.01651,
+          "cameraNoisePercent": 0.25,
+          "cameraNoiseMovedPercent": 6.3,
+          "longFloorMs": 15000,
+          "longNoisePercent": 0.26,
+          "longNoiseMovedPercent": 6.3,
+          "withinCameraNoise": false,
+          "withinLongFloor": false
+        }
+      ],
+      "noiseFloorPercent": 0.02,
+      "noiseFloorMovedPercent": 0.1
+    },
+    "atomic-acres": {
+      "warmupArena": "farcrysis",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "nuke-town-overview",
+            "nuke-town-plan",
+            "nuke-town-street-axis",
+            "nuke-town-west-garden",
+            "nuke-town-aqua-upper-roof",
+            "nuke-town-aqua-wall-closed",
+            "nuke-town-aqua-door-open"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+          "sceneEnvironmentIntensity": 0.24,
+          "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "atomic-acres",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-atomic-acres-256",
+            "environmentIntensity": 0.24,
+            "expectedEnvironmentIntensity": 0.24,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "nuke-town-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "nuke-town-plan",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0.6,
+          "meanAbsDelta": 0.00046
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "nuke-town-overview",
+            "nuke-town-plan",
+            "nuke-town-street-axis",
+            "nuke-town-west-garden",
+            "nuke-town-aqua-upper-roof",
+            "nuke-town-aqua-wall-closed",
+            "nuke-town-aqua-door-open"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+          "sceneEnvironmentIntensity": 0.24,
+          "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "atomic-acres",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-atomic-acres-256",
+            "environmentIntensity": 0.24,
+            "expectedEnvironmentIntensity": 0.24,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "nuke-town-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "nuke-town-plan",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0.6,
+          "meanAbsDelta": 0.00042
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "atomic-acres",
+        "second": "atomic-acres"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.1791,
+          "meanLuminanceSecond": 0.179,
+          "meanLuminanceDeltaPercent": -0.02,
+          "pixelsMovedPercent": 1,
+          "meanAbsDelta": 0.00057,
+          "cameraNoisePercent": 3.63,
+          "cameraNoiseMovedPercent": 7.4,
+          "longFloorMs": 15000,
+          "longNoisePercent": 0.02,
+          "longNoiseMovedPercent": 1,
+          "withinCameraNoise": true,
+          "withinLongFloor": true
+        },
+        {
+          "cameraId": "nuke-town-plan",
+          "ok": true,
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": -0.02,
+          "pixelsMovedPercent": 0.5,
+          "meanAbsDelta": 0.00041,
+          "cameraNoisePercent": 1.4,
+          "cameraNoiseMovedPercent": 7.3,
+          "longFloorMs": 15000,
+          "longNoisePercent": 0.02,
+          "longNoiseMovedPercent": 0.6,
+          "withinCameraNoise": true,
+          "withinLongFloor": true
+        }
+      ],
+      "noiseFloorPercent": 0.01,
+      "noiseFloorMovedPercent": 0.6
+    }
+  }
+}
