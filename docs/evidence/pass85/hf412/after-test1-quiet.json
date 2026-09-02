@@ -1,111 +1,111 @@
 {
-  "label": "after",
+  "label": "after-repair-quiet",
   "arena": "test1",
-  "capturedAt": "2026-09-02T16:05:26.434Z",
+  "capturedAt": "2026-09-02T17:33:48.081Z",
   "weapon": "carbine",
-  "droppedAtMs": 603.7999999523163,
-  "roseAtMs": 1311.8999999761581,
+  "droppedAtMs": 613.2000000476837,
+  "roseAtMs": 1309.6000000238419,
   "stanceAtDrop": "prone",
   "finalStance": "stand",
   "fireBlock": {
-    "total": 81,
+    "total": 74,
     "byReason": {
-      "rate-of-fire": 81
+      "rate-of-fire": 74
     },
     "last": "rate-of-fire",
-    "lastAtMs": 45264,
-    "lastFiredAtMs": 45225
+    "lastAtMs": 47208,
+    "lastFiredAtMs": 47166
   },
   "shotCount": 19,
-  "medianSteadyShotGapMs": 103.9,
-  "worstShotGapAcrossDropMs": 131,
-  "worstShotGapAcrossRiseMs": 110.6,
-  "shotsInFirst400msOfDrop": 4,
+  "medianSteadyShotGapMs": 104.2,
+  "worstShotGapAcrossDropMs": 112.6,
+  "worstShotGapAcrossRiseMs": 110.8,
+  "shotsInFirst400msOfDrop": 3,
   "fireInterruptedByDrop": false,
   "cameraTransition": {
     "totalFallMeters": 1.09,
-    "fivePercentAtMs": 662.5,
-    "ninetyFivePercentAtMs": 890.6,
-    "durationMs": 228.1,
-    "biggestSingleFrameFallMeters": 0.227,
-    "singleFrameFractionOfFall": 0.208
+    "fivePercentAtMs": 677.1,
+    "ninetyFivePercentAtMs": 888,
+    "durationMs": 210.9,
+    "biggestSingleFrameFallMeters": 0.241,
+    "singleFrameFractionOfFall": 0.221
   },
   "pageErrors": [],
   "shots": [
     {
-      "t": 106.7,
+      "t": 103,
       "spent": 1
     },
     {
-      "t": 213.4,
+      "t": 198.3,
       "spent": 1
     },
     {
-      "t": 309.8,
+      "t": 302.8,
       "spent": 1
     },
     {
-      "t": 413.7,
+      "t": 407,
       "spent": 1
     },
     {
-      "t": 510.2,
+      "t": 506.6,
       "spent": 1
     },
     {
-      "t": 603.8,
+      "t": 613.2,
       "spent": 1
     },
     {
-      "t": 709.7,
+      "t": 714.3,
       "spent": 1
     },
     {
-      "t": 840.7,
+      "t": 814.2,
       "spent": 1
     },
     {
-      "t": 944,
+      "t": 923.8,
       "spent": 1
     },
     {
-      "t": 1056.6,
+      "t": 1019.9,
       "spent": 1
     },
     {
-      "t": 1159.4,
+      "t": 1132.5,
       "spent": 1
     },
     {
-      "t": 1258.2,
+      "t": 1232.1,
       "spent": 1
     },
     {
-      "t": 1361.4,
+      "t": 1326.1,
       "spent": 1
     },
     {
-      "t": 1472,
+      "t": 1436.9,
       "spent": 1
     },
     {
-      "t": 1568.1,
+      "t": 1530,
       "spent": 1
     },
     {
-      "t": 1662.5,
+      "t": 1640,
       "spent": 1
     },
     {
-      "t": 1761.9,
+      "t": 1740.4,
       "spent": 1
     },
     {
-      "t": 1867.4,
+      "t": 1846.8,
       "spent": 1
     },
     {
-      "t": 1959.8,
+      "t": 1947.9,
       "spent": 1
     }
   ],
@@ -117,601 +117,559 @@
       "stanceRecoveryMs": 0
     },
     {
-      "t": 31.3,
+      "t": 35.1,
       "ammo": 29,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 56.1,
+      "t": 63.3,
       "ammo": 29,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 74,
+      "t": 83.2,
       "ammo": 29,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 89.8,
-      "ammo": 29,
-      "camY": 1.8384,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 106.7,
+      "t": 103,
       "ammo": 28,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 126.4,
+      "t": 125.7,
       "ammo": 28,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 147.9,
+      "t": 144.5,
       "ammo": 28,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 165.5,
+      "t": 160.9,
       "ammo": 28,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 181.8,
+      "t": 179.5,
       "ammo": 28,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 197.5,
-      "ammo": 28,
-      "camY": 1.8384,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 213.4,
+      "t": 198.3,
       "ammo": 27,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 238.2,
+      "t": 222.9,
       "ammo": 27,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 255.1,
+      "t": 244.5,
       "ammo": 27,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 274.9,
+      "t": 265,
       "ammo": 27,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 292.8,
+      "t": 283.3,
       "ammo": 27,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 309.8,
+      "t": 302.8,
       "ammo": 26,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 335.1,
+      "t": 327.3,
       "ammo": 26,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 352.4,
+      "t": 345.3,
       "ammo": 26,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 372.3,
+      "t": 367.3,
       "ammo": 26,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 396.9,
+      "t": 388.6,
       "ammo": 26,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 413.7,
+      "t": 407,
       "ammo": 25,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 437.6,
+      "t": 431,
       "ammo": 25,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 457.9,
+      "t": 449.1,
       "ammo": 25,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 479.8,
+      "t": 467.3,
       "ammo": 25,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 496.3,
+      "t": 487.8,
       "ammo": 25,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 510.2,
+      "t": 506.6,
       "ammo": 24,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 528.2,
+      "t": 532.6,
       "ammo": 24,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 551.8,
+      "t": 553.3,
       "ammo": 24,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 570.3,
+      "t": 572.5,
       "ammo": 24,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 587.2,
+      "t": 594.2,
       "ammo": 24,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 603.8,
+      "t": 613.2,
       "ammo": 23,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 630.6,
+      "t": 642,
       "ammo": 23,
-      "camY": 1.8315,
+      "camY": 1.8313,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 647.9,
+      "t": 660.3,
       "ammo": 23,
-      "camY": 1.8022,
+      "camY": 1.7946,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 662.5,
+      "t": 677.1,
       "ammo": 23,
-      "camY": 1.7583,
+      "camY": 1.7477,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 677.9,
+      "t": 696.5,
       "ammo": 23,
-      "camY": 1.7107,
+      "camY": 1.6837,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 695.6,
-      "ammo": 23,
-      "camY": 1.6425,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 709.7,
+      "t": 714.3,
       "ammo": 22,
-      "camY": 1.5717,
+      "camY": 1.6011,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 729.8,
+      "t": 738.9,
       "ammo": 22,
-      "camY": 1.4827,
+      "camY": 1.4858,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 745.6,
+      "t": 756.6,
       "ammo": 22,
-      "camY": 1.3905,
+      "camY": 1.3883,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 761.6,
-      "ammo": 22,
-      "camY": 1.3092,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 799.3,
-      "ammo": 22,
-      "camY": 1.1489,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 840.7,
+      "t": 814.2,
       "ammo": 21,
-      "camY": 0.922,
+      "camY": 1.1749,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 870.9,
+      "t": 847.2,
       "ammo": 21,
-      "camY": 0.813,
+      "camY": 0.9341,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 890.6,
+      "t": 869,
       "ammo": 21,
-      "camY": 0.7693,
+      "camY": 0.8472,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 907.6,
+      "t": 888,
       "ammo": 21,
-      "camY": 0.7497,
+      "camY": 0.7943,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 922.5,
+      "t": 905.8,
       "ammo": 21,
-      "camY": 0.7484,
+      "camY": 0.7601,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 944,
+      "t": 923.8,
       "ammo": 20,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 990.1,
+      "t": 951.2,
       "ammo": 20,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1013.7,
+      "t": 975.7,
       "ammo": 20,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1033.1,
+      "t": 1000,
       "ammo": 20,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1056.6,
+      "t": 1019.9,
       "ammo": 19,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1078,
+      "t": 1054.7,
       "ammo": 19,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1104.8,
+      "t": 1084.7,
       "ammo": 19,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1127.5,
+      "t": 1110.2,
       "ammo": 19,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1144.3,
-      "ammo": 19,
-      "camY": 0.7484,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 1159.4,
+      "t": 1132.5,
       "ammo": 18,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1179.8,
+      "t": 1156,
       "ammo": 18,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1195.1,
+      "t": 1176.1,
       "ammo": 18,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1213.7,
+      "t": 1194.6,
       "ammo": 18,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1228.1,
+      "t": 1213.9,
       "ammo": 18,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1242.7,
-      "ammo": 18,
-      "camY": 0.7484,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 1258.2,
+      "t": 1232.1,
       "ammo": 17,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1276.8,
+      "t": 1256.2,
       "ammo": 17,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1294.1,
+      "t": 1278.1,
       "ammo": 17,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1311.9,
+      "t": 1292.2,
       "ammo": 17,
       "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1337.4,
+      "t": 1309.6,
       "ammo": 17,
-      "camY": 0.7506,
+      "camY": 0.7484,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1361.4,
+      "t": 1326.1,
       "ammo": 16,
-      "camY": 0.7806,
+      "camY": 0.7493,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1385,
+      "t": 1347.1,
       "ammo": 16,
-      "camY": 0.8257,
+      "camY": 0.7615,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1407.1,
+      "t": 1365.6,
       "ammo": 16,
-      "camY": 0.887,
+      "camY": 0.7905,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1430.8,
+      "t": 1383.3,
       "ammo": 16,
-      "camY": 0.9593,
+      "camY": 0.8295,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1452.6,
+      "t": 1398.9,
       "ammo": 16,
-      "camY": 1.033,
+      "camY": 0.8704,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1472,
+      "t": 1416.8,
+      "ammo": 16,
+      "camY": 0.9213,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1436.9,
       "ammo": 15,
-      "camY": 1.1181,
+      "camY": 0.9838,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1494.4,
+      "t": 1458.7,
       "ammo": 15,
-      "camY": 1.2141,
+      "camY": 1.0729,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1512,
+      "t": 1476.3,
       "ammo": 15,
-      "camY": 1.2839,
+      "camY": 1.1437,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1531.4,
+      "t": 1494.2,
       "ammo": 15,
-      "camY": 1.3612,
+      "camY": 1.2294,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1551.4,
+      "t": 1511.2,
       "ammo": 15,
-      "camY": 1.4601,
+      "camY": 1.2917,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1568.1,
+      "t": 1530,
       "ammo": 14,
-      "camY": 1.5262,
+      "camY": 1.38,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1593,
+      "t": 1554.1,
       "ammo": 14,
-      "camY": 1.6197,
+      "camY": 1.4757,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1610.5,
+      "t": 1574.3,
       "ammo": 14,
-      "camY": 1.6796,
+      "camY": 1.5465,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1629,
+      "t": 1596.5,
       "ammo": 14,
-      "camY": 1.7256,
+      "camY": 1.6399,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1645.9,
+      "t": 1621.4,
       "ammo": 14,
-      "camY": 1.7709,
+      "camY": 1.7039,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1662.5,
+      "t": 1640,
       "ammo": 13,
-      "camY": 1.8041,
+      "camY": 1.7643,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1685.6,
+      "t": 1660.9,
       "ammo": 13,
-      "camY": 1.8316,
+      "camY": 1.8069,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1703.6,
+      "t": 1682.1,
       "ammo": 13,
-      "camY": 1.8384,
+      "camY": 1.8307,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1727.8,
-      "ammo": 13,
-      "camY": 1.8384,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 1746.6,
+      "t": 1701.9,
       "ammo": 13,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1761.9,
+      "t": 1721.2,
+      "ammo": 13,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1740.4,
       "ammo": 12,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1787.5,
+      "t": 1763.1,
       "ammo": 12,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1803.8,
+      "t": 1783.3,
       "ammo": 12,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1820.3,
+      "t": 1807.7,
       "ammo": 12,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1835.9,
+      "t": 1827.9,
       "ammo": 12,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1852.4,
-      "ammo": 12,
-      "camY": 1.8384,
-      "stanceRecoveryMs": 0
-    },
-    {
-      "t": 1867.4,
+      "t": 1846.8,
       "ammo": 11,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1888.9,
+      "t": 1868.1,
       "ammo": 11,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1909.3,
+      "t": 1886.2,
       "ammo": 11,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1925,
+      "t": 1912,
       "ammo": 11,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1941,
+      "t": 1930,
       "ammo": 11,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1959.8,
+      "t": 1947.9,
       "ammo": 10,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1982.4,
+      "t": 1969.3,
       "ammo": 10,
       "camY": 1.8384,
       "stanceRecoveryMs": 0
     },
     {
-      "t": 1998.7,
+      "t": 1989.1,
       "ammo": 10,
       "camY": 1.8384,
       "stanceRecoveryMs": 0

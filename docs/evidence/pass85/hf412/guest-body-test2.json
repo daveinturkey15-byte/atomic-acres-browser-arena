@@ -1,0 +1,1967 @@
+{
+  "contract": "hf412-guest-body-two-client-v1",
+  "capturedAt": "2026-09-02T17:42:37.732Z",
+  "arena": "test2",
+  "standToProneMs": 300,
+  "proneToStandMs": 380,
+  "hostDropStance": "prone",
+  "hostRiseStance": "stand",
+  "guestRemotes": 1,
+  "guestMatchPhase": "active",
+  "sampleCount": 193,
+  "guestMedianFrameMs": 15.3,
+  "guestSawProneAtSampleIndex": 38,
+  "drop": {
+    "frames": 50,
+    "blendAtFirstProneFrame": 0.015344592592592595,
+    "fivePercentMs": 35.1,
+    "ninetyFivePercentMs": 254.6,
+    "biggestSingleFrameStep": 0.099,
+    "biggestStepFrameMs": 19.4,
+    "finalBlend": 1,
+    "snapped": false
+  },
+  "rise": {
+    "frames": 105,
+    "biggestSingleFrameStep": 0.073,
+    "biggestStepFrameMs": 16.3,
+    "ninetyFivePercentDownMs": 41.4,
+    "fivePercentDownMs": 317.6,
+    "finalBlend": 0,
+    "snapped": false
+  },
+  "failures": [],
+  "pass": true,
+  "samples": [
+    {
+      "t": 0,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 15.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 34.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 49,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 63.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 75.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 87,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 100.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 112.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 132.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 152.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 176.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 193.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 208.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 225.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 248.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 280.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 302.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 319.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 338.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 361.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8399999999999999
+    },
+    {
+      "t": 390.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 405.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 417.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 431,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 442.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 460.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 483.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 502.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 516.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 532.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 550.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 567.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 588,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 605.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 619.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 656.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 674.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 697.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.07333333333333333,
+      "proneBlend": 0.015344592592592595,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8337087170370372
+    },
+    {
+      "t": 713.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.1253333334128062,
+      "proneBlend": 0.043187749978199144,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8222930225089385
+    },
+    {
+      "t": 732.4,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.19166666666666668,
+      "proneBlend": 0.0961261574074074,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8005882754629632
+    },
+    {
+      "t": 753.4,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.25,
+      "proneBlend": 0.15625,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7759375000000002
+    },
+    {
+      "t": 772.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.3306666668256124,
+      "proneBlend": 0.2557108529518139,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7351585502897565
+    },
+    {
+      "t": 792.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.3893333335717519,
+      "proneBlend": 0.3367106942660342,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7019486153509261
+    },
+    {
+      "t": 807.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.4470000000794729,
+      "proneBlend": 0.4207977541178699,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6674729208116734
+    },
+    {
+      "t": 820.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.48966666698455813,
+      "proneBlend": 0.4845022072173742,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6413540950408766
+    },
+    {
+      "t": 836.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.5380000003178915,
+      "proneBlend": 0.556890256474083,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6116749948456259
+    },
+    {
+      "t": 851.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.5890000001589458,
+      "proneBlend": 0.6320900622308646,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5808430744853454
+    },
+    {
+      "t": 870.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.647000000079473,
+      "proneBlend": 0.7141469541089054,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5471997488153487
+    },
+    {
+      "t": 888,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.7106666668256125,
+      "proneBlend": 0.7973010396035016,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5131065737625643
+    },
+    {
+      "t": 910.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.7810000002384188,
+      "proneBlend": 0.8771239182446734,
+      "crouchBlend": 0,
+      "pivotHeight": 0.48037919351968394
+    },
+    {
+      "t": 930,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.8453333334128064,
+      "proneBlend": 0.9356344699882702,
+      "crouchBlend": 0,
+      "pivotHeight": 0.45638986730480924
+    },
+    {
+      "t": 951.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.9126666669050855,
+      "proneBlend": 0.9784508688547615,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4388351437695478
+    },
+    {
+      "t": 966.5,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 0.9743333335717521,
+      "proneBlend": 0.9980574839617,
+      "crouchBlend": 0,
+      "pivotHeight": 0.430796431575703
+    },
+    {
+      "t": 982.1,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1010.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1036.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1055.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1074.6,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1096.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1115.4,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1135.4,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1150.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1168.2,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1186.5,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1202.6,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1220.2,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1247.2,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1265.4,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1317,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1337.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1364.5,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1381.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1397.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1415.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1430.6,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1443.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1459.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1471.3,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1484.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1502.6,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1516.5,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1530.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1546.9,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1563.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1576.5,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1590.7,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1608.8,
+      "found": true,
+      "stance": "prone",
+      "blendFrom": "stand",
+      "blendProgress": 1,
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1621.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.03236842092714812,
+      "proneBlend": 0.9969246817191638,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4312608804951428
+    },
+    {
+      "t": 1635.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.06842105263157894,
+      "proneBlend": 0.9865962968362735,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4354955182971278
+    },
+    {
+      "t": 1650.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.1055263158522154,
+      "proneBlend": 0.9689428305884643,
+      "crouchBlend": 0,
+      "pivotHeight": 0.44273343945872956
+    },
+    {
+      "t": 1663.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.13973684216800486,
+      "proneBlend": 0.9468779555969686,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4517800382052428
+    },
+    {
+      "t": 1673.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.1676315787591432,
+      "proneBlend": 0.9251199722016096,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4607008113973401
+    },
+    {
+      "t": 1687.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.20315789454861688,
+      "proneBlend": 0.8929505340798944,
+      "crouchBlend": 0,
+      "pivotHeight": 0.47389028102724334
+    },
+    {
+      "t": 1702.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.23736842086440635,
+      "proneBlend": 0.857717160431879,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4883359642229297
+    },
+    {
+      "t": 1719.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.2889473682955691,
+      "proneBlend": 0.7977770227527351,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5129114206713786
+    },
+    {
+      "t": 1734,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.32499999999999996,
+      "proneBlend": 0.7517812500000002,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5317696875
+    },
+    {
+      "t": 1750.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.36894736823282737,
+      "proneBlend": 0.6920773441906278,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5562482888818426
+    },
+    {
+      "t": 1763.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.4055263158522153,
+      "proneBlend": 0.6400241186218879,
+      "crouchBlend": 0,
+      "pivotHeight": 0.577590111365026
+    },
+    {
+      "t": 1777.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.44078947368421045,
+      "proneBlend": 0.5884006187126406,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5987557463278175
+    },
+    {
+      "t": 1792.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.481578947368421,
+      "proneBlend": 0.5276190771249455,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6236761783787724
+    },
+    {
+      "t": 1806.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.5176315787591432,
+      "proneBlend": 0.47356359420967314,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6458389263740342
+    },
+    {
+      "t": 1823.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.5631578947368421,
+      "proneBlend": 0.40576702143169574,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6736355212130049
+    },
+    {
+      "t": 1837.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.6,
+      "proneBlend": 0.3520000000000001,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6956800000000001
+    },
+    {
+      "t": 1849,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.6289473684210526,
+      "proneBlend": 0.3108670724595423,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7125445002915877
+    },
+    {
+      "t": 1869.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.6694736841477845,
+      "proneBlend": 0.2555244928665052,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7352349579247329
+    },
+    {
+      "t": 1886.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.7271052630324112,
+      "proneBlend": 0.18276883113787548,
+      "crouchBlend": 0,
+      "pivotHeight": 0.765064779233471
+    },
+    {
+      "t": 1899.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.7621052632206364,
+      "proneBlend": 0.14285493272078556,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7814294775844779
+    },
+    {
+      "t": 1910.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.7907894736842105,
+      "proneBlend": 0.11299324336637998,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7936727702197842
+    },
+    {
+      "t": 1923.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.831578947368421,
+      "proneBlend": 0.07554220731885121,
+      "crouchBlend": 0,
+      "pivotHeight": 0.809027694999271
+    },
+    {
+      "t": 1939.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.8649999998117748,
+      "proneBlend": 0.04975425013187996,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8196007574459292
+    },
+    {
+      "t": 1952.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.9063157894109425,
+      "proneBlend": 0.02468571165173317,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8298788582227894
+    },
+    {
+      "t": 1965.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.9386842103380906,
+      "proneBlend": 0.01081782930395725,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8355646899853775
+    },
+    {
+      "t": 1980.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 0.9755263156012485,
+      "proneBlend": 0.0017675661080243095,
+      "crouchBlend": 0,
+      "pivotHeight": 0.83927529789571
+    },
+    {
+      "t": 1995.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2013.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2027.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2040.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2055.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2066.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2079.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2091,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2101.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2113.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2125.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2137.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2149.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2161.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2174.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2186.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2197.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2208.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2217.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2227.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2241.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2252.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2266.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2280.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2296.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2309.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2320.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2332.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2351.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2367.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2384.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2401.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2414.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2436.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2457.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2477,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2501.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2520.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2544.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2568.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2587.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2604,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2626.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2641.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2660.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2672.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2688.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2709,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2728.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2742.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2760.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2772.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2788.5,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2806.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2826.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2841.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2855.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2866.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2880.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2891.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2903.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2915.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2926.7,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2936.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2947,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2958.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2968.9,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2980.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 2990.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3000.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3009.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3020,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3032.4,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3043.1,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3053.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3063.3,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3075.8,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3086.6,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 3097.2,
+      "found": true,
+      "stance": "stand",
+      "blendFrom": "prone",
+      "blendProgress": 1,
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    }
+  ]
+}
