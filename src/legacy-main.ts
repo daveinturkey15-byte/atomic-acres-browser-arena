@@ -414,7 +414,7 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
@@ -10828,17 +10828,28 @@ const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
 // exists, so each call walked the whole arena graph twice and found nothing.
 // Measured 2026-09-02 on atomic-acres at Quality: 10,108 getObjectByProperty
 // calls per frame from this one line, the single largest named JS cost in a
-// main thread that was 0.1% idle. The dressing group is attached inside the
-// arena builder (src/test-maps.ts -> applyTest1Dressing/applyTest2Dressing),
-// so it exists the moment `arena.root` does; the child-count check is the
-// guard for a root that gains its dressing later.
+// main thread that was 0.1% idle.
+//
+// INVARIANT THIS CACHE DEPENDS ON (break it and the fold silently reads a
+// stale group): the dressing group is named exactly once, inside the arena
+// builder - `src/test-maps-art.ts` applyTest1Dressing:984 / applyTest2Dressing:1225
+// are the ONLY two `name = 'testN-dressing'` sites in src/ - and it is added
+// straight to `arena.root`, so it exists the moment `arena.root` does and is
+// never swapped out under a stable root. The three re-resolve triggers below
+// exist so that a future change which DOES swap it is still correct:
+//   * a different `arena.root` object (the normal arena-transition path),
+//   * the root's direct child count changing (dressing added or removed),
+//   * the cached group having been detached from the graph (`parent === null`).
 let presentationDressingRootFor: THREE.Object3D | null = null;
 let presentationDressingRootChildCount = -1;
 let presentationDressingRoot: THREE.Object3D | undefined;
 
 function activePresentationDressingRoot(): THREE.Object3D | undefined {
   const root = arena.root;
-  if (root !== presentationDressingRootFor || (presentationDressingRoot === undefined && root.children.length !== presentationDressingRootChildCount)) {
+  const stale = root !== presentationDressingRootFor
+    || root.children.length !== presentationDressingRootChildCount
+    || (presentationDressingRoot !== undefined && presentationDressingRoot.parent === null);
+  if (stale) {
     presentationDressingRootFor = root;
     presentationDressingRootChildCount = root.children.length;
     presentationDressingRoot = root.getObjectByName('test1-dressing') ?? root.getObjectByName('test2-dressing');
@@ -19812,10 +19823,19 @@ function botCombatDamage(rawDamage: number): number {
 // HF-399: the haze sprite is attached by addNeonBotHaze when the bot rig is
 // built and never moves within it, so it is resolved once per rig instead of
 // with a getObjectByName walk over ~190 rig nodes per bot per frame.
+//
+// INVARIANT THIS CACHE DEPENDS ON: `addNeonBotHaze` (the only site in src/ that
+// creates a node named 'neon-purple-bot-haze') runs exactly once per rig, in
+// the bot rig builder immediately after buildOperator, and no code re-attaches
+// or replaces it afterwards - the other three read sites only set `visible` or
+// test `instanceof`. A cached sprite that has been detached from its rig is
+// re-resolved below, so a future change that swaps the sprite still works; a
+// haze attached to a rig that had NONE at build time would still be missed,
+// which is why the invariant is stated here rather than only assumed.
 const botHazeSpriteByRoot = new WeakMap<THREE.Object3D, THREE.Sprite | null>();
 function botHazeSprite(root: THREE.Object3D): THREE.Sprite | null {
   let haze = botHazeSpriteByRoot.get(root);
-  if (haze === undefined) {
+  if (haze === undefined || (haze !== null && haze.parent === null)) {
     const found = root.getObjectByName('neon-purple-bot-haze');
     haze = found instanceof THREE.Sprite && found.material instanceof THREE.SpriteMaterial ? found : null;
     botHazeSpriteByRoot.set(root, haze);
@@ -26522,6 +26542,17 @@ type MinimapStaticLayer = Readonly<{
   arena: ArenaMap;
   width: number;
   height: number;
+  /**
+   * INVARIANT THIS CACHE DEPENDS ON: `arena.bounds`, `arena.houses` and
+   * `arena.physicalCover` are authored by the arena builder and never mutated
+   * at runtime (every `physicalCover` push in src/ is build-time). Arena
+   * identity therefore normally settles the cache on its own; these two counts
+   * are the cheap tripwire that catches a future change which grows or shrinks
+   * either list under a stable arena object, since a stale layer would show the
+   * wrong landmarks with no other symptom.
+   */
+  houseCount: number;
+  coverCount: number;
   canvas: HTMLCanvasElement;
   /** Landmark label anchors in minimap pixel space (before the player transform). */
   labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
@@ -26531,7 +26562,14 @@ let minimapStaticLayer: MinimapStaticLayer | null = null;
 
 function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMap['bounds']): MinimapStaticLayer {
   const cached = minimapStaticLayer;
-  if (cached && cached.arena === arena && cached.width === width && cached.height === height) return cached;
+  if (
+    cached
+    && cached.arena === arena
+    && cached.width === width
+    && cached.height === height
+    && cached.houseCount === arena.houses.length
+    && cached.coverCount === arena.physicalCover.length
+  ) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -26568,7 +26606,16 @@ function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMa
     labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
     landmarks.push({ id: cover.id, kind, label });
   }
-  minimapStaticLayer = Object.freeze({ arena, width, height, canvas, labelAnchors: Object.freeze(labelAnchors), landmarks });
+  minimapStaticLayer = Object.freeze({
+    arena,
+    width,
+    height,
+    houseCount: arena.houses.length,
+    coverCount: arena.physicalCover.length,
+    canvas,
+    labelAnchors: Object.freeze(labelAnchors),
+    landmarks,
+  });
   return minimapStaticLayer;
 }
 
@@ -26621,24 +26668,26 @@ function updateMinimap(now: number): void {
     // the life of the arena, so they are painted ONCE into an offscreen layer
     // in minimap pixel space and composited under the per-frame player
     // transform with one drawImage. Measured 2026-09-02 (Quality, 60 Hz
-    // minimap): this function was 2.1 ms of a 25 ms frame, dominated by the
-    // landmark path work plus a getTransform()+DOMPoint allocation per cover
-    // per frame. Label anchors are the same points run through the same
-    // transform, in closed form, so the labels stay upright exactly as before.
+    // minimap, atomic-acres lawn-idle): this function held 4.4% of an inclusive
+    // CPU profile - about 1.1 ms of the measured 26.1 ms frame - dominated by
+    // the landmark path work plus a getTransform()+DOMPoint allocation per
+    // cover per frame. Label anchors are the same points run through the same
+    // transform in closed form (minimapPlayerViewPoint, guarded against a
+    // composed affine reference by src/minimap-player-view-transform.test.ts),
+    // so the labels stay upright exactly as before.
     const layer = activeMinimapStaticLayer(width, height, bounds);
     context.drawImage(layer.canvas, 0, 0);
-    const rotation = playerUpRotationRadians(player.yaw);
-    const cosR = Math.cos(rotation);
-    const sinR = Math.sin(rotation);
-    const scaleX = playerUpScaleX();
+    const labelView = {
+      width,
+      height,
+      playerX: worldPlayerX,
+      playerY: worldPlayerY,
+      rotation: playerUpRotationRadians(player.yaw),
+      scaleX: playerUpScaleX(),
+    };
     for (const anchor of layer.labelAnchors) {
-      const dx = (anchor.x - worldPlayerX) * scaleX;
-      const dy = anchor.y - worldPlayerY;
-      landmarkLabels.push({
-        label: anchor.label,
-        x: width / 2 + dx * cosR - dy * sinR,
-        y: height / 2 + dx * sinR + dy * cosR - 10,
-      });
+      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
+      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
     }
     renderedLandmarks = layer.landmarks;
   } else {
