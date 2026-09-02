@@ -145,6 +145,10 @@ describe('collider/visual parity gate (all six arenas)', () => {
       // Adding a row at 0 is the strictest possible entry, not a relaxation:
       // it means every ghost shot surface Map 3 has is a failure.
       map3: 0,
+      // RAID2 (owner 2026-09-02, HF-408): enters at the same strictest floor.
+      // The audit measured 0 invisible colliders and 0 walk-through meshes on
+      // this arena, so a row above 0 would forgive something it does not do.
+      raid2: 0,
       'gun-range': 0,
       farcrysis: 0,
     });

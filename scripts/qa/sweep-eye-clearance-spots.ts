@@ -26,6 +26,7 @@ import { buildHighSeas } from '../../src/high-seas';
 import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
 import { buildMap3 } from '../../src/map3-arena';
+import { buildRaid2 } from '../../src/raid2-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // `ShedArenaId` is re-declared, not re-exported, by destructible-shed-registry;
@@ -188,6 +189,8 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   test2: buildTest2,
   // MAP3 (owner 2026-09-02, HF-405).
   map3: buildMap3,
+  // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+  raid2: buildRaid2,
 });
 
 /**
@@ -196,7 +199,7 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * would sweep nothing while printing success, so it is asserted rather than
  * assumed. 8 = the nine ids in arena-identity.ts minus hidden farcrysis.
  */
-export const MINIMUM_SWEPT_ARENAS = 8;
+export const MINIMUM_SWEPT_ARENAS = 9;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

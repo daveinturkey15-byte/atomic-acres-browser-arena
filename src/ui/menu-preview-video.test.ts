@@ -59,7 +59,16 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * act; forgetting to remove one fails `has no arena stuck in standby that
  * already ships media` below. It is empty, and should stay empty.
  */
-const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>();
+const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
+  // RAID2 (owner 2026-09-02, HF-408). The arena shipped in this pass; its
+  // camera recipe is authored (source-assets/menu/pass87-raid2-preview/
+  // choreography.json) but no capture has been encoded against it yet, so the
+  // card shows the standby frame rather than a path that would 404. This entry
+  // is the thing that must be DELETED when the capture lands - and
+  // `has no arena stuck in standby that already ships media` below is what
+  // fails if somebody ships the media and forgets to remove it.
+  'raid2',
+]);
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';

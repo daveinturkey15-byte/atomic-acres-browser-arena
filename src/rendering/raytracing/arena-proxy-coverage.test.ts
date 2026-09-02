@@ -106,6 +106,16 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // silently would put Map 3 in the exact pass79 state this gate was written
   // for - a correctly-implemented reflection layer rendering nothing.
   map3: { meshes: 2, footprintM2: 272 },
+  // RAID2 (owner 2026-09-02, HF-408). MEASURED on the authored build, not
+  // guessed: 2 meshes / 631.6 m2. The two are the pool's presentation water
+  // sheet over its basin slab and the courtyard fountain's basin - the only
+  // two reflective surfaces a mansion terrace has, and between them they are
+  // this arena's entire mirror budget. The floor is pinned at 631 rather than
+  // at a round number, so deleting the water sheet - which is presentation-only
+  // and therefore the easiest thing in the arena to delete by accident - puts
+  // this arena straight into the pass79 state this gate exists for: a
+  // correctly-implemented reflection layer with nothing to reflect.
+  raid2: { meshes: 2, footprintM2: 631 },
 };
 
 type Coverage = {
@@ -167,6 +177,7 @@ beforeAll(async () => {
     { buildTest1, buildTest2 },
     // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the proxy-coverage sweep.
     { buildMap3 },
+    { buildRaid2 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -177,6 +188,7 @@ beforeAll(async () => {
     import('../../high-seas'),
     import('../../test-maps'),
     import('../../map3-arena'),
+    import('../../raid2-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -194,6 +206,8 @@ beforeAll(async () => {
     test2: buildTest2,
     // MAP3 (owner 2026-09-02, HF-405).
     map3: buildMap3,
+    // RAID2 (owner 2026-09-02, HF-408).
+    raid2: buildRaid2,
   };
 
   for (const id of ALL_ARENA_IDS) {

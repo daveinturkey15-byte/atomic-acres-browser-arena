@@ -39,9 +39,6 @@ const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
 // reason the comment above records: a new byte under an old key is exactly
 // what the cache-family lock exists to prevent.
 const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
-// RAID2 (HF-408): its own key, so publishing a Raid Rebuild capture never
-// invalidates Map 3's cached clip and vice versa.
-const RAID2_CACHE_KEY = 'pass87-raid2-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -212,9 +209,14 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-raid2-v1',
     mediaAvailable: false,
-    webm: `${ROOT}/raid2.webm?v=${RAID2_CACHE_KEY}`,
-    mp4: `${ROOT}/raid2.mp4?v=${RAID2_CACHE_KEY}`,
-    poster: `${ROOT}/raid2.webp?v=${RAID2_CACHE_KEY}`,
+    // EMPTY, not a path. A pending arena must declare NO media at all: an
+    // empty string can never collide with a shipped path, so this card can
+    // never accidentally play another arena's flyover. The capture lands here
+    // together with its own cache key ('pass87-raid2-preview-v1', reserved):
+    // reusing another family's key for new bytes is what the cache lock forbids.
+    webm: '',
+    mp4: '',
+    poster: '',
     durationSeconds: 8,
     width: 2560,
     height: 1440,

@@ -3,6 +3,7 @@ import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-
 import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
 import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
 import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
+import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -154,6 +155,15 @@ const MAP3_CHOREOGRAPHY = map3ChoreographyJson as unknown as Readonly<{
   recipeId: string;
   arenas: Readonly<{ map3: HelicopterRecipe }>;
 }>;
+// RAID2 (owner 2026-09-02, HF-408): same extension pattern once more, and the
+// same honesty as Map 3's entry - the camera recipe is authored here before any
+// media has been captured against it, because a card cannot leave standby
+// without one and authoring it now makes the capture a mechanical step rather
+// than a design step. The orbit is fitted to RAID2_BOUNDS, not inherited.
+const RAID2_CHOREOGRAPHY = raid2ChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ raid2: HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
@@ -164,6 +174,7 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     ...HIGH_SEAS_CHOREOGRAPHY.arenas,
     ...TEST_ARENAS_CHOREOGRAPHY.arenas,
     ...MAP3_CHOREOGRAPHY.arenas,
+    ...RAID2_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

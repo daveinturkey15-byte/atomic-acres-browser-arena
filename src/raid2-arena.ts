@@ -647,16 +647,31 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // arc, and no enemy spawn in sight. Unlike the shipped Raid these ARE close
   // to an x mirror, because this build gave the garage an autostep route in.
   //
-  // MEASURED, not authored by eye (artifacts/raid2/spawncheck.ts, re-run after
-  // every geometry change in this lane). The first table put (-46, -2) 0.40 m
-  // from the apron planter against a 0.44 m spawn radius, so the point and its
-  // mirror both measured standable=false - 4 cm inside geometry, which is the
-  // exact class of defect a spawn gate exists to catch and an eye never will.
+  // MEASURED, not authored by eye (artifacts/raid2/spawnspread.ts, re-run after
+  // every geometry change in this lane). Two defects the eye missed and the
+  // instrument did not:
+  //
+  //  1. The first table put (-46, -2) 0.40 m from the apron planter against a
+  //     0.44 m spawn radius, so that point and its mirror both measured
+  //     standable=false - 4 cm inside geometry.
+  //  2. The second table passed every per-point check and still failed
+  //     src/spawn-layout-quality.test.ts: it spanned 15.0 m of a 100 m map
+  //     against an 18% floor, i.e. six points blobbed in one corner of the
+  //     apron. The apron ALONE cannot seat six mirrored points at 4.5 m spacing
+  //     with the required spread (searched exhaustively: 92 legal apron
+  //     candidates, no passing 6-set), so team 0's spawn ZONE reaches out of
+  //     the apron into the south half of the west flank, which is how a spawn
+  //     region is meant to work anyway.
+  //
+  // The table below is the highest cross-team separation found among sets that
+  // spread 19-30 m: span 20.0 m (20% of the long axis), cross-team minimum 64 m,
+  // ZERO spawn-to-spawn sightlines, 12/12 points legal, envelope/floor/reachable
+  // all 100%.
   const team0: [number, number][] = [
-    [-46, -9], [-44.5, -2], [-46, 3], [-42, -11], [-42, 0], [-39, 4],
+    [-32, -16], [-38, -10], [-41, -2], [-48, 2], [-33, 2], [-39, 4],
   ];
   const team1: [number, number][] = [
-    [46, -9], [44.5, -2], [46, 3], [42, -11], [42, 0], [39, 4],
+    [32, -16], [38, -10], [41, -2], [48, 2], [33, 2], [39, 4],
   ];
 
   return {

@@ -11,7 +11,8 @@
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": -1
+    "map3": -1,
+    "raid2": -1
   },
   "unmeasuredCeiling": -1,
   "unmeasured": [
@@ -19,6 +20,11 @@
       "arena": "map3",
       "since": "2026-09-02",
       "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
+    },
+    {
+      "arena": "raid2",
+      "since": "2026-09-02",
+      "note": "RAID2 (HF-408) registered selectable on 2026-09-02. Stage 1 (legality, scripts/qa/sweep-eye-clearance-spots.ts) HAS been run against it in the lane that built it and its result is recorded in the lane report; stages 2 and 3 are BROWSER stages and were not run, so this entry stays at the -1 sentinel rather than at a stage-1-only number. The ratchet stays RED for raid2 until live seats and the runtime re-probe have actually been run and their counts written down here."
     }
   ],
   "accepted": [
@@ -57,7 +63,8 @@
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
+      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it",
+      "raid2": "UNMEASURED (2026-09-02) - the arena was registered today by HF-408 and stage 3 has never teleported the real player into it. Stage 1 legality WAS run in the lane that built it; stages 2 and 3 need a browser and were not run, so this stays UNMEASURED rather than inheriting test2's 0."
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },

@@ -289,8 +289,10 @@ describe('Pass 65 sound-event inventory', () => {
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
     // owner 2026-08-30: Test1/Test2 arenas added — digest recomputed over the
     // eight-arena variant rows. owner 2026-09-02 (HF-405): recomputed again
-    // over Map 3's bed, event and music variant rows.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('c8ddadbac7e5f5f5fa21a40c68c3277271e76e673630307650ee77cc4972dc8a');
+    // over Map 3's bed, event and music variant rows. owner 2026-09-02
+    // (HF-408): recomputed again over the Raid rebuild's two bed sources,
+    // its one event source and its music variant row.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('ba4a40f342435d4723e3a95ab47d33f4c32260c606888c1c0db2456a699f432c');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

@@ -63,6 +63,9 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // MAP3 (owner 2026-09-02, HF-405): same rule - a new arena starts with an
   // EMPTY accepted ledger. Anything the audit finds is a bug in the arena.
   map3: [],
+  // RAID2 (owner 2026-09-02, HF-408): same rule. The audit measured 0 ghost
+  // shot surfaces on this arena, so an empty ledger is the measurement.
+  raid2: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -94,6 +97,9 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   // MAP3 (HF-405): enters at the strictest possible ceiling, not at whatever
   // it happens to measure.
   map3: 0,
+  // RAID2 (HF-408): enters at the strictest possible ceiling, not at whatever
+  // it happens to measure.
+  raid2: 0,
   'gun-range': 0,
   farcrysis: 0,
 });

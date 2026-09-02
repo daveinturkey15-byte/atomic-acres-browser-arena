@@ -38,6 +38,9 @@ describe('Pass 66 command shell', () => {
       'test2',
       // MAP3 (owner 2026-09-02, HF-405): shipped selectable, labelled PREVIEW.
       'map3',
+      // RAID2 (owner 2026-09-02, HF-408): the Raid layout rebuild, likewise
+      // selectable and labelled PREVIEW, shipped BESIDE `test2` not instead of it.
+      'raid-rebuild',
     ]);
     // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
     expect(markup).not.toContain('data-arena-route="farcrysis"');

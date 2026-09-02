@@ -228,10 +228,22 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // the arena is authored for hard midmorning light and rain would contradict
   // the whole grade. Clear and overcast only until it leaves preview.
   'map3': arenaProfile('map3', 'open-scrub-midmorning-clear', false, ['clear', 'overcast']),
-  // RAID2 (PREVIEW, HF-408): graded for high late-morning sun rather than
-  // test2's golden hour, so overcast is reachable here without contradicting
-  // the grade. No precipitating state until it leaves preview.
-  'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear', 'overcast']),
+  // RAID2 (PREVIEW, HF-408): CLEAR ONLY, like test2, and the reason is a
+  // measurement rather than a preference. The first draft offered
+  // ['clear', 'overcast'], and `weather never repeats inside a match` went
+  // red: weatherPhaseSequence('raid2', 3, ...) opens with FOUR consecutive
+  // clear phases totalling 370 s, so across the guard's 320 s window the
+  // derived signal never moves. That is a real latent fragility in the
+  // sequencer - any arena whose id hashes into a long single-state opening
+  // can advertise two states and show one for six minutes, and whether it is
+  // caught depends on the id (map3, same two states, alternates from its
+  // first phase) - but the sequencer is shared by every arena and is not
+  // this lane's to change. Recorded in the lane report instead.
+  //
+  // Clear-only is also the honest authoring call: this arena is graded and
+  // lit for a bleached high sun, exactly as the shipped Raid is graded for
+  // golden hour, and an overcast state was never authored or looked at.
+  'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

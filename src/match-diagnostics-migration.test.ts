@@ -23,6 +23,13 @@ const map3ArenaExpansionMigration = readFileSync(
   new URL('../worker/migrations/0007_add_map3_arena.sql', import.meta.url),
   'utf8',
 );
+// RAID2 (owner 2026-09-02, HF-408): the tenth arena. Applied AFTER 0007 in the
+// same order production applies them, so this test exercises the real chain
+// rather than the newest migration against a fresh table.
+const raid2ArenaExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0008_add_raid2_arena.sql', import.meta.url),
+  'utf8',
+);
 
 const insertDiagnostic = (database: DatabaseSync, receiptId: string, arena: string): void => {
   database.prepare(`
@@ -58,6 +65,7 @@ describe('match diagnostics arena expansion migration', () => {
       database.exec(arenaExpansionMigration);
       database.exec(testArenaExpansionMigration);
       database.exec(map3ArenaExpansionMigration);
+      database.exec(raid2ArenaExpansionMigration);
 
       for (const arena of ARENA_IDS) insertDiagnostic(database, `new-${arena}`, arena);
 

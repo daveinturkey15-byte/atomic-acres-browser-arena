@@ -40,8 +40,8 @@ const CENTRE_TOLERANCE = 0.06;
 
 /**
  * Triaged 2026-09-02 against the PASS 84 tree. Arenas this lane owns (test1,
- * test2) and the arena that entered at zero (map3) have NO ledger and must
- * stay at zero. Everything else is a pre-existing finding on geometry owned by
+ * test2) and the arenas that entered at zero (map3, raid2) have NO ledger and
+ * must stay at zero. Everything else is a pre-existing finding on geometry owned by
  * another PASS 85 lane, recorded with what it is and who owns it rather than
  * silently excused by a threshold.
  */
@@ -49,6 +49,9 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
   test1: [],
   test2: [],
   map3: [],
+  // RAID2 (HF-408): the audit censused 39 walkable visuals and found all 39
+  // fully supported, so an empty ledger is the measurement, not an omission.
+  raid2: [],
   'atomic-acres': [
     // Nuke Town geometry - Lane U (HF-407) is rebuilding this arena's layout.
     // Four garage roof planes whose ridge sits 1.05 m above the box collider

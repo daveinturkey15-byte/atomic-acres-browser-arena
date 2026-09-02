@@ -29,11 +29,13 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
+      // RAID2 (HF-408, 2026-09-02): the Raid layout rethink, beside the shipped Raid.
+      'raid2',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(9);
-    expect(ARENA_SELECTIONS.length).toBe(9);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Raid Rebuild']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(10);
+    expect(ARENA_SELECTIONS.length).toBe(10);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -142,6 +144,7 @@ describe('opening arena selection', () => {
       test1: 'code',
       test2: 'code',
       map3: 'code',
+      raid2: 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -172,7 +175,7 @@ describe('opening arena selection', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -183,6 +186,7 @@ describe('opening arena selection', () => {
       'Firing Range multiplayer arena',
       'Raid multiplayer arena',
       'Map 3 multiplayer arena',
+      'Raid Rebuild multiplayer arena',
     ]);
   });
 
@@ -202,6 +206,11 @@ describe('opening arena selection', () => {
       // Support rewards are hosted-authoritative and this arena has had no
       // two-client lane run against it.
       'map3': false,
+      // RAID2 (HF-408): field support is ON, matching test2. This is the same
+      // mode on the same netcode with a different arena id, and unlike Map 3 it
+      // registers `multiplayer: true` - so turning support OFF here would be
+      // inconsistent with the row it actually ships.
+      'raid2': true,
     });
   });
 
@@ -232,6 +241,8 @@ describe('opening arena selection', () => {
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
       // MAP3 (HF-405).
+      '2 BOTS SKIRMISH',
+      // RAID2 (HF-408).
       '2 BOTS SKIRMISH',
     ]);
   });

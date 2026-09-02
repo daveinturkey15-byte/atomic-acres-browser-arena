@@ -573,19 +573,52 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
   // atmosphere.
   'raid2': frozen({
     id: 'raid2',
-    brief: 'Late-morning hillside estate - high white sun, deep pool-cyan shade.',
+    brief: 'Bleached late-morning estate - high sun off white stucco, cool sky-lit shade.',
+    // WHY THIS GRADE IS COOL AND NOT WARM, WHICH IS NOT THE OBVIOUS CHOICE.
+    //
+    // The intent was a warm key with cool shade - physically the honest shape
+    // for a sunlit estate, and the shape the first two drafts of this row used.
+    // It is not authorable. The distinctiveness floor below is a per-pair mean
+    // over the probe set, and the catalog's WARM QUADRANT IS FULL: rustworks
+    // ([1.17, 0.95, 0.91]), test2 ([1.17, 0.92, 0.83]) and atomic-acres
+    // ([1.04, 1.09, 0.90]) already occupy it. A mechanical sweep of the legal
+    // space (artifacts/raid2/gradesearch*.ts, this lane) found ZERO warm-key
+    // (r >= g >= b) grades clearing the floor - not over gain and gamma, and
+    // not over the split tone, crosstalk, saturation and contrast axes either.
+    // Every warm candidate collides with atomic-acres or rustworks, and the
+    // only warm-adjacent legal region is strongly magenta (every candidate at
+    // least 0.26 of magenta bias), which would put a pink cast on a map whose
+    // whole brief is "more similar to the original".
+    //
+    // So the warmth moves OUT of the grade and stays in the arena's own light:
+    // src/rendering/arenas/raid2.ts authors a 0xfff2dc key, and this row grades
+    // the frame around it - cool, lifted and low in contrast, which is what a
+    // white-stucco estate under a high sun actually photographs like. It is a
+    // real look, not a consolation: sun-bleached highlights, sky-blue shade.
+    //
+    // The alternative - re-authoring an existing arena's hue to make room - is
+    // outside this lane's ownership and is written up in the lane report with
+    // the exact patch, so a later pass can take the warm grade if the owner
+    // wants it. Measured margin here: 0.02562 against the 0.02157 floor, 18.8%
+    // of headroom, nearest neighbour gun-range.
     cdl: {
-      gain: [0.98, 1.0, 1.06],
-      lift: [0.001, 0.004, 0.009],
-      gamma: [1.02, 1.03, 1.0],
+      gain: [0.92, 0.86, 1.0],
+      // Held at the ART_DIRECTION_SAFETY_BOUNDS ceiling (0.006) rather than
+      // pushed past it: the bound is a combat-readability contract and the
+      // grade is authored to fit inside it, not the other way round.
+      lift: [0.002, 0.003, 0.006],
+      // Gain pulls the frame down, gamma lifts the midtones back: that pairing
+      // is the bleached, low-contrast midday response, and it is also what
+      // separates this arena from gun-range, its nearest neighbour.
+      gamma: [1.1, 1.08, 1.04],
     },
-    saturationScale: 1.1,
-    contrastScale: 1.06,
+    saturationScale: 1.12,
+    contrastScale: 1.02,
     crosstalkDelta: -0.06,
     splitTone: {
-      shadowTint: 0x2f6f86,      // pool cyan bounced into the colonnade shade
+      shadowTint: 0x2f6f86,      // pool cyan and open sky in the colonnade shade
       highlightTint: 0xfff4e2,   // high sun on white stucco
-      strengthScale: 1.05,
+      strengthScale: 1.45,
       shadowBalance: 0.52,
       highlightBalance: 0.42,
     },
@@ -596,7 +629,10 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       mistNear: 0xc8d8e0, mistFar: 0xeaf4fa,
       smokeNear: 0x38414a, smokeFar: 0x8fa0ad,
       dustNear: 0xd8dcd4, dustFar: 0xf4f8f4,
-      density: 0.55,
+      // 0.62: the bottom of ART_DIRECTION_SAFETY_BOUNDS.atmosphereDensity, as
+      // thin as this catalog is allowed to go. A clear late morning wants the
+      // least haze in the game and this is it.
+      density: 0.62,
     },
   }),
   // MAP3 (PREVIEW): the only COOL arena in the catalog. Every other outdoor
