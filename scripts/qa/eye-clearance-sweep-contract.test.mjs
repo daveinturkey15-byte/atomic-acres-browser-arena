@@ -186,6 +186,185 @@ test('every selectable arena actually resolves to a builder at runtime', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Lane J, 2026-09-02: the stage-1/stage-2 authority seam, and the per-spot
+// annotations that replace prose exemptions.
+//
+// One TSX probe serves both, because booting the arena builders costs about
+// five seconds and both questions need the real built arenas.
+// ---------------------------------------------------------------------------
+
+/**
+ * The historical artefact spot. 51 of gun-range's 55 red rows sat on the west
+ * face of the CLOSED test-bay secure door leaf (x 51.15 .. 51.85); this is one
+ * of them, and a 0.36 m prone capsule centred here is 0.33 m inside that leaf.
+ * A player can never stand here, so a violation reported from here is the
+ * instrument's, not the map's.
+ */
+const DOOR_ARTEFACT_SPOT = Object.freeze({ x: 51.12, z: 8.64, stanceEye: 0.61, stanceRadius: 0.36 });
+
+function runArenaProbe() {
+  const sweepUrl = pathToFileURL(resolve(HERE, 'sweep-eye-clearance-spots.ts')).href;
+  const collisionUrl = pathToFileURL(resolve(REPO_ROOT, 'src/collision.ts')).href;
+  // Inside the repo, not os.tmpdir(): this probe needs the bare `three`
+  // specifier the arena builders import, and ES module resolution walks up from
+  // the FILE, not from cwd. A probe in the system temp directory cannot see
+  // node_modules at all - which is exactly how this test first failed.
+  const scratch = mkdtempSync(join(REPO_ROOT, '.eye-clearance-probe-'));
+  try {
+    const probe = join(scratch, 'probe.mts');
+    writeFileSync(probe, [
+      `const sweep = await import(${JSON.stringify(sweepUrl)});`,
+      "const THREE = await import('three');",
+      `const { collidersOverlappingVerticalSpan, isBlocked } = await import(${JSON.stringify(collisionUrl)});`,
+      `const spot = ${JSON.stringify(DOOR_ARTEFACT_SPOT)};`,
+      `const annotated = ${JSON.stringify(
+        [...new Set((LEDGER.annotations ?? []).flatMap((entry) => entry.surfaces))],
+      )};`,
+      `const annotationArenas = ${JSON.stringify(
+        [...new Set((LEDGER.annotations ?? []).map((entry) => entry.arena))],
+      )};`,
+      '',
+      'const scene = new THREE.Scene();',
+      "const gunRange = sweep.ARENA_BUILDERS['gun-range'](scene);",
+      "const authority = sweep.dynamicAuthorityColliders('gun-range');",
+      'const legality = (colliders) => isBlocked(',
+      '  { x: spot.x, y: spot.stanceEye, z: spot.z },',
+      '  collidersOverlappingVerticalSpan(colliders, 0.01, spot.stanceEye),',
+      '  spot.stanceRadius,',
+      ');',
+      '',
+      '// Every annotated surface, checked against the arena that owns it.',
+      'const surfaceFacts = {};',
+      'for (const arenaId of annotationArenas) {',
+      '  const arenaScene = new THREE.Scene();',
+      '  const map = sweep.ARENA_BUILDERS[arenaId](arenaScene);',
+      '  const sameBox = (a, b) => a.minX === b.minX && a.maxX === b.maxX',
+      '    && a.minZ === b.minZ && a.maxZ === b.maxZ',
+      '    && a.minY === b.minY && a.maxY === b.maxY;',
+      '  for (const surface of map.shotSurfaces) {',
+      '    if (!annotated.includes(surface.name)) continue;',
+      '    const fact = surfaceFacts[surface.name] ?? { arena: arenaId, shotSurfaces: 0, movementColliders: 0 };',
+      '    fact.shotSurfaces += 1;',
+      '    fact.movementColliders += map.colliders.filter((box) => sameBox(box, surface.bounds)).length;',
+      '    surfaceFacts[surface.name] = fact;',
+      '  }',
+      '}',
+      '',
+      'process.stdout.write(JSON.stringify({',
+      '  doorAuthority: authority,',
+      '  artefactBlockedWithAuthority: legality([...gunRange.colliders, ...authority]),',
+      '  artefactBlockedWithoutAuthority: legality(gunRange.colliders),',
+      '  surfaceFacts,',
+      '}));',
+      '',
+    ].join('\n'));
+    const stdout = execFileSync(process.execPath, ['--import', 'tsx', probe], {
+      cwd: REPO_ROOT, encoding: 'utf8', timeout: 300000,
+    });
+    return JSON.parse(stdout.slice(stdout.indexOf('{'), stdout.lastIndexOf('}') + 1));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+const ARENA_PROBE = runArenaProbe();
+
+test('stage 1 asks legality against the same state-posed authority stage 2 can hit', () => {
+  // The bug: `gun-range-test-bay-secure-door-leaf` is authored solid:false,
+  // shots:false because its authority is the door STATE, not the mesh -
+  // gunRangeTestBayDoorLeafBounds feeds BOTH the movement collider and the
+  // ballistic surface, and legacy-main splices the latter into
+  // activeBallisticSurfaces for gun-range. Stage 2 traced the closed leaf;
+  // stage 1 could not see it; 51 unreachable rows were reported as clips.
+  assert.equal(
+    ARENA_PROBE.doorAuthority.length, 1,
+    'gun-range must contribute exactly the closed test-bay door leaf as dynamic authority',
+  );
+  const leaf = ARENA_PROBE.doorAuthority[0];
+  assert.deepEqual(
+    { minX: leaf.minX, maxX: leaf.maxX, minY: leaf.minY, maxY: leaf.maxY, minZ: leaf.minZ, maxZ: leaf.maxZ },
+    { minX: 51.15, maxX: 51.85, minY: 0, maxY: 6.5, minZ: 8.2, maxZ: 15.8 },
+    'the authority must be the CLOSED leaf bounds - the pose a player meets on arrival, '
+    + 'and the pose stage 2 measures, since the sweep never walks the approach trigger',
+  );
+});
+
+test('the door artefact case now reports correctly, and the old model still shows the bug', () => {
+  // Both directions. Without the door authority the artefact spot is legal -
+  // that is the defect, reproduced, so this test would have caught it. With the
+  // authority merged it is blocked, so the sweep can no longer emit it.
+  assert.equal(
+    ARENA_PROBE.artefactBlockedWithoutAuthority, false,
+    `(${DOOR_ARTEFACT_SPOT.x}, ${DOOR_ARTEFACT_SPOT.stanceEye}, ${DOOR_ARTEFACT_SPOT.z}) must read LEGAL against `
+    + 'static colliders alone - that is the artefact this fix removes. If this now reads blocked the '
+    + 'arena changed and the regression case must be re-derived, not deleted.',
+  );
+  assert.equal(
+    ARENA_PROBE.artefactBlockedWithAuthority, true,
+    'with the closed door leaf merged in, a prone capsule a third of a metre inside it must be ILLEGAL, '
+    + 'so the sweep never emits a hug spot there again',
+  );
+});
+
+test('every annotated surface is genuinely non-solid, so standing inside it is by design', () => {
+  // The mechanical justification for a class-(c) exemption: the player can
+  // legally stand where the clip is measured because the fixture is authored
+  // walk-through. Make one of these panels movement-solid and the exemption
+  // stops being true - and this fails, instead of quietly forgiving a real clip.
+  const annotations = LEDGER.annotations ?? [];
+  assert.ok(annotations.length > 0, 'the annotation mechanism must have at least one live entry to be exercised');
+  for (const annotation of annotations) {
+    for (const name of annotation.surfaces) {
+      const fact = ARENA_PROBE.surfaceFacts[name];
+      assert.ok(fact, `${annotation.id}: ${name} is not a shot surface of ${annotation.arena} at all`);
+      assert.equal(
+        fact.movementColliders, 0,
+        `${annotation.id}: ${name} is a MOVEMENT collider, so a player cannot legally stand inside it and `
+        + 'the "intentional walk-through fixture" reason is false. Fix the geometry or drop the annotation.',
+      );
+    }
+  }
+});
+
+test('annotations are named, dated, capped and scoped to a selectable arena', () => {
+  const roster = selectableArenaIdsFromSource();
+  const seen = new Set();
+  for (const annotation of LEDGER.annotations ?? []) {
+    assert.ok(annotation.id && !seen.has(annotation.id), `duplicate or missing annotation id: ${annotation.id}`);
+    seen.add(annotation.id);
+    assert.ok(roster.includes(annotation.arena), `${annotation.id}: arena ${annotation.arena} is not selectable`);
+    assert.ok(
+      Array.isArray(annotation.surfaces) && annotation.surfaces.length > 0,
+      `${annotation.id}: an annotation must name the exact surfaces it forgives, never an arena-wide count`,
+    );
+    assert.ok(
+      Number.isInteger(annotation.maxRows) && annotation.maxRows > 0,
+      `${annotation.id}: maxRows must be a positive integer row cap`,
+    );
+    assert.match(String(annotation.since), /^\d{4}-\d{2}-\d{2}$/u, `${annotation.id}: needs a date`);
+    assert.ok(String(annotation.reason ?? '').length > 80, `${annotation.id}: needs a real reason`);
+  }
+});
+
+test('the live sweep judges the ceiling on unannotated rows and fails a stale annotation', () => {
+  const live = STAGE_SOURCES['sweep-eye-clearance-live.mjs'];
+  assert.match(live, /partitionAnnotatedViolations/u, 'the live sweep must partition annotated rows');
+  assert.match(
+    live,
+    /row\.unannotated > ceiling/u,
+    'the ceiling must judge the rows nothing explains; annotated rows are capped under their own id',
+  );
+  assert.match(
+    live,
+    /matched NO measured row/u,
+    'an annotation that describes nothing must fail as stale, not sit here forgiving rows that no longer exist',
+  );
+  assert.match(live, /maxRows/u, 'an annotation must carry its own ratchet');
+  // Printed, always - an exemption a run does not show you is a silent one.
+  assert.match(live, /\[annotation \$\{annotation\.id\}\]/u, 'every matched annotated row must be printed');
+});
+
+// ---------------------------------------------------------------------------
 // Stage 2 (live sweep) and stage 3 (runtime verifier).
 //
 // These are the stages the first pass missed. Stage 1 generating spots for
@@ -271,6 +450,62 @@ test('stage 3 treats a missing stage-2 artifact as uncovered, not clean', () => 
 // that disagreement is precisely how a five-id ceiling table outlived a
 // seven-arena game without anyone noticing.
 // ---------------------------------------------------------------------------
+
+test('the gate that names this pipeline actually runs all three of its stages', () => {
+  // Lane J 2026-09-02. `qa:eye-clearance` ran the contract, stage 1 and stage 2
+  // and stopped. Stage 3 - the only stage that moves the REAL player and reads
+  // the REAL camera seat - was a separate script nothing invoked, pointed at a
+  // port no runner starts, and returning 0 whatever it found. The ledger's
+  // `method` field has described a three-stage pipeline throughout.
+  const scripts = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')).scripts;
+  const aggregate = scripts['qa:eye-clearance'];
+  const runtime = scripts['qa:eye-clearance:runtime'];
+  assert.ok(aggregate.includes('sweep-eye-clearance-spots'), 'the gate must run stage 1');
+  assert.ok(aggregate.includes('sweep-eye-clearance-live.mjs --check'), 'the gate must run stage 2 with a verdict');
+  assert.ok(
+    aggregate.includes('qa:eye-clearance:runtime') || aggregate.includes('verify-eye-clearance-runtime'),
+    'the gate must run stage 3; a pipeline that reports on a stage it never invokes certifies a seam it cannot see',
+  );
+  assert.ok(
+    runtime.includes('run-with-preview-server'),
+    'stage 3 needs the preview server the other browser stage gets - otherwise it cannot be run by the command that names it',
+  );
+  assert.ok(runtime.includes('--check'), 'stage 3 must carry a verdict, not just print');
+
+  const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
+  assert.match(verify, /QA_BASE_URL/u, 'stage 3 must follow the server the runner started');
+  assert.match(
+    verify,
+    /PerspectiveCamera/u,
+    'the runtime verdict floor must be READ from the shipped camera, never frozen as a literal here',
+  );
+  assert.match(
+    verify,
+    /Refusing to judge runtime clearance against a guessed threshold/u,
+    'a near-plane scrape that stops matching must throw, not fall back to a guess',
+  );
+  assert.match(verify, /partitionAnnotatedViolations/u, 'both stages must forgive through the same named annotations');
+  // Found by running the new verdict for the first time: a `stance-blocked` row
+  // carries no runtime probe, and reading that missing measurement as
+  // `distance 0` reported the worst possible clip at a seat the player could not
+  // even take - the same "unreachable spot reported as a clip" mistake that
+  // produced 51 of this pass's red rows, reintroduced inside its own fix.
+  assert.match(
+    verify,
+    /const unverified = partition\.unannotated\.filter\(\(row\) => !row\.runtime\)/u,
+    'rows with no runtime probe must be separated out, never judged as a 0 m clip',
+  );
+  assert.match(
+    verify,
+    /UNVERIFIED row on/u,
+    'an unmeasured row must be reported loudly - it is neither clean nor a clip',
+  );
+  assert.doesNotMatch(
+    verify,
+    /row\.runtime\?\.distance \?\? 0/u,
+    'the "missing measurement means zero" coercion must not come back',
+  );
+});
 
 test('the ledger carries exactly one ceiling per selectable arena', () => {
   const roster = selectableArenaIdsFromSource();
