@@ -83,8 +83,11 @@ def main() -> None:
     src_py = os.path.join(orch, f"publish_pass{a}.py")
     dst_py = os.path.join(orch, f"publish_pass{n}.py")
     py = roll_numbers(read(src_py), n)
-    py = re.sub(r'"dist-pass\d{2}", "dist-pass\d{2}",',
-                f'"dist-pass{b}", "dist-pass{a}", "dist-pass{n}",', py, count=1)
+    # the freshness-guard exclusion list names every dist-pass copy from 83 to this pass, once each
+    pat = re.compile('(?:"dist-pass' + chr(92) + 'd{2}", )+')
+    if not pat.search(py):
+        raise SystemExit("publish script: dist-pass exclusion list not found")
+    py = pat.sub("".join(f'"dist-pass{k}", ' for k in range(83, n + 1)), py, count=1)
     m = re.search(r'\nDESCRIPTION = \(\n(?:    "[^\n]*\n)+\)', py)
     if not m:
         raise SystemExit("publish script: DESCRIPTION block not found")
