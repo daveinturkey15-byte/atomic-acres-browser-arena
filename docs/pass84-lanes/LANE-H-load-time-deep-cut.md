@@ -63,3 +63,15 @@ wrong, so it gets its own measured pass."
 Per-arena before/after table (admission time, pipelines, modules,
 materials), the cuts with commit hashes, tripwire results, screenshots
 compared, and what was left uncut and why. Claim-state every line.
+
+## JOB 0 (added 18:55 BST, HF-417) — the Gun Range map-switch failure comes first
+Lane I found that an in-match switch INTO gun-range fails the 12 s fence
+(`WebGPU queue completion exceeded 12000 ms ... fenced draws 770`) on a quiet
+GPU, leaving the previous arena committed. First-load into gun-range works.
+Reproduce headless (Lane I's probe `scripts/qa/probe-ibl-load-parity.mjs`
+on its branch shows the exact sequence), then apply Lane C's pattern (the
+`// FARCRYSIS-LOAD:` block: realise the arena's pipeline vocabulary before
+the first fenced submission; count-free instancing) to the gun-range switch
+path, measure the switch time before/after, and add a headless switch matrix
+(every arena -> every arena, registry-derived) as a gate. Never widen the
+fence. Then continue with the deep cut below.

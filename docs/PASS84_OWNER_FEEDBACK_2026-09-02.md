@@ -446,3 +446,23 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   pass runs the same loop with Gemini critics and reports scores per cycle.
 - **Plan:** Lane AJ (skill + Map 3 corridor), Lane U addendum (adopt the
   protocol now), Lane AK (Nuke Town art pass by the method, after U lands).
+
+## HF-417 — Gun Range cannot be reached by an in-game map switch (found by Lane I, 2026-09-02 18:50)
+
+- **Finding (VERIFIED by Lane I, twice, once on a quiet GPU):** switching
+  arena into gun-range from an active match fails with
+  `[Gun Range map selection failed] Error: WebGPU queue completion exceeded
+  12000 ms for submission 614 ... fenced draws 770`; the previous arena stays
+  committed while the match stays active. gun-range's FIRST-load path is
+  fine. Same class as the Farcrysis admission failure Lane C fixed (cold
+  pipeline vocabulary compiled inside the fenced frame).
+- **Mechanical falsifier:** a headless in-match switch into gun-range from
+  every other arena commits inside the 12 s fence with zero page errors, and
+  the switch matrix (every arena -> every arena) is green and derived from
+  the registry.
+- **Plan:** Lane H (load-time deep cut) takes it as job 0, moved up in the
+  wave-3 order; Lane C's "realise the arena vocabulary before the first
+  fenced frame" pattern is the first thing to try. Also: IBL first-arena
+  bug CLOSED as already fixed on 75a4e508 (Lane I, 8/8 arenas identical
+  across load paths); "lighting feels off" routes to the art passes
+  (HF-407, HF-408) and Lane AB.
