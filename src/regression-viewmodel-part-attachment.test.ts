@@ -25,6 +25,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { viewmodelRigToWorldMeters } from './viewmodel-body-fit';
 import { WEAPON_IDS, type WeaponId } from './protocol';
 import { WeaponPresentation, type WeaponPose } from './weapon-presentation';
 
@@ -165,7 +166,12 @@ describe('visible viewmodels are never left frozen', () => {
     const stale = parts.map((part) => (
       renderedWorldPosition(part).distanceTo(composedWorldPosition(part, presentation.root))
     ));
-    expect(Math.max(...stale), 'the frozen reveal is no longer reproducible').toBeGreaterThan(4.9);
+    // HF-410: the 5 m nudge above is applied to the rig ROOT, whose parent now
+    // carries the body fit, while `stale` is a WORLD distance. Converting the
+    // threshold keeps the relation exactly what it was - it is the same 4.9 of
+    // the same 5 - instead of comparing rig metres against world metres.
+    expect(Math.max(...stale), 'the frozen reveal is no longer reproducible')
+      .toBeGreaterThan(viewmodelRigToWorldMeters(4.9));
 
     presentation.update({ ...REST_POSE });
     presentation.root.updateMatrixWorld(true);

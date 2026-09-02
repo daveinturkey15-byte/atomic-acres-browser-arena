@@ -292,6 +292,35 @@ export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelCont
 });
 
 /**
+ * HF-410 - THE POSE THE OWNER ASKED TO HAVE REMOVED.
+ *
+ * Owner, 2026-09-02, on PASS 84 with two Firing Range screenshots: "gun
+ * clipping through walls and floor aswell as HOLDING IT UP when near floor or
+ * prone or walls is super bad, needs a re work and fix". Screenshot 1 is this
+ * response at full blend: the rig lifted and pitched into a near-vertical
+ * high-ready that fills the frame.
+ *
+ * The lift and the pitch were bought to hide a rig that hung outside the
+ * player's collision body. That rig is now fitted inside it
+ * (src/viewmodel-body-fit.ts), so the probe that drives this response is sized
+ * to a 0.32 m envelope and cannot reach a surface the capsule may stand next
+ * to: on normal poses `obstructionBlend` is zero and this whole response is
+ * inert. These two ceilings are the belt to that braces: even if a pose ever
+ * does drive the blend, the discretionary part of the lift may not exceed
+ * three centimetres and the high-ready pitch may not exceed a few degrees.
+ *
+ * What is NOT capped, deliberately: `additionalDropMeters` (a drop is not
+ * "holding it up"), and the MEASURED floor clearance terms `lift * floorBlend`
+ * and the wall-drop counter-lift. Those are physical - they are what keeps the
+ * muzzle above the prone floor - and capping them would trade the owner's
+ * complaint for the one underneath it.
+ */
+/** Ceiling on the discretionary "raise it out of the way" lift, in metres. */
+export const VIEWMODEL_CONTACT_POSE_LIFT_CAP_METERS = 0.03;
+/** Ceiling on the high-ready pitch. Roughly three degrees; formerly up to 0.36 rad. */
+export const VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS = 0.05;
+
+/**
  * Presentation-only contact fold. ADS reduces the fold but cannot cancel it:
  * an always-on-top viewmodel would otherwise draw through the wall at the exact
  * moment contact is most likely. Open-space ADS remains byte-for-byte neutral.
@@ -333,12 +362,20 @@ export function viewmodelContactResponse(
     floorBlend,
     obstructionBlend,
     highReadyBlend,
-    pitchRadians: highReadyBlend === 0 ? 0 : profile.maximumHighReadyPitchRadians * highReadyBlend,
+    pitchRadians: highReadyBlend === 0
+      ? 0
+      : Math.min(
+        VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
+        profile.maximumHighReadyPitchRadians * highReadyBlend,
+      ),
     yawRadians: highReadyBlend === 0 ? 0 : profile.maximumYawRadians * highReadyBlend,
     rollRadians: highReadyBlend === 0 ? 0 : profile.maximumRollRadians * highReadyBlend,
-    additionalLiftMeters: profile.maximumAdditionalLiftMeters
-      * Math.max(wallBlend, floorBlend)
-      * (0.72 + 0.28 * adsRemaining)
+    additionalLiftMeters: Math.min(
+      VIEWMODEL_CONTACT_POSE_LIFT_CAP_METERS,
+      profile.maximumAdditionalLiftMeters
+        * Math.max(wallBlend, floorBlend)
+        * (0.72 + 0.28 * adsRemaining),
+    )
       // The probe's measured floor pressure is real world-space clearance.
       // Carry it into the camera-space root so the complete skinned sleeves and
       // receiver remain above the prone floor instead of only reporting lift.

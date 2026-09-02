@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
   VIEWMODEL_CONTACT_PROBE_OFFSETS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
@@ -148,7 +149,12 @@ describe('weapon presentation state', () => {
         aimAuthority: 'camera-forward-unchanged',
       });
       expect(response.obstructionBlend).toBeGreaterThan(0.85);
-      expect(response.pitchRadians).toBeGreaterThan(0.5);
+      // RE-PINNED FOR HF-410 (owner asked for the "holding it up" pose to be
+      // reworked out). The blend is still asserted, so the response is still
+      // live; only its visible amplitude is capped by
+      // VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, because the rig no
+      // longer sits outside the body it is carried in.
+      expect(response.pitchRadians).toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(response.scale).toBeGreaterThanOrEqual(profile.minimumScale);
       expect(response.scale).toBeLessThan(1);
       expect([
@@ -300,7 +306,8 @@ describe('weapon presentation state', () => {
       aimAuthority: 'camera-forward-unchanged',
     });
     expect(adsContact.highReadyBlend).toBeGreaterThan(0.4);
-    expect(adsContact.pitchRadians).toBeGreaterThan(0.3);
+    // RE-PINNED FOR HF-410: capped, for the reason above.
+    expect(adsContact.pitchRadians).toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
     expect(adsContact.yawRadians).toBeLessThan(0);
     expect(adsContact.rollRadians).toBeGreaterThan(0);
     expect(adsContact.scale).toBeLessThan(1);
