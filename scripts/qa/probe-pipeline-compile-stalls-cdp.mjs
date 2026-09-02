@@ -177,8 +177,14 @@ try {
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(() => { const s = document.querySelector('#solo'); return s !== null && !s.disabled; }, undefined, { timeout: BOOT_TIMEOUT_MS });
-  await page.evaluate((arena) => {
-    document.querySelector(`.map-card[data-arena-id="${arena}"]`)?.click();
+  await page.evaluate(async (arena) => {
+    const card = document.querySelector(`.map-card[data-arena-id="${arena}"]`);
+    if (card) card.click();
+    // FARCRYSIS-LOAD (pass 84): a hidden arena (selectable: false, e.g.
+    // farcrysis) has no map card. Reach it the way the eight-arena boot smoke
+    // does - the debug API's selectArena is the same activateArenaSelection
+    // path the deploy button takes - instead of silently probing the default.
+    else await window.__ATOMIC_ACRES_DEBUG__.selectArena(arena);
     const name = document.querySelector('#player-name');
     if (name) name.value = 'PipeProbe';
   }, ARENA);

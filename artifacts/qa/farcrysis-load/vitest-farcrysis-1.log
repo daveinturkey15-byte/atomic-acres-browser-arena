@@ -1,0 +1,27 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-farcrysis-load
+
+ ❯ src/farcrysis-tree-materials.test.ts (7 tests | 7 skipped) 20282ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/farcrysis-tree-materials.test.ts > farcrysis tree material fidelity (12 species)
+Error: Hook timed out in 20000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ src/farcrysis-tree-materials.test.ts:129:3
+    127|   let scene: THREE.Scene;
+    128|
+    129|   beforeAll(() => {
+       |   ^
+    130|     scene = new THREE.Scene();
+    131|     buildFarcrysis(scene);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 24 passed (25)
+      Tests  145 passed | 7 skipped (152)
+   Start at  08:03:13
+   Duration  60.38s (transform 74.99s, setup 0ms, import 100.35s, tests 410.94s, environment 5ms)
+
+VITEST EXIT 1
