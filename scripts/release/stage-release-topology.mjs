@@ -113,12 +113,35 @@ const channelRoot = (path) => {
 
 rmSync(join(distRoot, 'channels'), { recursive: true, force: true });
 const experimentalRoot = channelRoot(config.experimental.path);
+
+// VALIDATE BEFORE MOVING. The pass-identity check below used to run AFTER the
+// two renames, and `renameSync` is a move, not a copy: once index.html and
+// assets/ had left the dist root, a throw here returned a tree that no longer
+// satisfied the `candidate dist is incomplete` guard at the top of this script.
+// The staging step was therefore not idempotent on failure - the second run
+// failed for a different and more confusing reason than the first, and the only
+// recovery was a full rebuild. The check reads the same bytes either side of a
+// rename, so hoisting it costs nothing and makes the failure non-destructive.
+const candidateJs = walkFiles(join(distRoot, 'assets')).filter((path) => path.endsWith('.js'));
+if (!candidateJs.some((path) => readFileSync(path).includes(Buffer.from(config.experimental.pass)))) {
+  throw new Error(`Experimental candidate does not contain ${config.experimental.pass}`);
+}
+
 mkdirSync(experimentalRoot, { recursive: true });
 renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
 renameSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'));
-const experimentalJs = walkFiles(join(experimentalRoot, 'assets')).filter((path) => path.endsWith('.js'));
-if (!experimentalJs.some((path) => readFileSync(path).includes(Buffer.from(config.experimental.pass)))) {
-  throw new Error(`Experimental candidate does not contain ${config.experimental.pass}`);
+// MAP3 (HF-409): the Map 3 showcase page is a second build input, so vite emits
+// it beside index.html at the dist root with `./assets/...` links. Those links
+// only resolve inside the candidate channel, which is where index.html and the
+// assets directory just went - without this move /map3.html is served with a
+// 200 and every one of its chunks 404s, and the page never leaves its
+// "Starting Map 3..." banner. Measured: 9 x 404, banner still up after 180 s.
+//
+// `existsSync` rather than an unconditional move: the pinned historical
+// channels this script also stages were built before map3.html was an input,
+// and a rebuild of one of those must not fail for want of a page it never had.
+if (existsSync(join(distRoot, 'map3.html'))) {
+  renameSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'));
 }
 
 function stagePinned(channelName, channel) {
