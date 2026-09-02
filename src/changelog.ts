@@ -136,12 +136,18 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     pass: 'PASS 85',
     title: 'Pass 85 · Drop Shots, Firing Range Roof & First-Person Arms',
     releasedAt: pass85ReleasedAt,
-    areas: Object.freeze(['MOVEMENT', 'ARENAS', 'FIRST-PERSON']),
+    areas: Object.freeze(['MOVEMENT', 'ARENAS', 'FIRST-PERSON', 'GRAPHICS']),
     summary: 'Pass 85 lands the first of the 2026-09-02 evening list: Black Ops 2 style drop shots, the Firing Range roof netting that swallowed players, and first-person arms and knife that stay in frame.',
     highlights: Object.freeze([
       'Drop shots work the Black Ops 2 way: hold crouch to go prone while you keep firing, the camera falls through a real transition instead of snapping, hip fire widens while you drop, and other players see your body go down',
       'The camo netting over the Firing Range container yard is a real floor now; you no longer fall three metres through it',
       'The firing arm no longer ends in mid-air and the knife swing happens on screen instead of off the right edge; every weapon model was checked for mirrored geometry and none was found',
+      // HF-418 item 3, the brief's final clause: "register the copy in the
+      // changelog / identity surfaces". Added at the END so highlights[0]
+      // stays the entry the release card renders. No pass number is invented
+      // here - this extends the entry the release stamp already names, which
+      // is the pattern this file documents for lanes.
+      'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
       'Pass 84 stays published as the single safe backup; every older channel is retired',
     ]),
   }),
