@@ -48,6 +48,12 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // square and large. 176 x 176 at mapSize 2048 is 86 mm per texel, which is
   // where arenas/map3.ts derives its 0.085 normal bias from.
   'map3': Object.freeze({ halfWidth: 88, halfHeight: 88, near: 4, far: 300 }),
+  // RAID2 (PREVIEW, HF-408): RAID2_BOUNDS is 100 x 76 m, the same box test2
+  // was re-pinned to on 2026-08-31, so the volume is pinned by the same rule
+  // and for the same reason: 54 x 42 half-extents cover 108 x 84, the bounds
+  // plus the 4 m margin. The tallest authored mass here is the 5.3 m upper
+  // wall, below test2's parapet, so `far` needs no more depth than test2's.
+  'raid2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -71,6 +77,9 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // MAP3 (PREVIEW): matte paving and stone piers with one shallow water basin
   // - between Test1's dry range (0.16) and Test2's travertine-and-pool (0.22).
   'map3': 0.18,
+  // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
+  // texel footprint is the same and the bias that works there works here.
+  'raid2': 0.22,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

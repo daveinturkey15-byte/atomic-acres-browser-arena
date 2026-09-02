@@ -86,6 +86,13 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   'map3': definition('map3', 58, [
     { id: 'map3-hub-overflight', xQ: 0, zQ: 0, altitudeM: 24 },
   ]),
+  // RAID2 (PREVIEW, HF-408): the tallest authored mass is the 5.3 m upper wall,
+  // so the ceiling is set by sightline like test2's. The courtyard is the one
+  // portal because it is the only place on the map that is open to the sky with
+  // no roof, slab or upper room over it.
+  'raid2': definition('raid2', 63, [
+    { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

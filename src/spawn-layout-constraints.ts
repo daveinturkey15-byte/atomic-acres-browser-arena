@@ -56,6 +56,8 @@ import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { buildTest1, buildTest2 } from './test-maps';
 import { buildMap3 } from './map3-arena';
+// RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+import { buildRaid2 } from './raid2-arena';
 import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 import { validArenaSpawnPoint } from './spawn-safety';
 
@@ -78,6 +80,7 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   test2: buildTest2 as ArenaBuilder,
   // HF-405: Map 3 (PREVIEW) registered 2026-09-02; the exhaustive record caught it at integration.
   map3: buildMap3 as ArenaBuilder,
+  raid2: buildRaid2 as ArenaBuilder,
 });
 
 /** `[id, builder]` for every arena the menu offers. */

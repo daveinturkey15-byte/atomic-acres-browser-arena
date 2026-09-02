@@ -285,6 +285,15 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.085, modulationDepth: 0.09,
     bedPosition: Object.freeze({ x: -20, y: 3, z: 12 }), airPosition: Object.freeze({ x: 22, y: 5, z: -16 }),
   }),
+  // RAID2 (PREVIEW, HF-408): placed on this arena's own plan - the bed over the
+  // circular drive, the air over the pool terrace - and voiced a little brighter
+  // and drier than test2 because the rebuild has far less roof to soak it up.
+  'raid2': Object.freeze({
+    arenaId: 'raid2', identity: 'open-terrace-breeze-and-pool-water', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 54, airFrequencyHz: 182, airLowpassHz: 720, airQ: 1.7, airGain: 0.0068,
+    modulationHz: 0.078, modulationDepth: 0.085,
+    bedPosition: Object.freeze({ x: 0, y: 3, z: 14 }), airPosition: Object.freeze({ x: -10, y: 5, z: -28 }),
+  }),
   // MAP3 (PREVIEW): the bed is the wind in the colonnade bay, the air layer is
   // the open scrub on the far side of the hub. Both are placed off-axis from
   // the hub centre so the layer has a bearing to walk around.

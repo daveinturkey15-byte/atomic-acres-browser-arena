@@ -152,11 +152,11 @@ const HARD_COVER = 1.9;
 /** Mountable cover: under the measured 0.82 m jump apex. */
 const MOUNT = 0.7;
 /** Autostep-legal rise (CHARACTER_PHYSICS_CONFIG.autostepHeight = 0.42 m). */
-const STEP = 0.35;
+export const STEP = 0.35;
 /** Canonical stair module: 9 risers of 0.3778 m under the 0.42 m autostep, 0.45 m treads. */
-const STAIR_RISERS = 9;
+export const STAIR_RISERS = 9;
 const STAIR_TREAD = 0.45;
-const STAIR_RUN = STAIR_RISERS * STAIR_TREAD;
+export const STAIR_RUN = STAIR_RISERS * STAIR_TREAD;
 
 /** Sunken surfaces. Both are reached on the autostep, so neither is a trap. */
 const COURT_Y = -0.35;
@@ -646,11 +646,17 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // a standoff floor so no point opens with a wall filling the screen, an open
   // arc, and no enemy spawn in sight. Unlike the shipped Raid these ARE close
   // to an x mirror, because this build gave the garage an autostep route in.
+  //
+  // MEASURED, not authored by eye (artifacts/raid2/spawncheck.ts, re-run after
+  // every geometry change in this lane). The first table put (-46, -2) 0.40 m
+  // from the apron planter against a 0.44 m spawn radius, so the point and its
+  // mirror both measured standable=false - 4 cm inside geometry, which is the
+  // exact class of defect a spawn gate exists to catch and an eye never will.
   const team0: [number, number][] = [
-    [-46, -9], [-46, -2], [-46, 3], [-42, -11], [-42, 0], [-39, 4],
+    [-46, -9], [-44.5, -2], [-46, 3], [-42, -11], [-42, 0], [-39, 4],
   ];
   const team1: [number, number][] = [
-    [46, -9], [46, -2], [46, 3], [42, -11], [42, 0], [39, 4],
+    [46, -9], [44.5, -2], [46, 3], [42, -11], [42, 0], [39, 4],
   ];
 
   return {

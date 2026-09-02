@@ -397,8 +397,14 @@ export async function measureArena(id: string): Promise<LayoutMetrics> {
   const entry = factories[id];
   if (!entry) throw new Error(`unknown arena id: ${id}`);
   const scene = new THREE.Scene();
-  const arena = await entry.build(scene);
-  if (entry.enrich) await entry.enrich(scene, arena);
+  // ArenaBuild is (scene) => Omit<ArenaMap, 'id'> & { id?: string } and
+  // ArenaEnrich is (scene) => Promise<void>: the factory table deliberately
+  // does not promise an ArenaId, because it is keyed by one. measureLayout only
+  // reads colliders and bounds, and takes the id as its own argument, so the
+  // build result is narrowed here rather than being passed through untyped.
+  const built = entry.build(scene);
+  if (entry.enrich) await entry.enrich(scene);
+  const arena = { ...built, id } as unknown as ArenaMap;
   return measureLayout(id, arena);
 }
 

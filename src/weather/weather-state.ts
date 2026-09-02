@@ -228,6 +228,10 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // the arena is authored for hard midmorning light and rain would contradict
   // the whole grade. Clear and overcast only until it leaves preview.
   'map3': arenaProfile('map3', 'open-scrub-midmorning-clear', false, ['clear', 'overcast']),
+  // RAID2 (PREVIEW, HF-408): graded for high late-morning sun rather than
+  // test2's golden hour, so overcast is reachable here without contradicting
+  // the grade. No precipitating state until it leaves preview.
+  'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear', 'overcast']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

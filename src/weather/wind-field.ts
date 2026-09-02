@@ -227,6 +227,10 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // gust scale is the largest on the board (34 m) because the pier lines are
   // what break the wind up, and they are 6.4 m apart down a 54 m lane.
   'map3': profile('map3', 'open-scrub-gallery-crossbreeze', 0.62, 2.9, 2.6, 34, 1.0, false),
+  // RAID2 (PREVIEW, HF-408): the same hillside breeze as test2, on a longer
+  // gust scale (26 m against 18 m) because what breaks the wind here is a
+  // colonnade on 4 m gaps at the end of a 52 m lane, not a hedge line.
+  'raid2': profile('raid2', 'hillside-terrace-lane-breeze', -1.18, 2.5, 2.1, 26, 1.05, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {

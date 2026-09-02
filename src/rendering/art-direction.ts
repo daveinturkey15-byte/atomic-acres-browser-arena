@@ -558,6 +558,47 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.8,
     },
   }),
+  // RAID2 (PREVIEW, HF-408). Deliberately a DIFFERENT TIME OF DAY from test2,
+  // not a nudge of it: test2 is deep golden hour (gain r > g > b) and this is
+  // high late morning (gain b > g > r). Two reasons, and neither of them is the
+  // distinctiveness metric. First, the owner asked for something closer to the
+  // original, which reads as a bright sunlit estate rather than an amber one.
+  // Second, these two arenas sit beside each other in the menu, so if they
+  // graded alike the owner could not tell which one he had loaded - which is
+  // the entire point of shipping the rebuild beside the shipped map.
+  //
+  // Clearing the distinctiveness floor is a consequence of that choice, not its
+  // purpose. Saturation and contrast do not enter that metric, so the whole
+  // separation is carried where a player actually sees it: hue, split tone and
+  // atmosphere.
+  'raid2': frozen({
+    id: 'raid2',
+    brief: 'Late-morning hillside estate - high white sun, deep pool-cyan shade.',
+    cdl: {
+      gain: [0.98, 1.0, 1.06],
+      lift: [0.001, 0.004, 0.009],
+      gamma: [1.02, 1.03, 1.0],
+    },
+    saturationScale: 1.1,
+    contrastScale: 1.06,
+    crosstalkDelta: -0.06,
+    splitTone: {
+      shadowTint: 0x2f6f86,      // pool cyan bounced into the colonnade shade
+      highlightTint: 0xfff4e2,   // high sun on white stucco
+      strengthScale: 1.05,
+      shadowBalance: 0.52,
+      highlightBalance: 0.42,
+    },
+    midtoneContrastDelta: 0.03,
+    vignette: { base: 0.06, settingScale: 1 },
+    bloom: { intensityScale: 1.08, thresholdScale: 1 },
+    atmosphere: {
+      mistNear: 0xc8d8e0, mistFar: 0xeaf4fa,
+      smokeNear: 0x38414a, smokeFar: 0x8fa0ad,
+      dustNear: 0xd8dcd4, dustFar: 0xf4f8f4,
+      density: 0.55,
+    },
+  }),
   // MAP3 (PREVIEW): the only COOL arena in the catalog. Every other outdoor
   // map is warm-led - suburban sunset, sodium night, airport dawn, jungle and
   // estate golden hour, khaki range - so the grade that makes a stone gallery

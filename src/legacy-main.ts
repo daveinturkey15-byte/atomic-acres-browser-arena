@@ -162,6 +162,8 @@ import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
 import { buildMap3 } from './map3-arena';
+// RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
+import { buildRaid2 } from './raid2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3329,6 +3331,8 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
   // architecture rather than the src/map3 showcase corridors.
   map3: buildMap3,
+  // RAID2: the Raid layout rethink. Ships BESIDE test2, which is unchanged.
+  raid2: buildRaid2,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;

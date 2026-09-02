@@ -39,6 +39,9 @@ const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
 // reason the comment above records: a new byte under an old key is exactly
 // what the cache-family lock exists to prevent.
 const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
+// RAID2 (HF-408): its own key, so publishing a Raid Rebuild capture never
+// invalidates Map 3's cached clip and vice versa.
+const RAID2_CACHE_KEY = 'pass87-raid2-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -192,6 +195,26 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     webm: `${ROOT}/map3.webm?v=${PASS84_CACHE_KEY}`,
     mp4: `${ROOT}/map3.mp4?v=${PASS84_CACHE_KEY}`,
     poster: `${ROOT}/map3.webp?v=${PASS84_CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
+  // RAID2 (PREVIEW, HF-408). `mediaAvailable: false` is the honest field and
+  // the load-bearing one: no capture for this arena has been committed yet, and
+  // an entry that claimed one would put a 404 behind the menu card. The menu
+  // falls back to its still frame until a clip lands, which is the same
+  // behaviour every arena had before its own capture existed.
+  'raid2': Object.freeze({
+    arenaId: 'raid2',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // RAID REBUILD',
+    motionLabel: 'AUTHORED ESTATE FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-raid2-v1',
+    mediaAvailable: false,
+    webm: `${ROOT}/raid2.webm?v=${RAID2_CACHE_KEY}`,
+    mp4: `${ROOT}/raid2.mp4?v=${RAID2_CACHE_KEY}`,
+    poster: `${ROOT}/raid2.webp?v=${RAID2_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,
