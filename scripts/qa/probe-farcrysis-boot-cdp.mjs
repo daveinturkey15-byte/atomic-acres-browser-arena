@@ -458,6 +458,25 @@ try {
     report.stageTrack = census.stageTrack;
   }
 
+  // PASS 84 repair: ONE screenshot immediately after admission. The instancing
+  // and foliage-graph changes touch all 76 vegetation/prop layers and nothing
+  // in this repo's automated set ever looks at farcrysis (it is hidden, so the
+  // menu-card verifiers cannot reach it and the boot smoke asserts state, not
+  // pixels). A frame grab is the cheapest evidence that the arena still renders
+  // as an arena rather than a black frame or NaN'd geometry. Headless: one grab
+  // off the already-open page, no visible window, no extra browser.
+  if (report.outcome === 'admitted') {
+    const shot = resolve(dirname(OUT), `${LABEL}-admitted.png`);
+    try {
+      await page.screenshot({ path: shot, type: 'png' });
+      report.screenshot = shot;
+      console.error(`[farcrysis-boot] screenshot ${shot}`);
+    } catch (error) {
+      report.screenshotError = String(error).slice(0, 200);
+      console.error(`[farcrysis-boot] screenshot failed: ${report.screenshotError}`);
+    }
+  }
+
   // Optional in-combat window after admission: any pipeline created here is a
   // cold compile a player would feel as a stall. The target is zero.
   if (COMBAT_SECONDS > 0 && report.outcome === 'admitted') {
