@@ -21,7 +21,7 @@
 // least 3000 MiB of GPU memory free before the browser launches (the owner's
 // ComfyUI shares the card).
 import { chromium } from '@playwright/test';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
@@ -107,10 +107,47 @@ function httpUp(port, path = '/') {
 }
 
 const children = [];
+/** Listener pids this script brought up, by port - the only pids it is allowed to kill by port. */
+const ownedListeners = new Map();
+/**
+ * Synchronous on purpose: this runs from the `finally` right before
+ * `process.exit`, and an async `spawn('taskkill')` there was measured
+ * (2026-09-02, twice) to leave the vite preview listening on :41944 after the
+ * script had exited.
+ */
+function killPidTree(pid) {
+  if (process.platform === 'win32') {
+    try { execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* already gone */ }
+  }
+}
 function killTree(child) {
   if (!child || child.pid == null) return;
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') killPidTree(child.pid);
   else child.kill('SIGTERM');
+}
+
+/** The pid listening on 127.0.0.1:port, or null. Windows only; elsewhere the child tree kill suffices. */
+async function listenerPid(port) {
+  if (process.platform !== 'win32') return null;
+  const { stdout } = await execFileAsync('netstat', ['-ano', '-p', 'tcp']).catch(() => ({ stdout: '' }));
+  for (const line of stdout.split(/\r?\n/)) {
+    const columns = line.trim().split(/\s+/);
+    if (columns.length >= 5 && columns[1] === `127.0.0.1:${port}` && columns[3] === 'LISTENING') return Number(columns[4]);
+  }
+  return null;
+}
+
+/**
+ * `npx` on Windows is a cmd wrapper; `taskkill /T` on the wrapper has been
+ * measured (2026-09-02) to leave the vite child listening on :41944 after
+ * the wrapper exits, so the listener is also killed by the pid recorded when
+ * this script brought it up - never a pid it did not start.
+ */
+function killOwnedListeners() {
+  for (const [port, pid] of ownedListeners) {
+    killPidTree(pid);
+    ownedListeners.delete(port);
+  }
 }
 
 async function serveDist() {
@@ -120,7 +157,11 @@ async function serveDist() {
   children.push(server);
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
-    if (await httpUp(PORT)) return;
+    if (await httpUp(PORT)) {
+      const pid = await listenerPid(PORT);
+      if (pid) ownedListeners.set(PORT, pid);
+      return;
+    }
     await new Promise((wait) => setTimeout(wait, 500));
   }
   throw new Error(`served ${DIST} never came up on :${PORT}`);
@@ -133,8 +174,11 @@ async function ensurePeerServer() {
     '--host', '127.0.0.1', '--port', String(PEER_PORT), '--path', '/peerjs', '--no-allow_discovery',
   ], { stdio: 'ignore', windowsHide: true });
   children.push(child);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  // 30 s, not 10: on 2026-09-02 the peer server took longer than 10 s to bind
+  // while three other lanes' builds and browsers shared the machine.
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     if (await httpUp(PEER_PORT, '/peerjs/id')) return;
+    if (child.exitCode !== null) throw new Error(`peer server exited with ${child.exitCode} before binding :${PEER_PORT}`);
     await new Promise((wait) => setTimeout(wait, 100));
   }
   throw new Error('peer server never ready');
@@ -331,5 +375,6 @@ try {
 } finally {
   await browser?.close().catch(() => {});
   for (const child of children) killTree(child);
+  killOwnedListeners();
 }
 process.exit(exitCode);
