@@ -4756,6 +4756,17 @@ function invalidateKeyBindingProfile(): void {
 }
 const remotes = new Map<string, RemotePlayer>();
 // Lane J (HF-347 residual): silent state/join admission drops, made observable.
+// MP-LAB: see the outside-arena-bounds admission below. Must stay at or below
+// the smallest character capsule radius in physics.ts (0.36) or legal poses drop.
+// 0 is deliberate, not the loosest value the invariant tolerates: the capsule is
+// the thing that keeps a body out of a wall, and it already does - a resting
+// centre sits exactly `radius` inside the bounds. Admission's own question is
+// only "is this inside the world at all", and at margin 0 it still answers no
+// for a pose beyond the face (proved by
+// scripts/qa/mp-lab/resting-pose-admission.mts, pinned in
+// tests/e2e/mp-lab-state-admission-contract.test.mjs). Any nonzero band here
+// re-invents a second, weaker collision authority.
+const STATE_ADMISSION_BOUNDS_MARGIN = 0;
 const stateAdmissionDropTelemetry: {
   total: number;
   byReason: Record<string, number>;
@@ -8777,7 +8788,17 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   const projection = guestResumeProjection(message);
   const canonical = projection.player;
   const stance = canonical.stance ?? 'stand';
-  if (!pointInsideBounds(canonical, arena.bounds, 0.44) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
+  // MP-LAB: the same family as the state-admission drop fixed earlier in this
+  // lane, on the path that decides whether a resuming guest may stand where the
+  // host says it stands. At 0.44 the bounds half rejects the resting pose of
+  // EVERY stance against a perimeter wall (stand rests at maxX - 0.38,
+  // crouch/prone at maxX - 0.36; all three measured rejected at 0.44 and
+  // admitted at the admission margin by scripts/qa/mp-lab/resting-pose-admission.mts),
+  // so a guest that reconnects while hugging a wall NACKs 'blocked-pose' and
+  // spends its resume retries on a legal position. The world question is the
+  // one state admission asks; the collider question keeps the mover's own
+  // 0.44 m radius, unchanged.
+  if (!pointInsideBounds(canonical, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
     nackGuestResumeAuthority(message, 'blocked-pose');
     return true;
   }
@@ -12262,7 +12283,15 @@ function onNetworkMessage(message: GameMessage): void {
           deaths: authoritativeScore?.deaths ?? 0,
         }
       : claimedIncoming;
-    if (!pointInsideBounds(incoming, arena.bounds, 0.44)) {
+    // MP-LAB: a peer hugging a perimeter wall is a legal pose. Movement authority
+    // is the Rapier capsule (physics.ts playerRadius 0.38, crouch/prone 0.36)
+    // against physics-only boundary walls whose inner faces ARE arena.bounds, so
+    // a centre can rest at bounds.max - 0.38. The old 0.44 margin rejected that
+    // pose and the peer froze for everyone else: measured 2026-09-02 (host+guest
+    // harness, atomic-acres) 5 'outside-arena-bounds' drops of the host's state
+    // at x = 36.595 against maxX 37. Inside the world at all is the admission
+    // question; the capsule already keeps every legal pose off the wall.
+    if (!pointInsideBounds(incoming, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN)) {
       recordStateAdmissionDrop('outside-arena-bounds');
       return;
     }
@@ -30614,6 +30643,19 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
+    // MP-LAB: the cheap pose read for movement probes. snapshot() walks every
+    // rigged actor's skinned meshes and costs ~60 ms per call (measured
+    // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
+    // it is measuring. This returns only what a deadlock check needs.
+    samplePlayerPose: () => {
+      alive: boolean;
+      position: number[];
+      yaw: number;
+      gameStarted: boolean;
+      matchPhase: string;
+      awaitingCanonicalGuestAuthority: boolean;
+      menuHidden: boolean;
+    };
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     sampleViewmodelPenetration: () => Record<string, unknown>;
@@ -31913,6 +31955,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
   sampleGrenadeColdPathTelemetry,
+  // MP-LAB: see the type; nothing here allocates beyond the returned object.
+  samplePlayerPose: () => ({
+    alive: player.alive,
+    position: player.position.toArray(),
+    yaw: player.yaw,
+    gameStarted,
+    matchPhase: matchState.phase,
+    awaitingCanonicalGuestAuthority,
+    menuHidden: menu.classList.contains('hidden'),
+  }),
   snapshot: () => ({
     swim: {
       swimming: localSwimState.swimming,
