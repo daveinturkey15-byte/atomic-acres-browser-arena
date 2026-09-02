@@ -34,6 +34,8 @@ import type { Corridor } from './corridors';
 import { createGrassTuft, poissonScatter } from './plants';
 import { mergeGeometries, hash11 } from './leaf-geometry';
 import { SUMMER_PALETTE, createFoliageMaterial, createFoliageUniforms, rgb } from './foliage-material';
+// MAP3 (HF-409): the solids this corridor publishes for an arena to collide.
+import type { CorridorSolid } from './corridor-solids';
 
 const W = 9;
 const CORRIDOR_LEN = 54;
@@ -243,6 +245,9 @@ export function createWaterCorridor(): Corridor {
   waterGeo.rotateX(-Math.PI / 2);
   waterGeo.translate(0, WATER_BASE_Y, -LEN * 0.60);
   const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+  // MAP3 (HF-409): named at creation, saying what each mesh IS. The parity
+  // rules read these names; one chosen to dodge a rule is a lie a gate cannot catch.
+  waterMesh.name = 'map3-shoreline-water-surface';
   waterMesh.receiveShadow = true;
   group.add(waterMesh);
   disposables.push(waterGeo, waterMat);
@@ -279,6 +284,7 @@ export function createWaterCorridor(): Corridor {
     sandGeo.computeVertexNormals();
   }
   const sandMesh = new THREE.Mesh(sandGeo, sandMat);
+  sandMesh.name = 'map3-shoreline-sand-terrain';
   sandMesh.receiveShadow = true;
   group.add(sandMesh);
   disposables.push(sandGeo, sandMat);
@@ -325,9 +331,43 @@ export function createWaterCorridor(): Corridor {
     }
   }
 
+  // MAP3 (HF-409): the pier is the one built structure in this corridor and the
+  // one thing in it a player can stand on. Deck and pylon rows, not the merged
+  // mesh's bounding box (which would span the water beside it). Everything else
+  // here - the Gerstner surface, the sand, the barrels, buoys and drifting logs
+  // - is water or floats on it, and floats are presentation, not cover.
+  const solids: CorridorSolid[] = [
+    {
+      name: 'pier-deck',
+      x: PIER_X,
+      y: PIER_Y - 0.05,
+      z: (PIER_Z_START + PIER_Z_END) / 2,
+      sx: PIER_WIDTH,
+      sy: 0.2,
+      sz: Math.abs(PIER_Z_END - PIER_Z_START),
+      material: 'wood',
+    },
+  ];
+  for (let i = 0; i < 6; i += 1) {
+    const z = PIER_Z_START - 1.2 - i * 3.6;
+    for (const side of [-1, 1]) {
+      solids.push({
+        name: `pier-pylon-${i}${side > 0 ? 'e' : 'w'}`,
+        x: PIER_X + side * (PIER_WIDTH * 0.45),
+        y: PIER_Y - 0.5,
+        z,
+        sx: 0.28,
+        sy: 1.9,
+        sz: 0.28,
+        material: 'wood',
+      });
+    }
+  }
+
   const pierMerged = mergeSimple(pierParts);
   pierParts.forEach((g) => g.dispose());
   const pierMesh = new THREE.Mesh(pierMerged, woodMat);
+  pierMesh.name = 'map3-shoreline-pier';
   pierMesh.castShadow = true;
   pierMesh.receiveShadow = true;
   group.add(pierMesh);
@@ -355,6 +395,7 @@ export function createWaterCorridor(): Corridor {
     const merged = mergeGeometries(tufts);
     tufts.forEach((g) => g.dispose());
     const tuftMesh = new THREE.Mesh(merged, grassMat);
+    tuftMesh.name = 'map3-shoreline-marram-grass';
     tuftMesh.receiveShadow = true;
     group.add(tuftMesh);
     disposables.push(merged);
@@ -393,6 +434,7 @@ export function createWaterCorridor(): Corridor {
     const bGroup = new THREE.Group();
     const stavesGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.95, 12);
     const staves = new THREE.Mesh(stavesGeo, barrelMat);
+    staves.name = 'map3-shoreline-floating-barrel';
     staves.castShadow = true;
     staves.receiveShadow = true;
     bGroup.add(staves);
@@ -404,6 +446,8 @@ export function createWaterCorridor(): Corridor {
     hoop2.translate(0, -0.56, 0);
     const hoopMesh1 = new THREE.Mesh(hoop1, ironMat);
     const hoopMesh2 = new THREE.Mesh(hoop2, ironMat);
+    hoopMesh1.name = 'map3-shoreline-floating-barrel-hoop';
+    hoopMesh2.name = 'map3-shoreline-floating-barrel-hoop';
     bGroup.add(hoopMesh1, hoopMesh2);
     return bGroup;
   }
@@ -412,6 +456,7 @@ export function createWaterCorridor(): Corridor {
     const cGroup = new THREE.Group();
     const boxGeo = new THREE.BoxGeometry(size, size, size);
     const boxMesh = new THREE.Mesh(boxGeo, barrelMat);
+    boxMesh.name = 'map3-shoreline-floating-crate';
     boxMesh.castShadow = true;
     boxMesh.receiveShadow = true;
     cGroup.add(boxMesh);
@@ -423,6 +468,7 @@ export function createWaterCorridor(): Corridor {
     const coneGeo = new THREE.ConeGeometry(0.45, 1.2, 10);
     coneGeo.translate(0, 0.25, 0);
     const coneMesh = new THREE.Mesh(coneGeo, buoyMat);
+    coneMesh.name = 'map3-shoreline-floating-buoy';
     coneMesh.castShadow = true;
     buoyGroup.add(coneMesh);
 
@@ -430,11 +476,13 @@ export function createWaterCorridor(): Corridor {
     ringGeo.rotateX(Math.PI / 2);
     ringGeo.translate(0, 0.12, 0);
     const ringMesh = new THREE.Mesh(ringGeo, buoyWhiteMat);
+    ringMesh.name = 'map3-shoreline-floating-buoy-ring';
     buoyGroup.add(ringMesh);
 
     const mastGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6);
     mastGeo.translate(0, 1.0, 0);
     const mastMesh = new THREE.Mesh(mastGeo, ironMat);
+    mastMesh.name = 'map3-shoreline-floating-buoy-mast';
     buoyGroup.add(mastMesh);
     return buoyGroup;
   }
@@ -444,6 +492,7 @@ export function createWaterCorridor(): Corridor {
     const logGeo = new THREE.CylinderGeometry(0.20, 0.24, 2.8, 8);
     logGeo.rotateZ(Math.PI / 2);
     const logMesh = new THREE.Mesh(logGeo, woodMat);
+    logMesh.name = 'map3-shoreline-floating-driftwood';
     logMesh.castShadow = true;
     logMesh.receiveShadow = true;
     logGroup.add(logMesh);
@@ -545,6 +594,7 @@ export function createWaterCorridor(): Corridor {
   }
 
   const splashMesh = new THREE.Mesh(splashGeo, splashMat);
+  splashMesh.name = 'map3-shoreline-spray-particles';
   splashMesh.frustumCulled = false;
   splashMesh.renderOrder = 7;
   group.add(splashMesh);
@@ -648,6 +698,7 @@ export function createWaterCorridor(): Corridor {
   const carMerged = mergeSimple(carParts);
   carParts.forEach((g) => g.dispose());
   const carBodyMesh = new THREE.Mesh(carMerged, carBodyMat);
+  carBodyMesh.name = 'map3-shoreline-rover-body';
   carBodyMesh.castShadow = true;
   carBodyMesh.receiveShadow = true;
   carGroup.add(carBodyMesh);
@@ -669,6 +720,7 @@ export function createWaterCorridor(): Corridor {
     const tireGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 14);
     tireGeo.rotateZ(Math.PI / 2);
     const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.name = 'map3-shoreline-rover-tyre';
     tire.castShadow = true;
     tire.receiveShadow = true;
     wheelAssembly.add(tire);
@@ -676,6 +728,7 @@ export function createWaterCorridor(): Corridor {
     const rimGeo = new THREE.CylinderGeometry(WHEEL_RADIUS * 0.6, WHEEL_RADIUS * 0.6, WHEEL_WIDTH * 1.05, 10);
     rimGeo.rotateZ(Math.PI / 2);
     const rim = new THREE.Mesh(rimGeo, silverMat);
+    rim.name = 'map3-shoreline-rover-rim';
     wheelAssembly.add(rim);
 
     wheelAssembly.position.set(wx, wy, wz);
@@ -698,6 +751,7 @@ export function createWaterCorridor(): Corridor {
   return {
     group,
     length: LEN,
+    solids,
     foliage: uniforms,
     title: 'Gerstner shoreline with physics buoyancy & vehicle splash',
     skill: 'threejs-webgpu-water',

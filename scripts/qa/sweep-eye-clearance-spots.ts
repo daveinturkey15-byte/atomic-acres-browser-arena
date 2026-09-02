@@ -25,7 +25,7 @@ import { buildRustworks1v1, buildGunRange, buildSkylineTerminal } from '../../sr
 import { buildHighSeas } from '../../src/high-seas';
 import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
-import { buildMap3 } from '../../src/map3-arena';
+import { buildMap3, prepareMap3 } from '../../src/map3-arena';
 import { buildNuketown2 } from '../../src/nuketown2-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
@@ -201,8 +201,9 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * Floor on the derived roster. The derivation cannot silently collapse to an
  * empty list the way a regex-scraped one can, but an empty or truncated roster
  * would sweep nothing while printing success, so it is asserted rather than
- * assumed. 9 = the ten ids in arena-identity.ts minus hidden farcrysis.
- * Raised 8 -> 9 on 2026-09-02 (HF-407) when the Nuke Town Rebuild shipped.
+ * assumed. 9 = the ten ids in arena-identity.ts minus hidden farcrysis. map3
+ * left the roster for one day (2026-09-02, HF-409) and rejoined it when the
+ * corridor showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9.
  */
 export const MINIMUM_SWEPT_ARENAS = 9;
 
@@ -345,5 +346,21 @@ export function runSweep(): void {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  runSweep();
+  // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
+  // needs a wasm module first, so it throws until prepareMap3() has resolved.
+  // Stage 1 stays fully synchronous below this line.
+  //
+  // FINISHER 3: this is an async IIFE and NOT a top-level await. `package.json`
+  // declares no `"type": "module"`, so tsx transforms this .ts file to CJS,
+  // where a top-level await is a hard transform error - the stage did not run
+  // at all ("Top-level await is currently not supported with the cjs output
+  // format"), which is a documented usage in this file's own header. The await
+  // has to live inside a function for the stage to be runnable as documented.
+  void (async () => {
+    await prepareMap3();
+    runSweep();
+  })().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

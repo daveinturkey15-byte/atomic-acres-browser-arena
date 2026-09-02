@@ -1,194 +1,190 @@
 /**
- * MAP3: Map 3 — the Corridor Gallery (PREVIEW).
+ * MAP3: Map 3 - the Corridor Showcase, as a playable EXPLORE arena (PREVIEW).
  *
- * WHAT THIS IS, AND WHAT IT DELIBERATELY IS NOT.
+ * WHAT THIS IS.
  *
- * `map3.html` + `src/map3/**` is a standalone technique SHOWCASE: eight
- * animated corridors around a hub, ~10k lines of TSL, its own Rapier world, its
- * own render loop. It was built as a separate Vite page on purpose (see the
- * header of `src/map3/main.ts`) so the art could be judged before any
- * registration work was spent on it.
+ * The owner opened PASS 84 and asked (2026-09-02 16:25): "wtf happened to map
+ * 3? it was full of rich code based asset tests and now its just a square map
+ * of stone?" It was: the arena registered under `map3` was an authored stone
+ * gallery, and the real showcase - `src/map3/**`, animated corridors of TSL
+ * around a hub - had never been imported into it. This file is that import.
+ * The corridors ARE the arena now. Half an hour later he settled what kind of
+ * arena it is: "Just keep the showcase in and it's not about combat, it's a
+ * mode you can explore." So Map 3 is solo, no bots, no field support, no
+ * overdrive; the content is the place, and the job of the code here is to make
+ * the place STAND UP under a player.
  *
- * This file is the playable arena of the same PLACE. It is authored
- * architecture — floors, walls, piers, benches, planters — not an import of the
- * showcase's corridor modules, and that is a decision with three reasons, all
- * of them load-bearing:
+ * THE THREE THINGS THAT KEPT THE SHOWCASE OUT, AND WHERE EACH IS SOLVED.
  *
- *   1. COLLISION PARITY. AGENTS.md: "every substantial player-reachable visible
- *      object must have matching movement and shot authority". The showcase's
- *      corridors publish geometry and an update function and no colliders at
- *      all. Dropping them into an arena root would put a forest, a sea, a
- *      colonnade and a Jenga tower in front of the player with nothing solid
- *      behind any of it.
- *   2. NOTHING TICKS AN ARENA. `ArenaMap` has no per-frame hook and the frame
- *      loop calls none, so every corridor's `update(elapsed, dt, ...)` — which
- *      is where all eight drive their `uniform(0)` time — would never run. The
- *      showcase would arrive frozen: still water, still rain, still god rays.
- *   3. LOAD TIME. `arenaFactories` in legacy-main.ts is a STATIC import map, so
- *      the builder is in the main chunk. Importing the showcase would put ~10k
- *      lines plus `@dimforge/rapier3d-compat`'s wasm in front of every player
- *      of every arena, against a live owner priority ("faster map loads").
+ *   1. NO COLLIDERS. The corridor modules publish geometry and an `update()`
+ *      and nothing solid, because the showcase page flies a camera. Solved in
+ *      `src/map3/corridor-solids.ts`: each corridor now declares its solids -
+ *      trunks, plinths, pier pylons, colonnade columns, masonry clusters - in
+ *      its own local frame, at the point it places them, and this file turns
+ *      them into movement colliders and shot surfaces.
+ *   2. NOTHING TICKS AN ARENA. Solved in `src/arena-frame-animation.ts`: the
+ *      `ArenaMap.update` hook, driven once a frame for the ACTIVE arena only.
+ *      Without it every corridor arrives frozen - still water, still rain,
+ *      static god rays.
+ *   3. LOAD TIME. Solved in `src/arena-factory-registry.ts`: `map3` is the one
+ *      LAZY arena, so a player who picked Nuke Town never downloads any of
+ *      this.
  *
- * So: the menu card says PREVIEW, `multiplayer` is false, and the arena is the
- * gallery's ARCHITECTURE — a courtyard, eight bays, and one authored feature
- * per bay that says what that bay is about. The showcase page stays the place
- * to look at the techniques. Wiring the animated interiors in needs an arena
- * frame hook and per-corridor collision; both are real work with owner-visible
- * consequences, and neither is something to smuggle in under a preview.
+ * WHY THE LANES ARE AXIS-ALIGNED AND THE SHOWCASE'S SPOKES ARE NOT.
  *
- * WHY THE PLAN IS SQUARE AND NOT RADIAL.
+ * The showcase puts its corridors on 45-degree spokes. That cannot be
+ * collided: `box()` records a solid as extents-plus-yaw (an ORIENTED box, what
+ * the solver and Rapier consume) while the collider/visual parity audit
+ * compares a collider's rectangle against each mesh's world AABB, and those
+ * two agree exactly at yaw 0 and diverge badly anywhere else - a 0.5 x 4.6 m
+ * wall at 45 degrees measures 0.11 coverage against its own mesh and reads as
+ * an invisible collider. Making the audit orientation-aware would move the
+ * accepted rows of arenas this lane does not own. So the lanes run on the four
+ * world axes, and every rotation here is a MULTIPLE OF 90 DEGREES, which maps
+ * an axis-aligned box to an axis-aligned box exactly.
  *
- * The showcase puts its eight corridors on 45-degree spokes. The first build of
- * this arena copied that, and the collider/visual parity gate correctly failed
- * it: `box()` records a solid as extents-plus-yaw (an ORIENTED box, which is
- * what the collision solver and Rapier both consume), while the parity audit
- * compares a collider's rectangle against each mesh's world AABB. Those two
- * agree exactly when yaw is zero and diverge badly when it is not — a
- * 0.5 x 4.6 m wall at 90 degrees measures 0.11 coverage against its OWN mesh,
- * so every diagonal wall reads as an invisible collider. Making the audit
- * orientation-aware would change the accepted rows of arenas this lane does not
- * own (Atomic Acres' ledger has two rows that exist precisely because of AABB
- * inflation on a rotated rail), so the arena moved instead: the courtyard is
- * square, the eight bays run along +/-x and +/-z, two to a side, and NOTHING in
- * this file is yawed. It also plays better. Eight radial spokes are eight
- * identical head-on lanes; two bays per side share a corner, so the corner
- * courts below are real cross-connections between neighbours.
+ * THE EIGHTH CORRIDOR, AND PREPARE-THEN-BUILD (HF-409 finisher 2).
  *
- * LAYOUT. A 38 x 38 m paved courtyard. Eight bays, each 9 m wide, leaving the
- * courtyard at +/-9.5 m either side of each edge's midpoint and running out
- * 44-56 m. Bay walls are PIERS with 1.8 m gaps every 6.4 m, not solid tubes:
- * without the gaps the map is eight one-way corridors and every fight is a
- * head-on push. The gaps open into the four corner courts, which carry planter
- * cover, so every bay can be flanked from the side.
+ * The physics playground (`corridor-physics.ts`) used to be the one corridor
+ * the arena did not contain, because it owns a Rapier world and
+ * `RAPIER.init()` streams a wasm module - and arena construction is
+ * SYNCHRONOUS on purpose, inside the fenced transaction between the WebGPU
+ * fence and the authority commit. That was not a reason to ship seven
+ * corridors and call it the showcase; it was a reason to move the asynchrony
+ * OUT of the build.
  *
- * FAIRNESS INVOLUTION. The plan is symmetric under the 180-degree rotation
- * (x, z) -> (-x, -z): bay i maps to bay i+4, which is the same bay programme.
- * Team 0's spawns sit in bay 0 and the corner court beside it; team 1's are
- * their exact negations. Neither team owns a better half by construction.
+ * So Map 3 is PREPARE, then BUILD. `prepareMap3()` is async and does all of
+ * the waiting: it resolves the Rapier chunk and initialises its wasm.
+ * `buildMap3()` is synchronous, exactly as every other arena builder is, and
+ * THROWS if prepare has not run. It never returns a seven-corridor arena -
+ * silently omitting an eighth of the content, its colliders and its shot
+ * surfaces would pass every gate that counts what it can see, and the arena
+ * would be measured, ledgered and published as complete when it is not.
+ *
+ * Callers that build map3 synchronously (the arena transition's preparation
+ * phase, `__ATOMIC_ACRES_DEBUG__.prepareArena`, the parity audit's factory
+ * table, the spawn-layout builder map, the eye-clearance sweeps) await
+ * `prepareMap3()` first. It is idempotent and costs ~70 ms once per process.
  */
 import * as THREE from 'three';
 import {
   type Builder,
-  batchPresentationOnlyBoxes,
   box,
   emptyTelemetry,
   spawnRecord,
   standard,
 } from './additional-maps';
+import { createBallisticSurface, type BallisticMaterialId } from './ballistics';
 import type { ArenaMap } from './map';
+import type { ArenaFrameContext } from './arena-frame-animation';
+import { createGrammarCorridor, createMathsCorridor, createNatureCorridor, type Corridor } from './map3/corridors';
+import { createVolumeCorridor, createWaterCorridor, createWeatherCorridor } from './map3/corridors-extra';
+import { createColosseumCorridor } from './map3/corridor-colosseum';
+import { createPhysicsCorridorSync, isMap3RapierReady, loadMap3Rapier } from './map3/corridor-physics';
+import type { CorridorSolid } from './map3/corridor-solids';
 
 /**
- * Playfield extent. The longest bay ends at 18 + 56 = 74 m and its end wall
- * reaches 78; 84 leaves the corner courts and the outer planters inside bounds
- * without wrapping empty scrub into the shadow volume.
+ * Playfield extent. The longest lane is the seasons corridor: 34 m of start
+ * plus 56 m of corridor is 90, and its far trees stand a little past that.
+ * Everything beyond - the colosseum's bowl at 140 m and its skyline at 262 m -
+ * is deliberately OUTSIDE the bounds: it is a vista, not a place, and the
+ * parity audit's own backdrop rule is what says so.
  */
-export const MAP3_BOUNDS = Object.freeze({ minX: -84, maxX: 84, minZ: -84, maxZ: 84 });
+export const MAP3_BOUNDS = Object.freeze({ minX: -96, maxX: 96, minZ: -96, maxZ: 96 });
 
-/** Half-extent of the paved courtyard. */
-export const MAP3_COURTYARD_HALF = 19;
-/** Distance from the origin at which a bay floor starts. */
-const BAY_START = MAP3_COURTYARD_HALF - 1;
-/** Clear width between the two pier lines. */
-const BAY_WIDTH = 9;
-const BAY_HALF = BAY_WIDTH / 2;
-/** Offset of a bay's centre line from its edge's midpoint. */
-const BAY_OFFSET = 9.5;
-/** Pier line height. Clears the 1.70 m standing eye by a full storey. */
-const PIER_H = 4.2;
-const PIER_T = 0.5;
-/** Pier module: 4.6 m of solid, then a 1.8 m gap to flank through. */
-const PIER_RUN = 4.6;
-const PIER_GAP = 1.8;
-const PIER_PITCH = PIER_RUN + PIER_GAP;
-/** Waist-high cover: breaks the standing eye-line from prone, and mountable. */
-const LOW_COVER = 0.95;
-/** Hard cover: clears the 1.65 m standing eye line. */
-const HARD_COVER = 1.9;
+/** Half-extent of the paved courtyard at the centre of the hub. */
+export const MAP3_COURTYARD_HALF = 28;
 
 /**
- * A bay's frame, as two AXIS unit vectors. `outward` is the direction the bay
- * runs; `lateral` is its right-hand side. Both are always one of the four world
- * axes, which is the whole point (see the header).
+ * Distance from the origin at which a lane's corridor mouth sits.
+ *
+ * 34 m, and the number is forced rather than chosen. A lane on one edge and a
+ * lane on the NEXT edge are disjoint only while the second one's lateral
+ * offset plus its half-width stays inside this start; the shoreline is 41 m
+ * across and the forest 30, so at the courtyard's own 28 m their flanks
+ * reached into the neighbouring edge's ground (measured: the shoreline
+ * overlapped the seasons corridor by 21 x 8 m at a 26 m start).
+ * `src/map3-lane-layout.test.ts` fails if any two lanes' footprints intersect
+ * at all, so this cannot silently regress.
  */
-type BayFrame = Readonly<{ ox: number; oz: number; lx: number; lz: number }>;
+export const MAP3_LANE_START = 34;
 
-const BAY_FRAMES: readonly BayFrame[] = Object.freeze([
-  Object.freeze({ ox: 0, oz: -1, lx: 1, lz: 0 }),  // north edge, runs -z
-  Object.freeze({ ox: 1, oz: 0, lx: 0, lz: 1 }),   // east edge, runs +x
-  Object.freeze({ ox: 0, oz: 1, lx: -1, lz: 0 }),  // south edge, runs +z
-  Object.freeze({ ox: -1, oz: 0, lx: 0, lz: -1 }), // west edge, runs -x
-]);
+/** rotY for each edge: -z, +x, +z, -x. Quarter turns only; see the header. */
+const EDGE_ROTATION = Object.freeze([0, -Math.PI / 2, Math.PI, Math.PI / 2]);
 
-export type Map3BaySpec = Readonly<{
-  index: number;
-  /** Stable slug; names the showcase corridor this bay stands for. */
+export type Map3LaneSpec = Readonly<{
+  /** Stable slug. Names the pivot group and prefixes every collider it owns. */
   id: string;
   label: string;
-  /** Bay floor length in metres, outward from BAY_START. */
-  lengthM: number;
-  frame: BayFrame;
-  /** Signed offset of the bay centre line from its edge midpoint. */
-  offset: number;
+  /** 0 = north (-z), 1 = east (+x), 2 = south (+z), 3 = west (-x). */
+  edge: 0 | 1 | 2 | 3;
+  /** Offset of the lane's centre line from its edge's midpoint, in metres. */
+  lateral: number;
+  build: () => Corridor;
 }>;
 
 /**
- * The eight bays, in the showcase's corridor order and carrying its corridor
- * lengths, so the arena and `map3.html` describe the same place at the same
- * scale. Lengths are each corridor module's own `LEN`.
+ * The EIGHT showcase corridors, placed.
  *
- * Two bays per edge at -/+ BAY_OFFSET. Because the edges are walked in order
- * and the offsets alternate, bay i and bay i+4 are exact 180-degree images of
- * one another, which is the fairness involution in the header.
+ * Wide corridors get room (the shoreline is 41 m across, the forest 30);
+ * narrow ones sit at +/-13 m, which is more than the widest of them needs. The
+ * colosseum shares the north edge with the shoreline because almost all of it
+ * - the bowl, the arcade, the skyline - is beyond the bounds, and only its
+ * overlook terrace is in the playfield at all.
+ *
+ * The physics playground takes the south edge's free flank at +24 m: it is
+ * 10.8 m across between its kerbs, so it spans 18.6-29.4 m local, the forest
+ * beside it reaches 15, and its far flank stops 4.6 m inside the 34 m start
+ * that keeps a lane clear of its neighbouring EDGE.
+ * `src/map3-lane-layout.test.ts` measures the real meshes rather than these
+ * numbers and fails on any overlap.
  */
-export const MAP3_BAYS: readonly Map3BaySpec[] = Object.freeze(([
-  ['nature', 'Nature', 54],
-  ['maths', 'Maths', 48],
-  ['grammar', 'Grammar', 52],
-  ['water', 'Water', 54],
-  ['weather', 'Weather', 56],
-  ['volume', 'Volume', 44],
-  ['physics', 'Physics', 50],
-  ['colosseum', 'Colosseum', 44],
-] as const).map(([id, label, lengthM], index) => Object.freeze({
-  index,
-  id,
-  label,
-  lengthM,
-  frame: BAY_FRAMES[index % 4]!,
-  offset: index < 4 ? -BAY_OFFSET : BAY_OFFSET,
-})));
-
-/** World XZ of a point given in bay-local (lateral, outward) metres. */
-function bayPoint(bay: Map3BaySpec, lateral: number, outward: number): [number, number] {
-  const l = lateral + bay.offset;
-  return [
-    bay.frame.ox * outward + bay.frame.lx * l,
-    bay.frame.oz * outward + bay.frame.lz * l,
-  ];
-}
+export const MAP3_LANES: readonly Map3LaneSpec[] = Object.freeze([
+  { id: 'shoreline', label: 'Shoreline', edge: 0, lateral: -26, build: () => createWaterCorridor() },
+  { id: 'colosseum', label: 'Colosseum', edge: 0, lateral: 26, build: () => createColosseumCorridor() },
+  { id: 'raymarch', label: 'Raymarched SDF', edge: 1, lateral: -13, build: () => createMathsCorridor() },
+  { id: 'grammar', label: 'Shape grammar', edge: 1, lateral: 13, build: () => createGrammarCorridor(11) },
+  { id: 'vegetation', label: 'Vegetation', edge: 2, lateral: 0, build: () => createNatureCorridor(7) },
+  // MAP3 (HF-409 finisher 2): the eighth corridor. Needs prepareMap3() first.
+  // `bindKeys: false`: B and F are the game's emote and interact bindings.
+  // See PhysicsCorridorOptions in src/map3/corridor-physics.ts.
+  { id: 'physics', label: 'Rapier playground', edge: 2, lateral: 24, build: () => createPhysicsCorridorSync({ bindKeys: false }) },
+  { id: 'godrays', label: 'God rays', edge: 3, lateral: -13, build: () => createVolumeCorridor() },
+  { id: 'seasons', label: 'Seasons', edge: 3, lateral: 14, build: () => createWeatherCorridor(21) },
+]);
 
 /**
- * A box in bay-local coordinates. `size` is [width across the bay, height,
- * length along the bay]; the components are swapped, never rotated, so the
- * collider rectangle `box()` records is the mesh's true world AABB.
+ * Resolve everything `buildMap3` needs, so the build itself can stay
+ * synchronous. Idempotent and safe to call concurrently; see the header.
  */
-function bayBox(
-  builder: Builder,
-  bay: Map3BaySpec,
-  name: string,
-  lateral: number,
-  outward: number,
-  y: number,
-  size: [number, number, number],
-  material: THREE.Material,
-  options: Parameters<typeof box>[5] = {},
-): THREE.Mesh {
-  const [x, z] = bayPoint(bay, lateral, outward);
-  const alongX = bay.frame.ox !== 0;
-  const worldSize: [number, number, number] = alongX
-    ? [size[2], size[1], size[0]]
-    : [size[0], size[1], size[2]];
-  return box(builder, name, [x, y, z], worldSize, material, options);
+export async function prepareMap3(): Promise<void> {
+  await loadMap3Rapier();
+}
+
+/** True when `buildMap3` will not throw for want of preparation. */
+export function isMap3Prepared(): boolean {
+  return isMap3RapierReady();
+}
+
+/** Corridor-local -> world for a lane. Quarter turns, so this is exact. */
+export function laneToWorld(
+  lane: Map3LaneSpec,
+  x: number,
+  z: number,
+): { x: number; z: number } {
+  const px = x + lane.lateral;
+  const pz = z - MAP3_LANE_START;
+  switch (lane.edge) {
+    case 0: return { x: px, z: pz };
+    case 1: return { x: -pz, z: px };
+    case 2: return { x: -px, z: -pz };
+    default: return { x: pz, z: -px };
+  }
+}
+
+/** True when a lane's quarter turn swaps the X and Z extents of a box. */
+function laneSwapsExtents(lane: Map3LaneSpec): boolean {
+  return lane.edge === 1 || lane.edge === 3;
 }
 
 function makeBuilder(scene: THREE.Scene, name: string): Builder {
@@ -205,299 +201,219 @@ function makeBuilder(scene: THREE.Scene, name: string): Builder {
   };
 }
 
+const SOLID_BALLISTICS: Readonly<Record<CorridorSolid['material'], BallisticMaterialId>> = Object.freeze({
+  wood: 'wood',
+  stone: 'brick',
+  glass: 'glass',
+  metal: 'structural-metal',
+});
+
 /**
- * Materials. Authored MeshStandardMaterials, original to this map: the
- * gallery's whole visual argument is stone value and shadow, and the shipped
- * surface set (`test-maps-art.ts`) is authored for a range and an estate.
+ * Register one corridor solid as movement authority AND shot authority.
+ *
+ * There is no mesh here on purpose. The visible mass is the corridor's own
+ * geometry - a merged 60 m batch of trunks, a merged colonnade - and adding a
+ * second box beside it would be authoring a wall next to a tree instead of
+ * colliding the tree. The parity audit's Direction A asks exactly the right
+ * question of this shape: is there a visible mesh that covers this collider
+ * and rises through it? For a trunk collider inside its own batch the answer
+ * is yes, at coverage 1.0.
  */
+function registerSolid(builder: Builder, lane: Map3LaneSpec, solid: CorridorSolid): void {
+  const centre = laneToWorld(lane, solid.x, solid.z);
+  const swap = laneSwapsExtents(lane);
+  const halfX = (swap ? solid.sz : solid.sx) / 2;
+  const halfZ = (swap ? solid.sx : solid.sz) / 2;
+  const name = `map3-${lane.id}-${solid.name}`;
+  const bounds = {
+    minX: centre.x - halfX,
+    maxX: centre.x + halfX,
+    minZ: centre.z - halfZ,
+    maxZ: centre.z + halfZ,
+    minY: solid.y - solid.sy / 2,
+    maxY: solid.y + solid.sy / 2,
+  };
+  builder.colliders.push(bounds);
+  builder.physicsColliders.push(bounds);
+  builder.shotSurfaces.push(createBallisticSurface(
+    `${builder.root.name}:${builder.ballisticSurfaceSequence}:${name}`,
+    name,
+    bounds,
+    { material: SOLID_BALLISTICS[solid.material] },
+  ));
+  builder.ballisticSurfaceSequence += 1;
+}
+
 type Map3Materials = Readonly<{
   paving: THREE.MeshStandardMaterial;
   kerb: THREE.MeshStandardMaterial;
-  pier: THREE.MeshStandardMaterial;
-  lintel: THREE.MeshStandardMaterial;
-  bench: THREE.MeshStandardMaterial;
-  planter: THREE.MeshStandardMaterial;
   ground: THREE.MeshStandardMaterial;
-  water: THREE.MeshStandardMaterial;
+  marker: THREE.MeshStandardMaterial;
 }>;
 
-function map3Materials(): Map3Materials {
-  return Object.freeze({
-    // Value chosen from the showcase's own capture: its hub paving was re-graded
-    // from 0.31 to 0.20 linear on 2026-09-02 after 0.31 measured as blown white
-    // concrete under this sun.
-    paving: standard(0x565853, 0.94, 0.02),
-    kerb: standard(0x3e4040, 0.9, 0.02),
-    pier: standard(0x6b6b70, 0.82, 0.02),
-    lintel: standard(0x5a5a60, 0.86, 0.03),
-    bench: standard(0x77694f, 0.88, 0.02),
-    planter: standard(0x3f4a33, 0.95, 0.01),
-    ground: standard(0x4a5140, 1, 0),
-    // The only smooth surface on the map: the ray-traced preset needs something
-    // to reflect, and the water bay is where that belongs.
-    water: standard(0x2b6f74, 0.1, 0.02),
-  });
-}
+/**
+ * The hub's ring of waymarkers, and the spawn ring inside it.
+ *
+ * SIXTEEN stones on a 26 m radius, on the half-steps of a 22.5-degree rose, so
+ * every one of the ten authored spawn points below stands exactly midway
+ * between two of them - 5.10 m, inside the spawn gate's 6 m hard-cover reach.
+ * That is why the ring exists rather than being decoration: an explore mode
+ * still spawns a body, the spawn-quality gate still asks for cover in reach,
+ * and a bare 56 m plaza has none anywhere. It is also the showcase's own idea:
+ * `map3.html` puts a signed marker at every corridor mouth, and this is that
+ * rose brought inside the hub where the corridors all read from one place.
+ *
+ * The gaps are 10.1 m, so the ring is a threshold you walk through, never a
+ * wall you walk around.
+ */
+const HUB_MARKER_RADIUS = 26;
+const HUB_MARKER_COUNT = 16;
 
-/** Pier line down one side of a bay, split into modules with flanking gaps. */
-function pierLine(builder: Builder, bay: Map3BaySpec, side: -1 | 1, material: THREE.Material): void {
-  const lateral = side * (BAY_HALF + PIER_T / 2);
-  const name = side > 0 ? 'right' : 'left';
-  const modules = Math.max(1, Math.floor((bay.lengthM - PIER_GAP) / PIER_PITCH));
-  for (let i = 0; i < modules; i += 1) {
-    const start = BAY_START + i * PIER_PITCH;
-    bayBox(builder, bay, `map3 ${bay.id} pier ${name} ${i}`,
-      lateral, start + PIER_RUN / 2, PIER_H / 2, [PIER_T, PIER_H, PIER_RUN], material);
-  }
-  // The last module runs to the bay end so the far corner is never open.
-  const tailStart = BAY_START + modules * PIER_PITCH;
-  const tailLength = BAY_START + bay.lengthM - tailStart;
-  if (tailLength > 0.4) {
-    bayBox(builder, bay, `map3 ${bay.id} pier ${name} tail`,
-      lateral, tailStart + tailLength / 2, PIER_H / 2, [PIER_T, PIER_H, tailLength], material);
-  }
-}
-
-/** The gantry over a bay mouth — the showcase's signage frame, as architecture. */
-function gantry(builder: Builder, bay: Map3BaySpec, materials: Map3Materials): void {
-  for (const side of [-1, 1] as const) {
-    bayBox(builder, bay, `map3 ${bay.id} gantry leg ${side}`,
-      side * (BAY_HALF + 0.45), BAY_START - 0.6, 2.6, [0.6, 5.2, 0.6], materials.pier);
-  }
-  bayBox(builder, bay, `map3 ${bay.id} gantry beam`,
-    0, BAY_START - 0.6, 5.5, [BAY_WIDTH + 1.5, 0.6, 0.6], materials.lintel);
-}
-
-/** The one authored feature that says what a bay is about. */
-function bayFeature(builder: Builder, bay: Map3BaySpec, materials: Map3Materials): void {
-  const mid = BAY_START + bay.lengthM / 2;
-  const end = BAY_START + bay.lengthM;
-  switch (bay.id) {
-    case 'nature':
-      // Two staggered planter beds: low cover you vault, in a lane that would
-      // otherwise be a 54 m sightline.
-      for (let i = 0; i < 4; i += 1) {
-        bayBox(builder, bay, `map3 nature bed ${i}`,
-          i % 2 === 0 ? -2.4 : 2.4, BAY_START + 8 + i * 10, LOW_COVER / 2,
-          [3.4, LOW_COVER, 5.2], materials.planter);
-      }
-      break;
-    case 'maths':
-      // A lattice of square piers on a 6.5 m rhythm — the bay reads as a proof
-      // and plays as a pillar fight.
-      for (let i = 0; i < 6; i += 1) {
-        for (const side of [-1, 1] as const) {
-          bayBox(builder, bay, `map3 maths pillar ${i} ${side}`,
-            side * 2.6, BAY_START + 7 + i * 6.5, PIER_H / 2, [0.9, PIER_H, 0.9], materials.pier);
-        }
-      }
-      break;
-    case 'grammar':
-      // Reading benches in facing pairs: waist cover with a gap between each
-      // pair, so the lane is crossable at four points.
-      for (let i = 0; i < 4; i += 1) {
-        for (const side of [-1, 1] as const) {
-          bayBox(builder, bay, `map3 grammar bench ${i} ${side}`,
-            side * 3.0, BAY_START + 9 + i * 10, LOW_COVER / 2, [1.2, LOW_COVER, 4.4], materials.bench);
-        }
-      }
-      break;
-    case 'water':
-      // A sunken basin either side of a 2.2 m walkway. The basin surface sits
-      // 0.3 m below the bay floor, so the walkway is the contested line and the
-      // kerb beside it is the cover.
-      for (const side of [-1, 1] as const) {
-        bayBox(builder, bay, `map3 water basin ${side}`,
-          side * 2.9, mid, -0.3, [3.4, 0.5, bay.lengthM - 14], materials.water, { cast: false });
-        bayBox(builder, bay, `map3 water kerb ${side}`,
-          side * 1.15, mid, 0.15, [0.3, 0.3, bay.lengthM - 14], materials.kerb);
-      }
-      break;
-    case 'weather':
-      // An open colonnade: a paired column rhythm with a lintel over each pair,
-      // which is what makes the longest bay readable at range.
-      for (let i = 0; i < 7; i += 1) {
-        const at = BAY_START + 6 + i * 6.6;
-        for (const side of [-1, 1] as const) {
-          bayBox(builder, bay, `map3 weather column ${i} ${side}`,
-            side * 3.1, at, 2.35, [0.7, 4.7, 0.7], materials.pier);
-        }
-        bayBox(builder, bay, `map3 weather lintel ${i}`,
-          0, at, 5.0, [7.0, 0.6, 0.7], materials.lintel);
-      }
-      break;
-    case 'volume': {
-      // The showcase's own trick, as architecture: a solid sun-side wall pierced
-      // by one tall slit per bay and a roof slab split around a clerestory slot.
-      // There it is what makes a shaft read as a shaft; here it makes the hall
-      // the map's one dark interior and its only overhead cover.
-      const CELLS = 6;
-      const pitch = (bay.lengthM - 8) / CELLS;
-      for (let i = 0; i < CELLS; i += 1) {
-        const at = BAY_START + 4 + i * pitch;
-        for (const half of [-1, 1] as const) {
-          bayBox(builder, bay, `map3 volume sunwall ${i} ${half}`,
-            BAY_HALF - 0.35, at + half * (pitch / 4 + 0.22), PIER_H / 2,
-            [0.4, PIER_H, pitch / 2 - 0.45], materials.pier);
-          bayBox(builder, bay, `map3 volume roof ${i} ${half}`,
-            0, at + half * (pitch / 4 + 0.35), PIER_H + 0.25,
-            [BAY_WIDTH + 0.8, 0.5, pitch / 2 - 0.7], materials.lintel);
-        }
-      }
-      break;
-    }
-    case 'physics':
-      // A stepped stack: three 0.7 m rises onto a 2.1 m platform. Every rise is
-      // under the measured 0.82 m jump apex, so the bay's high ground is
-      // reachable without a launch pad, and the parapet keeps it from becoming
-      // one.
-      for (let step = 0; step < 3; step += 1) {
-        const top = 0.7 * (step + 1);
-        bayBox(builder, bay, `map3 physics step ${step}`,
-          0, BAY_START + 12 + step * 2.2, top / 2, [6.0, top, 2.2], materials.pier);
-      }
-      bayBox(builder, bay, 'map3 physics platform',
-        0, BAY_START + 22, 1.05, [6.0, 2.1, 8.0], materials.pier);
-      for (const side of [-1, 1] as const) {
-        bayBox(builder, bay, `map3 physics parapet ${side}`,
-          side * 2.6, BAY_START + 22, 2.55, [0.8, 0.9, 8.0], materials.kerb);
-      }
-      break;
-    case 'colosseum': {
-      // A square end chamber, 26 m across, entered only from the bay: three
-      // walls plus the two returns that frame the mouth, and a low ring of
-      // seating inside it. The map's one room-scale fight.
-      const half = 13;
-      const centre = end + half;
-      bayBox(builder, bay, 'map3 colosseum wall far',
-        0, centre + half, HARD_COVER, [half * 2 + 1.2, HARD_COVER * 2, 0.6], materials.pier);
-      for (const side of [-1, 1] as const) {
-        bayBox(builder, bay, `map3 colosseum wall side ${side}`,
-          side * half, centre, HARD_COVER, [0.6, HARD_COVER * 2, half * 2], materials.pier);
-        // Return wall each side of the mouth, leaving the bay's 9 m open.
-        bayBox(builder, bay, `map3 colosseum wall return ${side}`,
-          side * (BAY_HALF + (half - BAY_HALF) / 2), centre - half, HARD_COVER,
-          [half - BAY_HALF, HARD_COVER * 2, 0.6], materials.pier);
-        bayBox(builder, bay, `map3 colosseum seating ${side}`,
-          side * 8.5, centre, LOW_COVER / 2, [2.4, LOW_COVER, 14], materials.bench);
-      }
-      bayBox(builder, bay, 'map3 colosseum seating far',
-        0, centre + 8.5, LOW_COVER / 2, [12, LOW_COVER, 2.4], materials.bench);
-      break;
-    }
-    default:
-      break;
+function hubWaymarkers(builder: Builder, material: THREE.Material): void {
+  for (let i = 0; i < HUB_MARKER_COUNT; i += 1) {
+    const angle = ((i + 0.5) / HUB_MARKER_COUNT) * Math.PI * 2;
+    // Snapped to the millimetre: a marker at an irrational offset would give
+    // the collider a footprint that is not quite the mesh's, for no gain.
+    const x = Math.round(Math.sin(angle) * HUB_MARKER_RADIUS * 1000) / 1000;
+    const z = Math.round(-Math.cos(angle) * HUB_MARKER_RADIUS * 1000) / 1000;
+    box(builder, `map3-hub-waymarker-${i}`, [x, 0.95, z], [0.9, 1.9, 0.9], material);
   }
 }
 
 /**
- * Planter cover in a corner court. This is what makes the flanking gaps in the
- * pier lines worth using: without it the corner is open ground and nobody
- * crosses it. Four courts, one per corner, each the 180-degree image of the
- * one opposite.
+ * The authored spawn ring: five points per team on a 26 m radius, on the north
+ * and south quadrants.
+ *
+ * Explore mode (owner 16:55) fields no bots and no second player, so the two
+ * tables exist only because `spawnRecord` is typed for them. They are still
+ * authored to the gate's rules rather than dropped in a heap, because a spawn
+ * table nobody checks is how Raid ended up spawning the owner outside the map:
+ * 36.8 m of spread on a 192 m axis (floor 18%), 9.9 m minimum pair separation
+ * (floor 3), 36.8 m between the nearest cross-team pair (floor 30), and a
+ * waymarker 5.1 m from every point.
  */
-function cornerCourt(builder: Builder, corner: number, materials: Map3Materials): void {
-  const sx = corner === 0 || corner === 3 ? 1 : -1;
-  const sz = corner === 0 || corner === 1 ? 1 : -1;
-  for (let i = 0; i < 4; i += 1) {
-    const r = 26 + i * 10;
-    const skew = i % 2 === 0 ? 4 : -4;
-    box(builder, `map3 corner ${corner} planter ${i}`,
-      [sx * (r + skew) * 0.72, LOW_COVER / 2, sz * (r - skew) * 0.72],
-      [4.2, LOW_COVER, 2.4], materials.planter);
-  }
-  // One hard-cover block per court, so a corner is not purely a vaulting run.
-  box(builder, `map3 corner ${corner} pylon`,
-    [sx * 30, HARD_COVER / 2, sz * 30], [3.0, HARD_COVER, 3.0], materials.pier);
+const SPAWN_RING_RADIUS = 26;
+const SPAWN_ARC_DEGREES = [-45, -22.5, 0, 22.5, 45] as const;
+
+function spawnRing(sign: 1 | -1): [number, number][] {
+  return SPAWN_ARC_DEGREES.map((degrees) => {
+    const angle = (degrees * Math.PI) / 180;
+    const x = Math.round(Math.sin(angle) * SPAWN_RING_RADIUS * 100) / 100;
+    const z = Math.round(-Math.cos(angle) * SPAWN_RING_RADIUS * 100) / 100;
+    return [x * sign, z * sign] as [number, number];
+  });
 }
 
+function map3Materials(): Map3Materials {
+  return Object.freeze({
+    // Value taken from the showcase's own re-grade: its hub paving moved from
+    // 0.31 to 0.20 linear on 2026-09-02 after 0.31 measured as blown white
+    // concrete under this sun.
+    paving: standard(0x565853, 0.94, 0.02),
+    kerb: standard(0x3e4040, 0.9, 0.02),
+    ground: standard(0x4a5140, 1, 0),
+    // A shade lighter than the paving so the ring reads against it at range.
+    marker: standard(0x6c6e68, 0.88, 0.02),
+  });
+}
+
+/** A placed lane, kept so the frame hook can drive it. */
+type PlacedLane = {
+  readonly spec: Map3LaneSpec;
+  readonly corridor: Corridor;
+  readonly group: THREE.Group;
+  readonly inverseYaw: THREE.Quaternion;
+};
+
 export function buildMap3(scene: THREE.Scene): ArenaMap {
+  // PREPARE-THEN-BUILD. Loud, never silent: an arena that quietly came back
+  // with seven of its eight corridors would be measured, ledgered and
+  // published as whole. See the header.
+  if (!isMap3Prepared()) {
+    throw new Error(
+      'buildMap3: Map 3 has not been prepared. Its eighth corridor (the Rapier playground) '
+      + 'needs a wasm module, and fetching one is asynchronous while arena construction is not. '
+      + 'Await prepareMap3() before calling buildMap3(). In the game that happens in the arena '
+      + "transition's preparation phase; in QA call __ATOMIC_ACRES_DEBUG__.prepareArena('map3') "
+      + 'first, or await prepareMap3() in the script.',
+    );
+  }
   const builder = makeBuilder(scene, 'Map3 arena');
   const materials = map3Materials();
 
-  // Ground runs well past the playfield so the horizon is continuous scrub
-  // rather than an 84 m slab floating in a void. One draw call either way.
-  box(builder, 'map3 ground', [0, -0.7, 0], [230, 1.4, 230], materials.ground, { cast: false });
+  // Ground runs past the playfield so the horizon is continuous scrub rather
+  // than a slab floating in a void. Its top is y = 0, which is the plane every
+  // corridor was authored against (their own floors sit 3 cm above it).
+  box(builder, 'map3-ground-terrain', [0, -0.7, 0], [420, 1.4, 420], materials.ground, { cast: false });
 
-  // --- courtyard ----------------------------------------------------------
   const half = MAP3_COURTYARD_HALF;
-  box(builder, 'map3 courtyard paving', [0, -0.18, 0], [half * 2, 0.36, half * 2],
+  box(builder, 'map3-hub-paving', [0, -0.18, 0], [half * 2, 0.36, half * 2],
     materials.paving, { cast: false });
-  // Kerb runs along each edge, split around the two bay mouths on that edge, so
-  // the 0.35 m step down to the scrub reads as a built edge rather than a hole.
+  // A kerb on each edge, so the hub reads as built ground rather than a
+  // rectangle of a different colour painted on the scrub.
   for (const [ex, ez] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
     const alongX = ex === 0;
-    for (const side of [-1, 1] as const) {
-      const centre = side * (BAY_OFFSET + BAY_HALF + (half - BAY_OFFSET - BAY_HALF) / 2);
-      const run = half - BAY_OFFSET - BAY_HALF;
-      box(builder, `map3 kerb ${ex} ${ez} ${side}`,
-        [ex * (half - 0.25) + (alongX ? centre : 0), 0.1, ez * (half - 0.25) + (alongX ? 0 : centre)],
-        alongX ? [run, 0.4, 0.5] : [0.5, 0.4, run], materials.kerb, { cast: false });
-    }
-    // The stub between the two mouths, on the edge midpoint.
-    box(builder, `map3 kerb ${ex} ${ez} mid`,
+    box(builder, `map3-hub-kerb-${ex}-${ez}`,
       [ex * (half - 0.25), 0.1, ez * (half - 0.25)],
-      alongX ? [BAY_OFFSET * 2 - BAY_WIDTH, 0.4, 0.5] : [0.5, 0.4, BAY_OFFSET * 2 - BAY_WIDTH],
+      alongX ? [half * 2, 0.4, 0.5] : [0.5, 0.4, half * 2],
       materials.kerb, { cast: false });
   }
 
-  // Central plinth: the one piece of high ground every bay mouth can see,
-  // reached by four 0.35 m steps (under the 0.42 m autostep, so no jump).
-  box(builder, 'map3 plinth', [0, 0.35, 0], [7.2, 0.7, 7.2], materials.paving);
+  // The central plinth: the one piece of high ground every lane mouth can see,
+  // reached by four 0.35 m steps (under the 0.45 m autostep, so no jump).
+  box(builder, 'map3-hub-plinth', [0, 0.35, 0], [7.2, 0.7, 7.2], materials.paving);
   for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-    box(builder, `map3 plinth step ${sx} ${sz}`,
+    box(builder, `map3-hub-plinth-step-${sx}-${sz}`,
       [sx * 4.4, 0.175, sz * 4.4], [sz === 0 ? 1.6 : 5.2, 0.35, sz === 0 ? 5.2 : 1.6],
       materials.paving);
   }
 
-  // --- bays ---------------------------------------------------------------
-  for (const bay of MAP3_BAYS) {
-    const mid = BAY_START + bay.lengthM / 2;
-    // Bay floor: a 0.3 m slab standing proud of the courtyard, which is the
-    // separation the showcase settled on after three near-coplanar planes
-    // produced shimmering seams.
-    bayBox(builder, bay, `map3 ${bay.id} floor`, 0, mid, -0.12,
-      [BAY_WIDTH + 1, 0.3, bay.lengthM], materials.paving, { cast: false });
-    pierLine(builder, bay, -1, materials.pier);
-    pierLine(builder, bay, 1, materials.pier);
-    gantry(builder, bay, materials);
-    bayFeature(builder, bay, materials);
-    if (bay.id !== 'colosseum') {
-      // End wall with a 3 m doorway on the centre line, so a bay is a room with
-      // a back door rather than a dead end you can be trapped in.
-      const leaf = (BAY_WIDTH + 1 - 3) / 2;
-      for (const side of [-1, 1] as const) {
-        bayBox(builder, bay, `map3 ${bay.id} end wall ${side}`,
-          side * (1.5 + leaf / 2), BAY_START + bay.lengthM + 0.3, PIER_H / 2,
-          [leaf, PIER_H, 0.6], materials.pier);
-      }
-    }
+  hubWaymarkers(builder, materials.marker);
+
+  const placed: PlacedLane[] = [];
+  for (const lane of MAP3_LANES) {
+    const corridor = lane.build();
+    const group = new THREE.Group();
+    group.name = `map3-lane-${lane.id}`;
+    // MAP3 (HF-409): keep the static batcher OUT of the corridors.
+    //
+    // `batchSelectedArenaPresentation` -> `batchStaticMeshes` merges an arena
+    // root's static meshes into one draw call per material, and `dynamic` is
+    // that batcher's own documented escape hatch (art-kit.ts, checked on the
+    // mesh and every ancestor). A corridor is exactly what it must not touch:
+    // its geometry carries custom instanced attributes (`aCenter` on the rain
+    // splash rings, `aSpan`/`aSide`/`aDead` on every leaf) that no other mesh
+    // has, and merging across them is not a slow path, it is an ERROR - the
+    // headless boot smoke caught it as
+    // "mergeGeometries() failed with geometry at index 1 ... make sure aSpan
+    // exists among all geometries, or in none of them", with the corridors
+    // then missing from the frame. Even where the merge would succeed it would
+    // be wrong: these meshes move, and a batch is baked once.
+    group.userData.dynamic = true;
+    group.rotation.y = EDGE_ROTATION[lane.edge]!;
+    corridor.group.position.set(lane.lateral, 0, -MAP3_LANE_START);
+    group.add(corridor.group);
+    builder.root.add(group);
+    for (const solid of corridor.solids ?? []) registerSolid(builder, lane, solid);
+    placed.push({
+      spec: lane,
+      corridor,
+      group,
+      inverseYaw: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -EDGE_ROTATION[lane.edge]!, 0)),
+    });
   }
 
-  for (let corner = 0; corner < 4; corner += 1) cornerCourt(builder, corner, materials);
+  // Scratch vectors for the frame hook. Allocating these per frame, seven times
+  // a frame, is exactly the kind of steady garbage that shows up weeks later as
+  // a periodic hitch and takes a day to find.
+  const localPosition = new THREE.Vector3();
+  const localVelocity = new THREE.Vector3();
 
-  batchPresentationOnlyBoxes(builder.root, 'map3-presentation');
-
-  // Spawn sets are exact negations of one another under the 180-degree rotation
-  // the layout is built on, so bay 0's mouth and bay 4's mouth are the same
-  // position in each team's own frame. Six per team, spread over the bay's
-  // width and its neighbouring corner court, so one grenade cannot cover a set.
-  // HF-402 x HF-405 (integration 2026-09-02): the first table put both teams
-  // at the bay mouths beside the hub, 6.4 m apart across it, and failed the
-  // spawn-layout quality gate (enemy spawn in sight, wall in the face, teams
-  // 3.8% of the axis apart). These points are the gate's own validated
-  // candidates from scripts/qa/solve-spawn-layouts.ts --arenas map3: the
-  // south bay mouth plus the deep ends of the three southern corridors, so
-  // the nearest cross-team pair is 60 m of the 168 m axis (36%).
-  const team0: [number, number][] = [
-    [-12.7, -30], [-6.3, -30], [17, -80], [-20, -68], [20, -51],
-  ];
-  // Not a negation of team 0: the bays are not left-right symmetric, so team 1
-  // uses the solver's own north-side candidates (the three nearest the hub,
-  // (9.5, 24), (-9.5, 24) and (-26, 12.7), dropped for cross-team separation).
-  const team1: [number, number][] = [
-    [12.7, 30], [9.5, 34], [6.3, 30], [-20, 68], [20, 51],
-  ];
+  // Explore mode (owner 2026-09-02 16:55): no bots, no field support, no
+  // overdrive. You start on the hub's spawn ring with the lane mouths in front
+  // of you. See `spawnRing` for the measured numbers.
+  const team0: [number, number][] = spawnRing(1);
+  const team1: [number, number][] = spawnRing(-1);
 
   return {
     id: 'map3',
@@ -508,22 +424,38 @@ export function buildMap3(scene: THREE.Scene): ArenaMap {
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(team0, team1),
-    // One point at each bay mouth, one deep in each bay, and the four corner
-    // courts, so a bot patrol covers the gallery instead of circling the
-    // courtyard.
-    patrolPoints: [
-      ...MAP3_BAYS.flatMap((bay) => [
-        bayPoint(bay, 0, BAY_START + 4),
-        bayPoint(bay, 0, BAY_START + bay.lengthM - 6),
-      ]),
-      [26, 26], [-26, 26], [26, -26], [-26, -26],
-    ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    /**
+     * MAP3 (HF-409): the reason the corridors are not frozen.
+     *
+     * Every corridor drives its own time uniforms, its foliage springs and its
+     * vehicle from this call. The player's pose goes in in CORRIDOR-LOCAL
+     * space, because that is the frame the corridors were authored in and the
+     * frame their interaction maths (a shrub's push radius, the rover's
+     * avoidance) is written in.
+     */
+    update(elapsedSeconds: number, dtSeconds: number, context: ArenaFrameContext) {
+      for (const lane of placed) {
+        localPosition.copy(context.cameraPosition);
+        lane.corridor.group.worldToLocal(localPosition);
+        localVelocity.copy(context.playerVelocity).applyQuaternion(lane.inverseYaw);
+        lane.corridor.update(elapsedSeconds, dtSeconds, localPosition, localVelocity);
+      }
+    },
+    patrolPoints: MAP3_LANES.flatMap((lane) => {
+      const mouth = laneToWorld(lane, 0, -2);
+      const deep = laneToWorld(lane, 0, -24);
+      return [new THREE.Vector3(mouth.x, 0, mouth.z), new THREE.Vector3(deep.x, 0, deep.z)];
+    }),
     targets: [],
     houses: [],
     breakableWindows: [],
     physicalCover: [],
     bounds: { ...MAP3_BOUNDS },
-    physicsSafetyFloorY: -0.35,
+    // The scrub is 35 cm below the hub in the showcase's own section; the
+    // arena's ground slab tops out at y = 0 instead, so every corridor floor
+    // (authored at y = 0.03) sits 3 cm proud of walkable ground exactly as it
+    // does on the page. The fail-safe is a hair below that.
+    physicsSafetyFloorY: -0.05,
     houseTelemetry: emptyTelemetry(),
   };
 }

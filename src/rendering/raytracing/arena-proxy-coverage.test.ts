@@ -96,6 +96,18 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // measurement rather than left at the old one, so this coverage cannot be
   // silently spent later.
   test2: { meshes: 5, footprintM2: 280 },
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409). RE-MEASURED after the arena
+  // became the corridor showcase: the two authored basins of the stone gallery
+  // are gone and what replaced them is the real thing - the shoreline
+  // corridor's 41 x 54 m Gerstner sea, plus the shape-grammar corridor's glass
+  // tower. 2 meshes / 2,203.6 m2 against the old 272, so the floor RISES to
+  // 2,200 rather than staying where it was: this arena now carries the second
+  // largest reflective body in the game and that coverage must not be
+  // silently spent later. The sea needs its name registered in
+  // ARENA_WATER_SURFACES to be seen at all - its gloss is a TSL Fresnel chain
+  // and `material.roughness` reads it as matte, the same blind spot the
+  // shared ocean's registration exists for.
+  map3: { meshes: 2, footprintM2: 2200 },
   // NUKETOWN2 (owner 2026-09-02, HF-407). MEASURED on the authored build, not
   // guessed. This arena first measured ZERO - every surface on it is matte by
   // design (board siding, dry asphalt, painted vehicle panels), so the tracer
@@ -109,16 +121,6 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // spent later. A bleached noon test town is a MATTE map and is never going to
   // be a chrome one; "never zero anywhere" is the contract, and it is met.
   nuketown2: { meshes: 2, footprintM2: 16 },
-  // MAP3 (owner 2026-09-02, HF-405). MEASURED on the authored build, not
-  // guessed: the water bay's two sunken basins either side of its walkway are
-  // the arena's whole reflective budget, authored at roughness 0.10 against
-  // the 0.22 mirror ceiling. 2 meshes / 272.0 m2 (3.4 m x 40 m each), so the
-  // floor is pinned at 272. A stone gallery is a VALUE map and is never going
-  // to be a chrome one, but "never zero anywhere" is the contract this file
-  // exists to hold, and the basins are what holds it here: deleting them
-  // silently would put Map 3 in the exact pass79 state this gate was written
-  // for - a correctly-implemented reflection layer rendering nothing.
-  map3: { meshes: 2, footprintM2: 272 },
 };
 
 type Coverage = {
@@ -197,6 +199,10 @@ beforeAll(async () => {
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
   ]);
+
+  // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
+  // needs a wasm module resolved first, so it throws until prepare has run.
+  await (await import('../../map3-arena')).prepareMap3();
 
   const factories: Record<string, (scene: THREE.Scene) => unknown> = {
     'atomic-acres': buildArena,

@@ -30,8 +30,10 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * Floor on the derived roster, matching `MINIMUM_SWEPT_ARENAS` in
  * sweep-eye-clearance-spots.ts. 8 = the nine ids in arena-identity.ts minus
  * hidden farcrysis. Raise it when an arena is added; never lower it to get a
- * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, and
- * 8 -> 9 the same day (HF-407) when the Nuke Town Rebuild shipped.
+ * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, back to 7
+ * while its card was withdrawn (HF-409), 8 again when the corridor showcase became
+ * the arena, and 9 the same day (HF-407) when the Nuke Town Rebuild shipped: the
+ * floor is an alarm on the SCRAPE collapsing, so it has to equal the real roster.
  */
 export const MINIMUM_EYE_CLEARANCE_ARENAS = 9;
 

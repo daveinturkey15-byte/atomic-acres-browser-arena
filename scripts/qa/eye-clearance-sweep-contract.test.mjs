@@ -79,6 +79,15 @@ test('the selectable roster this test measures against is the real one', () => {
   // Guards the derivation itself. If this regex ever stops matching the file's
   // shape it yields an EMPTY roster, and an empty roster tests nothing while
   // reporting success - the precise trap the cross-browser gate hit.
+  // MAP3 (owner 2026-09-02, HF-409): ratcheted 8 -> 7 when Map 3's card was
+  // WITHDRAWN again the same day - the card launched the authored stone
+  // gallery, not the corridor showcase. The floor tracks the REAL roster
+  // size, which is what makes it a collapsed-derivation alarm rather than a
+  // coverage promise; it must never be lowered to excuse an arena that is
+  // still offered in the menu, and the explicit exclusion below is what pins
+  // this particular drop to a deliberate decision.
+  // MAP3 (owner 2026-09-02, HF-409, PASS 86): ratcheted BACK UP 7 -> 8 with the
+  // card. The 8 -> 7 drop lasted exactly as long as the withdrawal did.
   assert.ok(
     selectable.length >= 8,
     `expected the real selectable roster, got ${JSON.stringify(selectable)}`,
@@ -86,10 +95,12 @@ test('the selectable roster this test measures against is the real one', () => {
   for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be swept`);
   }
-  assert.ok(
-    !selectable.includes('farcrysis'),
-    'farcrysis is selectable:false and must stay out of the required set',
-  );
+  for (const hidden of ['farcrysis']) {
+    assert.ok(
+      !selectable.includes(hidden),
+      `${hidden} is selectable:false and must stay out of the required set`,
+    );
+  }
 });
 
 test('the sweep derives its roster instead of hardcoding one', () => {
@@ -111,8 +122,10 @@ test('the sweep keeps a floor under the derived roster', () => {
   // Importing a real array cannot silently collapse the way a scraped one can,
   // but a truncated roster would still sweep less than the game ships while
   // printing success, so the script asserts a floor rather than assuming one.
-  // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable. This
-  // pin only ever moves UP: it is the guard against a truncated roster.
+  // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable, back to 7
+  // while its card was withdrawn, 8 again when the showcase became the arena, and
+  // 9 (HF-407) when the Nuke Town Rebuild shipped. The floor must equal the REAL
+  // roster, which the equality assertion below enforces in both directions.
   assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*9/u, 'the roster floor must be pinned at 9');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
@@ -396,7 +409,23 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   // Stages 2 and 3 scrape TypeScript from JavaScript, and a scrape CAN collapse
   // to nothing. An empty roster tests nothing while reporting success - the trap
   // the cross-browser gate hit, and the reason stage 1 asserts a floor too.
-  // Raised 7 -> 8 on 2026-09-02 (HF-405) with Map 3; this pin only moves UP.
+  // Raised 7 -> 8 on 2026-09-02 (HF-405) with Map 3, and back to 7 the same day
+  // (HF-409) when Map 3's card was withdrawn.
+  //
+  // MAP3: "this pin only moves UP" was the wrong rule, and lowering the literal
+  // is not what makes this honest - so the literal is no longer the pin. The
+  // floor now has to EQUAL the roster this file derives independently, which
+  // fails in BOTH directions: a floor above the roster makes every eye-clearance
+  // run throw instead of measuring, and a floor below it is the relaxation the
+  // original comment was guarding against. An arena may only leave the roster by
+  // being written `selectable: false` in src/map-selection.ts, and the test above
+  // pins which arenas are allowed to be in that state.
+  const derived = selectableArenaIdsFromSource();
+  assert.equal(
+    MINIMUM_EYE_CLEARANCE_ARENAS, derived.length,
+    `the floor (${MINIMUM_EYE_CLEARANCE_ARENAS}) must equal the real selectable roster `
+    + `(${derived.length}: ${derived.join(', ')})`,
+  );
   assert.match(
     ROSTER_SOURCE,
     /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*9/u,

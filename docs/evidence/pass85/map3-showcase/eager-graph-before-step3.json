@@ -1,0 +1,83 @@
+{
+  "entry": "legacy-main-BV-EKVXd.js",
+  "chunkCount": 19,
+  "totalBytes": 4497642,
+  "chunks": [
+    {
+      "file": "additional-maps-CfppAeR2.js",
+      "bytes": 110653
+    },
+    {
+      "file": "changelog-D7nAbofp.js",
+      "bytes": 40922
+    },
+    {
+      "file": "combat-feedback-BpwEzfEE.js",
+      "bytes": 9423
+    },
+    {
+      "file": "deterministic-rng-Cz65iEo8.js",
+      "bytes": 756
+    },
+    {
+      "file": "farcrysis-BiFhgzgR.js",
+      "bytes": 145651
+    },
+    {
+      "file": "gameplay-DlU7tBUr.js",
+      "bytes": 501317
+    },
+    {
+      "file": "gun-range-rack-presentation-0KvrZ8Eu.js",
+      "bytes": 3577
+    },
+    {
+      "file": "high-seas-B9P_6guL.js",
+      "bytes": 45428
+    },
+    {
+      "file": "legacy-main-BV-EKVXd.js",
+      "bytes": 1843360
+    },
+    {
+      "file": "map-BW9Hi1fj.js",
+      "bytes": 43957
+    },
+    {
+      "file": "map3-arena--NNw5Oa1.js",
+      "bytes": 5407
+    },
+    {
+      "file": "preload-helper-DYl5dUZ5.js",
+      "bytes": 1271
+    },
+    {
+      "file": "release-identity-CKz71N3B.js",
+      "bytes": 518
+    },
+    {
+      "file": "rolldown-runtime-QTnfLwEv.js",
+      "bytes": 694
+    },
+    {
+      "file": "sky-backdrop-B5yIOF-o.js",
+      "bytes": 9524
+    },
+    {
+      "file": "test-maps-9hwrPtd3.js",
+      "bytes": 51958
+    },
+    {
+      "file": "vendor-peer-DW-fpQKQ.js",
+      "bytes": 86871
+    },
+    {
+      "file": "vendor-three-DMMu-fsD.js",
+      "bytes": 1553456
+    },
+    {
+      "file": "vendor-three-loaders-78tujjXe.js",
+      "bytes": 42899
+    }
+  ]
+}

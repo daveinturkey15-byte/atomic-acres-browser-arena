@@ -191,7 +191,8 @@ describe('opening arena selection', () => {
       'High Seas multiplayer arena',
       'Firing Range multiplayer arena',
       'Raid multiplayer arena',
-      'Map 3 multiplayer arena',
+      // MAP3: an explore arena is not a multiplayer arena.
+      'Map 3 explore arena',
       // NUKETOWN2 (HF-407).
       'Nuke Town Rebuild multiplayer arena',
     ]);
@@ -247,28 +248,71 @@ describe('opening arena selection', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
-      // MAP3 (HF-405).
-      '2 BOTS SKIRMISH',
+      // MAP3 (HF-405, then HF-409): Map 3 fields no bots at all and is not a
+      // firing range - it explores. "START RANGE" was the right words while
+      // the Gun Range was the only bot-less arena and the wrong words for the
+      // second one.
+      'START EXPLORING',
       // NUKETOWN2 (HF-407): SOLO_BOT_COUNT, same as the shipped Nuke Town.
       '1 BOT SKIRMISH',
     ]);
   });
 
-  // MAP3 (owner 2026-09-02, HF-405). Map 3 ships selectable and SOLO. The
-  // failure this pins is the one the repo has already had twice: an arena that
-  // is registered but not offered ("published but unselectable"), or one that
-  // advertises hosted lobbies nobody has run a two-client lane against.
-  it('offers Map 3 as a selectable solo preview and never as a hosted lobby', () => {
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409; card restored PASS 86). Map 3
+  // shipped selectable and SOLO at 15:14, was withdrawn at 16:25 the same day
+  // because the card launched the authored stone gallery rather than the
+  // corridor showcase, and is offered again now that the showcase IS the arena.
+  // It comes back as an EXPLORE arena, which is a declared registry kind.
+  it('offers Map 3 as an explore arena, with no lobby, no bots and no clock pressure', () => {
     const map3 = arenaSelection('map3');
     expect(map3.id).toBe('map3');
     expect(map3.selectable).toBe(true);
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    // The kind is the thing every gate reads; it is not a list of ids.
+    expect(map3.kind).toBe('explore');
+    // ...and it is the ONLY explore arena, so a team arena silently acquiring
+    // the kind (and dropping out of the team-spawn rule) fails here.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'explore').map((entry) => entry.id)).toEqual(['map3']);
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'team').length).toBe(ARENA_SELECTIONS.length - 1);
+    // Still registered: audio, spawn safety, replay and the compatibility
+    // decoder all read the FULL registry, and a saved match or a shared link
+    // naming map3 has to keep resolving.
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('map3');
     expect(map3.multiplayer).toBe(false);
     expect(map3.fieldSupport).toBe(false);
     expect(map3.overdrive).toBe(false);
     // The card has to SAY preview, or "solo only" is a surprise at the lobby.
     expect(map3.selectorLabel).toContain('PREVIEW');
-    expect(map3.rulesLabel).toContain('SOLO PREVIEW');
+    // HF-409, owner 16:55: "it's not about combat, it's a mode you can
+    // explore". The card says EXPLORE and the arena fields no bots at all -
+    // not two, not one. A preview that quietly kept a bot ladder would be the
+    // old claim wearing the new label.
+    expect(map3.rulesLabel).toContain('EXPLORE');
+    expect(map3.soloBotCount).toBe(0);
+    expect(map3.maximumSoloBots).toBe(0);
+
+    // MAP3 (HF-409 finisher 3): the card links to the standalone showcase page,
+    // and the href is RELATIVE. The published game document is at
+    // `channels/<pass>/index.html`, so a rooted '/map3.html' 404s on every
+    // channel - which is the whole reason the page looked destroyed.
+    expect(map3.showcasePath).toBe('map3.html');
+    expect(map3.showcasePath?.startsWith('/')).toBe(false);
+    expect(map3.showcasePath).not.toContain('://');
+    // No other arena claims a second page, so a copy-paste into a team arena
+    // (which has no such page built) fails here rather than shipping a 404.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.showcasePath).map((entry) => entry.id)).toEqual(['map3']);
+
+    // The lede counts the corridors, and there are EIGHT since the Rapier
+    // playground landed as a real lane in `MAP3_LANES`. An undercounting lede
+    // is the same class of untruth as the matchbar that called this a
+    // deathmatch, and is the kind of copy that silently rots as content lands.
+    expect(map3.menuLede).toContain('eight corridors');
+    expect(map3.menuLede).not.toContain('seven corridors');
+    // An explore arena must not carry a match clock into its HUD. The registry
+    // keeps `matchRules.durationMs` because the id is also the replay/storage
+    // boundary and a saved match naming map3 must still decode - so the HUD
+    // reads the KIND, not the clock. See `src/ui/hud-mode-banner.ts`.
+    expect(map3.fieldSupport).toBe(false);
     // Stable id is the network/storage boundary from the first commit.
     expect(decodeArenaId('map3')).toBe('map3');
     expect(isArenaId('map3')).toBe(true);

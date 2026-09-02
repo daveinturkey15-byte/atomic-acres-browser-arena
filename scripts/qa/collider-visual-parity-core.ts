@@ -681,6 +681,11 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         import('../../src/test-maps'),
         import('../../src/map3-arena'),
       ]);
+      // MAP3 (HF-409 finisher 2): map3's builder is synchronous but its eighth
+      // corridor needs a wasm module resolved first, so prepare it here - the
+      // one place both the CLI sweep and src/collider-visual-parity-gate.test.ts
+      // reach the factory table through.
+      await (await import('../../src/map3-arena')).prepareMap3();
       return {
         'atomic-acres': {
           build: buildArena,
