@@ -98,6 +98,7 @@ import { createWindField, sampleWind } from './weather/wind-field';
 // why it can never return a light (PASS 82 light-set freeze).
 import {
   DEFAULT_LIGHTING_TIME_CHOICE,
+  arenaDaylightProfile,
   isLightingTimeChoice,
   lightingConditionsAreIdentity,
   resolveLightingConditions,
@@ -4035,9 +4036,26 @@ const lightingQueryChoice = lightingQueryParams.get('tod');
 const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
 /** `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode. */
 const lightingCaptureFixedHour = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
-let lightingTimeChoice: LightingTimeChoice = isLightingTimeChoice(lightingQueryChoice)
+/**
+ * A LOCAL override, set only by `?tod=` or by the QA hook. It is deliberately
+ * NOT the normal path: the hour is host-authoritative, so the live value comes
+ * from the replicated match config below and a local override exists purely for
+ * deterministic captures and solo experimentation.
+ */
+let lightingTimeChoiceOverride: LightingTimeChoice | null = isLightingTimeChoice(lightingQueryChoice)
   ? lightingQueryChoice
-  : DEFAULT_LIGHTING_TIME_CHOICE;
+  : null;
+/**
+ * HOST-AUTHORITATIVE. A guest reads the host's replicated `config.timeOfDay`;
+ * a host and a solo player read their own. Absent (pre-PASS-87 lobbies and
+ * rejoin envelopes) means the default, so no peer is ever left on a different
+ * sun by an old checkpoint.
+ */
+function activeLightingTimeChoice(): LightingTimeChoice {
+  if (lightingTimeChoiceOverride) return lightingTimeChoiceOverride;
+  const replicated = (privateLobbySnapshot?.config ?? privateMatchConfig).timeOfDay;
+  return isLightingTimeChoice(replicated) ? replicated : DEFAULT_LIGHTING_TIME_CHOICE;
+}
 let lightingConditionBaseline: LightingConditionBaseline | null = null;
 let activeLightingConditions: LightingConditionWrites | null = null;
 let lightingConditionsSkyDarken = 0;
@@ -4084,7 +4102,7 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     arenaId: selectedArena.id,
     matchSeed: weatherMatchSeed,
     elapsedSeconds: lightingConditionsElapsedSeconds,
-    choice: lightingTimeChoice,
+    choice: activeLightingTimeChoice(),
     skyDarkenAmount: lightingConditionsSkyDarken,
     ...(lightingCaptureFixedHour === null ? {} : { fixedHour: lightingCaptureFixedHour }),
   });
@@ -4168,7 +4186,8 @@ function applyLightingConditionUniforms(force = false): void {
 function lightingConditionsTelemetry(): Record<string, unknown> {
   const writes = activeLightingConditions;
   return {
-    choice: lightingTimeChoice,
+    choice: activeLightingTimeChoice(),
+    localOverride: lightingTimeChoiceOverride,
     hour: writes ? Number(writes.hour.toFixed(3)) : null,
     deviation: writes ? Number(writes.deviation.toFixed(4)) : null,
     sunIntensityScale: writes ? Number(writes.sunIntensityScale.toFixed(4)) : null,
@@ -10646,6 +10665,17 @@ function renderPrivateLobby(): void {
   killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
   timeLimitInput.disabled = !hostControls || rangeLobby;
   killLimitInput.disabled = !hostControls || rangeLobby;
+  // LIGHTING: the same mirror for the host's TIME OF DAY choice. A guest reads
+  // it and cannot edit it, exactly like the two limits above, because two peers
+  // on different hours are arguing about a different match.
+  const timeOfDayInput = element<HTMLSelectElement>('#lobby-time-of-day');
+  timeOfDayInput.value = (snapshot?.config.timeOfDay ?? privateMatchConfig.timeOfDay) ?? DEFAULT_LIGHTING_TIME_CHOICE;
+  // Gun Range is indoors and Map 3 is preview-pinned: both resolve to the
+  // authored hour whatever is chosen, so the control is disabled rather than
+  // offering a choice that provably does nothing.
+  timeOfDayInput.disabled = !hostControls || arenaDaylightProfile(arenaSelection(
+    (snapshot?.config.arenaId ?? privateMatchConfig.arenaId),
+  ).id).pinned;
   const localMember = members.find((member) => member.id === player.id);
   // HF-328: squad identity is prescribed, so the free name input and colour picker
   // no longer exist in the lobby markup. Project the canonical identity into the
@@ -30167,6 +30197,7 @@ const updateLobbyConfigFromUi = (): void => {
   // so this assignment can never silently no-op.
   const timeLimitSelect = element<HTMLSelectElement>('#lobby-time-limit');
   const killLimitSelect = element<HTMLSelectElement>('#lobby-kill-limit');
+  const timeOfDaySelect = element<HTMLSelectElement>('#lobby-time-of-day');
   if (arenaId !== privateMatchConfig.arenaId) {
     timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
     killLimitSelect.value = '';
@@ -30182,6 +30213,10 @@ const updateLobbyConfigFromUi = (): void => {
     // contract; gun-range keeps its fixed untimed practice round.
     durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
     scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value),
+    // LIGHTING: the host's time-of-day mode joins the replicated match contract.
+    // A value the validator does not know collapses to the default rather than
+    // failing the whole lobby snapshot.
+    timeOfDay: isLightingTimeChoice(timeOfDaySelect.value) ? timeOfDaySelect.value : DEFAULT_LIGHTING_TIME_CHOICE,
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -30191,6 +30226,7 @@ element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobby
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-time-limit').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-kill-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-of-day').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
   const team: Team = teamSelect.value === '1' ? 1 : 0;
@@ -33109,8 +33145,8 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleLightingConditions: () => lightingConditionsTelemetry(),
   // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
   setLightingTimeChoice: (choice: string) => {
-    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: lightingTimeChoice };
-    lightingTimeChoice = choice;
+    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: activeLightingTimeChoice() };
+    lightingTimeChoiceOverride = choice;
     applyLightingConditionUniforms(true);
     return { accepted: true, ...lightingConditionsTelemetry() };
   },

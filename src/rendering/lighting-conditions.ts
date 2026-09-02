@@ -73,6 +73,21 @@ export const LIGHTING_TIME_CHOICES: readonly LightingTimeChoice[] = Object.freez
   'authored', 'early', 'midday', 'late', 'random', 'cycle',
 ]);
 
+/**
+ * Player-facing labels. They name what the choice DOES to this arena rather
+ * than a clock, because the band is arena-relative: LATE is dusk on Nuke Town
+ * and night on RustRig, and a menu that promised "20:00" would be lying on one
+ * of them.
+ */
+export const LIGHTING_TIME_CHOICE_LABELS: Readonly<Record<LightingTimeChoice, string>> = Object.freeze({
+  authored: 'AUTHORED',
+  early: 'EARLY',
+  midday: 'MIDDAY',
+  late: 'LATE',
+  random: 'RANDOM',
+  cycle: 'CYCLE OVER MATCH',
+});
+
 /** Solo and lobby default. The owner asked for variety, not for one new hour. */
 export const DEFAULT_LIGHTING_TIME_CHOICE: LightingTimeChoice = 'random';
 
