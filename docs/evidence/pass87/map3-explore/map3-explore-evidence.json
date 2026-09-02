@@ -1,0 +1,179 @@
+{
+  "capturedAt": "2026-09-02T23:05:04.479Z",
+  "machine": {
+    "freeVramMib": 6533,
+    "comfyQueueDepth": 0,
+    "waitedAttempts": 0
+  },
+  "dist": "C:\\Users\\david\\projects\\aa-claude-map3fin\\dist",
+  "lanes": {
+    "shoreline": {
+      "label": "Shoreline",
+      "edge": 0,
+      "lateral": -26,
+      "depth": 8,
+      "world": {
+        "x": -26,
+        "y": 1.7,
+        "z": -42
+      },
+      "yaw": 0,
+      "pitch": -0.04,
+      "file": "map3-corridor-shoreline.png"
+    },
+    "colosseum": {
+      "label": "Colosseum",
+      "edge": 0,
+      "lateral": 26,
+      "depth": 6,
+      "world": {
+        "x": 26,
+        "y": 1.7,
+        "z": -40
+      },
+      "yaw": 0,
+      "pitch": 0.02,
+      "file": "map3-corridor-colosseum.png"
+    },
+    "raymarch": {
+      "label": "Raymarched SDF",
+      "edge": 1,
+      "lateral": -13,
+      "depth": 8,
+      "world": {
+        "x": 42,
+        "y": 1.7,
+        "z": -13
+      },
+      "yaw": -1.5708,
+      "pitch": -0.02,
+      "file": "map3-corridor-raymarch.png"
+    },
+    "grammar": {
+      "label": "Shape grammar",
+      "edge": 1,
+      "lateral": 13,
+      "depth": 10,
+      "world": {
+        "x": 44,
+        "y": 1.7,
+        "z": 13
+      },
+      "yaw": -1.5708,
+      "pitch": 0.04,
+      "file": "map3-corridor-grammar.png"
+    },
+    "vegetation": {
+      "label": "Vegetation",
+      "edge": 2,
+      "lateral": 0,
+      "depth": 14,
+      "world": {
+        "x": 0,
+        "y": 1.7,
+        "z": 48
+      },
+      "yaw": -3.1416,
+      "pitch": -0.04,
+      "file": "map3-corridor-vegetation.png"
+    },
+    "physics": {
+      "label": "Rapier playground",
+      "edge": 2,
+      "lateral": 24,
+      "depth": 12,
+      "world": {
+        "x": -24,
+        "y": 1.7,
+        "z": 46
+      },
+      "yaw": -3.1416,
+      "pitch": -0.08,
+      "file": "map3-corridor-physics.png"
+    },
+    "godrays": {
+      "label": "God rays",
+      "edge": 3,
+      "lateral": -13,
+      "depth": 12,
+      "world": {
+        "x": -46,
+        "y": 1.7,
+        "z": 13
+      },
+      "yaw": 1.5708,
+      "pitch": 0.04,
+      "file": "map3-corridor-godrays.png"
+    },
+    "seasons": {
+      "label": "Seasons",
+      "edge": 3,
+      "lateral": 14,
+      "depth": 14,
+      "world": {
+        "x": -48,
+        "y": 1.7,
+        "z": -14
+      },
+      "yaw": 1.5708,
+      "pitch": -0.02,
+      "file": "map3-corridor-seasons.png"
+    }
+  },
+  "hud": {
+    "modeLabel": {
+      "present": true,
+      "shown": true,
+      "text": "EXPLORE · MAP 3"
+    },
+    "timer": {
+      "present": true,
+      "shown": false,
+      "text": "--:--"
+    },
+    "scoreline": {
+      "present": true,
+      "shown": false,
+      "text": "AQUA 0—0 CORAL"
+    },
+    "objective": {
+      "present": true,
+      "shown": true,
+      "text": "MAP 3 · EXPLORE · NO TIMER · NOTHING TO WIN · ESC FOR MENU"
+    },
+    "connectionPill": {
+      "present": true,
+      "shown": true,
+      "text": "SOLO EXPLORE"
+    },
+    "pauseHint": {
+      "present": true,
+      "shown": true,
+      "text": "ESC · BACK TO MENU"
+    }
+  },
+  "pageErrors": [],
+  "failedRequests": [
+    {
+      "url": "http://127.0.0.1:4195/assets/original/menu-previews/atomic-acres.webm?v=pass66-runtime-preview-v15",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:4195/assets/original/menu-previews/map3.webm?v=pass84-map3-preview-v1",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "arenaTitle": "MAP 3",
+  "map3Prepared": true,
+  "showcaseLink": {
+    "present": true,
+    "hidden": false,
+    "href": "map3.html",
+    "resolved": "http://127.0.0.1:4195/map3.html",
+    "target": "_blank",
+    "rel": "noopener noreferrer",
+    "text": "OPEN THE STANDALONE SHOWCASE ↗",
+    "documentUrl": "http://127.0.0.1:4195/index.html"
+  },
+  "boot": "active"
+}
