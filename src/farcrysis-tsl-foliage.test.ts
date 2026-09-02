@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { NodeMaterial } from 'three/webgpu';
 import {
   TSL_FOLIAGE_MAX_DISTINCT_GRAPHS,
   makeTslFoliageMaterial,
+  makeTslGrassMaterial,
   tslAdvanceWind,
   tslResetWindUniforms,
   tslWindUniformCount,
@@ -68,50 +70,15 @@ describe('HF-363 TSL foliage wind uniform registry', () => {
     expect(tslWindUniformCount()).toBe(0);
   });
 
-  // PASS 84 REPLACES the previous 'gives different sway buckets their own
-  // uniform' case, which pinned the bucket split itself. The split was the
-  // cost: nine live node graphs, ~0.6 s of pipeline compilation each, inside
-  // arena admission. Sway size is now a per-material uniform read through
-  // materialReference, so this asserts the STRONGER property — one graph and
-  // one wind uniform for every sway size, with the per-layer numbers intact.
-  it('puts every sway size on one shared graph and one wind uniform', () => {
+  it('gives different sway buckets their own uniform', () => {
     tslResetWindUniforms();
     const blade = makeTslFoliageMaterial({ color: 0x2e8b57, swayAmount: 0.03, swayHeight: 0.7 });
     const frond = makeTslFoliageMaterial({ color: 0x2e8b57, swayAmount: 0.09, swayHeight: 9 });
-
-    expect(tslWindUniformCount()).toBe(1);
-    expect(graphKey(blade)).toBe(graphKey(frond));
-
-    // Sharing must not have flattened the layers onto one look: each material
-    // still carries its own bucketed height, amplitude and speed, which is
-    // what the shared graph reads at draw time.
-    expect(blade.fcSwayHeight).toBe(0.8);
-    expect(frond.fcSwayHeight).toBe(8);
-    expect(blade.fcSwayAmount).toBeLessThan(frond.fcSwayAmount);
-    expect(blade.fcSwaySpeed).toBe(1);
-    expect(frond.fcSwaySpeed).toBe(1);
-
+    expect(tslWindUniformCount()).toBe(2);
+    expect(graphKey(blade)).not.toBe(graphKey(frond));
     blade.dispose();
-    expect(tslWindUniformCount()).toBe(1); // frond still drives it
     frond.dispose();
     expect(tslWindUniformCount()).toBe(0);
-  });
-
-  // The shared graph renders NaN for any material that reaches a draw without
-  // the four referenced properties, and nothing in three warns about it.
-  it('always carries the four values the shared graph dereferences', () => {
-    tslResetWindUniforms();
-    const dappledSway = makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.5, swayAmount: 0.05, swayHeight: 2.5 });
-    const still = makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.8 });
-    for (const material of [dappledSway, still]) {
-      for (const property of ['fcDapple', 'fcSwayHeight', 'fcSwayAmount', 'fcSwaySpeed'] as const) {
-        expect(Number.isFinite(material[property]), `${property} must be a finite number`).toBe(true);
-      }
-    }
-    expect(dappledSway.fcDapple).toBe(0.5);
-    expect(still.fcDapple).toBe(0.78);
-    dappledSway.dispose();
-    still.dispose();
   });
 
   it('double dispose cannot drive the reference count negative', () => {
@@ -169,5 +136,91 @@ describe('HF-374 TSL foliage pipeline-count ceiling', () => {
     expect(b.color.getHex()).toBe(0xc25f2c);
     a.dispose();
     b.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PASS 84 REPAIR — the shadow pass renders foliage with a DIFFERENT material.
+//
+// three r185 draws every shadow caster through `scene.overrideMaterial =
+// getShadowMaterial(light)` (nodes/lighting/ShadowNode.js), a bare shared
+// `NodeMaterial` with no arena properties on it. `Renderer._renderObjectDirect`
+// copies the SOURCE material's `positionNode` onto that shadow material and
+// then renders with it, and `NodeManager.getNodeFrameForRender` sets
+// `nodeFrame.material` to the material actually being rendered — the shadow
+// material. So any `materialReference('x','float')` inside a foliage
+// `positionNode` resolves `x` on the SHADOW material during the shadow pass.
+// It is undefined there; `ReferenceNode.updateValue` assigns it straight into
+// a `Float32Array` uniform, which stores NaN, and every swaying shadow-caster
+// vertex becomes NaN. Nothing in three warns; the arena simply loses its
+// foliage shadows and the vegetation band brightens.
+//
+// This is not hypothetical: a PASS 84 attempt did exactly that and the
+// measured admission frames brightened by +3.2..+6.5 luminance across the
+// vegetation band. The guard is on `positionNode` (and `castShadowPositionNode`
+// if one is ever authored) because that is precisely the node three carries
+// into the shadow pass.
+describe('PASS 84 foliage node graphs survive the shadow-pass override material', () => {
+  /** Collect every MaterialReferenceNode reachable from a node graph root. */
+  const materialReferencesIn = (root: unknown): Array<{ property: string; node: ReferenceLike }> => {
+    const found: Array<{ property: string; node: ReferenceLike }> = [];
+    const node = root as { traverse?: (cb: (n: unknown) => void) => void } | null | undefined;
+    if (!node || typeof node.traverse !== 'function') return found;
+    node.traverse((n) => {
+      const candidate = n as ReferenceLike;
+      if (candidate?.isMaterialReferenceNode === true) {
+        found.push({ property: String(candidate.property), node: candidate });
+      }
+    });
+    return found;
+  };
+
+  interface ReferenceLike {
+    isMaterialReferenceNode?: boolean;
+    property?: string;
+    getValueFromReference(object: object): unknown;
+  }
+
+  const shadowCasters = () => {
+    tslResetWindUniforms();
+    return [
+      makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.5, swayAmount: 0.05, swayHeight: 2.5 }),
+      makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.28, swayAmount: 0.09, swayHeight: 9 }),
+      makeTslFoliageMaterial({ color: 0x8a6b3a, dapple: 0.8, swayAmount: 0.02, swayHeight: 0.7 }),
+      makeTslFoliageMaterial({ color: 0x6b8f3a }),
+      makeTslGrassMaterial({ color: 0x7ba428, bladeHeight: 0.55, swayAmount: 0.08 }),
+    ];
+  };
+
+  it('resolves every position-node material reference on the shared shadow material', () => {
+    const materials = shadowCasters();
+    // The exact object three renders shadow casters with: a plain NodeMaterial
+    // that carries only the properties three itself sets on it.
+    const shadowMaterial = new NodeMaterial();
+    for (const material of materials) {
+      for (const source of ['positionNode', 'castShadowPositionNode'] as const) {
+        const graph = (material as unknown as Record<string, unknown>)[source];
+        for (const reference of materialReferencesIn(graph)) {
+          const value = reference.node.getValueFromReference(shadowMaterial);
+          expect(
+            typeof value === 'number' && Number.isFinite(value),
+            `${source} reads material.${reference.property}, which is undefined on three's shared `
+              + `ShadowMaterial — it becomes NaN in the shadow pass and kills the caster's vertices`,
+          ).toBe(true);
+        }
+      }
+    }
+    for (const material of materials) material.dispose();
+    expect(tslWindUniformCount()).toBe(0);
+  });
+
+  it('keeps the sway numbers out of material-reference nodes entirely', () => {
+    const materials = shadowCasters();
+    for (const material of materials) {
+      const properties = materialReferencesIn(material.positionNode).map((r) => r.property);
+      expect(properties, 'foliage sway must not be read from the rendered material').toEqual([]);
+    }
+    for (const material of materials) material.dispose();
+    expect(tslWindUniformCount()).toBe(0);
   });
 });
