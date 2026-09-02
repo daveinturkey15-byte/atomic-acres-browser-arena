@@ -113,6 +113,34 @@ function bodyFitViolations(label, extent) {
   return violations;
 }
 
+/**
+ * HF-410: the contact pose the label names must really be established. The old
+ * preconditions read `surfaceRetreat`, which since HF-387 publishes the APPLIED
+ * camera-space translation - the quantity HF-410 zeroes on purpose. The PROBE
+ * DEMAND survives untouched ("the retreat is still probed, still reported in
+ * telemetry", src/weapon-presentation.ts VIEWMODEL_WALL_PULLBACK_SCALE), so the
+ * original thresholds are kept verbatim and re-pinned onto
+ * `requestedSurfaceRetreat`, where they still mean what they were written to
+ * mean. Measured on the fitted rig: demand 0.82 m and wallBlend 1 at all three
+ * poses, against the 0.15 / 0.25 the gate has always asked for.
+ *
+ * These are ASSERTIONS, not waits: a pose that stops being a wall pose must go
+ * red with a number, never time out with none.
+ */
+function contactPoseViolations(label, observed, requiredDemandMeters, requiredLiftMeters) {
+  const violations = [];
+  if (!(observed.contactWallBlend > 0.99)) {
+    violations.push(`${label}: the wall contact pose was not established - wallBlend ${observed.contactWallBlend}`);
+  }
+  if (!(observed.requestedSurfaceRetreat > requiredDemandMeters)) {
+    violations.push(`${label}: probed retreat demand ${observed.requestedSurfaceRetreat} is not > ${requiredDemandMeters}`);
+  }
+  if (requiredLiftMeters !== null && !(observed.surfaceLift >= requiredLiftMeters)) {
+    violations.push(`${label}: floor lift ${observed.surfaceLift} is not >= ${requiredLiftMeters}`);
+  }
+  return violations;
+}
+
 async function observeContactPose(page, where, expected) {
   const observed = await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
@@ -594,6 +622,7 @@ try {
     'surfaceRetreat > 0.15',
   );
   violations.push(...bodyFitViolations('contact/m4a1/wall-hip', wallHipObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/wall-hip', wallHipObservation, 0.15, null));
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
   // The prone precondition kept its LIFT half: the floor lift is real under the
   // fit (measured 0.2 m, at the VIEWMODEL_PRONE_BASE_LIFT_METERS cap) and it is
@@ -612,6 +641,7 @@ try {
     'surfaceRetreat > 0.25 && surfaceLift >= 0.13',
   );
   violations.push(...bodyFitViolations('contact/m4a1/prone-wall-floor-hip', proneHipObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/prone-wall-floor-hip', proneHipObservation, 0.25, 0.13));
   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-hip', state));
   if (state.weaponPresentation.contactResponse?.contract !== 'catalog-viewmodel-contact-response-v2'
@@ -630,6 +660,7 @@ try {
     'surfaceRetreat > 0.25 && surfaceLift >= 0.13 (inherited from the hip step)',
   );
   violations.push(...bodyFitViolations('contact/m4a1/prone-wall-floor-ads', proneAdsObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/prone-wall-floor-ads', proneAdsObservation, 0.25, 0.13));
   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-ads', state));
   if (state.weaponPresentation.contactResponse?.highReadyBlend <= 0.2
