@@ -6,6 +6,7 @@ import {
   arenaCanAcquireFlamethrower,
   arenaCanAcquireFlareGun,
   arenaCanActivateFieldSupport,
+  arenaCanTrainTimedMapWeapons,
   arenaOwnsTimedMapWeapon,
 } from './arena-special-weapon-reach';
 
@@ -17,6 +18,10 @@ import {
  * direction costs load time; getting one wrong in the restrictive direction
  * would mean an arena that CAN spawn the weapon skipping its rehearsal, so
  * every route onto a map is asserted against the authority that owns it.
+ *
+ * That restrictive failure already happened once here: the first cut read only
+ * TIMED_MAP_WEAPON_DEFINITIONS and missed the Gun Range secure-test-bay grant.
+ * The rack route now has its own source-pinned test below.
  */
 describe('arena special-weapon reach', () => {
   const selection = (id: string) => {
@@ -35,18 +40,49 @@ describe('arena special-weapon reach', () => {
     }
   });
 
-  it('rehearses the flare gun only where the flare gun can spawn', () => {
+  it('rehearses the flare gun on its map spawn AND on the Gun Range rack', () => {
     const owner = TIMED_MAP_WEAPON_DEFINITIONS['flare-gun'].arenaId;
     const reachable = ARENA_SELECTIONS.filter((arena) => arenaCanAcquireFlareGun(arena)).map((arena) => arena.id);
-    expect(reachable).toEqual([owner]);
-    // The saving is the point: every other arena skips a 2.5 s serialized step.
-    expect(ARENA_SELECTIONS.length - reachable.length).toBeGreaterThanOrEqual(7);
+    // Gun Range racks every weapon id and its grant path checks only the arena
+    // id, so it reaches the flare gun without owning the spawn. The first cut
+    // of this module asserted `[owner]` here and was wrong.
+    expect([...reachable].sort()).toEqual([owner, 'gun-range'].sort());
+    // The saving is still the point: every other arena skips a serialized step.
+    expect(ARENA_SELECTIONS.length - reachable.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('derives the Gun Range rack route from the two authorities that create it', () => {
+    // 1. the rack itself: stations are built from WEAPON_IDS, not a list.
+    const bay = readFileSync(new URL('./gun-range-test-bay.ts', import.meta.url), 'utf8');
+    expect(bay).toContain('const weaponStations = Object.freeze(WEAPON_IDS.map(');
+    // 2. the grant: accepted on the arena id alone, never on the definition's.
+    const authority = readFileSync(new URL('./timed-map-weapon-authority.ts', import.meta.url), 'utf8');
+    const grant = authority.slice(authority.indexOf('export function grantTrainingTimedMapWeapon('));
+    expect(grant).toContain("context.arenaId !== 'gun-range'");
+    // If the grant ever starts consulting the definition's own arenaId, this
+    // predicate may narrow again — and this line is what says so.
+    // The accept/reject predicate never reads the definition's own arena.
+    const predicate = grant.slice(grant.indexOf('if (!validPlayerId'), grant.indexOf('const definition'));
+    expect(predicate).toContain("context.arenaId !== 'gun-range'");
+    expect(predicate).not.toContain('definition');
+    // 3. and the call site that supplies that context is the test bay station.
+    const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(main).toContain("arenaId: 'gun-range', stationKind: 'secure-test-bay', authorityRole: network.role,");
+    for (const arena of ARENA_SELECTIONS) {
+      expect(arenaCanTrainTimedMapWeapons(arena), arena.id).toBe(arena.id === 'gun-range');
+      // Every timed map weapon, not just the flare gun: the grant is generic.
+      if (arena.id === 'gun-range') {
+        expect(arenaCanAcquireFlareGun(arena)).toBe(true);
+        expect(arenaCanAcquireFlamethrower(arena)).toBe(true);
+      }
+    }
   });
 
   it('keeps the flamethrower rehearsal wherever a care package could grant it', () => {
     const owner = TIMED_MAP_WEAPON_DEFINITIONS.flamethrower.arenaId;
     for (const arena of ARENA_SELECTIONS) {
-      const expected = arena.id === owner || arenaCanActivateFieldSupport(arena);
+      const expected = arena.id === owner || arenaCanActivateFieldSupport(arena)
+        || arenaCanTrainTimedMapWeapons(arena);
       expect(arenaCanAcquireFlamethrower(arena), arena.id).toBe(expected);
     }
     // rustworks owns the map spawn; the crimson flamethrower reaches every
