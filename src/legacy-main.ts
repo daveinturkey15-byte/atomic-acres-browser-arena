@@ -30591,6 +30591,19 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
+    // MP-LAB: the cheap pose read for movement probes. snapshot() walks every
+    // rigged actor's skinned meshes and costs ~60 ms per call (measured
+    // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
+    // it is measuring. This returns only what a deadlock check needs.
+    samplePlayerPose: () => {
+      alive: boolean;
+      position: number[];
+      yaw: number;
+      gameStarted: boolean;
+      matchPhase: string;
+      awaitingCanonicalGuestAuthority: boolean;
+      menuHidden: boolean;
+    };
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     sampleViewmodelPenetration: () => Record<string, unknown>;
@@ -31890,6 +31903,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
   sampleGrenadeColdPathTelemetry,
+  // MP-LAB: see the type; nothing here allocates beyond the returned object.
+  samplePlayerPose: () => ({
+    alive: player.alive,
+    position: player.position.toArray(),
+    yaw: player.yaw,
+    gameStarted,
+    matchPhase: matchState.phase,
+    awaitingCanonicalGuestAuthority,
+    menuHidden: menu.classList.contains('hidden'),
+  }),
   snapshot: () => ({
     swim: {
       swimming: localSwimState.swimming,
