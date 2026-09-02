@@ -40,10 +40,10 @@
  *     --dist dist --port 4195 --out docs/evidence/pass87/map3-explore
  */
 import { chromium } from '@playwright/test';
-import { execSync } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
+import { waitForSharedMachine } from './lib/shared-machine-guard.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -105,35 +105,6 @@ function laneYaw(lane) {
   return Math.atan2(-(b.x - a.x), -(b.z - a.z));
 }
 
-function freeVramMib() {
-  const out = execSync('nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits', { encoding: 'utf8' });
-  return Math.min(...out.trim().split('\n').map((line) => Number.parseInt(line.trim(), 10)).filter(Number.isFinite));
-}
-
-async function comfyQueueDepth() {
-  try {
-    const response = await fetch('http://127.0.0.1:8188/queue', { signal: AbortSignal.timeout(4000) });
-    if (!response.ok) return 0;
-    const queue = await response.json();
-    return (queue.queue_running?.length ?? 0) + (queue.queue_pending?.length ?? 0);
-  } catch {
-    // ComfyUI not running at all is the empty case, not an error.
-    return 0;
-  }
-}
-
-/** Never take the GPU from the owner's own work. */
-async function waitForSharedMachine() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const free = freeVramMib();
-    const queued = await comfyQueueDepth();
-    if (free >= 3000 && queued === 0) return { freeVramMib: free, comfyQueueDepth: queued, attempts: attempt + 1 };
-    console.log(`[evidence] waiting: ${free} MiB free, ComfyUI queue ${queued} (attempt ${attempt + 1}/20)`);
-    await new Promise((r) => setTimeout(r, 30_000));
-  }
-  throw new Error('GPU never had 3000 MiB free with an empty ComfyUI queue; not launching Chrome');
-}
-
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -179,7 +150,7 @@ function startStaticServer(root) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const machine = await waitForSharedMachine();
+  const machine = await waitForSharedMachine({ label: 'evidence' });
   console.log(`[evidence] ${machine.freeVramMib} MiB free, ComfyUI idle; serving ${DIST} on ${PORT}`);
   const server = await startStaticServer(DIST);
 

@@ -52,11 +52,33 @@ describe('Map 3 explore capture harness', () => {
   });
 
   it('keeps the shared-machine guard, which is why QA may run here at all', () => {
-    expect(harness).toContain('nvidia-smi');
-    expect(harness).toContain('127.0.0.1:8188/queue');
-    expect(harness).toContain('free >= 3000 && queued === 0');
+    // The guard itself lives in one shared module - three drifting copies is
+    // how one of them quietly stops waiting - so the harness is checked for
+    // USING it, and the module is checked for still being a real guard.
+    expect(harness).toContain("from './lib/shared-machine-guard.mjs'");
+    expect(harness).toContain('await waitForSharedMachine(');
     expect(harness).toContain('headless: true');
     expect(harness).not.toContain('headless: false');
+
+    const guard = readFileSync('scripts/qa/lib/shared-machine-guard.mjs', 'utf8');
+    expect(guard).toContain('nvidia-smi');
+    expect(guard).toContain('127.0.0.1:8188/queue');
+    // BOTH conditions. Free VRAM alone passes while ComfyUI is between two
+    // nodes of one workflow and about to allocate everything again.
+    expect(guard).toContain('free >= minFreeVramMib && queued === 0');
+    expect(guard).toContain('minFreeVramMib = 3000');
+    // Bounded, not infinite: a harness that waits forever is a hung run nobody
+    // can tell from a crashed one.
+    expect(guard).toContain('not launching Chrome on a shared machine');
+  });
+
+  it('is used by every browser harness in this pass, not just one of them', () => {
+    for (const file of [
+      'scripts/qa/capture-map3-explore-evidence.mjs',
+      'scripts/qa/verify-map3-channel-page.mjs',
+    ]) {
+      expect(readFileSync(file, 'utf8'), file).toContain('waitForSharedMachine');
+    }
   });
 
   it('asserts the explore HUD claims instead of only screenshotting them', () => {

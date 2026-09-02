@@ -26,12 +26,13 @@
  *   node scripts/qa/verify-map3-channel-page.mjs [--port 4196] [--out docs/evidence/pass87/map3-explore]
  */
 import { chromium } from '@playwright/test';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { build } from 'vite';
+import { waitForSharedMachine } from './lib/shared-machine-guard.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -44,33 +45,6 @@ const HOST = '127.0.0.1';
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) throw new Error(`Invalid port: ${PORT}`);
 
 const channelPath = JSON.parse(readFileSync('release-channels.json', 'utf8')).experimental.path;
-
-function freeVramMib() {
-  const out = execSync('nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits', { encoding: 'utf8' });
-  return Math.min(...out.trim().split('\n').map((line) => Number.parseInt(line.trim(), 10)).filter(Number.isFinite));
-}
-
-async function comfyQueueDepth() {
-  try {
-    const response = await fetch('http://127.0.0.1:8188/queue', { signal: AbortSignal.timeout(4000) });
-    if (!response.ok) return 0;
-    const queue = await response.json();
-    return (queue.queue_running?.length ?? 0) + (queue.queue_pending?.length ?? 0);
-  } catch {
-    return 0;
-  }
-}
-
-async function waitForSharedMachine() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const free = freeVramMib();
-    const queued = await comfyQueueDepth();
-    if (free >= 3000 && queued === 0) return { freeVramMib: free, comfyQueueDepth: queued };
-    console.log(`[channel] waiting: ${free} MiB free, ComfyUI queue ${queued} (attempt ${attempt + 1}/20)`);
-    await new Promise((r) => setTimeout(r, 30_000));
-  }
-  throw new Error('GPU never had 3000 MiB free with an empty ComfyUI queue; not launching Chrome');
-}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -146,7 +120,7 @@ async function main() {
   };
   console.log('[channel] staged:', JSON.stringify(receipt.staged));
 
-  const machine = await waitForSharedMachine();
+  const machine = await waitForSharedMachine({ label: 'channel' });
   receipt.machine = machine;
   const server = await startStaticServer(temporaryDist);
   const url = `http://${HOST}:${PORT}/${channelPath}/map3.html`;
