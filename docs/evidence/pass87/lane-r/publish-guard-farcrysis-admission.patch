@@ -1,0 +1,225 @@
+Lane R (PASS 87, HF-423) — publish-guard patch, REPORTED, NOT APPLIED.
+
+scripts/orchestration/publish_pass*.py is owned by the integration lane, so this
+lane does not edit it. This is the exact change to make in publish_pass87.py
+(which will be derived from publish_pass85.py — the guard, its red test and both
+call sites are unchanged there since PASS 84).
+
+WHY IT HAS TO CHANGE
+--------------------
+`assert_farcrysis_not_selectable` refuses to publish any tree whose farcrysis
+registry entry is missing `selectable:!1`. HF-423 makes farcrysis selectable as a
+PREVIEW card, so that guard will REFUSE the PASS 87 tree by design. It must not
+simply be deleted: it is the only thing standing between the menu and an arena
+that once cold-loaded in 279 s and killed the tab. Replace it with a guard that
+is strictly harder to satisfy — a flag can be flipped in one line, a receipt has
+to be earned by running the arena.
+
+The replacement reads the receipt this lane's collector writes:
+  node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3
+  -> docs/evidence/pass87/lane-r/farcrysis-admission.json
+    (contract farcrysis-admission-evidence-v1)
+
+The ceiling is a RATIO against an atomic-acres control measured in the SAME
+machine window, never an absolute millisecond budget. That is deliberate: an
+absolute budget is a fence, and a fence that has to be widened whenever the
+owner's ComfyUI is busy is a fence that has been widened. The pair ratio is
+immune to that, because a busy machine slows the control too.
+
+--- a/scripts/orchestration/publish_pass87.py
++++ b/scripts/orchestration/publish_pass87.py
+@@ (module constants, beside DIST)
++# HF-423: farcrysis ships as a selectable PREVIEW card in PASS 87. The receipt
++# below replaces the selectable:false flag check. 1.60 is the ceiling; the
++# evidence on the branch measures a worst pair ratio well inside it, and the
++# number exists so a REGRESSION cannot ship, not to be moved when one does.
++FARCRYSIS_ADMISSION_RECEIPT = os.path.join(
++    SRC, "docs", "evidence", "pass87", "lane-r", "farcrysis-admission.json")
++FARCRYSIS_ADMISSION_RATIO_CEILING = 1.60
++FARCRYSIS_ADMISSION_MIN_RUNS = 3
++
+@@ replace the whole of assert_farcrysis_not_selectable() and
+@@ farcrysis_guard_red_test() with:
+
+-def assert_farcrysis_not_selectable(dist_dir):
+-    """Owner, 2026-08-28: farcrysis stays unselectable in ANY live published version.
+-    ...
+-    """
+-    entry_rx = re.compile(rb"routeId:[`'\"]farcrysis[`'\"]")
+-    ok_rx = re.compile(rb"selectable:(?:!1|false)")
+-    entries_seen = 0
+-    for path in glob.glob(os.path.join(dist_dir, "assets", "*.js")):
+-        with open(path, "rb") as fh:
+-            data = fh.read()
+-        for match in entry_rx.finditer(data):
+-            entries_seen += 1
+-            window = data[max(0, match.start() - 100):match.end() + 200]
+-            if not ok_rx.search(window):
+-                sys.exit("REFUSING TO PUBLISH: a farcrysis registry entry in "
+-                         f"{os.path.basename(path)} does not carry selectable:false - "
+-                         "the menu would offer the parked arena. Fix src/map-selection.ts.")
+-    print(f"  farcrysis-unselectable guard: OK ({entries_seen} registry entr"
+-          f"{'y' if entries_seen == 1 else 'ies'} checked, all selectable:false)")
++def farcrysis_is_selectable_in_build(dist_dir):
++    """Read the BYTES the minifier emits, exactly as the old guard did.
++
++    The registry serializes as routeId:`farcrysis`,selectable:!1 (template quotes
++    survive esbuild; !1 is false). An entry without selectable:!1 in its window is
++    an entry the menu will offer. Kept byte-level for the reason the first version
++    of the old guard existed to record: searching for data-arena-id="farcrysis"
++    passed green on every bundle, including ones with farcrysis selectable,
++    because the menu interpolates arena ids at runtime.
++    """
++    entry_rx = re.compile(rb"routeId:[`'\"]farcrysis[`'\"]")
++    off_rx = re.compile(rb"selectable:(?:!1|false)")
++    entries_seen = 0
++    selectable_entries = 0
++    for path in glob.glob(os.path.join(dist_dir, "assets", "*.js")):
++        with open(path, "rb") as fh:
++            data = fh.read()
++        for match in entry_rx.finditer(data):
++            entries_seen += 1
++            window = data[max(0, match.start() - 100):match.end() + 200]
++            if not off_rx.search(window):
++                selectable_entries += 1
++    return entries_seen, selectable_entries
++
++
++def assert_farcrysis_admission_evidence(dist_dir):
++    """HF-423: farcrysis may enter the menu ONLY behind measured admission evidence.
++
++    Owner, 2026-08-28: farcrysis stays out of the menu until it loads. That rule is
++    not relaxed here, it is made checkable. The old guard asked whether a flag was
++    off. This one asks the question the flag was standing in for: does the arena
++    actually admit, on this tree, repeatably, without compiling pipelines in the
++    match and without dying?
++
++    A tree that still ships farcrysis unselectable passes trivially - the parked
++    arena is still allowed.
++    """
++    entries_seen, selectable_entries = farcrysis_is_selectable_in_build(dist_dir)
++    if selectable_entries == 0:
++        print(f"  farcrysis-admission guard: OK (parked - {entries_seen} registry "
++              f"entr{'y' if entries_seen == 1 else 'ies'}, none selectable)")
++        return
++
++    if not os.path.isfile(FARCRYSIS_ADMISSION_RECEIPT):
++        sys.exit("REFUSING TO PUBLISH: the build offers farcrysis in the menu but there "
++                 f"is no admission receipt at {FARCRYSIS_ADMISSION_RECEIPT}. Run "
++                 "`node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3`.")
++    with open(FARCRYSIS_ADMISSION_RECEIPT, encoding="utf-8") as fh:
++        receipt = json.load(fh)
++
++    if receipt.get("contract") != "farcrysis-admission-evidence-v1":
++        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt is not a "
++                 f"farcrysis-admission-evidence-v1 document ({receipt.get('contract')!r}).")
++
++    head = sh(["git", "rev-parse", "HEAD"]).strip()
++    if receipt.get("sha") != head:
++        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt was measured on "
++                 f"{receipt.get('sha')!r}, not on the tree being published ({head!r}). "
++                 "A receipt from another commit is not evidence about this one.")
++
++    summary = receipt.get("summary") or {}
++    runs = receipt.get("runs") or 0
++    if runs < FARCRYSIS_ADMISSION_MIN_RUNS:
++        sys.exit(f"REFUSING TO PUBLISH: the farcrysis admission receipt has {runs} run(s); "
++                 f"{FARCRYSIS_ADMISSION_MIN_RUNS} paired runs are required. One run is an "
++                 "anecdote.")
++    if not summary.get("allAdmitted"):
++        sys.exit("REFUSING TO PUBLISH: not every farcrysis run in the admission receipt "
++                 "reached 'admitted'.")
++    if summary.get("anyCrashed") or summary.get("anyPageErrors"):
++        sys.exit("REFUSING TO PUBLISH: a farcrysis admission run crashed or logged a page "
++                 "error. That is the 279 s failure this guard exists for.")
++    if (summary.get("maxMenuPipelines") or 0) != 0:
++        sys.exit("REFUSING TO PUBLISH: farcrysis created "
++                 f"{summary.get('maxMenuPipelines')} WebGPU pipeline(s) inside the match. "
++                 "Lane C's load fix has regressed; fix it by compiling less, never by "
++                 "widening the admission fence.")
++    worst = summary.get("worstPairRatio")
++    if worst is None or worst > FARCRYSIS_ADMISSION_RATIO_CEILING:
++        sys.exit("REFUSING TO PUBLISH: farcrysis admits at "
++                 f"{worst}x the atomic-acres control measured in the same window "
++                 f"(ceiling {FARCRYSIS_ADMISSION_RATIO_CEILING}x).")
++    print(f"  farcrysis-admission guard: OK ({runs} paired runs, all admitted, "
++          f"0 in-match pipelines, worst pair ratio {worst}x <= "
++          f"{FARCRYSIS_ADMISSION_RATIO_CEILING}x)")
++
++
++def farcrysis_guard_red_test():
++    """Prove the admission guard can fire before trusting its pass.
++
++    The old farcrysis guard shipped vacuous once, so its successor keeps a red
++    test - and fires it on the axis that actually matters now: a build that DOES
++    offer farcrysis, with a receipt that fails. Both halves are proved: a
++    selectable build with a bad receipt must refuse, and the parked build must
++    still pass without any receipt at all.
++    """
++    import tempfile
++    global FARCRYSIS_ADMISSION_RECEIPT
++    saved = FARCRYSIS_ADMISSION_RECEIPT
++    with tempfile.TemporaryDirectory() as red_dir:
++        os.makedirs(os.path.join(red_dir, "assets"))
++        selectable = os.path.join(red_dir, "assets", "red-selectable.js")
++        with open(selectable, "wb") as fh:
++            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,legacyAliases:[]")
++        bad = os.path.join(red_dir, "bad-receipt.json")
++        with open(bad, "w", encoding="utf-8") as fh:
++            json.dump({"contract": "farcrysis-admission-evidence-v1",
++                       "sha": sh(["git", "rev-parse", "HEAD"]).strip(),
++                       "runs": 3,
++                       "summary": {"allAdmitted": True, "anyCrashed": False,
++                                   "anyPageErrors": False, "maxMenuPipelines": 0,
++                                   "worstPairRatio": 99.0}}, fh)
++        try:
++            FARCRYSIS_ADMISSION_RECEIPT = bad
++            fired = False
++            try:
++                assert_farcrysis_admission_evidence(red_dir)
++            except SystemExit:
++                fired = True
++            if not fired:
++                sys.exit("REFUSING: the farcrysis admission guard failed its own red test "
++                         "- it cannot fire on a bad receipt")
++            # ...and a missing receipt on a selectable build must also refuse.
++            FARCRYSIS_ADMISSION_RECEIPT = os.path.join(red_dir, "absent.json")
++            fired = False
++            try:
++                assert_farcrysis_admission_evidence(red_dir)
++            except SystemExit:
++                fired = True
++            if not fired:
++                sys.exit("REFUSING: the farcrysis admission guard accepted a selectable "
++                         "build with no receipt at all")
++        finally:
++            FARCRYSIS_ADMISSION_RECEIPT = saved
++        # The parked case must still pass with no receipt present.
++        parked = os.path.join(red_dir, "parked")
++        os.makedirs(os.path.join(parked, "assets"))
++        with open(os.path.join(parked, "assets", "green.js"), "wb") as fh:
++            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,selectable:!1,legacyAliases:[]")
++        assert_farcrysis_admission_evidence(parked)
+
+@@ both call sites: rename only, the ordering and the run_guard wiring are unchanged
+
+-            run_guard("farcrysis-unselectable", verdicts, assert_farcrysis_not_selectable, DIST)
++            run_guard("farcrysis-admission", verdicts, assert_farcrysis_admission_evidence, DIST)
+
+-    assert_farcrysis_not_selectable(DIST)
++    assert_farcrysis_admission_evidence(DIST)
+
+@@ and the two docstring/commit-message mentions of the guard's name
+-farcrysis-unselectable guard
++farcrysis-admission guard (receipt-backed; the parked case still passes)
+
+NOTES FOR WHOEVER APPLIES IT
+----------------------------
+1. `json` is already imported in publish_pass85.py; `glob`, `os`, `re`, `sys` too.
+   No new imports are needed.
+2. The receipt path is pinned to this lane's evidence directory on purpose: it is
+   a tracked file, so the receipt travels with the commit it describes and the
+   sha check above cannot be satisfied by a stale local artifact.
+3. If PASS 87 ends up shipping farcrysis PARKED after all, this patch is still
+   the right one to take: the parked branch passes without a receipt, and the
+   guard is then already in place for whichever pass does unhide it.
