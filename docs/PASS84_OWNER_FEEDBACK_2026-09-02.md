@@ -420,3 +420,29 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   "look" options with feasibility, cost class and a bounded first
   experiment each.
 - **Plan:** Lane AI, same brief, research half.
+
+## HF-416 — the "brief with embedded rules" scene-production method: skill it, prove it on a Map 3 corridor, apply it to Nuke Town
+
+- **Statement (verbatim, 2026-09-02 17:55-18:10 BST):** "It seems the
+  foundation of it was a really good prompt with the rules embedded in it
+  ... whether we use that method and a similar prompt directly, or
+  techniques to recreate the style of the prompt but outside of blender?
+  Just code? WebGPU? Good prompt. Start small" ... "Ensure we get what I
+  recently sent architected as a nice skill and then do some tests as a
+  corridor in map 3, maybe not 12 hours but 3-6 could work" ... "If you
+  already see useful things and techniques within there, ensure they are
+  written into our skills and techniques and apply them when rebuilding
+  nuketown, being usage conservative and not breaking or ruining anything ...
+  we are looking for cool AF stuff here".
+- **Source resolved:** https://restaurant-bar.space-z.ai/skyline_restaurant_bar_brief.html
+  (Blender 4.1.1 Cycles brief; 100M+ tokens, 12 h autonomous run, 16 fixed
+  cameras, six fresh-context critics, 100-point rubric with per-dimension
+  85% gates and a 90 exit, critical-failure auto-reject, plateau escalation,
+  cold-start validation). Transferable method, not the Blender part.
+- **Mechanical falsifier:** a shared skill `brief-driven-scene-production`
+  exists in the vault store with an eval record and a scoped guard accept;
+  one Map 3 corridor is produced by the method with a recorded rubric
+  history over at least three critic cycles; the Nuke Town rebuild's art
+  pass runs the same loop with Gemini critics and reports scores per cycle.
+- **Plan:** Lane AJ (skill + Map 3 corridor), Lane U addendum (adopt the
+  protocol now), Lane AK (Nuke Town art pass by the method, after U lands).

@@ -128,3 +128,28 @@ The reference measurements and the bus answer; the rebuild's measured
 proportions against them per element; what carried over (core, rare gun,
 sheds); gate results; frames; what still differs and what the art lane
 should do next. Claim-state every line.
+
+## ADDENDUM (orchestrator, 18:15 BST) — adopt the brief-with-embedded-rules protocol now
+The owner sent a production brief whose method produced a photoreal scene in
+one autonomous run (see `docs/pass84-lanes/LANE-AJ-brief-driven-scene-skill-map3.md`
+for the resolved structure) and asked that its useful techniques be applied
+to this rebuild "being usage conservative and not breaking or ruining
+anything". Adopt, at zero extra browser cost:
+1. Working documents in `docs/nuketown-rebuild/`: SPATIAL_PLAN.md (your
+   measured reference proportions and the built layout side by side),
+   ASSET_INVENTORY.md (every structure and prop with state and collider
+   status), TASK_STATE.md (checkpoint so a restart resumes, not repeats).
+2. A FIXED judgeset of review cameras (both spawn yards, street centre from
+   both ends, both upper rooms, garages, central vehicle, overhead); commit
+   them; every capture in your report comes from that set so the skeptic
+   compares like with like.
+3. The three-reading-distances rule for every substantial object:
+   silhouette at range, structure at mid, joins up close; and the
+   critical-failure list: floating or intersecting props, default
+   materials, a zone that exists only as a sign, darkness or fog hiding
+   unfinished work, reverse angles unfinished.
+4. Your skeptic will score a rubric (layout fidelity to the recorded
+   proportions 30, flow and cover rhythm 25, collision parity 15,
+   readability in combat 15, technical hygiene 15; gates >= 85% each). Put
+   the numbers you expect against each in your report.
+The art and dressing pass by the full critic loop is Lane AK, after you.

@@ -25,9 +25,11 @@ profiles clarity + neural rendering research (after Lane U lands), H
 load-time deep cut, AD release-CI fix + shared publish module, AE emulated
 mobile pass + phone checklist, AG hill-climb loop (staged, three supervised
 iterations), AH ComfyUI native 3D pipeline skill intake + animation options
-(governed skill work, no game source), AC branch cleanup execution (after
-Lane S's plan and PASS 86, tags first), AF streamline review (last, before
-the 05:10 gate).
+(governed skill work, no game source), AJ brief-driven scene-production
+skill + one Map 3 corridor by the method (3-6 h, after U and AI), AK Nuke
+Town art pass by the method with Gemini critics (after U and AJ), AC branch
+cleanup execution (after Lane S's plan and PASS 86, tags first), AF
+streamline review (last, before the 05:10 gate).
 
 Shelved by the owner: Farcrysis preview (R), bus doors (K), Raid art (L;
 Raid gets a layout rethink, HF-408). Waiting on the owner: chopper culling
