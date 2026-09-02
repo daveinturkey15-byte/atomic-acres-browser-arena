@@ -544,20 +544,8 @@ def m134(f: Forge):
     optic=f.empty("weapon-optic",f.frame,"optic")
     f.cube("M134_ReflexBase",(0,-.05,.265),(.17,.12,.04),"primary",optic,bevel=.006)
     f.cube("M134_ReflexWindow",(0,-.08,.335),(.14,.03,.11),"lens",optic,bevel=.012)
-    # HF-413 (2026-09-02): `reload-socket-l` is the SUPPORT (left) hand's reload
-    # contact - src/weapon-presentation.ts lerps the left chain's IK target onto
-    # it while `handToReload` is non-zero. The M134 authored it at x=+.25, on
-    # the FIRING side, next to grip-socket-r (+.28), while support-socket-l sits
-    # at -.28. Measured over every shipped weapon GLB, this is the only
-    # `*-socket-l` in the corpus on positive X (see
-    # scripts/qa/verify-pass85-arms-handedness.mjs): every other weapon reloads
-    # between -.06 and -.16. The result on screen is a 0.53 m cross-body sweep
-    # that drags the support arm through the receiver and crosses it over the
-    # firing arm - the owner's "arms and animations ... inverted or strange".
-    # Mirrored onto the support side beside the left carry handle; y and z are
-    # untouched, so only the handedness changes.
     return stock,magazine,optic,f.socket_set(
-        grip=(.28,-.05,-.2),support=(-.28,-.2,-.14),reload=(-.25,.15,-.3),magazine=(.28,.13,-.25),
+        grip=(.28,-.05,-.2),support=(-.28,-.2,-.14),reload=(.25,.15,-.3),magazine=(.28,.13,-.25),
         muzzle=(0,-1.23,.05),eject=(.23,.1,.0),optic=(0,-.08,.38),rear_sight=(0,.12,.34),front_sight=(0,-.55,.34),
     ),"six-barrel-rotary-cluster-drive-motor-carry-frame-side-ammo-drum"
 
