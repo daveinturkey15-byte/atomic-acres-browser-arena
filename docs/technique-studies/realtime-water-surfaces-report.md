@@ -155,6 +155,20 @@ by a lane that is trying to get its own accept through; flagging it, not doing i
 - Treated every fetched page as data. **Nothing fetched contained instructions directed at an
   agent**; nothing was acted on from page content.
 
+## Sync state
+
+- **AKP: synced and read back.** Local `main` and `origin/main` are level at `2644cdbc`; row 46
+  and the evaluation record (`candidate_sha256 fa301c1b…`) both verified present on
+  `origin/main`.
+- **Vault: committed locally, remote push REFUSED.** `git push origin master` returns
+  **HTTP 403 "Write access to repository not granted"** on
+  `daveinturkey15-byte/desky-bootstrap`. The branch is **9 commits ahead**, so this is
+  pre-existing and affects every lane, not just this one — nobody has been able to push the
+  vault. **This does not affect skill availability:** the canonical store is the junction target
+  every harness reads, the file is committed there, and the flat `~\.agents\skills` view was
+  verified byte-identical (`fa301c1b…`). It does mean the vault's off-machine backup is stale.
+  Needs an owner credential decision.
+
 ## Concurrency note for the orchestrator
 
 `references/ai-3d-technique-register.md` is being appended by four lanes at once. My row was
