@@ -304,6 +304,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
   // needs a wasm module first, so it throws until prepareMap3() has resolved.
   // Stage 1 stays fully synchronous below this line.
-  await prepareMap3();
-  runSweep();
+  //
+  // FINISHER 3: this is an async IIFE and NOT a top-level await. `package.json`
+  // declares no `"type": "module"`, so tsx transforms this .ts file to CJS,
+  // where a top-level await is a hard transform error - the stage did not run
+  // at all ("Top-level await is currently not supported with the cjs output
+  // format"), which is a documented usage in this file's own header. The await
+  // has to live inside a function for the stage to be runnable as documented.
+  void (async () => {
+    await prepareMap3();
+    runSweep();
+  })().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }
