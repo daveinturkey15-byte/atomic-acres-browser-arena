@@ -148,6 +148,8 @@ import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
 import { buildMap3 } from './map3-arena';
+// MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
+import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3516,6 +3518,15 @@ function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
 // The menu owns prerecorded media. Do not construct, stream, compile, upload,
 // or submit any gameplay arena until the player explicitly deploys.
 let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+/**
+ * MAP3 (HF-409): drives `ArenaMap.update` for the ACTIVE arena only.
+ *
+ * There is exactly one of these and exactly one call site (search `// MAP3:`
+ * in `frame()`). Arenas that do not set `update` - every arena but Map 3 -
+ * pay one property read per frame and nothing else; the context below is
+ * built by a callback the animator only invokes when a hook exists.
+ */
+const arenaFrameAnimator = createArenaFrameAnimator();
 let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
@@ -30010,6 +30021,15 @@ function frame(now: number, scheduleNext = true): void {
     updateTargets(selectedArena.id === 'gun-range'
       ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
       : visualNow);
+    // MAP3 (HF-409): advance arena-authored animation for the active arena.
+    // `arena` is the admitted arena; staged and cached arenas are never passed
+    // here, so a not-yet-admitted world cannot advance its clock behind the
+    // loading transition. The context factory allocates only when a hook exists.
+    arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
+      arenaId: arena.id,
+      cameraPosition: camera.position,
+      playerVelocity: player.velocity,
+    }));
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
