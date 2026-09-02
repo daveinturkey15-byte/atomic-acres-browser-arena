@@ -516,3 +516,33 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   cut); 12 of 19 weapons still covered only by their family representative;
   strafe capture needs a lateral debug hook in legacy-main (patch in the lane
   report). Evidence: `docs/evidence/pass85/hf413/` (31 MB).
+
+## PASS 85 publish record (build 1 of the 2026-09-02 evening plan)
+- **Published 20:12 BST** from integration head d606290c via
+  `scripts/orchestration/publish_pass85.py`: gh-pages channels are exactly
+  {pass85 (live), pass84 (safe backup)}; pass83 retired; root chooser generation
+  0d872ac4e574. Rollback: `python scripts/orchestration/publish_pass85.py --rollback`.
+- **Shipped:** Lane Z HF-413 (arms/knife, partial - see the HF-413 status above),
+  Lane X HF-411 (Firing Range camo-netting floor + walkable-surface parity gate,
+  Direction D, Firing Range/Raid/Map 3 at zero fall-through, other arenas on a
+  shrink-only ledger), Lane Y HF-412 (Black Ops 2 drop shots: hold-crouch-to-prone
+  320 ms, camera falls over 380 ms, hip-fire cone widens while dropping, body
+  transition replicated to peers; bots have no stance - open row).
+- **Held for build 2:** Lane W HF-410 viewmodel fit (merges clean; needs the
+  integrator decision on the on-foot near plane 0.08 -> 0.02 m and a browser
+  z-fighting look at High Seas/Map 3, plus the pass69-3 near-plane catalog spec
+  re-pin and the HF-413 gates re-run on the fitted rig).
+- **Gates on the cut:** tsc 0; focused vitest for Z/X/Y + release tests 244/244 and
+  67/67; plan contract 9/9; qa:release-identity OK; headless Chrome arena boot
+  smoke 9/9 arenas on the built PASS 85 (Firefox project not runnable headless).
+  The full vitest suite was NOT run on this cut (machine shared with six running
+  lanes); it runs on the PASS 86 cut.
+- **Process:** the 19:13 cut job never fired (session was mid-turn; one-shot
+  crons only fire while idle), so the cut ran by hand at 19:58-20:12. New
+  `scripts/orchestration/roll_pass.py --pass N` performs the whole stamp roll
+  (identity, changelog, channels, backup key, publish script + contract test,
+  patch, every test pin) so PASS 86/87 are one command each. Two guard trips
+  worth knowing: the plan test's case 9 wants the tracked patch to reverse-apply,
+  and running the release-topology test AFTER the build writes
+  artifacts/pipeline/release-topology.json and trips the freshness guard - build
+  last, copy immediately.
