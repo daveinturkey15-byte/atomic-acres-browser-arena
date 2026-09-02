@@ -71,9 +71,35 @@ const gpuUsedMiB = () => {
   } catch { return null; }
 };
 
+/**
+ * IS THE OWNER'S ComfyUI GENERATING?
+ *
+ * This is his workstation and his ComfyUI (port 8188) shares this GPU. A frame
+ * time sampled while a diffusion job is running is a measurement of the queue,
+ * not of the profile, and the lane rules void it. Sampled at the start and the
+ * end of every run and written into the row, so a reader can tell a quiet
+ * measurement from a contended one WITHOUT having to trust that the wrapper
+ * checked. Returns null when ComfyUI is not running at all, which is the
+ * common case and is not a busy state.
+ */
+const comfyBusy = async () => {
+  try {
+    const response = await fetch('http://127.0.0.1:8188/queue', { signal: AbortSignal.timeout(4_000) });
+    if (!response.ok) return null;
+    const queue = await response.json();
+    return (queue.queue_running?.length ?? 0) + (queue.queue_pending?.length ?? 0) > 0;
+  } catch { return null; }
+};
+
 const vramBeforeMiB = gpuUsedMiB();
+const comfyBusyBefore = await comfyBusy();
 const errors = [];
 const startedAtIso = new Date().toISOString();
+if (comfyBusyBefore === true && process.env.GFX_AUDIT_ALLOW_BUSY_GPU !== '1') {
+  // Refuse rather than produce a number that has to be thrown away later.
+  console.error('[gfx-audit] ComfyUI has work queued on this GPU; a frame-time measurement taken now is void. Waiting is the fix, not a flag.');
+  process.exit(2);
+}
 
 const browser = await chromium.launch({
   headless: true,
@@ -262,6 +288,9 @@ try {
     renderer: sampled.renderer,
     vramBeforeMiB,
     vramAfterMiB: gpuUsedMiB(),
+    // Quiet-machine evidence, carried by the row itself.
+    comfyBusyBefore,
+    comfyBusyAfter: await comfyBusy(),
     errors: errors.slice(0, 12),
   };
   row.vramDeltaMiB = row.vramAfterMiB !== null && row.vramBeforeMiB !== null
@@ -285,5 +314,6 @@ console.log(JSON.stringify({
   calls: row?.drawCallsLastAdmittedFrame ?? null,
   pipelinesInCombat: row?.pipelinesInCombat ?? null,
   errors: row?.errors?.length ?? 0,
+  comfyBusy: [row?.comfyBusyBefore ?? null, row?.comfyBusyAfter ?? null],
   outPath,
 }, null, 2));
