@@ -48,3 +48,15 @@ Machine rules as every lane. Never weaken a threshold; each change measured.
 11. **pass77 menu-preview provenance pins the SHARED generator digest per
     family** (red on the base line since c25f5e32): pin the generator once in a
     shared record or pin only the byte-affecting parts; never rewrite a digest.
+12. **Lane J's withheld nacelle patch** (skyline-terminal nacelle collider transposed
+    against its visual: authority x1.9/z4.1 vs visual x4.1/z1.9; patch in
+    `C:\Users\david\projects\aa-claude-eyeclear\artifacts\lane-report.md` section
+    6) - land it with the parity audit and an eye-clearance re-measure.
+13. **Lane N's change-impact patch** (two lines in scripts/release/change-impact.mjs +
+    scripts/qa/pass84-gamepad-wiring-contract.mjs, in
+    `C:\Users\david\projects\aa-claude-corpus\artifacts\lane-report.md`) so the
+    gamepad spec is executed by CI.
+14. **HF-413 left support sleeve** in prone-against-wall poses (2 honest reds in the
+    arms visual gate): exempt the arm chains from the contact-fold scale, or add a
+    fourth reach arc toward the eye with a near-plane guard; measured by
+    `npm run qa:pass65:first-person-arms-visual` headless.
