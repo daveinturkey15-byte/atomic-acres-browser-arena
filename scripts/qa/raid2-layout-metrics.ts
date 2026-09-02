@@ -262,6 +262,7 @@ export function measureLayout(id: string, arena: ArenaMap): LayoutMetrics {
   // has dozens of small ones.
   const clusterSeen = new Uint8Array(nx * nz);
   const clusterSizes: number[] = [];
+  const clusterSeeds: Array<{ m2: number; x: number; z: number }> = [];
   for (let start = 0; start < blockEye.length; start += 1) {
     if (!blockEye[start] || clusterSeen[start]) continue;
     let size = 0;
@@ -282,6 +283,24 @@ export function measureLayout(id: string, arena: ArenaMap): LayoutMetrics {
       visit(i + 1, j); visit(i - 1, j); visit(i, j + 1); visit(i, j - 1);
     }
     clusterSizes.push(size * cellArea);
+    if (process.env.RAID2_METRICS_CLUSTERS === '1') {
+      const i = Math.floor(start / nz);
+      const j = start % nz;
+      clusterSeeds.push({
+        m2: size * cellArea,
+        x: Math.round(bounds.minX + i * CELL_M),
+        z: Math.round(bounds.minZ + j * CELL_M),
+      });
+    }
+  }
+  if (process.env.RAID2_METRICS_CLUSTERS === '1') {
+    clusterSeeds.sort((a, b) => b.m2 - a.m2);
+    process.stdout.write(`${id}: ${clusterSeeds.length} eye-blocking masses (m2 @ first cell)
+`);
+    for (const entry of clusterSeeds) {
+      process.stdout.write(`  ${entry.m2.toFixed(1).padStart(7)} m2  @ x=${String(entry.x).padStart(4)} z=${String(entry.z).padStart(4)}
+`);
+    }
   }
   const quantile = (q: number): number => (perCellMeans.length === 0
     ? 0
@@ -292,6 +311,51 @@ export function measureLayout(id: string, arena: ArenaMap): LayoutMetrics {
 
   let upperCells = 0;
   for (let index = 0; index < floorUp.length; index += 1) if (floorUp[index]) upperCells += 1;
+
+  // Diagnostic dump, off by default. RAID2_METRICS_MAP=1 prints a 2 m ASCII
+  // plan whose glyph is the cell's long-axis open distance, so a tight pocket
+  // is found by looking at the map instead of by guessing at the geometry.
+  if (process.env.RAID2_METRICS_MAP === '1') {
+    const glyph = (i: number, j: number): string => {
+      const index = i * nz + j;
+      if (blockEye[index]) return '#';
+      if (blockMove[index]) return '=';
+      if (!open[index]) return '.';
+      const x0 = bounds.minX + (i + 0.5) * CELL_M;
+      const z0 = bounds.minZ + (j + 0.5) * CELL_M;
+      let best = 0;
+      for (const [dx, dz] of [[1, 0], [-1, 0]] as const) {
+        let travelled = 0;
+        while (travelled < maxSpan) {
+          travelled += stepM;
+          const x = x0 + dx * travelled;
+          const z = z0 + dz * travelled;
+          if (x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) break;
+          if (blockEye[Math.floor((x - bounds.minX) / CELL_M) * nz + Math.floor((z - bounds.minZ) / CELL_M)]) break;
+        }
+        if (travelled > best) best = travelled;
+      }
+      if (best < 10) return '1';
+      if (best < 16) return '2';
+      if (best < 24) return '3';
+      if (best < 34) return '4';
+      if (best < 45) return '5';
+      return '6';
+    };
+    const lines: string[] = [`${id}: long-axis open distance, 2 m cells. 1:<10 2:<16 3:<24 4:<34 5:<45 6:45+  #=eye wall  ==low wall  .=outside`];
+    let ruler = '      ';
+    for (let i = 0; i < nx; i += 4) {
+      const x = Math.round(bounds.minX + i * CELL_M);
+      ruler += x % 10 === 0 ? String(Math.abs(x / 10) % 10) : ' ';
+    }
+    lines.push(ruler);
+    for (let j = 0; j < nz; j += 4) {
+      let row = `z${String(Math.round(bounds.minZ + j * CELL_M)).padStart(4)} `;
+      for (let i = 0; i < nx; i += 4) row += glyph(i, j);
+      lines.push(row);
+    }
+    process.stdout.write(`${lines.join('\n')}\n\n`);
+  }
 
   const boundingAreaM2 = (bounds.maxX - bounds.minX) * (bounds.maxZ - bounds.minZ);
   const accessibleGroundM2 = accessibleCells * cellArea;

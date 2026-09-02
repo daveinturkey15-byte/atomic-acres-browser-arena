@@ -670,7 +670,7 @@ let factoriesPromise: Promise<ArenaFactories> | null = null;
 export async function loadArenaFactories(): Promise<ArenaFactories> {
   if (!factoriesPromise) {
     factoriesPromise = (async () => {
-      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }] = await Promise.all([
+      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }, { buildRaid2 }] = await Promise.all([
         import('../../src/map'),
         import('../../src/additional-maps'),
         import('../../src/farcrysis'),
@@ -678,6 +678,8 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         import('../../src/environment-assets'),
         import('../../src/test-maps'),
         import('../../src/map3-arena'),
+        // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+        import('../../src/raid2-arena'),
       ]);
       return {
         'atomic-acres': {
@@ -697,6 +699,9 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         test2: { build: buildTest2 },
         // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the audit.
         map3: { build: buildMap3 },
+        // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink joins the audit
+        // from its first commit, so it can never ship un-audited.
+        raid2: { build: buildRaid2 },
       } satisfies ArenaFactories;
     })();
   }
@@ -706,7 +711,7 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
 // Owner 2026-08-30: Test1/Test2 join the mechanical parity audit.
 // MAP3 (owner 2026-09-02, HF-405): Map 3 joins it too. A roster that does not
 // name a shipped arena is a gate that never looked at it.
-export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3'] as const;
+export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'raid2'] as const;
 
 /**
  * Installs the minimal window/document surface the arena art layers read at
