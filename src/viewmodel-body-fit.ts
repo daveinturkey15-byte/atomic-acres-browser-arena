@@ -97,30 +97,37 @@ export const VIEWMODEL_BODY_FIT_MARGIN_METERS = 0.06;
  *     0.317 m inside the 0.32 m budget.
  *
  * Lowering k further is free on screen - the projection is invariant under it -
- * and costs only overlay near-plane margin, of which there is 3x here
- * (the nearest measured rig vertex lands at 0.016 m against a 0.005 m plane).
- * Raising it puts the weapon back outside the body, which is the defect.
+ * and costs only near-plane margin. HF-410 REPAIR, one number and one plane:
+ * the plane in force on the shipped route is FIRST_PERSON_CAMERA_NEAR_METERS =
+ * 0.02 m, and the nearest ON-SCREEN rig vertex measured against it is 0.0246 m
+ * on this headless catalog rig (m4a1, deep prone squeeze) and 0.0293 m on the
+ * shipped GLB rig in installed Chrome - 1.23x and 1.47x of margin. Raising k
+ * puts the weapon back outside the body, which is the defect.
  */
 export const VIEWMODEL_BODY_FIT_SCALE = 0.13;
 
 /**
- * The first-person overlay's own near plane, in metres.
+ * The WebGL2 compatibility overlay's own near plane, in metres.
  *
- * The gameplay camera keeps its 0.08 m plane for the world: depth precision at
- * 180 m is a shared budget and this lane does not get to spend it. The overlay
- * is a separate depth-cleared submission of one small object, so it can afford
- * a plane the world cannot.
+ * SCOPE, CORRECTED. This constant has exactly one consumer:
+ * `renderSceneOverlayLayer` in src/atomic-signal.ts, the depth-cleared
+ * first-person submission on the WebGL2 route. It is NOT the plane the shipped
+ * WebGPU route draws the rig with - `atomicSignal` is hardcoded null in
+ * legacy-main, so that submission never runs there and the rig is drawn with
+ * the gameplay camera at FIRST_PERSON_CAMERA_NEAR_METERS.
  *
- * SIZED FROM MEASUREMENT, not chosen for comfort. The nearest visible rig point
- * across every graded pose is 0.0031 m from the eye under the fit (m4a1, deep
- * wall-and-floor contact, headless rig; 0.0164 m on the shipped GLB rig in
- * Chrome), so 0.002 m keeps the complete rig drawn. Depth resolution over the
- * rig's 0.002-0.32 m span is around a micrometre, which is four orders of
- * magnitude finer than any feature on a weapon.
+ * The first HF-410 pass used this constant to grade the viewmodel's near-plane
+ * telemetry, its contact clip plane, its aperture raycaster and its fold
+ * admission. That was a gate pinned to a submission that does not run, and it
+ * is corrected: every shipped-route consumer now reads
+ * FIRST_PERSON_CAMERA_NEAR_METERS, and nothing outside src/atomic-signal.ts
+ * reads this.
  *
- * This is strictly MORE of the rig than shipped before the fit: the arms'
- * off-frame shoulder end measured 0.024 m from the eye and was already being
- * cut by the world's 0.08 m plane.
+ * SIZED FROM MEASUREMENT: under the fit the nearest rig vertex anywhere - the
+ * off-frame sleeve end, which the frame edge discards either way - is 0.0070 m
+ * from the eye on the headless catalog rig, so 0.002 m keeps even that drawn on
+ * the route that owns its own depth buffer. Depth resolution over the rig's
+ * 0.002-0.32 m span is around a micrometre.
  */
 export const VIEWMODEL_OVERLAY_NEAR_METERS = 0.002;
 
@@ -144,8 +151,17 @@ export const VIEWMODEL_OVERLAY_NEAR_METERS = 0.002;
  * `viewportForwardMinM`, all 60 graded poses, installed Chrome, WebGPU): the
  * nearest ON-SCREEN rig vertex is 0.0293 m - slug-shotgun, prone, hip, with the
  * other five long guns within 4 mm. Off-screen sleeve geometry reaches closer
- * and is cut either way, below the frame, by contract. At 0.08 m, 42 of those
- * 60 poses had WEAPON geometry clipped inside the viewport.
+ * and is cut either way, below the frame, by contract.
+ *
+ * WHAT 0.08 m WOULD COST, measured rather than asserted. The skeptic pass found
+ * the original "42 of 60 poses clipped at 0.08 m" figure absent from the tree,
+ * and it was: the two 0.08 m runs predate the instrument fields that report it.
+ * `sampleViewmodelRigExtent` now carries an exact counterfactual - a perspective
+ * matrix's x/y mapping does not depend on `near`, so the vertices a 0.08 m plane
+ * would discard, and where on screen they would land, are computable in the same
+ * pass from the same vertices. Fields `referenceNearM`,
+ * `referenceNearPlaneCutVertices`, `referenceNearPlaneCutInViewport`; the run is
+ * docs/evidence/pass85/hf410/body-fit-after.json.
  *
  * 0.02 m clears the measured minimum with 1.47x of margin. THE COST, stated
  * rather than hidden: depth resolution scales as 1/near, so distant precision
@@ -155,6 +171,14 @@ export const VIEWMODEL_OVERLAY_NEAR_METERS = 0.002;
  * change this lane does not own.
  */
 export const FIRST_PERSON_CAMERA_NEAR_METERS = 0.02;
+
+/**
+ * The on-foot near plane this build shipped with BEFORE HF-410 (PASS 84,
+ * 75a4e508). Kept as a named constant for exactly one purpose: the browser
+ * instrument grades an exact counterfactual against it, so the cost of moving
+ * the plane is evidence in the tree rather than a number in a report.
+ */
+export const FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS = 0.08;
 
 /** World metres expressed in the unfitted rig frame the presentation composes in. */
 export function viewmodelWorldToRigMeters(worldMeters: number): number {
