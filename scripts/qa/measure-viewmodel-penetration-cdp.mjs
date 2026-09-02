@@ -112,23 +112,51 @@ for (const arena of ARENAS) {
         : [scenario.yaw];
 
       for (const stance of STANCES) {
-        await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setStance(value), stance);
-        await page.waitForTimeout(120);
-
         for (const yaw of yaws) {
           const sample = await page.evaluate(async (pose) => {
             const api = window.__ATOMIC_ACRES_DEBUG__;
+            const frame = () => new Promise((done) => requestAnimationFrame(done));
             api.teleportPlayer(pose.x, pose.y, pose.z, pose.yaw, pose.pitch);
-            // Settle: the contact fold and the clip plane are driven per frame,
+            // HF-395 (2026-09-02): the stance was requested BEFORE the teleport
+            // and the teleport leaves the player airborne, and requestStance
+            // refuses stand/prone while not grounded. Every "prone" and "stand"
+            // row of the pass 81 runs was therefore measured at whatever stance
+            // the machine was left in, with the eye still 1.7-1.8 m up: the
+            // ground plane never engaged in any stance and the stance column
+            // was noise. Land first, THEN drive the stance machine, THEN settle.
+            // Landing from the 1.7 m teleport eye into prone takes ~30 frames;
+            // 90 bounds a pose that never grounds (water, a ledge) at 1.5 s.
+            let grounded = false;
+            for (let waited = 0; waited < 90 && !grounded; waited += 1) {
+              await frame();
+              grounded = api.snapshot()?.player?.grounded === true;
+            }
+            const stanceReached = api.setStanceForQa(pose.stance);
+            // Stance recovery is up to 290 ms; the eye height eases over it.
+            for (let waited = 0; waited < 24; waited += 1) await frame();
+            // The stance change can re-seat the eye; restore the exact look.
+            const now = api.snapshot()?.player;
+            api.teleportPlayer(now.position[0], now.position[1], now.position[2], pose.yaw, pose.pitch);
+            for (let waited = 0; waited < 90; waited += 1) {
+              await frame();
+              if (api.snapshot()?.player?.grounded === true) break;
+            }
+            // Settle: the contact fold and the clip planes are driven per frame,
             // so a single frame after a teleport is not the resting pose.
-            await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done))));
-            return api.sampleViewmodelPenetration();
-          }, { x: scenario.x, y: 1.7, z: scenario.z, yaw, pitch: scenario.pitch });
+            await frame(); await frame(); await frame();
+            const measured = api.sampleViewmodelPenetration();
+            return { ...measured, grounded: api.snapshot()?.player?.grounded === true, stanceReached };
+          }, { x: scenario.x, y: 1.7, z: scenario.z, yaw, pitch: scenario.pitch, stance });
 
           rows.push({
             arena,
             weapon,
             stance,
+            // The stance the machine actually reached and whether the player
+            // was standing on something when sampled: a row where either
+            // disagrees with the request is not evidence about that stance.
+            stanceReached: sample.stanceReached,
+            grounded: sample.grounded,
             scenario: scenario.name,
             why: scenario.why,
             yawDegrees: Math.round((yaw * 180) / Math.PI),
@@ -136,9 +164,14 @@ for (const arena of ARENAS) {
             maxPenetrationM: sample.maxPenetrationM,
             maxBelowFloorM: sample.maxBelowFloorM,
             worstMesh: sample.worstMesh,
+            worstBox: sample.worstBox,
+            worstPoint: sample.worstPoint,
+            activeClipPlanes: sample.activeClipPlanes,
+            clippedVertices: sample.clippedVertices,
             solidBoxes: sample.solidBoxes,
             dressingBoxes: sample.dressingBoxes,
           });
+          if (rows.length % 25 === 0) console.error(`[penetration] ${rows.length} rows (${arena}/${weapon}/${stance}/${scenario.name})`);
         }
       }
     }
@@ -156,6 +189,21 @@ const summary = {
   rows: rows.length,
   penetratingRows: penetrating.length,
   belowFloorRows: belowFloor.length,
+  // Rows whose stance or footing did not match the request are listed, not
+  // hidden: they stay in every count above, so a stance-machine regression
+  // shows up here instead of silently turning prone rows into standing ones.
+  stanceMismatchRows: rows.filter((row) => row.stanceReached !== row.stance).length,
+  airborneRows: rows.filter((row) => !row.grounded).length,
+  byStance: Object.fromEntries(STANCES.map((stance) => {
+    const scoped = rows.filter((row) => row.stance === stance);
+    return [stance, {
+      rows: scoped.length,
+      penetrating: scoped.filter((row) => row.maxPenetrationM > 0.01).length,
+      belowFloor: scoped.filter((row) => row.maxBelowFloorM > 0.01).length,
+      worstPenetrationM: scoped.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
+      worstBelowFloorM: scoped.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
+    }];
+  })),
   maxPenetrationM: rows.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
   maxBelowFloorM: rows.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
   // Where it fails matters as much as how often: a defect only at glancing
@@ -167,6 +215,8 @@ const summary = {
         rows: scoped.length,
         penetrating: scoped.filter((row) => row.maxPenetrationM > 0.01).length,
         worstM: scoped.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
+        belowFloor: scoped.filter((row) => row.maxBelowFloorM > 0.01).length,
+        worstBelowFloorM: scoped.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
       }];
     }),
   ),
@@ -179,3 +229,4 @@ writeFileSync(resolve(OUT, `${LABEL}-summary.json`), `${JSON.stringify(summary, 
 console.log(JSON.stringify(summary, null, 2));
 console.log(`\n${penetrating.length}/${rows.length} poses have visible weapon geometry inside a solid`);
 console.log(`${belowFloor.length}/${rows.length} poses have visible weapon geometry below the standing surface`);
+console.log(`${summary.stanceMismatchRows}/${rows.length} rows did not reach the requested stance; ${summary.airborneRows}/${rows.length} were sampled airborne`);
