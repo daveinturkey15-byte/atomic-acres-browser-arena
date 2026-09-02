@@ -197,7 +197,15 @@ export const NUKETOWN2_CENTRAL_BUS = Object.freeze({
  */
 export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map((house) => Object.freeze({
   id: `${house.id}-upper` as const,
-  position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z] as const),
+  // 3.0 m toward the street from the house centre, NOT at the centre. The
+  // centre is where the internal partition stands (PARTITION_Z is the house
+  // mid-line), so the obvious `[house.x, y, house.z]` puts the weapon inside a
+  // wall - which `nuketown2-fidelity.test.ts` caught on its first run, and
+  // which is the identical failure src/railgun-authority.ts' header records
+  // against the shipped map. This lands it in the FRONT upper room, at the
+  // window the reference calls the biggest power position, 0.7 m above the
+  // upper floor slab.
+  position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.0] as const),
 })));
 
 /**
@@ -669,6 +677,22 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge wall outer', [23, HARD_COVER / 2, z], [8, HARD_COVER, 0.35], m.block);
   pair(builder, 'verge planter', [17, LOW_COVER / 2, HOUSE_FRONT_Z - 8.0], [4.0, LOW_COVER, 2.2], m.planter);
   pair(builder, 'verge planter far', [26, LOW_COVER / 2, HOUSE_FRONT_Z - 2.0], [3.0, LOW_COVER, 2.2], m.planter);
+  // KERB-SIDE HEDGE. The reference's kerbs carry props, and without this the
+  // driveway apron is a 9 m open shoulder you cross with nothing to break
+  // stride behind.
+  //
+  // What it is NOT: a fix for the map's longest lane. Measured on the built
+  // colliders (perimeter ring, 1.65 m eye) the longest clear standing lane is
+  // 63.53 m, [28, -15] -> [-28, 15], and adding this hedge did not move it by
+  // a centimetre. That lane passes through the ORIGIN - through the bus's own
+  // window band, between its mullions - because the bus is authored OPEN and
+  // an open bus is see-through at standing eye height by design. That is the
+  // reference's property, not a defect, and the honest instrument for it is the
+  // fidelity test's street-centre-line measurement (15 m, the bus doing its
+  // job) rather than a corner-to-corner diagonal that happens to line up with
+  // two panes of glass. Recorded here so nobody spends an afternoon "fixing"
+  // a number by walling in a vehicle the owner asked to be enterable.
+  pair(builder, 'verge kerb hedge', [-9.5, HARD_COVER / 2, HOUSE_FRONT_Z + 1.1], [9.0, HARD_COVER, 1.1], m.planter);
   // Bin store beside the garage, at the closed end of the road.
   pair(builder, 'verge bin store', [-24, HARD_COVER / 2, HOUSE_FRONT_Z - 5.5], [5.0, HARD_COVER, 0.4], m.block);
   // The town sign at the far end of each verge: two posts and a board, the one
