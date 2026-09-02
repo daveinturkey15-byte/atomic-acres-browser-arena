@@ -41,6 +41,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -63,7 +64,11 @@ const LABEL = arg('--label', '');
 // source of pixel difference in a live match and would drown the signal.
 const FREEZE_BOTS = argv.includes('--freeze-bots');
 const DWELL_MS = Number(arg('--dwell-ms', '2500'));
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas')
+// PASS 85 Lane N: this default was a hardcoded six-arena literal, so Test1,
+// Test2 and Map 3 were never swept by it and nothing said so. It is now
+// derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
+// superset of what it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
   .split(',').map((v) => v.trim()).filter(Boolean);
 
 const STORAGE_KEY = 'atomic-acres-pass65-settings-v1';

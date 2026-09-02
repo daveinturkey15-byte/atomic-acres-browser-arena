@@ -23,6 +23,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // Lane discipline: scripts/qa/installed-browser-lanes.mjs
 import { foregroundWindow, closeGracefully, processIsRunning } from './installed-browser-lanes.mjs';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -36,7 +37,11 @@ const BASE = arg('--url', 'http://127.0.0.1:41876');
 const BROWSER = arg('--browser', 'chrome');
 const RENDERER = arg('--renderer', 'webgpu');
 const PORT = Number(arg('--port', '9914'));
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas');
+// PASS 85 Lane N: this default was a hardcoded six-arena literal, so Test1,
+// Test2 and Map 3 were never swept by it and nothing said so. It is now
+// derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
+// superset of what it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster());
 const TIMEOUT_MS = Number(arg('--timeout', '600000'));
 
 const EXECUTABLES = {
