@@ -183,6 +183,28 @@ async function main() {
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.selectArena('map3'));
     receipt.map3Prepared = true;
 
+    // ---- 0. THE MENU'S LINK TO THE SHOWCASE PAGE ---------------------------
+    // Read while the menu is still up and map3 is selected. `href` is the raw
+    // attribute (what was authored) and `resolved` is what the browser makes of
+    // it against THIS document - which is the whole claim: relative, so it
+    // lands inside whatever channel the game was loaded from.
+    receipt.showcaseLink = await page.evaluate(() => {
+      const link = document.getElementById('arena-showcase-link');
+      if (!link) return { present: false };
+      return {
+        present: true,
+        hidden: link.hidden,
+        href: link.getAttribute('href'),
+        resolved: link.href,
+        target: link.getAttribute('target'),
+        rel: link.getAttribute('rel'),
+        text: (link.textContent ?? '').trim(),
+        documentUrl: document.URL,
+      };
+    });
+    console.log('[evidence] showcase link:', JSON.stringify(receipt.showcaseLink));
+    await page.screenshot({ path: join(OUT, 'map3-menu-showcase-link.png') });
+
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.startSolo());
     await page.waitForFunction(
       () => window.__ATOMIC_ACRES_DEBUG__.admissionState().matchPhase === 'active',
@@ -252,6 +274,16 @@ async function main() {
   if (receipt.hud.scoreline.shown) problems.push('an explore arena is showing a scoreline');
   if (!/ESC/u.test(receipt.hud.objective.text ?? '')) problems.push('the objective line does not say how to leave');
   if (receipt.pageErrors.length > 0) problems.push(`${receipt.pageErrors.length} page errors`);
+  const link = receipt.showcaseLink ?? {};
+  if (!link.present) problems.push('the menu has no showcase link element at all');
+  if (link.hidden) problems.push('the showcase link is hidden on an arena that declares a showcase page');
+  if (link.href !== 'map3.html') problems.push(`the showcase href is ${JSON.stringify(link.href)}, not the relative 'map3.html'`);
+  // A rooted href is the exact bug: it would 404 on every published channel.
+  if (String(link.href ?? '').startsWith('/')) problems.push('the showcase href is rooted and will 404 on every channel');
+  // Resolved against the game document, it must be a sibling of it.
+  if (link.resolved !== new URL('map3.html', link.documentUrl).href) {
+    problems.push(`the showcase link resolves to ${link.resolved}, not beside ${link.documentUrl}`);
+  }
   if (problems.length > 0) {
     console.error(`[evidence] FAILED:\n  - ${problems.join('\n  - ')}`);
     process.exitCode = 1;

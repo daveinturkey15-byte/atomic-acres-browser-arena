@@ -24,11 +24,27 @@
  */
 import { execSync } from 'node:child_process';
 
-/** Free MiB on the smallest GPU, which is the one that has to fit Chrome. */
+/**
+ * Free MiB on the smallest GPU, which is the one that has to fit Chrome.
+ *
+ * Returns null when the reading CANNOT BE TAKEN rather than throwing. nvidia-smi
+ * is itself contended on a busy GPU and fails transiently - observed here on
+ * 2026-09-02, mid-wait, while ComfyUI was loading a large model - and a probe
+ * that throws turns "I could not see the GPU for one second" into "abandon the
+ * whole run". An unreadable GPU is treated as NOT FREE by the caller, which is
+ * the safe direction: it keeps waiting instead of launching blind.
+ */
 export function freeVramMib() {
-  const out = execSync('nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits', { encoding: 'utf8' });
+  let out;
+  try {
+    out = execSync('nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits', {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15_000,
+    });
+  } catch {
+    return null;
+  }
   const values = out.trim().split('\n').map((line) => Number.parseInt(line.trim(), 10)).filter(Number.isFinite);
-  if (values.length === 0) throw new Error('nvidia-smi returned no readable memory.free value');
+  if (values.length === 0) return null;
   return Math.min(...values);
 }
 
@@ -53,16 +69,23 @@ export async function comfyQueueDepth() {
 export async function waitForSharedMachine({
   label = 'qa',
   minFreeVramMib = 3000,
-  attempts = 60,
-  intervalMs = 30_000,
+  // How long to be patient for. The owner may be part-way through a ComfyUI
+  // BATCH rather than one job - observed here on 2026-09-02, the running job id
+  // rotating while the queue never emptied - so a fixed half hour is the
+  // difference between a run that waits its turn and a run that gives up on a
+  // machine that was always going to free up. Overridable per invocation, since
+  // the right budget is the caller's deadline, not this module's guess.
+  attempts = Number(process.env.QA_MACHINE_WAIT_ATTEMPTS ?? '60'),
+  intervalMs = Number(process.env.QA_MACHINE_WAIT_INTERVAL_MS ?? '30000'),
 } = {}) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const free = freeVramMib();
     const queued = await comfyQueueDepth();
-    if (free >= minFreeVramMib && queued === 0) {
+    if (free !== null && free >= minFreeVramMib && queued === 0) {
       return { freeVramMib: free, comfyQueueDepth: queued, waitedAttempts: attempt };
     }
-    console.log(`[${label}] waiting for the shared machine: ${free} MiB free, ComfyUI queue ${queued} (attempt ${attempt + 1}/${attempts})`);
+    const reading = free === null ? 'unreadable (nvidia-smi failed)' : `${free} MiB free`;
+    console.log(`[${label}] waiting for the shared machine: ${reading}, ComfyUI queue ${queued} (attempt ${attempt + 1}/${attempts})`);
     await new Promise((resolveWait) => setTimeout(resolveWait, intervalMs));
   }
   throw new Error(
