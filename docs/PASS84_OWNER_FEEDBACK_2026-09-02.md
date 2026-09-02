@@ -394,3 +394,29 @@ lookups and subtree matrix walks in `solveRiggedArms`) is assigned to Lane W
 alongside the placement rework (same file). Owner 17:05: lighting and fps
 "both feel a bit off"; owner's own HUD shows 63-70 fps on Firing Range at
 1440p on PASS 84.
+
+## HF-414 — graphics profiles made clear: Performance / Quality / Max / RTX
+
+- **Statement (verbatim, 2026-09-02 ~17:50 BST):** "we need a clearer
+  understanding of the capabilities of webGPU and our settings of
+  performance, quality, max, and RTX. Is RTX above or below max, and is it
+  just based off quality but then only works on nvidia cards? ... ensure our
+  graphic profiles are clear as to what they are and what they deliver and
+  how/why etc". Overnight, after the Nuke Town rebuild.
+- **Mechanical falsifier:** per profile, the control set, rendering meaning
+  and measured cost (frame time, draws, pipelines, VRAM) per arena are
+  documented and pinned by a control-set hash test; in-game descriptions
+  derive from the audit; the RTX preset's adapter/feature dependence is
+  stated from a measured feature list, not assumed.
+- **Plan:** Lane AI (`docs/pass84-lanes/LANE-AI-graphics-profiles-and-neural-rendering.md`).
+
+## HF-415 — DLSS 5 "3D-guided neural rendering": can any of it make the game look cooler?
+
+- **Statement (verbatim):** "this DLSS5 general stuff ... possible to use
+  somehow as an option to make our game look cool? dont need better FPS via
+  AI as that would reduce latency, but do need cooler looking stuff options?"
+- **Mechanical falsifier:** a sourced research note stating what DLSS 5 is,
+  why it is not reachable from WebGPU, and at most three WebGPU-reachable
+  "look" options with feasibility, cost class and a bounded first
+  experiment each.
+- **Plan:** Lane AI, same brief, research half.

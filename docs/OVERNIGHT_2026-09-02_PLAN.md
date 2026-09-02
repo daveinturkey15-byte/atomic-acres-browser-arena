@@ -19,11 +19,15 @@ showcase port (explore mode), J eye clearance, S branch audit, N corpus, W
 viewmodel rework + solver, X Firing Range grating + walkable sweep, Y drop
 shots, Z arms/animations, I IBL lighting.
 
-Wave 3 (launch as slots free, briefs in docs/pass84-lanes/): AB dynamic
-time-of-day/weather lighting (after Lane I lands), H load-time deep cut,
-AD release-CI fix + shared publish module, AE emulated mobile pass + phone
-checklist, AC branch cleanup execution (after Lane S's plan, tags first),
-AF streamline review (last, before the 05:10 gate).
+Wave 3 (launch as slots free, briefs in docs/pass84-lanes/), in this order:
+AB dynamic time-of-day/weather lighting (after Lane I lands), AI graphics
+profiles clarity + neural rendering research (after Lane U lands), H
+load-time deep cut, AD release-CI fix + shared publish module, AE emulated
+mobile pass + phone checklist, AG hill-climb loop (staged, three supervised
+iterations), AH ComfyUI native 3D pipeline skill intake + animation options
+(governed skill work, no game source), AC branch cleanup execution (after
+Lane S's plan and PASS 86, tags first), AF streamline review (last, before
+the 05:10 gate).
 
 Shelved by the owner: Farcrysis preview (R), bus doors (K), Raid art (L;
 Raid gets a layout rethink, HF-408). Waiting on the owner: chopper culling
