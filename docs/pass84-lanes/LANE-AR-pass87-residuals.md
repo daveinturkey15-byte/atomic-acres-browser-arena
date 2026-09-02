@@ -38,3 +38,13 @@ Each item is its own commit with before/after evidence under
    else ledger it with the frame.
 
 Machine rules as every lane. Never weaken a threshold; each change measured.
+9. **Eye-clearance stage 3 ignores QA_BASE_URL** (`scripts/qa/verify-eye-clearance-runtime.mjs:15`
+   hardcodes 127.0.0.1:41975): `npm run qa:eye-clearance:runtime` cannot work
+   through `run-with-preview-server.mjs`; give it the same fix stage 2 got on
+   2026-08-31.
+10. **stage-release-topology deletes dist/index.html when the pass dist is
+    missing** (throws "candidate dist is incomplete" AFTER moving files), which
+    silently 404s the preview until a rebuild; make it validate before it moves.
+11. **pass77 menu-preview provenance pins the SHARED generator digest per
+    family** (red on the base line since c25f5e32): pin the generator once in a
+    shared record or pin only the byte-affecting parts; never rewrite a digest.
