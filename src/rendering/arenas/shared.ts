@@ -1,4 +1,5 @@
 import type { ArenaVisualBudgets, ArenaReviewCamera, ArenaColorPipelineDefinition } from '../arena-visual-definition';
+import { FIRST_PERSON_CAMERA_NEAR_METERS } from '../../viewmodel-body-fit';
 
 export const SHARED_GAMEPLAY_ASSETS = Object.freeze([
   './assets/original/models/operators/pass65-third-person-operator-lod0.glb',
@@ -39,6 +40,23 @@ export function budgets(overrides: Partial<ArenaVisualBudgets> = {}): ArenaVisua
   });
 }
 
+/**
+ * PASS 87 Lane AR, item 6. `near` was the literal 0.08 until now, which is
+ * exactly `FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS` - the on-foot near
+ * plane this build shipped with before HF-410 moved it to 0.02 in PASS 85.
+ * `setArenaReviewCamera` assigns `camera.near = reviewCamera.near` verbatim
+ * (src/legacy-main.ts), so every deterministic review capture and every
+ * visual-regression instrument that drives one has been rendering at a near
+ * plane the game no longer uses. A regression that moved
+ * FIRST_PERSON_CAMERA_NEAR_METERS - the value the whole viewmodel fit is
+ * graded against - would have been invisible to all of them, because the
+ * review camera overwrote it on the way in.
+ *
+ * Deriving it costs the review captures the same 4x depth-precision reduction
+ * the gameplay camera already pays (see the note on
+ * FIRST_PERSON_CAMERA_NEAR_METERS); that is the point. The instrument must see
+ * what the player sees, including the cost.
+ */
 export function camera(
   id: string,
   position: readonly [number, number, number],
@@ -46,5 +64,8 @@ export function camera(
   purpose: ArenaReviewCamera['purpose'],
   exposure: number,
 ): ArenaReviewCamera {
-  return Object.freeze({ id, position, target, fov: 70, near: 0.08, far: 190, fixedTimeMs: 63_000, seed: 6401, exposure, hud: 'hidden', purpose });
+  return Object.freeze({
+    id, position, target, fov: 70, near: FIRST_PERSON_CAMERA_NEAR_METERS, far: 190,
+    fixedTimeMs: 63_000, seed: 6401, exposure, hud: 'hidden', purpose,
+  });
 }
