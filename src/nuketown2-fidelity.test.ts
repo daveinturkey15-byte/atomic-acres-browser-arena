@@ -5,7 +5,9 @@ import { movementProfile } from './gameplay';
 import type { ArenaMap } from './map';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CENTRAL_BUS,
+  NUKETOWN2_GROUND_DRESSING,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_SECTION,
@@ -13,6 +15,11 @@ import {
   NUKETOWN2_STREET_HALF_WIDTH,
   buildNuketown2,
 } from './nuketown2-arena';
+import {
+  OVERDRIVE_POSITION,
+  claimOverdrive,
+  createOverdriveState,
+} from './overdrive';
 import { CharacterPhysics } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 
@@ -60,23 +67,29 @@ const PLAYSPACE_TOLERANCE = 0.05;
 
 /**
  * Longest clear STANDING eye-line over the whole map, measured by the estimator
- * below on the built colliders: 63.53 m, [28, -15] -> [-28, 15].
+ * below on the built colliders: 56.57 m, [28, -23] -> [-28, -15].
  *
- * That lane passes through the world origin, which is to say through the BUS's
- * own window band, between its mullions - the bus is authored OPEN because the
- * reference's is, and an open bus is see-through at standing eye height by
- * design. So this ceiling is an anti-creep pin on the map's overall openness,
- * not the instrument for "does the bus break the street"; that is measured
- * directly by the street-centre-line test below. 66 m leaves 2.5 m over the
- * measurement for the estimator's 2 m sample step and nothing more: any new
- * body that opens a lane wider than the current worst one fails here.
+ * THIS PIN WAS TIGHTENED, 66 -> 59, and the reason is worth keeping. It used to
+ * be 63.53 m along [28, -15] -> [-28, 15], a lane that runs through the world
+ * origin - which is to say through the BUS's own window band, between its
+ * mullions, because the bus is authored OPEN and an open bus is see-through at
+ * standing eye height by design. The roof-access treads added against the bus's
+ * west flank (`BUS_ROOF_STEPS`) stand in exactly that diagonal and broke it, so
+ * the worst lane on the map is now a border-path run that never crosses the
+ * vehicle. 59 m is the new measurement plus 2.5 m for the estimator's 2 m
+ * sample step and nothing more: any new body that opens a lane wider than the
+ * current worst one fails here. This ceiling remains an anti-creep pin on the
+ * map's overall openness, not the instrument for "does the bus break the
+ * street"; that is measured directly by the street-centre-line test below.
  */
-const MAX_STANDING_EYE_LINE_METRES = 66;
+const MAX_STANDING_EYE_LINE_METRES = 59;
 
 /**
  * Longest clear run ALONG the street centre-line at standing eye height,
- * measured at 0.5 m resolution: 15.0 m, from x = -20.5 to x = -5.5, i.e. the
- * west cul-de-sac up to the bus's west end. This is the reference property the
+ * measured at 0.5 m resolution: 15.0 m, from x = -20.5 to x = -5.5, i.e. from
+ * the WEST TRUCK'S REAR to the bus's west end. (Not "from the cul-de-sac": the
+ * cul-de-sac is at x = -29, 8.5 m further west, and it is the truck that stops
+ * the run.) This is the reference property the
  * bus exists for, and the number that would move if the bus were removed,
  * shortened, or pushed off centre: without it the run is the full 58 m street.
  * 17 m is the measurement plus two sample steps.
@@ -197,6 +210,10 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(NUKETOWN2_CENTRAL_BUS.length).toBeGreaterThanOrEqual(10);
     // The 2x-damage core floats 0.60 m over the roof, inside the pickup window.
     expect(NUKETOWN2_CENTRAL_BUS.roofY).toBeCloseTo(3.15, 10);
+    // And the aisle is a LOW floor, which is the other half of the same rule -
+    // see the overdrive block below, which measures the consequence rather than
+    // restating the arithmetic.
+    expect(NUKETOWN2_CENTRAL_BUS.floorY).toBeCloseTo(0.05, 10);
 
     // The property, measured rather than assumed: no clear standing run along
     // the street centre-line longer than the band. Without the bus this is the
@@ -409,6 +426,111 @@ describe('Nuke Town Rebuild fidelity', () => {
       longest.metres,
       `clear lane ${JSON.stringify(longest.from)} -> ${JSON.stringify(longest.to)}`,
     ).toBeLessThanOrEqual(MAX_STANDING_EYE_LINE_METRES);
+  });
+
+  it('gives the 2x-damage core to the roof and to nobody else', () => {
+    // THE OWNER'S FIRST KEPT FEATURE, measured against the REAL rule rather than
+    // against the geometry the rule is supposed to imply. The first cut asserted
+    // only "roofY is 3.15 and the bus is centred" and shipped a core that could
+    // be taken by standing INSIDE the bus - which is exactly the case
+    // src/overdrive.ts' v6 height-window tightening exists to prevent, and which
+    // no assertion in this file could see.
+    const EYE = 1.7; // movementProfile(standing).eyeHeight
+    const claimFrom = (feetY: number, x: number, z: number): boolean => (
+      claimOverdrive(createOverdriveState(0), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
+    );
+
+    expect(OVERDRIVE_POSITION.y).toBe(3.75);
+    // Standing on the roof, at the core: CLAIMED. dy 1.10.
+    expect(claimFrom(NUKETOWN2_CENTRAL_BUS.roofY, 0, 0), 'roof').toBe(true);
+    // Standing in the aisle directly beneath it: REJECTED. dy 2.00.
+    expect(claimFrom(NUKETOWN2_CENTRAL_BUS.floorY, 0, 0), 'aisle').toBe(false);
+    // Standing on the road beside the bus: REJECTED. dy 2.05.
+    expect(claimFrom(0, 1.2, 3.0), 'road').toBe(false);
+    // Standing on any roof-access tread: REJECTED - not by height (the top tread
+    // is well inside the height window) but by RADIUS, because every tread
+    // footprint is more than 1.65 m from the origin in plan. Climbing half way
+    // must not be a way to take the core out of a covered position.
+    for (const [top, x0, x1] of [[0.80, -2.6, -1.4], [1.75, -3.8, -2.6], [2.60, -5.0, -3.8]] as const) {
+      for (const x of [x0, x1, (x0 + x1) / 2]) {
+        for (const z of [1.25, 1.85, 2.45]) {
+          expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
+          expect(claimFrom(top, -x, -z), `tread partner top ${top} at (${-x}, ${-z})`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('lets a player actually climb onto the bus roof', async () => {
+    // The other half of the same defect: a core on a roof nobody can reach is
+    // not a feature. Simulated on the REAL CharacterPhysics against the REAL
+    // built colliders - jump apex from flat ground is 6.35^2 / (2 x 24.5) =
+    // 0.82 m and autostep is 0.42 m, so a 3.15 m roof with nothing beside it is
+    // unreachable, and the first cut had nothing beside it.
+    const map = buildNuketown2(new THREE.Scene());
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      const dt = 1 / 120;
+      // Approach the treads from the road, climb them, step onto the roof, walk
+      // to the core. A continuous hop, which is how a player climbs.
+      const route: Array<[number, number]> = [[-2.0, 1.85], [-3.2, 1.85], [-4.4, 1.85], [-4.4, 0.4], [0, 0]];
+      physics.teleportEye({ x: -2.0, y: 1.9, z: 3.8 });
+      let vy = 0;
+      for (const waypoint of route) {
+        for (let step = 0; step < 420; step += 1) {
+          const eye = physics.eyePosition();
+          const dx = waypoint[0] - eye.x;
+          const dz = waypoint[1] - eye.z;
+          const distance = Math.hypot(dx, dz);
+          const advance = Math.min(distance, 4.2 * dt);
+          vy += -24.5 * dt;
+          const result = physics.move({
+            x: distance > 1e-4 ? (dx / distance) * advance : 0,
+            y: vy * dt,
+            z: distance > 1e-4 ? (dz / distance) * advance : 0,
+          }, dt);
+          if (result.grounded) vy = 6.35;
+          else if (result.blockedY && vy > 0) vy = 0;
+        }
+      }
+      const end = physics.eyePosition();
+      // Standing (or mid-hop) on the roof over the core, not on the road.
+      expect(Math.hypot(end.x, end.z), 'reached the core in plan').toBeLessThan(1.0);
+      expect(end.y, 'eye height on the bus roof').toBeGreaterThan(NUKETOWN2_CENTRAL_BUS.roofY + 1.5);
+    } finally {
+      physics.dispose();
+    }
+  }, 60_000);
+
+  it('keeps the ground dressing out of the buildings', () => {
+    // The gate NOTHING else can be: asphalt, aprons and lawns are
+    // presentation-only decals, so no collider or collider/visual parity gate
+    // ever looks at them. The first cut ran the front lawn from x = -4 and laid
+    // 38.4 m2 of green lawn inside each house's front room, 20 mm proud of the
+    // interior floor, with every gate in the repository green.
+    const overlap = (a: { x0: number; x1: number; z0: number; z1: number },
+      b: { x0: number; x1: number; z0: number; z1: number }): number => (
+      Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0))
+      * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0))
+    );
+    for (const piece of NUKETOWN2_GROUND_DRESSING) {
+      // Both the authored piece and the 180-degree partner `pair()` writes.
+      const placements = [
+        { x0: piece.x0, x1: piece.x1, z0: piece.z0, z1: piece.z1 },
+        { x0: -piece.x1, x1: -piece.x0, z0: -piece.z1, z1: -piece.z0 },
+      ];
+      for (const building of NUKETOWN2_BUILDING_FOOTPRINTS) {
+        const footprints = [
+          { x0: building.x0, x1: building.x1, z0: building.z0, z1: building.z1 },
+          { x0: -building.x1, x1: -building.x0, z0: -building.z1, z1: -building.z0 },
+        ];
+        for (const placement of placements) {
+          for (const footprint of footprints) {
+            expect(overlap(placement, footprint), `${piece.id} inside ${building.id}`).toBe(0);
+          }
+        }
+      }
+    }
   });
 
   it('cannot be escaped: sprinting hard at every boundary stays inside the fence', async () => {

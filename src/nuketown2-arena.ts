@@ -60,7 +60,10 @@
  * `src/overdrive.ts` is a single global `{0, 3.75, 0}`, not a per-arena value.
  * Authoring the bus roof at 3.15 m puts the 2x-damage core 0.60 m above it,
  * inside the 1.9 m pickup window, and the owner's "keep the 2x damage" is
- * carried with zero new runtime code and zero risk to the shipped arena.
+ * carried with zero new runtime code and zero risk to the shipped arena. That
+ * one decision then FIXES the bus's floor height and forces a climb onto its
+ * roof; both are derived at `NUKETOWN2_CENTRAL_BUS` and `BUS_ROOF_STEPS` below,
+ * and both were wrong in the first cut.
  *
  * NOTHING IS YAWED. `box()` records a solid as extents-plus-yaw while the
  * collider/visual parity audit compares a collider rectangle against each mesh's
@@ -174,17 +177,60 @@ export const NUKETOWN2_SECTION = Object.freeze({
  * solid body across the middle of a 58 m street is what stops the road being one
  * lane end to end, and it is why the sightline band in the fidelity test is
  * what it is.
+ *
+ * `floorY` AND `roofY` ARE BOTH SET BY THE 2x-DAMAGE CORE, not by taste, and the
+ * two constraints pull in opposite directions. `OVERDRIVE_POSITION` is a single
+ * global {0, 3.75, 0} and `claimOverdrive` is a pure height-and-radius rule, so
+ * with a standing eye height of 1.70 m:
+ *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - 3.75| <= 1.90
+ *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
+ *   - a player STANDING IN THE AISLE must NOT claim, because a core you can take
+ *     from inside cover is not a contested position at all - and because
+ *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
+ *     precisely so the aisle cannot claim through the roof slab. That needs
+ *     3.75 - (floorY + 1.70) > 1.90, i.e. floorY < 0.15. Authored 0.05, dy 2.00.
+ * The first cut had floorY 0.85 and DID hand the core to anyone standing inside
+ * the bus (measured: claimed = true), which silently reversed that hardening.
+ * This is a low-floor bus now: 50 mm to step over, walk-in doors, and the aisle
+ * rejected by 0.10 m of margin that `nuketown2-fidelity.test.ts` calls
+ * `claimOverdrive` to prove rather than restating as arithmetic.
  */
 export const NUKETOWN2_CENTRAL_BUS = Object.freeze({
   length: 11,
   width: 2.5,
-  floorY: 0.85,
+  floorY: 0.05,
   roofY: 3.15,
 });
 
 /**
- * The two upper rooms the rare weapon belongs in — the reference's "upstairs
- * window is the biggest power position on the map".
+ * The treads that make the bus roof - and therefore the 2x-damage core - a place
+ * a player can actually get to. Measured, not assumed: the jump apex from flat
+ * ground is 6.35^2 / (2 x 24.5) = 0.823 m and autostep is 0.42 m, so a rise of
+ * about 1.2 m is the most a player can take in one hop. A 3.15 m roof with
+ * nothing beside it is unreachable, which is what the first cut shipped: a
+ * simulated player hopping at the bus flank peaked at eye 3.92 m against the
+ * 4.85 m standing on the roof would give.
+ *
+ * Three treads against the bus's west flank: 0.80, 1.75, 2.60, then 0.55 up onto
+ * the cant rail, whose top is the roof. Rises 0.80 / 0.95 / 0.85 / 0.55.
+ *
+ * WHY THEY SIT WHERE THEY SIT. Every tread footprint is more than
+ * `OVERDRIVE_PICKUP_RADIUS` (1.65 m) from the world origin in plan - the nearest
+ * corner is 1.88 m - so climbing HALF way up cannot short-circuit the claim: the
+ * core is taken on the roof or not at all.
+ */
+const BUS_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.freeze([
+  // [tread top, x from, x to]
+  Object.freeze([0.80, -2.6, -1.4] as const),
+  Object.freeze([1.75, -3.8, -2.6] as const),
+  Object.freeze([2.60, -5.0, -3.8] as const),
+]);
+
+/**
+ * The two upper rooms the rare weapon belongs in. Published analyses of the
+ * reference all reach the same conclusion about it: the front-facing upstairs
+ * window is the strongest position on the map, because it holds the whole
+ * central lane.
  *
  * These are EXPORTED and DERIVED from `NUKETOWN2_HOUSE_LAYOUT` rather than
  * hand-written, because the shipped map's equivalent list was hand-written
@@ -501,9 +547,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
 
 /**
  * The garage: attached to the outboard end of its house, one storey, an open
- * door onto the cul-de-sac and a rear door into the back yard. The reference
- * calls it "a more secluded area with views on the Cul De Sac and the rear
- * Yard", and those two openings are exactly that sentence as geometry.
+ * door onto the cul-de-sac and a rear door into the back yard. Published
+ * descriptions of the reference treat the garage as a tucked-away room that can
+ * see both the closed end of the road and the yard behind the house, and those
+ * two openings are that property as geometry. (Paraphrased, deliberately: the
+ * brief's rule for this lane is "copy NO text from any source", and the first
+ * cut of this comment carried a source sentence verbatim.)
  */
 function garage(builder: Builder, m: Nuketown2Materials): void {
   const H = 3.4;
@@ -584,10 +633,21 @@ function bus(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `bus mullion ${index}`, [x, (SILL_TOP + HEAD_BOTTOM) / 2, flankZ],
       [0.18, HEAD_BOTTOM - SILL_TOP, T], m.busTrim);
   }
-  // Wheels: presentation only, under the body where nothing walks.
+  // Wheels: presentation only. A LOW-FLOOR bus has no under-body void to hide
+  // them in, so they sit in the flank line itself as wheel arches - half inside
+  // the body, half proud of it, which is what a wheel in an arch looks like and
+  // is not the "floating or intersecting prop" failure (they are attached to the
+  // body they belong to, at the height a wheel is).
   for (const [index, x] of [-3.9, 3.3].entries()) {
-    pair(builder, `bus wheel ${index}`, [x, 0.42, flankZ - 0.15], [1.0, 0.84, 0.4], m.rubber,
+    pair(builder, `bus wheel ${index}`, [x, 0.38, flankZ], [1.0, 0.76, 0.42], m.rubber,
       { solid: false, shots: false, cast: false });
+  }
+
+  // ROOF ACCESS. See BUS_ROOF_STEPS: the 2x-damage core rides this roof, and a
+  // roof nothing can climb is a feature that does not exist.
+  for (const [index, [top, x0, x1]] of BUS_ROOF_STEPS.entries()) {
+    pair(builder, `bus roof step ${index}`, [(x0 + x1) / 2, top / 2, (W / 2 + 2.45) / 2],
+      [x1 - x0, top, 2.45 - W / 2], m.block);
   }
 }
 
@@ -638,6 +698,37 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
 }
 
 /**
+ * The paired ground-dressing rectangles, in plan. EXPORTED so the fidelity gate
+ * can check them against the building footprints, because nothing else can:
+ * these pieces are presentation-only, `batchPresentationOnlyBoxes` merges them
+ * into one mesh, and no collider or parity gate ever looks at a decal.
+ *
+ * That blind spot is not hypothetical. The first cut ran the front lawn from
+ * x = -4, which laid 38.4 m2 of green lawn INSIDE each house's front room, 20 mm
+ * proud of the interior floor, and every gate in the repository stayed green.
+ * The lawn now starts at the house's east wall (`HOUSE_X1`).
+ */
+export const NUKETOWN2_GROUND_DRESSING = Object.freeze([
+  // Driveway apron: the dropped-kerb crossing in front of each garage.
+  Object.freeze({ id: 'street driveway', material: 'drive' as const, x0: -19.5, x1: -12.5, z0: HOUSE_FRONT_Z, z1: HOUSE_FRONT_Z + 2.4 }),
+  // Front lawn: from the house's east wall out to the verge.
+  Object.freeze({ id: 'street lawn front', material: 'lawn' as const, x0: HOUSE_X1, x1: 20, z0: HOUSE_FRONT_Z - 4.8, z1: HOUSE_FRONT_Z }),
+  // Back yard lawn: the whole strip between the house back wall and the fence.
+  Object.freeze({ id: 'yard lawn', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: NUKETOWN2_BOUNDS.maxX, z0: YARD_FENCE_Z, z1: HOUSE_BACK_Z }),
+]);
+
+/**
+ * The building footprints in plan, EXPORTED for the same reason: the gate that
+ * checks ground dressing needs something to check it against, and re-typing
+ * these numbers in the test is how the shipped map's rare-gun sites came to
+ * describe a house that had moved.
+ */
+export const NUKETOWN2_BUILDING_FOOTPRINTS = Object.freeze([
+  Object.freeze({ id: 'house', x0: HOUSE_X0, x1: HOUSE_X1, z0: HOUSE_BACK_Z, z1: HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'garage', x0: GARAGE_X0, x1: GARAGE_X1, z0: HOUSE_BACK_Z, z1: HOUSE_FRONT_Z }),
+]);
+
+/**
  * The road surface, kerbs, driveway aprons and lawns. Presentation-weight
  * geometry with a real collider under it, so nothing here is a ghost.
  */
@@ -665,13 +756,10 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `street dash ${i}`, [1.5 + i * 4, 0.01, 0], [2.2, 0.04, 0.16], m.trim,
       { solid: false, shots: false, cast: false });
   }
-  // Driveway apron in front of each garage.
-  pair(builder, 'street driveway', [-16, -0.05, HOUSE_FRONT_Z + 1.2], [7.0, 0.14, 2.4], m.drive, decal);
-  // Front lawn either side of the driveway; the front garden of the house.
-  pair(builder, 'street lawn front', [8, -0.05, HOUSE_FRONT_Z - 2.4], [24, 0.14, 4.8], m.lawn, decal);
-  // Back yard lawn.
-  pair(builder, 'yard lawn', [0, -0.05, (HOUSE_BACK_Z + YARD_FENCE_Z) / 2],
-    [width, 0.14, YARD_DEPTH], m.lawn, decal);
+  for (const piece of NUKETOWN2_GROUND_DRESSING) {
+    pair(builder, piece.id, [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2],
+      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], m[piece.material], decal);
+  }
 }
 
 /**
@@ -691,16 +779,18 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // stride behind.
   //
   // What it is NOT: a fix for the map's longest lane. Measured on the built
-  // colliders (perimeter ring, 1.65 m eye) the longest clear standing lane is
-  // 63.53 m, [28, -15] -> [-28, 15], and adding this hedge did not move it by
-  // a centimetre. That lane passes through the ORIGIN - through the bus's own
-  // window band, between its mullions - because the bus is authored OPEN and
-  // an open bus is see-through at standing eye height by design. That is the
-  // reference's property, not a defect, and the honest instrument for it is the
-  // fidelity test's street-centre-line measurement (15 m, the bus doing its
-  // job) rather than a corner-to-corner diagonal that happens to line up with
-  // two panes of glass. Recorded here so nobody spends an afternoon "fixing"
-  // a number by walling in a vehicle the owner asked to be enterable.
+  // colliders (perimeter ring, 1.65 m eye) adding this hedge did not move the
+  // longest clear standing lane by a centimetre, because that lane passes
+  // through the ORIGIN - through the bus's own window band, between its
+  // mullions - and the bus is authored OPEN, so it is see-through at standing
+  // eye height by design. That is the reference's property, not a defect, and
+  // the honest instrument is the fidelity test's street-centre-line
+  // measurement (the bus doing its job) rather than a corner-to-corner diagonal
+  // that happens to line up with two panes of glass. Recorded here so nobody
+  // spends an afternoon "fixing" a number by walling in a vehicle the owner
+  // asked to be enterable. The current numbers are re-measured after every
+  // geometry change and quoted in `nuketown2-fidelity.test.ts`, not here, so
+  // this comment cannot go stale against the build.
   pair(builder, 'verge kerb hedge', [-9.5, HARD_COVER / 2, HOUSE_FRONT_Z + 1.1], [9.0, HARD_COVER, 1.1], m.planter);
   // Bin store beside the garage, at the closed end of the road.
   pair(builder, 'verge bin store', [-24, HARD_COVER / 2, HOUSE_FRONT_Z - 5.5], [5.0, HARD_COVER, 0.4], m.block);
@@ -801,6 +891,15 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     breakableWindows: [],
     // Vehicle-scale bodies, declared so the arena can state which cover in the
     // road is which without a consumer having to re-derive it from mesh names.
+    //
+    // WHAT `blocksShots` MEANS HERE, because the bus makes it look like a lie:
+    // this list is a MINIMAP AND DIAGNOSTICS declaration of a vehicle-scale
+    // obstacle, one AABB per vehicle. It is not the shot-authority surface set -
+    // that is `shotSurfaces`, which is per-body and correctly leaves the bus's
+    // window band open. `blocksShots: true` on the bus says "this vehicle is a
+    // shootable solid in the road", not "no ray crosses this box"; the standing
+    // lanes that pass through the window band are the same build telling the
+    // truth at the resolution that decides a fight.
     physicalCover: [
       {
         id: 'nuketown2-central-bus',
