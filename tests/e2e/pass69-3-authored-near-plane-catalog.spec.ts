@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { WEAPON_IDS, type WeaponId } from '../../src/protocol';
+import { FIRST_PERSON_CAMERA_NEAR_METERS } from '../../src/viewmodel-body-fit';
 
 declare global {
   interface Window {
@@ -781,7 +782,14 @@ function assertContactContract(state: any, weapon: WeaponId, label: string): Rec
   expect(presentation.surfaceLift, `${label}: live prone floor lift`).toBeGreaterThanOrEqual(0.13);
   expect(clearance, `${label}: exact cached retreat contract`).toMatchObject({
     contract: 'authored-glb-contact-retreat-2026-08-09-v1',
-    cameraNear: 0.08,
+    // HF-410: DERIVED, never a literal. The runtime publishes the live gameplay
+    // camera's near plane here, so pinning 0.08 pinned a number this spec does
+    // not own - it silently became a second, stale source of truth for
+    // FIRST_PERSON_CAMERA_NEAR_METERS and went red the moment that constant
+    // moved. requiredMargin is UNCHANGED at 0.02: the clearance this spec
+    // demands above the plane is not weakened, it is re-based onto the plane
+    // actually in force.
+    cameraNear: FIRST_PERSON_CAMERA_NEAR_METERS,
     requiredMargin: 0.02,
     baseRetreat: 0.06,
     maximumSurfaceRetreat: 0.28,

@@ -253,7 +253,10 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     expect(hide).toContain("missileStatus.dataset.ready = 'false'");
     expect(hide).toContain('nextLocalSupportGunReportAt = 0');
     expect(legacy).toContain('if (!possession || !player.alive)');
-    expect(legacy).toContain('if (camera.near !== 0.08)');
+    // RE-PINNED FOR HF-410: same restore contract, now expressed through the
+    // named on-foot near plane instead of a literal that three call sites had
+    // to keep agreeing on by hand.
+    expect(legacy).toContain('if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS)');
   });
 
   it('authors and optimizes only Chopper LODs for this correction', () => {

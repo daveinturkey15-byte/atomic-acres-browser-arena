@@ -866,6 +866,7 @@ import {
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
+  CHARACTER_PHYSICS_CONFIG,
   CharacterPhysics,
   MAX_MAJOR_DEBRIS_BODIES,
   worldBoundaryColliders,
@@ -873,6 +874,14 @@ import {
   type MajorDebrisBodySnapshot,
   type DynamicWorldCollider,
 } from './physics';
+import {
+  FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+  FIRST_PERSON_CAMERA_NEAR_METERS,
+  VIEWMODEL_BODY_FIT_SCALE,
+  viewmodelBodyFitLightDistance,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { evaluateInvisibleWallRuntimeGap, INVISIBLE_WALL_RUNTIME_GAP_MESSAGE } from './invisible-wall-runtime-gap';
 import { shedPlacementsForArena } from './destructible-shed-registry';
@@ -2101,7 +2110,10 @@ function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsE
     decalLifetimeScale: budget.decalLifetimeScale * graphicsRuntime.decalScale,
   });
 }
-const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
+// HF-410: the on-foot near plane is a VIEWMODEL number and now lives with the
+// body fit that sizes it. See FIRST_PERSON_CAMERA_NEAR_METERS for the
+// measurement, the reason and the stated depth-precision cost.
+const camera = new THREE.PerspectiveCamera(76, 1, FIRST_PERSON_CAMERA_NEAR_METERS, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
@@ -11022,8 +11034,20 @@ player.selectedGrenade = initialLoadoutSelection.grenade;
 player.weapon = player.primaryWeapon;
 renderFieldKitSelection();
 
-const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
-viewFill.position.set(0, 0.4, 0.2);
+// HF-410: this fill lamp lights the first-person layer and nothing else, so it
+// lives inside the body fit with the rig it lights. Position, cutoff radius and
+// physical intensity all scale (irradiance is intensity / r^2), which is what
+// keeps the rig lit exactly as it was before the fit rather than 39x brighter.
+const viewFill = new THREE.PointLight(
+  0xe3f1ff,
+  viewmodelBodyFitLightIntensity(1.35),
+  viewmodelBodyFitLightDistance(5),
+);
+viewFill.position.set(
+  viewmodelRigToWorldMeters(0),
+  viewmodelRigToWorldMeters(0.4),
+  viewmodelRigToWorldMeters(0.2),
+);
 viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
@@ -11369,6 +11393,286 @@ function sampleViewmodelPenetration(): Record<string, unknown> {
     lastGroundedFeetY,
     perMesh: perMesh.slice(0, 12),
     contactFold: weaponView.contactFoldState(),
+  };
+}
+
+/**
+ * HF-410 - THE RIG'S OWN ENVELOPE, measured, in the frames that decide it.
+ *
+ * The penetration sampler answers "is the gun inside something". This answers
+ * the question underneath it: HOW BIG IS THE RIG, and does it fit inside the
+ * body that carries it. Two frames, because two different things are being
+ * asked:
+ *
+ *  - the EYE frame (camera space) decides framing and near-plane safety;
+ *  - the WORLD frame decides collision, and the capsule is vertical in world
+ *    space no matter where the camera is pointing, so the radial number is
+ *    taken as the horizontal distance from the player's own axis and compared
+ *    directly against CHARACTER_PHYSICS_CONFIG.playerRadius.
+ *
+ * A rig whose capsuleRadialMaxM exceeds the capsule radius sticks out of the
+ * player's own collision body, and every wall the capsule may stand next to
+ * therefore intersects it. No retreat, fold, or clip plane can repair that;
+ * only shrinking the envelope can. Debug only; walks full vertex buffers.
+ */
+function sampleViewmodelRigExtent(): Record<string, unknown> {
+  camera.updateWorldMatrix(true, false);
+  const toEye = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+  const vertex = new THREE.Vector3();
+  const eyeVertex = new THREE.Vector3();
+  // HF-410: THE FRAMING, in the only units framing has.
+  //
+  // The fit is a uniform scale about the eye, and a perspective projection is
+  // invariant under exactly that, so the claim "the framing does not change" is
+  // falsifiable here rather than by eye: the rig's normalised-device bounding
+  // box must be the same before and after. This is the side-by-side capture,
+  // expressed as numbers a gate can read.
+  const ndcVertex = new THREE.Vector3();
+  // HF-410: WHAT THE WORLD NEAR PLANE ACTUALLY CUTS.
+  //
+  // `atomicSignal` is hardcoded null, so the depth-cleared first-person overlay
+  // does not run on the shipped WebGPU route: the rig is submitted with the
+  // gameplay camera and its 0.08 m near plane. The fit brings rig points closer
+  // to the eye, so the honest question is not "is anything past the plane" but
+  // "is anything the PLAYER CAN SEE past it". A vertex below the frame is cut
+  // either way and costs nothing; one inside the viewport is a visible defect.
+  const nearPlaneCutMeshes = new Set<string>();
+  let nearPlaneCutVertices = 0;
+  let nearPlaneCutInViewport = 0;
+  // HF-410 REPAIR - THE COUNTERFACTUAL, MEASURED.
+  //
+  // Moving the on-foot plane from 0.08 m to 0.02 m spends a SHARED budget:
+  // depth resolution scales as 1/near, so distant precision goes 4x coarser.
+  // The first pass justified that with "42 of 60 poses had weapon geometry
+  // clipped inside the viewport at 0.08 m" and then shipped no run carrying
+  // that number - the only 0.08 m rows in the tree predate these fields. An
+  // integrator was asked to approve a shared cost against evidence that was not
+  // there.
+  //
+  // It is measurable exactly, in this same pass, from these same vertices: a
+  // perspective matrix's x/y mapping does not depend on `near` (the frustum
+  // extents scale with it), so with the fit in force the set of vertices a
+  // 0.08 m plane would discard is precisely {forward < 0.08}, and each one's
+  // screen position is the one it already has. This is not a simulation of the
+  // old build - it is the old plane applied to the current rig, which is the
+  // question the decision actually turns on.
+  const referenceNearPlaneCutMeshes = new Set<string>();
+  let referenceNearPlaneCutVertices = 0;
+  let referenceNearPlaneCutInViewport = 0;
+  let referenceCutMinY = Number.POSITIVE_INFINITY;
+  let referenceCutMaxY = Number.NEGATIVE_INFINITY;
+  // The nearest ON-SCREEN vertex. This, not the whole rig's nearest point, is
+  // what a near plane has to clear: the sleeve continues below the frame by
+  // contract and cutting it costs nothing.
+  let viewportForwardMin = Number.POSITIVE_INFINITY;
+  let viewportForwardMinMesh: string | null = null;
+  let cutMinX = Number.POSITIVE_INFINITY;
+  let cutMaxX = Number.NEGATIVE_INFINITY;
+  let cutMinY = Number.POSITIVE_INFINITY;
+  let cutMaxY = Number.NEGATIVE_INFINITY;
+  let ndcMinX = Number.POSITIVE_INFINITY;
+  let ndcMaxX = Number.NEGATIVE_INFINITY;
+  let ndcMinY = Number.POSITIVE_INFINITY;
+  let ndcMaxY = Number.NEGATIVE_INFINITY;
+  // HF-410 REPAIR - A FRAMING BOX A GATE CAN ACTUALLY READ.
+  //
+  // The box above deliberately accumulates every vertex in front of the eye,
+  // including ones inside the near plane, so both sides of a before/after
+  // comparison cover the same geometry. The cost is that a vertex approaching
+  // the projection singularity (forward -> 0) throws |ndc| to hundreds and
+  // swamps the box: comparing the fit-disabled and fitted runs at matching
+  // poses, the sniper hip rows differ by -11.55 in ndcMaxX and +16.96 in
+  // ndcMinY, which says nothing about framing and cannot be ratcheted.
+  //
+  // So the DRAWABLE box is reported alongside it: the same measurement
+  // restricted to vertices at or beyond the plane in force, which is exactly
+  // the geometry the rasteriser keeps. That one is stable enough to gate on.
+  let drawnNdcMinX = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxX = Number.NEGATIVE_INFINITY;
+  let drawnNdcMinY = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxY = Number.NEGATIVE_INFINITY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let forwardMin = Number.POSITIVE_INFINITY;
+  let forwardMax = Number.NEGATIVE_INFINITY;
+  let radialMax = 0;
+  let radialMesh: string | null = null;
+  let radialPoint: [number, number, number] | null = null;
+  let forwardMesh: string | null = null;
+  let floorClearance = Number.POSITIVE_INFINITY;
+  let floorMesh: string | null = null;
+  let vertexCount = 0;
+  let meshCount = 0;
+  const feetY = lastGroundedFeetY;
+  const viewmodelPose = weaponView.presentationState();
+  weaponView.root.updateWorldMatrix(true, true);
+  weaponView.root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!materials.some((material) => material && material.visible && material.colorWrite !== false)) return;
+    let ancestor: THREE.Object3D | null = mesh.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return;
+    meshCount += 1;
+    const stride = position.count > 6_000 ? 3 : 1;
+    const name = mesh.name || '(unnamed)';
+    for (let index = 0; index < position.count; index += stride) {
+      worldVertex(mesh, position, index, vertex);
+      vertexCount += 1;
+      const radial = Math.hypot(vertex.x - player.position.x, vertex.z - player.position.z);
+      if (radial > radialMax) {
+        radialMax = radial;
+        radialMesh = name;
+        radialPoint = [vertex.x, vertex.y, vertex.z];
+      }
+      if (feetY !== null) {
+        const clearance = vertex.y - (feetY as number);
+        if (clearance < floorClearance) { floorClearance = clearance; floorMesh = name; }
+      }
+      eyeVertex.copy(vertex).applyMatrix4(toEye);
+      if (eyeVertex.x < minX) minX = eyeVertex.x;
+      if (eyeVertex.x > maxX) maxX = eyeVertex.x;
+      if (eyeVertex.y < minY) minY = eyeVertex.y;
+      if (eyeVertex.y > maxY) maxY = eyeVertex.y;
+      const forward = -eyeVertex.z;
+      if (forward < forwardMin) forwardMin = forward;
+      if (forward > forwardMax) { forwardMax = forward; forwardMesh = name; }
+      if (forward < camera.near && forward > 1e-4) {
+        nearPlaneCutVertices += 1;
+        nearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          nearPlaneCutInViewport += 1;
+          if (ndcVertex.x < cutMinX) cutMinX = ndcVertex.x;
+          if (ndcVertex.x > cutMaxX) cutMaxX = ndcVertex.x;
+          if (ndcVertex.y < cutMinY) cutMinY = ndcVertex.y;
+          if (ndcVertex.y > cutMaxY) cutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward < FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS && forward > 1e-4) {
+        referenceNearPlaneCutVertices += 1;
+        referenceNearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          referenceNearPlaneCutInViewport += 1;
+          if (ndcVertex.y < referenceCutMinY) referenceCutMinY = ndcVertex.y;
+          if (ndcVertex.y > referenceCutMaxY) referenceCutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward > 1e-4 && forward < viewportForwardMin) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          viewportForwardMin = forward;
+          viewportForwardMinMesh = name;
+        }
+      }
+      // Only points in FRONT OF THE EYE project meaningfully. The near plane is
+      // deliberately not the filter: a perspective matrix's x/y mapping is
+      // independent of `near`, so a point inside the plane still reports the
+      // screen position it would occupy, and excluding it would make the two
+      // sides of this comparison cover different geometry.
+      if (forward > 1e-4) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x < ndcMinX) ndcMinX = ndcVertex.x;
+        if (ndcVertex.x > ndcMaxX) ndcMaxX = ndcVertex.x;
+        if (ndcVertex.y < ndcMinY) ndcMinY = ndcVertex.y;
+        if (ndcVertex.y > ndcMaxY) ndcMaxY = ndcVertex.y;
+        if (forward >= camera.near) {
+          if (ndcVertex.x < drawnNdcMinX) drawnNdcMinX = ndcVertex.x;
+          if (ndcVertex.x > drawnNdcMaxX) drawnNdcMaxX = ndcVertex.x;
+          if (ndcVertex.y < drawnNdcMinY) drawnNdcMinY = ndcVertex.y;
+          if (ndcVertex.y > drawnNdcMaxY) drawnNdcMaxY = ndcVertex.y;
+        }
+      }
+    }
+  });
+  const round = (value: number): number | null => (
+    Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null
+  );
+  return {
+    contract: 'viewmodel-rig-extent-v1',
+    /** HF-410: the fit in force when this row was measured. 1 is unfitted. */
+    bodyFitScale: VIEWMODEL_BODY_FIT_SCALE,
+    weapon: player.weapon,
+    stance: player.stance,
+    adsBlend: Math.round(weaponView.adsProgress() * 1000) / 1000,
+    meshesMeasured: meshCount,
+    verticesMeasured: vertexCount,
+    /** Metres the forward-most visible vertex sits ahead of the eye. */
+    eyeForwardMaxM: round(forwardMax),
+    /** Metres the rear-most visible vertex sits ahead of the eye (negative: behind it). */
+    eyeForwardMinM: round(forwardMin),
+    eyeLateralMinM: round(minX),
+    eyeLateralMaxM: round(maxX),
+    eyeDownMaxM: round(-minY),
+    eyeUpMaxM: round(maxY),
+    /** THE NUMBER THIS LANE EXISTS FOR: horizontal metres from the player's own axis. */
+    capsuleRadialMaxM: round(radialMax),
+    capsuleRadiusM: CHARACTER_PHYSICS_CONFIG.playerRadius,
+    /** Positive: the rig fits inside the capsule. Negative: it sticks out by this much. */
+    capsuleMarginM: round(CHARACTER_PHYSICS_CONFIG.playerRadius - radialMax),
+    radialMesh,
+    radialPoint,
+    forwardMesh,
+    /** Metres the lowest visible vertex sits above the tracked standing surface. */
+    floorClearanceMinM: round(floorClearance),
+    floorMesh,
+    // HF-410: WHAT THE POSE WAS DOING WHEN THIS FRAME WAS MEASURED.
+    //
+    // Without these the extent numbers cannot be read: a rig that sits lower on
+    // screen might have been fitted, or might simply have stopped being shoved
+    // upward by a floor probe. The owner's complaint is about the second.
+    surfaceRetreatM: viewmodelPose.surfaceRetreat,
+    surfaceLiftM: viewmodelPose.surfaceLift,
+    contactLiftM: viewmodelPose.contactResponse.additionalLiftMeters,
+    contactDropM: viewmodelPose.contactResponse.additionalDropMeters,
+    contactPitchRadians: viewmodelPose.contactResponse.pitchRadians,
+    contactWallBlend: viewmodelPose.contactResponse.wallBlend,
+    contactFloorBlend: viewmodelPose.contactResponse.floorBlend,
+    foldPitchRadians: weaponView.contactFoldState().foldPitchRadians,
+    foldRetreatM: weaponView.contactFoldState().retreatMeters,
+    /** Visible vertices the gameplay camera's near plane discards, and how many are on screen. */
+    nearPlaneCutVertices,
+    nearPlaneCutInViewport,
+    nearPlaneCutMeshes: [...nearPlaneCutMeshes],
+    /**
+     * HF-410 REPAIR: the same counts under the plane this build shipped with
+     * BEFORE the fit (0.08 m), computed exactly from the same vertices. This is
+     * what the near-plane change bought, in the tree, per pose.
+     */
+    referenceNearM: FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+    referenceNearPlaneCutVertices,
+    referenceNearPlaneCutInViewport,
+    referenceNearPlaneCutMeshes: [...referenceNearPlaneCutMeshes],
+    referenceCutNdcMinY: round(referenceCutMinY),
+    referenceCutNdcMaxY: round(referenceCutMaxY),
+    /** WHERE on screen the cut lands. Bottom-edge only is invisible; anything higher is not. */
+    cutNdcMinX: round(cutMinX), cutNdcMaxX: round(cutMaxX),
+    cutNdcMinY: round(cutMinY), cutNdcMaxY: round(cutMaxY),
+    /** THE NEAR PLANE THE RIG ACTUALLY NEEDS: nearest ON-SCREEN vertex, metres. */
+    viewportForwardMinM: Number.isFinite(viewportForwardMin)
+      ? Math.round(viewportForwardMin * 10_000) / 10_000
+      : null,
+    viewportForwardMinMesh,
+    /** THE FRAMING. Identical before and after the fit, or the fit changed the picture. */
+    ndcMinX: round(ndcMinX), ndcMaxX: round(ndcMaxX),
+    ndcMinY: round(ndcMinY), ndcMaxY: round(ndcMaxY),
+    /** The same box over DRAWN geometry only - free of the projection singularity. */
+    drawnNdcMinX: round(drawnNdcMinX), drawnNdcMaxX: round(drawnNdcMaxX),
+    drawnNdcMinY: round(drawnNdcMinY), drawnNdcMaxY: round(drawnNdcMaxY),
+    /** Metres between the nearest visible vertex and the render camera near plane. */
+    nearPlaneMarginM: round(forwardMin - camera.near),
+    cameraNearM: camera.near,
+    cameraFovDegrees: camera.fov,
+    eyeHeightM: round(camera.position.y),
+    lastGroundedFeetY: feetY,
   };
 }
 
@@ -18728,8 +19032,14 @@ function tryFire(now: number): void {
   // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
   // the barrel axis, so the protected centre cone still applies unchanged.
   if (!flamethrowerShot && !projectileShot) {
+    // HF-410 REPAIR: the WORLD anchor, not the rig socket. Under the body fit
+    // the socket sits ~0.25 m from the eye, inside PARTICLE_READABILITY's hard
+    // 0.35 m near-lens cull, so smoke emitted there is never drawn at all.
+    // muzzleEffectWorldPosition() undoes the uniform scale about the eye, which
+    // puts the anchor back at the world distance it shipped at while keeping
+    // the same pixel on screen.
     hfParticleRuntime.emitMuzzleSmoke(
-      weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin,
+      weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin,
       baseDirection,
       cameraUp,
     );
@@ -18765,7 +19075,10 @@ function tryFire(now: number): void {
       end: Object.freeze({ x: authoritativeEnd.x, y: authoritativeEnd.y, z: authoritativeEnd.z }),
     }));
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
-    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    // HF-410 REPAIR: same reason as emitMuzzleSmoke above - the tracer and the
+    // flamethrower stream are world-space presentations and must start from the
+    // unfitted muzzle point, which is the same pixel and the shipped distance.
+    const visualStart = weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin;
     if (flamethrowerShot) {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
@@ -23882,8 +24195,9 @@ function resetKillstreakPossessionPresentation(): void {
   // somewhere".
   cameraShakeState = createCameraShakeState(cameraShakeState.seed);
   cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
 }
@@ -23908,7 +24222,8 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  // HF-410: the gunner cockpit mirrored the on-foot plane; the drone keeps its own.
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? FIRST_PERSON_CAMERA_NEAR_METERS : 0.35;
   if (camera.near !== supportCameraNear) {
     camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
@@ -25765,8 +26080,9 @@ function clearFieldSupport(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
   document.documentElement.dataset.killstreakPossession = 'none';
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
   weaponView.setPresentationVisible(player.alive);
@@ -31308,6 +31624,8 @@ const debugWindow = window as Window & {
     };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     sampleViewmodelPenetration: () => Record<string, unknown>;
+    /** HF-410: the rig's own envelope against the capsule that carries it. */
+    sampleViewmodelRigExtent: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
@@ -32520,6 +32838,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     triggerHeld: gamepadTriggerHeld,
   }),
   sampleViewmodelPenetration,
+  sampleViewmodelRigExtent,
   // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
   // runtime coefficient revert). This probe ends the guessing: live bus
   // gains, context state, the music scheduler flag and a real output
