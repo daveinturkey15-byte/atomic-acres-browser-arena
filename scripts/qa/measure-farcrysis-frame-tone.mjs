@@ -16,13 +16,29 @@
 //                 would drop this; a lift toward each layer's own hue should
 //                 hold or raise it.
 //
-// Usage: node scripts/qa/measure-farcrysis-frame-tone.mjs <dir> [<dir> ...]
+// AGGREGATES. `ALL VIEWS` is the arena's whole review set and it is the number
+// a publish reviewer should read first - it is printed unconditionally and it
+// cannot be suppressed. `--exclude <view,...>` adds a SECOND, clearly labelled
+// row beside it, for the case where a camera itself MOVED between the two
+// captures: farcrysis-core-interior was inside a catwalk in the before capture
+// (nearest opaque surface 0.01 m) and was re-aimed by this same lane, so the
+// five unchanged cameras answer "did the lighting change help?" while ALL VIEWS
+// answers "is the arena's review set better off?". Both are true and they point
+// different ways here, so both are printed. Reporting only the subset would be
+// choosing the flattering aggregate.
+//
+// Usage: node scripts/qa/measure-farcrysis-frame-tone.mjs [--exclude a,b] <dir> [<dir> ...]
 import { readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import sharp from 'sharp';
 
-const dirs = process.argv.slice(2);
-if (dirs.length === 0) throw new Error('usage: measure-farcrysis-frame-tone.mjs <captureDir> [...]');
+const argv = process.argv.slice(2);
+const excludeIndex = argv.indexOf('--exclude');
+const EXCLUDED = excludeIndex >= 0 && argv[excludeIndex + 1]
+  ? argv[excludeIndex + 1].split(',').map((entry) => entry.trim()).filter(Boolean)
+  : [];
+const dirs = argv.filter((entry, index) => entry !== '--exclude' && index !== excludeIndex + 1);
+if (dirs.length === 0) throw new Error('usage: measure-farcrysis-frame-tone.mjs [--exclude a,b] <captureDir> [...]');
 
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const LUT = Array.from({ length: 256 }, (_, i) => srgbToLinear(i / 255));
@@ -86,8 +102,16 @@ for (const dir of dirs) {
       + ` p05=${row.p05.toFixed(4)} p50=${row.p50.toFixed(4)} chroma=${row.chromaMean.toFixed(4)}`
       + ` [n=${samples.length} spread ${((hi - lo) * 100).toFixed(2)}pp]`);
   }
-  console.log(`  ${'ALL VIEWS'.padEnd(32)} crushed=${(mean(rows, 'crushedShare') * 100).toFixed(2)}%`
+  console.log(`  ${`ALL VIEWS (${rows.length})`.padEnd(32)} crushed=${(mean(rows, 'crushedShare') * 100).toFixed(2)}%`
     + ` p05=${mean(rows, 'p05').toFixed(4)} p50=${mean(rows, 'p50').toFixed(4)} chroma=${mean(rows, 'chromaMean').toFixed(4)}`);
+  if (EXCLUDED.length > 0) {
+    const kept = rows.filter((row) => !EXCLUDED.includes(row.view));
+    const missing = EXCLUDED.filter((view) => !rows.some((row) => row.view === view));
+    if (missing.length > 0) throw new Error(`--exclude names ${missing.join(', ')}, not present in ${dir}`);
+    if (kept.length === 0) throw new Error('--exclude removed every view; there is no aggregate left to print');
+    console.log(`  ${`EXCL ${EXCLUDED.join(',')} (${kept.length})`.padEnd(32)} crushed=${(mean(kept, 'crushedShare') * 100).toFixed(2)}%`
+      + ` p05=${mean(kept, 'p05').toFixed(4)} p50=${mean(kept, 'p50').toFixed(4)} chroma=${mean(kept, 'chromaMean').toFixed(4)}`);
+  }
   console.log(`  ${'ALL SAMPLES'.padEnd(32)} crushed=${(mean(all, 'crushedShare') * 100).toFixed(2)}%`
     + ` (n=${all.length}); worst single-view sample spread ${(sampleSpread * 100).toFixed(2)}pp`);
 }
