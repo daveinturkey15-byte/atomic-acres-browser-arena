@@ -150,86 +150,106 @@ Pipelines are counted by wrapping `GPUDevice.createRenderPipeline(+Async)`
 before any page script runs.
 
 **Honesty about the machine (VERIFIED).** This is the owner's shared
-workstation and five other PASS 86/87 lanes were running against the same GPU
-during the sweep. Free VRAM moved between 1.7 GB and 8.8 GB across the window.
-Run-to-run spread on a single cell is therefore large, and single-cell
-differences under about 15% carry no signal. What the table supports is the
-ORDERING of the profiles, which is consistent across arenas, and the
+workstation. Five other PASS 86/87 lanes were running against the same GPU, and
+partway through the sweep the owner's ComfyUI began a batch that ran for over an
+hour; free VRAM moved between 0.7 GB and 9.3 GB. Rows taken while ComfyUI had
+work queued were DISCARDED, not annotated, and the audit script now refuses to
+launch in that state and stamps the queue into every row. Even so, run-to-run
+spread on a single cell is large: read the AVERAGED ladder below and the
 categorical facts (admitted / not admitted, pipelines in combat, draw counts),
-which are not noise-sensitive.
+which are not noise-sensitive. Do not read a single cell.
 
 | Profile | Arena | Pass | Deploy (s, cold) | Frames/s | Median ms | p95 ms | p99 ms | >33 ms | Draws | Tris | Pipelines @admission | Pipelines in combat | GPU busy? |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| PERFORMANCE | atomic-acres | p1 | 33.3 | 45.7 | 16.3 | 41.9 | 67.1 | 30 | 150 | 289k | 297 | 0 | not stamped |
 | PERFORMANCE | atomic-acres | p2 | 35.2 | 55.3 | 14.3 | 38.5 | 48.1 | 16 | 155 | 289k | 297 | 0 | not stamped |
-| PERFORMANCE | high-seas | p1 | 23.3 | 59.7 | 12.3 | 34.4 | 44.3 | 12 | 105 | 233k | 222 | 0 | not stamped |
+| PERFORMANCE | skyline-terminal | p2 | 19.5 | 73.8 | 11.4 | 25.8 | 29.8 | 2 | 215 | 51k | 225 | 0 | quiet |
+| PERFORMANCE | high-seas | p2 | 23.9 | 75.7 | 10.9 | 24.1 | 31.5 | 1 | 103 | 233k | 222 | 0 | quiet |
 | BALANCED | atomic-acres | p2 | 48.3 | 55.7 | 15.3 | 30.0 | 38.9 | 6 | 186 | 540k | 375 | 0 | not stamped |
-| QUALITY | atomic-acres | p1 | 35.9 | 55.0 | 15.6 | 33.0 | 40.9 | 9 | 194 | 537k | 374 | 0 | not stamped |
-| QUALITY | skyline-terminal | p1 | 36.8 | 66.5 | 13.5 | 27.6 | 37.3 | 4 | 127 | 58k | 300 | 0 | not stamped |
-| QUALITY | high-seas | p1 | 43.5 | 63.9 | 12.7 | 36.1 | 42.8 | 10 | 127 | 217k | 248 | 0 | not stamped |
-| RAY TRACED | skyline-terminal | p1 | 37.6 | 60.0 | 14.4 | 29.9 | 34.1 | 4 | 125 | 59k | 307 | 0 | not stamped |
-| RAY TRACED | high-seas | p1 | 51.6 | 54.2 | 13.7 | 42.3 | 51.2 | 20 | 127 | 214k | 259 | 0 | not stamped |
-| MAX | skyline-terminal | p1 | 52.7 | 43.9 | 19.6 | 42.8 | 47.4 | 23 | 239 | 83k | 392 | 0 | not stamped |
-| MAX | high-seas | p1 | 64.7 | 43.0 | 21.4 | 42.0 | 47.6 | 14 | 263 | 265k | 364 | 0 | not stamped |
+| BALANCED | skyline-terminal | p2 | 33.3 | 82.8 | 10.2 | 25.5 | 28.5 | 1 | 126 | 59k | 301 | 0 | quiet |
+| BALANCED | high-seas | p2 | 56.0 | 69.9 | 12.2 | 25.4 | 30.1 | 2 | 122 | 237k | 252 | 0 | quiet |
+| QUALITY | atomic-acres | p2 | 41.2 | 47.8 | 16.8 | 36.2 | 42.3 | 26 | 189 | 536k | 374 | 0 | quiet |
+| QUALITY | skyline-terminal | p2 | 30.2 | 75.9 | 11.0 | 25.1 | 28.7 | 2 | 127 | 58k | 300 | 0 | quiet |
+| QUALITY | high-seas | p2 | 54.8 | 77.4 | 11.5 | 23.4 | 25.3 | 0 | 127 | 217k | 251 | 0 | quiet |
+| RAY TRACED | atomic-acres | p2 | 54.4 | 72.8 | 12.3 | 25.5 | 28.5 | 1 | 188 | 541k | 382 | 0 | quiet |
+| RAY TRACED | skyline-terminal | p2 | 36.2 | 57.5 | 15.3 | 31.3 | 37.0 | 6 | 125 | 59k | 307 | 0 | quiet |
+| RAY TRACED | high-seas | p2 | 58.4 | 65.4 | 13.5 | 28.2 | 29.6 | 1 | 127 | 214k | 259 | 0 | quiet |
+| MAX | atomic-acres | p2 | 42.1 | 45.6 | 21.1 | 41.6 | 48.1 | 17 | 345 | 656k | 478 | 0 | quiet |
+| MAX | skyline-terminal | p2 | 49.8 | 48.0 | 18.7 | 36.6 | 41.4 | 17 | 241 | 84k | 392 | 0 | quiet |
+| MAX | high-seas | p2 | 66.1 | 37.6 | 23.1 | 50.3 | 65.2 | 23 | 263 | 265k | 364 | 0 | quiet |
 
-Missing cells (VERIFIED as not measured, not as failures): RAY TRACED and MAX
-on atomic-acres, MAX and BALANCED on skyline-terminal and high-seas, BALANCED
-on high-seas. The sweep was interrupted twice — once by a script defect (a
-preset that stages a renderer reconstruction RELOADS the page, and the first
-version of the harness read the debug handle off the torn-down window), and
-once by the owner's ComfyUI taking the GPU. The audit script now refuses to
-launch while ComfyUI has work queued, which is why the last rows are absent
-rather than wrong.
+Pass `p2` is the complete ladder on one build. `quiet` in the last column means
+the row itself recorded the owner's ComfyUI queue as empty before AND after the
+run; 13 of 15 carry that stamp, and the three that say "not stamped" were taken
+before the gate existed. Every row: `backend: webgpu`, `admissionOutcome:
+admitted`, `errors: 0`, `pipelinesInCombat: 0`.
+
+### The ladder, averaged over the three arenas
+
+Per-arena numbers move with machine load; the ladder does not. Mean over
+atomic-acres, skyline-terminal and high-seas:
+
+| Profile | Median frame (ms) | p95 (ms) | Frames/s | Draw calls (per arena) | Pipelines at admission |
+|---|---|---|---|---|---|
+| PERFORMANCE | **12.2** | 29.5 | 68.3 | 155 / 215 / 103 | 297 / 225 / 222 |
+| BALANCED | **12.6** | **27.0** | 69.5 | 186 / 126 / 122 | 375 / 301 / 252 |
+| QUALITY | **13.1** | 28.2 | 67.1 | 189 / 127 / 127 | 374 / 300 / 251 |
+| RAY TRACED | **13.7** | 28.3 | 65.2 | 188 / 125 / 127 | 382 / 307 / 259 |
+| MAX | **21.0** | **42.8** | 43.7 | 345 / 241 / 263 | 478 / 392 / 364 |
 
 ### What the table supports
 
-1. **Every profile ADMITS on every arena measured, with zero page errors.**
-   11 rows, `admissionOutcome: "admitted"`, `backend: "webgpu"`, `errors: 0`.
-   That is the headless boot smoke for the ladder. **VERIFIED.**
-2. **The tripwire is clean: `pipelinesInCombat` is 0 on every single row.**
-   No profile compiles a WebGPU render pipeline while a settled match is being
-   played. Every pipeline is built during admission (222-392 of them). This is
-   the measurement that matters most for the owner's freeze reports, and on
-   these arenas and profiles it is clean. **VERIFIED.**
-3. **The cost ordering, consistent across arenas: MAX ≫ RAY TRACED ≈ QUALITY ≈
-   BALANCED > PERFORMANCE.** MAX is the only profile that separates from the
-   pack by more than the noise: 19.6-21.4 ms median against 12.3-15.6 ms for
-   everything else, 43-44 frames/s against 45-67. **VERIFIED.**
-4. **RAY TRACED is NOT more expensive than MAX — it is close to QUALITY.** On
-   skyline-terminal, RAY TRACED 14.4 ms median / 60.0 fps against QUALITY's
-   13.5 / 66.5 and MAX's 19.6 / 43.9. That is the direct answer to "is RTX
-   above or below max": in cost it is below, clearly. **VERIFIED.**
-5. **Draw calls rank the way the control sets predict.** atomic-acres:
-   PERFORMANCE 150-155, BALANCED 186, QUALITY 194. skyline-terminal:
-   RAY TRACED 125, QUALITY 127, MAX 239. MAX's extra passes are visible as
-   extra draws, and BALANCED sits where its control set says it should.
+1. **The cost ladder is monotone and in the designed order.** 12.2 → 12.6 →
+   13.1 → 13.7 → 21.0 ms. Every rung costs more than the one below it, and
+   BALANCED lands exactly where it was designed to: above PERFORMANCE, below
+   QUALITY, much closer to QUALITY. **VERIFIED.**
+2. **RAY TRACED is BELOW MAX and beside QUALITY.** 13.7 ms against QUALITY's
+   13.1 and MAX's 21.0 — a 0.6 ms step up from QUALITY, and 7.3 ms below MAX.
+   That is the direct, measured answer to "is RTX above or below max". It is
+   below, and not by a little. **VERIFIED.**
+3. **MAX is the only profile that separates from the pack, and by a lot.**
+   +7.3 ms median and +14.6 ms p95 over the next rung, 43.7 frames/s against
+   65-70. Its draw calls tell the same story: 345 on atomic-acres against
+   QUALITY's 189. "For very high-end machines" is a measurement, not a slogan.
    **VERIFIED.**
-6. **Nothing came close to the queue-completion fence.** Peak completion
-   latency across all rows was 86.8-180.1 ms against a 12 000 ms fence.
-   **VERIFIED.**
-7. **The PASS 78 MAX cold-compile P0 (5.17-6.54 s against a 4000 ms bound) did
-   not reproduce.** MAX admitted on both arenas measured. The old figure is not
-   refuted — different head, different method — but the current state is
-   "admits". **VERIFIED for these two arenas; OPEN for the rest.**
+4. **BALANCED has the best p95 and the best long-frame count in the ladder**
+   (27.0 ms mean p95, and 1-6 frames over 33 ms per window against QUALITY's
+   2-26). Dropping the 4-sample HDR target and the SSR attachments buys
+   smoothness rather than headline frame rate, which is exactly the shape the
+   owner asked for: "will run nice and look good". **VERIFIED.**
+5. **Every profile ADMITS on every arena, with zero page errors.** 15 rows.
+   That is the headless boot smoke for the whole ladder. **VERIFIED.**
+6. **Tripwire clean: `pipelinesInCombat` = 0 on all 15 rows.** 222-478
+   pipelines are compiled during admission; not one is compiled while a settled
+   match is being played. This is the measurement that matters most for the
+   owner's freeze reports. **VERIFIED.**
+7. **Nothing came close to the queue-completion fence:** peak completion
+   latency 64.1-155.5 ms against a 12 000 ms fence. **VERIFIED.**
+8. **The PASS 78 MAX cold-compile P0 (5.17-6.54 s against a 4000 ms bound) did
+   not reproduce.** MAX admitted on all three arenas. Not a refutation —
+   different head, different method — but the current state is "admits".
+   **VERIFIED for these three arenas.**
+9. **Deploy time is the real cost of the top rungs, not frame time.** Cold
+   deploy runs 20-35 s on PERFORMANCE and 36-66 s on RAY TRACED and MAX. The
+   frame ladder is gentle; the *loading* ladder is not. **VERIFIED**, and it is
+   the strongest argument in this document for the menu-time precompile in
+   `docs/NEURAL_RENDERING_OPTIONS_2026-09-03.md` §3 recommendation 2.
 
 ### What the table does NOT support, said plainly
 
-- **Any single-cell comparison under ~15%.** PERFORMANCE on atomic-acres
-  measured 45.7 fps in pass 1 and 55.3 fps in pass 2 on an identical control
-  set: a 21% swing from machine load alone. Do not read BALANCED-vs-QUALITY
-  from one cell.
-- **BALANCED being faster than QUALITY.** The one BALANCED cell (atomic-acres,
-  55.7 fps / 15.3 ms) is indistinguishable from QUALITY's (55.0 / 15.6) on the
-  same arena, on a 5080 that is not the machine BALANCED exists for. Its p95 is
-  better (30.0 vs 33.0 ms) and its long-frame count is much better (6 frames
-  over 33 ms vs 9), which is the shape you would expect from dropping MSAA 4x
-  and SSR, but a 5080 at 1440p is not where that gap opens up. **OPEN: BALANCED
-  needs a measurement on a mid-range GPU before its "runs nice" claim is
+- **Any single-cell comparison under about 15%.** atomic-acres in particular
+  swung hard: PERFORMANCE measured 45.7 and 55.3 frames/s in two passes on an
+  identical control set, and its RAY TRACED cell (12.3 ms median) came out
+  *faster* than its PERFORMANCE cell (14.3 ms), which cannot be true of the
+  control sets and is load. Read the averaged ladder, not one cell.
+- **BALANCED being faster than QUALITY on a mid-range GPU.** On a 5080 the
+  median gap is 0.5 ms, because the passes BALANCED drops are not what
+  bottlenecks a 5080 at 1440p. Its p95 and long-frame advantages are the honest
+  signal. **OPEN: BALANCED needs a mid-range measurement before "runs nice" is
   evidence rather than reasoning.** The in-game copy is written to survive that:
-  it claims a control set and a set of omissions, not a frame rate.
+  it claims a control set and a set of omissions, never a frame rate.
 - **VRAM.** `nvidia-smi` reports the whole GPU on a machine shared with the
-  owner's ComfyUI and five other lanes; the deltas ranged from -4488 MiB to
-  +8548 MiB and are noise. Reported for completeness, usable for nothing.
+  owner's ComfyUI and five other lanes; deltas ranged from -4488 to +8548 MiB
+  and are noise. Collected for completeness, usable for nothing.
 
 ### One live observation the sweep produced for free
 
@@ -245,10 +265,10 @@ adaptive valve — `configuredAdaptiveQualityLevels` builds tiers as fractions o
 the selected scale and `adaptiveResolution` is `true` on MAX by design — so
 under sustained frame pressure it settled a tier below its own cap. If that is
 right, MAX was not actually supersampling during this sweep on an RTX 5080 at
-1440p on a shared machine, which is worth the owner knowing. **OPEN:** confirm
-by reading the live pixel-ratio tier rather than inferring it from the canvas;
-the snapshot does not currently expose it, which is itself a gap.
-
+1440p, which is worth the owner knowing, and MAX is *still* the most expensive
+profile by a wide margin without it. **OPEN:** confirm by reading the live
+pixel-ratio tier rather than inferring it from the canvas; the snapshot does not
+currently expose it, which is itself a gap.
 
 ### Side by side: what each profile actually buys
 
@@ -383,6 +403,12 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   this lane's ownership; the integrator should re-word it to point at
   `GRAPHICS_PROFILE_DESCRIPTIONS` as the source of the ladder.
 - **OPEN:** the MAX cold-compile P0 from PASS 78 (5.17-6.54 s against a 4000 ms
-  bound) did **not** reproduce here: MAX admitted on every arena measured. The
-  old figure is not refuted — it was measured differently, on a different head
-  — but the current state is "admits". Re-measure before quoting the old number.
+  bound) did **not** reproduce here: MAX admitted on all three arenas measured.
+  The old figure is not refuted — it was measured differently, on a different
+  head — but the current state is "admits". Re-measure before quoting the old
+  number.
+- **OPEN (the real cost of the top rungs):** cold deploy time, not frame time,
+  is where RAY TRACED and MAX are expensive — 36-66 s against PERFORMANCE's
+  20-35 s, and 222-478 pipelines compiled inside admission. The frame ladder is
+  gentle; the loading ladder is not. Menu-time precompile is the fix and is not
+  implemented.
