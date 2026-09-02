@@ -1,0 +1,67 @@
+{
+  "contract": "viewmodel-penetration-ratchet-v1",
+  "arenas": [
+    "atomic-acres",
+    "test2"
+  ],
+  "weapons": [
+    "carbine"
+  ],
+  "yawSteps": 12,
+  "stances": [
+    "stand",
+    "crouch",
+    "prone"
+  ],
+  "scenarios": {
+    "atomic-acres/house-front-wall": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 8,
+      "worstBelowFloorM": 0.012
+    },
+    "atomic-acres/bus-van-gap": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 10,
+      "worstBelowFloorM": 0.012
+    },
+    "atomic-acres/garage-door": {
+      "penetrating": 36,
+      "worstM": 0.323,
+      "belowFloor": 0,
+      "worstBelowFloorM": 0
+    },
+    "atomic-acres/west-fence-corner": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 7,
+      "worstBelowFloorM": 0.012
+    },
+    "atomic-acres/open-ground-down": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 2,
+      "worstBelowFloorM": 0.012
+    },
+    "atomic-acres/grass-slope-down": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 36,
+      "worstBelowFloorM": 0.012
+    },
+    "test2/zone-a-wall": {
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 15,
+      "worstBelowFloorM": 0.012
+    }
+  },
+  "measuredFrom": "artifacts/qa/hf395/after-v2-summary.json",
+  "excludedScenarios": [
+    "test2/upper-room",
+    "test2/zone-b-court",
+    "test2/zone-c-wall"
+  ],
+  "excludedReason": "rows sampled airborne in the recording run; their numbers do not describe a standing player"
+}

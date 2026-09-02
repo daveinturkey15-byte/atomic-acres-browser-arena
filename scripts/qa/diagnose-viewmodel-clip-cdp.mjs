@@ -73,12 +73,29 @@ for (const pose of POSES) {
     await page.waitForTimeout(400);
     currentArena = pose.arena;
   }
-  await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setStance(value), pose.stance);
-  await page.waitForTimeout(120);
   const sample = await page.evaluate(async (p) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
+    const frame = () => new Promise((done) => requestAnimationFrame(done));
+    // HF-395: the same stance defect the measurement instrument had. Requesting
+    // a stance before the teleport, or right after it while the player is still
+    // airborne, is refused by the stance machine, so every row was sampled at
+    // whatever stance was left over with the eye still 1.7-1.84 m up. Land
+    // first, drive the stance, re-seat the exact look, land again, settle.
     api.teleportPlayer(p.x, 1.7, p.z, p.yaw, p.pitch);
-    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(done))));
+    let grounded = false;
+    for (let waited = 0; waited < 90 && !grounded; waited += 1) {
+      await frame();
+      grounded = api.snapshot()?.player?.grounded === true;
+    }
+    const stanceReached = api.setStanceForQa(p.stance);
+    for (let waited = 0; waited < 24; waited += 1) await frame();
+    const now = api.snapshot()?.player;
+    api.teleportPlayer(now.position[0], now.position[1], now.position[2], p.yaw, p.pitch);
+    for (let waited = 0; waited < 90; waited += 1) {
+      await frame();
+      if (api.snapshot()?.player?.grounded === true) break;
+    }
+    await frame(); await frame(); await frame();
     const penetration = api.sampleViewmodelPenetration();
     const snapshot = api.snapshot();
     // The live planes, straight off the clipping root.
@@ -129,6 +146,14 @@ for (const pose of POSES) {
       eye,
       playerPosition: snapshot?.player?.position ?? null,
       stance: penetration.stance,
+      stanceReached,
+      grounded: snapshot?.player?.grounded === true,
+      // HF-395: a pose whose EYE is inside a movement collider is not reachable
+      // in play, and no separating plane exists for a box you are inside. That
+      // is a different verdict from "the clip system missed a wall".
+      worstBoxSource: penetration.worstBoxSource ?? null,
+      eyeInsideColliderBox: penetration.eyeInsideColliderBox ?? null,
+      eyeInsideDressingBox: penetration.eyeInsideDressingBox ?? null,
       lastGroundedFeetY: penetration.lastGroundedFeetY,
       activeClipPlanes: penetration.activeClipPlanes,
       clippedVertices: penetration.clippedVertices,

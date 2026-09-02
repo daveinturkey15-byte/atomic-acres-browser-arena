@@ -26,8 +26,9 @@
  *     node scripts/qa/measure-viewmodel-penetration-cdp.mjs --out artifacts/qa/penetration
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { buildRatchet, gradeAgainstRatchet, updateRefusals } from './viewmodel-penetration-ratchet.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -39,6 +40,18 @@ const OUT = arg('--out', 'artifacts/qa/viewmodel-penetration');
 const ARENAS = arg('--arenas', 'atomic-acres,test2').split(',').map((s) => s.trim()).filter(Boolean);
 const WEAPONS = arg('--weapons', 'carbine,m4a1,lmg').split(',').map((s) => s.trim()).filter(Boolean);
 const LABEL = arg('--label', 'run');
+/**
+ * THE RATCHET. A fixed pose set is only evidence once for the run that measured
+ * it; checked in, it becomes a floor nothing may fall through. `--ratchet`
+ * grades this run against `scripts/qa/viewmodel-penetration-ratchet.json` and
+ * exits non-zero when any scenario is WORSE than the recorded number. There is
+ * no automatic relaxation: `--update-ratchet` is the only way the file moves,
+ * and it refuses to record a run that covers less than the file already does,
+ * so a shrunken weapon or arena list can never launder a regression into green.
+ */
+const RATCHET_PATH = resolve(arg('--ratchet-file', 'scripts/qa/viewmodel-penetration-ratchet.json'));
+const GRADE_AGAINST_RATCHET = argv.includes('--ratchet');
+const UPDATE_RATCHET = argv.includes('--update-ratchet');
 
 mkdirSync(resolve(OUT), { recursive: true });
 
@@ -64,7 +77,13 @@ const SCENARIOS = {
   ],
 };
 
-const YAW_STEPS = 12; // 30 degrees apart
+/**
+ * How many yaw samples per sweeping scenario. 12 (30 degrees apart) is the
+ * authored sweep and what the ratchet records; a smaller number is a COARSER
+ * run, and the ratchet refuses to be rewritten from one, so it can never be
+ * used to make a failing pose disappear.
+ */
+const YAW_STEPS = Number(arg('--yaw-steps', '12'));
 const STANCES = ['stand', 'crouch', 'prone'];
 
 const browser = await chromium.launch({
@@ -132,15 +151,23 @@ for (const arena of ARENAS) {
               grounded = api.snapshot()?.player?.grounded === true;
             }
             const stanceReached = api.setStanceForQa(pose.stance);
-            // Stance recovery is up to 290 ms; the eye height eases over it.
-            for (let waited = 0; waited < 24; waited += 1) await frame();
-            // The stance change can re-seat the eye; restore the exact look.
-            const now = api.snapshot()?.player;
-            api.teleportPlayer(now.position[0], now.position[1], now.position[2], pose.yaw, pose.pitch);
-            for (let waited = 0; waited < 90; waited += 1) {
-              await frame();
-              if (api.snapshot()?.player?.grounded === true) break;
+            if (grounded) {
+              // Stance recovery is up to 290 ms; the eye height eases over it.
+              for (let waited = 0; waited < 24; waited += 1) await frame();
+              // The stance change can re-seat the eye; restore the exact look.
+              const now = api.snapshot()?.player;
+              api.teleportPlayer(now.position[0], now.position[1], now.position[2], pose.yaw, pose.pitch);
+              for (let waited = 0; waited < 90; waited += 1) {
+                await frame();
+                if (api.snapshot()?.player?.grounded === true) break;
+              }
             }
+            // A pose that never grounded in 1.5 s will not ground in another
+            // 1.5 s: the stance machine has already refused, the row is
+            // recorded `grounded: false` and counted in airborneRows, and
+            // spending 180 more frames on it changes no number in the report.
+            // Skipping them is what makes the full matrix finishable on a
+            // machine this instrument has to share.
             // Settle: the contact fold and the clip planes are driven per frame,
             // so a single frame after a teleport is not the resting pose.
             await frame(); await frame(); await frame();
@@ -230,3 +257,33 @@ console.log(JSON.stringify(summary, null, 2));
 console.log(`\n${penetrating.length}/${rows.length} poses have visible weapon geometry inside a solid`);
 console.log(`${belowFloor.length}/${rows.length} poses have visible weapon geometry below the standing surface`);
 console.log(`${summary.stanceMismatchRows}/${rows.length} rows did not reach the requested stance; ${summary.airborneRows}/${rows.length} were sampled airborne`);
+
+const ratchetShape = buildRatchet(summary, {
+  arenas: ARENAS, weapons: WEAPONS, yawSteps: YAW_STEPS, stances: STANCES,
+});
+
+if (UPDATE_RATCHET) {
+  const held = existsSync(RATCHET_PATH) ? JSON.parse(readFileSync(RATCHET_PATH, 'utf8')) : null;
+  const refusals = updateRefusals(held, ratchetShape);
+  if (refusals.length) {
+    console.error('refusing to update the ratchet from a run that covers less than it already does:');
+    for (const line of refusals) console.error(`  - ${line}`);
+    process.exit(3);
+  }
+  writeFileSync(RATCHET_PATH, `${JSON.stringify(ratchetShape, null, 2)}\n`);
+  console.log(`ratchet written to ${RATCHET_PATH}`);
+}
+
+if (GRADE_AGAINST_RATCHET) {
+  if (!existsSync(RATCHET_PATH)) {
+    console.error(`no ratchet at ${RATCHET_PATH}; run once with --update-ratchet first`);
+    process.exit(3);
+  }
+  const regressions = gradeAgainstRatchet(JSON.parse(readFileSync(RATCHET_PATH, 'utf8')), ratchetShape);
+  if (regressions.length) {
+    console.error(`\nRATCHET FAILED (${regressions.length}):`);
+    for (const line of regressions) console.error(`  - ${line}`);
+    process.exit(2);
+  }
+  console.log(`ratchet held: every scenario at or better than ${RATCHET_PATH}`);
+}
