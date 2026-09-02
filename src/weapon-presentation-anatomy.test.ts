@@ -22,6 +22,7 @@ import {
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
   VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+  VIEWMODEL_WALL_PULLBACK_SCALE,
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
   firstPersonArmPresentationScale,
@@ -263,11 +264,17 @@ describe('first-person anatomical presentation', () => {
 
     const state = presentation.presentationState();
     const contact = viewmodelContactResponse('minigun', surfaceRetreat, 0, false, 0);
+    const appliedRetreat = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT)
+      * VIEWMODEL_WALL_PULLBACK_SCALE;
+    expect(appliedRetreat, 'HF-397 halves the applied pullback').toBe(surfaceRetreat / 2);
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters - contact.additionalDropMeters,
-      HIP_VIEWMODEL_POSITION.z + surfaceRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
-        - authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
+      // HF-397: the owner asked for the near-wall pullback to be halved, so
+      // the APPLIED retreat is the probed one scaled. Pinned here through the
+      // exported constant so a silent return to the full pullback fails.
+      HIP_VIEWMODEL_POSITION.z + appliedRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat('minigun', appliedRetreat),
     ]);
     expect(presentation.root.scale.toArray()).toEqual([
       HIP_VIEWMODEL_SCALE * contact.scale,

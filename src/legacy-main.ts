@@ -11113,8 +11113,25 @@ function sampleViewmodelPenetration(): Record<string, unknown> {
   }
 
   perMesh.sort((left, right) => right.maxDepthM - left.maxDepthM);
+  // HF-395: WHOSE solid is it, and is the EYE inside one?
+  //
+  // A pose whose eye is inside a movement collider is not reachable in play and
+  // no clip plane can help it: `separatingFaceFor` refuses a box you are inside
+  // because every face it could pick cuts the whole rig. Reporting this makes
+  // the difference between "the clip system failed" and "this QA pose stands
+  // inside a wall" readable instead of guessed. Read-only; no gameplay reads it.
+  const eyeInsideBox = (box: Box2): boolean => (
+    camera.position.x > box.minX && camera.position.x < box.maxX
+    && camera.position.z > box.minZ && camera.position.z < box.maxZ
+    && camera.position.y > (box.minY ?? Number.NEGATIVE_INFINITY)
+    && camera.position.y < (box.maxY ?? Number.POSITIVE_INFINITY)
+  );
   return {
     contract: 'viewmodel-world-penetration-v1',
+    /** Which list the deepest penetrated solid came from. */
+    worstBoxSource: worstBox === null ? null : (colliders.includes(worstBox as never) ? 'collider' : 'dressing'),
+    eyeInsideColliderBox: colliders.some((box) => !box.rotation && eyeInsideBox(box)),
+    eyeInsideDressingBox: dressing.some((box) => !box.rotation && eyeInsideBox(box)),
     weapon: player.weapon,
     stance: player.stance,
     position: [player.position.x, player.position.y, player.position.z],

@@ -1142,6 +1142,10 @@ def add_m4a1_production_geometry(spec, frame, receiver, action_part, materials, 
         weighted_normals=False,
     )
     rail_length = 0.72
+    # HF-396: the top rail spine floated 17-18 mm above the RAS core (top .114);
+    # a riser the length of the handguard seats it. Over the forged upper the
+    # spine already overlaps the receiver top, so the riser stops there.
+    cube(f"M4A1_RASRailRiser_{label}", (0, -0.36, 0.124), (0.11, 0.33, 0.02), materials["primary"], handguard, bevel=0.003)
     cube(f"M4A1_TopRailSpine_{label}", (0, -0.145, 0.145), (0.125, rail_length, 0.026), materials["primary"], handguard, bevel=0.004)
     cube(f"M4A1_BottomRailSpine_{label}", (0, -0.36, -0.026), (0.12, 0.31, 0.025), materials["primary"], handguard, bevel=0.004)
     for side in (-1, 1):
