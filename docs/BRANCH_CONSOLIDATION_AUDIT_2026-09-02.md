@@ -4,38 +4,69 @@ Lane S of the PASS 85 sweep. Read-only audit; this file is the only thing the
 lane wrote. Nothing was deleted, tagged, moved, pruned or fast-forwarded.
 
 - **Shipping head measured against:** `75a4e508` (PASS 84, live 15:14 BST).
-- **Measured:** 2026-09-02, 19:30–20:40 BST, from `C:\Users\david\projects\aa-gemini-audit`.
+- **Measured:** first scan 2026-09-02 **19:30–20:04 BST** (it ends at commit
+  `f1169a3e`, 20:04:40 +0100 — the earlier "19:30–20:40" header was impossible
+  and is corrected); **re-measured and repaired 20:27–21:20 BST** after an
+  independent skeptic review. Both from `C:\Users\david\projects\aa-gemini-audit`
+  (detached at `75a4e508`, read-only).
 - **Owner instruction behind this:** 07:05 / 14:10 — "I want all of these
   branches/worktrees consolidated and merged", "yeah that sounds good, get 84
   live then do that".
 - **Claim-states:** VERIFIED = this lane ran the command and read the output.
   CLAIMED = taken from another record without re-running. OPEN = unresolved.
+  ESTIMATED = derived from a declared sample, not measured per row.
+- **Committed evidence (new, this repair):** `docs/evidence/pass85/lane-s/`
+  — `branch-scan.tsv` (396 rows, one per local branch), `worktree-scan.tsv`
+  (410 rows, one per registered worktree), `worktree-size-samples.tsv`
+  (17 `du -sk` measurements). These are the only record that survives the
+  323 branch and ~325 worktree deletions the plan performs.
 
 ---
 
 ## 1. Headline
 
-| Fact | Value | State |
-|---|---|---|
-| Local branches | 395 | VERIFIED |
-| Merged into `75a4e508` | 97 | VERIFIED |
-| Not merged | 298 | VERIFIED |
-| — of those, every commit patch-equivalent on the shipping line | 143 | VERIFIED |
-| — active PASS 84/85 lane branches (2026-09-02) | 12 unmerged (+10 already merged) | VERIFIED |
-| — Pass 71 candidate family | 82 | VERIFIED |
-| — older, non-Pass-71, non-active | 55 | VERIFIED |
-| — orphan `gh-pages` lineage | 4 | VERIFIED |
-| — unrelated history (no merge-base) | 2 | VERIFIED |
-| Registered worktrees | 412 | VERIFIED |
-| — directory missing on disk | 3 | VERIFIED |
-| — clean | 380 | VERIFIED |
-| — dirty (uncommitted work) | 29 | VERIFIED |
-| — carrying a `node_modules` tree | 370 | VERIFIED |
-| — outside `C:\Users\david\projects` | 284 (272 under `Documents\Codex`) | VERIFIED |
-| `.git` common dir size | 4.0 GB | VERIFIED |
-| `origin/main` (`506d6142`) is a strict ancestor of `75a4e508` | 0 ahead, 506 behind | VERIFIED |
-| Local `main` (`249a7ee7`) is a strict ancestor of `75a4e508` | yes | VERIFIED |
-| Existing tags in the repo | 3 (`hitl-fallback-20260825-1440`, `…-1455`, `pass78-fallback`); 0 `archive/` | VERIFIED |
+**Counts as of the re-measurement, 2026-09-02 20:27–21:05 BST, ship `75a4e508`.**
+Live lane branches move these daily — 396/95/301 now versus 395/97/298 at the
+19:30 scan, entirely because three PASS 85 lane branches committed in between.
+Re-derive with the commands in §2 before acting on any of it. Every row below is
+reproducible from `docs/evidence/pass85/lane-s/branch-scan.tsv` and
+`worktree-scan.tsv`, which are the per-row tables behind these aggregates.
+
+| Fact | 19:30 scan | 20:27 re-scan | State |
+|---|---|---|---|
+| Local branches | 395 | **396** | VERIFIED |
+| Merged into `75a4e508` | 97 | **95** | VERIFIED |
+| Not merged | 298 | **301** | VERIFIED |
+| — of those, every commit patch-equivalent on the shipping line (`SUPERSEDED`) | 143 | **143** | VERIFIED |
+| — active PASS 84/85 lane branches (2026-09-02) | 12 | **15** | VERIFIED |
+| — Pass 71 candidate family | 82 | **82** | VERIFIED |
+| — older, non-Pass-71, non-active | 55 | **55** | VERIFIED |
+| — unrelated history, **no merge-base at all** (all six `gh-pages`-lineage) | 4 + 2 (wrong) | **6** | VERIFIED, corrected |
+| Registered worktrees | 412 | **410** | VERIFIED |
+| — directory missing on disk | 3 | **0** | VERIFIED, see §4 |
+| — clean | 380 | **379** | VERIFIED |
+| — dirty (uncommitted work) | 29 | **31** | VERIFIED |
+| — with a `node_modules` entry | 370 | **371** (198 real, **173 junctions**) | VERIFIED, corrected |
+| — clean worktrees holding git-**ignored** evidence files | not measured | **319 (58,069 files)** | VERIFIED, new |
+| — under `C:\Users\david\Documents\Codex\**` | 272 | **272** | VERIFIED |
+| `.git` common dir size | 4.0 GB | 4.0 GB | VERIFIED |
+| `origin/main` (`506d6142`) is a strict ancestor of `75a4e508` | 0 ahead, 506 behind | same | VERIFIED |
+| Local `main` (`249a7ee7`) is a strict ancestor of `75a4e508` | yes | yes | VERIFIED |
+| Existing tags in the repo | 3 (`hitl-fallback-20260825-1440`, `…-1455`, `pass78-fallback`); 0 `archive/` | same | VERIFIED |
+
+Two rows above are **corrections, not drift**:
+
+- The 19:30 scan split the orphan branches "4 `gh-pages` lineage + 2 with no
+  merge-base". Measured: `git merge-base <b> 75a4e508` is **empty for all six**
+  (`gh-pages`, `gh-pages-deploy-temp`, `gh-pages-update`, `gh-pages-v68-pin`,
+  `desky/final-publish-45a6a37`, `desky/gh-pages-v68-live`). `gh-pages` is an
+  orphan branch, so every branch cut from it is an unrelated history.
+- "370 carrying a `node_modules` tree — retire, **this is the disk**" was wrong
+  on both halves. 173 of the 371 are Windows **junctions** into ~20 hub
+  worktrees and occupy essentially zero bytes (`du -sk` on one reports `0`;
+  `Get-Item … LinkType` reports `Junction`). Disk is dominated by `dist-*`
+  build copies at ~264 MB each — one sampled worktree carries 30 of them and
+  measures 8.0 GB. §4 has the consequences, one of which is a new hazard.
 
 **The single most important finding is not a branch.** It is a commit on the
 shipping line — see §3.1.
@@ -61,8 +92,29 @@ shipping line — see §3.1.
    (and by which commit) or **never existed** there.
 6. Per-feature judgement on the survivors, and byte-level `git diff` of the
    specific artefacts the brief named as known-stranded.
-7. `git worktree list --porcelain`, then `git status --porcelain` and a
-   `node_modules` stat per worktree (412 × ~0.15 s).
+7. `git worktree list --porcelain`, then per worktree: `git status --porcelain`,
+   `git status --porcelain --ignored=matching -- artifacts docs/evidence
+   test-results playwright-report`, a `find -type f` count under those four
+   paths, a `node_modules` / `dist*` / `public` probe, `readlink` on
+   `node_modules`, and `git merge-base --is-ancestor` against the ship
+   (410 worktrees, ~6 min total).
+
+**The two per-row tables the brief asks for are committed, not summarised.**
+Job 1 (per branch) and Job 2 (per worktree) are delivered as evidence files,
+because 396 + 410 rows do not belong in prose and because they are the only
+thing that survives the deletions:
+
+| File | Rows | Columns |
+|---|---|---|
+| `docs/evidence/pass85/lane-s/branch-scan.tsv` | 396 | `branch, tip, committerdate_iso, author, merged, ahead, patch_unique, files_changed, insertions, deletions, class, subject` |
+| `docs/evidence/pass85/lane-s/worktree-scan.tsv` | 410 | `path, branch, head, dirty_entries, ignored_evidence_files, node_modules, node_modules_kind, node_modules_target, dist_dirs, has_public, has_artifacts, has_test_results, merged_into_ship, structural_size_class` |
+| `docs/evidence/pass85/lane-s/worktree-size-samples.tsv` | 17 | `structural_cell, kilobytes, path` — the `du -sk` calibration |
+
+`class` in `branch-scan.tsv` is the one-line judgement the brief asks for, and
+is derived, not typed: `MERGED` (ancestor of ship) → `UNRELATED` (no merge-base)
+→ `SUPERSEDED` (`patch_unique == 0`) → `ACTIVE_LANE` (committed 2026-09-02) →
+`PASS71_FAMILY` (name match) → `OLDER_UNMERGED`. The named STRANDED items in §3
+are the per-feature reading on top of that machine classification.
 
 **Sampling declared.** Two things were sampled, not exhausted:
 
@@ -72,14 +124,50 @@ shipping line — see §3.1.
   against the shipping tree; the other 81 tips were classified from their
   file-set signature, not from per-hunk reading. Every one of them is
   archive-tagged before deletion, so the sampling costs nothing recoverable.
-- On-disk worktree size: three worktrees were measured with `du -sh`
-  (88 MB, 392 MB, 4.3 GB). A full `du` over 412 worktrees was not run — it
-  would have consumed the lane's whole budget. Total reclaim is therefore
-  **estimated, not measured** (§4).
+- On-disk worktree size. **17** worktrees are measured with `du -sk`
+  (`worktree-size-samples.tsv`), stratified across the five structural cells;
+  every one of the 410 rows carries a `structural_size_class`. A full `du` is
+  **not** run: measured cost is 32 s for a 2.8 GB worktree and two samples
+  exceeded a 120 s timeout, so 410 of them is ≈3.5 h — outside this lane's
+  budget and outside the brief's one-minute-per-item rule. Command if the owner
+  wants the real inventory: `git worktree list --porcelain | awk '/^worktree
+  /{print substr($0,10)}' | while read -r p; do du -sk "$p"; done`.
 
 ---
 
 ## 3. Salvage — what is genuinely not on the shipping line
+
+### 3.0 The 301 unmerged branches, batched (Job 1)
+
+Codex branches batched by pass number, as the brief asks. All VERIFIED from
+`branch-scan.tsv`; `files` is the summed `git diff --shortstat 75a4e508...<b>`
+file count across the batch.
+
+| Batch | Unmerged | of which SUPERSEDED | with patch-unique commits | files vs ship |
+|---|---|---|---|---|
+| `codex/pass60` | 1 | 1 | 0 | 2 |
+| `codex/pass63` | 4 | 3 | 1 | 67 |
+| `codex/pass64` | 8 | 5 | 3 | 90 |
+| `codex/pass65` | 64 | 45 | 19 | 1,589 |
+| `codex/pass66` | 22 | 16 | 6 | 722 |
+| `codex/pass69` | 11 | 9 | 2 | 168 |
+| `codex/pass70` | 37 | 34 | 3 | 432 |
+| `codex/pass71` | 78 | 0 | 78 | 18,044 |
+| `codex/pass73` | 15 | 11 | 4 | 180 |
+| `codex/pass74` | 1 | 0 | 1 | 22 |
+| `codex/pass75` | 7 | 2 | 5 | 196 |
+| `codex/*` no pass number | 4 | 3 | 1 | 131 |
+| **Codex subtotal** | **252** | **129** | **123** | |
+
+Non-Codex unmerged, by harness prefix: `claude/` 14 (0 superseded — these are
+today's live lanes), `hermes/` 13 (9), `agent/` 5 (4), `gh-pages`-lineage 4 (0,
+unrelated histories), `backup/` 3 (0), `desky/` 3 (1), `omp/` 1 (0),
+`integration/` 1 (0), other 5 (0). **Subtotal 49.** 252 + 49 = 301.
+
+The `pass71` row is the whole story of the "0 superseded / 18,044 files"
+anomaly: it is one nested candidate lineage where every tip carries the same
+large re-landed tree, which is why none of it is patch-equivalent and why §2's
+basename join was needed to stop it reading as 51 stranded modules per branch.
 
 ### 3.1 STRANDED (S1) — a commit on the shipping line silently deleted 22 files
 
@@ -319,24 +407,65 @@ is **dirty (4 entries)** — reconcile before removing anything.
 
 ## 4. Worktrees
 
-412 registered. Full table:
-`git worktree list --porcelain` reproduces it; the per-worktree scan is
-reproducible with the loop in §2.7.
+410 registered at the re-scan. **Per-worktree table:
+`docs/evidence/pass85/lane-s/worktree-scan.tsv`, 410 rows** — path, branch,
+head, dirty count, ignored-evidence file count, `node_modules` kind and target,
+`dist*` count, `public`/`artifacts`/`test-results` presence, merged-or-not,
+structural size class. The aggregates below are `awk` over that file.
 
 | Class | Count | Action |
 |---|---|---|
-| Directory missing on disk | 3 | prune |
-| Dirty (uncommitted changes) | 29 | **KEEP — reconcile first** |
-| Clean, branch not an active lane | 363 | retire |
-| Carrying `node_modules` | 370 | retire (this is the disk) |
+| Directory missing on disk | **0** | nothing to do (see below) |
+| Dirty (uncommitted changes) | 31 | **KEEP — reconcile first** |
+| Clean | 379 | candidates |
+| — of those, holding git-**ignored** evidence files | **319 (58,069 files)** | **inventory before removal — see the hazard below** |
+| `node_modules` present | 371 | 198 real, **173 junctions** |
 | Under `C:\Users\david\Documents\Codex\**` (dead Codex sessions) | 272 | retire |
-| Under `C:\Users\david\projects` | 128 | 21 are live lanes; rest retire |
+| Under `C:\Users\david\projects` | 126 | live lanes excepted; rest retire |
+| Modelled removal set under this plan | **325 removed / 85 survive** | |
 
-**Missing directories (prune):** all three are detached, under
-`C:\Users\david\AppData\Local\Temp\`:
-`aa-merge-audit-w2d-w`, `aa-merge-audit-w2d-x`, `aa-merge-audit-w2d-y`.
-Note `git worktree prune --dry-run -v` printed **nothing** for them (VERIFIED),
-so `git worktree remove --force` by path is needed, not `prune`.
+**Missing directories: the earlier claim is withdrawn.** The 19:30 scan found
+three (`aa-merge-audit-w2d-{w,x,y}` under `AppData\Local\Temp`) and asserted
+that `git worktree prune --dry-run -v` would not catch them. At 20:35 all three
+are **already unregistered** — 410 registered worktrees, 409 dirs in
+`.git/worktrees`, **zero** registered directories missing, and
+`git worktree prune --dry-run -v` prints nothing because there is nothing left
+to prune. No remove step was ever run against them, so the most likely
+explanation is exactly the one the earlier claim denied: `prune` (via auto-gc)
+collected them. **The "prune does NOT catch these" instruction is unsupported
+and has been removed from Step 3.** State: the original observation is
+NOT REPRODUCIBLE; the mechanism is OPEN.
+
+**HAZARD (new, VERIFIED) — `node_modules` is a junction in 173 worktrees.**
+`ls -la` shows `node_modules -> …`, `Get-Item … | Select LinkType` reports
+`Junction`, and `du -sk` on one reports `0`. They point at ~20 hub worktrees:
+
+| Hub | Junctions into it | Hub's fate under this plan |
+|---|---|---|
+| `Documents\Codex\2026-07-25\…\atomic-acres-pass65-integration` | 43 | not a registered worktree — survives |
+| `Documents\Codex\2026-08-09\…\atomic-acres-pass71-integration` | 33 | removed |
+| `Documents\Codex\2026-08-09\…\atomic-acres-pass70-candidate` | 17 | removed |
+| `Documents\Codex\2026-08-09\…\atomic-acres-pass71-owner-fixes` | 10 | removed |
+| `C:\Users\david\projects\aa-omp-pass84` | 10 | **survives — live integration tree** |
+| `Documents\Codex\2026-07-25\…\atomic-acres-pass66-integration` | 9 | removed |
+| `C:\Users\david\projects\atomic-acres-production-27e0858` | 7 | survives (holds `main`) |
+| `C:\Users\david\projects\atomic-acres-gauntlet` | 7 | survives (frozen) |
+
+Two consequences, both measured against the plan's own removal set:
+
+1. **Only 2 breakages**, and both are between worktrees nobody is using:
+   `Documents\Codex\…\atomic-acres-rigged-bot-gate` (survives, dirty) links into
+   `…\atomic-acres-pass69-3-surgical` (removed), and
+   `projects\atomic-acres-verify-99da1d9` links into
+   `projects\atomic-acres-desky-backlog-86dc167`. Both just need `npm ci` if
+   anyone ever returns to them. Not a blocker; noted so it is not a surprise.
+2. **The real risk is deletion through the reparse point.** 10 junctions point
+   into `aa-omp-pass84` and 7 into the `main` checkout. Whether
+   `git worktree remove --force` deletes the junction or recurses into its
+   target is version- and filesystem-dependent, and this lane will **not** test
+   it destructively on a live tree. State: **OPEN**. The safe, cheap pre-step
+   is in Step 3: `cmd //c rmdir "<path>\node_modules"` removes a junction and
+   never touches its target. Do it for every worktree before removing it.
 
 **Dirty worktrees — do not touch (29).** Branch-carrying ones:
 
@@ -385,11 +514,38 @@ plus 14 detached ones. Two need naming:
 - `C:\Users\david\projects\atomic-acres-gauntlet` (+ its `.gauntlet-tmp\wt-head`)
   — frozen; leave.
 
-**Disk.** ESTIMATED, not measured. Sampled `du -sh`: 88 MB / 392 MB / 4.3 GB
-for three worktrees; 370 carry `node_modules`. A realistic reclaim is
-**150–400 GB** but the lane did not measure it. `.git` itself is 4.0 GB
-VERIFIED and will not shrink from branch deletion alone (archive tags keep
-every object reachable — by design).
+**HAZARD (new, VERIFIED) — `--force` destroys git-ignored evidence, and
+`git status --porcelain` cannot see it.** `--porcelain` alone does not report
+ignored files, and it is the only "is there work here?" test the original plan
+had. Measured with `git status --porcelain --ignored=matching -- artifacts
+docs/evidence test-results playwright-report` plus a `find -type f` in every
+worktree: **319 of the 379 clean worktrees hold ignored evidence, 58,069 files
+in total** — 30,591 in `atomic-acres-gauntlet` (excluded by path anyway), 2,952
+in `Documents\Codex\…\atomic-acres-pass66-final-adjustments`, 2,611 in
+`projects\atomic-acres-highseas`, 1,293 in `atomic-acres-pass69-2-runtime`, and
+four-figure counts across the Pass 69–71 Codex sessions. `git worktree remove
+--force` deletes the whole directory, ignored files included.
+
+**Say it plainly: worktree removal is NOT covered by the archive tags.** The
+`archive/<branch>` tags make every *branch* deletion reversible because the
+commits stay reachable. Nothing in this plan makes a *worktree* removal
+reversible: uncommitted work, ignored `artifacts/`, `test-results/` and
+screenshot trees are gone permanently. Step 3 therefore inventories ignored
+content and skips any worktree that has it, and prints the skip list.
+
+**Disk.** ESTIMATED from a declared sample of 17 `du -sk` measurements
+(`worktree-size-samples.tsv`), not measured per row. Spread **51.9 MB to
+8.0 GB**; median ≈ 0.78 GB, mean ≈ 1.63 GB. Two worktrees
+(`atomic-acres-browser-arena` and the doubled-prefix registration) exceeded a
+120 s `du` timeout and are not in the mean. Applying median×325 and mean×325 to
+the modelled removal set gives a reclaim of roughly **250–530 GB**, superseding
+the earlier 150–400 GB guess. The structural size class is a **poor** size
+predictor — the cells overlap badly (`E_noinstall_nodist` samples span 51.9 MB
+to 984 MB, while `C_installed_nodist` measures 288 MB) — so use it as an
+inventory key, not as a size. What actually dominates is `dist-*` build copies
+at ~264 MB each: `aa-base-c736d48c` carries about thirty of them and measures
+8.0 GB. `.git` itself is 4.0 GB VERIFIED and will not shrink from branch
+deletion alone (archive tags keep every object reachable — by design).
 
 ---
 
@@ -406,9 +562,11 @@ Design notes, both taken from this repo's own scars:
   ("a hardcoded list is how a tree survives a retirement it was meant for"),
   and the same failure the `gotcha-hardcoded-gate-rosters` record describes.
 - Every unmerged branch gets `archive/<branch>` **before** deletion, so every
-  deletion is reversible with `git branch <name> archive/<name>`. Merged
-  branches get no tag: their tips are already ancestors of the shipping head,
-  so there is nothing to preserve.
+  **branch** deletion is reversible with `git branch <name> archive/<name>`.
+  Merged branches get no tag: their tips are already ancestors of the shipping
+  head, so there is nothing to preserve. **This reversibility does not extend
+  to worktree removal** — see §4: `--force` destroys uncommitted *and*
+  git-ignored files and no tag brings them back.
 
 ### Step 0 — prerequisites (manual, blocking)
 
@@ -419,6 +577,23 @@ git -C C:/Users/david/projects/atomic-acres-production-27e0858 status
 # 0c. Confirm with the owner: S2 (mobile rail), S3 (High Seas provenance) and
 #     S4 (Azure Coil) are salvaged or explicitly abandoned. S1 is independent
 #     of this plan and can proceed on its own lane at any time.
+#
+# 0d. BLOCKING — move the canonical checkout off a deletable branch.
+#     `atomic-acres-browser-arena` IS the main working tree (VERIFIED:
+#     `git rev-parse --git-common-dir` -> that path's .git) and it is checked
+#     out on `agent/rig-weapon-hud-source-20260722`, which the derivation puts
+#     on the DELETABLE list (VERIFIED: present in the 323, absent from the 73).
+#     Step 2(a2)'s worktree lookup resolves exactly that path for that branch
+#     (VERIFIED by running the awk read-only), and git refuses to remove a main
+#     working tree — so the run dies there. It is also the directory this plan
+#     tells you to run from. Because APPLY=0 only echoes, the dry run passes
+#     and this surfaces for the first time under --apply.
+git -C C:/Users/david/projects/atomic-acres-browser-arena status --porcelain   # must be reconcilable
+git -C C:/Users/david/projects/atomic-acres-browser-arena checkout main
+#     (Alternative if the checkout cannot be moved yet: add
+#      agent/rig-weapon-hud-source-20260722 to the PROTECT heredoc in Step 1.
+#      Step 2 also carries a path guard now, but 0d is the real fix — leaving
+#      the canonical checkout on a July feature branch is the underlying bug.)
 ```
 
 ### Step 1 — the protect-list and the dry run
@@ -449,14 +624,67 @@ PROTECT=$(mktemp)
     awk '/^worktree /{p=substr($0,10)} /^branch /{print p"\t"substr($0,8)}' |
     while IFS=$'\t' read -r p b; do
       [ -d "$p" ] || continue
-      [ -n "$(git -C "$p" status --porcelain)" ] && echo "${b#refs/heads/}"
+      # `|| true`: exactly one worktree on this machine has a CORRUPT index
+      # and `git status` exits non-zero there. Without this, set -e kills the
+      # whole run inside a command substitution. Protect it either way — an
+      # unreadable worktree is the last thing that should be auto-deleted.
+      st=$(git -C "$p" status --porcelain 2>/dev/null) || { echo "${b#refs/heads/}"; continue; }
+      if [ -n "$st" ]; then echo "${b#refs/heads/}"; fi
+      : # the loop body MUST end true: with pipefail, a while-loop that ends on
+        # a false test makes the whole pipeline false and set -e kills the run
+        # before the protect-list is ever written. Found by executing the dry
+        # run rather than reading it (VERIFIED: the first draft died here,
+        # silently, with zero output and exit 1).
     done
 } | sort -u > "$PROTECT"
 echo "protected branches: $(wc -l < "$PROTECT")"
+
+# --- ONE guarded worktree removal, used by BOTH Step 2 and Step 3 -----------
+# Never remove: the main working tree, the frozen trees, the parked extraction.
+SKIPPED=$(mktemp)
+protected_path() {
+  case "$1" in
+    */atomic-acres-browser-arena|*/atomic-acres-gauntlet*|*/pass74-parked*) return 0;;
+  esac
+  # the MAIN working tree reports a RELATIVE common dir; linked ones report the
+  # absolute path of the main tree's .git (VERIFIED both ways on this repo)
+  [ "$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" = ".git" ] && return 0
+  return 1
+}
+safe_remove_worktree() {
+  local p="$1"
+  [ -d "$p" ] || return 0
+  if protected_path "$p"; then echo "SKIP (protected path): $p"; return 0; fi
+  # (i) uncommitted work — and an UNREADABLE worktree counts as work
+  local st
+  if ! st=$(git -C "$p" status --porcelain 2>/dev/null); then
+    echo "SKIP (git status failed - corrupt index?): $p" | tee -a "$SKIPPED"; return 0; fi
+  if [ -n "$st" ]; then
+    echo "SKIP (dirty): $p" | tee -a "$SKIPPED"; return 0; fi
+  # (ii) git-IGNORED evidence: --porcelain alone cannot see this. 319 of 379
+  #      clean worktrees hold 58,069 such files (VERIFIED, see section 4).
+  local n
+  # `|| n=0`: find exits non-zero for every path that does not exist, and with
+  # pipefail that would kill the run on the first worktree without an
+  # artifacts/ tree (VERIFIED: it did, on the second branch of the dry run)
+  n=$(find "$p/artifacts" "$p/docs/evidence" "$p/test-results" \
+           "$p/playwright-report" -type f 2>/dev/null | wc -l) || n=0
+  if [ "$n" -gt 0 ]; then
+    echo "SKIP ($n ignored evidence files): $p" | tee -a "$SKIPPED"; return 0; fi
+  # (iii) node_modules is a JUNCTION in 173 worktrees. Drop the link first so
+  #       --force cannot recurse into a shared or live target.
+  if [ -L "$p/node_modules" ]; then run "cmd //c rmdir \"$(cygpath -w "$p")\\node_modules\""; fi
+  run "git worktree remove --force '$p'"
+}
 ```
 
 Run it with no argument first. It prints every action it would take and
-changes nothing.
+changes nothing — **except** the SKIP lines, which are real measurements and
+are the point of the dry run. Read the skip list before passing `--apply`:
+under the plan's own removal set (325 of 410) the ignored-evidence guard alone
+takes ~300 worktrees off the removal list, and each one is a deliberate
+decision (`rm -rf` it yourself, or archive the evidence first), not something
+this script should make for you.
 
 ### Step 2 — (a) archive-tag, then delete branches
 
@@ -474,12 +702,19 @@ git for-each-ref --format='%(refname:short)' refs/heads | sort |
 git for-each-ref --format='%(refname:short)' refs/heads | sort |
   comm -23 - "$PROTECT" |
   while read -r b; do
-    # a branch checked out anywhere must lose its worktree first
+    # a branch checked out anywhere must lose its worktree first.
+    # safe_remove_worktree (Step 1) refuses the main working tree, the frozen
+    # trees, dirty trees, and trees holding git-ignored evidence.
     git worktree list --porcelain |
       awk -v want="refs/heads/$b" '/^worktree /{p=substr($0,10)} $0=="branch "want{print p}' |
-      while read -r p; do run "git worktree remove --force '$p'"; done
+      while read -r p; do safe_remove_worktree "$p"; done
+    # if the worktree survived the guard, the branch is still checked out:
+    # leave it alone rather than fighting git for it
+    if git worktree list --porcelain | grep -qx "branch refs/heads/$b"; then
+      echo "SKIP branch (still checked out): $b"; continue
+    fi
     if git merge-base --is-ancestor "$b" "$SHIP" 2>/dev/null; then
-      run "git branch -d '$b'"          # merged: safe delete, refuses if wrong
+      run "git branch -D '$b'"          # see the design note below: -D, not -d
     else
       git rev-parse -q --verify "refs/tags/archive/$b" >/dev/null \
         || { echo "REFUSING $b: no archive tag"; continue; }
@@ -488,21 +723,55 @@ git for-each-ref --format='%(refname:short)' refs/heads | sort |
   done
 ```
 
-`git branch -d` for merged branches is deliberate: it refuses if the merge
-assumption is wrong, which is the check, not an inconvenience.
-
-Expected effect, VERIFIED by running the protect-list derivation read-only on
-2026-09-02 20:35 (no deletions performed):
+**Design note, corrected — it is `-D`, and the ancestry test above is the
+guard.** The first draft used `git branch -d` here on the reasoning that "it
+refuses if the merge assumption is wrong, which is the check". That reasoning
+is **REFUTED, by measurement.** `git branch -d` validates against the branch's
+configured *upstream* when it has one, and against *HEAD* otherwise — it never
+looks at `$SHIP`. Modelling that exactly over the 69 merged-and-deletable
+branches, from the checkout this plan tells you to run in
+(`atomic-acres-browser-arena`, HEAD `1fe03af1`, 2026-07-22):
 
 ```
-branches touched in the last 14 days   62
-protect-list total                     72
-deletable total                       323
-  of which already merged (no tag)      69
-  of which unmerged (archive-tagged)   254
+-d succeeds via HEAD          1
+-d succeeds via upstream     53
+-d REFUSES                   15   <- all 15 are genuine ancestors of 75a4e508
 ```
 
-So: **72 branches survive, 323 are retired, 254 `archive/*` tags are created.**
+Of the 15, **10 have no upstream at all** and **5 have an upstream that does not
+contain them** (their `origin/…` ref is behind the local branch). The guard
+fires on branches whose merge assumption is *right*, and under
+`set -euo pipefail` the first refusal kills the run — invisibly, because
+`APPLY=0` only echoes. The 15: `codex/pass61-experimental-netcode`,
+`pass61-release-browser-prereq`, `pass64-gameplay`, `pass65-final-stability-fixes`,
+`pass66-integration`, `pass69-3-arms-author-20260810`,
+`pass69-3-rigged-evidence-integration`, `pass69-live-soak`, `pass70-candidate`,
+`pass70-hands`, `pass70-optic-aperture`, `hermes/pass59-favicon-console-hygiene`,
+`pass59-menu-baseline-normalization`, `pass59-release-metadata`, and
+`evidence/dave-gaming-pc/codex/pass69-2-rejected-squash-main-mispoint`.
+
+The enclosing `git merge-base --is-ancestor "$b" "$SHIP"` already performs the
+check `-d` was believed to perform, against the *right* reference, so `-D`
+loses nothing: every branch reaching that arm is an ancestor of the shipping
+head and its commits stay reachable from `$SHIP`.
+
+Expected effect, VERIFIED by running the protect-list derivation read-only twice
+— at 20:00 and again at **20:50** on 2026-09-02, no deletions performed:
+
+```
+                                       20:00   20:50
+branches touched in the last 14 days      62      63
+protect-list total                        72      73
+deletable total                          323     323
+  of which already merged (no tag)        69      69
+  of which unmerged (archive-tagged)     254     254
+worktrees in the modelled removal set      —     325   (85 survive)
+```
+
+So: **73 branches survive, 323 are retired, 254 `archive/*` tags are created**,
+and at most 325 worktrees are offered for removal — of which the Step 1 guards
+will skip roughly 300 on ignored-evidence grounds until someone decides about
+them one by one.
 Those counts move with the protect-list at run time — that is the point of
 deriving it rather than pasting it. The 14-day window is deliberately generous;
 it keeps every PASS 79–85 branch, not just today's lanes. Narrow it to 3 days
@@ -512,31 +781,38 @@ tagged.
 ### Step 3 — (b) remove worktrees
 
 ```bash
-# stale registrations whose directory is gone (prune does NOT catch these)
-git worktree list --porcelain |
-  awk '/^worktree /{print substr($0,10)}' |
-  while read -r p; do [ -d "$p" ] || run "git worktree remove --force '$p'"; done
+# stale registrations whose directory is gone.
+# `prune` is the right tool and it does catch these: at the 20:35 re-scan zero
+# registered directories were missing and the three the 19:30 scan had seen
+# (aa-merge-audit-w2d-{w,x,y}) were already gone with no remove ever run.
 run "git worktree prune -v"
 
-# every clean worktree whose branch is now gone or is fully merged,
-# excluding the canonical checkout and the two frozen trees
+# every clean worktree whose branch is now gone or is fully merged.
+# safe_remove_worktree (Step 1) is the ONLY removal path: it refuses the main
+# working tree, the frozen trees and pass74-parked, refuses anything dirty,
+# refuses anything holding git-IGNORED evidence, and drops a node_modules
+# junction before --force can recurse through it.
 git worktree list --porcelain |
   awk '/^worktree /{p=substr($0,10); b="(detached)"} /^branch /{b=substr($0,8)} /^$/{if(p!=""){print p"\t"b; p=""}}' |
   while IFS=$'\t' read -r p b; do
-    case "$p" in
-      */atomic-acres-browser-arena|*/atomic-acres-gauntlet*|*/pass74-parked*) continue;;
-    esac
     [ -d "$p" ] || continue
-    [ -n "$(git -C "$p" status --porcelain)" ] && continue        # dirty: keep
     br=${b#refs/heads/}
     if [ "$br" = "(detached)" ] || ! git rev-parse -q --verify "refs/heads/$br" >/dev/null; then
-      run "git worktree remove --force '$p'"
+      safe_remove_worktree "$p"
     fi
   done
+
+echo "--- worktrees deliberately kept ---"; cat "$SKIPPED"
 ```
 
 Order matters: branches first (Step 2 removes the worktrees that block a
 delete), then this sweep catches detached and now-branchless trees.
+
+**Expect this step to skip far more than it removes, and that is correct.**
+319 of the 379 clean worktrees hold git-ignored evidence (§4). The skip list is
+the deliverable: it turns "delete 325 directories" into a reviewable inventory,
+and only the owner should decide which evidence trees are disposable. Deleting
+a worktree is the one irreversible action in this whole plan.
 
 ### Step 4 — (c) fast-forward `main`
 
@@ -604,8 +880,10 @@ checked against minified bytes, content-addressed root chooser, run-time
 enumeration of the retirement set, a HF-400 post-state assertion) and its own
 red test `publish_pass84_plan.test.mjs`.
 
-**In flight, noted 20:45 (VERIFIED, uncommitted in `aa-omp-pass84`):** the
-orchestrator has added `scripts/orchestration/roll_pass.py`, which *generates*
+**Noted at commit time, 20:04 BST; landed immediately after this report in
+`d606290c` (20:06:15) — the earlier "uncommitted, noted 20:45" was wrong on
+both counts (VERIFIED):** the orchestrator added
+`scripts/orchestration/roll_pass.py`, which *generates*
 `publish_pass{N}.py` from `publish_pass{N-1}.py` with every pass number rolled
 and each edit asserted to match exactly once, plus `publish_pass85.py` (913
 lines) and its plan test. That removes the hand-copy drift risk, which was the
@@ -632,7 +910,11 @@ still gains one ~900-line publisher per pass, permanently.
 4. Reconcile `release-channels.json` at head: it still declares **eight**
    channels (`latest`, `experimental`, `previous`, `retained`, `historical`,
    `stable`, `rollback`, `pass83Backup`) while production carries **two** trees.
-   `publish_pass84.py` guards this at publish time (lines 507–547), so it is
+   `publish_pass84.py` guards this at publish time in
+   `resolve_in_game_fallback()` / `assert_in_game_fallback_exists()` — cite the
+   symbols, not line numbers: `roll_pass.py` regenerates this file every pass,
+   so the "507–547" in the first draft is already ~494/526 at `75a4e508` and
+   will be wrong again by PASS 86. So it is
    not live-broken — but the checked-in manifest disagreeing with production is
    the exact shape of the `gotcha-published-but-unselectable-pass` failure.
    OPEN: owner/release lane to decide whether the manifest is trimmed to two.
@@ -644,8 +926,11 @@ still gains one ~900-line publisher per pass, permanently.
 | Item | Why | State |
 |---|---|---|
 | 82 Pass 71 branches, per-hunk | Nested candidate lineage; only the maximal tip was read in full (§2). All are archive-tagged, so nothing is lost. | CLAIMED |
-| Total disk reclaim | `du` over 412 worktrees exceeds the lane budget; three sampled (88 MB / 392 MB / 4.3 GB). | ESTIMATED |
-| `desky/final-publish-45a6a37`, `desky/gh-pages-v68-live` | **No merge-base with the shipping line at all** — separate `gh-pages` publish lineages, 94 and 0 commits not on `origin/gh-pages`. Content not diffable against `src/`; archive-tag and delete. | VERIFIED unrelated / CLAIMED disposable |
+| Total disk reclaim | `du` over 410 worktrees is ≈3.5 h (measured 32 s for one 2.8 GB tree, two >120 s); 17 sampled, spread 51.9 MB–8.0 GB. Median×325 to mean×325 = **250–530 GB**. | ESTIMATED |
+| Per-worktree size class | The structural class (`node_modules` / `dist*` / `public`) is a **poor** predictor — cells overlap by two orders of magnitude. Delivered as an inventory key only. | ESTIMATED |
+| All six `gh-pages`-lineage branches | **No merge-base with the shipping line at all** (VERIFIED for each: `git merge-base <b> 75a4e508` empty). `desky/final-publish-45a6a37` is 94 commits not on `origin/gh-pages`, `desky/gh-pages-v68-live` and `gh-pages-v68-pin` 8 each, `gh-pages` 5, the other two 2. Content not diffable against `src/`; archive-tag and delete. | VERIFIED unrelated / CLAIMED disposable |
+| Whether `git worktree remove --force` recurses through a `node_modules` junction | 173 worktrees link into ~20 hubs, 10 of them into the live `aa-omp-pass84` and 7 into the `main` checkout. Testing it means risking a live tree, so it was not tested. Step 1 drops the junction with `cmd //c rmdir` first, which makes the answer irrelevant. | OPEN |
+| Why the three `aa-merge-audit-w2d-*` registrations disappeared between 19:30 and 20:35 | No remove step was run by anyone. `prune` via auto-gc is the only mechanism that fits. The first draft's "prune does NOT catch these" is withdrawn. | NOT REPRODUCIBLE / OPEN |
 | `C:/c/Users/david/projects/atomic-acres-pass68-benchmark-fetch-fix` | Doubled drive prefix in the registered path. | OPEN |
 | Whether `ccfeec86`'s deletion was intentional | The message says nothing about it and the +52-line pin it describes is unrelated to all 22 files. Consistent with a stale working tree / `git add -A` — the `concurrent-sessions-one-worktree` failure mode. No record found either way. | OPEN |
 
@@ -667,3 +952,59 @@ line" (a shipping-line bug, not a branch to salvage).
 **Verify:** the survivor set drops from ~51 files per Pass 71 branch to zero
 real stranded modules, and the deletion query names a single commit — here
 `ccfeec86`, whose `--stat` shows 52 insertions against 6,259 deletions.
+
+### 7.2 Gotcha — a worktree-cleanup plan that only asks `git status`
+
+**Symptom:** a bulk `git worktree remove --force` sweep is presented as safe
+because every target reported clean, and archive tags are said to make "every
+deletion reversible".
+**Cause:** `git status --porcelain` does not report **ignored** files, and
+`.gitignore` is exactly where this repo puts the evidence a QA pass produces —
+`artifacts/`, `test-results/`, `playwright-report/`. Measured here: 319 of 379
+clean worktrees hold 58,069 ignored evidence files. Separately, `node_modules`
+is a Windows **junction** in 173 worktrees (10 of them pointing into the live
+integration tree, 7 into the `main` checkout), which is both why "carrying
+`node_modules` — this is the disk" was wrong (a junction costs ~0 bytes; the
+disk is `dist-*` copies at ~264 MB each) and a live risk if `--force` recurses
+through a reparse point.
+**Correction:** never remove a worktree without (i)
+`git status --porcelain --ignored=matching -- artifacts docs/evidence
+test-results playwright-report` plus a `find -type f` count, skipping and
+reporting anything with hits; (ii) `cmd //c rmdir "<path>\node_modules"` first
+to drop a junction without touching its target; (iii) a `git rev-parse
+--git-common-dir` test — it returns the literal `.git` only in the MAIN working
+tree — so the sweep can never be pointed at the repository itself. And say out
+loud that archive tags cover branches, never directories.
+**Verify:** the dry run prints a skip list rather than a clean removal list;
+`git rev-parse --git-common-dir` in `atomic-acres-browser-arena` returns `.git`
+while every linked worktree returns the absolute path, so the guard fires; and
+`du -sk` on a junction `node_modules` returns `0`, confirming it is not disk.
+
+---
+
+## 8. Repair record (2026-09-02, 20:27–21:20 BST)
+
+An independent skeptic reviewed `f1169a3e` and returned ACCEPT_WITH_FIXES: the
+**findings** (§3.1–§3.6, S1–S7) survived every attempt to refute them, including
+an attack on S1 using this report's own basename caveat; the **plan** did not.
+Everything below was re-measured by this repair pass, not accepted on report.
+
+| # | Issue | Severity | Disposition |
+|---|---|---|---|
+| B1 | Step 2 would `git worktree remove --force` the repository's **main** working tree (`atomic-acres-browser-arena`, on the deletable branch `agent/rig-weapon-hud-source-20260722`), which is also the directory the plan says to run from. Invisible in the dry run. | blocker | FIXED — blocking Step 0d; `safe_remove_worktree` refuses any tree whose `--git-common-dir` is `.git`; both Step 2 and Step 3 now go through it. Reproduced: the branch is in the 323, not the 73; Step 2's awk resolves that exact path. |
+| B2 | `git branch -d` refuses on **15 of the 69** correctly-merged branches (it checks upstream-or-HEAD, never `$SHIP`), aborting the run under `set -euo pipefail`. | blocker | FIXED — `-D`, with the ancestry test named as the guard. Reproduced exactly: 1 via HEAD, 53 via upstream, 15 refuse; 10 of the 15 have no upstream, 5 have one that is behind. The skeptic's "all 15 have no upstream" is itself corrected here. |
+| M3 | `--force` destroys git-ignored evidence that `git status --porcelain` cannot see; "every deletion is reversible" was false for worktrees. | major | FIXED — measured across **all 410** worktrees (the skeptic sampled 60): 319 clean trees, 58,069 ignored files. Guard added, §4 states plainly that tags do not cover directories, §7.2 records the gotcha. |
+| M4 | Brief Job 1 (per-branch rows) and Job 2 (per-worktree rows) undelivered; the `scan.tsv` / `wtfull.tsv` cited as evidence did not exist. | major | FIXED — `docs/evidence/pass85/lane-s/branch-scan.tsv` (396 rows), `worktree-scan.tsv` (410 rows), `worktree-size-samples.tsv` (17 `du` measurements), all committed. Codex branches batched by pass number in §3.0. On-disk size now attempted properly and declared ESTIMATED with its measured cost. |
+| M5 | Impossible measurement window (claimed 19:30–20:40 and "noted 20:45" for a commit that landed 20:04:40). | minor | FIXED — header and §5(e) corrected against `git log -1 --format=%cI`. |
+| M6 | No "as of" anchor on the headline counts. | minor | FIXED — §1 now carries both scans side by side with the anchor and the reason for the drift. |
+| M7 | `publish_pass84.py` guard cited by line number into a file regenerated every pass. | minor | FIXED — cited by symbol. |
+| — | "`git worktree prune --dry-run -v` printed nothing for the 3 missing directories, so `prune` does NOT catch them." | refuted | **WITHDRAWN.** Not reproducible: 0 missing directories at re-scan, all three already unregistered with no remove step run. §4 and Step 3 restated; mechanism OPEN. |
+| — | "4 orphan `gh-pages` lineage + 2 with no merge-base." | corrected | All **six** have no merge-base (VERIFIED per branch). |
+| — | "370 carrying `node_modules` — retire, this is the disk." | corrected | 173 of 371 are junctions costing ~0 bytes; disk is `dist-*` copies. New hazard section in §4. |
+
+Nothing in §3 changed. S1 — `ccfeec86`, an ancestor of the shipping head,
+deleting four verifiers and the 2,125-line `src/feel/**` subsystem under a
+message about an unrelated radar pin — was independently reproduced twice,
+including a basename search across all 5,613 paths at `75a4e508`, and remains
+the most important thing in this document. It needs no branch and no
+consolidation go-ahead: it can start now.

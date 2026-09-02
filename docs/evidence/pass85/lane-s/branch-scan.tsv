@@ -1,0 +1,397 @@
+branch	tip	committerdate_iso	author	merged	ahead	patch_unique	files_changed	insertions	deletions	class	subject
+agent/ci-navigation-hardening-20260722	3f86a520	2026-07-22T16:04:32+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: deduplicate verification and bound navigation
+agent/main-ci-hotfix-20260722	fadf0e8b	2026-07-22T14:44:40+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: allow full-hd software render evidence
+agent/pass57-release-metadata-20260722	76dde017	2026-07-22T15:44:50+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs: record Pass 57 production release
+agent/pass60-acres-ui-uav-20260723	0fb1aafd	2026-07-23T21:21:00+01:00	Dave Hatton	no	1	0	13	95	23	SUPERSEDED	fix(pass60): scale HUD and clear Acres routes
+agent/pass60-rustworks-20260723	ca205f8f	2026-07-23T21:29:58+01:00	Dave Hatton	no	1	0	12	491	157	SUPERSEDED	fix(rustworks): rebuild container yard and add Welsh flag
+agent/rig-weapon-hud-live-20260722	ff8efd50	2026-07-22T14:43:58+01:00	Dave Hatton	no	1	0	1	1	1	SUPERSEDED	test: allow full-hd software render evidence
+agent/rig-weapon-hud-source-20260722	1fe03af1	2026-07-27T15:40:06+01:00	Dave Hatton	no	4	4	52	2117	245	OLDER_UNMERGED	docs: add PASS 65 entry to in-game changelog
+agent/rustworks-ocean-layout-20260722	655a35a1	2026-07-22T15:16:39+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs: reconcile live player release history
+agent/skyline-terminal-overhaul-20260722	f079b0cd	2026-07-22T17:18:49+01:00	Dave Hatton	no	1	0	8	646	32	SUPERSEDED	feat: overhaul Skyline Terminal
+backup/claude-pass74-pre-highseas-20260822	c7944d82	2026-08-22T13:49:53+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass74): HF-347 dummy clock, HF-363 grain rewiring, water subtree dispose, CRLF repair
+backup/pass65-20260727	0050b15f	2026-07-27T15:31:35+01:00	Dave Hatton	no	2	2	44	1896	174	OLDER_UNMERGED	backup: pre-refinement Pass 65 baseline state
+backup/pass65-qoder-dirty-20260728	c827d76c	2026-07-28T05:17:14+01:00	Dave Hatton	no	2	1	35	827	161	OLDER_UNMERGED	On contrib/dave-gaming-pc/codex/pass65-integration: Qoder Pass 65 dirty checkpoint before Codex audit 2026-07-28
+backup/pass75-pre-claude-071-rebase-20260822	44ef42e4	2026-08-22T09:51:38+01:00	Dave Hatton	no	7	1	58	2931	180	OLDER_UNMERGED	fix(pass75): contain yacht perimeter without client deaths
+backup/pass78-fallback-20260823	fe68d1dc	2026-08-23T21:27:00+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	checkpoint(pass78): full swarm state - waves 1+2 landed, wave 3 in flight
+codex/atomic-acres-aesthetic-overhaul-20260722	018ca5b2	2026-07-22T17:35:22+01:00	Dave Hatton	no	1	0	17	364	96	SUPERSEDED	Refine Atomic Acres retro-future aesthetic
+codex/multiplayer-refinement-20260722	b09ad068	2026-07-22T13:30:17+01:00	Dave Hatton	no	1	0	1	3	3	SUPERSEDED	test: tolerate software-rendered evidence capture
+codex/pass54-wall-penetration-20260722	f4fdd8a2	2026-07-22T11:41:02+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat: add shared wall penetration
+codex/pass71-candidate-a-run-conclusions	2d3c37ee	2026-08-13T19:25:56+01:00	Dave Hatton	no	62	62	197	18541	2243	PASS71_FAMILY	release: bind Pass 71 preview to candidate A checks
+codex/rustworks-operator-refinement-20260722	88e127a2	2026-07-22T14:26:11+01:00	Dave Hatton	no	5	0	44	1170	285	SUPERSEDED	test: lock Rustworks visual refinement contract
+codex/shooting-range-20260722	f427c571	2026-07-22T12:00:43+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat: build indoor range armory
+contrib/dave-gaming-pc/claude/bus-doors-interior	75a4e508	2026-09-02T15:06:58+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass84): re-pin the EBR balance tests to HF-398 (52.1 / 33.6 / 46 rpm), the two source-shape pins the gamepad lane shifted, and give Map 3 a grade that clears the distinctiveness floor
+contrib/dave-gaming-pc/claude/eye-clearance-triage	7b05a660	2026-09-02T20:01:14+01:00	Dave Hatton	no	6	6	32	3540	49	ACTIVE_LANE	test(qa/eye-clearance): pin the authority seam, the annotations and the three-stage gate
+contrib/dave-gaming-pc/claude/farcrysis-load-fix	6b94915c	2026-09-02T14:18:20+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	evidence(farcrysis-load): keep the 23 probe/tsc/boot-smoke logs as .log.txt (the repo ignores *.log)
+contrib/dave-gaming-pc/claude/farcrysis-playable-preview	4331ae0f	2026-09-02T16:33:26+01:00	Dave Hatton	no	3	3	14	2565	44	ACTIVE_LANE	perf(farcrysis): measure in-combat frame time against atomic-acres and attribute the gap (PASS 85 Lane R, item 1)
+contrib/dave-gaming-pc/claude/gamepad-aim-assist	a49d92d4	2026-09-02T13:36:38+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(e2e): mixed-input regression gate, exact assist staging, real snap-cone headroom (PASS 84 Lane E) [REPAIR 2]
+contrib/dave-gaming-pc/claude/hf395-396-viewmodel	f9c6379b	2026-09-02T19:44:34+01:00	Dave Hatton	no	7	7	43	32300	142	ACTIVE_LANE	qa(HF-410 repair): commit the 0.08 m evidence the first pass asserted, re-measure penetration on the repaired tree, and ratchet the floor down to it
+contrib/dave-gaming-pc/claude/hf399-fps-regression	b0deba94	2026-09-02T14:31:07+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs(HF-399): tripwire + visual-parity evidence for the repaired HEAD
+contrib/dave-gaming-pc/claude/hf401-chopper-pilot	6e00ce7e	2026-09-02T15:29:52+01:00	Dave Hatton	no	6	6	5	1257	136	ACTIVE_LANE	docs(hf401): withdraw three refuted conclusions, escalate the one real blocker
+contrib/dave-gaming-pc/claude/hf402-spawn-layouts	a3f55846	2026-09-02T12:31:17+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	qa(hf402): bots are asserted, from the runtime's own spawn audit
+contrib/dave-gaming-pc/claude/hf403-mp-lab	05d15810	2026-09-02T13:44:13+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(mp-lab): a guest resuming against a perimeter wall is no longer NACKed as blocked (HF-403)
+contrib/dave-gaming-pc/claude/hf404-cross-browser-smooth	860019c8	2026-09-02T19:23:04+01:00	Dave Hatton	no	18	18	30	49307	177	ACTIVE_LANE	docs(HF-404): correct the Lane T evidence - matched thresholds, the cadence change, and a baseline not called clean
+contrib/dave-gaming-pc/claude/hf410-integration-prep	21730228	2026-09-02T20:22:18+01:00	Dave Hatton	no	59	59	199	74078	275	ACTIVE_LANE	Merge branch 'contrib/dave-gaming-pc/claude/hf395-396-viewmodel' into contrib/dave-gaming-pc/claude/hf410-integration-prep
+contrib/dave-gaming-pc/claude/hf411-walkable-parity	a105c944	2026-09-02T18:33:06+01:00	Dave Hatton	no	7	7	13	19160	10	ACTIVE_LANE	docs(pass85): track the Lane X report and correct the stale atomic-acres row (HF-411)
+contrib/dave-gaming-pc/claude/hf412-drop-shot	bd68c82b	2026-09-02T18:47:34+01:00	Dave Hatton	no	5	5	20	6964	13	ACTIVE_LANE	test(hf412): the guest-side two-client recording the ledger asks for, re-taken quiet receipts, and the HUD row inspected instead of assumed
+contrib/dave-gaming-pc/claude/hf413-arms-animations	fce720d8	2026-09-02T18:52:08+01:00	Dave Hatton	no	13	13	90	11559	42	ACTIVE_LANE	docs(hf413): after-repair evidence - 47 rows, the six-frame strips, and the first rendered minigun reload
+contrib/dave-gaming-pc/claude/ibl-first-arena	683f28aa	2026-09-02T18:35:24+01:00	Dave Hatton	no	8	8	24	4850	0	ACTIVE_LANE	docs(pass85): retract the overstated parity headline - 7 of 9, not 8, not 0.1%
+contrib/dave-gaming-pc/claude/load-time-deep-cut	b082bc83	2026-09-02T19:27:31+01:00	Dave Hatton	no	19	19	26	3887	0	ACTIVE_LANE	qa(pass85): arena switch matrix gate - the instrument HF-417 slipped past
+contrib/dave-gaming-pc/claude/map3-demo-showcase	cfce66a5	2026-09-02T19:23:19+01:00	Dave Hatton	no	10	10	62	3685	521	ACTIVE_LANE	evidence(map3): a spawn receipt that actually reproduces on the shipped tree (HF-409 repair)
+contrib/dave-gaming-pc/claude/nuketown-rejig	8d74618e	2026-09-02T19:00:27+01:00	Dave Hatton	no	14	14	71	4178	26	ACTIVE_LANE	docs(nuketown2): reword the last five near-verbatim source phrases into the lane's own words (HF-407)
+contrib/dave-gaming-pc/claude/pass74-20260821	97654025	2026-08-22T16:26:49+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs(pass74): HF-335 ledger - trajectory restored
+contrib/dave-gaming-pc/claude/pass74-skins-lane	b1f0bac5	2026-08-22T12:28:26+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass74-skins): HF-360 the authoring pipeline runs - three archetypes, nine GLBs
+contrib/dave-gaming-pc/claude/pass84-release-prep	9da6a1bf	2026-09-02T13:22:24+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	qa(release): enforce the built-identity check on the publish path (HF-406)
+contrib/dave-gaming-pc/claude/qa-corpus-streamline	462b5687	2026-09-02T20:15:08+01:00	Dave Hatton	no	4	4	22	1300	78	ACTIVE_LANE	docs(pass85): QA corpus audit - reachability of all 76 specs and 330 scripts/qa files, measured
+contrib/dave-gaming-pc/claude/raid-art-pass	75a4e508	2026-09-02T15:06:58+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass84): re-pin the EBR balance tests to HF-398 (52.1 / 33.6 / 46 rpm), the two source-shape pins the gamepad lane shifted, and give Map 3 a grade that clears the distinctiveness floor
+contrib/dave-gaming-pc/codex/atomic-acres-aesthetic-overhaul	edb15dd1	2026-07-22T19:44:48+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Harden software-rendered browser timing gates
+contrib/dave-gaming-pc/codex/ci-release-pipeline	044d61d1	2026-07-22T16:44:42+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: centralize contribution and production releases
+contrib/dave-gaming-pc/codex/pass58-release-metadata-20260722	65a92b95	2026-07-22T21:34:54+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Record Pass 58 and harden Pages receipt wait
+contrib/dave-gaming-pc/codex/pass60-feedback	dbe8ed56	2026-07-23T22:57:21+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: pin Pass 59 stable chooser contract
+contrib/dave-gaming-pc/codex/pass60-release-metadata	fd8cef33	2026-07-24T00:04:06+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix: resolve Pass 60 production timestamp
+contrib/dave-gaming-pc/codex/pass60-terminal-overhaul	721afd43	2026-07-23T21:13:47+01:00	Dave Hatton	no	1	0	2	167	37	SUPERSEDED	feat: overhaul Skyline Terminal presentation
+contrib/dave-gaming-pc/codex/pass61-experimental-netcode	4fdc92b6	2026-07-24T02:54:18+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat: add Pass 61 experimental netcode channel
+contrib/dave-gaming-pc/codex/pass61-release-browser-prereq	e0e977d5	2026-07-24T03:49:49+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: install browser before topology verification
+contrib/dave-gaming-pc/codex/pass62-gameplay-reconciliation	3aad07cf	2026-07-24T10:46:08+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: accept refined performance texture sampling
+contrib/dave-gaming-pc/codex/pass62-graphics-refinement	f2a675c3	2026-07-24T11:00:24+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix: restore authored lighting pools
+contrib/dave-gaming-pc/codex/pass62-netcode-correctness	40cbff44	2026-07-24T11:22:34+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(netcode): resolve immutable authored bullet timelines
+contrib/dave-gaming-pc/codex/pass62-offline-integration	005e44f6	2026-07-24T16:11:33+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	release: defer remaining visual defects to Pass 63
+contrib/dave-gaming-pc/codex/pass63-atomic-visuals	2e9e413e	2026-07-24T18:55:34+01:00	Dave Hatton	no	1	0	10	258	19	SUPERSEDED	fix: occlude Atomic lights and clear house apertures
+contrib/dave-gaming-pc/codex/pass63-cleanup	9ab0f302	2026-07-24T19:33:31+01:00	Dave Hatton	no	11	0	42	2793	145	SUPERSEDED	test: isolate authoritative netcode preview
+contrib/dave-gaming-pc/codex/pass63-live-stable62	2f6adedd	2026-07-25T02:56:12+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	accept exact Pass 63 preview
+contrib/dave-gaming-pc/codex/pass63-terminal-visuals	8bf104d3	2026-07-24T18:54:28+01:00	Dave Hatton	no	1	0	4	361	21	SUPERSEDED	fix: align Skyline Terminal openings with collision
+contrib/dave-gaming-pc/codex/pass63-text-chat	a42dd99a	2026-07-24T19:04:58+01:00	Dave Hatton	no	1	1	11	778	9	OLDER_UNMERGED	feat: add host-authoritative room text chat
+contrib/dave-gaming-pc/codex/pass64-diagnostics	5a7958cb	2026-07-25T11:01:07+01:00	Dave Hatton	no	4	2	11	1059	56	OLDER_UNMERGED	feat(pass64): add match diagnostics analyzer
+contrib/dave-gaming-pc/codex/pass64-gameplay	8a7dbd0f	2026-07-25T03:58:14+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Correct Pass 64 player-facing arena names
+contrib/dave-gaming-pc/codex/pass64-gameplay-audit-fixes	66fc584c	2026-07-25T14:11:36+01:00	Dave Hatton	no	1	0	8	78	7	SUPERSEDED	Fix Pass 64 diagnostic identity and result replay
+contrib/dave-gaming-pc/codex/pass64-hud	af4adaad	2026-07-25T02:33:03+01:00	Dave Hatton	no	2	0	23	923	136	SUPERSEDED	feat: add tactical HUD and accessible menu shell
+contrib/dave-gaming-pc/codex/pass64-hud-release-fixes	eadfa07a	2026-07-25T14:11:34+01:00	Dave Hatton	no	1	0	7	109	10	SUPERSEDED	Harden Pass 64 HUD release evidence
+contrib/dave-gaming-pc/codex/pass64-hud-v2	e1fdeec0	2026-07-25T10:24:30+01:00	Dave Hatton	no	1	0	8	2339	557	SUPERSEDED	feat(pass64): overhaul command menu and combat HUD
+contrib/dave-gaming-pc/codex/pass64-integration	7bbd89d5	2026-07-25T21:19:47+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass64): compare transient draw-call delta
+contrib/dave-gaming-pc/codex/pass64-playable-webgpu	75d6ef71	2026-07-25T11:09:39+01:00	Dave Hatton	no	1	1	16	1613	813	OLDER_UNMERGED	feat: complete playable WebGPU renderer migration
+contrib/dave-gaming-pc/codex/pass64-renderer	b597e651	2026-07-25T05:27:39+01:00	Dave Hatton	no	1	0	6	119	18	SUPERSEDED	fix(ci): scope presentation prewarm compilation
+contrib/dave-gaming-pc/codex/pass64-renderer-fixes	82f30e49	2026-07-25T14:15:12+01:00	Dave Hatton	no	1	1	11	491	191	OLDER_UNMERGED	fix(pass64): harden WebGPU renderer ownership
+contrib/dave-gaming-pc/codex/pass64-topology-smoke	a7ab56be	2026-07-25T22:07:53+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(release): smoke topology via rollback renderer
+contrib/dave-gaming-pc/codex/pass65-advanced-graphics	0cab17b4	2026-07-26T19:00:00+01:00	Dave Hatton	no	1	0	26	1657	229	SUPERSEDED	feat(pass65): make advanced graphics executable
+contrib/dave-gaming-pc/codex/pass65-advanced-graphics-audit	e485e631	2026-07-26T23:03:56+01:00	Dave Hatton	no	2	0	24	681	91	SUPERSEDED	feat(pass65): refine gun range cat preview
+contrib/dave-gaming-pc/codex/pass65-arsenal-audit-fixes	3a22f114	2026-07-26T10:43:50+01:00	Dave Hatton	no	1	1	25	574	97	OLDER_UNMERGED	fix(pass65): harden arsenal authority contracts
+contrib/dave-gaming-pc/codex/pass65-arsenal-runtime	c1fcc248	2026-07-26T09:47:24+01:00	Dave Hatton	no	1	0	46	4109	1806	SUPERSEDED	feat(pass65): add arsenal loadouts and ordnance
+contrib/dave-gaming-pc/codex/pass65-atomic-stability	53c4b7f0	2026-07-27T03:02:32+01:00	Dave Hatton	no	1	0	6	405	15	SUPERSEDED	fix(pass65): fail close Atomic profile authority parity
+contrib/dave-gaming-pc/codex/pass65-bot-catalog	7afa669c	2026-07-26T19:43:47+01:00	Dave Hatton	no	1	0	24	650	148	SUPERSEDED	feat(pass65): derive complete bot arsenal and cadence
+contrib/dave-gaming-pc/codex/pass65-decisions	95c62836	2026-07-26T07:57:52+01:00	Dave Hatton	no	1	0	9	466	240	SUPERSEDED	docs(pass65): freeze owner decisions and stable topology
+contrib/dave-gaming-pc/codex/pass65-destruction-material-parity	662f2b22	2026-07-27T11:09:49+01:00	Dave Hatton	no	2	0	26	2383	164	SUPERSEDED	feat(destruction): add bounded house breakup authority
+contrib/dave-gaming-pc/codex/pass65-djmaesen-arms-integration	211d9cca	2026-07-29T15:04:27+01:00	Dave Hatton	no	1	0	2	2150	0	SUPERSEDED	chore(pass65): preserve recovered arms authoring baseline
+contrib/dave-gaming-pc/codex/pass65-drone-motion-audit	916b4602	2026-07-29T13:19:14+01:00	Dave Hatton	no	1	0	2	33	1	SUPERSEDED	fix(drone): reverse along pitched flight vector
+contrib/dave-gaming-pc/codex/pass65-f-arbitration-fix	1bbf2fef	2026-07-29T13:43:49+01:00	Dave Hatton	no	2	0	3	61	36	SUPERSEDED	fix(input): retain global support handoff
+contrib/dave-gaming-pc/codex/pass65-f01	6e70f5c3	2026-07-26T03:37:30+01:00	Dave Hatton	no	4	0	2	1711	0	SUPERSEDED	Snapshot weapon values from descriptors
+contrib/dave-gaming-pc/codex/pass65-f02	a78f5575	2026-07-26T04:04:16+01:00	Dave Hatton	no	1	0	6	466	171	SUPERSEDED	Adapt B1 weapons through canonical catalog
+contrib/dave-gaming-pc/codex/pass65-f04-loadout	3da073d5	2026-07-26T04:34:56+01:00	Dave Hatton	no	1	0	2	1974	0	SUPERSEDED	Add Pass 65 loadout v2 schema foundation
+contrib/dave-gaming-pc/codex/pass65-final-menu-previews	2d50046b	2026-07-29T08:15:10+01:00	Dave Hatton	no	1	1	15	27	27	OLDER_UNMERGED	assets(pass65): recapture final menu previews
+contrib/dave-gaming-pc/codex/pass65-final-stability-fixes	5acbbfb8	2026-07-29T15:04:53+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(webgpu): complete HF-138 endurance workflows
+contrib/dave-gaming-pc/codex/pass65-flash-authority-audio	9ea99362	2026-07-27T10:01:53+01:00	Dave Hatton	no	1	1	15	1168	30	OLDER_UNMERGED	fix(flashbang): enforce host-authored victim effects
+contrib/dave-gaming-pc/codex/pass65-foundation	68e9ec34	2026-07-26T02:15:44+01:00	Dave Hatton	no	4	0	36	1944	0	SUPERSEDED	Align Pass 65 combat effects and policies
+contrib/dave-gaming-pc/codex/pass65-frame-pacing	13684a8a	2026-07-26T20:26:07+01:00	Dave Hatton	no	1	0	5	1036	0	SUPERSEDED	test(perf): gate Atomic frame pacing tails
+contrib/dave-gaming-pc/codex/pass65-gunrange-lighting	4197af2b	2026-07-26T08:09:12+01:00	Dave Hatton	no	1	0	6	497	20	SUPERSEDED	feat(pass65): bound Gun Range contrast lighting
+contrib/dave-gaming-pc/codex/pass65-hf-completeness-graph	c4d5e17f	2026-07-27T01:43:00+01:00	Dave Hatton	no	1	0	5	915	113	SUPERSEDED	feat(pass65): enforce owner feedback completeness graph
+contrib/dave-gaming-pc/codex/pass65-hf135-fire-ray	2802c16d	2026-07-29T15:14:39+01:00	Dave Hatton	no	1	1	10	455	22	OLDER_UNMERGED	fix(pass65): align chopper gunner fire with camera ray
+contrib/dave-gaming-pc/codex/pass65-hitl-assets	90f7b6a8	2026-07-26T15:51:28+01:00	Dave Hatton	no	1	0	23	1774	49	SUPERSEDED	feat(pass65): author Hunter Drone Blender asset family
+contrib/dave-gaming-pc/codex/pass65-hitl-identity	180ed738	2026-07-26T12:04:53+01:00	Dave Hatton	no	1	1	31	1526	86	OLDER_UNMERGED	feat(pass65): stage The Big One HITL identity
+contrib/dave-gaming-pc/codex/pass65-hitl-ui	e3cc650e	2026-07-26T15:26:00+01:00	Dave Hatton	no	1	0	10	394	21	SUPERSEDED	fix(pass65): restore tactical hud and graphics controls
+contrib/dave-gaming-pc/codex/pass65-hitl-world	d0ab3614	2026-07-26T15:39:41+01:00	Dave Hatton	no	1	1	13	294	112	OLDER_UNMERGED	fix(pass65): stabilize WebGPU arena presentation
+contrib/dave-gaming-pc/codex/pass65-house-destruction	227f081b	2026-07-26T23:51:20+01:00	Dave Hatton	no	1	0	3	239	8	SUPERSEDED	fix(pass65): retain physical house window debris
+contrib/dave-gaming-pc/codex/pass65-hud-modernize	328aa5f6	2026-07-27T10:56:50+01:00	Dave Hatton	no	2	1	15	1073	38	OLDER_UNMERGED	feat(countdown): strengthen bounded deployment cues
+contrib/dave-gaming-pc/codex/pass65-integration	7c57f0bc	2026-07-29T18:41:08+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass65): harden cold WebGL2 match admission
+contrib/dave-gaming-pc/codex/pass65-killstreak-blockers	2d52aeae	2026-07-26T11:41:27+01:00	Dave Hatton	no	1	0	14	1293	98	SUPERSEDED	feat(pass65): close killstreak authority blockers
+contrib/dave-gaming-pc/codex/pass65-killstreak-catalog-authority	1d6f3be3	2026-07-26T08:54:45+01:00	Dave Hatton	no	1	0	13	928	159	SUPERSEDED	feat(pass65): establish killstreak catalog authority
+contrib/dave-gaming-pc/codex/pass65-killstreak-runtime	505ec150	2026-07-26T10:11:47+01:00	Dave Hatton	no	1	1	21	2781	138	OLDER_UNMERGED	feat: implement Pass 65 killstreak authority
+contrib/dave-gaming-pc/codex/pass65-ladder-fix	1338ecac	2026-07-29T14:27:56+01:00	Dave Hatton	no	1	0	9	247	58	SUPERSEDED	fix(killstreaks): bank repeatable ladder charges
+contrib/dave-gaming-pc/codex/pass65-menu-lifecycle	3d5d3a1d	2026-07-26T08:28:21+01:00	Dave Hatton	no	1	0	9	836	63	SUPERSEDED	feat: harden active-match menu lifecycle
+contrib/dave-gaming-pc/codex/pass65-menu-lifecycle-v2	81fb0ab1	2026-07-26T19:55:28+01:00	Dave Hatton	no	1	1	4	434	20	OLDER_UNMERGED	fix(pass65): harden active match menu lifecycle
+contrib/dave-gaming-pc/codex/pass65-menu-lifecycle-v3	a6088412	2026-07-26T20:23:01+01:00	Dave Hatton	no	1	0	9	621	104	SUPERSEDED	fix(pass65): harden active match menu lifecycle
+contrib/dave-gaming-pc/codex/pass65-obb-collision	fbcbdc0f	2026-07-26T10:50:13+01:00	Dave Hatton	no	1	1	3	440	53	OLDER_UNMERGED	fix(collision): honor oriented dynamic world boxes
+contrib/dave-gaming-pc/codex/pass65-observer-effect-fix	ae72bdb2	2026-07-29T18:36:13+01:00	Dave Hatton	no	3	0	21	3366	71	SUPERSEDED	fix(pass65): harden cold WebGL2 match admission
+contrib/dave-gaming-pc/codex/pass65-operator-visual-gate	c62cd6a0	2026-07-27T01:09:14+01:00	Dave Hatton	no	1	1	38	2188	95	OLDER_UNMERGED	feat(pass65): forge gated third-person operator family
+contrib/dave-gaming-pc/codex/pass65-owner-native-gates	a9fd5e33	2026-07-29T13:47:46+01:00	Dave Hatton	no	1	0	3	130	26	SUPERSEDED	test(pass65): require native stability evidence
+contrib/dave-gaming-pc/codex/pass65-p0	6331400a	2026-07-26T00:42:49+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs(pass65): make reward eligibility enumerable
+contrib/dave-gaming-pc/codex/pass65-presentation-audio-blockers	4189aee3	2026-07-26T10:50:48+01:00	Dave Hatton	no	1	1	20	1412	46	OLDER_UNMERGED	feat(pass65): finish presentation and audio blockers
+contrib/dave-gaming-pc/codex/pass65-preview-choreography	addb62c5	2026-07-27T09:20:39+01:00	Dave Hatton	no	1	1	36	2044	590	OLDER_UNMERGED	feat(pass65): forge prerecorded menu preview family
+contrib/dave-gaming-pc/codex/pass65-preview-motion	2b32c972	2026-07-26T03:42:39+01:00	Dave Hatton	no	1	0	8	879	96	SUPERSEDED	feat(menu): choreograph Pass 65 preview flights
+contrib/dave-gaming-pc/codex/pass65-preview-video	48dcb9cb	2026-07-26T19:37:17+01:00	Dave Hatton	no	1	1	29	1495	394	OLDER_UNMERGED	feat: stream prerecorded map menu previews
+contrib/dave-gaming-pc/codex/pass65-production-vehicles	5f4d7715	2026-07-27T00:34:53+01:00	Dave Hatton	no	1	1	64	4186	117	OLDER_UNMERGED	feat(support): ship authored Pass 65 vehicle family
+contrib/dave-gaming-pc/codex/pass65-railgun-authoritative-visual	bec7fd73	2026-07-26T21:19:12+01:00	Dave Hatton	no	1	0	9	294	51	SUPERSEDED	fix(railgun): bind replicated beam to authority
+contrib/dave-gaming-pc/codex/pass65-railgun-multihit	734ee1c1	2026-07-29T09:57:30+01:00	Dave Hatton	no	2	0	14	1442	123	SUPERSEDED	fix(railgun): close protocol and observer identity gaps
+contrib/dave-gaming-pc/codex/pass65-semtex-streaks	1133117c	2026-07-26T19:32:29+01:00	Dave Hatton	no	1	0	51	1747	207	SUPERSEDED	feat: author semtex and unify support platforms
+contrib/dave-gaming-pc/codex/pass65-sensory-audio-settings-v2	97742072	2026-07-26T10:05:07+01:00	Dave Hatton	no	1	1	21	1760	153	OLDER_UNMERGED	feat(pass65): integrate sensory audio and settings
+contrib/dave-gaming-pc/codex/pass65-sensory-settings	de9208da	2026-07-26T01:36:47+01:00	Dave Hatton	no	2	0	2	1429	0	SUPERSEDED	fix(audio): harden sound event inventory contracts
+contrib/dave-gaming-pc/codex/pass65-shed-release-blockers	c307ecb9	2026-07-26T11:59:06+01:00	Dave Hatton	no	1	1	9	648	45	OLDER_UNMERGED	fix(pass65): complete shed damage presentation
+contrib/dave-gaming-pc/codex/pass65-skill-evidence-presentation	05dd2bcd	2026-07-26T03:12:31+01:00	Dave Hatton	no	5	0	107	5831	0	SUPERSEDED	fix(skills): bind evidence to semantic identity
+contrib/dave-gaming-pc/codex/pass65-skill-world-support	770c0e6c	2026-07-26T02:39:12+01:00	Dave Hatton	no	3	0	44	2523	0	SUPERSEDED	Strengthen Pass 65 world and support skill contracts
+contrib/dave-gaming-pc/codex/pass65-smoke-authority	f5c7d68f	2026-07-27T00:13:02+01:00	Dave Hatton	no	1	0	10	1052	55	SUPERSEDED	feat: replicate authoritative smoke corridors
+contrib/dave-gaming-pc/codex/pass65-spec-redteam-fix	a46ec149	2026-07-27T10:05:36+01:00	Dave Hatton	no	4	0	25	1390	293	SUPERSEDED	refactor(killstreak): centralize reward authority
+contrib/dave-gaming-pc/codex/pass65-support-authority-reconcile	f2ff7d82	2026-07-26T23:43:07+01:00	Dave Hatton	no	1	0	9	268	106	SUPERSEDED	fix(pass65): unify offensive support authority
+contrib/dave-gaming-pc/codex/pass65-support-redteam	701204d7	2026-07-27T11:25:25+01:00	Dave Hatton	no	1	0	5	355	21	SUPERSEDED	fix(killstreak): close support terminal lifecycles
+contrib/dave-gaming-pc/codex/pass65-support-visual-gate	187f5692	2026-07-26T21:38:55+01:00	Dave Hatton	no	1	0	14	1051	59	SUPERSEDED	feat(pass65): harden support targeting feedback
+contrib/dave-gaming-pc/codex/pass65-targeting-markers-railgun	4f4c94d2	2026-07-27T02:18:56+01:00	Dave Hatton	no	1	0	12	347	50	SUPERSEDED	feat(pass65): harden support markers and railgun visuals
+contrib/dave-gaming-pc/codex/pass65-text-integrity-guard	52602a10	2026-07-29T14:22:34+01:00	Dave Hatton	no	1	0	3	81	5	SUPERSEDED	test(repo): reject corrupted tracked text
+contrib/dave-gaming-pc/codex/pass65-uv-warning-trace	bac3e2c4	2026-07-29T09:32:43+01:00	Dave Hatton	no	1	0	2	15	0	SUPERSEDED	fix(webgpu): provide impact particle UVs
+contrib/dave-gaming-pc/codex/pass65-wave2-arms	c5bd341e	2026-07-29T06:35:08+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs(hitl): capture pass 65 correction wave two
+contrib/dave-gaming-pc/codex/pass65-wave2-chopper	5ac03889	2026-07-29T07:15:14+01:00	Dave Hatton	no	1	0	49	529	314	SUPERSEDED	feat(pass65): complete chopper presentation
+contrib/dave-gaming-pc/codex/pass65-wave2-drone	0dfef047	2026-07-29T07:11:37+01:00	Dave Hatton	no	1	1	21	832	131	OLDER_UNMERGED	fix(pass65): correct drone flight and carpet targeting
+contrib/dave-gaming-pc/codex/pass65-wave2-stability	c7cccbfd	2026-07-29T07:41:54+01:00	Dave Hatton	no	1	0	7	143	38	SUPERSEDED	fix(stability): batch support ground and shed blast work
+contrib/dave-gaming-pc/codex/pass65-weapon-asset-forge	2f524f3c	2026-07-27T11:32:29+01:00	Dave Hatton	no	5	3	470	26063	624	OLDER_UNMERGED	feat(assets): forge Pass 65 firearm production corpus
+contrib/dave-gaming-pc/codex/pass65-webgpu-gtao	0d0272ec	2026-07-27T00:24:43+01:00	Dave Hatton	no	2	0	14	215	49	SUPERSEDED	test(webgpu): validate custom GTAO review profile
+contrib/dave-gaming-pc/codex/pass66-adaptive-admission	221f35fb	2026-07-30T02:50:13+01:00	Dave Hatton	no	3	3	5	433	86	OLDER_UNMERGED	fix(pass66): lock WebGPU quality before active play
+contrib/dave-gaming-pc/codex/pass66-arms	8b58f2d1	2026-07-29T23:43:28+01:00	Dave Hatton	no	2	0	40	6855	292	SUPERSEDED	feat(pass66): forge licensed first-person arms
+contrib/dave-gaming-pc/codex/pass66-evidence-finalizer	f41d0e24	2026-07-30T01:50:48+01:00	Dave Hatton	no	1	0	3	1006	0	SUPERSEDED	feat(pass66): add fail-closed evidence finalizer
+contrib/dave-gaming-pc/codex/pass66-evidence-runner	1039be19	2026-07-30T04:48:02+01:00	Dave Hatton	no	4	1	14	2050	32	OLDER_UNMERGED	Bind Pass 66 hardware verifier identity
+contrib/dave-gaming-pc/codex/pass66-final-adjustments-20260801	80ae1551	2026-08-02T16:46:54+01:00	Dave Hatton	no	9	0	431	42797	3204	SUPERSEDED	fix(media): isolate long WebGPU arena captures
+contrib/dave-gaming-pc/codex/pass66-final-regression-audit	1fc15265	2026-07-30T02:57:34+01:00	Dave Hatton	no	1	0	3	137	40	SUPERSEDED	fix(pass66): fracture persistent window debris
+contrib/dave-gaming-pc/codex/pass66-functional-fixes	b80cf976	2026-07-30T22:36:53+01:00	Dave Hatton	no	1	0	6	103	8	SUPERSEDED	fix(pass66): Carpet Bomber shed obliteration crash and sniper ADS first-frame stall
+contrib/dave-gaming-pc/codex/pass66-integration	8c3ad1cd	2026-08-03T11:33:42+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(v67.1): manage-loadout card dark+readable (specificity fix); chooser live card shows PASS 67.1 not internal 66
+contrib/dave-gaming-pc/codex/pass66-interaction-glass-8127	675df63b	2026-07-30T22:07:02+01:00	Dave Hatton	no	3	1	21	910	229	OLDER_UNMERGED	Fix Pass 66 glass possession and audio authority
+contrib/dave-gaming-pc/codex/pass66-media	ec8f743d	2026-07-29T22:41:47+01:00	Dave Hatton	no	1	0	31	6863	558	SUPERSEDED	feat(media): forge deterministic Pass 66 map previews
+contrib/dave-gaming-pc/codex/pass66-owner-evidence	8cf644e2	2026-07-30T01:09:38+01:00	Dave Hatton	no	1	0	1	245	15	SUPERSEDED	fix(pass66): bind evidence descendant to frozen S0
+contrib/dave-gaming-pc/codex/pass66-preview-provenance	bd18a14b	2026-07-30T05:32:43+01:00	Dave Hatton	no	1	0	3	1145	0	SUPERSEDED	Verify immutable PR preview provenance
+contrib/dave-gaming-pc/codex/pass66-release-gate-hardening	cb0a9882	2026-07-30T05:35:34+01:00	Dave Hatton	no	2	0	4	702	126	SUPERSEDED	Validate exact Pass 66 acceptance projection
+contrib/dave-gaming-pc/codex/pass66-release-repairs	6cc6cbb5	2026-07-30T02:09:23+01:00	Dave Hatton	no	1	0	11	198	43	SUPERSEDED	fix(pass66): harden protected release topology
+contrib/dave-gaming-pc/codex/pass66-runtime	bcd2347a	2026-07-29T21:02:41+01:00	Dave Hatton	no	1	0	11	602	89	SUPERSEDED	feat(runtime): gate presentation and slice menu preparation
+contrib/dave-gaming-pc/codex/pass66-support	5ad8b5c5	2026-07-29T21:45:35+01:00	Dave Hatton	no	1	1	23	896	100	OLDER_UNMERGED	feat(pass66): harden support input and drone formation
+contrib/dave-gaming-pc/codex/pass66-support-presentation-audit	32f820c3	2026-07-30T21:56:41+01:00	Dave Hatton	no	5	2	47	1513	134	OLDER_UNMERGED	feat(pass66): upgrade field kit and streak presentations
+contrib/dave-gaming-pc/codex/pass66-ui-hud-reskin	ba48d44b	2026-07-30T19:51:09+01:00	Dave Hatton	no	1	0	7	820	2	SUPERSEDED	Overhaul Pass 66 tactical UI and HUD
+contrib/dave-gaming-pc/codex/pass66-viewmodel-frame-audit	81de1575	2026-07-30T19:03:51+01:00	Dave Hatton	no	1	0	6	247	33	SUPERSEDED	fix(pass66): bound M14 thermal work and viewmodel clipping
+contrib/dave-gaming-pc/codex/pass66-webgpu-performance	cdd05bea	2026-07-30T00:15:51+01:00	Dave Hatton	no	2	0	9	598	73	SUPERSEDED	fix(pass66): fence WebGPU readback admission
+contrib/dave-gaming-pc/codex/pass66-webgpu-preset-lock	7d8fa819	2026-07-30T04:04:42+01:00	Dave Hatton	no	4	0	12	737	132	SUPERSEDED	perf: cull closed Atomic arena backfaces
+contrib/dave-gaming-pc/codex/pass66-world	ecefb50d	2026-07-29T20:58:01+01:00	Dave Hatton	no	1	0	16	942	30	SUPERSEDED	feat(pass66): unify world and bot perception authority
+contrib/dave-gaming-pc/codex/pass69-3-all-finger-floors	acc527bd	2026-08-10T06:11:24+01:00	Dave Hatton	no	1	0	6	1059	301	SUPERSEDED	fix(bots): floor all carbine grip joints
+contrib/dave-gaming-pc/codex/pass69-3-arms-author-20260810	264c94f8	2026-08-10T04:14:12+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs(pass69.3): reopen first-person arms reauthoring
+contrib/dave-gaming-pc/codex/pass69-3-arms-reauthor-plan	4cefa5c0	2026-08-10T04:13:27+01:00	Dave Hatton	no	1	0	3	343	2	SUPERSEDED	docs(pass69.3): reopen first-person arms reauthoring
+contrib/dave-gaming-pc/codex/pass69-3-dummy-rgb-proof-v1	e45fad33	2026-08-10T11:57:29+01:00	Dave Hatton	no	1	0	13	2519	72	SUPERSEDED	test: prove Gun Range dummy production rasterization
+contrib/dave-gaming-pc/codex/pass69-3-first-fire-prewarm	69949a85	2026-08-10T02:34:42+01:00	Dave Hatton	no	1	0	6	291	21	SUPERSEDED	fix(gameplay): prewarm retained first-fire effects
+contrib/dave-gaming-pc/codex/pass69-3-hand-camera-v2	8e5bef16	2026-08-10T11:56:53+01:00	Dave Hatton	no	3	3	12	3111	84	OLDER_UNMERGED	fix: bind hand evidence to canonical operator skin
+contrib/dave-gaming-pc/codex/pass69-3-m14-prewarm	4ce8ddb8	2026-08-10T03:30:44+01:00	Dave Hatton	no	1	0	11	606	34	SUPERSEDED	fix: prewarm M14 fire and thermal ADS
+contrib/dave-gaming-pc/codex/pass69-3-reconciliation	bd3c660c	2026-08-10T11:03:14+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(qa): bind rigged evidence to main-camera draws
+contrib/dave-gaming-pc/codex/pass69-3-rigged-bot-live	2ca51ef7	2026-08-10T05:33:06+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass69.3): floor rendered right pinky pose
+contrib/dave-gaming-pc/codex/pass69-3-rigged-evidence-integration	4a22cc92	2026-08-10T14:16:23+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(qa): keep hand admission out of generic LOS
+contrib/dave-gaming-pc/codex/pass69-3-rigged-receipt-diag	724f14e5	2026-08-10T06:28:09+01:00	Dave Hatton	no	1	0	2	205	93	SUPERSEDED	fix(qa): diagnose rigged bot receipt failures
+contrib/dave-gaming-pc/codex/pass69-3-rigged-visual-los	3828d67a	2026-08-10T08:01:27+01:00	Dave Hatton	no	1	0	13	2663	235	SUPERSEDED	fix(qa): bind rigged bot evidence to visible frames
+contrib/dave-gaming-pc/codex/pass69-3-support-aircraft-live	4cd8a474	2026-08-10T02:48:01+01:00	Dave Hatton	no	1	0	8	740	5	SUPERSEDED	test(qa): add exact support aircraft live matrix
+contrib/dave-gaming-pc/codex/pass69-3-webgpu-special	7be1bd65	2026-08-10T04:10:16+01:00	Dave Hatton	no	1	0	12	649	111	SUPERSEDED	fix(rendering): retain special weapon light graph
+contrib/dave-gaming-pc/codex/pass69-live-soak	685ed786	2026-08-10T21:46:45+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	Merge pull request #57 from daveinturkey15-byte/contrib/dave-gaming-pc/codex/pass69-two-choice-verifier
+contrib/dave-gaming-pc/codex/pass69-main-windows-timeout	0727822a	2026-08-10T19:23:10+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	acceptance: record fallback admission evidence
+contrib/dave-gaming-pc/codex/pass69-publication	20ed41fb	2026-08-10T16:44:45+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: retrigger Pass 69 verification
+contrib/dave-gaming-pc/codex/pass69-two-choice-verifier	b55f47f9	2026-08-10T21:22:47+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(release): verify two-choice production topology
+contrib/dave-gaming-pc/codex/pass70-candidate	de7ca98d	2026-08-11T12:34:29+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	assets(pass70): recapture immutable menu previews v14
+contrib/dave-gaming-pc/codex/pass70-carpet-authority-rejoin	9dbf6271	2026-08-11T11:46:21+01:00	Dave Hatton	no	1	0	6	477	25	SUPERSEDED	fix: retain authoritative carpet fire across guest rejoin
+contrib/dave-gaming-pc/codex/pass70-carpet-hosted-fire	1d09bd4d	2026-08-11T11:21:39+01:00	Dave Hatton	no	1	0	6	338	10	SUPERSEDED	Fix hosted Carpet Bomber ground fire
+contrib/dave-gaming-pc/codex/pass70-carpet-reservation-lifecycle	81f30ea4	2026-08-11T12:10:22+01:00	Dave Hatton	no	1	0	5	215	15	SUPERSEDED	fix: reserve carpet authority through residual expiry
+contrib/dave-gaming-pc/codex/pass70-chopper-complete	c7e1070e	2026-08-11T09:54:49+01:00	Dave Hatton	no	1	1	34	830	188	OLDER_UNMERGED	feat: complete Pass 70 chopper gunner
+contrib/dave-gaming-pc/codex/pass70-context-loss-gate	d977e326	2026-08-11T10:25:36+01:00	Dave Hatton	no	1	0	4	383	13	SUPERSEDED	test(pass70): distinguish injected soak recovery
+contrib/dave-gaming-pc/codex/pass70-crossbow-bolt	22d20015	2026-08-11T07:41:36+01:00	Dave Hatton	no	1	0	4	219	3	SUPERSEDED	fix(pass70): clear crossbow bolt from optic
+contrib/dave-gaming-pc/codex/pass70-death-drop-expiry	28977fb0	2026-08-11T23:36:26+01:00	Dave Hatton	no	2	0	2	177	69	SUPERSEDED	test(pass70): require scavenge expiry margin
+contrib/dave-gaming-pc/codex/pass70-field-kit-ui	7c6b9b6a	2026-08-11T07:49:34+01:00	Dave Hatton	no	1	0	14	528	222	SUPERSEDED	feat(pass70): clarify Field Kit stats and save flow
+contrib/dave-gaming-pc/codex/pass70-fire	c09d8191	2026-08-11T07:49:20+01:00	Dave Hatton	no	1	0	13	215	60	SUPERSEDED	fix(pass70): make flare and ground fire damage exact
+contrib/dave-gaming-pc/codex/pass70-firefox-geckodriver	27808597	2026-08-11T17:37:44+01:00	Dave Hatton	no	4	0	4	2377	0	SUPERSEDED	test: preserve Firefox injected-script newlines
+contrib/dave-gaming-pc/codex/pass70-firefox-multiplayer	0e4ccb42	2026-08-11T15:18:47+01:00	Dave Hatton	no	1	0	9	764	19	SUPERSEDED	fix(pass70): harden cross-browser multiplayer presentation
+contrib/dave-gaming-pc/codex/pass70-hands	60ffbcc7	2026-08-11T09:04:10+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat(pass70): brand drone swarm bodies
+contrib/dave-gaming-pc/codex/pass70-hands-asset-finalize	e73b9f52	2026-08-11T11:51:23+01:00	Dave Hatton	no	1	0	23	1409	168	SUPERSEDED	asset(pass70): reauthor first-person hands master
+contrib/dave-gaming-pc/codex/pass70-hands-finish	9f72a21c	2026-08-11T09:49:21+01:00	Dave Hatton	no	1	0	2	218	15	SUPERSEDED	fix(pass70): reconcile first-person hand pose chain
+contrib/dave-gaming-pc/codex/pass70-hitl2-candidate	07a6bad5	2026-08-12T10:39:36+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: bound viewmodel geometry convergence
+contrib/dave-gaming-pc/codex/pass70-hitl2-fieldkit	9c760123	2026-08-11T13:56:59+01:00	Dave Hatton	no	2	0	10	105	10	SUPERSEDED	test(pass70): close custom loadout audit gaps
+contrib/dave-gaming-pc/codex/pass70-hitl2-support-testbay	a7434e5b	2026-08-11T19:50:38+01:00	Dave Hatton	no	1	0	53	4912	287	SUPERSEDED	feat(pass70): complete support and test-bay lane
+contrib/dave-gaming-pc/codex/pass70-hitl2-viewmodel-arms	240ee64a	2026-08-11T14:51:46+01:00	Dave Hatton	no	1	0	11	863	221	SUPERSEDED	fix(pass70): correct viewmodel grips and contact stow
+contrib/dave-gaming-pc/codex/pass70-hitl3-damage-audio-perf	66275a2b	2026-08-12T07:51:29+01:00	Dave Hatton	no	3	0	26	1393	169	SUPERSEDED	fix(pass70): seal residual flame authority edges
+contrib/dave-gaming-pc/codex/pass70-hitl3-gunrange-hud	a6ea3019	2026-08-12T07:52:11+01:00	Dave Hatton	no	1	1	27	1449	101	OLDER_UNMERGED	fix gun range clock sticky alerts and carpet collision
+contrib/dave-gaming-pc/codex/pass70-hitl3-viewmodel-xray	099fcaff	2026-08-12T07:29:30+01:00	Dave Hatton	no	1	0	12	1112	494	SUPERSEDED	fix viewmodel contact and exact operator reveals
+contrib/dave-gaming-pc/codex/pass70-host-timer-authority	1fe097a5	2026-08-11T10:49:22+01:00	Dave Hatton	no	1	0	13	804	41	SUPERSEDED	fix(pass70): make Gun Range clock host authoritative
+contrib/dave-gaming-pc/codex/pass70-hotfix-chopper-door	478700f8	2026-08-12T13:27:13+01:00	Dave Hatton	no	1	0	12	636	54	SUPERSEDED	Add authoritative chopper missiles and stabilize bay door lights
+contrib/dave-gaming-pc/codex/pass70-hotfix-combat-ui	c1bdbff8	2026-08-12T13:26:39+01:00	Dave Hatton	no	1	0	17	419	42	SUPERSEDED	fix(pass70): restore railgun reveal and prewarm glass impacts
+contrib/dave-gaming-pc/codex/pass70-hotfix-owner-round2	c405e10c	2026-08-12T18:47:31+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: retain Windows browser gate headroom
+contrib/dave-gaming-pc/codex/pass70-hotfix-viewmodel	81d77b6a	2026-08-12T13:16:38+01:00	Dave Hatton	no	1	0	10	377	89	SUPERSEDED	fix(pass70): harden viewmodel contact and arm IK
+contrib/dave-gaming-pc/codex/pass70-menu-preview-v14	a557b80f	2026-08-11T11:11:37+01:00	Dave Hatton	no	1	0	9	41	25	SUPERSEDED	chore(pass70): open immutable menu preview v14 family
+contrib/dave-gaming-pc/codex/pass70-multiplayer-fixes	712a931d	2026-08-11T11:28:28+01:00	Dave Hatton	no	3	1	27	577	133	OLDER_UNMERGED	fix(pass70): close multiplayer stability adversaries
+contrib/dave-gaming-pc/codex/pass70-optic-aperture	5508e491	2026-08-11T07:26:54+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass70): distinguish optic and iron apertures
+contrib/dave-gaming-pc/codex/pass70-owner-feedback-foundation	ee1802f2	2026-08-11T06:30:37+01:00	Dave Hatton	no	1	0	2	19	1	SUPERSEDED	test(pass70): bind start benchmark to owner gate
+contrib/dave-gaming-pc/codex/pass70-qoder-late-failures	73b25baa	2026-08-11T22:30:14+01:00	Dave Hatton	no	1	0	2	230	25	SUPERSEDED	test(pass70): stage Qoder recovery deterministically
+contrib/dave-gaming-pc/codex/pass70-qoder-rejoin-diagnostic	f5d5811d	2026-08-11T22:07:51+01:00	Dave Hatton	no	1	0	2	222	6	SUPERSEDED	test(pass70): foreground Qoder rejoin admission
+contrib/dave-gaming-pc/codex/pass70-qoder-sw-adapter-recovery	75b66c3d	2026-08-11T22:56:41+01:00	Dave Hatton	no	1	0	2	151	55	SUPERSEDED	test(pass70): isolate software host recovery
+contrib/dave-gaming-pc/codex/pass70-range-bots	b1dc4df9	2026-08-11T07:50:14+01:00	Dave Hatton	no	1	0	6	42	7	SUPERSEDED	fix(pass70): face and illuminate range dummies
+contrib/dave-gaming-pc/codex/pass70-recovery-pose-assert	1d623be2	2026-08-11T20:58:53+01:00	Dave Hatton	no	1	0	1	10	0	SUPERSEDED	test: bind recovered players to checkpoint poses
+contrib/dave-gaming-pc/codex/pass70-release-identity	d527c9ef	2026-08-11T10:12:57+01:00	Dave Hatton	no	1	0	19	220	95	SUPERSEDED	feat(pass70): stage truthful local release identity
+contrib/dave-gaming-pc/codex/pass70-surface-effects	e1254466	2026-08-11T08:57:28+01:00	Dave Hatton	no	1	0	7	121	7	SUPERSEDED	fix(pass70): retain decals and settle glass debris
+contrib/dave-gaming-pc/codex/pass70-test-bay-world	49f76764	2026-08-11T09:13:22+01:00	Dave Hatton	no	1	0	12	545	37	SUPERSEDED	fix(pass70): make the test bay world coherent
+contrib/dave-gaming-pc/codex/pass70-v15-preview-code	8612226f	2026-08-11T20:50:19+01:00	Dave Hatton	no	1	0	9	85	28	SUPERSEDED	chore(pass70): open immutable menu preview v15 family
+contrib/dave-gaming-pc/codex/pass70-weapon-contact-scope	c68ab4e3	2026-08-11T09:20:47+01:00	Dave Hatton	no	1	0	13	819	41	SUPERSEDED	fix(pass70): protect contact poses and author railgun scope
+contrib/dave-gaming-pc/codex/pass70-webkit-contract	33a076e2	2026-08-11T16:31:54+01:00	Dave Hatton	no	1	0	4	348	40	SUPERSEDED	test(pass70): qualify WebKit no-audio evidence
+contrib/dave-gaming-pc/codex/pass71-acceptance-static-timeout-fix	1fb919c9	2026-08-14T06:50:43+01:00	Dave Hatton	no	135	135	332	66949	2755	PASS71_FAMILY	test(acceptance): isolate Pass71 approval text policy
+contrib/dave-gaming-pc/codex/pass71-authority-hardening	f92b2725	2026-08-13T09:37:36+01:00	Dave Hatton	no	11	11	75	4114	1478	PASS71_FAMILY	fix(pass71): harden sticky and support feedback authority
+contrib/dave-gaming-pc/codex/pass71-bot-glass-protocol	8fafaa0f	2026-08-13T14:00:51+01:00	Dave Hatton	no	37	37	166	13698	2153	PASS71_FAMILY	fix(protocol): admit canonical bot glass events
+contrib/dave-gaming-pc/codex/pass71-candidate-287-chopper-fix	e219fbfd	2026-08-14T06:04:08+01:00	Dave Hatton	no	133	133	332	66903	2755	PASS71_FAMILY	fix(chopper): align tracked evidence with current authority
+contrib/dave-gaming-pc/codex/pass71-candidate-91ea-chopper-fix	cd1d2e02	2026-08-14T09:49:17+01:00	Dave Hatton	no	142	142	335	68661	2735	PASS71_FAMILY	test: fix Chopper evidence sequencing
+contrib/dave-gaming-pc/codex/pass71-capsule-evidence	16009b42	2026-08-13T13:41:37+01:00	Dave Hatton	no	35	35	165	13359	2134	PASS71_FAMILY	test(physics): prove shipped capsule contacts
+contrib/dave-gaming-pc/codex/pass71-chopper-69e-sequencing-fix	3ee514a8	2026-08-14T03:58:05+01:00	Dave Hatton	no	124	124	328	63779	2398	PASS71_FAMILY	test(chopper): arm evidence before presentation and input
+contrib/dave-gaming-pc/codex/pass71-chopper-ci-257b-fix2	a08ea9fd	2026-08-14T10:35:41+01:00	Dave Hatton	no	144	144	335	68909	2735	PASS71_FAMILY	test(chopper): separate software CI evidence
+contrib/dave-gaming-pc/codex/pass71-chopper-ci-6bf	0f667b4f	2026-08-14T08:56:01+01:00	Dave Hatton	no	139	139	335	68570	2755	PASS71_FAMILY	test(chopper): retain CI timing evidence before expiry
+contrib/dave-gaming-pc/codex/pass71-chopper-ci-fix	95d2189a	2026-08-13T17:05:43+01:00	Dave Hatton	no	46	46	174	15414	2205	PASS71_FAMILY	test: harden chopper evidence camera
+contrib/dave-gaming-pc/codex/pass71-chopper-ci-sequencing	b85998c5	2026-08-14T07:57:35+01:00	Dave Hatton	no	136	136	332	67716	2758	PASS71_FAMILY	test(chopper): sequence CI evidence before actions
+contrib/dave-gaming-pc/codex/pass71-ci-debris-readiness	47f99b01	2026-08-14T02:18:15+01:00	Dave Hatton	no	121	121	328	63188	2372	PASS71_FAMILY	test(glass): observe debris lifecycle in page
+contrib/dave-gaming-pc/codex/pass71-crossbow-candidate-fix	0ce824a4	2026-08-14T08:49:38+01:00	Dave Hatton	no	140	140	335	68542	2738	PASS71_FAMILY	test(quality): audit repaired Pass71 glass source
+contrib/dave-gaming-pc/codex/pass71-crossbow-fuse-ci	03529c75	2026-08-14T01:53:30+01:00	Dave Hatton	no	119	119	327	62882	2367	PASS71_FAMILY	test(glass): arm crossbow fuse observation before fire
+contrib/dave-gaming-pc/codex/pass71-debris-real-time-fallback	ec5ecd00	2026-08-14T04:26:06+01:00	Dave Hatton	no	125	125	328	64885	2461	PASS71_FAMILY	Fix crossbow target pane blast occlusion
+contrib/dave-gaming-pc/codex/pass71-dynamic-acceptance	a698496a	2026-08-13T12:06:05+01:00	Dave Hatton	no	29	29	147	10569	1988	PASS71_FAMILY	fix(release): select acceptance provenance dynamically
+contrib/dave-gaming-pc/codex/pass71-effects-audio-glass	c35dd012	2026-08-13T09:00:44+01:00	Dave Hatton	no	5	5	19	1516	341	PASS71_FAMILY	test(audio): gate soak on canonical readiness
+contrib/dave-gaming-pc/codex/pass71-final-quality-audit-7c9	d1257e9c	2026-08-14T07:49:03+01:00	Dave Hatton	no	137	137	335	67683	2752	PASS71_FAMILY	test(quality): audit final Pass71 glass source
+contrib/dave-gaming-pc/codex/pass71-final-quality-audit-e219	edb2f010	2026-08-14T06:09:24+01:00	Dave Hatton	no	134	134	332	66931	2755	PASS71_FAMILY	test(quality): audit final Pass71 source e219
+contrib/dave-gaming-pc/codex/pass71-final-quality-source-audit	36280f69	2026-08-14T04:30:16+01:00	Dave Hatton	no	129	129	328	65294	2469	PASS71_FAMILY	test(quality): audit final Pass71 runtime source
+contrib/dave-gaming-pc/codex/pass71-firefox-chrome-parity	bd25073c	2026-08-13T10:32:31+01:00	Dave Hatton	no	17	17	119	7734	1671	PASS71_FAMILY	test: add native Firefox Chrome parity gate
+contrib/dave-gaming-pc/codex/pass71-flare-exact-identity	21992f41	2026-08-13T18:27:02+01:00	Dave Hatton	no	59	59	184	16632	2241	PASS71_FAMILY	fix(glass): bind flare breach to exact collider
+contrib/dave-gaming-pc/codex/pass71-flare-settle-287	d2b0ed11	2026-08-14T05:04:33+01:00	Dave Hatton	no	131	131	328	65400	2469	PASS71_FAMILY	fix(glass): clamp exact-lifetime ULP drift
+contrib/dave-gaming-pc/codex/pass71-frame-budget-windows-fix	996740d3	2026-08-13T14:42:08+01:00	Dave Hatton	no	40	40	170	14912	2153	PASS71_FAMILY	test(pass71): require complete frame baselines
+contrib/dave-gaming-pc/codex/pass71-glass-ci-diagnosis	26de7920	2026-08-13T15:33:07+01:00	Dave Hatton	no	41	41	169	15078	2163	PASS71_FAMILY	fix(ci): shard Pass 71 supplemental browser gates
+contrib/dave-gaming-pc/codex/pass71-glass-ci-fix	dfa9aec7	2026-08-14T07:41:59+01:00	Dave Hatton	no	136	136	335	67677	2752	PASS71_FAMILY	fix(glass): retain exact impact and physics receipts
+contrib/dave-gaming-pc/codex/pass71-glass-eligibility	80622379	2026-08-13T10:18:51+01:00	Dave Hatton	no	17	17	123	7433	1685	PASS71_FAMILY	fix(pass71): breach glass for projectile weapons
+contrib/dave-gaming-pc/codex/pass71-glass-matrix-budget	712cbddf	2026-08-13T18:36:51+01:00	Dave Hatton	no	59	59	182	16561	2231	PASS71_FAMILY	test(glass): shard lifecycle action matrix
+contrib/dave-gaming-pc/codex/pass71-glass-matrix-reconcile	687e0a03	2026-08-13T18:14:43+01:00	Dave Hatton	no	56	56	181	16440	2222	PASS71_FAMILY	fix(glass): schedule pane collider reconciliation promptly
+contrib/dave-gaming-pc/codex/pass71-glass-second-fix	9dbb95be	2026-08-13T17:52:17+01:00	Dave Hatton	no	53	53	180	16380	2219	PASS71_FAMILY	fix(glass): classify flare pane contacts exactly
+contrib/dave-gaming-pc/codex/pass71-grenade-budget-287	efd3147a	2026-08-14T05:12:19+01:00	Dave Hatton	no	130	130	328	65389	2469	PASS71_FAMILY	test(pass71): calibrate software grenade CI budget
+contrib/dave-gaming-pc/codex/pass71-grenade-ci-semantic	b94525f7	2026-08-13T17:18:30+01:00	Dave Hatton	no	46	46	171	15624	2166	PASS71_FAMILY	test(grenades): split software CI action semantics
+contrib/dave-gaming-pc/codex/pass71-grenade-estimator-fix	f4b04056	2026-08-14T03:27:23+01:00	Dave Hatton	no	124	124	328	63550	2390	PASS71_FAMILY	test(pass71): stabilize software grenade frontier budget
+contrib/dave-gaming-pc/codex/pass71-grenade-native-receipt	b23821ba	2026-08-13T19:54:34+01:00	Dave Hatton	no	60	60	197	19002	2232	PASS71_FAMILY	qa: require full HF-298 grenade coverage
+contrib/dave-gaming-pc/codex/pass71-hf296-contact-evidence	086fc55a	2026-08-13T20:25:18+01:00	Dave Hatton	no	64	64	204	19766	2247	PASS71_FAMILY	qa: compose HF-296 contact evidence
+contrib/dave-gaming-pc/codex/pass71-hf296-full-closure-v2	db3389bf	2026-08-13T21:34:08+01:00	Dave Hatton	no	71	71	227	26957	2251	PASS71_FAMILY	test(pass71): add exact HF-296 contact closure evidence
+contrib/dave-gaming-pc/codex/pass71-hf297-arms-evidence	82218bfc	2026-08-13T20:58:29+01:00	Dave Hatton	no	69	69	226	25066	2250	PASS71_FAMILY	qa: keep partial HF-297 evidence non-closing
+contrib/dave-gaming-pc/codex/pass71-hf297-full-closure-v2	de8be844	2026-08-14T00:10:06+01:00	Dave Hatton	no	93	93	305	52685	2295	PASS71_FAMILY	test(pass71): close HF-297 full arms evidence
+contrib/dave-gaming-pc/codex/pass71-hf300-drone-thermal	cb5282ed	2026-08-13T22:32:13+01:00	Dave Hatton	no	79	79	247	34198	2253	PASS71_FAMILY	test(pass71): add exact HF-300 drone thermal evidence
+contrib/dave-gaming-pc/codex/pass71-hf302-hf311-host-attestation	eb4ce9e9	2026-08-14T00:43:22+01:00	Dave Hatton	no	107	107	312	54033	2303	PASS71_FAMILY	qa: attest Pass 71 evidence host identity
+contrib/dave-gaming-pc/codex/pass71-hf303-quality-visual	8065e634	2026-08-13T21:18:48+01:00	Dave Hatton	no	64	64	202	21253	2243	PASS71_FAMILY	qa: add HF-303 exact-camera Quality parity evidence
+contrib/dave-gaming-pc/codex/pass71-hf304-acceptance-registration	8ea8cffd	2026-08-14T00:52:20+01:00	Dave Hatton	no	110	110	318	57190	2295	PASS71_FAMILY	release: require live-hosted HF-304 evidence
+contrib/dave-gaming-pc/codex/pass71-hf304-full-evidence	53348ee1	2026-08-13T21:44:35+01:00	Dave Hatton	no	73	73	234	29051	2251	PASS71_FAMILY	qa: add HF-304 glass evidence component
+contrib/dave-gaming-pc/codex/pass71-hf304-live-hosted-closure	f5fce536	2026-08-14T00:41:26+01:00	Dave Hatton	no	93	93	302	52460	2287	PASS71_FAMILY	test(pass71): close HF-304 hosted glass evidence
+contrib/dave-gaming-pc/codex/pass71-hf305-nuke-evidence	7aa85595	2026-08-13T22:19:28+01:00	Dave Hatton	no	80	80	255	35703	2262	PASS71_FAMILY	test(pass71): add exact HF-305 nuke evidence
+contrib/dave-gaming-pc/codex/pass71-hf306-cockpit-evidence	f7dca1f0	2026-08-13T22:39:52+01:00	Dave Hatton	no	81	81	259	38090	2335	PASS71_FAMILY	test(pass71): close HF-306 cockpit framing evidence
+contrib/dave-gaming-pc/codex/pass71-hf306-integration-resolution	af8b6514	2026-08-13T22:47:23+01:00	Dave Hatton	no	87	87	279	44593	2286	PASS71_FAMILY	test(pass71): close HF-306 cockpit framing evidence
+contrib/dave-gaming-pc/codex/pass71-hf307-hf308-chopper-weapons	40f90b22	2026-08-13T23:13:17+01:00	Dave Hatton	no	84	84	274	41062	2354	PASS71_FAMILY	fix: close HF-307 chopper splash authority
+contrib/dave-gaming-pc/codex/pass71-hf308-acceptance-registration	f77100cd	2026-08-14T01:05:37+01:00	Dave Hatton	no	113	113	324	60967	2365	PASS71_FAMILY	release: require canonical HF-308 closure evidence
+contrib/dave-gaming-pc/codex/pass71-hf308-chopper-missiles	fa6414cb	2026-08-13T23:14:47+01:00	Dave Hatton	no	91	91	290	46911	2295	PASS71_FAMILY	fix: close HF-307 chopper splash authority
+contrib/dave-gaming-pc/codex/pass71-hf308-full-closure-v2	a7f04d54	2026-08-14T00:45:53+01:00	Dave Hatton	no	93	93	302	52987	2279	PASS71_FAMILY	test(pass71): close HF-308 chopper missile evidence
+contrib/dave-gaming-pc/codex/pass71-hf309-first-entry	75de026a	2026-08-13T23:13:51+01:00	Dave Hatton	no	86	86	279	44347	2345	PASS71_FAMILY	test(pass71): add exact HF-309 first-entry evidence
+contrib/dave-gaming-pc/codex/pass71-hf310-stuck-evidence	40ffe2dd	2026-08-13T20:11:07+01:00	Dave Hatton	no	62	62	199	20217	2242	PASS71_FAMILY	qa: own HF-310 STUCK raster evidence
+contrib/dave-gaming-pc/codex/pass71-hitch-release-gate	e2753e5c	2026-08-13T12:17:50+01:00	Dave Hatton	no	27	27	150	11048	2100	PASS71_FAMILY	test(pass71): gate first actions and pin rollback bytes
+contrib/dave-gaming-pc/codex/pass71-host-lobby-p0	20867ea4	2026-08-14T19:39:37+01:00	Dave Hatton	no	150	150	342	69774	2789	PASS71_FAMILY	test(pass71): require WebGPU Chrome Firefox lobby recovery
+contrib/dave-gaming-pc/codex/pass71-integration	16b43a71	2026-08-13T12:38:35+01:00	Dave Hatton	no	32	32	157	11775	2119	PASS71_FAMILY	test(pass71): cover projectile glass lifecycle natively
+contrib/dave-gaming-pc/codex/pass71-native-evidence-serial	cbfc4bf3	2026-08-14T01:17:46+01:00	Dave Hatton	no	108	108	314	55688	2303	PASS71_FAMILY	qa: serialize Pass 71 native evidence
+contrib/dave-gaming-pc/codex/pass71-native-feature-evidence	e72b2064	2026-08-13T13:02:37+01:00	Dave Hatton	no	31	31	158	12231	2118	PASS71_FAMILY	test: prove controlled support native runtime paths
+contrib/dave-gaming-pc/codex/pass71-native-parity-v3	ae7e162a	2026-08-13T20:36:21+01:00	Dave Hatton	no	64	64	199	20426	2244	PASS71_FAMILY	qa: harden native browser parity evidence
+contrib/dave-gaming-pc/codex/pass71-nuke-attribution	68360bc0	2026-08-13T17:22:11+01:00	Dave Hatton	no	50	50	178	15864	2218	PASS71_FAMILY	test(pass71): attribute nuke warning raster to beacon
+contrib/dave-gaming-pc/codex/pass71-nuke-shadow-race	55502dff	2026-08-13T16:38:29+01:00	Dave Hatton	no	47	47	173	15253	2178	PASS71_FAMILY	fix(rendering): use basic shadows on software WebGL
+contrib/dave-gaming-pc/codex/pass71-owner-fixes	fe64a4ec	2026-08-13T09:16:48+01:00	Dave Hatton	no	4	4	54	3927	284	PASS71_FAMILY	fix(pass71): raise authored chopper cockpit frame
+contrib/dave-gaming-pc/codex/pass71-perception-firefox	2c1b553c	2026-08-13T08:16:50+01:00	Dave Hatton	no	1	1	13	652	772	PASS71_FAMILY	fix: restore thermal reveals and Firefox presentation pacing
+contrib/dave-gaming-pc/codex/pass71-projectile-glass-native	3c49652f	2026-08-13T12:38:01+01:00	Dave Hatton	no	31	31	156	11723	2118	PASS71_FAMILY	test(pass71): cover projectile glass lifecycle natively
+contrib/dave-gaming-pc/codex/pass71-prone-native-fix	d417d2a6	2026-08-13T14:34:45+01:00	Dave Hatton	no	40	40	169	14917	2159	PASS71_FAMILY	fix(pass71): preserve viewmodel exposure at contact
+contrib/dave-gaming-pc/codex/pass71-quality-baseline	9494320d	2026-08-13T14:02:41+01:00	Dave Hatton	no	36	36	166	14210	2131	PASS71_FAMILY	test: audit read-only physics evidence variant
+contrib/dave-gaming-pc/codex/pass71-quality-baseline-floor-audit	1cea32ed	2026-08-14T02:52:46+01:00	Dave Hatton	no	123	123	328	63471	2390	PASS71_FAMILY	test(quality): audit canonical world-floor source
+contrib/dave-gaming-pc/codex/pass71-recovery-20260816	bba76d85	2026-08-16T21:58:49+01:00	Dave Hatton	no	168	168	345	70096	2829	PASS71_FAMILY	test(pass71): keep peer permits aligned during QA
+contrib/dave-gaming-pc/codex/pass71-release-candidate	5244dc83	2026-08-13T19:34:07+01:00	Dave Hatton	no	63	63	197	18660	2243	PASS71_FAMILY	release: verify candidate A acceptance receipt
+contrib/dave-gaming-pc/codex/pass71-release-identity-agent	a64faaf4	2026-08-13T09:45:57+01:00	Dave Hatton	no	15	15	115	6947	1669	PASS71_FAMILY	release(pass71): stage candidate identity
+contrib/dave-gaming-pc/codex/pass71-release-integration	eb098984	2026-08-14T22:30:09+01:00	Dave Hatton	no	163	163	344	69945	2796	PASS71_FAMILY	test(pass71): retain HF296 actor cell handshake
+contrib/dave-gaming-pc/codex/pass71-sleeve-crop	dcfefa48	2026-08-13T11:33:57+01:00	Dave Hatton	no	26	26	142	10019	1970	PASS71_FAMILY	fix(pass71): keep each sleeve connected below crop
+contrib/dave-gaming-pc/codex/pass71-sticky-onset-authority	872a7127	2026-08-13T10:04:31+01:00	Dave Hatton	no	16	16	102	7317	1618	PASS71_FAMILY	fix(pass71): authorize sticky alerts at attachment onset
+contrib/dave-gaming-pc/codex/pass71-sticky-receipt-race	a17a65e6	2026-08-13T11:19:11+01:00	Dave Hatton	no	20	20	132	8873	1809	PASS71_FAMILY	fix(pass71): queue reordered sticky receipts
+contrib/dave-gaming-pc/codex/pass71-stuck-raster	915f8c9b	2026-08-13T13:28:07+01:00	Dave Hatton	no	33	33	158	12042	2133	PASS71_FAMILY	fix(pass71): anchor sticky warning at presentation
+contrib/dave-gaming-pc/codex/pass71-viewmodel	809fc17a	2026-08-13T09:00:15+01:00	Dave Hatton	no	1	1	7	266	130	PASS71_FAMILY	fix(pass71): stabilize first-person arm presentation
+contrib/dave-gaming-pc/codex/pass71-windows-chopper-shard-fix	687d42af	2026-08-14T02:27:53+01:00	Dave Hatton	no	119	119	327	63108	2385	PASS71_FAMILY	test: stabilize Windows Chopper evidence
+contrib/dave-gaming-pc/codex/pass72-1-behavioral-corrections-20260821	2a8242d8	2026-08-21T20:33:39+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: own Pass 73 gameplay on Windows Chrome
+contrib/dave-gaming-pc/codex/pass72-integration-review-20260820	b3748f9e	2026-08-20T23:53:10+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	docs: finalize Pass 72 verification ledger
+contrib/dave-gaming-pc/codex/pass73-arms-collision-matrix-20260821	03a0f26e	2026-08-21T12:20:07+01:00	Dave Hatton	no	2	0	9	1971	52	SUPERSEDED	fix: prove continuous arms across action states
+contrib/dave-gaming-pc/codex/pass73-ci-gate-integration-20260821	606c0a5a	2026-08-21T09:54:38+01:00	Dave Hatton	no	1	0	7	161	2	SUPERSEDED	test(ci): require Pass 73 gameplay regression group
+contrib/dave-gaming-pc/codex/pass73-collision-route-authority-20260821	a7ee9534	2026-08-21T12:19:00+01:00	Dave Hatton	no	2	1	17	1207	50	OLDER_UNMERGED	Update Atomic Acres asset provenance
+contrib/dave-gaming-pc/codex/pass73-combat-network-authority-20260821	29b7a09d	2026-08-21T12:14:26+01:00	Dave Hatton	no	1	0	11	898	67	SUPERSEDED	test: prove pass 73 combat authority
+contrib/dave-gaming-pc/codex/pass73-evidence-ledger-20260821	bab4559e	2026-08-21T09:01:40+01:00	Dave Hatton	no	1	0	6	484	6	SUPERSEDED	docs: atomize pass 73 owner regressions
+contrib/dave-gaming-pc/codex/pass73-firefox-gate-audit-20260821	34c4fbbd	2026-08-21T10:20:09+01:00	Dave Hatton	no	1	0	6	1000	267	SUPERSEDED	test(pass73): harden Firefox Chrome WebGPU parity gate
+contrib/dave-gaming-pc/codex/pass73-gameplay-regressions-20260821	9f96d2b1	2026-08-21T09:11:39+01:00	Dave Hatton	no	1	0	18	1619	89	SUPERSEDED	fix pass73 gameplay regressions
+contrib/dave-gaming-pc/codex/pass73-grenade-native-gate-20260821	de45bdbe	2026-08-21T09:45:37+01:00	Dave Hatton	no	3	0	6	394	46	SUPERSEDED	fix: prewarm grenade final render context
+contrib/dave-gaming-pc/codex/pass73-hitl-release-20260821	81920310	2026-08-21T21:22:51+01:00	Dave Hatton	no	1	1	1	35	2	OLDER_UNMERGED	ci: add one-time Pass 73 HITL release path
+contrib/dave-gaming-pc/codex/pass73-installed-firefox-active-20260821	3a066b49	2026-08-21T12:44:34+01:00	Dave Hatton	no	1	1	8	1599	299	OLDER_UNMERGED	qa: require active visible Firefox parity matrix
+contrib/dave-gaming-pc/codex/pass73-live-graphics-harden-20260821	00a01550	2026-08-21T13:04:10+01:00	Dave Hatton	no	1	0	4	1716	227	SUPERSEDED	test: bind live graphics gate to staged native WebGPU
+contrib/dave-gaming-pc/codex/pass73-native-ads-reveal-20260821	3e44fd7c	2026-08-21T13:02:01+01:00	Dave Hatton	no	1	1	11	1894	11	OLDER_UNMERGED	Add native ADS reveal visual gate
+contrib/dave-gaming-pc/codex/pass73-network-reveal-gate-20260821	f337ae14	2026-08-21T10:46:57+01:00	Dave Hatton	no	1	0	9	849	7	SUPERSEDED	test: harden pass73 glass and reveal authority
+contrib/dave-gaming-pc/codex/pass73-release-topology-20260821	d63111b6	2026-08-21T09:36:38+01:00	Dave Hatton	no	1	0	24	713	212	SUPERSEDED	release: stage Pass 73 with exact retained history
+contrib/dave-gaming-pc/codex/pass73-renderer-viewmodel-20260821	c5b6cc5a	2026-08-21T09:26:15+01:00	Dave Hatton	no	1	0	43	1537	199	SUPERSEDED	fix(renderer): apply live graphics and restore viewmodel continuity
+contrib/dave-gaming-pc/codex/pass74-next	0d1ff896	2026-08-21T20:31:52+01:00	Dave Hatton	no	6	6	22	638	15	OLDER_UNMERGED	test: prove chopper audio audience
+contrib/dave-gaming-pc/codex/pass75-high-seas-audio-audit	e30af365	2026-08-22T08:08:11+01:00	Dave Hatton	no	6	1	60	2912	179	OLDER_UNMERGED	fix(diagnostics): expand D1 arena constraint
+contrib/dave-gaming-pc/codex/pass75-high-seas-identity-diagnostics-r3	e30af365	2026-08-22T08:08:11+01:00	Dave Hatton	no	6	1	60	2912	179	OLDER_UNMERGED	fix(diagnostics): expand D1 arena constraint
+contrib/dave-gaming-pc/codex/pass75-high-seas-preview-provenance	58e1817d	2026-08-22T13:47:27+01:00	Dave Hatton	no	1	1	20	10368	30	OLDER_UNMERGED	wip(pass75): preserve High Seas preview media
+contrib/dave-gaming-pc/codex/pass75-hijacked-geometry	bae724e8	2026-08-22T07:45:43+01:00	Dave Hatton	no	1	0	2	1533	0	SUPERSEDED	Pass 75: add High Seas yacht arena geometry
+contrib/dave-gaming-pc/codex/pass75-hijacked-systems	555d1a54	2026-08-22T08:01:09+01:00	Dave Hatton	no	1	1	49	739	140	OLDER_UNMERGED	feat(pass75): integrate High Seas arena systems
+contrib/dave-gaming-pc/codex/pass75-hijacked-verification	fe813009	2026-08-22T07:27:18+01:00	Dave Hatton	no	1	0	2	228	28	SUPERSEDED	feat: support stacked authored navigation levels
+contrib/dave-gaming-pc/codex/pass75-hijacked-yacht	b1187ea4	2026-08-22T11:13:58+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(qa): close arena surface and sky admission gaps
+contrib/dave-gaming-pc/codex/pass75-mobile-compact-six-card-fix	19d6586d	2026-08-22T13:47:26+01:00	Dave Hatton	no	1	1	3	10	3	OLDER_UNMERGED	wip(pass75): preserve compact mobile and six-card fixes
+contrib/dave-gaming-pc/codex/player-feedback-20260722	d5d856c0	2026-07-22T18:20:44+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Merge remote-tracking branch 'origin/main' into contrib/dave-gaming-pc/codex/player-feedback-20260722
+contrib/dave-gaming-pc/codex/release-ci-identity-20260722	31db2814	2026-07-22T20:46:50+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Fix production Pages commit identity
+contrib/dave-gaming-pc/codex/release-integration-20260722	a06c5040	2026-07-22T18:16:54+01:00	Dave Hatton	no	8	1	69	2930	361	OLDER_UNMERGED	test: reconcile combined level contracts
+contrib/dave-gaming-pc/codex/release-method-v2	56010706	2026-07-23T13:39:46+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Merge remote-tracking branch 'origin/main' into contrib/dave-gaming-pc/codex/release-method-v2
+contrib/dave-gaming-pc/codex/requirements-acceptance-gate	10f5847d	2026-07-24T10:00:59+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: bind releases to accepted requirements
+contrib/dave-gaming-pc/codex/rustworks-tower-overhaul	d6ac7885	2026-07-22T18:23:29+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Rebuild Rustworks tower combat space
+contrib/dave-gaming-pc/codex/skyline-terminal-overhaul	5fb048b0	2026-07-22T19:08:29+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Calibrate Atomic transient draw-call budget
+contrib/dave-gaming-pc/hermes/main-v671-reconcile	8c3ad1cd	2026-08-03T11:33:42+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(v67.1): manage-loadout card dark+readable (specificity fix); chooser live card shows PASS 67.1 not internal 66
+contrib/dave-gaming-pc/hermes/pass59-ci-determinism	72ab2684	2026-07-23T11:10:14+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: stabilize transient draw-call sampling
+contrib/dave-gaming-pc/hermes/pass59-favicon-console-hygiene	d8af62db	2026-07-23T13:05:23+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix: declare inline favicon for clean Pages logs
+contrib/dave-gaming-pc/hermes/pass59-menu-baseline-normalization	ad3a67d3	2026-07-23T12:05:14+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: normalize release text in menu baseline
+contrib/dave-gaming-pc/hermes/pass59-network-gameplay-maps-ui	8a4b674e	2026-07-23T10:30:13+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: allow bounded Linux shadow startup
+contrib/dave-gaming-pc/hermes/pass59-release-metadata	ed9e126d	2026-07-23T12:25:19+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: rely on normalized menu baseline
+contrib/dave-gaming-pc/hermes/pass68-benchmark-fetch-fix	aefa2c44	2026-08-06T20:02:52+01:00	Dave Hatton	no	4	0	1	5	0	SUPERSEDED	chore: retrigger CI
+contrib/dave-gaming-pc/hermes/pass68-chooser-labels	1383a615	2026-08-07T06:55:57+01:00	Dave Hatton	no	1	0	1	5	4	SUPERSEDED	fix(release-topology-browser): update chooser labels for Pass 68 topology
+contrib/dave-gaming-pc/hermes/pass68-historical-timestamp-gate	aa1b71d4	2026-08-07T08:53:20+01:00	Dave Hatton	no	1	0	1	6	2	SUPERSEDED	fix(release-topology-browser): preserve historical pending timestamps
+contrib/dave-gaming-pc/hermes/pass68-legacy-alias	d5de861f	2026-08-07T09:26:30+01:00	Dave Hatton	no	1	0	1	1	1	SUPERSEDED	fix(release-topology-browser): route legacy aliases to Pass 68
+contrib/dave-gaming-pc/hermes/pass68-release-workflow-fix	ba2fa174	2026-08-05T20:32:45+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	PASS 68: fix release-production workflow + source-contract test
+contrib/dave-gaming-pc/hermes/pass68-stable-changelog-id	b2439d8e	2026-08-07T09:08:40+01:00	Dave Hatton	no	1	0	2	2	2	SUPERSEDED	fix(release-topology-browser): verify pinned stable changelog identity
+contrib/dave-gaming-pc/hermes/pass68-topology-label-fix	854b6f96	2026-08-07T06:39:46+01:00	Dave Hatton	no	1	0	2	2	2	SUPERSEDED	fix(release-topology): accept v68 label + classify QA verifier as process-only
+contrib/dave-gaming-pc/hermes/pass69-1-mobile-controls	71d0e7ed	2026-08-08T16:09:11+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass69): harden rotation and version regressions
+contrib/dave-gaming-pc/hermes/pass69-2-runtime	b25df9da	2026-08-09T16:56:35+01:00	Dave Hatton	no	50	50	82	3557	818	OLDER_UNMERGED	chore(pass69.2): bind acceptance to v11 preview
+contrib/dave-gaming-pc/hermes/pass69-arms	612ad227	2026-08-07T19:30:13+01:00	Dave Hatton	no	1	0	2	41	30	SUPERSEDED	fix(viewmodel): solve mirrored arms in parent space
+contrib/dave-gaming-pc/hermes/pass69-art-lane	d9b3176e	2026-08-04T22:39:02+01:00	Dave Hatton	no	7	7	19	1885	47	OLDER_UNMERGED	feat(pass69): golden-hour jungle/beach art lane, throwback props, play-feel detailing
+contrib/dave-gaming-pc/hermes/pass69-chopper	6e6a4b5f	2026-08-07T19:23:37+01:00	Dave Hatton	no	1	0	4	63	4	SUPERSEDED	fix(chopper): reconcile authored presentation contract
+contrib/dave-gaming-pc/hermes/pass69-field-kit	a1513da9	2026-08-07T19:30:58+01:00	Dave Hatton	no	2	0	4	24	9	SUPERSEDED	fix(field-kit): keep weapon metrics inside cards
+contrib/dave-gaming-pc/hermes/pass69-hidden-farcrysis	83395da4	2026-08-07T18:41:50+01:00	Dave Hatton	no	21	21	63	12351	49	OLDER_UNMERGED	pass69(tick13): physics terrain-height fix — 55 interactables raised from floating/buried to sit on visual terrain surface; +9 new cover/breakables (crates, barrels, sandbags, trunks) with Rapier colliders; replicated terrainHeight+placementBaseY in physics module; additive only, TSL-clean, build green 712ms
+contrib/dave-gaming-pc/hermes/pass69-integrated	739807e6	2026-08-07T20:40:59+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass69): align acceptance chronology
+contrib/dave-gaming-pc/hermes/pass69-mobile-desktop-reconciliation	97c1a084	2026-08-08T12:20:11+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	chore(pass69): bind reviewed replacement preview
+contrib/dave-gaming-pc/hermes/pass69-release-shell	60cd8e6d	2026-08-07T23:14:16+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(acceptance): match embedded preview receipt time
+contrib/dave-gaming-pc/hermes/pass72-future-features-20260819	db9fade5	2026-08-20T11:13:23+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	release: record Pass 72 acceptance
+contrib/dave-gaming-pc/hermes/production-release-timestamp	03c470e7	2026-08-03T18:08:48+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	ci: fail closed on missing release timestamp
+contrib/dave-gaming-pc/hermes/sea-dragon-island-patrol	55090261	2026-07-28T07:57:24+01:00	Dave Hatton	no	1	1	18	1734	3	OLDER_UNMERGED	feat: add animated Azure Coil island patrol
+contrib/dave-gaming-pc/hermes/stable-last-release-timestamp	73cd5aaa	2026-08-08T13:47:58+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(release): timestamp stable fallback provenance
+contrib/dave-gaming-pc/hermes/v68-browser-fixes	2db57f11	2026-08-05T13:07:48+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass68): decouple renderer signal from deferred weapon readiness
+contrib/dave-gaming-pc/hermes/v68-bugfixes	ab0b6264	2026-08-04T22:42:54+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(pass64): assert canonical profile JSON instead of cleaned legacy keys in shared-profile test
+contrib/dave-gaming-pc/hermes/v68-live-test	5b65b308	2026-08-03T13:22:26+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(v68): balance, gun-range bots, possession perf, stable pin, tests
+contrib/dave-gaming-pc/hermes/v68-signal-admission	ff4b5706	2026-08-05T15:11:19+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test(pass68): enter gameplay before signal sampling
+contrib/dave-gaming-pc/omp/pass82-freeze-fixes	db969405	2026-09-01T21:08:31+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat(release): publish_pass82.py sibling - adds channels/pass82, retains PASS 81 as previous version
+contrib/dave-gaming-pc/omp/pass83-lobby-identity	e046c130	2026-09-01T21:36:21+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	chore(release): stamp PASS 83, publish_pass83.py sibling, re-pin topology pins
+contrib/dave-gaming-pc/omp/pass84-overnight	c75c452f	2026-09-02T20:20:03+01:00	Dave Hatton	no	51	51	158	41778	133	ACTIVE_LANE	docs(pass85): publish record - live 20:12 BST, what shipped, what build 2 carries
+desky/atomic-acres-backlog-86dc167	305e8fe2	2026-07-22T03:07:01+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	test: stabilize bounded browser verification
+desky/ci-evidence-timeouts-20260722	ece5d639	2026-07-22T14:00:35+01:00	Dave Hatton	no	1	0	2	3	2	SUPERSEDED	ci: remove duplicate PR runs and bound navigation
+desky/final-publish-45a6a37	334e12e4	2026-07-22T13:13:24+01:00	Dave Hatton	no	94	94	0	0	0	UNRELATED	Publish reconciled multiplayer release 62126b9
+desky/gemini-workhorse-pass56-20260722	7958c9f1	2026-07-22T13:55:12+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	Merge remote-tracking branch 'origin/main' into desky/gemini-workhorse-pass56-20260722
+desky/gh-pages-v68-live	d52a7d0e	2026-08-03T13:29:56+01:00	Dave Hatton	no	8	8	0	0	0	UNRELATED	deploy(v68): THE BIG ONE v68 live - stability, loading, gun range, combat fixes; stable = 67.1 singleplayer; chooser refresh hint
+desky/terminal-polish-20260722	8d506009	2026-07-22T11:41:43+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	feat: polish Skyline Terminal presentation
+evidence/dave-gaming-pc/codex/pass69-2-rejected-actual-head	b25df9da	2026-08-09T16:56:35+01:00	Dave Hatton	no	50	50	82	3557	818	OLDER_UNMERGED	chore(pass69.2): bind acceptance to v11 preview
+evidence/dave-gaming-pc/codex/pass69-2-rejected-squash	2864f2d4	2026-08-08T16:41:29+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	Merge pull request #53 from daveinturkey15-byte/contrib/dave-gaming-pc/hermes/pass69-1-mobile-controls
+evidence/dave-gaming-pc/codex/pass69-2-rejected-squash-main-mispoint	2864f2d4	2026-08-08T16:41:29+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	Merge pull request #53 from daveinturkey15-byte/contrib/dave-gaming-pc/hermes/pass69-1-mobile-controls
+gauntlet/pass79-omp-20260823	b138b9c0	2026-08-31T19:13:19+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix: gun clipping through walls, the chopper exit camera, and spawn layouts on every map
+gh-pages	df185260	2026-08-26T09:51:11+01:00	Dave Hatton	no	5	5	0	0	0	UNRELATED	publish: PASS 80 overnight refinement build as a third channel
+gh-pages-deploy-temp	446e71bf	2026-08-03T09:19:06+01:00	Dave Hatton	no	2	2	0	0	0	UNRELATED	deploy(v67.1): THE BIG ONE v67.1 - dual thumbstick mobile controls, glass-break hitch fix, kit-card brightness, fire button fix
+gh-pages-update	b7af3b75	2026-08-03T07:33:35+01:00	Dave Hatton	no	2	2	0	0	0	UNRELATED	deploy(v67.1): THE BIG ONE v67.1 live release with dual thumbstick mobile controls, glass-break hitch fix, kit-card brightness fix
+gh-pages-v68-pin	271cea28	2026-08-03T12:48:01+01:00	Dave Hatton	no	8	8	0	0	0	UNRELATED	deploy(stable): pin PASS 67.1 singleplayer from 8c3ad1cd4d819aba79f07c01c16c8c4294fd14c1
+hotfix/pass80-hide-farcrysis	e7317146	2026-08-28T17:16:44+01:00	Dave Hatton	no	2	1	9	461	7	OLDER_UNMERGED	fix: a first-time visitor could not deploy, and every gate filled in the field they lacked
+integration/pass74-plus-high-seas-20260822	ad30b2e2	2026-08-28T12:32:09+01:00	Dave Hatton	no	2	1	2	69	3	OLDER_UNMERGED	docs(lane-q): commit the finished cross-browser audit - it named three live faults
+lane/aa-lane-ballistics-20260828	1d37e17f	2026-08-28T21:57:58+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	fix(rustworks-1v1): concrete trench cover shoots like concrete, not drywall (HF-390)
+lane/aa-lane-grassmtn-20260828	cee9230a	2026-08-28T22:18:41+01:00	Dave Hatton	yes	0	0	0	0	0	MERGED	polish(nuketown): kept-lawn blade tune + WebGPU fps/still evidence scripts
+main	249a7ee7	2026-07-24T16:32:44+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	Merge pull request #30 from daveinturkey15-byte/contrib/dave-gaming-pc/codex/pass62-offline-integration
+pass71-audio-buzz	c3f64abf	2026-08-13T11:18:55+01:00	Dave Hatton	no	24	24	140	9538	1953	PASS71_FAMILY	fix(audio): remove periodic arena noise gust
+pass71-bot-glass-audit	d69a55d5	2026-08-13T10:41:33+01:00	Dave Hatton	no	20	20	133	8683	1811	PASS71_FAMILY	fix(pass71): admit hosted bot flare glass breaks
+pass71-glass-combined-check	0dd30991	2026-08-13T11:05:01+01:00	Dave Hatton	no	21	21	133	8925	1828	PASS71_FAMILY	fix(pass71): make projectile glass host-canonical
+pass71-guest-glass-authority	0423ce74	2026-08-13T11:03:40+01:00	Dave Hatton	no	20	20	132	8664	1828	PASS71_FAMILY	fix(pass71): make projectile glass host-canonical
+precheck-main	4e458676	2026-08-04T08:18:42+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	Merge pull request #38 from daveinturkey15-byte/contrib/dave-gaming-pc/hermes/production-release-timestamp
+test/pass65-chopper-assets	2df960ed	2026-08-07T09:32:28+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	fix(release-topology-browser): route legacy aliases to Pass 68 (#46)
+test/pass66-arms-pick	2df960ed	2026-08-07T09:32:28+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	fix(release-topology-browser): route legacy aliases to Pass 68 (#46)
+test/pass69-fieldkit-recovery	2df960ed	2026-08-07T09:32:28+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	fix(release-topology-browser): route legacy aliases to Pass 68 (#46)
+test/pass69-presentation-recovery	2df960ed	2026-08-07T09:32:28+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	fix(release-topology-browser): route legacy aliases to Pass 68 (#46)
+verify/pass68-final-verification	2df960ed	2026-08-07T09:32:28+01:00	daveinturkey15-byte	yes	0	0	0	0	0	MERGED	fix(release-topology-browser): route legacy aliases to Pass 68 (#46)
+wip/codex/pass66-arms-knife-experiment-20260730	d2ec780b	2026-07-30T22:17:37+01:00	Dave Hatton	no	1	1	18	560	532	OLDER_UNMERGED	wip(pass66): preserve arms and knife calibration experiment

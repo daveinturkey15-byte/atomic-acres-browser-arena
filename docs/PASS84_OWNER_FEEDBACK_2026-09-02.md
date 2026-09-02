@@ -574,3 +574,40 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
 - PROCESS: PASS 85 shipped with src/presentation-prewarm-contract.test.ts RED (a Lane Y
   doc comment put "snapshot()" inside the endurance-telemetry region; not in any lane's
   focused set). Fixed on integration; the PASS 86 cut runs the FULL suite.
+
+### PASS 86 cut guidance (orchestrator, 21:30 BST) — what the 22:20 cut merges
+Wave 2c2 verdicts are all ACCEPT_WITH_FIXES with repairs landed; the merge audit
+is running. Integration head 714d4121 (PASS 85 + Lane W + prewarm fix) passed the
+FULL vitest suite at 21:23 (549 files / 5206 tests). Merge set for PASS 86, in the
+auditor's order, each only if it merges clean and the full suite stays green:
+- **J eye-clearance triage** — merge; ALSO land its withheld F1 patch (skyline-
+  terminal nacelle collider transposed against its visual: authority x1.9/z4.1 vs
+  visual x4.1/z1.9) - a collider/visual parity defect, integrator-approved; keep
+  the two lowered ceilings (ratchets only tighten).
+- **N QA corpus streamline** — merge; apply its outside-ownership two-line
+  scripts/release/change-impact.mjs patch with the gamepad wiring contract; then
+  set LINE_CEILING for src/legacy-main.ts to the merged line count with a
+  CEILING_HISTORY entry naming the lanes that grew it (the documented procedure;
+  the gate fails in both directions so every merge that touches legacy-main needs
+  this step). Follow-up (PASS 87): make that gate a one-direction ratchet.
+- **T periodic stall** — merge ONLY if the repaired branch left the stall gate's
+  thresholdMs and the aliveness poll cadence no stricter-to-pass than before
+  (the skeptic found 95.5 -> 110 ms and 40 -> 4 steps); if either is still more
+  permissive, hold T for PASS 87. Its instruments and attribution are wanted.
+  Integrator decision on its withheld minimap patch: APPROVED at 30 Hz redraw
+  (MINIMAP_RENDER_HZ 60 -> 30) - land it in the PASS 87 residual lane.
+- **H gun-range switch + load cut** — merge if its report is in and green.
+- **U Nuke Town rebuild (nuketown2)** and **V Map 3 explore** — ONLY if their
+  finisher workers (launched 21:35 on branches contrib/dave-gaming-pc/claude/
+  nuketown-rejig and map3-demo-showcase) report MERGE-READY before the cut with
+  the full suite green; otherwise they ship in PASS 87. U's blockers found by the
+  skeptic: verbatim third-party prose in a committed doc (must be gone), the 2x
+  core on an unreachable roof, lawn decal inside the houses, no menu preview, no
+  rare-gun runtime switch. V's: card withdrawn, /map3.html dead on every published
+  channel (release topology orphans it), HUD still says TDM in explore.
+- **S** — docs only (committed on integration by the orchestrator); Lane AC must
+  apply the skeptic's two blockers to the plan (never `worktree remove --force`
+  the main working tree; `git branch -d` refusals) before executing anything.
+- Lane Y follow-up rows: bots have no stance; HUD/menu overflow with 8 arena
+  cards (menuOverflowX 250-312) - pass64-hud-menu spec 13 failed / 8 passed since
+  PASS 84 - assign to the PASS 87 streamline/UI pass.
