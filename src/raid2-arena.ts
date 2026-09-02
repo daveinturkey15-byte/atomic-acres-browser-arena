@@ -200,22 +200,73 @@ type Raid2Materials = Readonly<{
  * surface a player shoots at sits well above the paving in value so a silhouette
  * reads against it at range.
  */
+export const RAID2_PALETTE = Object.freeze({
+  /** The floor everything else is read against. */
+  travertine: 0x9a8f7d,
+  /** Walls. */
+  stucco: 0xc4b6a2,
+  /** Hard cover: piers, kerbs, plinths, counter runs, stair treads, rails. */
+  stone: 0xa8a496,
+  /** Mountable furniture and the pergola piers. */
+  timber: 0x8f6f4e,
+  court: 0x386b63,
+  poolTile: 0x2f5f74,
+  water: 0x2e9cb0,
+  glass: 0xbfd8de,
+  planting: 0x4a6540,
+  /** Presentation-only skirt OUTSIDE the boundary. Deliberately the darkest. */
+  hillside: 0x79805f,
+});
+
+/**
+ * Rec.709 relative luminance of a packed sRGB triple, 0..1. The readability
+ * gate (fidelity test 22) is written against this and nothing else, so "reads
+ * as black" stops being a matter of opinion.
+ */
+export function raid2PaletteLuminance(hex: number): number {
+  const r = ((hex >> 16) & 0xff) / 255;
+  const g = ((hex >> 8) & 0xff) / 255;
+  const b = (hex & 0xff) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 function raid2Materials(): Raid2Materials {
   return Object.freeze({
-    travertine: standard(0x9a8f7d, 0.93, 0.02),
-    stucco: standard(0xc4b6a2, 0.88, 0.02),
-    stone: standard(0x7b7466, 0.9, 0.02),
-    timber: standard(0x6d4f36, 0.86, 0.02),
-    court: standard(0x386b63, 0.95, 0.02),
-    poolTile: standard(0x2f5f74, 0.6, 0.04),
+    travertine: standard(RAID2_PALETTE.travertine, 0.93, 0.02),
+    stucco: standard(RAID2_PALETTE.stucco, 0.88, 0.02),
+    // 0xa8a496, not the 0x7b7466 this arena shipped with. That value measured
+    // 0.457 relative luminance against the paving's 0.565, i.e. the arena's
+    // COVER was darker than the floor it stands on, in direct contradiction of
+    // the readability rule stated four lines above. Under this grade (gain
+    // [0.92, 0.86, 1.0] pulls the frame down and green carries 72% of
+    // luminance) the shaded faces of the courtyard piers, the fountain kerb and
+    // the drive island read as silhouettes rather than as cover - visible in
+    // docs/evidence/pass85/lane-aq/judgeset/raid2-courtyard.png at the first
+    // capture. A pale cool limestone at 0.642 sits above the paving and stays
+    // separated from the warm stucco by hue rather than by value.
+    stone: standard(RAID2_PALETTE.stone, 0.9, 0.02),
+    // Likewise lifted from 0x6d4f36 (0.328). Timber is furniture and the two
+    // pergola piers; it stays the darkest family on the map on purpose, but
+    // 0.490 is a wood and 0.328 was a hole in the frame.
+    timber: standard(RAID2_PALETTE.timber, 0.86, 0.02),
+    court: standard(RAID2_PALETTE.court, 0.95, 0.02),
+    poolTile: standard(RAID2_PALETTE.poolTile, 0.6, 0.04),
     water: new THREE.MeshStandardMaterial({
-      color: 0x2e9cb0, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82,
+      color: RAID2_PALETTE.water, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82,
     }),
     glass: new THREE.MeshStandardMaterial({
-      color: 0xbfd8de, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.4,
+      color: RAID2_PALETTE.glass, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.4,
     }),
-    planting: standard(0x3d5535, 0.97, 0.01),
-    hillside: standard(0x5d6247, 0.98, 0),
+    // Lifted with the rest of the family (0x3d5535 -> 0x4a6540, 0.304 ->
+    // 0.363): the drive planters are HARD COVER at 1.9 m, so they are a
+    // shooting backdrop, not dressing.
+    planting: standard(RAID2_PALETTE.planting, 0.97, 0.01),
+    // The skirt beyond the boundary read as a flat black slab in the overview
+    // frame: 0x5d6247 measures 0.372 against paving 0.565, and it is the one
+    // surface with no wall bouncing light back into it. 0x79805f measures 0.486,
+    // still clearly BELOW the estate so it never competes with the playfield,
+    // but ground rather than void.
+    hillside: standard(RAID2_PALETTE.hillside, 0.98, 0),
   });
 }
 

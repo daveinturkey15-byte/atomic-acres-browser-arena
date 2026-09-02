@@ -88,7 +88,17 @@ export const definition = createProceduralArenaVisualDefinition({
     // Note 2: 0xfff2dc at 2.62 is test2's luminous key with a neutral spectrum.
     sunColor: 0xfff2dc, sunIntensity: 2.62,
     // Note 1: cooler than test2's 0x8fb2d8 because a midday sky is a bluer fill.
-    ambientColor: 0x86aede, ambientIntensity: 0.44,
+    //
+    // RAISED 0.44 -> 0.60 and desaturated 0x86aede -> 0x93b6dd in the repair
+    // pass. `scene.environment` is NULL on this route (note 0), so the flat
+    // ambient is the ONLY thing lighting a face the sun does not reach; at 0.44
+    // under a grade whose gain pulls green down, every shaded vertical on the
+    // map fell to a silhouette. 0.60 is inside the shipped envelope, not past
+    // it - rustworks-1v1 runs 0.72 and gun-range 0.64 - and the fill stays cool,
+    // which is the argument this note exists to protect. It is not a
+    // brightness dial for the arena: the key is untouched at 2.62, so only the
+    // shadow side moves.
+    ambientColor: 0x93b6dd, ambientIntensity: 0.6,
     practicals: [
       { id: 'raid2-estate-practicals', policy: 'emissive-only', maximumDistance: 0, castsShadow: false },
     ],

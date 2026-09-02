@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildRaid2, RAID2_BOUNDS, RAID2_UPPER_ROOMS, STAIR_RISERS, STAIR_RUN, STEP } from './raid2-arena';
+import { buildRaid2, RAID2_BOUNDS, RAID2_PALETTE, RAID2_UPPER_ROOMS, raid2PaletteLuminance, STAIR_RISERS, STAIR_RUN, STEP } from './raid2-arena';
 
 import { measureLayout } from '../scripts/qa/raid2-layout-metrics';
 import { AUTOSTEP_M, CELL_M as REACH_CELL_M, measureReachability, STAND_CAPSULE_M } from '../scripts/qa/raid2-reachability';
@@ -249,6 +249,40 @@ describe('raid2 layout fidelity — the rules the shipped map learned the hard w
  * on the geometry as it was authored and passes on the geometry as it stands,
  * so it is a falsifier and not a snapshot.
  */
+describe('raid2 readability — the half of the palette that is a gate', () => {
+  const luminance = (name: keyof typeof RAID2_PALETTE): number => raid2PaletteLuminance(RAID2_PALETTE[name]);
+
+  it('22. never puts a cover family darker than the floor it stands on', () => {
+    // src/raid2-arena.ts states the rule in its own material header: "every
+    // vertical surface a player shoots at sits well above the paving in value
+    // so a silhouette reads against it at range". The arena shipped breaking
+    // it. `stone` - the family carrying the courtyard piers, the fountain kerb,
+    // the drive island, the C3 counter run, every stair tread and every rail -
+    // measured 0.457 Rec.709 relative luminance against the paving's 0.565, so
+    // the map's cover was DARKER than its floor. Under this arena's grade
+    // (gain [0.92, 0.86, 1.0], and green carries 72% of luminance) those faces
+    // read as holes in the frame rather than as things to fight behind; the
+    // first judgeset capture shows it plainly in raid2-courtyard.png.
+    //
+    // The gate is the rule, not a taste: a hard-cover family may not sit below
+    // the paving. This assertion FAILS on the palette as it shipped.
+    expect(luminance('stone')).toBeGreaterThanOrEqual(luminance('travertine'));
+    expect(luminance('stucco')).toBeGreaterThanOrEqual(luminance('travertine'));
+    expect(luminance('planting')).toBeGreaterThan(0.35);
+  });
+
+  it('23. keeps the out-of-bounds skirt below the estate but above a void', () => {
+    // The hillside skirt is presentation-only and sits OUTSIDE the boundary, so
+    // it must never compete with the playfield - but at 0x5d6247 (0.372) it
+    // read as a flat black slab under the estate in the overview frame, which
+    // is the other half of the same defect. It stays the darkest family on the
+    // map and stays under the paving; it just stops being a void.
+    expect(luminance('hillside')).toBeLessThan(luminance('travertine'));
+    expect(luminance('hillside')).toBeGreaterThan(0.45);
+    expect(luminance('hillside')).toBeLessThan(luminance('stone'));
+  });
+});
+
 describe('raid2 traversal — every kept gameplay feature is reachable', () => {
   const reach = measureReachability(arena, RAID2_UPPER_ROOMS);
 

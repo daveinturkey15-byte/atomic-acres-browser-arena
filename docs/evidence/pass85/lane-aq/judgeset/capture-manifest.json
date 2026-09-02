@@ -1,8 +1,8 @@
 {
   "contract": "arena-viewpoint-regression-capture-v1",
   "verdict": "PASS",
-  "label": "raid2-shared-harness",
-  "sha": "b2abed4d",
+  "label": "raid2-repair",
+  "sha": "4c78e05c",
   "url": "http://127.0.0.1:41941",
   "renderer": "webgpu",
   "backend": "webgpu",
@@ -13,7 +13,7 @@
     "vendor": "nvidia",
     "architecture": "blackwell"
   },
-  "bundleAtStart": "/legacy-main-D_lnFTKG.js",
+  "bundleAtStart": "/legacy-main-0fy6bYpK.js",
   "viewport": {
     "width": 1280,
     "height": 720
@@ -21,7 +21,7 @@
   "seed": "viewpoint",
   "settleMs": 5000,
   "samples": 3,
-  "capturedAt": "2026-09-02T22:53:09.448Z",
+  "capturedAt": "2026-09-02T23:33:06.234Z",
   "environmentInvalid": null,
   "arenas": [
     {
@@ -31,155 +31,155 @@
         {
           "cameraId": "raid2-estate-overview",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-estate-overview.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-estate-overview.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-estate-overview.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-estate-overview.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-estate-overview.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-estate-overview.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-estate-overview.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-estate-overview.s2.png"
           ],
-          "committedFrame": 401,
+          "committedFrame": 315,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 427
+          "frame": 338
         },
         {
           "cameraId": "raid2-west-apron",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-west-apron.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-west-apron.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-west-apron.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-west-apron.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-west-apron.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-west-apron.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-west-apron.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-west-apron.s2.png"
           ],
-          "committedFrame": 700,
+          "committedFrame": 566,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 724
+          "frame": 589
         },
         {
           "cameraId": "raid2-garage-fan",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-garage-fan.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-garage-fan.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-garage-fan.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-garage-fan.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-garage-fan.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-garage-fan.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-garage-fan.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-garage-fan.s2.png"
           ],
-          "committedFrame": 993,
+          "committedFrame": 850,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 1014
+          "frame": 868
         },
         {
           "cameraId": "raid2-defining-lane",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-defining-lane.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-defining-lane.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-defining-lane.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-defining-lane.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-defining-lane.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-defining-lane.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-defining-lane.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-defining-lane.s2.png"
           ],
-          "committedFrame": 1266,
+          "committedFrame": 1129,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 1290
+          "frame": 1152
         },
         {
           "cameraId": "raid2-pool-deck-return",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-pool-deck-return.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-pool-deck-return.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-pool-deck-return.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-pool-deck-return.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-pool-deck-return.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-pool-deck-return.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-pool-deck-return.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-pool-deck-return.s2.png"
           ],
-          "committedFrame": 1561,
+          "committedFrame": 1409,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 1587
+          "frame": 1431
         },
         {
           "cameraId": "raid2-courtyard",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-courtyard.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-courtyard.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-courtyard.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-courtyard.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-courtyard.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-courtyard.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-courtyard.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-courtyard.s2.png"
           ],
-          "committedFrame": 1875,
+          "committedFrame": 1678,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 1906
+          "frame": 1704
         },
         {
           "cameraId": "raid2-house-spine",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-house-spine.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-house-spine.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-house-spine.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-house-spine.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-house-spine.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-house-spine.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-house-spine.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-house-spine.s2.png"
           ],
-          "committedFrame": 2240,
+          "committedFrame": 2027,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 2260
+          "frame": 2046
         },
         {
           "cameraId": "raid2-upper-bedroom",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-upper-bedroom.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-upper-bedroom.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-upper-bedroom.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-upper-bedroom.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-upper-bedroom.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-upper-bedroom.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-upper-bedroom.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-upper-bedroom.s2.png"
           ],
-          "committedFrame": 2516,
+          "committedFrame": 2325,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 2546
+          "frame": 2354
         },
         {
           "cameraId": "raid2-drive-balcony",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-balcony.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-balcony.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-balcony.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-balcony.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-balcony.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-balcony.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-balcony.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-balcony.s2.png"
           ],
-          "committedFrame": 2844,
+          "committedFrame": 2686,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 2871
+          "frame": 2709
         },
         {
           "cameraId": "raid2-drive-approach",
           "ok": true,
-          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-approach.png",
+          "path": "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-approach.png",
           "samplePaths": [
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-approach.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-approach.s1.png",
-            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\shared-harness\\raid2\\raid2-drive-approach.s2.png"
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-approach.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-approach.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-raid2\\artifacts\\raid2\\judgeset-repair\\raid2\\raid2-drive-approach.s2.png"
           ],
-          "committedFrame": 3157,
+          "committedFrame": 2965,
           "fixedTimeMs": 63000,
           "seed": 6401,
           "exposure": 1.04,
-          "frame": 3183
+          "frame": 2994
         }
       ],
-      "ms": 66356,
+      "ms": 70005,
       "errors": []
     }
   ]

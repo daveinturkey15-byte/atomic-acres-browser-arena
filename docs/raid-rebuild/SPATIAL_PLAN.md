@@ -136,17 +136,23 @@ Five rectangles, deliberately down from the shipped map's twelve. A simpler
 outline is not a cosmetic choice: every jog in the outline is a corner a player
 gets stuck in, and every jog is boundary mass that fragments the map's wall.
 
+Read out of `RAID2_BLOB` in `src/raid2-arena.ts` — the code is the authority and
+this table is generated from it, not maintained beside it. (It was maintained
+beside it once: the apron row said `−14 … +6` after the apron had already been
+extended north to `−20` in code, so the derived area below was wrong by 84 m².
+The skeptic caught that; the numbers here are recomputed.)
+
 | span x | z range | what it is |
 |---|---|---|
-| −50 … −36 | −14 … +6 | west spawn apron (a neck, not a room) |
+| −50 … −36 | −20 … +6 | west spawn apron (extended north to z −20 so it is an apron, not a 10 m neck) |
 | −36 … −20 | −36 … +16 | court and laundry flank |
 | −20 … +16 | −38 … +38 | the map's full-depth middle |
 | +16 … +34 | −36 … +32 | pool-wing and gallery flank |
 | +34 … +50 | −16 … +12 | east garage wing |
 
-Ground inside the outline: 5520 m² of a 7600 m² box = **72.6 %**; buildings
+Ground inside the outline: **5604 m² of a 7600 m² box = 73.7 %**; buildings
 subtract to a target accessible fill of **60–70 %**, holding the reference's
-62.4 %.
+62.4 %. Measured accessible fill on the build: **65.8 %**.
 
 ### 3.2 North lane — the pool terrace (the one long lane)
 
@@ -230,9 +236,17 @@ same exception, for the same reason, that the shipped map documents.
 
 ## 4. The gate bands, and the reason for each number
 
-Held by `src/raid2-fidelity.test.ts`. Every band is derived from a measurement in
-this document or from the shipped roster, never from what the build happened to
-produce.
+Held by `src/raid2-fidelity.test.ts`. Every band is either DERIVED — from a
+measurement in this document or from the shipped roster — or an explicit
+RATCHET pinned at what the build measures so that the next lane cannot make it
+worse. Which of the two each band is, is stated in the table.
+
+**One correction, on the record.** This section previously claimed that no band
+came from the build. That was false for band 5 (eye-blocking clusters): its
+written reason said "may not exceed Nuke Town's count", Nuke Town measures 33,
+and the assertion said 34 — which is exactly what the build produces. The band
+is now labelled a ratchet and says so, and band 5b was added as the DERIVED
+form of the same claim.
 
 | # | band | reason |
 |---|---|---|
@@ -240,7 +254,8 @@ produce.
 | 2 | accessible fill 0.58 – 0.72 | the reference's measured 62.4 %, ±0.07 for the flood fill's cell quantisation |
 | 3 | mean open line ≥ 13.0 m | Nuke Town measures 13.84 m on a map 42 % smaller. A larger map that sees less than a smaller one is the defect being fixed; the floor is set just under Nuke Town so the gate fails a regression rather than pinning a lucky build |
 | 4 | long-axis median ≥ 24.0 m | Nuke Town measures 26.55 m over a 74 m axis (36 %). 24 m over a 100 m axis is 24 % — deliberately below Nuke Town's ratio, because Raid's house band genuinely does interrupt its own long axis |
-| 5 | eye-blocking clusters ≤ 34 | Nuke Town builds its map from 33 masses. The shipped Raid uses 59. The rebuild may not exceed Nuke Town's count on a map with three lanes and four upper rooms |
+| 5 | **RATCHET:** eye-blocking clusters ≤ 34 | The build measures 34; Nuke Town measures 33. There is no reference number that says 34, so this band is pinned at the produced value with ZERO headroom, and its only job is that the next lane cannot add a mass silently. The 34th is accounted for: the house's mouth scheme (two interleaved openings per partition) necessarily strands four short wall segments between their own mouths — house west z −13.2…−10 (3.5 m²), partition west z −15.5…−13 (3.75 m²), partition east z −13…−10.3 (3.0 m²) and the house north-east return z −20…−19.2 (7.0 m²). Consolidating any of them means closing a mouth and breaking the no-line-crosses-both-partitions invariant, which is a real trade and is written down rather than smuggled into a band |
+| 5b | **DERIVED:** eye-blocking masses per 100 m² of accessible ground ≤ 0.87 | The same claim in the form a bigger map can be held to — a player experiences the number of separate things that end a sightline *per step of floor he walks*. Measured on the shipped roster: shipped Raid 59/5098 = 1.157, rustworks-1v1 0.889, Nuke Town 33/3803 = **0.868**, Terminal 0.469. The band is Nuke Town's own density. The rebuild measures 0.679 — 22 % under the band and 41 % under the map it replaces |
 | 6 | mean cluster ≥ 15.0 m² | fragmentation floor: the complement of #5. Shipped Raid 11.0 m², Nuke Town 17.2 m² |
 | 7 | roofed accessible ground ≤ 0.24 | shipped Raid 36.7 %, Nuke Town 13.0 %, Terminal 30.8 %. A mansion earns more roof than a suburb and less than an airport |
 | 8 | ≥45 m cells between 0.12 and 0.45 | the reference has exactly one long lane. Below 0.12 the long lane does not exist (shipped Raid is 0.106); above 0.45 the map is a field (Terminal is 0.889) |
@@ -250,6 +265,10 @@ produce.
 | 12 | mountable cover ≥ 24 pieces | the same proof from the other side: the map must still be full of things to fight behind |
 | 13 | x-mirror spawn fairness | every team-0 spawn has a team-1 partner within 2 m of its x-mirror, and no cross-team pair closer than 55 m |
 | 14 | no ground cover in the 0.9–1.8 m dead band | the cover rule the shipped map documents, carried forward |
+| 15 | **the traversal gate** — reachability pitch finer than one 0.45 m tread | `scripts/qa/raid2-reachability.ts` point-samples at 0.25 m. A 0.5 m lattice can miss a 0.45 m tread entirely and turn one 0.378 m riser into an apparent 0.756 m step, i.e. report a good stair as sealed and a sealed stair as good. A closed 0.45 m interval always contains a point of a 0.25 m lattice |
+| 16 | every upper room ≥ 99 % reachable from the spawn table, and none vacuously empty | Bands 1–14 are measured by a 2D ground-level rasteriser and are structurally blind to whether anything above grade can be stood on. The first revision of this arena passed all fourteen with **three of its four upper rooms physically unreachable**. The gate is an optimistic autostep-connected flood fill (0.42 m step, 1.82 m standing capsule) from the SPAWN TABLE ONLY; it fails on the geometry as it was authored |
+| 17 | zero unreachable patrol points | Bots do not climb and this arena authors no vertical navigation, so a patrol point not autostep-connected to a spawn is a node a bot walks at forever. Four of fifteen were, including one at grade inside the courtyard fountain kerb |
+| 18 | no hard-cover material family darker than the paving | The arena's own material header states it: every vertical surface a player shoots at must sit above the paving in value so a silhouette reads against it at range. The arena shipped breaking it — `stone`, which carries every piece of hard cover on the map, measured 0.457 Rec.709 luminance against the paving's 0.565. Asserted through `raid2PaletteLuminance()` |
 
 ---
 
