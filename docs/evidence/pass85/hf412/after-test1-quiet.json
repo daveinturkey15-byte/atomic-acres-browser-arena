@@ -1,0 +1,720 @@
+{
+  "label": "after",
+  "arena": "test1",
+  "capturedAt": "2026-09-02T16:05:26.434Z",
+  "weapon": "carbine",
+  "droppedAtMs": 603.7999999523163,
+  "roseAtMs": 1311.8999999761581,
+  "stanceAtDrop": "prone",
+  "finalStance": "stand",
+  "fireBlock": {
+    "total": 81,
+    "byReason": {
+      "rate-of-fire": 81
+    },
+    "last": "rate-of-fire",
+    "lastAtMs": 45264,
+    "lastFiredAtMs": 45225
+  },
+  "shotCount": 19,
+  "medianSteadyShotGapMs": 103.9,
+  "worstShotGapAcrossDropMs": 131,
+  "worstShotGapAcrossRiseMs": 110.6,
+  "shotsInFirst400msOfDrop": 4,
+  "fireInterruptedByDrop": false,
+  "cameraTransition": {
+    "totalFallMeters": 1.09,
+    "fivePercentAtMs": 662.5,
+    "ninetyFivePercentAtMs": 890.6,
+    "durationMs": 228.1,
+    "biggestSingleFrameFallMeters": 0.227,
+    "singleFrameFractionOfFall": 0.208
+  },
+  "pageErrors": [],
+  "shots": [
+    {
+      "t": 106.7,
+      "spent": 1
+    },
+    {
+      "t": 213.4,
+      "spent": 1
+    },
+    {
+      "t": 309.8,
+      "spent": 1
+    },
+    {
+      "t": 413.7,
+      "spent": 1
+    },
+    {
+      "t": 510.2,
+      "spent": 1
+    },
+    {
+      "t": 603.8,
+      "spent": 1
+    },
+    {
+      "t": 709.7,
+      "spent": 1
+    },
+    {
+      "t": 840.7,
+      "spent": 1
+    },
+    {
+      "t": 944,
+      "spent": 1
+    },
+    {
+      "t": 1056.6,
+      "spent": 1
+    },
+    {
+      "t": 1159.4,
+      "spent": 1
+    },
+    {
+      "t": 1258.2,
+      "spent": 1
+    },
+    {
+      "t": 1361.4,
+      "spent": 1
+    },
+    {
+      "t": 1472,
+      "spent": 1
+    },
+    {
+      "t": 1568.1,
+      "spent": 1
+    },
+    {
+      "t": 1662.5,
+      "spent": 1
+    },
+    {
+      "t": 1761.9,
+      "spent": 1
+    },
+    {
+      "t": 1867.4,
+      "spent": 1
+    },
+    {
+      "t": 1959.8,
+      "spent": 1
+    }
+  ],
+  "samples": [
+    {
+      "t": 0,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 31.3,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 56.1,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 74,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 89.8,
+      "ammo": 29,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 106.7,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 126.4,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 147.9,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 165.5,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 181.8,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 197.5,
+      "ammo": 28,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 213.4,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 238.2,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 255.1,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 274.9,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 292.8,
+      "ammo": 27,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 309.8,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 335.1,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 352.4,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 372.3,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 396.9,
+      "ammo": 26,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 413.7,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 437.6,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 457.9,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 479.8,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 496.3,
+      "ammo": 25,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 510.2,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 528.2,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 551.8,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 570.3,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 587.2,
+      "ammo": 24,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 603.8,
+      "ammo": 23,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 630.6,
+      "ammo": 23,
+      "camY": 1.8315,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 647.9,
+      "ammo": 23,
+      "camY": 1.8022,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 662.5,
+      "ammo": 23,
+      "camY": 1.7583,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 677.9,
+      "ammo": 23,
+      "camY": 1.7107,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 695.6,
+      "ammo": 23,
+      "camY": 1.6425,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 709.7,
+      "ammo": 22,
+      "camY": 1.5717,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 729.8,
+      "ammo": 22,
+      "camY": 1.4827,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 745.6,
+      "ammo": 22,
+      "camY": 1.3905,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 761.6,
+      "ammo": 22,
+      "camY": 1.3092,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 799.3,
+      "ammo": 22,
+      "camY": 1.1489,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 840.7,
+      "ammo": 21,
+      "camY": 0.922,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 870.9,
+      "ammo": 21,
+      "camY": 0.813,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 890.6,
+      "ammo": 21,
+      "camY": 0.7693,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 907.6,
+      "ammo": 21,
+      "camY": 0.7497,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 922.5,
+      "ammo": 21,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 944,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 990.1,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1013.7,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1033.1,
+      "ammo": 20,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1056.6,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1078,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1104.8,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1127.5,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1144.3,
+      "ammo": 19,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1159.4,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1179.8,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1195.1,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1213.7,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1228.1,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1242.7,
+      "ammo": 18,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1258.2,
+      "ammo": 17,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1276.8,
+      "ammo": 17,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1294.1,
+      "ammo": 17,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1311.9,
+      "ammo": 17,
+      "camY": 0.7484,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1337.4,
+      "ammo": 17,
+      "camY": 0.7506,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1361.4,
+      "ammo": 16,
+      "camY": 0.7806,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1385,
+      "ammo": 16,
+      "camY": 0.8257,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1407.1,
+      "ammo": 16,
+      "camY": 0.887,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1430.8,
+      "ammo": 16,
+      "camY": 0.9593,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1452.6,
+      "ammo": 16,
+      "camY": 1.033,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1472,
+      "ammo": 15,
+      "camY": 1.1181,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1494.4,
+      "ammo": 15,
+      "camY": 1.2141,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1512,
+      "ammo": 15,
+      "camY": 1.2839,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1531.4,
+      "ammo": 15,
+      "camY": 1.3612,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1551.4,
+      "ammo": 15,
+      "camY": 1.4601,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1568.1,
+      "ammo": 14,
+      "camY": 1.5262,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1593,
+      "ammo": 14,
+      "camY": 1.6197,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1610.5,
+      "ammo": 14,
+      "camY": 1.6796,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1629,
+      "ammo": 14,
+      "camY": 1.7256,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1645.9,
+      "ammo": 14,
+      "camY": 1.7709,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1662.5,
+      "ammo": 13,
+      "camY": 1.8041,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1685.6,
+      "ammo": 13,
+      "camY": 1.8316,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1703.6,
+      "ammo": 13,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1727.8,
+      "ammo": 13,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1746.6,
+      "ammo": 13,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1761.9,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1787.5,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1803.8,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1820.3,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1835.9,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1852.4,
+      "ammo": 12,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1867.4,
+      "ammo": 11,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1888.9,
+      "ammo": 11,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1909.3,
+      "ammo": 11,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1925,
+      "ammo": 11,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1941,
+      "ammo": 11,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1959.8,
+      "ammo": 10,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1982.4,
+      "ammo": 10,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    },
+    {
+      "t": 1998.7,
+      "ammo": 10,
+      "camY": 1.8384,
+      "stanceRecoveryMs": 0
+    }
+  ]
+}

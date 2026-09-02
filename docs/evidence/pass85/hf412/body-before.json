@@ -1,0 +1,147 @@
+{
+  "label": "before",
+  "arena": "atomic-acres",
+  "capturedAt": "2026-09-02T16:08:57.331Z",
+  "droppedAtMs": 254.60000002384186,
+  "proneBlendAtDrop": 0.4511883639059736,
+  "finalProneBlend": 0.9997751326758212,
+  "fivePercentAfterMs": 64.3,
+  "ninetyFivePercentAfterMs": 316.2,
+  "biggestSingleFrameBlendStep": 0.248,
+  "snapped": false,
+  "samples": [
+    {
+      "t": 0,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 62.2,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 125.9,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 190.1,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 254.6,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8400000000000001
+    },
+    {
+      "t": 318.9,
+      "stance": "prone",
+      "proneBlend": 0.4511883639059736,
+      "crouchBlend": 0,
+      "pivotHeight": 0.6550127707985509
+    },
+    {
+      "t": 384.5,
+      "stance": "prone",
+      "proneBlend": 0.6988057880877979,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5534896268840028
+    },
+    {
+      "t": 445.2,
+      "stance": "prone",
+      "proneBlend": 0.8347011117784136,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4977725441708505
+    },
+    {
+      "t": 505.8,
+      "stance": "prone",
+      "proneBlend": 0.9092820467105875,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4671943608486591
+    },
+    {
+      "t": 570.8,
+      "stance": "prone",
+      "proneBlend": 0.9502129316321362,
+      "crouchBlend": 0,
+      "pivotHeight": 0.45041269803082423
+    },
+    {
+      "t": 634.3,
+      "stance": "prone",
+      "proneBlend": 0.9726762775527075,
+      "crouchBlend": 0,
+      "pivotHeight": 0.44120272620338996
+    },
+    {
+      "t": 693,
+      "stance": "prone",
+      "proneBlend": 0.9850044231795223,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43614818649639586
+    },
+    {
+      "t": 756.6,
+      "stance": "prone",
+      "proneBlend": 0.99177025295098,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4333741962900982
+    },
+    {
+      "t": 824,
+      "stance": "prone",
+      "proneBlend": 0.9954834190573874,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43185179818647124
+    },
+    {
+      "t": 888.7,
+      "stance": "prone",
+      "proneBlend": 0.9975212478233336,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4310162883924332
+    },
+    {
+      "t": 950,
+      "stance": "prone",
+      "proneBlend": 0.9986396319624521,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4305577508953946
+    },
+    {
+      "t": 1016.9,
+      "stance": "prone",
+      "proneBlend": 0.9992534141916233,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43030610018143445
+    },
+    {
+      "t": 1090.7,
+      "stance": "prone",
+      "proneBlend": 0.9995902650210202,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43016799134138173
+    },
+    {
+      "t": 1156.6,
+      "stance": "prone",
+      "proneBlend": 0.9997751326758212,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43009219560291334
+    }
+  ]
+}

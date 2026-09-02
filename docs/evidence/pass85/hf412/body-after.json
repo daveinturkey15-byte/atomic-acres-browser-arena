@@ -1,0 +1,147 @@
+{
+  "label": "after",
+  "arena": "atomic-acres",
+  "capturedAt": "2026-09-02T16:07:47.482Z",
+  "droppedAtMs": 206.10000002384186,
+  "proneBlendAtDrop": 0.07407407407407408,
+  "finalProneBlend": 1,
+  "fivePercentAfterMs": 71,
+  "ninetyFivePercentAfterMs": 400.9,
+  "biggestSingleFrameBlendStep": 0.241,
+  "snapped": false,
+  "samples": [
+    {
+      "t": 0,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 73.8,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 141.7,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 206.1,
+      "stance": "stand",
+      "proneBlend": 0,
+      "crouchBlend": 0,
+      "pivotHeight": 0.84
+    },
+    {
+      "t": 277.1,
+      "stance": "prone",
+      "proneBlend": 0.07407407407407408,
+      "crouchBlend": 0,
+      "pivotHeight": 0.8096296296296297
+    },
+    {
+      "t": 344.6,
+      "stance": "prone",
+      "proneBlend": 0.2592592592592593,
+      "crouchBlend": 0,
+      "pivotHeight": 0.7337037037037037
+    },
+    {
+      "t": 405.5,
+      "stance": "prone",
+      "proneBlend": 0.5,
+      "crouchBlend": 0,
+      "pivotHeight": 0.635
+    },
+    {
+      "t": 470.1,
+      "stance": "prone",
+      "proneBlend": 0.7407407407407408,
+      "crouchBlend": 0,
+      "pivotHeight": 0.5362962962962963
+    },
+    {
+      "t": 538.1,
+      "stance": "prone",
+      "proneBlend": 0.9259259259259259,
+      "crouchBlend": 0,
+      "pivotHeight": 0.4603703703703704
+    },
+    {
+      "t": 607,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 677.9,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 745.6,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 807,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 870.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 931.8,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 996.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1052.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1114.4,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    },
+    {
+      "t": 1172.2,
+      "stance": "prone",
+      "proneBlend": 1,
+      "crouchBlend": 0,
+      "pivotHeight": 0.43
+    }
+  ]
+}
