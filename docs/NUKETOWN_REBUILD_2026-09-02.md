@@ -57,11 +57,11 @@ Nuketown?"*; Matthew Menke, *Nuketown Level Analysis* (Medium).
 | R2 | Two symmetrical sides split down the middle by a **road**. | VERIFIED |
 | R3 | **Two two-storey houses** with garages, backyards and accessible interiors, offering elevated sightlines toward the opposing spawn. | VERIFIED |
 | R4 | Each house has **two downstairs entries** (front door, back door) and **stairs to an upstairs window**. | VERIFIED |
-| R5 | The **front-facing upstairs windows are the biggest power positions**; the upstairs window covers the whole central lane. | VERIFIED |
+| R5 | The **front-facing upstairs windows are the strongest positions on the map**, because each one holds the whole central lane. | VERIFIED |
 | R6 | The **garage** is a tucked-away room that can see both the **closed end of the road** and the **yard behind its house**. | VERIFIED |
 | R7 | **Side paths along the north border** give distant views — the flank lane. | VERIFIED |
 | R8 | **Spawns are in the backyards behind each house.** | VERIFIED |
-| R9 | Central lane carries a **school bus**, a **moving truck / tractor-trailer** and **a couple of cars** as cover; the truck is the island of cover in the cul-de-sac. | VERIFIED |
+| R9 | The central lane carries a **school bus**, a **large moving truck** and **about two cars** as cover; the truck is the one piece of cover standing in the open closed end of the road. | VERIFIED |
 | R10 | De facto **three-lane flow**; flanks develop rapidly around the periphery. | VERIFIED |
 | R11 | Near-symmetric: both teams get the same options and sightlines; a single-storey house on one side would skew the match. | VERIFIED |
 | R12 | Very small, non-stop-action layout; one of the smallest maps in the series. | VERIFIED |

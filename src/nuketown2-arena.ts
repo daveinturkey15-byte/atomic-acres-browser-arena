@@ -249,7 +249,7 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
   // wall - which `nuketown2-fidelity.test.ts` caught on its first run, and
   // which is the identical failure src/railgun-authority.ts' header records
   // against the shipped map. This lands it in the FRONT upper room, at the
-  // window the reference calls the biggest power position, 0.7 m above the
+  // window the reference's analyses call its strongest position, 0.7 m above the
   // upper floor slab.
   position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.0] as const),
 })));
@@ -406,9 +406,9 @@ function nuketown2Materials(): Nuketown2Materials {
  * The plan is the reference's, described rather than copied: two ground rooms
  * split by an internal wall with a doorway, a front door and a back door so the
  * house is a route and not a room, a stair to the upper floor, and the front
- * upper window as a real opening in the wall rather than a decal — the reference
- * calls that window the biggest power position on the map, and it only is one if
- * you can actually shoot through it.
+ * upper window as a real opening in the wall rather than a decal. Published
+ * analyses agree that the front upstairs window is where the reference's map is
+ * won, and it only is that if you can actually shoot through it.
  */
 function house(builder: Builder, m: Nuketown2Materials): void {
   const siding = m.sidingA;

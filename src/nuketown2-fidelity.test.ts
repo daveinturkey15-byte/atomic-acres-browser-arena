@@ -278,7 +278,7 @@ describe('Nuke Town Rebuild fidelity', () => {
 
   it('keeps the power position real: the upper front window is an opening, and the rare gun lives there', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // Design doc R5: the upstairs front window is the biggest power position on
+    // Design doc R5: the upstairs front window is the strongest position on
     // the reference map, and it is only one if it is a hole rather than a
     // painting. Stand at each upper window seat and look across the road: the
     // seat must be unobstructed at eye height.

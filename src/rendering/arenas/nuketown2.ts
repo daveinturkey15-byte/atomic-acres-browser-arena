@@ -97,7 +97,7 @@ export const definition = createProceduralArenaVisualDefinition({
     // inside the 15 m clear run the fidelity test measures (x -20.5 to -5.5),
     // which is exactly the stretch this camera is supposed to be looking along.
     camera('nuketown2-street-centre', [-18, 1.7, 0], [24, 1.6, 0.4], 'geometry', 1.03),
-    // The reference's biggest power position: the north upper front window,
+    // The reference's strongest position: the north upper front window,
     // looking diagonally across the road at the south house's driveway rather
     // than straight into its own reflection. Interior looking out through a
     // real opening, so it is also the map's hardest light-occlusion frame.
