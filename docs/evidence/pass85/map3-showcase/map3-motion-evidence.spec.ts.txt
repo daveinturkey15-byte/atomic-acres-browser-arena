@@ -1,0 +1,124 @@
+/**
+ * MAP3 (HF-409) evidence: the in-game corridors are THERE, and they ANIMATE.
+ *
+ * The whole point of the arena frame hook is that the showcase does not arrive
+ * frozen, and the whole point of the arena rewrite is that the showcase is
+ * what the arena contains. A screenshot cannot show either; a structural dump
+ * of the built scene plus two frames a few seconds apart from the same pose,
+ * with a measured pixel delta between them, can.
+ *
+ * This spec is evidence, not a gate - it is run by hand for a lane report and
+ * is in no npm script.
+ */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { expect, test } from '@playwright/test';
+
+type DebugApi = {
+  selectArena: (id: string) => Promise<void>;
+  startSolo: () => void;
+  teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+  snapshot: () => { matchPhase: string; gameStarted: boolean };
+};
+
+const OUT = resolve('artifacts/pass85-laneV/motion');
+
+/** Where to stand, and which way to look, to see each corridor from its mouth. */
+const VIEWS: Array<{ id: string; x: number; z: number; yaw: number }> = [
+  { id: 'hub', x: 0, z: 0, yaw: 0 },
+  { id: 'shoreline', x: -26, z: -30, yaw: Math.PI },
+  { id: 'colosseum', x: 26, z: -30, yaw: Math.PI },
+  { id: 'raymarch', x: 30, z: -13, yaw: Math.PI / 2 },
+  { id: 'grammar', x: 30, z: 13, yaw: Math.PI / 2 },
+  { id: 'vegetation', x: 0, z: 30, yaw: 0 },
+  { id: 'godrays', x: -30, z: 13, yaw: -Math.PI / 2 },
+  { id: 'seasons', x: -30, z: -14, yaw: -Math.PI / 2 },
+];
+
+test('map3 in game: the showcase is present and moving', async ({ page }) => {
+  test.setTimeout(600_000);
+  mkdirSync(OUT, { recursive: true });
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(String(error).slice(0, 300)));
+
+  await page.goto('/?release=latest&renderer=webgpu&map=map3', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__),
+    undefined,
+    { timeout: 120_000 },
+  );
+  await page.evaluate(async () => {
+    await (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.selectArena('map3');
+  });
+  await page.evaluate(() => {
+    (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.startSolo();
+  });
+  await page.waitForFunction(() => {
+    const state = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__?.snapshot();
+    return state?.matchPhase === 'active' && state?.gameStarted === true;
+  }, undefined, { timeout: 240_000 });
+  await page.waitForTimeout(4_000);
+
+  // STRUCTURE: what is actually in the arena root, by lane.
+  const structure = await page.evaluate(() => {
+    const api = window as unknown as { __ATOMIC_ACRES_DEBUG__: { sampleSceneGraph: () => unknown } };
+    const scene = api.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph() as {
+      traverse: (visit: (node: Record<string, unknown>) => void) => void;
+    };
+    const lanes: Record<string, { meshes: number; triangles: number; names: string[] }> = {};
+    let arenaRootChildren: string[] = [];
+    scene.traverse((node) => {
+      const name = String((node as { name?: string }).name ?? '');
+      if (name === 'Map3 arena') {
+        arenaRootChildren = ((node as { children?: Array<{ name?: string }> }).children ?? [])
+          .map((child) => String(child.name ?? '(unnamed)'));
+      }
+      if (!name.startsWith('map3-lane-')) return;
+      const entry = { meshes: 0, triangles: 0, names: [] as string[] };
+      (node as unknown as { traverse: (visit: (n: Record<string, unknown>) => void) => void })
+        .traverse((child) => {
+          const geometry = (child as { geometry?: { index?: { count: number }; attributes?: { position?: { count: number } } } }).geometry;
+          if (!geometry) return;
+          entry.meshes += 1;
+          entry.triangles += Math.round(((geometry.index?.count ?? geometry.attributes?.position?.count ?? 0) / 3));
+          const childName = String((child as { name?: string }).name ?? '(unnamed)');
+          if (!entry.names.includes(childName)) entry.names.push(childName);
+        });
+      lanes[name] = entry;
+    });
+    return { arenaRootChildren, lanes };
+  });
+  writeFileSync(resolve(OUT, 'map3-scene-structure.json'), `${JSON.stringify(structure, null, 2)}\n`);
+
+  // VIEWS: one framed still per corridor, from its own mouth.
+  for (const view of VIEWS) {
+    await page.evaluate((v) => {
+      (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+        .__ATOMIC_ACRES_DEBUG__.teleportPlayer(v.x, 1.7, v.z, v.yaw, -0.05);
+    }, view);
+    await page.waitForTimeout(1_500);
+    await page.screenshot({ path: resolve(OUT, `map3-view-${view.id}.png`) });
+  }
+
+  // MOTION: same pose, five seconds apart, standing where the rain falls.
+  await page.evaluate(() => {
+    (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi })
+      .__ATOMIC_ACRES_DEBUG__.teleportPlayer(-30, 1.7, -14, -Math.PI / 2, -0.05);
+  });
+  await page.waitForTimeout(3_000);
+  const first = await page.screenshot();
+  writeFileSync(resolve(OUT, 'map3-motion-t0.png'), first);
+  await page.waitForTimeout(5_000);
+  const second = await page.screenshot();
+  writeFileSync(resolve(OUT, 'map3-motion-t5.png'), second);
+
+  const identical = Buffer.compare(first, second) === 0;
+  writeFileSync(resolve(OUT, 'map3-motion.json'), `${JSON.stringify({
+    identical,
+    firstBytes: first.length,
+    secondBytes: second.length,
+    pageErrors,
+  }, null, 2)}\n`);
+  expect(identical, 'two frames five seconds apart are byte-identical: the arena is frozen').toBe(false);
+  expect(pageErrors).toEqual([]);
+});
