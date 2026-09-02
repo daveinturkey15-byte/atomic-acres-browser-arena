@@ -625,6 +625,42 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await submitForegroundWebGpuFrame();'));
     expect(arenaDeployment.indexOf('withArenaFrustumCullingDisabled(scene'))
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
+    // PASS 84 lane C: the cold WebGPU warm frame is the FIRST submission of a
+    // cold session and it is fenced at 12 s. farcrysis realised 134-217 cold
+    // pipelines inside that one submission, missed the fence, rolled back and
+    // left the queue stuck for the next arena's 4 s fence too. The fix realises
+    // that arena's exact ScenePass vocabulary through compileAsync first, which
+    // Dawn compiles off-fence. That is an ARENA-ID SPECIAL CASE in a shared
+    // engine path, which is this repo's documented drift shape (hardcoded
+    // rosters that silently stop matching the real arena set), so it is pinned
+    // here: the branch must exist, it must be gated on farcrysis, it must run
+    // strictly BEFORE the shadow refresh and the fenced warm frame, and it must
+    // stay the ONLY arena-id branch in this region. A second arena taking a
+    // divergent prewarm sequence is a deliberate decision and fails this test
+    // until it is made one.
+    const coldWebGpuWarmFrame = arenaDeployment.slice(
+      arenaDeployment.indexOf("if (renderRuntime.backend === 'webgpu') {"),
+      arenaDeployment.indexOf("profileArenaTransition('quality-presentation');"),
+    );
+    expect(coldWebGpuWarmFrame).not.toHaveLength(0);
+    expect(coldWebGpuWarmFrame).toContain("if (selectedArena.id === 'farcrysis' && pass64TslSystems) {");
+    expect(coldWebGpuWarmFrame)
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));');
+    expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(1);
+    for (const fencedStep of [
+      'requestStaticShadowRefresh(true);',
+      'await submitForegroundWebGpuFrame(true);',
+      'await flushWebGpuFrames(12_000);',
+    ]) {
+      expect(coldWebGpuWarmFrame).toContain(fencedStep);
+      expect(
+        coldWebGpuWarmFrame.indexOf('farcrysisPrecompile.precompileExactScenePass(scene)'),
+        `the farcrysis precompile must precede ${fencedStep}, otherwise it compiles inside the fence it exists to relieve`,
+      ).toBeLessThan(coldWebGpuWarmFrame.indexOf(fencedStep));
+    }
+    // The relief must never become a fence change: the arena still has to pass
+    // the same 12 s bound every other arena passes.
+    expect(coldWebGpuWarmFrame).not.toMatch(/flushWebGpuFrames\((?!12_000)/);
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
     expect(source).toContain('MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000');
