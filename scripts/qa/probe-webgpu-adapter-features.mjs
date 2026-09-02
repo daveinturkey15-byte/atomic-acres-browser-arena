@@ -21,10 +21,33 @@
 // HEADLESS ONLY. Usage:
 //   node scripts/qa/probe-webgpu-adapter-features.mjs --out artifacts/graphics-audit
 import { chromium } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
-import { OPTIONAL_WEBGPU_DEVICE_FEATURES } from '../../src/rendering/render-runtime.ts';
+
+// The renderer's allowlist, read out of the source rather than imported.
+// render-runtime.ts reaches a module graph with extensionless relative imports
+// that Node's TypeScript stripping cannot resolve, and pulling three r185 into
+// a probe process to read one array would be absurd. Parsing the literal keeps
+// the probe honest: if the allowlist moves or is renamed, this throws instead
+// of silently reporting a stale list as the current one.
+function readOptionalDeviceFeatures() {
+  const source = readFileSync('src/rendering/render-runtime.ts', 'utf8');
+  const block = source.match(
+    /export const OPTIONAL_WEBGPU_DEVICE_FEATURES: readonly string\[\] = Object\.freeze\(\[([\s\S]*?)\]\);/,
+  );
+  if (!block) {
+    throw new Error('OPTIONAL_WEBGPU_DEVICE_FEATURES not found in src/rendering/render-runtime.ts');
+  }
+  // Strip the per-entry `// Consumer:` comments FIRST. Without this the quote
+  // scan picks up apostrophes inside the prose and reports sentence fragments
+  // as WebGPU feature names - which the first run of this probe duly did.
+  const withoutComments = block[1].replaceAll(/\/\/[^\n]*/g, '');
+  const features = [...withoutComments.matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1]);
+  if (features.length === 0) throw new Error('OPTIONAL_WEBGPU_DEVICE_FEATURES parsed as empty');
+  return features;
+}
+const OPTIONAL_WEBGPU_DEVICE_FEATURES = readOptionalDeviceFeatures();
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -32,6 +55,7 @@ const arg = (name, fallback) => {
   return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
 };
 const OUT_DIR = arg('--out', 'artifacts/graphics-audit');
+const BASE = arg('--url', 'http://localhost:41977');
 
 const browser = await chromium.launch({
   headless: true,
@@ -42,7 +66,11 @@ const browser = await chromium.launch({
 let report = null;
 try {
   const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-  await page.goto('about:blank');
+  // WebGPU needs a SECURE CONTEXT. `about:blank` has none, so navigator.gpu
+  // is undefined there and the first version of this probe reported
+  // "WebGPU unavailable" on a machine with a working RTX 5080. Point it at
+  // the served origin (localhost counts as secure) before asking.
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   report = await page.evaluate(async (allowList) => {
     if (!navigator.gpu) return { available: false, reason: 'navigator.gpu is undefined' };
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
