@@ -121,3 +121,39 @@ instruction, and the in-build fallback re-pinned to the backup.
   per map.
 - **Plan:** delegate a two-page host+guest E2E harness (local peerjs server)
   to Claude; fix what it finds; wire it as a repeatable QA script.
+
+## HF-404 — smooth in Chrome, Edge and Firefox: no freezes, crashes, error messages or low fps
+
+- **Owner lane:** presentation and stability; all browsers, all maps.
+- **Statement (verbatim, 08:47 BST):** "aswell as making sure no freezes or
+  crashes or error message or low fps in edge and firefox aswell as chrome,
+  i just need it smooth across all those browsers". Recurring ask
+  (2026-08-31 x2, 2026-09-01, 2026-09-02).
+- **Mechanical falsifier:** three-lane meter (`measure-cross-engine-stalls.mjs`,
+  chrome+edge+firefox, 180 s, with a death/respawn cycle) on the PASS 84
+  build and on the live channel shows zero console/page errors, no stall
+  over 250 ms, frozen fraction under 0.5%, and fps p5 above a justified
+  floor, on atomic-acres, Raid and high-seas; a repeatable gate
+  `qa:cross-browser:smooth` enforces it with a registry-derived roster.
+- **Plan:** Lane O (`docs/pass84-lanes/LANE-O-cross-browser-smooth.md`);
+  the gate becomes part of the publish ritual.
+
+## HF-405 — Map 3 continued on Claude and registered as a real arena (preview)
+
+- **Owner lane:** content; Map 3.
+- **Statement (08:40 and 08:47 BST):** "sort all of this too" (the Map 3
+  registration previously held for art approval) and "bring map 3 back
+  stuff from gemini its usage about to expire, do it with claude fable".
+- **Mechanical falsifier:** `npx tsc --noEmit` on the root config; the
+  arena-boot smoke and menu-preview verifier see Map 3 (registry-derived
+  rosters); a PREVIEW-labelled card is selectable and boots solo; no other
+  arena's files change.
+- **Plan:** Lane P (`docs/pass84-lanes/LANE-P-map3-claude.md`).
+
+## Wave 2 decisions the owner delegated at 08:40 ("sort all of this too")
+
+IBL first-arena bug -> Lane I; eye-clearance RED spots -> Lane J; bus doors
+and interior -> Lane K; Raid art pass -> Lane L; chopper pilot verification
+(HF-401 visual half) -> Lane M; QA corpus streamline -> Lane N; real-device
+mobile -> emulated pass plus an owner phone checklist (wave 3); dynamic
+time-of-day and weather lighting -> wave 3 after Lane I lands.
