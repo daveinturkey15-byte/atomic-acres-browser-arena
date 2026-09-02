@@ -141,9 +141,40 @@ row — the real hits are under `kimodo`:
   generation (`soma-rp-v1.1`, 60 frames, seed 1234: Y-up, +Z forward, hip height 1.006 m,
   loop-seam error 38.48° worst joint — a traversal, not a cycle).
 
-**Status of the Kimodo route today: correspondence only. Zero generated clips have landed.**
-No retargeter, no `.gltf` bake, no runtime binding. It is a documented, licence-cleared,
-un-executed route.
+**CORRECTION, made before publishing (2026-09-02, reconciled against a concurrent lane's vault
+note `Dev-Practices/Animation Pipeline Options 2026-09.md` and then re-verified in the repo).**
+A first pass of this study said the Kimodo route was "correspondence only". **That was wrong,
+and the error is instructive: it came from grepping `src/` alone.** The route is built, and the
+tooling is in the tree:
+
+- `scripts/animation/bake-motion-prompts.mjs` — prompt → motion bake
+- `scripts/animation/inspect-kimodo-motion.mjs` — raw `.f32` inspection (this is what caught the
+  SOMA-30-not-SMPL-X joint-count surprise the correspondence module documents)
+- `scripts/blender/retarget-kimodo-motion.py` — the real retargeter: composes SOMA local
+  rotations up the parent chain to global, exploits SOMA's identity rest rotations, and applies
+  the global delta to the operator rest pose. Its own header explains why a quaternion copy
+  produces "a character standing bent sideways while every individual number looks plausible."
+- `scripts/animation/measure-retarget-quality.mjs` — measures the **shipped GLB**, not Blender:
+  channel coverage, **grip safety as channel VARIATION rather than presence**, foot slide over
+  the planted phase, and lowest-foot height
+- `docs/PASS77_KIMODO_SKELETAL_ANIMATION_ASSESSMENT.md`
+
+PASS 80 (2026-08-26) baked six clips, retargeted four onto the canonical 62-joint rig and
+measured them: `Kimodo_Idle_Alert` (120 f, slide 0.033/0.036 m), `Kimodo_Idle_Crouch` (120 f,
+0.052/0.043 m), `Kimodo_Reload_Crouched` (90 f, 0.034/0.026 m), `Kimodo_Hit_Chest` (60 f,
+0.022/0.020 m) — all with the grip intact — and `Kimodo_Walk_Forward` (60 f, **4.20/4.19 m,
+unshippable**). **What is true is the narrower and more useful statement: none of those clips is
+in the shipped GLB.** `pass65-third-person-operator-lod0.glb` still carries exactly its original
+24 authored clip names. The lane stopped between *generated* and *integrated*.
+
+Two consequences for this study, and both strengthen its conclusion:
+
+1. **Kimodo is proven on our rig; MotionBricks is not even attempted on it.** A route with four
+   measured, grip-safe, shippable clips is not in the same state as one whose skeleton has never
+   touched our armature. Any comparison that treats them as peers is wrong.
+2. **The measured shippable band is 0.020–0.052 m of foot slide, and 4.20 m is the known
+   failure.** That is a real, local, already-agreed bar, and §7's gate G4 is set from it rather
+   than from a number this study invented.
 
 ### And what actually animates our skins and bots today
 
@@ -152,8 +183,8 @@ un-executed route.
 | Rig | `pass65-third-person-operator-family-v1`, **62 joints**, one skeleton shared by every skin (`createOperatorSkinCatalog` rejects a divergent rig) |
 | Source asset | `public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf` — **CC0 1.0**, licence file in tree |
 | Runtime | `THREE.AnimationMixer` + `src/animation-blend-graph.ts` (weights sum to 1, monotonic, deterministic, `maximumLayers` cap) + `src/animation-locomotion.ts` (speed-matched, direction-aware, one shared stride frequency) + `animation-additive-pose.ts` + `animation-hit-reaction.ts` |
-| Bound corpus | 14 clips, hard-capped by `operator-appearance-catalog.test.ts` as a **spawn-time prewarm budget** (binding every track of every clip costs hundreds of ms on the main thread) |
-| Measured gaps, from the repo's own comments | `Walk` authored for **1.34 m/s** but played up to 3.2 m/s; run clips authored ~**3.08 m/s** while a sprinting operator travels **8.7 m/s** — the residual slide "is reported rather than hidden, because closing it needs a faster authored sprint clip, not a bigger multiplier". `Run_Back/Left/Right` exist but are off the prewarm budget. Ledger Lane Y: **"bots have no stance."** No reload clip; melee is `Punch_Right` / `Kick_Right` only. |
+| Clip corpus | **24 authored clips in the shipped GLB**; **14** of them bound at runtime, hard-capped by `operator-appearance-catalog.test.ts` as a **spawn-time prewarm budget** (binding every track of every clip costs hundreds of ms on the main thread) |
+| Measured gaps | `Walk` authored for **1.34 m/s** but played up to 3.2 m/s; run clips authored ~**3.08 m/s** while a sprinting operator travels **8.7 m/s** — the residual slide "is reported rather than hidden, because closing it needs a faster authored sprint clip, not a bigger multiplier". `Run_Back/Left/Right` exist but are off the prewarm budget. Ledger Lane Y: **"bots have no stance."** And the sharpest one: the third-person rig has **no reload, no crouch, no prone, no ADS and no knife clip** — while the 37-joint first-person arms rig has all of them, so the player sees a reload and every other player sees a man standing still holding a gun. |
 
 That last row is the answer to "can it help us": **the animation problem in this repo is a
 missing-clip problem with a named, measured shortfall list.** Both Kimodo and MotionBricks are
@@ -271,6 +302,15 @@ translation) and `1.02e-4` (local quaternion components), 44-frame case, on his 
 
 **Sized for 2–3 hours of Opus work. No native build. No GPU. No paid anything.**
 
+**Sequencing — read this first.** A concurrent lane's recommendation (vault
+`Dev-Practices/Animation Pipeline Options 2026-09.md`) is to **land the four already-measured
+Kimodo clips** — `Reload_Crouched`, `Idle_Crouch`, `Idle_Alert`, `Hit_Chest` — into
+`pass65-third-person-operator-lod0/1/2.glb` first: ~3–4 hours, no downloads, no new licence
+decision, and it is the direct answer to the owner's "animation improvements for our skins and
+bots". **That work outranks this experiment.** HF-422's trial answers a different, narrower
+question — *is MotionBricks worth a native build at all?* — and should run after it, or in
+parallel on a different agent, never instead of it.
+
 ### Why this experiment and not the obvious one
 
 The obvious experiment — build `motion-bricks.cpp`, run the planner, bake clips — is a full
@@ -343,6 +383,13 @@ needs and the ones the eventual native build would need anyway.
 
 ### Phase 2 — retarget onto the operator rig (55 min)
 
+**Reuse, do not rewrite.** The Kimodo route already owns every piece of this except the source
+skeleton: `scripts/blender/retarget-kimodo-motion.py` does the global-delta retarget onto the
+operator rest pose, and `scripts/animation/measure-retarget-quality.mjs` measures the **shipped
+GLB** for channel coverage, grip safety (as channel *variation*, not presence), foot slide and
+lowest-foot height. Writing a second retargeter or a second metric would be the real error in
+this lane. Add a **source-skeleton adapter** and reuse both.
+
 `src/animation/motionbricks-g1-retarget.ts`, modelled exactly on
 `kimodo-operator-retarget.ts` and importing its `OPERATOR_JOINTS_RETARGET_MUST_NOT_DRIVE`:
 
@@ -357,12 +404,16 @@ needs and the ones the eventual native build would need anyway.
 3. **Scale**: hip-height ratio, operator stature / G1 stature, applied to root translation only.
 4. **Convert** global rotation matrices → local quaternions against the G1 parent chain, then
    into operator local space through rest-pose calibration.
-5. **Bake** one `THREE.AnimationClip` named `MB_Walk_Gun_Debug` from `walk_gun` (76 frames,
-   2.53 s — the longest gun-carry cycle available).
+5. **Bake** one clip named `MB_Walk_Gun_Debug` from `walk_gun` (76 frames, 2.53 s — the longest
+   gun-carry cycle available) through the existing Blender retarget path, generalised by a
+   `--source-skeleton g1-34` flag rather than by a fork.
 
-**Metrics computed in the module, not eyeballed:**
-- **foot-slide**: planted-ankle world displacement during the contact phase, metres per stride,
-  same definition `animation-locomotion.ts` calibration uses;
+**Metrics come from `measure-retarget-quality.mjs` on the produced GLB, not from eyeballing and
+not from a new implementation:**
+- **foot-slide**: planted-ankle world displacement during the contact phase, metres;
+- **grip safety**: no finger/thumb channel whose value *changes* over the clip;
+- **channel coverage**: which operator joints are actually animated (the Kimodo clips landed
+  21–22 moving joints; a G1 source should land fewer, and the shortfall must be named);
 - **authored ground speed** by the same median-backward-ankle-velocity method, so the new clip
   enters `OPERATOR_LOCOMOTION_CALIBRATION`'s units and can be compared to `Walk` = 1.3416 m/s;
 - **loop-seam error**: worst per-joint angular delta frame N → frame 0 (Kimodo's canary was
@@ -394,7 +445,8 @@ clip binding is doing something it should not.
 | G1 | 34 joint names and parents recovered from published metadata, not guessed |
 | G2 | Phase 1 reproduces the §2 frame table exactly for all 15 styles |
 | G3 | Baked clip writes **zero** tracks on any `OPERATOR_JOINTS_RETARGET_MUST_NOT_DRIVE` joint |
-| G4 | Foot-slide on the destination rig ≤ **0.06 m per stride** at the clip's own authored speed — i.e. no worse than what `Walk` already achieves at 1.34 m/s |
+| G4 | Foot-slide on the destination rig ≤ **0.06 m**, the top of the measured PASS 80 shippable band (0.020–0.052 m across four accepted Kimodo clips). For scale, the one clip that band rejected, `Kimodo_Walk_Forward`, measured **4.20 m** — this gate is not a close call in either direction |
+| G4b | Grip safety: **no finger or thumb channel varies** over the clip, by `measure-retarget-quality.mjs`'s own definition |
 | G5 | No limb inversion, no hip drift > 0.05 m, no ground penetration > 0.02 m across all four cameras |
 | G6 | **Readability:** in the three-quarter capture the operator reads as a human carrying a weapon. This is a judgement call and it is recorded as a judgement call, with the capture attached, not laundered into a number. |
 | G7 | Pipeline tripwire 0; prewarm budget unchanged at 14; focused vitest green; `tsc` 0 |
@@ -432,8 +484,65 @@ gate the generator sits behind, and it must not be reported as measuring the mod
 | Style frame counts in the §2 table | **VERIFIED (derived)** | arithmetic on the published `styles/manifest.json` parameter counts using the `docs/FORMATS.md` tensor layout; **the layout assumption is what Phase 1 falsifies against the bytes** |
 | Kimodo and MotionBricks are complements, Kimodo as authoring input | **VERIFIED** | upstream's own `docs/motions-bricks.md` and `IMPLEMENTATION.md`, quoted |
 | Our operator rig: 62 joints, CC0 Quaternius source, 14-clip prewarm budget, named speed shortfalls | **VERIFIED** | `src/animation/kimodo-operator-retarget.ts`, `src/operator-model.ts`, `src/animation-locomotion.ts`, `public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt` |
-| Kimodo route has landed zero clips | **VERIFIED** | only `kimodo-operator-retarget.ts` exists; it states it is not a retargeter |
+| Kimodo route is **built and measured**: bake, inspect, Blender retarget and shipped-GLB metric scripts all exist; PASS 80 retargeted four clips at 0.020-0.052 m foot slide with grip intact | **VERIFIED** | `scripts/animation/{bake-motion-prompts,inspect-kimodo-motion,measure-retarget-quality}.mjs`, `scripts/blender/retarget-kimodo-motion.py`, `docs/PASS77_KIMODO_SKELETAL_ANIMATION_ASSESSMENT.md`; numbers cross-checked against the concurrent lane's vault note |
+| None of those four clips is in the shipped GLB; it still carries its original 24 clip names | **CLAIMED** | stated by the concurrent lane's note from a 2026-09-02 read of `pass65-third-person-operator-lod0.glb`; **not independently re-read by this lane** |
+| A first pass of this study called the Kimodo route "correspondence only" | **CORRECTED** | the error came from grepping `src/` alone and missing `scripts/`; recorded rather than deleted, because the same mistake is one grep away for the next agent |
 | Neither tool has a browser/wasm inference path | **VERIFIED** | both repos' build and demo docs describe CMake/GGML native + a localhost server only |
 | CPU/Vulkan parity tolerances | **CLAIMED** | upstream `reference/README.md`; the author's machine, not ours |
 | G1 → operator will retarget worse than SOMA-30 → operator | **OPEN** | reasoned from robot proportions and topology; **this is what §7 measures** |
 | Windows build feasibility | **OPEN** | NixOS-developed, no Windows CI, untried here |
+| The 34 G1 joint names/parents are recoverable without downloading the 0.73 GB model | **OPEN** | `support.gguf` holds them and is only 5,472 bytes, but whether the `.mbstyle` files alone carry the name list was not checked; §7 Phase 2 stops and reports BLOCKED rather than guessing |
+
+---
+
+## 9. Governed-procedure state (for the orchestrator)
+
+| Step | State |
+|---|---|
+| Source resolved without login | **DONE** — route 1 (`api.fxtwitter.com`), HTTP 200 |
+| Register row | **DONE** — row **49** in `.akephalos/references/ai-3d-technique-register.md`; `technique_register_guard.py` reports no REG-5/REG-6 problem against it |
+| Skill | **DONE** — `game-animation-asset-pipeline` v1.1.0 → **v1.2.0**, new **Lane A3** plus five gotchas, in the canonical vault store; SHA-256 `681cea78104905a1bd9f167ccab2afd57232b1ad1abe170ccc5331af52f7ebb7` |
+| Eval record | **DONE** — `skill-evaluations/game-animation-asset-pipeline.json`, hash-matched, `decision: accept` |
+| SkillScan | **DONE** — **SAFE** (static documentation, no executable code, no network calls) |
+| `link_skills.ps1 -VerifyOnly` | **DONE** — 162/162 skills OK across all seven junctioned harness roots, read-through probe OK |
+| Qoder mirror (not a junction) | **DONE** for this skill only, by scoped file copy; a blanket `sync_skill_mirrors.py --apply` was deliberately **not** run because five other skills were mid-flight from concurrent lanes |
+| `skill_regression_guard.py accept --skill game-animation-asset-pipeline` | **BLOCKED** — see below |
+
+**The scoped accept is blocked by three pre-existing, unrelated skills.** The guard's
+description-length check runs **library-wide before** the per-skill scope is applied, so no
+accept can succeed anywhere in the library until these are fixed:
+
+```
+FAIL skill-regression-guard problems=3 drift=1
+- gem-nano-agent-debug: description 367 chars exceeds 360
+- wow-spp-local-mod-restore: description 373 chars exceeds 360
+- game-release-benchmark-guard: description 377 chars exceeds 360
+```
+
+All three are committed and unmodified in the vault (`git status --porcelain` clean for each),
+so this is pre-existing debt, not tonight's. **This lane did not touch them** — they are outside
+its ownership — and it did **not** weaken the 360-char threshold, which is the guard doing its
+job. It will equally block the HF-419/420/421 lanes. The exact patch, each trimmed under 360
+with every routing term preserved:
+
+- `gem-nano-agent-debug` → 342 chars: drop `, memory behavior` → `, memory`, `widget/desktop UI
+  behavior` → `widget/desktop UI`, and `or fixing leaks of raw reasoning` → `or leaks of raw
+  reasoning`.
+- `wow-spp-local-mod-restore` → 346 chars: drop `/proficiencies` from
+  `character gold/items/proficiencies/spells`, `default` from `new-character default grants`,
+  and `full ` from `full server/client restarts`.
+- `game-release-benchmark-guard` → 345 chars: drop the Oxford comma in
+  `rendering, and release contracts`, and drop `best-known build designations, ` from the
+  use-list.
+
+After those land, `python scripts/skill_regression_guard.py accept --skill
+game-animation-asset-pipeline --policy skill-regression-policy.json --skill-root
+"C:/Users/david/Documents/desky-bootstrap-clone/Skills" --baseline skill-baseline.json
+--evaluations skill-evaluations` completes this lane. The evaluation record is already written
+and hash-matched, so nothing else is owed.
+
+**Also worth the owner's attention, from the same guard run** (all pre-existing, none this
+lane's): register rows 24 and 32 name canonical repositories with no 40-hex pin; carrying skills
+`local-video-generation`, `comfyui-3d-native-pipeline`, `open-world-city-art-loop` and
+`threejs-webgpu-interior-lighting-look` are absent from the frozen baseline; and the Qoder mirror
+is stale for `threejs-webgpu-water` and missing `open-world-city-art-loop`.
