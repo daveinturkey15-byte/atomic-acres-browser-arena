@@ -98,5 +98,16 @@
       "ceiling": 2,
       "note": "NOT re-baselined, same reason, and this one is the loudest signal in the sweep. Legal spots went 2386 -> 2944 and colliders-with-no-legal-stance 4 -> 0 when the probe was corrected, so the corrected instrument is seeing most of this arena for the first time. 55 violations across stand/prone/crouch is exactly the 'I can see through walls when I hug them' class the owner keeps reporting, and it deserves a real look rather than a bigger number in this file."
     }
-  ]
+  ],
+  "arenaSideCeilings": {
+    "farcrysis": {
+      "ceiling": 68,
+      "excludeSurfacePrefixes": [
+        "farcrysis-terrain-proxy-"
+      ],
+      "measuredAt": "2026-09-02",
+      "note": "MEASURED from docs/evidence/pass87/lane-r/eye-clearance-stage2-violations.json: 441 rows total, 373 of them naming farcrysis-terrain-proxy-* (the ground), 68 naming the arena's own colliders - farcrysis-art-tower-platform-collider 23, farcrysis-core-catwalk 20, farcrysis-vantage-02-base-* 15, farcrysis-art-cave-arch-top-collider 3, farcrysis-enhanced-palm-trunk-collider-* 5, farcrysis-ruined-wall-sw-a 1, farcrysis-crate-08 1. The 441 raw ceiling is the honest measurement and stays, but ~85% of it is the stage-1 flat-ground eye seat, so on its own it would let the arena's real row count grow more than fivefold without firing. This sub-ceiling is a TIGHTENING added the same day the raw one was recorded, not a re-baseline: it is set AT the measured arena-side value with no slack. When stage 1 learns to seat eye heights on an arena's own heightfield, the raw count collapses toward this one and this becomes the binding gate; do not raise it to absorb that change."
+    }
+  },
+  "arenaSideCeilingsNote": "Per-arena sub-ceiling on the violations that do NOT name a known instrument-artefact surface class. Enforced alongside `ceilings` by scripts/qa/sweep-eye-clearance-live.mjs --check (see arenaSideCeiling / countArenaSideViolations in scripts/qa/eye-clearance-roster.mjs). An arena with no entry here is ratcheted on its raw count only; an entry with an empty exclusion list or a non-integer ceiling THROWS rather than passing vacuously. Excluding a class from this count never excuses it - the rows stay in the raw ceiling."
 }

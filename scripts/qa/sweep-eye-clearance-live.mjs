@@ -14,7 +14,9 @@
 
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readLedger, resolveArenaRoster, UNMEASURED_CEILING } from './eye-clearance-roster.mjs';
+import {
+  arenaSideCeiling, countArenaSideViolations, readLedger, resolveArenaRoster, UNMEASURED_CEILING,
+} from './eye-clearance-roster.mjs';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const argv = process.argv.slice(2);
@@ -123,8 +125,20 @@ for (const [index, arena] of ARENAS.entries()) {
     JSON.stringify({ arena, probeM: PROBE_M, spotCount: spots.length, ...result }, null, 1));
   const byStance = {};
   for (const v of result.violations) byStance[v.stance] = (byStance[v.stance] ?? 0) + 1;
-  console.log(`${arena.padEnd(18)} spots=${spots.length} traces=${result.traces} VIOLATIONS=${result.violations.length} ${JSON.stringify(byStance)}`);
-  summary.push({ arena, spots: spots.length, violations: result.violations.length, byStance });
+  // HF-423: the raw count is not the whole verdict on an arena whose rows are
+  // mostly an instrument limitation. `arenaSide` is the subset that does NOT
+  // name an excluded surface class, and it carries its own, much tighter
+  // ceiling below. See eye-clearance-roster.mjs for why.
+  const arenaSide = countArenaSideViolations(arena, result.violations, readLedger());
+  console.log(`${arena.padEnd(18)} spots=${spots.length} traces=${result.traces} VIOLATIONS=${result.violations.length}`
+    + `${arenaSide === null ? '' : ` (arena-side ${arenaSide})`} ${JSON.stringify(byStance)}`);
+  summary.push({
+    arena,
+    spots: spots.length,
+    violations: result.violations.length,
+    ...(arenaSide === null ? {} : { arenaSideViolations: arenaSide }),
+    byStance,
+  });
 
   // Back to menu for the next arena.
   await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=eyesweep&previewTime=0`,
@@ -167,6 +181,32 @@ if (argv.includes('--check')) {
     if (row.violations > ceiling) {
       console.error(`[eye-clearance] ${row.arena}: ${row.violations} violations > ceiling ${ceiling} - REGRESSED`);
       failed = true;
+    }
+
+    // HF-423 second half. A raw ceiling that is mostly instrument slack is a
+    // ratchet in name only: farcrysis measured 441, of which 373 are the
+    // stage-1 flat-ground eye seat, so the arena's own 68 real rows could grow
+    // more than fivefold without the raw ceiling ever firing. Where the ledger
+    // names an excluded surface class, the count that excludes it is ratcheted
+    // too, and it is the one that catches a real collision regression.
+    const sub = arenaSideCeiling(row.arena, ledger);
+    if (sub) {
+      if (row.arenaSideViolations === undefined) {
+        console.error(
+          `[eye-clearance] ${row.arena}: an arena-side sub-ceiling of ${sub.ceiling} is committed but this run `
+          + 'produced no arena-side count. The sweep must classify every violation before a verdict is possible.',
+        );
+        failed = true;
+      } else if (row.arenaSideViolations > sub.ceiling) {
+        console.error(
+          `[eye-clearance] ${row.arena}: ${row.arenaSideViolations} ARENA-SIDE violations > sub-ceiling `
+          + `${sub.ceiling} - REGRESSED (raw ${row.violations} against ${ceiling}; excluded classes `
+          + `${sub.excludeSurfacePrefixes.join(', ')})`,
+        );
+        failed = true;
+      } else {
+        console.log(`[eye-clearance] ${row.arena}: arena-side ${row.arenaSideViolations} <= ${sub.ceiling}`);
+      }
     }
   }
   process.exit(failed ? 1 : 0);

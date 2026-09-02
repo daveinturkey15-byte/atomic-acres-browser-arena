@@ -91,3 +91,57 @@ export function resolveArenaRoster(explicit) {
 export function readLedger() {
   return JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
 }
+
+/**
+ * ARENA-SIDE SUB-CEILING (HF-423).
+ *
+ * A raw violation ceiling stops being a ratchet when most of what it counts is
+ * the instrument rather than the arena. farcrysis measured 441 on its first
+ * sweep, and 373 of those name `farcrysis-terrain-proxy-*` - the ground - as
+ * the surface, because stage 1 seats its eye heights on a hardcoded ground
+ * plane of y = 0 and only 22.0 % of farcrysis's legal spots sit where that is
+ * true. 441 is the honestly measured number and it stays as the raw ceiling.
+ * But as a REGRESSION guard it is worth almost nothing: the arena's own 68 real
+ * rows could grow more than fivefold - every catwalk, platform and trunk in the
+ * map going bad at once - and 441 would still be green.
+ *
+ * So the ledger may name, per arena, a set of surface-name prefixes that are
+ * known instrument artefacts, and a much tighter ceiling on everything else.
+ * Both are enforced. This is a TIGHTENING, not a re-baseline: it adds a second
+ * gate to an arena that previously had one loose one, and it survives the
+ * stage-1 fix - when stage 1 learns to seat eye heights on a real heightfield
+ * the raw count collapses toward the arena-side count and the sub-ceiling is
+ * already the binding one.
+ *
+ * Excluding a surface class from the sub-count is NOT excusing it. The excluded
+ * rows are still counted in the raw number, still ratcheted there, and the
+ * ledger's `measured` note says exactly why they exist and what will retire
+ * them.
+ */
+export function arenaSideCeiling(arena, ledger) {
+  const entry = ledger?.arenaSideCeilings?.[arena];
+  if (!entry) return null;
+  const prefixes = entry.excludeSurfacePrefixes ?? [];
+  if (!Array.isArray(prefixes) || prefixes.length === 0 || !Number.isInteger(entry.ceiling)) {
+    throw new Error(
+      `eye-clearance: arenaSideCeilings.${arena} must carry an integer \`ceiling\` and a non-empty `
+      + '`excludeSurfacePrefixes` array. A sub-ceiling that excludes nothing, or that has no number, '
+      + 'would silently pass everything.',
+    );
+  }
+  return { ceiling: entry.ceiling, excludeSurfacePrefixes: prefixes, note: entry.note ?? null };
+}
+
+/**
+ * How many of `violations` are the arena's own, i.e. do not name one of the
+ * excluded surface classes. `null` when the arena has no sub-ceiling committed.
+ * A row with no surface name counts as arena-side: the conservative direction.
+ */
+export function countArenaSideViolations(arena, violations, ledger) {
+  const sub = arenaSideCeiling(arena, ledger);
+  if (!sub) return null;
+  return violations.filter((row) => {
+    const surface = String(row?.surface ?? '');
+    return !sub.excludeSurfacePrefixes.some((prefix) => surface.startsWith(prefix));
+  }).length;
+}
