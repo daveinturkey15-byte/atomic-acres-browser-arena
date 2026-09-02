@@ -27,12 +27,27 @@ describe('arena selectability', () => {
     }
   });
 
+  // MAP3 (owner 2026-09-02, HF-409). Map 3 joined farcrysis behind the menu:
+  // the card launched the authored stone gallery, not the corridor showcase the
+  // owner asked for, so the card is withdrawn until the showcase is the arena.
+  // Its registry row, id decoding and preview media all stay, exactly as
+  // farcrysis's do.
+  it('still carries map3 as a real arena and still decodes its id', () => {
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('map3');
+    expect(decodeArenaId('map3')).toBe('map3');
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('map3');
+  });
+
   it('offers every other arena, including high-seas', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
     // The owner asked for farcrysis out and Hijacked (high-seas) kept, explicitly.
     expect(offered).toContain('high-seas');
+    // The hidden set is spelled out rather than derived from `selectable`, so
+    // that hiding one more arena is a deliberate edit to this line and never a
+    // side effect that the assertion re-derives and waves through.
+    const hidden = new Set(['farcrysis', 'map3']);
     expect(offered).toEqual(
-      ARENA_SELECTIONS.filter((entry) => entry.id !== 'farcrysis').map((entry) => entry.id),
+      ARENA_SELECTIONS.filter((entry) => !hidden.has(entry.id)).map((entry) => entry.id),
     );
   });
 

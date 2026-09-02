@@ -264,7 +264,20 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: false,
     fieldSupport: false,
     overdrive: false,
-    selectable: true,
+    // MAP3 (owner 2026-09-02, HF-409): "it was full of rich code based asset
+    // tests and now its just a square map of stone?"
+    //
+    // The registry row STAYS - hiding an arena is a presentation decision and
+    // the id is still the network, replay, storage and room-link boundary, so
+    // `decodeArenaId('map3')`, saved matches and shared links keep resolving
+    // (`src/arena-selectability.test.ts` pins both halves). What is withdrawn
+    // is the MENU CARD, because what that card currently launches is the
+    // authored stone gallery in `src/map3-arena.ts` and not the animated
+    // corridor showcase the owner remembers building. The showcase now ships
+    // as its own page at `/map3.html` (see the Vite input added in the same
+    // commit) so it is reachable on the live channel while the corridors are
+    // brought into the arena proper with colliders and a frame hook.
+    selectable: false,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',

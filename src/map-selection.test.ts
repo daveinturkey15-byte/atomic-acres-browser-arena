@@ -236,15 +236,21 @@ describe('opening arena selection', () => {
     ]);
   });
 
-  // MAP3 (owner 2026-09-02, HF-405). Map 3 ships selectable and SOLO. The
-  // failure this pins is the one the repo has already had twice: an arena that
-  // is registered but not offered ("published but unselectable"), or one that
-  // advertises hosted lobbies nobody has run a two-client lane against.
-  it('offers Map 3 as a selectable solo preview and never as a hosted lobby', () => {
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409). Map 3 shipped selectable and
+  // SOLO on 2026-09-02 15:14 and was withdrawn from the menu at 16:25 the same
+  // day: the card launched the authored stone gallery rather than the corridor
+  // showcase, and the owner read that as the showcase having been destroyed.
+  // The row, the labels and the id boundary all stay - only the card is gone,
+  // and it comes back the moment the arena IS the showcase.
+  it('keeps Map 3 a real solo-preview arena while its card is withdrawn', () => {
     const map3 = arenaSelection('map3');
     expect(map3.id).toBe('map3');
-    expect(map3.selectable).toBe(true);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    expect(map3.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('map3');
+    // Still registered: audio, spawn safety, replay and the compatibility
+    // decoder all read the FULL registry, and a saved match or a shared link
+    // naming map3 has to keep resolving.
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('map3');
     expect(map3.multiplayer).toBe(false);
     expect(map3.fieldSupport).toBe(false);
     expect(map3.overdrive).toBe(false);

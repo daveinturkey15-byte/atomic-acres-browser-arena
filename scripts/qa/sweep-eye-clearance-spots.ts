@@ -194,9 +194,11 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * Floor on the derived roster. The derivation cannot silently collapse to an
  * empty list the way a regex-scraped one can, but an empty or truncated roster
  * would sweep nothing while printing success, so it is asserted rather than
- * assumed. 8 = the nine ids in arena-identity.ts minus hidden farcrysis.
+ * assumed. 7 = the nine ids in arena-identity.ts minus hidden farcrysis and
+ * minus map3, whose menu card the owner withdrew on 2026-09-02 (HF-409) while
+ * the arena is the authored stone gallery rather than the corridor showcase.
  */
-export const MINIMUM_SWEPT_ARENAS = 8;
+export const MINIMUM_SWEPT_ARENAS = 7;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

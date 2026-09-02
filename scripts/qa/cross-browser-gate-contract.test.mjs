@@ -101,9 +101,18 @@ test('every selectable arena is covered by the derived roster', () => {
   // identical guard in eye-clearance-sweep-contract.test.mjs. The floor and the
   // required set are the only things standing between a collapsed derivation and
   // a gate that reports success while browser-testing nothing.
-  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  // MAP3 (owner 2026-09-02, HF-409): ratcheted 8 -> 7 when Map 3's card was
+  // WITHDRAWN again the same day - the card launched the authored stone
+  // gallery, not the corridor showcase. The floor tracks the REAL roster
+  // size, which is what makes it a collapsed-derivation alarm rather than a
+  // coverage promise; it must never be lowered to excuse an arena that is
+  // still offered in the menu, and the explicit exclusion below is what pins
+  // this particular drop to a deliberate decision.
+  assert.ok(selectable.length >= 7, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  for (const required of ['atomic-acres', 'test1', 'test2']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
-  assert.ok(!selectable.includes('farcrysis'), 'farcrysis is selectable:false and must stay out of the required set');
+  for (const hidden of ['farcrysis', 'map3']) {
+    assert.ok(!selectable.includes(hidden), `${hidden} is selectable:false and must stay out of the required set`);
+  }
 });

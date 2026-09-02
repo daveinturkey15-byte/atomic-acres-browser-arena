@@ -30,9 +30,13 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * Floor on the derived roster, matching `MINIMUM_SWEPT_ARENAS` in
  * sweep-eye-clearance-spots.ts. 8 = the nine ids in arena-identity.ts minus
  * hidden farcrysis. Raise it when an arena is added; never lower it to get a
- * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped.
+ * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, and back
+ * to 7 the same day (HF-409) when Map 3's card was withdrawn: the floor is an
+ * alarm on the SCRAPE collapsing, so it has to equal the real roster, and the
+ * arena it drops is pinned as deliberately hidden in
+ * scripts/qa/eye-clearance-sweep-contract.test.mjs.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 8;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 7;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

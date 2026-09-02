@@ -36,11 +36,13 @@ describe('Pass 66 command shell', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       'test1',
       'test2',
-      // MAP3 (owner 2026-09-02, HF-405): shipped selectable, labelled PREVIEW.
-      'map3',
     ]);
     // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
     expect(markup).not.toContain('data-arena-route="farcrysis"');
+    // MAP3 (owner 2026-09-02, HF-409): Map 3's card is withdrawn while the
+    // arena is the authored stone gallery instead of the corridor showcase.
+    // Same shape as farcrysis: no card, still a real arena everywhere else.
+    expect(markup).not.toContain('data-arena-route="map3"');
     expect(markup).toContain(`${SELECTABLE_ARENAS.length} deployable spaces · choose before launch`);
   });
 

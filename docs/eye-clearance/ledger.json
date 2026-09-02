@@ -10,17 +10,10 @@
     "gun-range": 2,
     "high-seas": 2,
     "test1": 0,
-    "test2": 0,
-    "map3": -1
+    "test2": 0
   },
   "unmeasuredCeiling": -1,
-  "unmeasured": [
-    {
-      "arena": "map3",
-      "since": "2026-09-02",
-      "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
-    }
-  ],
+  "unmeasured": [],
   "accepted": [
     {
       "arena": "gun-range",
@@ -44,6 +37,7 @@
     }
   ],
   "farcrysis": "excluded - parked by the owner 2026-08-28",
+  "map3": "excluded - card withdrawn by the owner 2026-09-02 (HF-409), same shape as farcrysis. It entered the ratchet on 2026-09-02 (HF-405) at the -1 unmeasured sentinel and no stage was ever run against it, so nothing measured is being discarded here. When the corridor showcase becomes the arena and the card returns, map3 re-enters `ceilings` at the -1 sentinel with a dated `unmeasured` note, never at a guessed number.",
   "rebaseline": "2026-08-29 layout v3: atomic-acres 9 -> 15. Same single deferred class (house access-ramp flank fringe, sub-15 cm); the open v3 map simply exposes more LEGAL hug spots beside the ramps than the walled map did (3,248 spots vs 3,046). No new surface class; the other four arenas hold 3/0/2/2. Prior rebaselines: 0->24 (instrument vision), 24->9 (greenhouse walls went solid).",
   "runtimeResolve": {
     "module": "src/camera-eye-clearance.ts (resolveEyeClearance), wired at the end of the local camera seat in legacy-main",
@@ -56,8 +50,7 @@
       "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
-      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
+      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)"
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },
