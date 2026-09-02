@@ -120,6 +120,33 @@ async function main() {
   };
   console.log('[channel] staged:', JSON.stringify(receipt.staged));
 
+  // ---- THE FILE-LEVEL PROOF, WHICH NEEDS NO GPU --------------------------
+  //
+  // Every local asset map3.html names must resolve RELATIVE TO ITS OWN
+  // LOCATION in the channel. This is the whole bug expressed as a file test,
+  // and it stands on its own on a machine whose GPU is busy - the browser run
+  // below confirms it at runtime, it does not establish it.
+  //
+  // The counterfactual is the point: the same references are also resolved
+  // against the dist ROOT, which is where the page used to be left. If the
+  // "missing from the root" count is not the full set, the page did not
+  // actually depend on being moved and this fix would be theatre.
+  const pageHtml = readFileSync(join(channelRoot, 'map3.html'), 'utf8');
+  const references = [...pageHtml.matchAll(/(?:src|href)="([^"]+)"/gu)]
+    .map((match) => match[1])
+    .filter((reference) => !/^(?:https?:|data:|#)/u.test(reference));
+  const missingInChannel = references.filter((reference) => !existsSync(resolve(channelRoot, reference)));
+  const missingFromDistRoot = references.filter((reference) => !existsSync(resolve(temporaryDist, reference)));
+  receipt.assets = {
+    localReferences: references.length,
+    missingInChannel,
+    missingIfLeftAtDistRoot: missingFromDistRoot.length,
+  };
+  console.log(`[channel] assets: ${references.length} local refs, ${missingInChannel.length} missing in channel, `
+    + `${missingFromDistRoot.length} would be missing at the dist root`);
+  writeFileSync(join(OUT, 'map3-channel-page.json'), `${JSON.stringify(receipt, null, 2)}
+`);
+
   const machine = await waitForSharedMachine({ label: 'channel' });
   receipt.machine = machine;
   const server = await startStaticServer(temporaryDist);
@@ -184,6 +211,13 @@ async function main() {
   if (!receipt.staged.channelIndexHtml) problems.push('index.html is not in the channel');
   if (!receipt.staged.channelAssets) problems.push('assets/ is not in the channel');
   if (receipt.staged.rootMap3HtmlLeftBehind) problems.push('map3.html is STILL at the dist root, where its ./assets links 404');
+  if (receipt.assets.localReferences < 5) problems.push(`only ${receipt.assets.localReferences} local asset references parsed; the check is not looking at the real page`);
+  if (receipt.assets.missingInChannel.length > 0) {
+    problems.push(`assets missing in the channel: ${JSON.stringify(receipt.assets.missingInChannel)}`);
+  }
+  if (receipt.assets.missingIfLeftAtDistRoot !== receipt.assets.localReferences) {
+    problems.push('the page would still resolve from the dist root, so this move is not what fixes it');
+  }
   if (receipt.requests.failed.length > 0) {
     problems.push(`${receipt.requests.failed.length} failed requests: ${JSON.stringify(receipt.requests.failed.slice(0, 10))}`);
   }
