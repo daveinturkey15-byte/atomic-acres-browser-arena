@@ -1,5 +1,5 @@
 {
-  "contract": "viewmodel-penetration-ratchet-v1",
+  "contract": "viewmodel-penetration-ratchet-v2",
   "arenas": [
     "atomic-acres",
     "test2"
@@ -15,53 +15,86 @@
   ],
   "scenarios": {
     "atomic-acres/house-front-wall": {
+      "gradedRows": 36,
       "penetrating": 0,
       "worstM": 0,
-      "belowFloor": 8,
-      "worstBelowFloorM": 0.012
+      "belowFloor": 9,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.6192
     },
     "atomic-acres/bus-van-gap": {
+      "gradedRows": 36,
       "penetrating": 0,
       "worstM": 0,
-      "belowFloor": 10,
-      "worstBelowFloorM": 0.012
+      "belowFloor": 12,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 1
     },
     "atomic-acres/garage-door": {
-      "penetrating": 36,
+      "gradedRows": 12,
+      "penetrating": 12,
       "worstM": 0.323,
       "belowFloor": 0,
-      "worstBelowFloorM": 0
+      "worstBelowFloorM": 0,
+      "worstClippedFraction": 0.9884
     },
     "atomic-acres/west-fence-corner": {
+      "gradedRows": 36,
       "penetrating": 0,
       "worstM": 0,
       "belowFloor": 7,
-      "worstBelowFloorM": 0.012
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.8826
     },
     "atomic-acres/open-ground-down": {
+      "gradedRows": 3,
       "penetrating": 0,
       "worstM": 0,
       "belowFloor": 2,
-      "worstBelowFloorM": 0.012
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.0833
     },
     "atomic-acres/grass-slope-down": {
+      "gradedRows": 36,
       "penetrating": 0,
       "worstM": 0,
       "belowFloor": 36,
-      "worstBelowFloorM": 0.012
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.1909
     },
     "test2/zone-a-wall": {
+      "gradedRows": 36,
       "penetrating": 0,
       "worstM": 0,
-      "belowFloor": 15,
-      "worstBelowFloorM": 0.012
+      "belowFloor": 16,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.007
+    },
+    "test2/zone-b-court": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 29,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.0845
+    },
+    "test2/zone-c-wall": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 14,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.007
+    },
+    "test2/upper-room": {
+      "gradedRows": 36,
+      "penetrating": 0,
+      "worstM": 0,
+      "belowFloor": 30,
+      "worstBelowFloorM": 0.012,
+      "worstClippedFraction": 0.1539
     }
   },
-  "measuredFrom": "artifacts/qa/hf395/after-v2-summary.json",
-  "excludedScenarios": [
-    "test2/upper-room",
-    "test2/zone-b-court",
-    "test2/zone-c-wall"
-  ],
-  "excludedReason": "rows sampled airborne in the recording run; their numbers do not describe a standing player"
+  "measuredFrom": "artifacts/qa/hf395/repair-v3-summary.json",
+  "measuredNote": "Every scenario the instrument authors is recorded. There is no exclusion list: rows that could not be posed drop out individually (gradedRows) and the count itself is ratcheted."
 }

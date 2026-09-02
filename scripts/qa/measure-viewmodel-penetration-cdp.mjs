@@ -135,7 +135,6 @@ for (const arena of ARENAS) {
           const sample = await page.evaluate(async (pose) => {
             const api = window.__ATOMIC_ACRES_DEBUG__;
             const frame = () => new Promise((done) => requestAnimationFrame(done));
-            api.teleportPlayer(pose.x, pose.y, pose.z, pose.yaw, pose.pitch);
             // HF-395 (2026-09-02): the stance was requested BEFORE the teleport
             // and the teleport leaves the player airborne, and requestStance
             // refuses stand/prone while not grounded. Every "prone" and "stand"
@@ -145,10 +144,26 @@ for (const arena of ARENAS) {
             // was noise. Land first, THEN drive the stance machine, THEN settle.
             // Landing from the 1.7 m teleport eye into prone takes ~30 frames;
             // 90 bounds a pose that never grounds (water, a ledge) at 1.5 s.
+            //
+            // REVIEW REPAIR (2026-09-02): one attempt is not enough, and the
+            // proof is in the lane's own two runs. On the SAME coordinates
+            // test2/zone-c-wall landed 36/36 in one run and 0/36 in the other,
+            // eleven minutes apart, on builds differing only in a pure geometry
+            // module that cannot touch physics. A teleport that arrives while
+            // the previous pose's motion is still resolving can leave the
+            // player falling, and the whole scenario then reports numbers about
+            // a player who is nowhere near the pose. Re-teleporting from a
+            // standstill recovers it; a row that still will not land is marked
+            // INVALID rather than counted.
             let grounded = false;
-            for (let waited = 0; waited < 90 && !grounded; waited += 1) {
-              await frame();
-              grounded = api.snapshot()?.player?.grounded === true;
+            let landingAttempts = 0;
+            for (let attempt = 0; attempt < 3 && !grounded; attempt += 1) {
+              landingAttempts = attempt + 1;
+              api.teleportPlayer(pose.x, pose.y, pose.z, pose.yaw, pose.pitch);
+              for (let waited = 0; waited < 90 && !grounded; waited += 1) {
+                await frame();
+                grounded = api.snapshot()?.player?.grounded === true;
+              }
             }
             const stanceReached = api.setStanceForQa(pose.stance);
             if (grounded) {
@@ -162,19 +177,20 @@ for (const arena of ARENAS) {
                 if (api.snapshot()?.player?.grounded === true) break;
               }
             }
-            // A pose that never grounded in 1.5 s will not ground in another
-            // 1.5 s: the stance machine has already refused, the row is
-            // recorded `grounded: false` and counted in airborneRows, and
-            // spending 180 more frames on it changes no number in the report.
-            // Skipping them is what makes the full matrix finishable on a
-            // machine this instrument has to share.
             // Settle: the contact fold and the clip planes are driven per frame,
             // so a single frame after a teleport is not the resting pose.
             await frame(); await frame(); await frame();
             const measured = api.sampleViewmodelPenetration();
-            return { ...measured, grounded: api.snapshot()?.player?.grounded === true, stanceReached };
+            return {
+              ...measured,
+              grounded: api.snapshot()?.player?.grounded === true,
+              stanceReached,
+              landingAttempts,
+            };
           }, { x: scenario.x, y: 1.7, z: scenario.z, yaw, pitch: scenario.pitch, stance });
 
+          const verticesMeasured = Number(sample.verticesMeasured) || 0;
+          const clippedVertices = Number(sample.clippedVertices) || 0;
           rows.push({
             arena,
             weapon,
@@ -184,6 +200,20 @@ for (const arena of ARENAS) {
             // disagrees with the request is not evidence about that stance.
             stanceReached: sample.stanceReached,
             grounded: sample.grounded,
+            landingAttempts: sample.landingAttempts,
+            /**
+             * WHETHER THIS ROW IS EVIDENCE AT ALL.
+             *
+             * A row sampled airborne, or in a stance the machine refused, does
+             * not describe the pose that was asked for. Such a row is written
+             * out in full - it is never deleted - but every graded number is
+             * computed over valid rows only, and the ratchet records how many
+             * valid rows each scenario produced so a run that silently loses
+             * them fails on coverage instead of passing on a smaller sample.
+             * This replaces the previous scenario-level exclusion list, which
+             * threw away 34 good rows of test2/zone-b-court to drop 2 bad ones.
+             */
+            valid: sample.grounded === true && sample.stanceReached === stance,
             scenario: scenario.name,
             why: scenario.why,
             yawDegrees: Math.round((yaw * 180) / Math.PI),
@@ -194,7 +224,21 @@ for (const arena of ARENAS) {
             worstBox: sample.worstBox,
             worstPoint: sample.worstPoint,
             activeClipPlanes: sample.activeClipPlanes,
-            clippedVertices: sample.clippedVertices,
+            clippedVertices,
+            verticesMeasured,
+            /**
+             * HOW MUCH OF THE RIG THE CLIP PLANES REMOVED.
+             *
+             * The blind spot in the previous grading. A viewmodel that is
+             * entirely discarded reports 0 m penetration and 0 m below the
+             * floor - it grades as PERFECT - so "fix the clipping by cutting
+             * the whole weapon away" passed every check. It is also a defect
+             * the owner would see instantly. Recorded per row, ratcheted per
+             * scenario.
+             */
+            clippedFraction: verticesMeasured > 0
+              ? Math.round((clippedVertices / verticesMeasured) * 10_000) / 10_000
+              : 0,
             solidBoxes: sample.solidBoxes,
             dressingBoxes: sample.dressingBoxes,
           });
@@ -207,46 +251,78 @@ for (const arena of ARENAS) {
 
 await browser.close();
 
-const penetrating = rows.filter((row) => row.maxPenetrationM > 0.01);
-const belowFloor = rows.filter((row) => row.maxBelowFloorM > 0.01);
-const worst = [...rows].sort((left, right) => right.maxPenetrationM - left.maxPenetrationM).slice(0, 15);
+/**
+ * EVERY GRADED NUMBER IS COMPUTED OVER VALID ROWS ONLY.
+ *
+ * A row the instrument could not pose (never landed, or the stance machine
+ * refused) is not evidence about that pose on either build. It is still written
+ * to `-rows.json` in full and counted in `invalidRows`, and the ratchet demands
+ * that each scenario keep producing at least as many valid rows as it did when
+ * the ratchet was recorded - so losing rows can never be mistaken for improving.
+ */
+const graded = rows.filter((row) => row.valid);
+const penetrating = graded.filter((row) => row.maxPenetrationM > 0.01);
+const belowFloor = graded.filter((row) => row.maxBelowFloorM > 0.01);
+const worst = [...graded].sort((left, right) => right.maxPenetrationM - left.maxPenetrationM).slice(0, 15);
+/** A rig this fraction clipped is not clipped, it is gone. */
+const ERASED_FRACTION = 0.99;
 
 const summary = {
   label: LABEL,
   rows: rows.length,
+  gradedRows: graded.length,
+  invalidRows: rows.length - graded.length,
   penetratingRows: penetrating.length,
   belowFloorRows: belowFloor.length,
   // Rows whose stance or footing did not match the request are listed, not
-  // hidden: they stay in every count above, so a stance-machine regression
-  // shows up here instead of silently turning prone rows into standing ones.
+  // hidden: they are excluded from the graded numbers and reported here, so a
+  // stance-machine regression shows up instead of silently turning prone rows
+  // into standing ones or shrinking the sample.
   stanceMismatchRows: rows.filter((row) => row.stanceReached !== row.stance).length,
   airborneRows: rows.filter((row) => !row.grounded).length,
+  retriedLandings: rows.filter((row) => (row.landingAttempts ?? 1) > 1).length,
+  erasedRows: graded.filter((row) => row.clippedFraction >= ERASED_FRACTION).length,
+  worstClippedFraction: graded.reduce((peak, row) => Math.max(peak, row.clippedFraction), 0),
   byStance: Object.fromEntries(STANCES.map((stance) => {
-    const scoped = rows.filter((row) => row.stance === stance);
+    const scoped = graded.filter((row) => row.stance === stance);
     return [stance, {
       rows: scoped.length,
       penetrating: scoped.filter((row) => row.maxPenetrationM > 0.01).length,
       belowFloor: scoped.filter((row) => row.maxBelowFloorM > 0.01).length,
       worstPenetrationM: scoped.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
       worstBelowFloorM: scoped.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
+      worstClippedFraction: scoped.reduce((peak, row) => Math.max(peak, row.clippedFraction), 0),
     }];
   })),
-  maxPenetrationM: rows.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
-  maxBelowFloorM: rows.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
+  maxPenetrationM: graded.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
+  maxBelowFloorM: graded.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
   // Where it fails matters as much as how often: a defect only at glancing
   // angles points at the clip plane's orientation, not at its distance.
   byScenario: Object.fromEntries(
     [...new Set(rows.map((row) => `${row.arena}/${row.scenario}`))].map((key) => {
-      const scoped = rows.filter((row) => `${row.arena}/${row.scenario}` === key);
+      const all = rows.filter((row) => `${row.arena}/${row.scenario}` === key);
+      const scoped = all.filter((row) => row.valid);
       return [key, {
-        rows: scoped.length,
+        rows: all.length,
+        gradedRows: scoped.length,
         penetrating: scoped.filter((row) => row.maxPenetrationM > 0.01).length,
         worstM: scoped.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
         belowFloor: scoped.filter((row) => row.maxBelowFloorM > 0.01).length,
         worstBelowFloorM: scoped.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
+        // The erasure metric. See the row-level comment on clippedFraction.
+        worstClippedFraction: scoped.reduce((peak, row) => Math.max(peak, row.clippedFraction), 0),
+        erased: scoped.filter((row) => row.clippedFraction >= ERASED_FRACTION).length,
       }];
     }),
   ),
+  // The unfiltered totals, so nothing is hidden by the validity filter.
+  unfiltered: {
+    penetratingRows: rows.filter((row) => row.maxPenetrationM > 0.01).length,
+    belowFloorRows: rows.filter((row) => row.maxBelowFloorM > 0.01).length,
+    maxPenetrationM: rows.reduce((peak, row) => Math.max(peak, row.maxPenetrationM), 0),
+    maxBelowFloorM: rows.reduce((peak, row) => Math.max(peak, row.maxBelowFloorM), 0),
+    erasedRows: rows.filter((row) => row.clippedFraction >= ERASED_FRACTION).length,
+  },
   worst,
 };
 
@@ -254,9 +330,10 @@ writeFileSync(resolve(OUT, `${LABEL}-rows.json`), `${JSON.stringify(rows, null, 
 writeFileSync(resolve(OUT, `${LABEL}-summary.json`), `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log(JSON.stringify(summary, null, 2));
-console.log(`\n${penetrating.length}/${rows.length} poses have visible weapon geometry inside a solid`);
-console.log(`${belowFloor.length}/${rows.length} poses have visible weapon geometry below the standing surface`);
-console.log(`${summary.stanceMismatchRows}/${rows.length} rows did not reach the requested stance; ${summary.airborneRows}/${rows.length} were sampled airborne`);
+console.log(`\n${penetrating.length}/${graded.length} graded poses have visible weapon geometry inside a solid`);
+console.log(`${belowFloor.length}/${graded.length} graded poses have visible weapon geometry below the standing surface`);
+console.log(`${summary.erasedRows}/${graded.length} graded poses had the rig ENTIRELY clipped away (worst fraction ${summary.worstClippedFraction})`);
+console.log(`${summary.invalidRows}/${rows.length} rows were not evidence (${summary.airborneRows} airborne, ${summary.stanceMismatchRows} stance mismatched); ${summary.retriedLandings} needed a landing retry`);
 
 const ratchetShape = buildRatchet(summary, {
   arenas: ARENAS, weapons: WEAPONS, yawSteps: YAW_STEPS, stances: STANCES,
