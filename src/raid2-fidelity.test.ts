@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildRaid2, RAID2_BOUNDS, STAIR_RISERS, STAIR_RUN, STEP } from './raid2-arena';
+import { buildRaid2, RAID2_BOUNDS, RAID2_UPPER_ROOMS, STAIR_RISERS, STAIR_RUN, STEP } from './raid2-arena';
 
 import { measureLayout } from '../scripts/qa/raid2-layout-metrics';
+import { AUTOSTEP_M, CELL_M as REACH_CELL_M, measureReachability, STAND_CAPSULE_M } from '../scripts/qa/raid2-reachability';
 import { measureSpawnLayout } from './spawn-layout-constraints';
 
 /** stairRun's tread depth; a riser is this deep along the direction of climb. */
@@ -11,12 +12,16 @@ const STAIR_TREAD_M = 0.45;
 /**
  * RAID2 fidelity gate (HF-408).
  *
- * WHAT MAKES THIS A GATE RATHER THAN A SNAPSHOT. Every band below is derived,
- * before the build, either from the reference study in
- * docs/raid-rebuild/SPATIAL_PLAN.md or from a number already measured on the
- * SHIPPED roster - never from what this build happened to produce. The reason
- * is written beside each one, so a later pass that wants to move a band has to
- * argue with the reason and not just with the number.
+ * WHAT MAKES THIS A GATE RATHER THAN A SNAPSHOT. Every band below is either
+ * DERIVED - from the reference study in docs/raid-rebuild/SPATIAL_PLAN.md or
+ * from a number already measured on the SHIPPED roster - or an explicit
+ * RATCHET pinned at what this build measures so the next lane cannot make it
+ * worse. Which of the two a band is, is stated beside it. Exactly ONE band is a
+ * ratchet (test 8, the absolute mass count) and it says so; an earlier revision
+ * of this file presented it as derived while it sat one above its own written
+ * rationale and exactly on the produced value, which is not a gate, and the
+ * lane report claimed no band came from the build, which was false. Test 8b is
+ * the derived form of the same claim and is the one that carries the argument.
  *
  * The owner's complaint was "Raid just feels like loads of walls". That is a
  * claim about geometry, so the falsifier is geometric: the metrics come from
@@ -52,12 +57,18 @@ describe('raid2 layout fidelity — the reference proportions', () => {
 });
 
 describe('raid2 layout fidelity — the openness the complaint was about', () => {
-  it('3. sees further than Nuke Town does on a map 71% larger', () => {
-    // Nuke Town (atomic-acres) measures a 13.84 m mean open line on 4440 m2.
-    // Raid is 7600 m2 and measured 9.97 m: the LARGEST playable arena in the
-    // game with the SHORTEST sightlines of any real combat arena in it. That
-    // inversion is the defect. The floor sits just under Nuke Town's own
-    // number so this fails a regression rather than pinning a lucky build.
+  it('3. holds a 13 m mean open line, within 2% of Nuke Town on a map 71% larger', () => {
+    // DERIVED from the shipped roster. Nuke Town (atomic-acres) measures a
+    // 13.84 m mean open line on 4440 m2. Raid is 7600 m2 - 71% larger - and
+    // measured 9.97 m: the LARGEST playable arena in the game with the SHORTEST
+    // sightlines of any real combat arena in it. That inversion is the defect.
+    // The floor sits just under Nuke Town's own number so this fails a
+    // regression rather than pinning a lucky build.
+    //
+    // The rebuild measures 13.61 m, which is 1.7% BELOW Nuke Town, not above
+    // it: this test used to be NAMED "sees further than Nuke Town" and that was
+    // never what it asserted or what the build does. Parity on a map 71% larger
+    // is the honest claim and it is the one worth making.
     expect(metrics.meanOpenM).toBeGreaterThanOrEqual(13.0);
   });
 
@@ -94,13 +105,50 @@ describe('raid2 layout fidelity — the openness the complaint was about', () =>
 });
 
 describe('raid2 layout fidelity — consolidation, not subtraction', () => {
-  it('8. spends its wall on few big masses, like Nuke Town (<= 34)', () => {
-    // THE CENTRAL CLAIM OF THE REBUILD. Nuke Town builds its map from 33
-    // eye-blocking masses; the shipped Raid uses 59 on a map only 1.7x the
-    // size. A player does not experience "wall area", he experiences the number
-    // of separate things that end a sightline. The rebuild may not exceed Nuke
-    // Town's count even though it carries three lanes and four upper rooms.
+  it('8. RATCHET: never adds another eye-blocking mass (<= 34, zero headroom)', () => {
+    // THIS BAND IS A RATCHET, NOT A DERIVATION, and saying so is the point.
+    //
+    // The build measures 34 masses. Nuke Town measures 33. There is no
+    // reference number that says 34, so this band is pinned at what the build
+    // produced with ZERO headroom: its whole job is that the NEXT lane to touch
+    // raid2 geometry cannot add a mass without arguing for it here. Presenting
+    // it as "the rebuild may not exceed Nuke Town's count" while asserting 34
+    // was the methodology defect the skeptic caught, and it is corrected in
+    // place rather than quietly widened.
+    //
+    // Where the 34th mass comes from is measurable, not a mystery: the house's
+    // mouth scheme (two openings per partition, interleaved so no line crosses
+    // both) necessarily leaves four short wall segments isolated between their
+    // own mouths - house west z -13.2..-10 (3.5 m2), partition west z
+    // -15.5..-13 (3.75 m2), partition east z -13..-10.3 (3.0 m2) and the house
+    // north-east return z -20..-19.2 (7.0 m2). Consolidating any of them means
+    // closing a mouth, which breaks the no-line-crosses-both-partitions
+    // invariant this arena is built around. That is a real trade, so it is
+    // written down instead of being smuggled into a band.
+    //
+    // The DERIVED form of the same claim is test 8b, and that is the one that
+    // carries the argument.
     expect(metrics.eyeClusterCount).toBeLessThanOrEqual(34);
+  });
+
+  it('8b. DERIVED: spends its wall on few big masses, like Nuke Town (<= 0.87 per 100 m2)', () => {
+    // THE CENTRAL CLAIM OF THE REBUILD, in the form a bigger map can be held to.
+    // A player does not experience "wall area", he experiences the number of
+    // separate things that end a sightline - PER STEP OF FLOOR HE WALKS.
+    // Measured on the shipped roster (masses per 100 m2 of accessible ground):
+    //
+    //   shipped Raid (test2)   59 / 5098 m2 = 1.157   <- the defect
+    //   rustworks-1v1          25 / 2812 m2 = 0.889
+    //   Nuke Town              33 / 3803 m2 = 0.868   <- the band
+    //   skyline-terminal       20 / 4266 m2 = 0.469
+    //
+    // The band is Nuke Town's own density, unrounded down to 0.87. It is
+    // derived from the shipped roster and NOT from this build, and unlike the
+    // absolute count it cannot be satisfied by simply being a small map. The
+    // rebuild measures 0.679 - 22% under the band, and 41% under the map it
+    // replaces.
+    const perHundred = (metrics.eyeClusterCount / metrics.accessibleGroundM2) * 100;
+    expect(perHundred).toBeLessThanOrEqual(0.87);
   });
 
   it('9. and those masses are architecture, not partitions (>= 15 m2 mean)', () => {
@@ -178,6 +226,61 @@ describe('raid2 layout fidelity — the rules the shipped map learned the hard w
     expect(3.4 / STAIR_RISERS).toBeLessThan(0.42);
     expect(STAIR_RUN).toBeCloseTo(4.05, 5);
     expect(STEP).toBeLessThan(0.42);
+  });
+});
+
+/**
+ * THE GATE THAT DID NOT EXIST, AND THAT IS WHY THIS PASS SHIPPED A SEALED MAP.
+ *
+ * Every band above is measured by a 2D ground-level rasteriser, which is the
+ * right instrument for "loads of walls" and is structurally blind to whether
+ * anything above grade can be stood on. raid2's first revision passed all
+ * fourteen of them with three of its four upper rooms physically unreachable:
+ * two stairwells were emitted with an unbroken first-floor slab over their
+ * treads (0.138 m of headroom against a 1.82 m standing and a 1.16 m crouch
+ * capsule), a third stair had its bottom riser buried inside a solid wall, and
+ * a stairwell rail lay across the fourth stair's exit. Three of the four upper
+ * patrol points were nodes bots are told to walk to and cannot.
+ *
+ * These three assertions are that gate. The instrument
+ * (scripts/qa/raid2-reachability.ts) is a deliberately OPTIMISTIC
+ * autostep-connected flood fill from the SPAWN TABLE ONLY, point-sampled at
+ * 0.25 m - finer than one 0.45 m stair tread, which is load-bearing. It fails
+ * on the geometry as it was authored and passes on the geometry as it stands,
+ * so it is a falsifier and not a snapshot.
+ */
+describe('raid2 traversal — every kept gameplay feature is reachable', () => {
+  const reach = measureReachability(arena, RAID2_UPPER_ROOMS);
+
+  it('19. measures at a pitch finer than one stair tread', () => {
+    // A 0.5 m lattice can miss a 0.45 m tread entirely, turning one 0.378 m
+    // riser into an apparent 0.756 m step and reporting a good stair as sealed.
+    // A closed 0.45 m interval always contains a point of a 0.25 m lattice.
+    expect(REACH_CELL_M).toBeLessThan(0.45);
+    // And the probe must use the controller's real numbers, not its own.
+    expect(AUTOSTEP_M).toBe(0.42);
+    expect(STAND_CAPSULE_M).toBeCloseTo(1.82, 6);
+  });
+
+  it('20. leaves no upper room a player cannot reach from a spawn', () => {
+    const sealed = reach.regions
+      .filter((region) => region.reachableFraction < 0.99)
+      .map((region) => `${region.id} ${region.label}: `
+        + `${region.reachableCells}/${region.standableCells} reachable`);
+    expect(sealed).toEqual([]);
+    // And the rooms must actually exist: a region measuring zero standable
+    // cells would pass the fraction test vacuously.
+    for (const region of reach.regions) {
+      expect(region.standableCells, `${region.id} has no standable floor`).toBeGreaterThan(150);
+    }
+  });
+
+  it('21. gives bots no patrol point they cannot walk to', () => {
+    // BOTS DO NOT CLIMB and this arena authors no vertical navigation, so a
+    // patrol point that is not autostep-connected to a spawn is a node the bot
+    // walks at forever. Four of raid2's fifteen were, including one sitting
+    // inside the courtyard fountain kerb at grade.
+    expect(reach.unreachablePatrolPoints).toEqual([]);
   });
 });
 

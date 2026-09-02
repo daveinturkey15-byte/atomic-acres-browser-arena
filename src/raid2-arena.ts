@@ -130,6 +130,23 @@ const RAID2_BLOB: ReadonlyArray<readonly [number, number, number, number]> = [
   [34, 50, -16, 12],    // east garage wing
 ];
 
+/**
+ * The four upper rooms, as the reachability gate measures them.
+ *
+ * This table exists so the gate and the CLI cannot drift from each other, and
+ * so "the reference's four upper rooms" is a claim with an address rather than
+ * prose. It is the ONLY place the rooms are enumerated; band 12 counts first-
+ * floor area and cannot tell a room from a slab.
+ */
+export const RAID2_UPPER_ROOMS = Object.freeze([
+  Object.freeze({ id: 'U1', label: 'pool wing bedroom — the declared power position', x0: 18, x1: 32, z0: -34, z1: -21 }),
+  Object.freeze({ id: 'U2', label: 'upper landing over C1', x0: -26, x1: -10.4, z0: -20, z1: -11 }),
+  Object.freeze({ id: 'U3', label: 'laundry upper floor', x0: -25.2, x1: -10, z0: -4, z1: 9 }),
+  Object.freeze({ id: 'U3B', label: 'team-0 drive balcony', x0: -24, x1: -12, z0: 9, z1: 10.6 }),
+  Object.freeze({ id: 'U4', label: 'gallery upper floor', x0: 14, x1: 30, z0: -4, z1: 8 }),
+  Object.freeze({ id: 'U4B', label: 'team-1 drive balcony', x0: 16, x1: 26, z0: 8, z1: 9.6 }),
+]);
+
 /** First-floor height. Four upper rooms sit here and nothing else is standable above. */
 const UPPER_FLOOR_Y = 3.4;
 /**
@@ -444,7 +461,26 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   }
   // The glazed east return, so the wing reads as a room from the pool side.
   rect('raid2 wing glazing', 18.8, 31.2, 1.1, 2.9, -33.2, -32.9, m.glass, { solid: false, shots: true });
-  floorSlab('raid2 wing floor', 18, 32, -34, -21);
+  /**
+   * THE STAIRWELL IS A HOLE, AND A HOLE HAS TO BE AUTHORED AS THE COMPLEMENT.
+   *
+   * This slab shipped as ONE rectangle x 18..32, z -34..-21 with the stair
+   * underneath it. A 0.24 m slab whose soffit sits at 3.16 m leaves 0.138 m of
+   * headroom over the top tread against a 1.82 m standing and a 1.16 m crouch
+   * capsule, so U1 - the arena's own declared power position - was sealed: an
+   * autostep-connected flood fill from all twelve spawns reached 0 of its 608
+   * standable cells. The 2D ground-level fidelity instrument structurally
+   * cannot see that, which is why `scripts/qa/raid2-reachability.ts` now exists
+   * and gates it (fidelity tests 19-21).
+   *
+   * So the slab is emitted as four pieces around the stair's footprint. The
+   * `head` piece closes the slab over the wing's north wall; the hole itself is
+   * exactly x 19.2..20.8, z -33.4..-29.35, the stair's own extent.
+   */
+  floorSlab('raid2 wing floor west', 18, 19.2, -34, -21);
+  floorSlab('raid2 wing floor head', 19.2, 20.8, -34, -33.4);
+  floorSlab('raid2 wing floor landing', 19.2, 20.8, -29.35, -21);
+  floorSlab('raid2 wing floor east', 20.8, 32, -34, -21);
   stairRun('raid2 wing stair', 19.2, 20.8, -33.4, -29.35, 'z+');
   // U1 upper bedroom - the map's power position. Window slots west (over the
   // pool lane) and south (over the deck); solid north and east so it cannot
@@ -453,8 +489,11 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   rect('raid2 u1 wall east', 31.2, 32, UPPER_FLOOR_Y, UPPER_WALL_TOP, -34, -21, m.stucco);
   wallAlongZ('raid2 u1 wall west', 18, 18.8, -34, -21, UPPER_WALL_TOP, [[-30, -26]], m.stucco, UPPER_FLOOR_Y);
   wallAlongX('raid2 u1 wall south', 18, 32, -21.8, -21, UPPER_WALL_TOP, [[22, 26]], m.stucco, UPPER_FLOOR_Y);
-  // Its floor is open to the stair; the stairwell hole is the gap in the slab.
-  rect('raid2 u1 rail', 19.2, 20.8, UPPER_FLOOR_Y, RAIL_TOP, -29.35, -29.05, m.stone);
+  // The stairwell rail guards the hole's OPEN (east) edge. It shipped lying
+  // across the stair's top tread at z -29.35..-29.05, i.e. a 1.05 m barrier
+  // squarely in the exit - a second, independent seal on the same room, and one
+  // no jump apex (0.82 m) clears either.
+  rect('raid2 u1 rail', 20.8, 21.1, UPPER_FLOOR_Y, RAIL_TOP, -33.4, -29.35, m.stone);
 
   // =========================================================================
   // CENTRE LANE - the house. ONE mass, x -26..30, z -20..-4, and exactly TWO
@@ -492,7 +531,11 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongZ('raid2 house partition east', 11.6, 12.4, H_Z0, H_Z1, WALL_TOP, [[-15.5, -13], [-10.3, -5.2]]);
 
   // C1 living room, roofed. Its hearth block is the west end-stop of the spine.
-  floorSlab('raid2 c1 roof', H_X0, -10.4, H_Z0, H_Z1);
+  // C1's overhead mass over its SOUTH half only. The north half's overhead mass
+  // is U2's floor, and this slab used to be emitted over the whole room at the
+  // same y as that floor - two exactly coincident colliders over z -20..-11,
+  // one of which was invisible in every audit that counts distinct boxes.
+  floorSlab('raid2 c1 roof', H_X0, -10.4, -11, H_Z1);
   // Footed against C1's north wall and clear of both partition bands, so it is
   // cover to fight behind and not a second wall across the room.
   rect('raid2 c1 hearth block', -22, -19, 0, HARD_COVER, H_Z0, -17.8, m.stone);
@@ -524,7 +567,15 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
 
   // U2, the upper landing over C1's north half. Reached by the C1 stair; looks
   // onto the pool deck through two window slots and down into the courtyard.
-  floorSlab('raid2 u2 floor', H_X0, -10.4, H_Z0, -11);
+  // Same complement rule as the wing: the C1 stair's footprint
+  // (x -25.2..-23.6, z -19.2..-15.15) is a HOLE, carried north to the house
+  // wall so the opening reads as a stairwell rather than a slot. Emitted as one
+  // rectangle this floor sealed U2 exactly as the wing's sealed U1.
+  floorSlab('raid2 u2 floor west', H_X0, -25.2, H_Z0, -11);
+  floorSlab('raid2 u2 floor landing', -25.2, -23.6, -15.15, -11);
+  floorSlab('raid2 u2 floor east', -23.6, -10.4, H_Z0, -11);
+  // The stairwell's open (east) edge, guarded the way U1's now is.
+  rect('raid2 u2 rail stairwell', -23.6, -23.3, UPPER_FLOOR_Y, RAIL_TOP, H_Z0, -15.15, m.stone);
   wallAlongX('raid2 u2 wall north', H_X0, -10.4, H_Z0, H_Z0 + WALL_T, UPPER_WALL_TOP, [[-22, -19], [-16, -13]], m.stucco, UPPER_FLOOR_Y);
   rect('raid2 u2 wall west', H_X0, H_X0 + WALL_T, UPPER_FLOOR_Y, UPPER_WALL_TOP, H_Z0, -11, m.stucco);
   rect('raid2 u2 rail south', H_X0 + WALL_T, -10.4, UPPER_FLOOR_Y, RAIL_TOP, -11.3, -11, m.stone);
@@ -540,9 +591,17 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongZ('raid2 laundry east', -10.8, -10, H_Z1, 9, WALL_TOP, [[-3.5, 0]]);
   wallAlongX('raid2 laundry south', -26, -10, 8.2, 9, WALL_TOP, [[-20, -16]]);
   floorSlab('raid2 laundry floor south', -26, -10, H_Z1, 5.2);
-  floorSlab('raid2 laundry floor west', -26, -14.55, 5.2, 7.2);
+  floorSlab('raid2 laundry floor west', -26, -14.85, 5.2, 7.2);
   floorSlab('raid2 laundry floor north', -26, -10, 7.2, 9);
-  stairRun('raid2 laundry stair', -14.4, -10.35, 5.4, 7, 'x-');
+  // Shifted 0.45 m (one tread) WEST of where it shipped. Its bottom riser used
+  // to sit at x -10.8..-10.35, entirely inside the solid segment of
+  // `raid2 laundry east` (x -10.8..-10, y 0..3.4): the slab hole was carved
+  // correctly and the stair's FOOT was walled off, so U3 and the team-0 drive
+  // balcony were sealed. One tread west puts the foot clear of the wall and
+  // leaves the laundry's mouth scheme - and therefore every sightline
+  // invariant in this file - untouched. The landing edge now meets the top
+  // tread exactly (both at x -14.85) instead of leaving a 0.15 m slot.
+  stairRun('raid2 laundry stair', -14.85, -10.8, 5.4, 7, 'x-');
   rect('raid2 laundry bench', -22.6, -20.6, 0, MOUNT, -2.4, 0.6, m.timber);
   // U3, over the laundry, with the balcony that watches the drive from the
   // team-0 side. Its rail is the documented dead-band exception.
@@ -562,7 +621,11 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongX('raid2 gallery south', 14, H_X1, 7.2, 8, WALL_TOP, [[19, 23]]);
   floorSlab('raid2 gallery floor south', 14, H_X1, H_Z1, 5.2);
   floorSlab('raid2 gallery floor west', 14, 15.2, 5.2, 7.2);
-  floorSlab('raid2 gallery floor east', 19.4, H_X1, 5.2, 7.2);
+  // 19.25, not 19.4: the landing edge meets the gallery stair's top tread
+  // exactly. The 0.15 m slot it used to leave is smaller than the 0.38 m capsule
+  // radius so nobody fell through it, but a floor with a slot in it is a defect
+  // whether or not it is currently exploitable.
+  floorSlab('raid2 gallery floor east', 19.25, H_X1, 5.2, 7.2);
   floorSlab('raid2 gallery floor north', 14, H_X1, 7.2, 8);
   stairRun('raid2 gallery stair', 15.2, 19.25, 5.4, 7, 'x+');
   // The display hall's one hard-cover sculpture, on the centre line so the room
@@ -687,7 +750,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
     // simply do not defend a map whose power positions are all upstairs.
     patrolPoints: ([
       [-43, 0, -4], [-27, 0, -28], [0, 0, -28], [24, 0, -25],
-      [-18, 0, -12], [0, 0, -12], [21, 0, -12],
+      [-18, 0, -12], [5, 0, -12], [21, 0, -12],
       [-18, 0, 4], [0, 0, 18], [22, 0, 3], [43, 0, -2],
       [25, UPPER_FLOOR_Y, -26], [-18, UPPER_FLOOR_Y, -15],
       [-18, UPPER_FLOOR_Y, 5], [22, UPPER_FLOOR_Y, 3],
