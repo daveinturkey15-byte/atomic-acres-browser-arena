@@ -157,7 +157,14 @@ export const WALKABLE_NAME_RULES: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\b(sky|skybox|skydome|dome|cloud|atmosphere|backdrop|horizon)\b|ridge-ring/i, reason: 'sky/backdrop dressing' },
   { pattern: /\b(water|ocean|sea|wave|foam|caustic|waterline|surf)\b/i, reason: 'water volume presentation' },
   { pattern: /\b(grass|foliage|fern|bush|shrub|tuft|canopy|canopies|leaf|leaves|frond|vine|tree|trees|hedge|crown|crowns|trunk|trunks|planting)\b/i, reason: 'soft foliage' },
-  { pattern: /\b(particle|particles|sprite|spark|smoke|dust|mist|rain|glow|godray|godrays|lightshaft)\b/i, reason: 'particle/volumetric effect' },
+  // `light-shaft`, hyphenated, is how this repo actually spells it - both
+  // map3-godrays-light-shaft-volume and map3-colosseum-light-shaft-volume.
+  // The rule listed only the closed-up `lightshaft`, so the godrays one was
+  // excluded by its `godrays` token while the colosseum one - the same class of
+  // mesh, a non-solid non-shot cone of shaft material 24 m up and 156 m out -
+  // was censused as a walkable floor with a 12,480 m2 hole under it. Nobody can
+  // reach it, stand on it or shoot it. Same intent, one missing spelling.
+  { pattern: /\b(particle|particles|sprite|spark|smoke|dust|mist|rain|glow|godray|godrays|light[-\s]?shafts?)\b/i, reason: 'particle/volumetric effect' },
   { pattern: /\b(decal|scorch|stripe|marking|markings|paint|number|numbers|sign|signage|poster|label)\b/i, reason: 'surface decal/dressing' },
   { pattern: /\b(terrain|hardpan|verge)\b|berm-ring/i, reason: 'terrain shell outside the playfield' },
 ];
