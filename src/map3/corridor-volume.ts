@@ -184,19 +184,19 @@ export function createVolumeCorridor(): Corridor {
     const ro = invWorld.mul(vec4(cameraPosition, 1.0)).xyz.toVar();
     const exit = invWorld.mul(vec4(positionWorld, 1.0)).xyz;
     const seg = exit.sub(ro);
-    const dist = min(length(seg), float(56.0));
+    const dist = min(length(seg), float(48.0));
     const rd = normalize(seg).toVar();
     const S = normalize(sunLocal).toVar();
     const stepLen = dist.div(float(STEPS));
 
-    // Phase function with rich side-scattering and forward Mie lobe
+    // Forward Mie scattering lobe for natural sun halo
     const cosTheta = clamp(rd.dot(S), float(-1.0), float(1.0));
-    const g = float(0.45);
+    const g = float(0.55);
     const g2 = g.mul(g);
     const num = float(1.0).sub(g2);
     const denom = float(1.0).add(g2).sub(float(2.0).mul(g).mul(cosTheta));
-    const mie = num.div(max(denom.mul(sqrt(denom)), float(0.01))).mul(0.35);
-    const phase = float(0.38).add(mie);
+    const mie = num.div(max(denom.mul(sqrt(denom)), float(0.01))).mul(0.40);
+    const phase = float(0.25).add(mie);
 
     const acc = float(0.0).toVar();
     const t = stepLen.mul(0.5).toVar();
@@ -205,14 +205,14 @@ export function createVolumeCorridor(): Corridor {
       const p = ro.add(rd.mul(t));
 
       // Inside corridor bounding volume test
-      const inBounds = smoothstep(float(W / 2 + 0.6), float(W / 2 - 0.2), abs(p.x))
-        .mul(smoothstep(float(-LEN - 1.2), float(-LEN + 0.8), p.z))
-        .mul(smoothstep(float(1.2), float(-0.8), p.z))
-        .mul(smoothstep(float(-0.2), float(0.3), p.y))
-        .mul(smoothstep(float(ROOF_Y + 0.9), float(ROOF_Y - 0.2), p.y));
+      const inBounds = smoothstep(float(W / 2 + 0.4), float(W / 2 - 0.2), abs(p.x))
+        .mul(smoothstep(float(-LEN - 1.0), float(-LEN + 0.6), p.z))
+        .mul(smoothstep(float(1.0), float(-0.6), p.z))
+        .mul(smoothstep(float(-0.1), float(0.3), p.y))
+        .mul(smoothstep(float(ROOF_Y + 0.8), float(ROOF_Y - 0.2), p.y));
 
-      // Atmospheric medium with gentle height fog
-      const dens = exp(p.y.mul(-0.18)).mul(0.045);
+      // Atmospheric medium density with gentle ground concentration
+      const dens = exp(p.y.mul(-0.16)).mul(0.030);
 
       // --- 1. BACK-PROJECT ALONG SUN RAY TO ROOF PLANE (y = ROOF_Y) ---
       const tRoof = float(ROOF_Y).sub(p.y).div(max(S.y, float(0.06)));
@@ -222,47 +222,47 @@ export function createVolumeCorridor(): Corridor {
       // Clerestory skylight opening between transverse roof beams
       const zRel = pRoofZ.add(2.0).div(float(BAY_SPACING));
       const slotFrac = abs(fract(zRel.add(0.5)).sub(0.5));
-      // Sharp beam cut: 0 at solid beam (slotFrac < 0.08), 1 in open gap (slotFrac > 0.14)
+      // Crisp beam edges: 0 at solid beam, 1 in open gap
       const inRoofSlotZ = smoothstep(float(0.08), float(0.15), slotFrac);
 
       // Central opening between side architraves
-      const inRoofSlotX = smoothstep(float(W / 2 - 0.6), float(W / 2 - 1.2), abs(pRoofX));
+      const inRoofSlotX = smoothstep(float(W / 2 - 0.7), float(W / 2 - 1.2), abs(pRoofX));
       const roofGate = inRoofSlotZ.mul(inRoofSlotX).mul(tRoof.greaterThan(float(0.0)).select(float(1.0), float(0.0)));
 
       // --- 2. SIDE COLONNADE APERTURE TEST ---
-      // For rays entering through the side columns:
       const sideX = S.x.greaterThan(float(0.0)).select(float(W / 2 - 0.75), float(-W / 2 + 0.75));
       const tSide = sideX.sub(p.x).div(abs(S.x).greaterThan(float(1e-3)).select(S.x, float(1e-3)));
       const ySide = p.y.add(S.y.mul(tSide));
       const zSide = p.z.add(S.z.mul(tSide));
       const zSideRel = zSide.add(2.0).div(float(BAY_SPACING));
       const sideFrac = abs(fract(zSideRel.add(0.5)).sub(0.5));
-      const inSideSlot = smoothstep(float(0.09), float(0.16), sideFrac)
-        .mul(smoothstep(float(0.35), float(0.9), ySide))
+      const inSideSlot = smoothstep(float(0.10), float(0.18), sideFrac)
+        .mul(smoothstep(float(0.4), float(1.0), ySide))
         .mul(smoothstep(float(ROOF_Y + 0.1), float(ROOF_Y - 0.4), ySide))
         .mul(tSide.greaterThan(float(0.0)).select(float(1.0), float(0.0)));
 
-      // Combined aperture gate: crisp light beam definition
+      // Combined aperture gate: high contrast beams
       const beamGate = max(roofGate, inSideSlot);
 
-      // Subtle atmospheric dust motes
-      const dust = sin(p.x.mul(3.2).add(time.mul(0.5)))
-        .mul(cos(p.y.mul(3.8).sub(time.mul(0.3))))
-        .mul(sin(p.z.mul(2.9).add(time.mul(0.4))))
+      // Subtle airborne dust turbulence
+      const dust = sin(p.x.mul(2.8).add(time.mul(0.4)))
+        .mul(cos(p.y.mul(3.2).sub(time.mul(0.3))))
+        .mul(sin(p.z.mul(2.5).add(time.mul(0.35))))
         .mul(0.20)
         .add(0.90);
 
-      // Shaft contribution: high contrast between beam and dark shadow,
-      // with distance fade to prevent long-distance tunnel accumulation blowout
-      const distFade = float(1.0).sub(smoothstep(float(24.0), float(48.0), t));
+      // Exponential distance falloff to prevent deep corridor accumulation blowout
+      const distFade = exp(t.mul(-0.038));
       const sampleLight = beamGate.mul(dens).mul(inBounds).mul(dust).mul(phase).mul(distFade).mul(stepLen);
       acc.addAssign(sampleLight);
 
       t.addAssign(stepLen);
     });
 
-    const sunColor = rgb(0xffeaaf); // Warm radiant sunlight
-    return sunColor.mul(clamp(acc.mul(2.2), float(0.0), float(1.3)));
+    // Warm golden sunlight with soft saturation knee
+    const toneMappedAcc = acc.div(float(1.0).add(acc.mul(0.70)));
+    const sunColor = rgb(0xfce0a2); // Warm radiant sunlight
+    return sunColor.mul(clamp(toneMappedAcc.mul(1.65), float(0.0), float(1.10)));
   })();
 
   const volGeo = new THREE.BoxGeometry(W + 0.4, ROOF_Y + 1.2, LEN + 0.8);
