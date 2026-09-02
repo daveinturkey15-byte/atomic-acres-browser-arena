@@ -1,6 +1,7 @@
 /**
  * Gamepad section of the Options panel (PASS 84 Lane E): live pad status,
- * per-stick deadzone/curve sliders, invert-Y, rumble switch, the fairness
+ * per-stick inner/outer deadzone + response-curve sliders, invert-Y, rumble
+ * switch, the fairness
  * tier read-out and pad button remapping with reset-to-defaults. The markup
  * lives in the shell (`pass64-shell.ts`); this module only binds it.
  */
@@ -14,7 +15,10 @@ export const GAMEPAD_SETTINGS_IDS = Object.freeze({
   status: 'gamepad-status',
   statusRow: 'gamepad-status-row',
   moveDeadzone: 'gamepad-move-deadzone',
+  moveOuter: 'gamepad-move-outer',
+  moveCurve: 'gamepad-move-curve',
   lookDeadzone: 'gamepad-look-deadzone',
+  lookOuter: 'gamepad-look-outer',
   lookCurve: 'gamepad-look-curve',
   invertY: 'gamepad-invert-y',
   rumble: 'gamepad-rumble',
@@ -30,13 +34,17 @@ export function gamepadSettingsMarkup(): string {
   const ids = GAMEPAD_SETTINGS_IDS;
   const dz = STICK_CURVE_LIMITS.deadzone;
   const ex = STICK_CURVE_LIMITS.exponent;
+  const ou = STICK_CURVE_LIMITS.outer;
   const d = DEFAULT_GAMEPAD_SETTINGS;
   return `<section id="${ids.section}" class="settings-section" aria-labelledby="gamepad-settings-title">
       <header><b id="gamepad-settings-title">GAMEPAD</b><span id="${ids.status}">NO PAD DETECTED · PRESS ANY BUTTON</span><button id="${ids.settingsReset}" type="button">RESET STICKS</button></header>
       <div class="gamepad-status-row" id="${ids.statusRow}" data-connected="false"><b>DISCONNECTED</b><span>Plug in or pair a pad, then press any button. Works mid-match; no click or mouse capture needed.</span></div>
       <div class="settings-grid">
         <label>MOVE STICK DEADZONE<input id="${ids.moveDeadzone}" type="range" min="${dz.min}" max="${dz.max}" step="0.01" value="${d.moveCurve.deadzone}"></label>
+        <label>MOVE OUTER DEADZONE<input id="${ids.moveOuter}" type="range" min="${ou.min}" max="${ou.max}" step="0.01" value="${d.moveCurve.outer}"></label>
+        <label>MOVE RESPONSE CURVE<input id="${ids.moveCurve}" type="range" min="${ex.min}" max="${ex.max}" step="0.05" value="${d.moveCurve.exponent}"></label>
         <label>LOOK STICK DEADZONE<input id="${ids.lookDeadzone}" type="range" min="${dz.min}" max="${dz.max}" step="0.01" value="${d.lookCurve.deadzone}"></label>
+        <label>LOOK OUTER DEADZONE<input id="${ids.lookOuter}" type="range" min="${ou.min}" max="${ou.max}" step="0.01" value="${d.lookCurve.outer}"></label>
         <label>LOOK RESPONSE CURVE<input id="${ids.lookCurve}" type="range" min="${ex.min}" max="${ex.max}" step="0.05" value="${d.lookCurve.exponent}"></label>
         <label class="setting-check"><input id="${ids.invertY}" type="checkbox"> INVERT LOOK Y</label>
         <label class="setting-check"><input id="${ids.rumble}" type="checkbox" checked> RUMBLE (FIRE / HIT / DAMAGE)</label>
@@ -65,10 +73,23 @@ export type GamepadSettingsPanel = Readonly<{
   dispose: () => void;
 }>;
 
+export type GamepadSettingsPanelOptions = Readonly<{
+  currentTier?: () => 'mouse' | 'pad' | 'touch';
+  /**
+   * Visibility observer for the section (defaults to the page's
+   * IntersectionObserver). The slow pad-presence timer runs only while the
+   * Options surface is actually on screen; injected for tests.
+   */
+  intersectionObserver?: typeof IntersectionObserver | null;
+}>;
+
+/** How often the Options panel re-checks `navigator.getGamepads()` while visible. */
+export const GAMEPAD_PRESENCE_INTERVAL_MS = 500;
+
 export function bindGamepadSettingsPanel(
   doc: PanelDocument,
   runtime: GamepadInputRuntime,
-  options: { currentTier?: () => 'mouse' | 'pad' | 'touch' } = {},
+  options: GamepadSettingsPanelOptions = {},
 ): GamepadSettingsPanel | null {
   const ids = GAMEPAD_SETTINGS_IDS;
   const section = byId<HTMLElement>(doc, ids.section);
@@ -76,8 +97,12 @@ export function bindGamepadSettingsPanel(
   const status = byId<HTMLElement>(doc, ids.status);
   const statusRow = byId<HTMLElement>(doc, ids.statusRow);
   const moveDeadzone = byId<HTMLInputElement>(doc, ids.moveDeadzone);
+  const moveOuter = byId<HTMLInputElement>(doc, ids.moveOuter);
+  const moveCurve = byId<HTMLInputElement>(doc, ids.moveCurve);
   const lookDeadzone = byId<HTMLInputElement>(doc, ids.lookDeadzone);
+  const lookOuter = byId<HTMLInputElement>(doc, ids.lookOuter);
   const lookCurve = byId<HTMLInputElement>(doc, ids.lookCurve);
+  const sliders = [moveDeadzone, moveOuter, moveCurve, lookDeadzone, lookOuter, lookCurve];
   const invertY = byId<HTMLInputElement>(doc, ids.invertY);
   const rumble = byId<HTMLInputElement>(doc, ids.rumble);
   const rows = byId<HTMLElement>(doc, ids.bindingRows);
@@ -89,7 +114,10 @@ export function bindGamepadSettingsPanel(
 
   const writeSettingsInputs = (settings: GamepadSettings): void => {
     if (moveDeadzone) moveDeadzone.value = String(settings.moveCurve.deadzone);
+    if (moveOuter) moveOuter.value = String(settings.moveCurve.outer);
+    if (moveCurve) moveCurve.value = String(settings.moveCurve.exponent);
     if (lookDeadzone) lookDeadzone.value = String(settings.lookCurve.deadzone);
+    if (lookOuter) lookOuter.value = String(settings.lookCurve.outer);
     if (lookCurve) lookCurve.value = String(settings.lookCurve.exponent);
     if (invertY) invertY.checked = settings.invertLookY;
     if (rumble) rumble.checked = settings.rumble;
@@ -178,20 +206,28 @@ export function bindGamepadSettingsPanel(
   };
   settingsReset?.addEventListener('click', onSettingsReset);
 
+  const sliderValue = (input: HTMLInputElement | null, fallback: number): number => {
+    const value = Number(input?.value);
+    return input && Number.isFinite(value) ? value : fallback;
+  };
   const onSlider = (): void => {
     const current = runtime.getSettings();
     runtime.updateSettings({
-      moveCurve: { ...current.moveCurve, deadzone: Number(moveDeadzone?.value ?? current.moveCurve.deadzone) },
+      moveCurve: {
+        deadzone: sliderValue(moveDeadzone, current.moveCurve.deadzone),
+        outer: sliderValue(moveOuter, current.moveCurve.outer),
+        exponent: sliderValue(moveCurve, current.moveCurve.exponent),
+      },
       lookCurve: {
-        ...current.lookCurve,
-        deadzone: Number(lookDeadzone?.value ?? current.lookCurve.deadzone),
-        exponent: Number(lookCurve?.value ?? current.lookCurve.exponent),
+        deadzone: sliderValue(lookDeadzone, current.lookCurve.deadzone),
+        outer: sliderValue(lookOuter, current.lookCurve.outer),
+        exponent: sliderValue(lookCurve, current.lookCurve.exponent),
       },
       invertLookY: invertY?.checked ?? current.invertLookY,
       rumble: rumble?.checked ?? current.rumble,
     });
   };
-  for (const input of [moveDeadzone, lookDeadzone, lookCurve]) input?.addEventListener('input', onSlider);
+  for (const input of sliders) input?.addEventListener('input', onSlider);
   for (const input of [invertY, rumble]) input?.addEventListener('change', onSlider);
 
   const offPad = runtime.onPadChange(() => refresh());
@@ -235,9 +271,33 @@ export function bindGamepadSettingsPanel(
     captureLoopActive = true;
     raf(captureLoop);
   };
-  const presenceTimer = typeof setInterval === 'function'
-    ? setInterval(() => runtime.reconcilePresence(), 500)
-    : null;
+  // Presence polling costs a `navigator.getGamepads()` walk per tick, so it
+  // runs only while this section is on screen (lobby/pause Options tab) and
+  // stops the moment the menu hides; gameplay has its own per-frame poll.
+  let presenceTimer: ReturnType<typeof setInterval> | null = null;
+  const startPresence = (): void => {
+    if (presenceTimer !== null || typeof setInterval !== 'function') return;
+    runtime.reconcilePresence();
+    presenceTimer = setInterval(() => runtime.reconcilePresence(), GAMEPAD_PRESENCE_INTERVAL_MS);
+  };
+  const stopPresence = (): void => {
+    if (presenceTimer === null) return;
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  };
+  const Observer = options.intersectionObserver === undefined
+    ? (typeof IntersectionObserver === 'function' ? IntersectionObserver : null)
+    : options.intersectionObserver;
+  let visibility: IntersectionObserver | null = null;
+  if (Observer) {
+    visibility = new Observer((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) startPresence();
+      else stopPresence();
+    });
+    visibility.observe(section);
+  } else {
+    startPresence();
+  }
   const rowsClickWithCapture = (event: Event): void => {
     onRowsClick(event);
     ensureCaptureLoop();
@@ -253,9 +313,10 @@ export function bindGamepadSettingsPanel(
       rows?.removeEventListener('click', rowsClickWithCapture);
       bindingsReset?.removeEventListener('click', onBindingsReset);
       settingsReset?.removeEventListener('click', onSettingsReset);
-      for (const input of [moveDeadzone, lookDeadzone, lookCurve]) input?.removeEventListener('input', onSlider);
+      for (const input of sliders) input?.removeEventListener('input', onSlider);
       for (const input of [invertY, rumble]) input?.removeEventListener('change', onSlider);
-      if (presenceTimer !== null) clearInterval(presenceTimer);
+      visibility?.disconnect();
+      stopPresence();
       captureAction = null;
       offPad();
       offScheme();
