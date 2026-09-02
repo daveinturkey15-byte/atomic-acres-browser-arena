@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 5,
-  "channel": "the-big-one",
-  "releasePass": "PASS 73",
-  "sourceSha": "506d6142ce09b8317279a8c705d2de25fa2ab84b",
-  "path": "channels/the-big-one",
-  "exactRootFileCount": 515,
-  "treeSha256": "1e6d5690e56be2b7ae8d981796688b81891d036adc5b985792ad9ef1117020cb"
-}
