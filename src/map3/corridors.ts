@@ -33,7 +33,7 @@ import {
 
 export interface Corridor {
   group: THREE.Group;
-  update(elapsed: number, dt: number): void;
+  update(elapsed: number, dt: number, playerPos?: THREE.Vector3, playerVel?: THREE.Vector3): void;
   dispose(): void;
   /**
    * Exposed so the bootstrap can point leaf transmission at the REAL sun.

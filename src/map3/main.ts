@@ -317,17 +317,17 @@ async function main(): Promise<void> {
     pivot.add(c.group);
     scene.add(pivot);
 
-    // Sign at the hub end, facing the player as they arrive.
+    // Sign at the hub end, elevated so the corridor mouth at eye-level is open
     const near = createSign(c.title, c.skill);
     if (near) {
-      near.position.set(0, 2.6, -HUB_R + 0.5);
+      near.position.set(0, 4.0, -HUB_R + 0.5);
       // Faces back toward the hub, so it is readable on approach.
       pivot.add(near);
     }
     // Sign at the far end, facing back — so you always know what you walked.
     const far = createSign(c.title, c.skill);
     if (far) {
-      far.position.set(0, 2.6, -HUB_R - c.length + 1);
+      far.position.set(0, 3.8, -HUB_R - c.length + 1);
       far.rotation.y = Math.PI;   // readable when walking back out
       pivot.add(far);
     }
@@ -373,7 +373,7 @@ async function main(): Promise<void> {
     if (e.code === 'Space' && grounded) { vy = 6.35; grounded = false; }
 
     const digit = e.code.startsWith('Digit') ? Number(e.code.slice(5)) : -1;
-    if (digit >= 1 && digit <= 6) {
+    if (digit >= 1 && digit <= 8) {
       // Solo a corridor: show only that one. Press again to restore all.
       const idx = digit - 1;
       const soloed = pivots.every((p, i) => (i === idx) === p.visible);
@@ -438,11 +438,6 @@ async function main(): Promise<void> {
   let lastTris = 0;
 
   function tick(): void {
-    const info = renderer.info?.render as { drawCalls?: number; triangles?: number } | undefined;
-    if (info && (info.drawCalls ?? 0) > 0) {
-      lastDraws = info.drawCalls ?? 0;
-      lastTris = info.triangles ?? 0;
-    }
     const dt = Math.min(clock.getDelta(), 0.05);
     const elapsed = clock.elapsedTime;
 
@@ -484,9 +479,15 @@ async function main(): Promise<void> {
     playerVel.set(dt > 0 ? move.x / dt : 0, vy, dt > 0 ? move.z / dt : 0);
     physics.setPlayer(camera.position, playerVel);
 
-    corridors.forEach((c) => c.update(elapsed, dt));
+    corridors.forEach((c) => c.update(elapsed, dt, camera.position, playerVel));
 
-    renderer.renderAsync(scene, camera);
+    renderer.render(scene, camera);
+
+    const info = renderer.info?.render as { drawCalls?: number; calls?: number; triangles?: number } | undefined;
+    if (info) {
+      lastDraws = info.drawCalls ?? info.calls ?? lastDraws;
+      lastTris = info.triangles ?? lastTris;
+    }
 
     frames++;
     fpsAccum += dt;
@@ -503,7 +504,7 @@ async function main(): Promise<void> {
       if (dc > 0 && dc < total * 0.25) reportScene(dc, total);
       const tri = Math.round(lastTris / 1000);
       hud.textContent = `${fps} fps · ${dc} draws · ${tri}k tris · ${backendName} · ${shimTel()} · ${gpuShort}`
-        + `  |  1-6 solo corridor · 0 all · O shadows · P foliage · H half-res`;
+        + `  |  1-8 solo corridor · 0 all · O shadows · P foliage · H half-res`;
       hud.style.color = gpu.software ? '#e2865c' : '#cfe3e2';
     }
     requestAnimationFrame(tick);
