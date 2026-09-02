@@ -8220,6 +8220,11 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
   player.selectedGrenade = hostState.grenade;
   player.weapon = hostState.weapon;
   player.stance = hostState.stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.grenades = hostState.grenades;
   player.ammo = { ...hostState.ammo };
   player.reserve = { ...hostState.reserve };
@@ -8996,6 +9001,11 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.selectedGrenade = canonical.grenade;
   player.weapon = canonical.weapon;
   player.stance = stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.seq = Math.max(player.seq, canonical.seq);
   for (const weapon of ORDINARY_WEAPON_IDS) {
     player.ammo[weapon] = projection.combatInventory.ammo[weapon];
