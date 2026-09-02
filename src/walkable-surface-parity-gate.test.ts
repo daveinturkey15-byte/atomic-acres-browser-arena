@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_ARENA_IDS,
+  UNSUPPORTED_HOLE_FLOOR_M2,
+  WALKABLE_MAX_SLOPE_DEG,
   WALKABLE_NAME_RULES,
+  largestConnectedRegion,
   runWalkableSurfaceParityAudit,
   type WalkableArenaResult,
 } from '../scripts/qa/walkable-surface-parity-core';
+import { CHARACTER_PHYSICS_CONFIG } from './physics';
 
 /**
  * PERMANENT GATE for Direction D - FALL-THROUGH FLOOR
@@ -190,6 +194,50 @@ describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
       ).toEqual([]);
     }
   }, 300_000);
+
+  it('measures the largest CONTIGUOUS hole, not just the unsupported share', () => {
+    // A share is relative to the panel it is measured on, so on a big enough
+    // surface the 2% share floor tolerates a hole the size of the defect the
+    // owner reported. The connected-component measure is the absolute floor
+    // underneath it. 4-connected, so two regions touching at a corner are two
+    // holes and not one.
+    //   . X .      X X .        X X .
+    //   X X X  =5  X X .  = 4   . . X  = 2 (the diagonal is NOT fused)
+    //   . X .      . . X        . . .
+    const grid = (rows: string[]) => Uint8Array.from(rows.join('').split('').map((c) => (c === 'X' ? 1 : 0)));
+    expect(largestConnectedRegion(grid(['.X.', 'XXX', '.X.']), 3, 3)).toBe(5);
+    expect(largestConnectedRegion(grid(['XX.', 'XX.', '..X']), 3, 3)).toBe(4);
+    expect(largestConnectedRegion(grid(['XX.', '..X', '...']), 3, 3)).toBe(2);
+    expect(largestConnectedRegion(grid(['...', '...', '...']), 3, 3)).toBe(0);
+    // The floor itself must stay under the standing footprint it protects.
+    expect(UNSUPPORTED_HOLE_FLOOR_M2).toBeLessThan(0.76 * 0.76);
+  });
+
+  it('leaves NO contiguous hole at all on Firing Range, Raid or Map 3', async () => {
+    const results = await audit();
+    // The share gate says "2% or less of this face is open"; this says "and
+    // there is no single patch of open air anywhere on it". On the arenas this
+    // lane owns the answer is exactly zero, so the weaker of the two floors is
+    // never what is holding them clean.
+    for (const arenaId of ['test1', 'test2', 'map3']) {
+      const result = results.find(({ id }) => id === arenaId)!;
+      const holed = (result.surfaces ?? [])
+        .filter((surface) => surface.largestHoleM2 > 0)
+        .map((surface) => `${surface.name} @ ${JSON.stringify(surface.centre)} hole ${surface.largestHoleM2} m2`);
+      expect(holed, `${arenaId}: contiguous unsupported patches on a walkable visual`).toEqual([]);
+    }
+  }, 300_000);
+
+  it('states its own slope blind spot rather than implying full coverage', () => {
+    // DISCLOSED LIMIT, pinned so it cannot drift silently: the controller will
+    // climb up to maximumSlopeClimbDegrees, but this sweep only censuses faces
+    // flat enough to read as floors. Everything between the two is walkable in
+    // game and invisible to Direction D. Raising the sweep's limit is a
+    // widening (more coverage); it must never be lowered.
+    expect(WALKABLE_MAX_SLOPE_DEG).toBeLessThan(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees);
+    expect(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees).toBe(50);
+    expect(WALKABLE_MAX_SLOPE_DEG).toBe(20);
+  });
 
   it('gives every arena an explicit ledger, even an empty one', () => {
     for (const arenaId of ALL_ARENA_IDS) {

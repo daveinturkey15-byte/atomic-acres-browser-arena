@@ -13,9 +13,9 @@
 //   Direction B "walk-through prop" walks from MESH to collider, but it only
 //     censuses meshes that are TALL (>= 0.9 m) and NARROW, because it is
 //     hunting for cover you can walk through. A 0.06 m thick horizontal panel
-//     is neither, and on top of that Direction B's very first name rule
-//     excludes anything matching /floor|deck-plank|ground|terrain/ as a
-//     "walkable surface" - i.e. it deliberately drops the exact class this
+//     is neither, and on top of that Direction B's SECOND name rule (the first
+//     is water) excludes anything matching /floor|deck-plank|ground|terrain/ as
+//     a "walkable surface" - i.e. it deliberately drops the exact class this
 //     module measures.
 //
 // So a horizontal presentation panel strung across a gap at roof height -
@@ -95,11 +95,23 @@ export const SAMPLE_MIN_PER_AXIS = 5;
 export const SAMPLE_MAX_PER_AXIS = 64;
 /**
  * A finding is any surface with more unsupported top face than this. It is not
- * zero because the sample grid lands on float-authored seams; 2% of a 9 x 6.4 m
- * panel is 1.15 m2, far smaller than any real hole (the HF-411 net measured
- * 76% unsupported).
+ * zero because the sample grid lands on float-authored seams. The HF-411 net
+ * measured 97% unsupported (971 of 999 samples), three orders of magnitude
+ * clear of this floor - but see UNSUPPORTED_HOLE_FLOOR_M2 below, because a
+ * share alone is not a safe sole criterion.
  */
 export const UNSUPPORTED_SHARE_FLOOR = 0.02;
+/**
+ * ...and because a SHARE is relative to the panel, the share floor alone scales
+ * the sensitivity with the size of the thing being measured: 2% of the 9 x 6.4 m
+ * camo net is 1.15 m2 of open air, the same defect class the owner reported, an
+ * order of magnitude smaller. So the largest CONNECTED unsupported region is
+ * measured as well, and a contiguous hole bigger than this fails regardless of
+ * how large the surface around it is. 0.5 m2 is under the 0.76 m standing
+ * capsule diameter squared (0.58 m2): a hole this size cannot swallow a
+ * standing player whole, and anything that can, does.
+ */
+export const UNSUPPORTED_HOLE_FLOOR_M2 = 0.5;
 
 /**
  * A real floor has a real flat top FACE. A rock, a tree canopy, a dome or a
@@ -164,6 +176,10 @@ export type WalkableFinding = {
   unsupportedShare: number;
   samples: number;
   unsupportedSamples: number;
+  /** Area of the LARGEST 4-connected unsupported region, in m2. */
+  largestHoleM2: number;
+  /** Which floor the finding tripped: the share, the contiguous hole, or both. */
+  trippedBy: 'share' | 'hole' | 'share+hole';
   /** World AABB of the unsupported region: minX, maxX, minZ, maxZ. */
   hole: [number, number, number, number] | null;
   /** Highest collider top found under the hole, or null if there is nothing at all. */
@@ -181,6 +197,8 @@ export type WalkableSurface = {
   topY: number;
   slopeDeg: number;
   unsupportedShare: number;
+  /** Area of the LARGEST 4-connected unsupported region, in m2. */
+  largestHoleM2: number;
   /** Top-face corners, world space, for a probe that wants edge points. */
   quad: Array<[number, number, number]>;
 };
@@ -436,6 +454,37 @@ function objectPath(object: THREE.Object3D): string {
   return parts.join('/');
 }
 
+/**
+ * Largest 4-connected region of set cells in a countU x countV occupancy grid,
+ * in CELLS. Iterative flood fill with an explicit stack: a 64 x 64 grid of open
+ * air is 4096 deep and recursion would blow the stack on exactly the worst
+ * defect this module exists to find.
+ */
+export function largestConnectedRegion(grid: Uint8Array, countU: number, countV: number): number {
+  const seen = new Uint8Array(grid.length);
+  const stack: number[] = [];
+  let largest = 0;
+  for (let start = 0; start < grid.length; start += 1) {
+    if (grid[start] !== 1 || seen[start] === 1) continue;
+    seen[start] = 1;
+    stack.length = 0;
+    stack.push(start);
+    let size = 0;
+    while (stack.length > 0) {
+      const index = stack.pop()!;
+      size += 1;
+      const iu = Math.floor(index / countV);
+      const iv = index - iu * countV;
+      if (iu > 0) { const n = index - countV; if (grid[n] === 1 && seen[n] === 0) { seen[n] = 1; stack.push(n); } }
+      if (iu < countU - 1) { const n = index + countV; if (grid[n] === 1 && seen[n] === 0) { seen[n] = 1; stack.push(n); } }
+      if (iv > 0) { const n = index - 1; if (grid[n] === 1 && seen[n] === 0) { seen[n] = 1; stack.push(n); } }
+      if (iv < countV - 1) { const n = index + 1; if (grid[n] === 1 && seen[n] === 0) { seen[n] = 1; stack.push(n); } }
+    }
+    largest = Math.max(largest, size);
+  }
+  return largest;
+}
+
 function sampleCount(span: number): number {
   return THREE.MathUtils.clamp(Math.ceil(span / SAMPLE_STEP_M) + 1, SAMPLE_MIN_PER_AXIS, SAMPLE_MAX_PER_AXIS);
 }
@@ -528,6 +577,10 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
     let holeSumX = 0;
     let holeSumZ = 0;
     let holeTopSum = 0;
+    // Occupancy grid for the connected-component hole measure below. A share
+    // alone cannot tell 1 m2 of contiguous open air from the same number of
+    // samples sprinkled along four float-authored seams.
+    const unsupportedGrid = new Uint8Array(countU * countV);
     for (let iu = 0; iu < countU; iu += 1) {
       const u = insetU + (iu / (countU - 1)) * (1 - 2 * insetU);
       for (let iv = 0; iv < countV; iv += 1) {
@@ -541,6 +594,7 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
         if (overheadBlockedAt(colliders, point.x, point.y, point.z)) overheadBlockedSamples += 1;
         if (supportedAt(colliders, point.x, point.y, point.z)) continue;
         unsupportedSamples += 1;
+        unsupportedGrid[iu * countV + iv] = 1;
         holeMinX = Math.min(holeMinX, point.x);
         holeMaxX = Math.max(holeMaxX, point.x);
         holeMinZ = Math.min(holeMinZ, point.z);
@@ -556,6 +610,11 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
       continue;
     }
     const unsupportedShare = samples === 0 ? 0 : unsupportedSamples / samples;
+    // Largest CONTIGUOUS hole, in m2. The grid is uniform over the quad, so one
+    // cell is the quad's real area divided by the sample count; 4-connected so
+    // two regions touching only at a corner are not fused into one.
+    const cellArea = samples === 0 ? 0 : area / samples;
+    const largestHoleM2 = round(largestConnectedRegion(unsupportedGrid, countU, countV) * cellArea);
     const centre: [number, number, number] = [
       round(quad.reduce((sum, c) => sum + c.x, 0) / 4),
       round(topY),
@@ -569,9 +628,12 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
       topY: round(topY),
       slopeDeg: round(slopeDeg),
       unsupportedShare: round(unsupportedShare),
+      largestHoleM2,
       quad: quad.map((corner) => [round(corner.x), round(corner.y), round(corner.z)] as [number, number, number]),
     });
-    if (unsupportedShare <= UNSUPPORTED_SHARE_FLOOR) {
+    const trippedShare = unsupportedShare > UNSUPPORTED_SHARE_FLOOR;
+    const trippedHole = largestHoleM2 > UNSUPPORTED_HOLE_FLOOR_M2;
+    if (!trippedShare && !trippedHole) {
       supported += 1;
       continue;
     }
@@ -590,6 +652,8 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
       unsupportedShare: round(unsupportedShare),
       samples,
       unsupportedSamples,
+      largestHoleM2,
+      trippedBy: trippedShare && trippedHole ? 'share+hole' : trippedShare ? 'share' : 'hole',
       hole: [round(holeMinX), round(holeMaxX), round(holeMinZ), round(holeMaxZ)],
       bestColliderTopUnderHole: landing,
       dropM: landing === null ? round(holeTopY) : round(holeTopY - landing),

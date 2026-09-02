@@ -44,6 +44,7 @@ async function main(): Promise<void> {
         + ` span ${JSON.stringify(finding.span)} area ${finding.area} m2`
         + ` — ${Math.round(finding.unsupportedShare * 100)}% unsupported`
         + ` (${finding.unsupportedSamples}/${finding.samples} samples),`
+        + ` largest contiguous hole ${finding.largestHoleM2} m2 [${finding.trippedBy}],`
         + ` hole ${JSON.stringify(finding.hole)},`
         + ` drop ${finding.dropM} m to ${finding.bestColliderTopUnderHole ?? 'nothing'}`);
     }
