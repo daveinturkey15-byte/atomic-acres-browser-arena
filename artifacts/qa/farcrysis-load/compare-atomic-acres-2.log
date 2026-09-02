@@ -1,8 +1,0 @@
-[farcrysis-boot] menu ready at 2880 ms
-[farcrysis-boot] selectArena(atomic-acres) -> ok in 44844 ms
-[farcrysis-boot] startSolo -> active in 25066 ms
-[farcrysis-boot] outcome=admitted selectToAdmitted=44845 ms, selectToActive=69910 ms
-[farcrysis-boot] pipelines: menu 0, during load 374; shader modules during load 431; long tasks 283 = 32373 ms (max 1723)
-[farcrysis-boot] scene: 6609 meshes (108 instanced, 27615 instances), 1830 unique materials (0 in arena root), 2789 geometries
-Wrote C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\compare-atomic-acres-2.json
-PROBE EXIT 0
