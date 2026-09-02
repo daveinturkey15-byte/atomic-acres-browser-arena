@@ -9,15 +9,20 @@
  * that already own a frame - grass, weather, water, glass, targets - and none
  * of it is arena-authored.
  *
- * The Map 3 showcase is the first arena content that animates itself. Its seven
+ * The Map 3 showcase is the first arena content that animates itself. Its eight
  * placed corridors (`MAP3_LANES`) each publish an
  * `update(elapsed, dt, cameraPosition, playerVelocity)`
  * and drive every time-varying uniform from it: the water surface and its
- * buoyancy, rain and its splashes, the god-ray volume, the physics bay, the
- * colosseum crowd. Dropped into an arena root with no per-frame call, all seven
- * would arrive FROZEN - still water, still rain, static god rays - which looks
- * exactly like broken content and is one of the three reasons the showcase was
- * not imported into the arena in the first place.
+ * buoyancy, rain and its splashes, the god-ray volume, the Rapier playground's
+ * 131 bodies, the colosseum crowd. Dropped into an arena root with no per-frame
+ * call, all eight would arrive FROZEN - still water, still rain, static god
+ * rays, a playground nothing can push - which looks exactly like broken content
+ * and is one of the three reasons the showcase was not imported into the arena
+ * in the first place.
+ *
+ * (Eight since the Rapier playground landed as the eighth lane. This comment
+ * said SEVEN and named MAP3_LANES as its source, which is the kind of count
+ * that goes quietly wrong the moment the thing it counts grows.)
  *
  * WHAT THIS DELIBERATELY IS NOT.
  *
