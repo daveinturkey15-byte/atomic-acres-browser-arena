@@ -992,23 +992,47 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
-    // Exact X MIRRORS of one another (see the file header).
+    // HF-402 (2026-09-02). Owner: "currently raid spawns me in outside".
     //
-    // Owner 2026-08-31: "bot spawns are bad on other maps than nuketown ... make
-    // player and bot spawns nicely spread and balanced everywhere". These six
-    // points used to sit in a 4 x 10 m box - 10 m of a 100 m map, a minimum pair
-    // distance of 2.83 m, and one point ((-43,-7) and its mirror) authored
-    // INSIDE geometry, so the whole enemy team materialised inside an 11 m
-    // circle that one grenade covers. Now a spawn LINE across 46 m of z, every
-    // point verified walkable at the authored 1.7 m spawn height and every pair
-    // at least 7.2 m apart, and every point chosen from the set that is walkable
-    // on BOTH sides - because the collider set is NOT actually X-mirrored even
-    // though the layout is: (-45,-14) is walkable while (45,-14) is inside
-    // geometry, and (-45,4) is inside geometry while (45,4) is walkable. Pinned
-    // by src/spawn-layout-quality.test.ts.
+    // The 2026-08-31 table put a spawn LINE at x = +/-47 across 46 m of z. It
+    // passed the gate of its day because "walkable" was measured as "not
+    // inside a collider" against the bounding RECTANGLE - and TEST2_BLOB, the
+    // building footprint, leaves ~26% of that rectangle as nothing: no paving,
+    // no route, a 3.4 m boundary wall between it and the map, and the physics
+    // fail-safe floor 1.2 m under grade. Measured before this change
+    // (scripts/qa/measure-spawn-layouts.ts): team 0 had 5/6 spawns with no
+    // floor beneath and 6/6 with no autostep route to the enemy; team 1 had
+    // 4/6 with no floor and 6/6 with no route, because its two grounded points
+    // sat in the garage, whose whole west face is a 0.7 m kerb that a player
+    // jumps and a bot never crosses (bots collide against everything in their
+    // 1.7 m span and Raid authors no vertical navigation).
+    //
+    // These points come from scripts/qa/solve-spawn-layouts.ts under the
+    // HF-402 constraint set (src/spawn-layout-constraints.ts): every point has
+    // paving or a collider top under its feet, an autostep-only route to the
+    // enemy table, hard cover within 3 m, and NO enemy spawn in sight at any
+    // range; the tables are 52 m apart. The solver searched each team's back
+    // band of the map and spread the points across it, Nuke Town style.
+    //
+    // Re-solved 2026-09-02 after review: the first HF-402 pass bounded cover
+    // from above (within 6 m) and never from below, so the farthest-point
+    // search parked spawns against wall faces - ten of its twelve points stood
+    // 0.5-1.2 m from a face that fills the view, and the respawn at (-31, 22)
+    // opened with a stucco wall across the whole screen and only 17% of the
+    // compass walkable. The constraint set now carries a standoff floor
+    // (1.2 m) and an open-arc floor (30%), both calibrated on the SHIPPED
+    // maps' own minima, and these points clear both.
+    //
+    // NOT an X mirror any more, deliberately: the map's east end (the E2
+    // garage wing and the x 28-36 strip in front of it) is sealed off from the
+    // rest of the map at autostep by the garage kerb, the solid kitchen east
+    // wall (27.6-28, z -6..4) and the solid gallery east wall (31.6-32, z
+    // 4..12) - the spec's E2 exits "W to C3" and "SW to S4" were never built
+    // - so team 1's back band is the interior east of the courtyard until
+    // that geometry gets its doors. Pinned by src/spawn-layout-quality.test.ts.
     spawns: spawnRecord(
-      [[-47, -26], [-45, -19], [-47, -12], [-46, 0], [-47, 13], [-45, 26]],
-      [[47, -26], [45, -19], [47, -12], [46, 0], [47, 13], [45, 26]],
+      [[-46, 0], [-30, -34], [-32, 19], [-32, -15], [-30, 2], [-38, -25]],
+      [[22, 1], [24, -24], [24, 22], [26, -11], [30, 10], [22, 13]],
     ),
     // Ten at grade and FOUR on the +3.40 m floors. The old comment kept every
     // anchor at grade because the only raised surface was a 0.70 m deck a bot

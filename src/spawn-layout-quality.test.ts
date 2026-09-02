@@ -1,24 +1,22 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { ARENA_SELECTIONS } from './map-selection';
-import { buildArena } from './map';
-import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
-import { buildFarcrysis } from './farcrysis';
-import { buildHighSeas } from './high-seas';
-import { buildTest1, buildTest2 } from './test-maps';
 import { validArenaSpawnPoint } from './spawn-safety';
+import {
+  ARENA_BUILDERS,
+  FREE_FOR_ALL_ONLY_ARENA_IDS,
+  SPAWN_LAYOUT_THRESHOLDS,
+  arenaFieldsBots,
+  arenaRunsTeamModes,
+  measureSpawnLayout,
+} from './spawn-layout-constraints';
 
 type SpawnPoint = { x: number; z: number };
-const BUILDERS: Record<string, (scene: THREE.Scene) => { spawns: Record<number, SpawnPoint[]>; bounds: { minX: number; maxX: number; minZ: number; maxZ: number }; colliders: readonly unknown[] }> = {
-  'atomic-acres': buildArena as never,
-  'rustworks-1v1': buildRustworks1v1 as never,
-  'gun-range': buildGunRange as never,
-  'skyline-terminal': buildSkylineTerminal as never,
-  farcrysis: buildFarcrysis as never,
-  'high-seas': ((scene: THREE.Scene) => buildHighSeas(scene)) as never,
-  test1: buildTest1 as never,
-  test2: buildTest2 as never,
-};
+// HF-402: the builder table is `Record<ArenaId, ...>` in
+// spawn-layout-constraints.ts - exhaustive by type, so a new registry id
+// without a builder fails tsc instead of silently escaping this gate.
+const BUILDERS = ARENA_BUILDERS;
 
 /**
  * THE SPAWN LAYOUT GATE.
@@ -131,4 +129,130 @@ describe('authored spawn layouts, on every playable arena', () => {
       });
     });
   }
+});
+
+/**
+ * HF-402 (2026-09-02). Owner: "please ensure all maps have more reasonable
+ * spawns for both players and bots, currently raid spawns me in outside".
+ *
+ * Everything above passed on Raid while five of its six team-0 spawns stood
+ * in the void outside the boundary wall: "walkable" was measured as "not
+ * inside a collider", and nothing is inside a collider where there is no map.
+ * Measured on the shipped b138b9c0 tables before this block existed:
+ *
+ *     test2 (Raid)   team 0: 5/6 no floor, 6/6 no autostep route to the enemy
+ *                    team 1: 4/6 no floor, 6/6 no route (the two with a floor
+ *                            sit in a garage only a jump leaves)
+ *     every other selectable arena: 12/12 or 24/24 on every rule below
+ *
+ * The rules and their thresholds live in src/spawn-layout-constraints.ts and
+ * are calibrated on Nuke Town. The roster is derived from ARENA_SELECTIONS.
+ */
+describe('HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight', () => {
+  for (const selection of PLAYABLE) {
+    describe(selection.displayName, () => {
+      const arena = BUILDERS[selection.id](new THREE.Scene());
+      const report = measureSpawnLayout(selection.id, arena);
+      const describePoint = (point: (typeof report.points)[number]): string => `${selection.id} team ${point.team} spawn (${point.x}, ${point.z})`;
+
+      it('stands every spawn on a floor within autostep of its feet - outside the footprint there is none', () => {
+        for (const point of report.points) {
+          expect(point.floorGapM, `${describePoint(point)} has nothing beneath it (a fail-safe floor more than 0.6 m down does not count)`).not.toBeNull();
+        }
+      });
+
+      it('connects every spawn to an enemy spawn by a route that needs no jump - a bot cannot jump', () => {
+        for (const point of report.points) {
+          expect(point.reachable, `${describePoint(point)} has no autostep route to any enemy spawn${point.reachableByJump ? ' (a jump would reach one: a bot trap)' : ''}`).toBe(true);
+        }
+      });
+
+      it(`puts hard cover within ${SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM} m of every spawn`, () => {
+        for (const point of report.points) {
+          expect(point.coverDistanceM, `${describePoint(point)} is ${point.coverDistanceM} m from the nearest cover`).toBeLessThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM);
+        }
+      });
+
+      // HF-402 repair: standoff and open arc. Thresholds are the SHIPPED set's
+      // own minima (see SPAWN_LAYOUT_THRESHOLDS), so every arena but Raid
+      // passed these the day they were written - which is the point: they
+      // encode what the maps the owner accepts already do.
+      it(`keeps every spawn at least ${SPAWN_LAYOUT_THRESHOLDS.minimumWallStandoffM} m off any face that fills the view`, () => {
+        for (const point of report.points) {
+          expect(point.wallStandoffM, `${describePoint(point)} opens ${point.wallStandoffM} m from a wall in its face`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumWallStandoffM);
+        }
+      });
+
+      it(`leaves at least ${SPAWN_LAYOUT_THRESHOLDS.minimumOpenArcFraction * 100}% of the compass open to walk out of`, () => {
+        for (const point of report.points) {
+          expect(point.openArcFraction, `${describePoint(point)} is boxed in: only ${(point.openArcFraction * 100).toFixed(0)}% of the compass is walkable`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumOpenArcFraction);
+        }
+      });
+
+      if (arenaFieldsBots(selection.id)) {
+        it(`keeps every enemy spawn with a direct eye-height line at least ${SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM} m away - bots draw from that table`, () => {
+          for (const point of report.points) {
+            if (point.nearestVisibleEnemyM === null) continue;
+            expect(point.nearestVisibleEnemyM, `${describePoint(point)} sees an enemy spawn ${point.nearestVisibleEnemyM} m away`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM);
+          }
+        });
+      }
+
+      if (arenaRunsTeamModes(selection.id)) {
+        it(`separates the two tables by at least ${SPAWN_LAYOUT_THRESHOLDS.minimumCrossTeamSeparationFraction * 100}% of the longer axis`, () => {
+          expect(report.summary.crossTeamMinFraction, `${selection.id} tables are ${report.summary.crossTeamMinDistanceM} m apart`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumCrossTeamSeparationFraction);
+        });
+      }
+
+      it('reports no failure at all - and none the rules above did not already name', () => {
+        // The per-point failure list is what the solver and the runtime
+        // verifier consume; it must agree with the assertions above.
+        //
+        // The previous version of this filtered `teams-too-close` out of
+        // report.failures and asserted the remainder was empty. That was
+        // vacuous: `teams-too-close:*` is the ONLY string measureSpawnLayout
+        // ever pushes into report.failures, so the filtered array was empty
+        // whatever the layout did. It now asserts the real invariant - that
+        // the layout produces no failure of any kind - which is what the
+        // block's title claims and what the solver is held to.
+        const named = new Set(['no-floor', 'no-autostep-route-to-enemy', 'no-cover-in-reach', 'enemy-spawn-in-sight', 'inside-geometry-or-out-of-bounds', 'wall-in-the-face', 'boxed-in']);
+        for (const point of report.points) {
+          for (const failure of point.failures) expect(named.has(failure), `${describePoint(point)}: unknown failure ${failure}`).toBe(true);
+        }
+        expect(report.points.flatMap((point) => point.failures.map((failure) => `${describePoint(point)}: ${failure}`)), `${selection.id} per-point failures`).toEqual([]);
+        expect(report.failures, `${selection.id} layout-level failures`).toEqual([]);
+      });
+    });
+  }
+});
+
+/**
+ * HF-402 repair. The team-separation rule is skipped on arenas the runtime
+ * forces into free-for-all, where the two tables are one merged pool. That
+ * exemption used to key on `maximumSoloBots === 0`, which got the right answer
+ * for the wrong reason and would have let a future bot-less TEAM arena escape
+ * the rule. It now keys on FREE_FOR_ALL_ONLY_ARENA_IDS - and this pins that
+ * list against the runtime that actually decides it, so the two cannot drift.
+ */
+describe('HF-402: the free-for-all exemption matches what the runtime does', () => {
+  const legacyMain = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+
+  it('pins every exempted arena to the runtime line that forces it to free-for-all', () => {
+    for (const arenaId of FREE_FOR_ALL_ONLY_ARENA_IDS) {
+      expect(
+        legacyMain.includes(`const rangeLobby = arenaId === '${arenaId}';`),
+        `${arenaId} is exempt from the team-separation rule, but legacy-main.ts no longer forces it to free-for-all`,
+      ).toBe(true);
+    }
+    // ...and that the forced mode really is ffa, not merely a named lobby.
+    expect(legacyMain).toContain("const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';");
+    expect(legacyMain).toContain('modeInput.disabled = !hostControls || rangeLobby;');
+  });
+
+  it('exempts nothing else: every other selectable arena is held to team separation', () => {
+    for (const selection of PLAYABLE) {
+      if (FREE_FOR_ALL_ONLY_ARENA_IDS.includes(selection.id)) continue;
+      expect(arenaRunsTeamModes(selection.id), `${selection.id} escapes the team-separation rule`).toBe(true);
+    }
+  });
 });
