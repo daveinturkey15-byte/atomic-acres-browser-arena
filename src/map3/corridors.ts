@@ -28,22 +28,41 @@ import { createLitterSkirt, hash11, mergeGeometries } from './leaf-geometry';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, createBarkMaterial, createFlatFoliageMaterial,
   createFoliageMaterial, createFoliageUniforms, createForestFloorMaterial,
+  setVehicleInteractor, setPlayerInteractor, rgb,
   type FoliageUniforms,
 } from './foliage-material';
+
+function mergeSimple(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uvs: number[] = [];
+  const idx: number[] = [];
+  let off = 0;
+  for (const g of list) {
+    const p = g.getAttribute('position');
+    const n = g.getAttribute('normal');
+    const u = g.getAttribute('uv');
+    for (let i = 0; i < p.count * 3; i++) pos.push(p.array[i] as number);
+    for (let i = 0; i < p.count * 3; i++) nor.push(n ? (n.array[i] as number) : 0);
+    for (let i = 0; i < p.count * 2; i++) uvs.push(u ? (u.array[i] as number) : 0);
+    const gi = g.getIndex();
+    if (gi) for (let i = 0; i < gi.count; i++) idx.push((gi.array[i] as number) + off);
+    else for (let i = 0; i < p.count; i++) idx.push(i + off);
+    off += p.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  out.setIndex(idx);
+  return out;
+}
 
 export interface Corridor {
   group: THREE.Group;
   update(elapsed: number, dt: number, playerPos?: THREE.Vector3, playerVel?: THREE.Vector3): void;
   dispose(): void;
-  /**
-   * Exposed so the bootstrap can point leaf transmission at the REAL sun.
-   * Each corridor builds its own FoliageUniforms privately; without this the
-   * translucency term keeps its construction-time sun and stops agreeing with
-   * the sky the moment the sun starts orbiting — the leaves would glow from a
-   * direction the sun is no longer in.
-   */
   foliage?: FoliageUniforms;
-  /** Walk-through length in metres; the hub uses it to place the far sign. */
   length: number;
   title: string;
   skill: string;
@@ -51,17 +70,28 @@ export interface Corridor {
 
 const CORRIDOR_WIDTH = 9;
 
+interface InteractivePlant {
+  x: number;
+  z: number;
+  baseScale: number;
+  baseRotY: number;
+  bendX: number;
+  bendZ: number;
+  velX: number;
+  velZ: number;
+  radius: number;
+  maxBend: number;
+  stiffness: number;
+  damping: number;
+}
+
 /* ------------------------------------------------------------------ */
-/* 1. NATURE                                                           */
+/* 1. NATURE & VEHICLE THROUGH VEGETATION                             */
 /* ------------------------------------------------------------------ */
 
 /**
- * A forest floor you walk the length of, with the six techniques applied — and
- * a hard split down the middle for the first third so the difference is
- * demonstrated rather than claimed. Left of the line: flat leaf cards, one
- * green, no transmission, canopy in the shadow map, no litter. Right: the same
- * geometry count with curvature, translucency, abaxial shading, senescence and
- * a litter skirt.
+ * A forest floor with full procedural vegetation, interactive vehicle interaction,
+ * instanced sapling and shrub spring-rebound bending, and the before/after split.
  */
 export function createNatureCorridor(seed = 7): Corridor {
   const group = new THREE.Group();
@@ -80,7 +110,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   const floorMat = createForestFloorMaterial({ z1: Z1, z2: Z2 });
   disposables.push(foliageMat, autumnMat, springMat, flatMat, barkMat, darkBarkMat, floorMat);
 
-  const floorGeo = new THREE.PlaneGeometry(CORRIDOR_WIDTH, LEN, 12, 48);
+  const floorGeo = new THREE.PlaneGeometry(CORRIDOR_WIDTH + 4, LEN, 14, 54);
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -88,9 +118,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   group.add(floor);
   disposables.push(floorGeo);
 
-  // One batch per material. Everything below pushes transformed geometry into
-  // these and nothing creates a mesh of its own — that is what keeps a forest
-  // this dense down to a handful of draw calls.
+  // Batched background trees
   const wood: THREE.BufferGeometry[] = [];
   const darkWood: THREE.BufferGeometry[] = [];
   const green: THREE.BufferGeometry[] = [];
@@ -107,11 +135,8 @@ export function createNatureCorridor(seed = 7): Corridor {
   };
 
   /* ---- ZONE A: broadleaf, and the before/after split ------------------ */
-  // The near third is halved down the centre line: left is the flat card with
-  // no transmission and no litter, right is the full treatment. Same geometry
-  // budget on both sides, so the difference is the shading, not the density.
-  poissonScatter(30, { minX: -11, maxX: 11, minZ: Z1, maxZ: 1 }, 2.4, seed).forEach((p, i) => {
-    if (Math.abs(p.x) < 1.8) return;
+  poissonScatter(28, { minX: -11, maxX: 11, minZ: Z1, maxZ: 1 }, 2.6, seed).forEach((p, i) => {
+    if (Math.abs(p.x) < 2.0) return; // Keep central trail open for vehicle
     const before = p.x < 0;
     const parts = createTree({
       seed: seed * 10 + i,
@@ -126,8 +151,8 @@ export function createNatureCorridor(seed = 7): Corridor {
   });
 
   /* ---- ZONE B: conifer stand, grass understorey, deadwood ------------- */
-  poissonScatter(26, { minX: -12, maxX: 12, minZ: Z2, maxZ: Z1 }, 2.7, seed * 3).forEach((p, i) => {
-    if (Math.abs(p.x) < 2.0) return;
+  poissonScatter(24, { minX: -12, maxX: 12, minZ: Z2, maxZ: Z1 }, 2.9, seed * 3).forEach((p, i) => {
+    if (Math.abs(p.x) < 2.2) return;
     const parts = createConifer({
       seed: seed * 20 + i,
       height: 7 + hash11(seed * 5 + i) * 8,
@@ -137,20 +162,14 @@ export function createNatureCorridor(seed = 7): Corridor {
     green.push(place(parts.foliage, p.x, p.y));
     green.push(place(parts.litter, p.x, p.y));
   });
-  // Fallen logs read as history; three is enough to sell it.
+  // Fallen logs
   [[-3.4, Z1 - 4, 0.4], [3.9, Z1 - 11, -0.8], [-4.6, Z2 + 3, 1.9]].forEach(([x, z, r], i) => {
     darkWood.push(place(createFallenLog(seed * 30 + i, 3.2 + i), x, z, r));
   });
-  // Grass understorey along the conifer floor.
-  poissonScatter(150, { minX: -9, maxX: 9, minZ: Z2, maxZ: Z1 }, 0.62, seed * 7).forEach((p, i) => {
-    if (Math.abs(p.x) < 1.3) return;
-    green.push(place(createGrassTuft(seed * 50 + i, 0.8 + hash11(seed + i) * 0.8), p.x, p.y,
-      hash11(seed * 2 + i) * 6.28));
-  });
 
   /* ---- ZONE C: autumn grove, heavy litter, spring saplings ------------ */
-  poissonScatter(34, { minX: -12, maxX: 12, minZ: -LEN, maxZ: Z2 }, 2.2, seed * 11).forEach((p, i) => {
-    if (Math.abs(p.x) < 1.8) return;
+  poissonScatter(30, { minX: -12, maxX: 12, minZ: -LEN, maxZ: Z2 }, 2.4, seed * 11).forEach((p, i) => {
+    if (Math.abs(p.x) < 2.0) return;
     const young = hash11(seed * 13 + i) > 0.7;
     const parts = createTree({
       seed: seed * 40 + i,
@@ -164,22 +183,22 @@ export function createNatureCorridor(seed = 7): Corridor {
     autumn.push(place(parts.litter, p.x, p.y));
   });
 
-  /* ---- shared understorey and floor litter ---------------------------- */
-  poissonScatter(110, { minX: -11, maxX: 11, minZ: -LEN, maxZ: 0 }, 1.05, seed * 5).forEach((p, i) => {
-    if (Math.abs(p.x) < 1.3) return;
+  /* ---- Background understorey and litter skirts ----------------------- */
+  poissonScatter(80, { minX: -11, maxX: 11, minZ: -LEN, maxZ: 0 }, 1.35, seed * 5).forEach((p, i) => {
+    if (Math.abs(p.x) < 2.2) return;
     const before = p.y > Z1 && p.x < 0;
     const g = createShrub(seed * 60 + i, 0.6 + hash11(seed + i * 3) * 1.1);
     (before ? flat : (p.y < Z2 ? autumn : green))
       .push(place(g, p.x, p.y, hash11(seed + i * 9) * 6.28));
   });
-  poissonScatter(220, { minX: -6, maxX: 6, minZ: -LEN + 1, maxZ: -1 }, 0.44, seed * 3)
-    .forEach((p, i) => {
-      if (p.y > Z1 && p.x < 0) return;
-      const g = createLitterSkirt(0.28, 3, {
-        length: 0.19, width: 0.07, segmentsV: 3, segmentsU: 2, widestAt: 0.4,
-      }, seed * 17 + i);
-      (p.y < Z2 ? autumn : green).push(place(g, p.x, p.y));
-    });
+  poissonScatter(160, { minX: -6, maxX: 6, minZ: -LEN + 1, maxZ: -1 }, 0.58, seed * 3).forEach((p, i) => {
+    if (p.y > Z1 && p.x < 0) return;
+    if (Math.abs(p.x) < 1.4) return;
+    const g = createLitterSkirt(0.28, 3, {
+      length: 0.19, width: 0.07, segmentsV: 3, segmentsU: 2, widestAt: 0.4,
+    }, seed * 17 + i);
+    (p.y < Z2 ? autumn : green).push(place(g, p.x, p.y));
+  });
 
   function addBatch(parts: THREE.BufferGeometry[], material: THREE.Material, cast: boolean): void {
     if (!parts.length) return;
@@ -192,8 +211,6 @@ export function createNatureCorridor(seed = 7): Corridor {
     disposables.push(merged);
   }
 
-  // Wood is the only shadow caster; the canopy is deliberately excluded so
-  // direct sun reaches the floor instead of turning into leaf mush.
   addBatch(wood, barkMat, true);
   addBatch(darkWood, darkBarkMat, true);
   addBatch(green, foliageMat, false);
@@ -201,14 +218,484 @@ export function createNatureCorridor(seed = 7): Corridor {
   addBatch(spring, springMat, false);
   addBatch(flat, flatMat, false);
 
+  /* ---------------------------------------------------------------- */
+  /* 2. Interactive Instanced Vegetation (Saplings, Shrubs, Grass)     */
+  /* ---------------------------------------------------------------- */
+
+  // A. Interactive Saplings
+  const saplingTemplate = createTree({
+    seed: 77, height: 2.6, trunkRadius: 0.07, depth: 2, leavesPerClump: 8, deadFraction: 0.06,
+  });
+  disposables.push(saplingTemplate.wood, saplingTemplate.foliage, saplingTemplate.litter);
+
+  const saplingPositions = [
+    { x: -1.35, z: -7.5, s: 1.05 },
+    { x: 1.45, z: -11.0, s: 0.95 },
+    { x: -1.25, z: -15.5, s: 1.15 },
+    { x: 1.30, z: -19.0, s: 0.90 },
+    { x: -1.40, z: -24.5, s: 1.10 },
+    { x: 1.25, z: -28.0, s: 1.00 },
+    { x: -1.30, z: -33.5, s: 1.05 },
+    { x: 1.35, z: -37.0, s: 0.95 },
+    { x: -1.20, z: -42.0, s: 1.10 },
+    { x: 1.40, z: -46.5, s: 1.00 },
+  ];
+  const saplingPlants: InteractivePlant[] = saplingPositions.map((p, i) => ({
+    x: p.x,
+    z: p.z,
+    baseScale: p.s,
+    baseRotY: hash11(i * 7) * Math.PI * 2,
+    bendX: 0,
+    bendZ: 0,
+    velX: 0,
+    velZ: 0,
+    radius: 0.85,
+    maxBend: 1.6,
+    stiffness: 22.0,
+    damping: 3.2,
+  }));
+
+  const saplingWoodMesh = new THREE.InstancedMesh(saplingTemplate.wood, barkMat, saplingPlants.length);
+  const saplingFoliageMesh = new THREE.InstancedMesh(saplingTemplate.foliage, foliageMat, saplingPlants.length);
+  saplingWoodMesh.castShadow = true;
+  saplingWoodMesh.receiveShadow = true;
+  group.add(saplingWoodMesh, saplingFoliageMesh);
+  disposables.push(saplingWoodMesh, saplingFoliageMesh);
+
+  // B. Interactive Roadside Shrubs
+  const shrubGeo = createShrub(99, 1.1);
+  disposables.push(shrubGeo);
+
+  const shrubPositions: Array<{ x: number; z: number; s: number }> = [];
+  poissonScatter(32, { minX: -2.3, maxX: 2.3, minZ: -49, maxZ: -3 }, 1.35, 42).forEach((p, i) => {
+    shrubPositions.push({ x: p.x, z: p.y, s: 0.75 + hash11(i * 3) * 0.55 });
+  });
+  const shrubPlants: InteractivePlant[] = shrubPositions.map((p, i) => ({
+    x: p.x,
+    z: p.z,
+    baseScale: p.s,
+    baseRotY: hash11(i * 5) * Math.PI * 2,
+    bendX: 0,
+    bendZ: 0,
+    velX: 0,
+    velZ: 0,
+    radius: 0.70,
+    maxBend: 1.3,
+    stiffness: 26.0,
+    damping: 3.8,
+  }));
+
+  const shrubMesh = new THREE.InstancedMesh(shrubGeo, foliageMat, shrubPlants.length);
+  group.add(shrubMesh);
+  disposables.push(shrubMesh);
+
+  // C. Interactive Trail Grass Tufts
+  const grassGeo = createGrassTuft(123, 1.25);
+  disposables.push(grassGeo);
+
+  const grassPositions: Array<{ x: number; z: number; s: number }> = [];
+  poissonScatter(64, { minX: -2.2, maxX: 2.2, minZ: -50, maxZ: -2 }, 0.72, 88).forEach((p, i) => {
+    grassPositions.push({ x: p.x, z: p.y, s: 0.85 + hash11(i * 4) * 0.5 });
+  });
+  const grassPlants: InteractivePlant[] = grassPositions.map((p, i) => ({
+    x: p.x,
+    z: p.z,
+    baseScale: p.s,
+    baseRotY: hash11(i * 3) * Math.PI * 2,
+    bendX: 0,
+    bendZ: 0,
+    velX: 0,
+    velZ: 0,
+    radius: 0.55,
+    maxBend: 1.4,
+    stiffness: 32.0,
+    damping: 4.8,
+  }));
+
+  const grassMesh = new THREE.InstancedMesh(grassGeo, foliageMat, grassPlants.length);
+  group.add(grassMesh);
+  disposables.push(grassMesh);
+
+  /* ---------------------------------------------------------------- */
+  /* 3. Procedural 4x4 Forester Overland Truck                        */
+  /* ---------------------------------------------------------------- */
+
+  const carGroup = new THREE.Group();
+
+  const carBodyMat = new MeshStandardNodeMaterial();
+  carBodyMat.roughness = 0.36;
+  carBodyMat.metalness = 0.62;
+  carBodyMat.colorNode = rgb(0x2d4f26); // Forest ranger deep olive green
+  disposables.push(carBodyMat);
+
+  const carSteelMat = new MeshStandardNodeMaterial();
+  carSteelMat.roughness = 0.65;
+  carSteelMat.metalness = 0.88;
+  carSteelMat.colorNode = rgb(0x1a1c1e); // Dark gunmetal chassis
+  disposables.push(carSteelMat);
+
+  const carTimberMat = new MeshStandardNodeMaterial();
+  carTimberMat.roughness = 0.85;
+  carTimberMat.colorNode = rgb(0x4a3724); // Weathered hardwood bed
+  disposables.push(carTimberMat);
+
+  const tireMat = new MeshStandardNodeMaterial();
+  tireMat.roughness = 0.90;
+  tireMat.metalness = 0.05;
+  tireMat.colorNode = rgb(0x151518); // Rubber black
+  disposables.push(tireMat);
+
+  const rimMat = new MeshStandardNodeMaterial();
+  rimMat.roughness = 0.28;
+  rimMat.metalness = 0.92;
+  rimMat.colorNode = rgb(0xc5ccd4); // Steel rim
+  disposables.push(rimMat);
+
+  const headlightMat = new MeshStandardNodeMaterial();
+  headlightMat.roughness = 0.2;
+  headlightMat.colorNode = rgb(0xfffae0);
+  headlightMat.emissiveNode = rgb(0xffe899, 2.5);
+  disposables.push(headlightMat);
+
+  // A. Cab & Hood
+  const bodyParts: THREE.BufferGeometry[] = [];
+  const cab = new THREE.BoxGeometry(1.65, 0.75, 1.45);
+  cab.translate(0, 0.95, -0.2);
+  bodyParts.push(cab);
+
+  const hood = new THREE.BoxGeometry(1.45, 0.42, 1.35);
+  hood.translate(0, 0.78, 1.15);
+  bodyParts.push(hood);
+
+  // Roof visor / brow
+  const brow = new THREE.BoxGeometry(1.68, 0.08, 0.25);
+  brow.translate(0, 1.34, 0.48);
+  bodyParts.push(brow);
+
+  // Side mirrors
+  for (const side of [-1, 1]) {
+    const mirror = new THREE.BoxGeometry(0.12, 0.22, 0.16);
+    mirror.translate(side * 0.94, 1.05, 0.35);
+    bodyParts.push(mirror);
+  }
+
+  const bodyMerged = mergeSimple(bodyParts);
+  bodyParts.forEach((g) => g.dispose());
+  const bodyMesh = new THREE.Mesh(bodyMerged, carBodyMat);
+  bodyMesh.castShadow = true;
+  bodyMesh.receiveShadow = true;
+  carGroup.add(bodyMesh);
+  disposables.push(bodyMerged);
+
+  // B. Steel Chassis, Bull-Bar & Roof Rack
+  const steelParts: THREE.BufferGeometry[] = [];
+
+  // Frame rails
+  for (const side of [-1, 1]) {
+    const rail = new THREE.BoxGeometry(0.12, 0.16, 3.8);
+    rail.translate(side * 0.55, 0.42, 0.2);
+    steelParts.push(rail);
+  }
+
+  // Heavy front bull-bar bumper with winch
+  const bumper = new THREE.BoxGeometry(1.85, 0.24, 0.28);
+  bumper.translate(0, 0.48, 1.88);
+  steelParts.push(bumper);
+
+  const winch = new THREE.CylinderGeometry(0.12, 0.12, 0.45, 10);
+  winch.rotateZ(Math.PI / 2);
+  winch.translate(0, 0.55, 1.95);
+  steelParts.push(winch);
+
+  // Bull-bar brush guard hoops
+  const guardPillars = [
+    [-0.7, 0.55, 1.9, -0.65, 0.95, 1.85],
+    [0.7, 0.55, 1.9, 0.65, 0.95, 1.85],
+    [-0.65, 0.95, 1.85, 0.65, 0.95, 1.85],
+  ];
+  guardPillars.forEach(([x0, y0, z0, x1, y1, z1]) => {
+    const d = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
+    const tube = new THREE.CylinderGeometry(0.035, 0.035, d, 6);
+    tube.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    steelParts.push(tube);
+  });
+
+  // Roll cage / headache rack behind cab
+  const rollBarBars = [
+    [-0.78, 0.6, -0.95, -0.72, 1.45, -0.95],
+    [0.78, 0.6, -0.95, 0.72, 1.45, -0.95],
+    [-0.72, 1.45, -0.95, 0.72, 1.45, -0.95],
+  ];
+  rollBarBars.forEach(([x0, y0, z0, x1, y1, z1]) => {
+    const d = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
+    const tube = new THREE.CylinderGeometry(0.04, 0.04, d, 6);
+    tube.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    steelParts.push(tube);
+  });
+
+  const steelMerged = mergeSimple(steelParts);
+  steelParts.forEach((g) => g.dispose());
+  const steelMesh = new THREE.Mesh(steelMerged, carSteelMat);
+  steelMesh.castShadow = true;
+  steelMesh.receiveShadow = true;
+  carGroup.add(steelMesh);
+  disposables.push(steelMerged);
+
+  // C. Hardwood Rear Cargo Bed & Toolboxes
+  const timberParts: THREE.BufferGeometry[] = [];
+  const bedFloor = new THREE.BoxGeometry(1.62, 0.10, 1.55);
+  bedFloor.translate(0, 0.58, -1.65);
+  timberParts.push(bedFloor);
+
+  for (const side of [-1, 1]) {
+    const sideBoard = new THREE.BoxGeometry(0.08, 0.38, 1.55);
+    sideBoard.translate(side * 0.77, 0.76, -1.65);
+    timberParts.push(sideBoard);
+  }
+  const tailgate = new THREE.BoxGeometry(1.62, 0.38, 0.08);
+  tailgate.translate(0, 0.76, -2.40);
+  timberParts.push(tailgate);
+
+  const timberMerged = mergeSimple(timberParts);
+  timberParts.forEach((g) => g.dispose());
+  const timberMesh = new THREE.Mesh(timberMerged, carTimberMat);
+  timberMesh.castShadow = true;
+  timberMesh.receiveShadow = true;
+  carGroup.add(timberMesh);
+  disposables.push(timberMerged);
+
+  // D. Headlights
+  const lightParts: THREE.BufferGeometry[] = [];
+  for (const side of [-1, 1]) {
+    const lamp = new THREE.CylinderGeometry(0.12, 0.12, 0.10, 10);
+    lamp.rotateX(Math.PI / 2);
+    lamp.translate(side * 0.56, 0.78, 1.83);
+    lightParts.push(lamp);
+
+    // Roof spotlamp
+    const spot = new THREE.CylinderGeometry(0.09, 0.09, 0.08, 8);
+    spot.rotateX(Math.PI / 2);
+    spot.translate(side * 0.38, 1.45, 0.44);
+    lightParts.push(spot);
+  }
+  const lightMerged = mergeSimple(lightParts);
+  lightParts.forEach((g) => g.dispose());
+  const lightMesh = new THREE.Mesh(lightMerged, headlightMat);
+  carGroup.add(lightMesh);
+  disposables.push(lightMerged);
+
+  // E. 4 Off-road Wheels & Front Steering Assemblies
+  const WHEEL_R = 0.44;
+  const WHEEL_W = 0.34;
+  const wheels: THREE.Mesh[] = [];
+
+  const frontWheelAssemblyL = new THREE.Group();
+  const frontWheelAssemblyR = new THREE.Group();
+  frontWheelAssemblyL.position.set(-0.95, WHEEL_R, 1.15);
+  frontWheelAssemblyR.position.set(0.95, WHEEL_R, 1.15);
+  carGroup.add(frontWheelAssemblyL, frontWheelAssemblyR);
+
+  const rearAssemblyL = new THREE.Group();
+  const rearAssemblyR = new THREE.Group();
+  rearAssemblyL.position.set(-0.95, WHEEL_R, -1.45);
+  rearAssemblyR.position.set(0.95, WHEEL_R, -1.45);
+  carGroup.add(rearAssemblyL, rearAssemblyR);
+
+  [frontWheelAssemblyL, frontWheelAssemblyR, rearAssemblyL, rearAssemblyR].forEach((assembly) => {
+    const tireGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 14);
+    tireGeo.rotateZ(Math.PI / 2);
+    const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.castShadow = true;
+    tire.receiveShadow = true;
+    assembly.add(tire);
+
+    const rimGeo = new THREE.CylinderGeometry(WHEEL_R * 0.58, WHEEL_R * 0.58, WHEEL_W * 1.05, 10);
+    rimGeo.rotateZ(Math.PI / 2);
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    assembly.add(rim);
+
+    wheels.push(tire);
+    disposables.push(tireGeo, rimGeo);
+  });
+
+  group.add(carGroup);
+
+  // Vehicle dynamic state
+  const carPos = new THREE.Vector3(0, 0.03, -6.0);
+  const carVel = new THREE.Vector3();
+  let carHeading = 0;
+  let carSpeed = 0;
+  let carWheelRot = 0;
+  let steeringAngle = 0;
+  let carRoll = 0;
+  let carPitch = 0;
+
+  // Temp math objects for spring matrix updates
+  const _matPos = new THREE.Vector3();
+  const _matEuler = new THREE.Euler();
+  const _matQuat = new THREE.Quaternion();
+  const _matScale = new THREE.Vector3();
+  const _instMatrix = new THREE.Matrix4();
+  const _localPlayerPos = new THREE.Vector3();
+
+  function updateSpringPlants(
+    plants: InteractivePlant[],
+    mesh: THREE.InstancedMesh,
+    mesh2: THREE.InstancedMesh | null,
+    delta: number,
+    hasPlayer: boolean,
+  ) {
+    for (let i = 0; i < plants.length; i++) {
+      const p = plants[i];
+
+      // Interaction with vehicle
+      const dx = p.x - carPos.x;
+      const dz = p.z - carPos.z;
+      const dist = Math.hypot(dx, dz);
+      const vehicleReach = p.radius + 1.25;
+
+      if (dist < vehicleReach) {
+        const pushNorm = Math.max(0, 1.0 - dist / vehicleReach);
+        const pushDirX = dist > 0.01 ? dx / dist : 1.0;
+        const pushDirZ = dist > 0.01 ? dz / dist : 0.0;
+        // Directional deflection + forward drag from moving vehicle
+        const forwardX = Math.sin(carHeading);
+        const forwardZ = Math.cos(carHeading);
+        const impulse = pushNorm * (p.maxBend * 1.8);
+        p.velX += (pushDirX * impulse + forwardX * (carSpeed * 0.25)) * 14.0 * delta;
+        p.velZ += (pushDirZ * impulse + forwardZ * (carSpeed * 0.25)) * 14.0 * delta;
+      }
+
+      // Interaction with player
+      if (hasPlayer) {
+        const pdx = p.x - _localPlayerPos.x;
+        const pdz = p.z - _localPlayerPos.z;
+        const pdist = Math.hypot(pdx, pdz);
+        const playerReach = p.radius + 0.55;
+        if (pdist < playerReach && Math.abs(_localPlayerPos.y) < 2.0) {
+          const ppush = Math.max(0, 1.0 - pdist / playerReach);
+          const pdirX = pdist > 0.01 ? pdx / pdist : 1.0;
+          const pdirZ = pdist > 0.01 ? pdz / pdist : 0.0;
+          p.velX += pdirX * ppush * 10.0 * delta;
+          p.velZ += pdirZ * ppush * 10.0 * delta;
+        }
+      }
+
+      // 2nd-order spring-damper restorative physics
+      const fx = -p.stiffness * p.bendX - p.damping * p.velX;
+      const fz = -p.stiffness * p.bendZ - p.damping * p.velZ;
+      p.velX += fx * delta;
+      p.bendX += p.velX * delta;
+      p.velZ += fz * delta;
+      p.bendZ += p.velZ * delta;
+
+      // Clamp max deflection
+      const curBend = Math.hypot(p.bendX, p.bendZ);
+      if (curBend > p.maxBend) {
+        p.bendX = (p.bendX / curBend) * p.maxBend;
+        p.bendZ = (p.bendZ / curBend) * p.maxBend;
+      }
+
+      // Construct instance matrix: root anchor at y = 0, tilt and scale squish
+      _matPos.set(p.x + p.bendX * 0.10, 0.03, p.z + p.bendZ * 0.10);
+      _matEuler.set(p.bendZ * 0.40, p.baseRotY, -p.bendX * 0.40, 'YXZ');
+      _matQuat.setFromEuler(_matEuler);
+      const flatten = Math.max(0.25, 1.0 - curBend * 0.35);
+      _matScale.set(p.baseScale, p.baseScale * flatten, p.baseScale);
+      _instMatrix.compose(_matPos, _matQuat, _matScale);
+
+      mesh.setMatrixAt(i, _instMatrix);
+      if (mesh2) mesh2.setMatrixAt(i, _instMatrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh2) mesh2.instanceMatrix.needsUpdate = true;
+  }
+
+  // Initial matrix setup for instanced vegetation
+  updateSpringPlants(saplingPlants, saplingWoodMesh, saplingFoliageMesh, 0.001, false);
+  updateSpringPlants(shrubPlants, shrubMesh, null, 0.001, false);
+  updateSpringPlants(grassPlants, grassMesh, null, 0.001, false);
+
+  const _carWorldPos = new THREE.Vector3();
+
   return {
     group,
     length: LEN,
     foliage: uniforms,
-    title: 'Leaf translucency, curvature and litter',
+    title: 'Vegetation bending, leaf translucency & vehicle interaction',
     skill: 'threejs-procedural-vegetation',
-    update(elapsed) {
+    update(elapsed, dt, playerPos) {
       (uniforms.time as unknown as { value: number }).value = elapsed;
+
+      const delta = Math.min(dt, 0.05);
+
+      let hasPlayer = false;
+      if (playerPos) {
+        group.updateWorldMatrix(true, false);
+        _localPlayerPos.copy(playerPos);
+        group.worldToLocal(_localPlayerPos);
+        hasPlayer = true;
+      }
+
+      /* --- 1. Vehicle Movement along Winding Forest Trail --- */
+      const loopTime = (elapsed * 0.24) % (Math.PI * 2);
+      // Patrol loop between z = -4.5 and z = -47.5
+      const targetZ = -4.5 - (Math.sin(loopTime) * 0.5 + 0.5) * 43.0;
+      const targetX = Math.sin(loopTime * 1.5) * 1.4 + Math.sin(loopTime * 3.0) * 0.45;
+
+      const prevX = carPos.x;
+      const prevZ = carPos.z;
+      const moveDirZ = targetZ - carPos.z;
+      const moveDirX = targetX - carPos.x;
+      const moveDist = Math.hypot(moveDirX, moveDirZ);
+
+      if (moveDist > 0.001) {
+        const desiredHeading = Math.atan2(moveDirX, moveDirZ);
+        let dHeading = desiredHeading - carHeading;
+        while (dHeading > Math.PI) dHeading -= Math.PI * 2;
+        while (dHeading < -Math.PI) dHeading += Math.PI * 2;
+        carHeading += dHeading * Math.min(1.0, 5.0 * delta);
+        carSpeed = moveDist / delta;
+      }
+
+      carPos.x += moveDirX * Math.min(1.0, 3.2 * delta);
+      carPos.z += moveDirZ * Math.min(1.0, 3.2 * delta);
+      carVel.set(
+        delta > 0 ? (carPos.x - prevX) / delta : 0,
+        0,
+        delta > 0 ? (carPos.z - prevZ) / delta : 0,
+      );
+
+      // Steering angle on front wheels
+      const targetSteering = Math.max(-0.48, Math.min(0.48, (targetX - carPos.x) * 0.9));
+      steeringAngle += (targetSteering - steeringAngle) * 6.0 * delta;
+
+      // Chassis suspension roll and pitch
+      const targetRoll = -steeringAngle * 0.22;
+      const targetPitch = Math.sin(elapsed * 3.8) * 0.022 * Math.min(1.0, carSpeed * 0.2);
+      carRoll += (targetRoll - carRoll) * 6.0 * delta;
+      carPitch += (targetPitch - carPitch) * 8.0 * delta;
+
+      carGroup.position.copy(carPos);
+      carGroup.rotation.y = carHeading;
+      carGroup.rotation.z = carRoll;
+      carGroup.rotation.x = carPitch;
+
+      // Spin wheels
+      carWheelRot += (carSpeed / WHEEL_R) * delta;
+      frontWheelAssemblyL.rotation.y = steeringAngle;
+      frontWheelAssemblyR.rotation.y = steeringAngle;
+      wheels.forEach((w) => { w.rotation.x = carWheelRot; });
+
+      // Pass vehicle world position to TSL vertex foliage shader
+      carGroup.getWorldPosition(_carWorldPos);
+      setVehicleInteractor(uniforms, _carWorldPos);
+      if (playerPos) setPlayerInteractor(uniforms, playerPos);
+
+      /* --- 2. Update Interactive Spring-Rebound Vegetation --- */
+      updateSpringPlants(saplingPlants, saplingWoodMesh, saplingFoliageMesh, delta, hasPlayer);
+      updateSpringPlants(shrubPlants, shrubMesh, null, delta, hasPlayer);
+      updateSpringPlants(grassPlants, grassMesh, null, delta, hasPlayer);
     },
     dispose() {
       disposables.forEach((d) => d.dispose());

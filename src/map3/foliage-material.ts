@@ -64,6 +64,10 @@ export interface FoliageUniforms {
   windSpeed: ReturnType<typeof uniform>;
   /** Wind bearing as a unit XZ direction. */
   windDirection: ReturnType<typeof uniform>;
+  /** Vehicle world position for vegetation bending and push aside. */
+  vehiclePos: ReturnType<typeof uniform>;
+  /** Player world position for footstep vegetation parting. */
+  playerPos: ReturnType<typeof uniform>;
 }
 
 export function createFoliageUniforms(): FoliageUniforms {
@@ -75,6 +79,8 @@ export function createFoliageUniforms(): FoliageUniforms {
     enhance: uniform(1),
     windSpeed: uniform(1.4),
     windDirection: uniform(new THREE.Vector3(0.82, 0, 0.57).normalize()),
+    vehiclePos: uniform(new THREE.Vector3(0, -999, 0)),
+    playerPos: uniform(new THREE.Vector3(0, -999, 0)),
   };
 }
 
@@ -179,7 +185,32 @@ export function createFoliageMaterial(
     const sway = sin(phase).mul(0.055).add(cos(phase.mul(1.9)).mul(0.022));
 
     const amount = sway.mul(height).mul(w).mul(gust).mul(uniforms.enhance);
-    mat.positionNode = positionLocal.add(vec3(dir.x.mul(amount), float(0), dir.z.mul(amount)));
+
+    // Dynamic vehicle and player interaction push
+    const vPos = uniforms.vehiclePos;
+    const plPos = uniforms.playerPos;
+
+    const vDiffX = p.x.sub(vPos.x);
+    const vDiffZ = p.z.sub(vPos.z);
+    const vDistSq = vDiffX.mul(vDiffX).add(vDiffZ.mul(vDiffZ));
+    const vPush = clamp(float(1.0).sub(vDistSq.mul(0.18)), float(0.0), float(1.0)); // ~2.3m radius
+    const vPushAmt = vPush.mul(vPush).mul(1.5).mul(height.add(0.2));
+
+    const plDiffX = p.x.sub(plPos.x);
+    const plDiffZ = p.z.sub(plPos.z);
+    const plDistSq = plDiffX.mul(plDiffX).add(plDiffZ.mul(plDiffZ));
+    const plPush = clamp(float(1.0).sub(plDistSq.mul(0.65)), float(0.0), float(1.0)); // ~1.2m radius
+    const plPushAmt = plPush.mul(plPush).mul(0.8).mul(height.add(0.1));
+
+    const pushX = vDiffX.mul(vPushAmt).add(plDiffX.mul(plPushAmt));
+    const pushZ = vDiffZ.mul(vPushAmt).add(plDiffZ.mul(plPushAmt));
+    const pushY = vPush.mul(-0.25).add(plPush.mul(-0.12));
+
+    mat.positionNode = positionLocal.add(vec3(
+      dir.x.mul(amount).add(pushX),
+      pushY,
+      dir.z.mul(amount).add(pushZ),
+    ));
   }
 
   // --- roughness ---------------------------------------------------------
@@ -353,6 +384,22 @@ export function setWind(
   (uniforms.windSpeed as unknown as { value: number }).value = speed;
   (uniforms.windDirection as unknown as { value: THREE.Vector3 }).value
     .set(Math.sin(bearingRadians), 0, Math.cos(bearingRadians));
+}
+
+/** Set vehicle world position for vegetation bending. */
+export function setVehicleInteractor(
+  uniforms: FoliageUniforms,
+  pos: THREE.Vector3,
+): void {
+  (uniforms.vehiclePos as unknown as { value: THREE.Vector3 }).value.copy(pos);
+}
+
+/** Set player world position for vegetation parting. */
+export function setPlayerInteractor(
+  uniforms: FoliageUniforms,
+  pos: THREE.Vector3,
+): void {
+  (uniforms.playerPos as unknown as { value: THREE.Vector3 }).value.copy(pos);
 }
 
 /** Fade every enhancement for the corridor's before/after lever. */
