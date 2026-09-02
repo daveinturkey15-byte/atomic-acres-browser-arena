@@ -10,6 +10,208 @@ arena selected via `__ATOMIC_ACRES_DEBUG__.selectArena('farcrysis')` then
 Instrument: `scripts/qa/probe-farcrysis-boot-cdp.mjs`; raw data under
 `artifacts/qa/farcrysis-load/`.
 
+## R. PASS 84 REPAIR PASS 2, 2026-09-02 - after the REJECT verdict
+
+The lane was reviewed a second time and REJECTED. The skeptic was right: the
+first repair's headline commit, `3b2c6e7a`, was a rendering regression. This
+section supersedes 0.2, 0.4 and 0.5 below, which are left in place, marked, so
+the record shows what was claimed and what it turned into.
+
+Repair commits: `046a7840`, `ce70eece`, `92d2494f`.
+
+### R.1 BLOCKER - the foliage collapse NaN'd every foliage shadow caster. REVERTED. VERIFIED
+
+`3b2c6e7a` moved the dapple strength and the three sway numbers off the node
+graph into module-level `materialReference()` singletons, so 85 foliage
+materials shared 4 graphs instead of 9. The three sway numbers are read in the
+POSITION node, and three r185 does not render shadow casters with the source
+material:
+
+| three 0.185.1 | what it does |
+|---|---|
+| `nodes/lighting/ShadowNode.js:746` | `scene.overrideMaterial = getShadowMaterial(light)` |
+| `nodes/lighting/ShadowFilterNode.js:196` | that is a bare `new NodeMaterial()`, one per light |
+| `renderers/common/Renderer.js:3579-3616` | copies the SOURCE material's `positionNode` onto it, then `material = overrideMaterial` |
+| `renderers/common/nodes/NodeManager.js:852,857` | `nodeFrame.material = renderObject.material` |
+| `nodes/accessors/MaterialReferenceNode.js` | `this.reference = state.material` |
+| `nodes/accessors/ReferenceNode.js:379` | writes the resulting `undefined` into a `Float32Array` uniform = NaN |
+
+so `positionLocal.y.div(fcSwayHeight)` becomes `div(NaN)` for every swaying
+shadow caster. three warns about none of it. The arena keeps rendering; it just
+stops writing foliage into the shadow map.
+
+MEASURED here twice, independently of the skeptic:
+
+1. Mechanically, by the new guard test run against the PRE-revert tree - every
+   `MaterialReferenceNode` reachable from `positionNode`, resolved against a
+   bare `NodeMaterial`, returns `undefined`:
+   `fcSwaySpeed, fcSwaySpeed, fcSwayAmount, fcSwayHeight` (x2 materials).
+   The guard is therefore not vacuous: it fails on the tree it was written for.
+2. End-to-end, on the committed admission frames, with a SIGNED metric
+   (`scripts/qa/compare-farcrysis-admitted-frames.mjs`, committed). Row 3 of
+   the 6x8 tile grid is the vegetation band:
+
+| pair | mean signed luminance | %brighter >8 | %darker >8 | vegetation band |
+|---|---|---|---|---|
+| CONTROL after-3 -> after-4 (same build) | -0.081 | 3.43 | 3.53 | -1.67 .. +1.19 |
+| before-foliage -> after-3 | **+0.955** | 5.61 | 2.65 | **+3.58 .. +6.37** |
+| before-foliage -> after-4 | **+0.873** | 5.85 | 2.96 | **+3.20 .. +6.52** |
+| before-foliage -> repair-1 (REPAIRED) | +0.019 | 3.09 | 2.99 | -0.58 .. +0.29 |
+| before-foliage -> repair-2 (REPAIRED) | +0.034 | 3.42 | 3.54 | -0.54 .. +0.36 |
+| repair-1 -> after-3 | +0.936 | 5.76 | 2.85 | +3.34 .. +6.63 |
+| repair-1 -> after-4 | +0.854 | 5.57 | 2.74 | +3.14 .. +6.78 |
+
+`repair-1` and `repair-2` are a FRESH build and two fresh cold boots of the
+reverted tree, not a re-analysis of old files. Both land inside the same-build
+control against the pre-regression frame, and both reproduce the full
+brightening against both regressed frames. Two-sided: the regression is real,
+and it is gone.
+
+`src/farcrysis-tsl-foliage.ts` is reverted to its `e9993cee` bytes - verified
+by `git diff e9993cee HEAD -- src/farcrysis-tsl-foliage.ts` being empty except
+for an added header block that records the mechanism, names
+`InstancedBufferAttribute` / baked geometry data as the only carriers that
+survive the shadow override, and says DO NOT REINTRODUCE. `materialColor` is
+untouched and remains safe: it is read in the COLOR node, which three replaces
+for shadow-pass materials.
+
+What the revert costs, from this lane's own numbers: 298 -> 326 render
+pipelines, 4 -> 9 live node graphs, `TSL_FOLIAGE_MAX_DISTINCT_GRAPHS` back to
+16, and no wall-clock (see R.3). Correct shadows are worth 28 pipelines.
+
+### R.2 MAJOR - the NaN guard now tests the material that actually fails. VERIFIED
+
+The replaced test only inspected the material `makeTslFoliageMaterial` had just
+returned - the one case that cannot fail. Two cases now stand in
+`src/farcrysis-tsl-foliage.test.ts`, over four foliage materials plus the grass
+material:
+
+- every `MaterialReferenceNode` reachable from `positionNode` or
+  `castShadowPositionNode` must resolve to a FINITE number against
+  `new NodeMaterial()` - the exact object three renders shadow casters with;
+- the sway numbers must not be material references at all.
+
+Both fail on the pre-revert tree with the message quoted in R.1 and pass after
+it. The restored `gives different sway buckets their own uniform` case came
+back with the source.
+
+### R.3 MAJOR - all the evidence is now on the branch, and it was recounted. VERIFIED
+
+`after-2b.json`, `compare-atomic-acres-2.json` and `skeptic-verify.json` were
+still disk-only (`artifacts/` is gitignored; only some files had been
+force-added). Force-added with `census.txt` and `build-prefoliage.log`.
+
+Everything recounted here from the committed files, independently of the
+previous report (`facets.async` is the async discriminator; "arena PBR" is the
+generically-named `MeshStandardMaterial` + `MeshStandardNodeMaterial` class):
+
+| run | pipelines | sync | async | async sum ms | >200 ms | arena PBR | shader modules | admitted ms |
+|---|---|---|---|---|---|---|---|---|
+| before-foliage | 326 | 234 | 92 | 15,317 | 42 | 33 | 329 | 46,915 |
+| after-2b | 326 | 234 | 92 | 24,446 | 43 | 33 | 329 | 66,846 |
+| skeptic-verify | 326 | 234 | 92 | 13,080 | 43 | 33 | 329 | 44,166 |
+| after-3 (REGRESSED) | 298 | 224 | 74 | 19,333 | 38 | 28 | 311 | 65,604 |
+| after-4 (REGRESSED) | 298 | 224 | 74 | 16,550 | 38 | 28 | 311 | 51,560 |
+| **repair-1 (REPAIRED)** | **326** | **234** | **92** | **12,210** | 42 | 33 | **329** | **39,189** |
+| **repair-2 (REPAIRED)** | **326** | **234** | **92** | **10,779** | 37 | 33 | **329** | **38,321** |
+| atomic-acres (compare-2) | 374 | 332 | 42 | 4,748 | 11 | **1** | 431 | 44,844 |
+
+Two readings fall out of that table.
+
+- The repaired build reproduces the pre-regression profile EXACTLY
+  (326 / 234 / 92 / 329), which is what a revert must do.
+- The SAME build's async-latency sum spans 10,779 -> 24,446 ms across five
+  runs. Wall-clock admission on `dave-gaming-pc` is not an A/B signal while
+  ComfyUI holds the GPU. State farcrysis load claims in counts.
+
+Two evidence lines from the previous report are CORRECTED because they do not
+reproduce:
+
+- "fragment WGSL median 70.5 KB farcrysis vs 71.4 KB atomic-acres" - over
+  `fragment*` shader-module records the medians are 61,919 and 60,802 bytes.
+  The conclusion survives and is slightly stronger (shader SIZE is not the
+  difference, within 2 %), but farcrysis is the marginally LARGER one.
+- "atomic-acres 72 async / 8.1 s" - it is 42 async, 4,748 ms, of which 11 cost
+  >200 ms and exactly ONE is a generic arena PBR program against farcrysis's
+  33. That contrast is root cause 2, in numbers that reproduce.
+
+### R.4 MAJOR - section 0.4's unsigned comparison was structurally blind. CORRECTED
+
+The old metric ("% of pixels differing by more than 16") cannot separate
+"foliage moved" from "foliage got brighter", so it reported a one-directional
+regression as run-to-run noise. It is replaced by the signed decomposition in
+R.1, committed as a script so it reproduces, and the CONTROL pair is always
+compared first because the wind is time-driven and no two frames of one build
+match either. Section 0.4 below is SUPERSEDED.
+
+### R.5 The repaired build, re-measured end to end. VERIFIED
+
+Same probe, same instrument, two cold boots, both `outcome=admitted`,
+`transitionProfile.arenaId=farcrysis outcome=committed`, 0 page errors,
+0 console errors:
+
+| | repair-1 | repair-2 |
+|---|---|---|
+| selectArena -> admitted | 39,190 ms | 38,321 ms |
+| selectArena -> match active | 57,233 ms | 56,846 ms |
+| pipelines / shader modules during load | 326 / 329 | 326 / 329 |
+| long tasks | 224 = 25,761 ms, max 3,525 | 248 = 27,423 ms, max 3,758 |
+| scene | 6,668 meshes, 164 instanced, 93,630 instances, 1,758 materials | 6,667 / 164 / 93,630 / 1,757 |
+| 75 s combat window | not run | **0 pipelines, 0 shader modules**, 19 gaps >=100 ms, max 256 ms, 23.5 fps |
+
+38.3-39.2 s is the fastest farcrysis admission this lane has recorded (the
+range was 44.2-66.8 s) and is faster than atomic-acres' 44,844 ms on the same
+instrument - but given R.3's contention spread that is not a claim about the
+fix, it is a claim about the GPU being quieter. The brief's step-5 target,
+admission inside the 12 s fence, is STILL NOT MET; what is true is that every
+individual fenced submission completes and the transition commits, where before
+the lane farcrysis never admitted at all. Zero in-combat pipeline creation -
+which the brief does ask for - is now verified on the repaired build rather
+than inherited from the regressed one.
+
+`repair-1-admitted.png` was inspected: canopy, palms, grass field, shoreline
+water, HUD and viewmodel all present, shaded trunk undersides and ground
+shadow visible, no black frame, no NaN geometry. The vegetation still reads as
+flat low-poly "lollipop" trees (the owner's own complaint) and the HUD counter
+reads 12 fps in headless while ComfyUI shares the GPU.
+
+### R.6 Minors
+
+- **Stall-probe patch (285f44fb).** Unchanged recommendation: KEEP. The
+  previous `.map-card[data-arena-id=...]?.click()` was a silent no-op for every
+  hidden arena, so the probe measured the DEFAULT arena while reporting the
+  requested one. Reverting restores that bug. It IS a cross-lane change to a
+  shared probe and the orchestrator should record it as one; earlier
+  hidden-arena stall numbers taken with it are suspect. OPEN, orchestrator's
+  call.
+- **New file `scripts/qa/compare-farcrysis-admitted-frames.mjs`.** New, and
+  farcrysis-specific; it changes no existing shared script.
+- **Attribution.** The three repair commits carry
+  `Co-Authored-By: Claude Opus 5.1`, as this pass's brief requires. The ten
+  earlier commits carry `Claude Fable 5.1` (harness system-reminder). The
+  branch is therefore MIXED. History was not rewritten - the skeptic reviewed
+  those exact hashes. One `filter-branch` normalises them either way;
+  orchestrator's call.
+
+### R.7 Gates re-run on the repaired tree. VERIFIED
+
+- `npx tsc --noEmit` exit 0, clean (`artifacts/qa/farcrysis-load/tsc-repair2.log`, empty).
+- `npx vitest run src/farcrysis` - 23 files, 152 tests, all passed.
+- `npx vitest run src/farcrysis-tsl-foliage src/presentation-prewarm-contract
+  src/farcrysis-instance-capacity src/farcrysis-webgpu-pipeline-budget
+  src/farcrysis-boot-cost src/rendering/pass64-tsl-scene` - 6 files, 48 passed.
+- `npm run build` exit 0.
+- Full vitest suite NOT run (orchestrator runs it on the merged tree).
+- Playwright boot smoke NOT re-run - see section 7, still OPEN.
+- No threshold, fence, timeout or assertion weakened. The only ceiling that
+  moved is `TSL_FOLIAGE_MAX_DISTINCT_GRAPHS` returning 4 -> 16 with the
+  reverted source it bounds.
+- Machine: `nvidia-smi` checked before every launch (10,402 / 11,670 / 8,933
+  MiB of 16,303 used), one headless installed-Chrome instance at a time, all
+  closed by the probe, no server started or left running, no process killed.
+
+---
+
 ## 0. PASS 84 repair pass, 2026-09-02 - what changed after the skeptic review
 
 The lane was reviewed independently as ACCEPT_WITH_FIXES. This section is the
@@ -37,7 +239,11 @@ the wrong reading. What is true:
 So the pass-84 outcome for this arena is "boots reliably, at ~1.2-1.5x the load
 time of the shipped arenas", not "12 s". It stays `selectable: false`.
 
-### 0.2 Fix 3 - compiling LESS, not just later (commit 3b2c6e7a) - VERIFIED
+### 0.2 Fix 3 - compiling LESS, not just later (commit 3b2c6e7a) - REVERTED, SEE R.1
+
+> **SUPERSEDED 2026-09-02 by section R.1.** Commit 3b2c6e7a was a rendering
+> regression and has been reverted (046a7840). Its counts below are accurate;
+> its correctness claim was not. Kept as the record of what was claimed.
 
 The skeptic's blocking finding was that fix 2 DEFERS compilation (it moves the
 PBR programs off the fenced submission into three's serial `compileAsync`)
@@ -106,7 +312,11 @@ it precompiles under `withArenaFrustumCullingDisabled`; it sits strictly BEFORE
 nothing else. Checked non-vacuous against the real source (precompile at offset
 1357, shadow refresh 1452, warm frame 1492, fence 1539).
 
-### 0.4 Somebody looked at the arena (commit de283d74) - VERIFIED
+### 0.4 Somebody looked at the arena (commit de283d74) - SUPERSEDED BY R.4
+
+> **SUPERSEDED 2026-09-02 by section R.4.** The unsigned metric in this table
+> is structurally blind to a one-directional change and reported a real
+> regression as noise. Use the signed decomposition in R.1.
 
 The probe now takes one `page.screenshot()` immediately after admission,
 headless, off the page it already has open. Same spawn camera, 1600x900:
@@ -128,7 +338,10 @@ This is NOT an art review: the vegetation still reads as flat low-poly
 and the HUD frame counter reads 10-12 fps in headless while ComfyUI shares the
 GPU.
 
-### 0.5 Evidence is now in the branch (commit 7b50b82f) - VERIFIED
+### 0.5 Evidence is now in the branch (commit 7b50b82f) - INCOMPLETE, COMPLETED IN R.3
+
+> **CORRECTED 2026-09-02.** Three files were still disk-only. Closed in R.3
+> (commit 92d2494f).
 
 `artifacts/` is gitignored and the four files carrying the load-bearing facets
 were disk-only. `before-v3.json` and `after-1.json` - the single-variable pair
@@ -387,13 +600,26 @@ is a feature the current tree lacks; not re-verified visually. Nothing merged.
 
 ## 7. What I could not verify - OPEN
 
-- Owner-facing look of the arena as ART. Two frames now exist and the
-  before/after delta is inside the same-build run-to-run control (see 0.4), so
-  "no visual regression from these changes" is measured, not asserted; whether
-  the arena is GOOD is untouched and unjudged here.
-- A time saving from fix 3. The count reduction is deterministic and
-  reproducible (326 -> 298 pipelines in every run); the seconds it is worth are
-  below this machine's GPU-contention noise and were not resolved.
+> **CORRECTED 2026-09-02 (repair pass 2).** The first two bullets below were
+> written when 3b2c6e7a was still in the tree. They are replaced.
+
+- Owner-facing look of the arena as ART. Five frames now exist and the signed
+  comparison in R.1 shows the repaired build inside the same-build control
+  against the pre-regression frame in two independent runs, so "no visual
+  regression from the changes that remain" is MEASURED. Whether the arena is
+  GOOD is untouched and unjudged here - it still reads as flat low-poly
+  "lollipop" vegetation.
+- Fix 3 is gone. It was never worth measurable time (its count reduction was
+  real and reproducible, its seconds were below this machine's contention
+  noise) and it cost correct foliage shadows, so it was reverted. No claim
+  about it stands.
+- Whether the pipeline count can be reduced further WITHOUT an appearance or
+  art decision. The remaining 33 generic arena PBR programs are the residual;
+  every single-property collapse listed in `census-variants.txt` is an
+  appearance change. Not attempted.
+- Whether foliage shadows are correct in absolute terms - only that the
+  repaired build matches the pre-regression build. Nobody compared farcrysis
+  foliage shadows against an authored reference.
 - Behaviour on a device whose `maxUniformBufferBindingSize` exceeds 65536:
   the shared capacity still yields one program per material variant (by
   construction), not measured.
@@ -408,8 +634,13 @@ is a feature the current tree lacks; not re-verified visually. Nothing merged.
 - `src/farcrysis.ts`, `-art.ts`, `-detail.ts`, `-grass-field.ts`,
   `-palms-enhanced.ts`, `-physics.ts`, `-vegetation.ts` - construction sites.
 - `src/legacy-main.ts` - one `// FARCRYSIS-LOAD:` block in the arena-load region.
-- `src/farcrysis-tsl-foliage.ts` + `.test.ts` - per-material shading uniforms,
-  9 -> 4 live node graphs, ceiling 16 -> 4 (repair pass, 3b2c6e7a).
+- `src/farcrysis-tsl-foliage.ts` + `.test.ts` - 3b2c6e7a's per-material
+  shading uniforms REVERTED in 046a7840 (they NaN'd every foliage shadow
+  caster); source is back to its e9993cee bytes plus a header block
+  recording why, and the test now pins resolution against three's shared
+  ShadowMaterial.
+- `scripts/qa/compare-farcrysis-admitted-frames.mjs` (new) - signed
+  before/after admission-frame comparison (ce70eece).
 - `src/presentation-prewarm-contract.test.ts` - source-pins the farcrysis
   branch, its position before the fence, and that it is the only arena-id
   branch in that region (repair pass, 39bd0a1c).
