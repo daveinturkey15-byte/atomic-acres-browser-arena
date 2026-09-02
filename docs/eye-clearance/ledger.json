@@ -11,7 +11,8 @@
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": -1
+    "map3": -1,
+    "nuketown2": -1
   },
   "unmeasuredCeiling": -1,
   "unmeasured": [
@@ -19,6 +20,11 @@
       "arena": "map3",
       "since": "2026-09-02",
       "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
+    },
+    {
+      "arena": "nuketown2",
+      "since": "2026-09-02",
+      "note": "NUKETOWN2 (HF-407) registered selectable on 2026-09-02, the same day it was authored. No stage of the eye-clearance pipeline has been run against it - stages 2 and 3 need a browser and this lane's machine rules forbid a headed one - so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for nuketown2 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here. The arena's own mechanical parity audit is green (0 invisible colliders, 0 walk-through meshes over 186 colliders and 188 visible meshes), which is evidence about COLLIDERS, not about where the camera eye ends up."
     }
   ],
   "accepted": [
@@ -57,7 +63,8 @@
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
+      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it",
+      "nuketown2": "UNMEASURED (2026-09-02) - the arena was authored today and stage 3 has never teleported the player into it. Stages 2 and 3 need a browser; the HF-407 lane's machine rules forbid a headed one and no headless run was made, so this stays the sentinel string rather than a number nobody measured."
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },

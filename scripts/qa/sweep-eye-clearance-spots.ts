@@ -26,6 +26,7 @@ import { buildHighSeas } from '../../src/high-seas';
 import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
 import { buildMap3 } from '../../src/map3-arena';
+import { buildNuketown2 } from '../../src/nuketown2-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // `ShedArenaId` is re-declared, not re-exported, by destructible-shed-registry;
@@ -188,15 +189,18 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   test2: buildTest2,
   // MAP3 (owner 2026-09-02, HF-405).
   map3: buildMap3,
+  // NUKETOWN2 (owner 2026-09-02, HF-407).
+  nuketown2: buildNuketown2,
 });
 
 /**
  * Floor on the derived roster. The derivation cannot silently collapse to an
  * empty list the way a regex-scraped one can, but an empty or truncated roster
  * would sweep nothing while printing success, so it is asserted rather than
- * assumed. 8 = the nine ids in arena-identity.ts minus hidden farcrysis.
+ * assumed. 9 = the ten ids in arena-identity.ts minus hidden farcrysis.
+ * Raised 8 -> 9 on 2026-09-02 (HF-407) when the Nuke Town Rebuild shipped.
  */
-export const MINIMUM_SWEPT_ARENAS = 8;
+export const MINIMUM_SWEPT_ARENAS = 9;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

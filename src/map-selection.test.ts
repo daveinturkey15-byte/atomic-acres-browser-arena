@@ -29,11 +29,17 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
+      // NUKETOWN2 (HF-407): the Nuke Town rejig, registered beside the shipped
+      // Nuke Town rather than replacing it.
+      'nuketown2',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(9);
-    expect(ARENA_SELECTIONS.length).toBe(9);
+    // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
+    // 'Nuke Town' - the two arenas sit next to each other in the menu and the
+    // owner has to be able to tell which one he is loading.
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Nuke Town Rebuild']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(10);
+    expect(ARENA_SELECTIONS.length).toBe(10);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -142,6 +148,9 @@ describe('opening arena selection', () => {
       test1: 'code',
       test2: 'code',
       map3: 'code',
+      // NUKETOWN2 (HF-407): the whole point of the rejig. The shipped Nuke Town
+      // is the ONE imported arena in the game; its rebuild is code.
+      nuketown2: 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -172,7 +181,7 @@ describe('opening arena selection', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -183,6 +192,8 @@ describe('opening arena selection', () => {
       'Firing Range multiplayer arena',
       'Raid multiplayer arena',
       'Map 3 multiplayer arena',
+      // NUKETOWN2 (HF-407).
+      'Nuke Town Rebuild multiplayer arena',
     ]);
   });
 
@@ -202,6 +213,11 @@ describe('opening arena selection', () => {
       // Support rewards are hosted-authoritative and this arena has had no
       // two-client lane run against it.
       'map3': false,
+      // NUKETOWN2 (HF-407): field support is ON, unlike Map 3. The owner said
+      // he will host this preview with friends, and it carries the shipped Nuke
+      // Town's hosted feature set deliberately - the thing under test is the
+      // LAYOUT, so nothing else may differ between the two.
+      'nuketown2': true,
     });
   });
 
@@ -233,6 +249,8 @@ describe('opening arena selection', () => {
       '2 BOTS SKIRMISH',
       // MAP3 (HF-405).
       '2 BOTS SKIRMISH',
+      // NUKETOWN2 (HF-407): SOLO_BOT_COUNT, same as the shipped Nuke Town.
+      '1 BOT SKIRMISH',
     ]);
   });
 
@@ -255,6 +273,39 @@ describe('opening arena selection', () => {
     expect(decodeArenaId('map3')).toBe('map3');
     expect(isArenaId('map3')).toBe(true);
     expect(ARENA_IDS).toContain('map3');
+  });
+
+  // NUKETOWN2 (owner 2026-09-02, HF-407). The rebuild ships selectable, hosted
+  // and with the 2x core, because the owner asked to host it with friends and
+  // asked for the 2x damage to be kept. What this pins is the pair of failures
+  // that would make the A/B meaningless: the rebuild being registered but not
+  // offered ("published but unselectable"), and the two Nuke Towns being
+  // indistinguishable in the menu.
+  it('offers the Nuke Town Rebuild as a selectable hosted preview beside the shipped map', () => {
+    const rebuild = arenaSelection('nuketown2');
+    expect(rebuild.id).toBe('nuketown2');
+    expect(rebuild.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('nuketown2');
+    // The owner's three kept features, as far as the registry can carry them.
+    expect(rebuild.multiplayer).toBe(true);
+    expect(rebuild.fieldSupport).toBe(true);
+    expect(rebuild.overdrive).toBe(true);
+    // The card must say preview, and must not read as the shipped map.
+    expect(rebuild.selectorLabel).toContain('PREVIEW');
+    expect(rebuild.rulesLabel).toContain('PREVIEW');
+    expect(rebuild.displayName).not.toBe(arenaSelection('atomic-acres').displayName);
+    expect(rebuild.routeId).not.toBe(arenaSelection('atomic-acres').routeId);
+    // The shipped Nuke Town is untouched by this lane: still there, still the
+    // imported build, still the default the decoder falls back to.
+    expect(arenaSelection('atomic-acres').authoring).toBe('import');
+    expect(decodeArenaId('nuke-town')).toBe('atomic-acres');
+    expect(decodeArenaId('nuketown')).toBe('atomic-acres');
+    // Stable id is the network/storage boundary from the first commit, so the
+    // promotion the owner will ask for later is one field and not a migration.
+    expect(decodeArenaId('nuketown2')).toBe('nuketown2');
+    expect(decodeArenaId('nuke-town-rebuild')).toBe('nuketown2');
+    expect(isArenaId('nuketown2')).toBe(true);
+    expect(ARENA_IDS).toContain('nuketown2');
   });
 
   it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {

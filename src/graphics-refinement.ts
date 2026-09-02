@@ -48,6 +48,13 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // square and large. 176 x 176 at mapSize 2048 is 86 mm per texel, which is
   // where arenas/map3.ts derives its 0.085 normal bias from.
   'map3': Object.freeze({ halfWidth: 88, halfHeight: 88, near: 4, far: 300 }),
+  // NUKETOWN2 (PREVIEW, HF-407): playable rectangle 58 x 52 m. 33 x 30
+  // half-extents cover 66 x 60, i.e. the bounds plus the same 4 m margin
+  // Test2's pin uses. `far` follows the standing rule - the volume's own
+  // diagonal (89.2 m) plus the shared non-Atomic sun standoff (|[-62, 25, 38]|
+  // = 76.9 m) = 166 m, rounded up to 170. The tallest authored mass is the
+  // 6.5 m house roof deck, so nothing needs more depth than that.
+  'nuketown2': Object.freeze({ halfWidth: 33, halfHeight: 30, near: 4, far: 170 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -71,6 +78,10 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // MAP3 (PREVIEW): matte paving and stone piers with one shallow water basin
   // - between Test1's dry range (0.16) and Test2's travertine-and-pool (0.22).
   'map3': 0.18,
+  // NUKETOWN2 (PREVIEW, HF-407): matte board siding, asphalt and painted
+  // vehicle panels - the same surface mix the shipped Nuke Town was fitted at,
+  // so it carries the same 0.24 rather than a value nobody measured.
+  'nuketown2': 0.24,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

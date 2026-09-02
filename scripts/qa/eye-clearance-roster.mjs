@@ -30,9 +30,10 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * Floor on the derived roster, matching `MINIMUM_SWEPT_ARENAS` in
  * sweep-eye-clearance-spots.ts. 8 = the nine ids in arena-identity.ts minus
  * hidden farcrysis. Raise it when an arena is added; never lower it to get a
- * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped.
+ * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, and
+ * 8 -> 9 the same day (HF-407) when the Nuke Town Rebuild shipped.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 8;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 9;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

@@ -196,6 +196,33 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
+  // NUKETOWN2 (PREVIEW), owner 2026-09-02 via HF-407. mediaAvailable FALSE and
+  // EMPTY urls, which is the honest state and the one the test's
+  // MEDIA_PENDING_ARENAS allowlist exists for: the flyover is captured from an
+  // arena's own authoritative runtime by an offline recipe, and this arena was
+  // authored today. Empty strings can never collide with a shipped path, so
+  // this card can never silently become another arena's flyover - which is
+  // exactly the failure Test1 and Test2 shipped on 2026-08-30. The card renders
+  // a labelled PREVIEW STANDBY until the capture lands.
+  'nuketown2': Object.freeze({
+    arenaId: 'nuketown2',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // NUKE TOWN REBUILD',
+    motionLabel: 'FLYOVER CAPTURE PENDING',
+    reducedMotionLabel: 'FLYOVER CAPTURE PENDING',
+    // The presentation id names the CHOREOGRAPHY RECIPE, not the bytes, and it
+    // must equal the one in source-assets/menu/pass85-nuketown2-preview - the
+    // test pins those two together. `mediaAvailable: false` is the field that
+    // says there is no capture yet; the id does not change when one lands.
+    presentationId: 'menu-video-runtime-helo-nuketown2-v1',
+    mediaAvailable: false,
+    webm: '',
+    mp4: '',
+    poster: '',
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
 } satisfies Record<ArenaId, MenuPreviewVideoDefinition>);
 
 export function menuPreviewVideoDefinition(arenaId: ArenaId): MenuPreviewVideoDefinition {

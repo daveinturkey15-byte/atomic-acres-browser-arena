@@ -148,6 +148,7 @@ import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
 import { buildMap3 } from './map3-arena';
+import { buildNuketown2 } from './nuketown2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3303,6 +3304,10 @@ const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap
   // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
   // architecture rather than the src/map3 showcase corridors.
   map3: buildMap3,
+  // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407. Code-authored replacement
+  // layout for the Nuke Town flow, registered beside the shipped arena so the
+  // main map is never broken mid-pass. See src/nuketown2-arena.ts.
+  nuketown2: buildNuketown2,
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;

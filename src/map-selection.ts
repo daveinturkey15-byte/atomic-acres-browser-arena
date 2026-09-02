@@ -5,7 +5,7 @@ import type { ArenaId } from './arena-identity';
 
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -266,6 +266,41 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     overdrive: false,
     selectable: true,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town layout rejig, built
+  // entirely in code against the measured reference proportions recorded in
+  // `docs/NUKETOWN_REBUILD_2026-09-02.md`, and registered BESIDE the shipped
+  // `atomic-acres` rather than on top of it. The owner picks the moment the
+  // two swap; that is a later lane and one field, because the id has been the
+  // network/replay/storage boundary since this commit.
+  //
+  // `multiplayer: true`, `fieldSupport: true` and `overdrive: true` match the
+  // shipped Nuke Town deliberately: the owner said he will host this preview
+  // with friends, the 2x-damage core is one of the three features he asked to
+  // keep, and the core's global position lands on this arena's bus roof.
+  Object.freeze({
+    id: 'nuketown2' as const,
+    routeId: 'nuke-town-rebuild' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'NUKE TOWN REBUILD · PREVIEW',
+    displayName: 'Nuke Town Rebuild',
+    titleLead: 'NUKE TOWN',
+    titleAccent: 'REBUILD',
+    menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
+    summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO · PREVIEW',
+    soloBotCount: SOLO_BOT_COUNT,
+    maximumSoloBots: MAX_SOLO_BOTS,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: true,
+    selectable: true,
+    // HF-407: no Blender bake, no GLB, no imported mesh/image/font/LUT. This is
+    // the whole point of the rejig - the shipped Nuke Town is the only
+    // `authoring: 'import'` arena in the game.
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

@@ -59,7 +59,12 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * act; forgetting to remove one fails `has no arena stuck in standby that
  * already ships media` below. It is empty, and should stay empty.
  */
-const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>();
+// HF-407: 'nuketown2' is on the list because its arena was authored today and
+// its flyover is captured from its own authoritative runtime by an offline
+// recipe that has not been run for it. It carries the pending obligation in
+// full - mediaAvailable false, three empty urls, the standby card - and it
+// comes OFF this list in the same commit the capture lands.
+const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>(['nuketown2']);
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
