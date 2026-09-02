@@ -87,13 +87,37 @@ if (identityChunks.length !== 1) {
 // label is owned by the Farcrysis lane, not by release identity. Everything else -
 // a badge, a chooser card, a release note - is a defect, which is how this check
 // found `Local HITL candidate - not yet published.` on the in-build chooser.
+// A production build reaches this check minified, which USED to be load-bearing by
+// accident: `FLASHBANG_HITL_CONTRACT` and `SEMTEX_HITL_CONTRACT` in
+// src/combat/pass65-ordnance-contract.ts are mangled away by esbuild, so a bare `HITL`
+// scan passed only because nobody ran it on an unminified or debug build. Those are
+// identifiers, not player-facing text, and failing on them would be a false alarm that
+// teaches the next agent to weaken this gate. The scan therefore matches the acronym as
+// a WORD - not glued to an identifier character on either side - which still catches
+// every rendered form (`HITL CANDIDATE · NOT LIVE`, `AWAITING OWNER HITL`, `Local HITL
+// candidate - not yet published.`), and the known player-facing phrasings are banned
+// outright regardless of what surrounds them, so narrowing the acronym scan cannot
+// quietly narrow the gate.
 const ALLOWED_HITL_LABELS = ['[F4RCry515 HITL]', '[farcrysis-hitl]'];
+const PLAYER_FACING_HITL_PHRASES = [
+  'HITL CANDIDATE',
+  'AWAITING OWNER HITL',
+  'HITL candidate',
+  'OWNER HITL',
+];
+const HITL_WORD = /.{0,60}(?<![A-Za-z0-9_$])HITL(?![A-Za-z0-9_$]).{0,60}/u;
 const textish = /\.(?:js|css|html|json|txt|svg)$/u;
 for (const file of files.filter((f) => textish.test(f))) {
-  let body = readFileSync(file, 'utf8');
+  const raw = readFileSync(file, 'utf8');
+  let body = raw;
   for (const allowed of ALLOWED_HITL_LABELS) body = body.split(allowed).join('');
-  const hit = /.{0,60}HITL.{0,60}/u.exec(body);
-  if (hit) failures.push(`${file} ships the acronym in player-facing text - ...${hit[0].trim()}... - it belongs to the owner checklist under docs/, not to a build`);
+  const phrase = PLAYER_FACING_HITL_PHRASES.find((needle) => body.includes(needle));
+  if (phrase) {
+    failures.push(`${file} ships the player-facing review phrase "${phrase}" - it belongs to the owner checklist under docs/, not to a build`);
+    continue;
+  }
+  const hit = HITL_WORD.exec(body);
+  if (hit) failures.push(`${file} ships the acronym as player-facing text - ...${hit[0].trim()}... - it belongs to the owner checklist under docs/, not to a build`);
 }
 
 // 3. the changelog chunk carries THIS pass's entry

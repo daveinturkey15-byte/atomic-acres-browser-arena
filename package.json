@@ -185,6 +185,7 @@
     "stage:release-topology": "node scripts/release/stage-release-topology.mjs",
     "verify:release-topology": "node scripts/qa/verify-release-topology.mjs",
     "verify:benchmark": "node scripts/release/verify-benchmark-record.mjs",
+    "qa:release-identity": "node scripts/qa/verify-built-release-identity.mjs",
     "qa:release-topology": "node scripts/qa/verify-release-topology-browser.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
     "deploy:ci": "gh-pages -d dist",

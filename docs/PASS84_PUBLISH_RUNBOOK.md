@@ -131,10 +131,36 @@ grep -c "PASS 83" dist/assets/release-identity-*.js               # must print 0
 #     acronym. This is what the owner hit on 2026-09-02: the live PASS 83 channel served
 #     `HITL CANDIDATE · NOT LIVE` and a PASS 73 notes panel out of
 #     channels/pass83/assets/changelog-CgKeduvY.js while index.html looked fine.
-node scripts/qa/verify-built-release-identity.mjs
+npm run qa:release-identity                       # = node scripts/qa/verify-built-release-identity.mjs
 #   expected: "RELEASE IDENTITY OK: ... calls itself PASS 84, opens its notes on Pass 84,
 #   ships no HITL string"; exit 0. It exits 1 with the offending file and the surrounding
 #   60 characters otherwise. It FAILS until the HF-406 section-0 patch is applied.
+#
+#   This is ALSO enforced, not merely documented: scripts/orchestration/publish_pass84.py
+#   runs it as the `release-identity` guard (with its own `release-identity-red-test`
+#   proving the guard can fire) in both `--dry-run` and the real publish, next to the
+#   farcrysis guards. Running it here just gets the answer before you copy dist/.
+
+# 4c. HF-406 changed the SHAPE of the badge label, so three existing gates were re-pinned
+#     to the new truth (none weakened - each now pins the pass number, which the old copy
+#     pins never did):
+#       scripts/qa/verify-release-topology-browser.mjs  (run by npm run qa:release-topology
+#         and by .github/workflows/release-production.yml) - the pending branch required
+#         the literal `HITL CANDIDATE · NOT LIVE` and the published branch the literal
+#         `LAST RELEASE`. Both now require the badge to LEAD with the pass of the channel
+#         under test, and src/release-pipeline.test.ts forbids the acronym reappearing in
+#         that file as a pinned label.
+#       scripts/release/release-timestamp-contract.mjs - expectedLastReleaseLabel() and
+#         verifyProductionReleaseTimestamp() now REQUIRE the pass being published and
+#         build the expected label as `<PASS n> · <UK date> · <time> <zone>`. A publish
+#         that carries the right instant under the PREVIOUS pass number now fails here.
+#         This is the check the workflow runs, so a stale-stamp publish is caught in
+#         production, not only in a lane's unit test.
+#       tests/e2e/release-channel-chooser.spec.ts and tests/e2e/pass63-project-map.spec.ts -
+#         re-pinned to the stamped pass and to the current changelog entry id, both derived
+#         from source rather than hardcoded. NOT run by this lane (they need a staged
+#         topology and a browser); expect them green only after the topology roster items
+#         below are settled.
 
 # 5. Hand-copy the build IMMEDIATELY after the build. Do not edit or touch any source
 #    afterwards: the freshness guard compares the newest dist-pass84 mtime against the

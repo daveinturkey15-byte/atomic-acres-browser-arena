@@ -196,6 +196,48 @@ def assert_farcrysis_not_selectable(dist_dir):
           f"{'y' if entries_seen == 1 else 'ies'} checked, all selectable:false)")
 
 
+def assert_release_identity(dist_dir):
+    """HF-406: does the tree about to be published call itself the pass it IS?
+
+    This is the fourth time the class has been caught: PASS 80 and PASS 81 published
+    under the previous pass number, PASS 82 did it again, and on 2026-09-02 the live
+    PASS 83 channel served an eleven-pass-old badge and release notes out of its
+    changelog chunk while index.html looked perfectly correct. The badge check must
+    therefore read the built ASSET bytes, which is what
+    scripts/qa/verify-built-release-identity.mjs does - it reads the expected pass out
+    of src/release-identity.ts, so there is no argument here to get wrong.
+
+    Added as a guard (never replacing one) so the check is enforced by the publish path
+    rather than only described in the runbook.
+    """
+    result = subprocess.run(
+        ["node", "scripts/qa/verify-built-release-identity.mjs", "--dist", dist_dir],
+        cwd=SRC, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        sys.exit("REFUSING TO PUBLISH: the built tree does not carry the stamped release "
+                 "identity, so the badge, the features panel and the release notes would "
+                 "name the wrong pass:" + os.linesep + output)
+    print(f"  release-identity guard: OK ({output.splitlines()[-1] if output else 'no output'})")
+
+
+def release_identity_guard_red_test():
+    """Prove the identity guard can fire before trusting its pass."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as red_dir:
+        os.makedirs(os.path.join(red_dir, "assets"))
+        with open(os.path.join(red_dir, "assets", "release-identity-red.js"), "w",
+                  encoding="utf-8") as fh:
+            fh.write('const a="PASS 1";export{a};')
+        fired = False
+        try:
+            assert_release_identity(red_dir)
+        except SystemExit:
+            fired = True
+        if not fired:
+            sys.exit("REFUSING: the release-identity guard failed its own red test - it cannot fire")
+
+
 def farcrysis_guard_red_test():
     """Prove the farcrysis guard can fire before trusting its pass (it shipped vacuous once)."""
     import tempfile
@@ -699,6 +741,9 @@ def dry_run(gh_pages_dir, plan_json, rollback=False):
             run_guard("build-freshness", verdicts, assert_build_is_not_stale)
             run_guard("farcrysis-red-test", verdicts, farcrysis_guard_red_test)
             run_guard("farcrysis-unselectable", verdicts, assert_farcrysis_not_selectable, DIST)
+            # HF-406: the tree must call itself the pass it is stamped as.
+            run_guard("release-identity-red-test", verdicts, release_identity_guard_red_test)
+            run_guard("release-identity", verdicts, assert_release_identity, DIST)
         else:
             verdicts["build-present"] = {"ok": False, "detail": f"no build at {DIST}"}
             print(f"  build-present: WOULD REFUSE - no build at {DIST}")
@@ -834,6 +879,10 @@ def main(argv=None):
     assert_build_is_not_stale()
     farcrysis_guard_red_test()
     assert_farcrysis_not_selectable(DIST)
+    # HF-406: refuse a tree that does not call itself the pass src/release-identity.ts
+    # stamped. Three prior publishes shipped under the previous pass number.
+    release_identity_guard_red_test()
+    assert_release_identity(DIST)
     predecessor_guard_red_test()
     sources = read_shell_sources()
 
