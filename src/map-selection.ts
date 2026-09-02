@@ -265,6 +265,9 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     fieldSupport: false,
     overdrive: false,
     selectable: true,
+    // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
 ]);

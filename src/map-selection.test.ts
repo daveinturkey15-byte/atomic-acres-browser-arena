@@ -141,6 +141,7 @@ describe('opening arena selection', () => {
       'high-seas': 'code',
       test1: 'code',
       test2: 'code',
+      map3: 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
