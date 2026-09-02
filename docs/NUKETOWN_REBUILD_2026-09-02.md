@@ -160,9 +160,29 @@ truck to the bus. That is the property the fidelity test measures.
 
 ## 4. Measured build (filled in after the arena was written)
 
-See `artifacts/nuketown2-measurements.json` in the lane worktree and the table in
-the lane report. Every row is measured on the arena **as built** by
-`buildNuketown2()`, not on the authored constants.
+Every row below is measured on the arena **as built** by `buildNuketown2()`, not
+on the authored constants. Raw evidence:
+`docs/evidence/pass85/lane-u/` (measurements.json, collider-visual-parity.txt,
+spawn-solver.txt, solo-run-60s.json, viewpoint-capture-manifest.json, the seven
+review-camera frames, and the two diagrams this lane drew).
+
+| element | reference basis | rebuild, measured | delta | claim-state |
+|---|---|---|---|---|
+| playspace | 2,972 m2 (R1) | 58 x 52 = **3,016 m2** | **+1.5 %** | VERIFIED |
+| whole map | 4,950 m2 (R1) | 74 x 68 = **5,032 m2** | **+1.7 %** | VERIFIED |
+| play : whole | 0.60 (R1) | **0.599** | +0.0 % | VERIFIED |
+| cross-street section | must contain path+yard+house+street+house+yard+path (R2/R3/R7/R8) | 4 + 7.5 + 10 + 9 + 10 + 7.5 + 4 = **52 m**, sums exactly | 0 | VERIFIED |
+| houses | two, two storeys, garages, interiors (R3/R4/R6) | 2 houses, 4 ground rooms, 4 upper rooms, 4 exterior doors, 8 windows, 2 stairs, 2 garages | - | VERIFIED |
+| upper front window | the power position (R5) | real opening; a player standing at it is unobstructed (fidelity test) | - | VERIFIED |
+| spawns | back yards behind each house (R8) | all 10 past |z| = 14.5, i.e. behind their own house | - | VERIFIED |
+| symmetry | near-symmetric, same options both sides (R11) | **exact 180-degree rotation, zero exceptions** | - | VERIFIED |
+| vehicles | bus + truck + cars (R9) | 1 bus (open, centred on origin), 2 trucks (open cargo box, one per cul-de-sac), 2 cars (closed) | 1 extra truck, stated in 2.5 | VERIFIED |
+| street sightline | broken by the road's vehicles (R9) | longest clear run along the centre-line **15.0 m** of a 58 m street | - | VERIFIED |
+| size / pace | one of the smallest maps in the series (R12) | diagonal 77.9 m: **8.95 s** sprint, 12.67 s walk, 25.29 s perimeter lap (shipped Nuke Town: 10.95 s) | - | VERIFIED |
+| collider / visual parity | - | **0 invisible colliders, 0 walk-through meshes** over 181 colliders and 186 visible meshes | - | VERIFIED |
+| spawn quality | - | 10 spawns, 100 % in-envelope (floor 100 %, reach 100 %), cross-team min 38 m, **enemy-LOS pairs 0** | - | VERIFIED |
+| 60 s solo run | - | native WebGPU (nvidia/blackwell), **median 75 fps**, 5 % low 60, min 35, **0 page errors, 0 console errors**; 84 visible meshes, 43,980 triangles | - | VERIFIED |
+| art-direction distinctiveness | must clear the catalog floor | weakest pair **0.02446** vs atomic-acres (floor 0.02157; catalog's own weakest 0.02262) | - | VERIFIED |
 
 ---
 
@@ -180,3 +200,21 @@ the lane report. Every row is measured on the arena **as built** by
 5. House dimensions, street width and the 8 m house offset are **derived**, not
    published. They are recorded here as ratios so a later lane can rescale the
    whole map by one constant without re-deriving the flow.
+6. **Roofs are flat slabs.** The reference's houses are pitched. This is a
+   first-pass visual and a deliberate one: a pitched roof changes the collider
+   set and the upper-floor headroom, and the owner asked for the LAYOUT first.
+7. **The surround is a flat ground plane.** The brief allowed reusing the
+   existing lawn field, forest surround and mountain ring "where they take a
+   layout parameter"; measured 2026-09-02, none of the three does - they are
+   authored against the shipped Nuke Town's own constants. Parameterising them
+   is a real change to a shipped arena's modules and is NOT in this lane.
+8. **Weather is pinned clear**, unlike the shipped Nuke Town's four-rung shower
+   ladder. Reason and the measurement behind it are in the row in
+   `src/weather/weather-state.ts`.
+9. **The menu flyover does not exist.** The card renders a labelled PREVIEW
+   STANDBY through the sanctioned pending-media path; the camera recipe is
+   authored (`source-assets/menu/pass85-nuketown2-preview/`), so the capture is
+   a mechanical step whenever somebody wants to run it.
+10. **Eye clearance is unmeasured.** The ledger carries the -1 sentinel with a
+    dated note, so the ratchet is RED for this arena until a browser run
+    measures it.

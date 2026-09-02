@@ -87,10 +87,16 @@ export const definition = createProceduralArenaVisualDefinition({
     // mirror images of each other, the arena's rotational symmetry is broken
     // and one team has something the other does not.
     camera('nuketown2-south-yard', [14, 1.75, 20.5], [1, 1.5, 13.5], 'geometry', 1.03),
-    // Down the street centre-line from the west cul-de-sac. The bus should
-    // block the far half of this frame; that is the whole reason it is there,
-    // and it is the property the fidelity test measures numerically.
-    camera('nuketown2-street-centre', [-24, 1.7, 0], [24, 1.6, 0.4], 'geometry', 1.03),
+    // Down the street centre-line. The bus should block the far half of this
+    // frame; that is the whole reason it is there, and it is the property the
+    // fidelity test measures numerically.
+    //
+    // x = -18, NOT the -24 this camera was first authored at. -24 is the west
+    // cul-de-sac truck's own position, so the first capture of this frame was
+    // taken from INSIDE the truck's cargo box and reviewed a brown slab. -18 is
+    // inside the 15 m clear run the fidelity test measures (x -20.5 to -5.5),
+    // which is exactly the stretch this camera is supposed to be looking along.
+    camera('nuketown2-street-centre', [-18, 1.7, 0], [24, 1.6, 0.4], 'geometry', 1.03),
     // The reference's biggest power position: the north upper front window,
     // looking diagonally across the road at the south house's driveway rather
     // than straight into its own reflection. Interior looking out through a
