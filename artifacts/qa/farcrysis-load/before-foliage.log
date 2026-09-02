@@ -1,0 +1,8 @@
+[farcrysis-boot] menu ready at 2762 ms
+[farcrysis-boot] selectArena(farcrysis) -> ok in 46915 ms
+[farcrysis-boot] startSolo -> active in 20411 ms
+[farcrysis-boot] screenshot C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\before-foliage-admitted.png
+[farcrysis-boot] outcome=admitted selectToAdmitted=46901 ms, selectToActive=67325 ms
+[farcrysis-boot] pipelines: menu 0, during load 326; shader modules during load 329; long tasks 255 = 32073 ms (max 4246)
+[farcrysis-boot] scene: 6665 meshes (164 instanced, 93630 instances), 1756 unique materials (184 in arena root), 2902 geometries
+Wrote C:\Users\david\projects\aa-farcrysis-load\artifacts\qa\farcrysis-load\before-foliage.json
