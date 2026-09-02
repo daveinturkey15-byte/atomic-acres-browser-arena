@@ -1010,9 +1010,18 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     // These points come from scripts/qa/solve-spawn-layouts.ts under the
     // HF-402 constraint set (src/spawn-layout-constraints.ts): every point has
     // paving or a collider top under its feet, an autostep-only route to the
-    // enemy table, hard cover within 2.5 m, and no enemy spawn in sight closer
-    // than 52 m; the tables are 52 m apart. The solver searched each team's
-    // back band of the map and spread the points across it, Nuke Town style.
+    // enemy table, hard cover within 3 m, and NO enemy spawn in sight at any
+    // range; the tables are 52 m apart. The solver searched each team's back
+    // band of the map and spread the points across it, Nuke Town style.
+    //
+    // Re-solved 2026-09-02 after review: the first HF-402 pass bounded cover
+    // from above (within 6 m) and never from below, so the farthest-point
+    // search parked spawns against wall faces - ten of its twelve points stood
+    // 0.5-1.2 m from a face that fills the view, and the respawn at (-31, 22)
+    // opened with a stucco wall across the whole screen and only 17% of the
+    // compass walkable. The constraint set now carries a standoff floor
+    // (1.2 m) and an open-arc floor (30%), both calibrated on the SHIPPED
+    // maps' own minima, and these points clear both.
     //
     // NOT an X mirror any more, deliberately: the map's east end (the E2
     // garage wing and the x 28-36 strip in front of it) is sealed off from the
@@ -1022,8 +1031,8 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     // - so team 1's back band is the interior east of the courtyard until
     // that geometry gets its doors. Pinned by src/spawn-layout-quality.test.ts.
     spawns: spawnRecord(
-      [[-46, 0], [-30, -35], [-31, 22], [-30, -13], [-30, 4], [-39, -24]],
-      [[22, -37], [25, 22], [27, -8], [31, 7], [22, -22], [22, 1]],
+      [[-46, 0], [-30, -34], [-32, 19], [-32, -15], [-30, 2], [-38, -25]],
+      [[22, 1], [24, -24], [24, 22], [26, -11], [30, 10], [22, 13]],
     ),
     // Ten at grade and FOUR on the +3.40 m floors. The old comment kept every
     // anchor at grade because the only raised surface was a 0.70 m deck a bot

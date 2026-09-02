@@ -27,12 +27,13 @@ for (const [id, build] of SELECTABLE_ARENA_BUILDERS()) {
   const report = measureSpawnLayout(id, arena);
   reports.push(report);
   console.log(`\n=== ${id} === ${report.summary.spawnCount} spawns, in-envelope ${report.summary.inEnvelopePercent}% (floor ${report.summary.floorPercent}%, reach ${report.summary.reachablePercent}%), `
-    + `POI median ${report.summary.medianPoiDistanceM} m, cover max ${report.summary.maxCoverDistanceM} m, cross-team min ${report.summary.crossTeamMinDistanceM} m, enemy-LOS pairs ${report.summary.enemyLosPairs}`);
-  console.log('  team  x       z       y     floor(src)      route   jump  cover   poi    los(nearest)  verdict');
+    + `POI median ${report.summary.medianPoiDistanceM} m, cover max ${report.summary.maxCoverDistanceM} m, standoff min ${report.summary.minWallStandoffM} m, open arc min ${report.summary.minOpenArcFraction}, cross-team min ${report.summary.crossTeamMinDistanceM} m, enemy-LOS pairs ${report.summary.enemyLosPairs}`);
+  console.log('  team  x       z       y     floor(src)      route   jump  cover   poi   stand   arc   los(nearest)  verdict');
   for (const point of report.points) {
     const floor = point.floorGapM === null ? 'NONE' : `${point.floorGapM.toFixed(2)} ${point.floorSource}`;
     const los = `${point.enemySpawnsVisible}${point.nearestVisibleEnemyM === null ? '' : ` (${point.nearestVisibleEnemyM.toFixed(0)} m)`}`;
-    console.log(`  ${point.team}   ${point.x.toFixed(1).padStart(6)} ${point.z.toFixed(1).padStart(7)} ${point.y.toFixed(1).padStart(6)}  ${floor.padEnd(16)} ${point.reachable ? 'yes' : 'NO '}     ${point.reachableByJump ? 'yes' : 'NO '}   ${point.coverDistanceM.toFixed(1).padStart(5)}  ${point.poiDistanceM.toFixed(1).padStart(5)}   ${los.padEnd(12)}  ${point.failures.length === 0 ? 'ok' : point.failures.join(',')}`);
+    const standoff = Number.isFinite(point.wallStandoffM) ? point.wallStandoffM.toFixed(2) : ' inf';
+    console.log(`  ${point.team}   ${point.x.toFixed(1).padStart(6)} ${point.z.toFixed(1).padStart(7)} ${point.y.toFixed(1).padStart(6)}  ${floor.padEnd(16)} ${point.reachable ? 'yes' : 'NO '}     ${point.reachableByJump ? 'yes' : 'NO '}   ${point.coverDistanceM.toFixed(1).padStart(5)}  ${point.poiDistanceM.toFixed(1).padStart(5)}  ${standoff.padStart(5)}  ${point.openArcFraction.toFixed(2)}  ${los.padEnd(12)}  ${point.failures.length === 0 ? 'ok' : point.failures.join(',')}`);
   }
   if (report.failures.length > 0) console.log(`  layout: ${report.failures.join(', ')}`);
   if (report.summary.worstOffender) console.log(`  worst: ${report.summary.worstOffender}`);
