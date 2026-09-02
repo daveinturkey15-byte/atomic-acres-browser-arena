@@ -18,7 +18,7 @@
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+    "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -36,21 +36,21 @@
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod0.glb",
-        "sha256": "bc7c965c3931ca2cce575a98552532b46fae11f41e313d3b03940cf726583a3b",
+        "sha256": "1e27677f87f6d641ecb1d2cefa5f559992f3e1acf5222b6ce3241bd76585d1b3",
         "variant": "first-person-lod0",
         "lod": 0,
         "triangles": 10840,
-        "bytes": 213428,
+        "bytes": 213440,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod1.glb",
-        "sha256": "ee938f709c39d0ccf4a6594786d2f8bd23534659a829d515e69b7589d9be8e5a",
+        "sha256": "f9898e4dc36da5c89c9a517cfb0c20169c51bf3d980fd47f76c5360fc37eae70",
         "variant": "first-person-lod1",
         "lod": 1,
         "triangles": 6994,
-        "bytes": 181848,
+        "bytes": 181876,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -58,31 +58,31 @@
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod0.glb",
-        "sha256": "0302f01ddae85ad5aace8b356068e3fba4c1d255b0b5504c31f726d129e0eacd",
+        "sha256": "21d2f105961ff64936858c535409449f0329993a2cbb10078a7e8a0b52f91540",
         "variant": "world-lod0",
         "lod": 0,
         "triangles": 8536,
-        "bytes": 196240,
+        "bytes": 196252,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod1.glb",
-        "sha256": "5b844bb66d5bcbdaab4f1aed21070b481a61d76f0415196e153b1fcb36ddb70c",
+        "sha256": "d05ec7b59c5bb941a322e023dcc5ef90e5cbe885659fc4dfbd025f2421ff59da",
         "variant": "world-lod1",
         "lod": 1,
         "triangles": 7128,
-        "bytes": 182556,
+        "bytes": 182576,
         "meshNodes": 8,
         "renderPrimitives": 8
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod2.glb",
-        "sha256": "cc0a9f99a0c0cd0fd8c2b566f6cd65a456bb6253c6cd60cecdaf1aace9b6fdb5",
+        "sha256": "c9ade4ff7e993c1c6b7fc69b78efbceee59325d98e3b7d258d259f04c7f1c623",
         "variant": "world-lod2",
         "lod": 2,
         "triangles": 3136,
-        "bytes": 147684,
+        "bytes": 147700,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -90,11 +90,11 @@
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-drop-lod0.glb",
-        "sha256": "db4c0b9b844772b660bec18cc1d5ab684155e8cd9ae59e74b6a81d49ac5e70c9",
+        "sha256": "689255645a56642aab68bc7fd8a7aaa034b4174b69b2e8bbcabd53679ce8e089",
         "variant": "drop-lod0",
         "lod": 0,
         "triangles": 7128,
-        "bytes": 182552,
+        "bytes": 182560,
         "meshNodes": 8,
         "renderPrimitives": 8
       }
@@ -250,7 +250,7 @@
       {
         "variant": "first-person-lod0",
         "triangles": 10840,
-        "bytes": 213428,
+        "bytes": 213440,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,
@@ -281,7 +281,7 @@
       {
         "variant": "first-person-lod1",
         "triangles": 6994,
-        "bytes": 181848,
+        "bytes": 181876,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,
@@ -312,7 +312,7 @@
       {
         "variant": "world-lod0",
         "triangles": 8536,
-        "bytes": 196240,
+        "bytes": 196252,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,
@@ -343,7 +343,7 @@
       {
         "variant": "world-lod1",
         "triangles": 7128,
-        "bytes": 182556,
+        "bytes": 182576,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,
@@ -374,7 +374,7 @@
       {
         "variant": "world-lod2",
         "triangles": 3136,
-        "bytes": 147684,
+        "bytes": 147700,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,
@@ -405,7 +405,7 @@
       {
         "variant": "drop-lod0",
         "triangles": 7128,
-        "bytes": 182552,
+        "bytes": 182560,
         "meshNodes": 8,
         "renderPrimitives": 8,
         "materials": 4,

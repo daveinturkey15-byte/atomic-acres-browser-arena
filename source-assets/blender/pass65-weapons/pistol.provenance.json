@@ -18,7 +18,7 @@
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+    "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",

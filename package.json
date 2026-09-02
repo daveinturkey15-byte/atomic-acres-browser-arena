@@ -159,6 +159,7 @@
     "qa:pass73:collision-route-authority:webgpu": "node scripts/qa/run-pass73-collision-route-authority.mjs native-webgpu",
     "qa:pass66:prone-contact-matrix": "node scripts/qa/run-pass66-prone-contact-matrix.mjs",
     "qa:pass65:first-person-arms-visual": "node scripts/qa/verify-pass65-first-person-arms-visual.mjs",
+    "qa:pass85:arms-handedness": "node scripts/qa/verify-pass85-arms-handedness.mjs",
     "qa:pass65:weapon-gltf": "node scripts/qa/validate-pass65-weapon-glbs.mjs",
     "qa:pass65:firearm-corpus-receipt": "node scripts/qa/finalize-pass65-firearm-corpus-gate.mjs",
     "qa:pass65:production-assets": "node .agents/skills/atomic-acres-production-asset-governance/scripts/verify-production-assets.mjs",

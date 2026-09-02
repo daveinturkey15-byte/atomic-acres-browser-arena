@@ -1734,7 +1734,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -1852,7 +1852,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/carbine.provenance.json",
-        "sha256": "008c08bcca6f92353411bdeea7bb438b2f5cf0fe9c748ce2695006f29bb40286"
+        "sha256": "a36604a9e8d0db8d50538a95235225151da07d723006ff4f1c025f66f535f0af"
       },
       "sockets": [
         "rightGrip",
@@ -2174,7 +2174,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -2292,7 +2292,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/smg.provenance.json",
-        "sha256": "bf906d6a9fbccb0520416ded368a7ae9546d3c64cb6a1c30c4d64cd37aee226e"
+        "sha256": "d2e5e126ef2e381a99ec63832ad5a50f9ba57488ebdd1a52a0033d8546e81d5d"
       },
       "sockets": [
         "rightGrip",
@@ -2614,7 +2614,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -2732,7 +2732,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/lmg.provenance.json",
-        "sha256": "b39581bf281f7d43b699ac194429f9e70c73567775adf5f687f24cf176c4c5ac"
+        "sha256": "fe06268d7dbc77e149280aeb7fd36698f48b15df2b424eddc72bf36f1d376396"
       },
       "sockets": [
         "rightGrip",
@@ -3054,7 +3054,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -3172,7 +3172,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/scattergun.provenance.json",
-        "sha256": "dae0f17775686aa780264ad2c75c71d5f2d9abf1dfd610feffe519b6e14913b0"
+        "sha256": "87ac588f90cff2af6e78e8b2894f28d5845fa23b0d00df3877b6094504976320"
       },
       "sockets": [
         "rightGrip",
@@ -3494,7 +3494,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -3612,7 +3612,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/sniper.provenance.json",
-        "sha256": "19f39560c782b70dd47689f83bbac72e12075b120f3723cf87d69273bc2bb832"
+        "sha256": "b01da8fc8a7992c94e7f9fadb9ceeafca124e9ca1043f73733890468ceff3f87"
       },
       "sockets": [
         "rightGrip",
@@ -3934,7 +3934,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -4052,7 +4052,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/railgun.provenance.json",
-        "sha256": "7b688e883ad2ae7a03d9a2af995b66634c3e51bc69a5d2c91d4bb6d68064d14d"
+        "sha256": "3ab0b0059e46c40247d3df0b27b1ed1c4b03820917237aec50f86b4854d118d1"
       },
       "sockets": [
         "rightGrip",
@@ -4375,7 +4375,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -4493,7 +4493,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/pistol.provenance.json",
-        "sha256": "38b141140b3262917782f3858558f62ac90a7d2052e28c2a0cc1dfc0decd8670"
+        "sha256": "f5ef1e1d7e3af866c20f7b8c3e02e1aabca4c8213c6c902ab632b5dbe0c492f0"
       },
       "sockets": [
         "rightGrip",
@@ -4815,7 +4815,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -4933,7 +4933,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/magnum.provenance.json",
-        "sha256": "ecce170131c63c3cabeb68df84c8fd7ed1d1e4fc0cab15980308162633808731"
+        "sha256": "d84dbfbbe09607add927f2163013b70b1e9813302afefe4967e65823428a60ae"
       },
       "sockets": [
         "rightGrip",
@@ -5255,7 +5255,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -5373,7 +5373,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/machine-pistol.provenance.json",
-        "sha256": "1b30a15c7b260dab40d4af8ac7ce82804af779bc1499e4ed5ab722d75e122580"
+        "sha256": "512ac862a3c58e0ff0f1ebea1dec286cc25146430b3b83ae4d97a71f40fa40a0"
       },
       "sockets": [
         "rightGrip",
@@ -5695,7 +5695,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -5813,7 +5813,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/mini-uzi.provenance.json",
-        "sha256": "ae7d08f5dd7675357fb58b04e1448ff988f802db4405342019119193faaa3b63"
+        "sha256": "185eef2ae0e99c10dc3eefb83fc642dd9a23710f9800d16ed7d062558e2d9192"
       },
       "sockets": [
         "rightGrip",
@@ -6135,7 +6135,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -6253,7 +6253,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/mp5.provenance.json",
-        "sha256": "11dc92f9bd2d0f79a3adff9ca73bb7fcfe19c364b7fc6d1918042e727ed3ad4b"
+        "sha256": "cb0966f265b67acb78712467929331472513ed4261fae6a42b3b06bb5ec54505"
       },
       "sockets": [
         "rightGrip",
@@ -6575,7 +6575,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -6693,7 +6693,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/m4a1.provenance.json",
-        "sha256": "9026be518ae445db346691a1053c9f9303cedce736ed2a7aeb4df53fb38929e7"
+        "sha256": "7bf9b181043168858e7b5f5863f465881c5559db909bdc688cca51a684aa1128"
       },
       "sockets": [
         "rightGrip",
@@ -7015,7 +7015,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -7133,7 +7133,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/ak-47.provenance.json",
-        "sha256": "9d75ad1448ea98c7f654e18aad1cfe93d9b8b5a434d44553e6ff2eb0df891603"
+        "sha256": "51199d7b42ed596521b53b51f8ac67be29c904a876026a644544d5c961696eb4"
       },
       "sockets": [
         "rightGrip",
@@ -7455,7 +7455,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -7464,21 +7464,21 @@
       "firstPersonGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod0.glb",
-          "sha256": "bc7c965c3931ca2cce575a98552532b46fae11f41e313d3b03940cf726583a3b",
+          "sha256": "1e27677f87f6d641ecb1d2cefa5f559992f3e1acf5222b6ce3241bd76585d1b3",
           "variant": "first-person-lod0",
           "lod": 0,
           "triangles": 10840,
-          "bytes": 213428,
+          "bytes": 213440,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod1.glb",
-          "sha256": "ee938f709c39d0ccf4a6594786d2f8bd23534659a829d515e69b7589d9be8e5a",
+          "sha256": "f9898e4dc36da5c89c9a517cfb0c20169c51bf3d980fd47f76c5360fc37eae70",
           "variant": "first-person-lod1",
           "lod": 1,
           "triangles": 6994,
-          "bytes": 181848,
+          "bytes": 181876,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -7486,31 +7486,31 @@
       "worldGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod0.glb",
-          "sha256": "0302f01ddae85ad5aace8b356068e3fba4c1d255b0b5504c31f726d129e0eacd",
+          "sha256": "21d2f105961ff64936858c535409449f0329993a2cbb10078a7e8a0b52f91540",
           "variant": "world-lod0",
           "lod": 0,
           "triangles": 8536,
-          "bytes": 196240,
+          "bytes": 196252,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod1.glb",
-          "sha256": "5b844bb66d5bcbdaab4f1aed21070b481a61d76f0415196e153b1fcb36ddb70c",
+          "sha256": "d05ec7b59c5bb941a322e023dcc5ef90e5cbe885659fc4dfbd025f2421ff59da",
           "variant": "world-lod1",
           "lod": 1,
           "triangles": 7128,
-          "bytes": 182556,
+          "bytes": 182576,
           "meshNodes": 8,
           "renderPrimitives": 8
         },
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod2.glb",
-          "sha256": "cc0a9f99a0c0cd0fd8c2b566f6cd65a456bb6253c6cd60cecdaf1aace9b6fdb5",
+          "sha256": "c9ade4ff7e993c1c6b7fc69b78efbceee59325d98e3b7d258d259f04c7f1c623",
           "variant": "world-lod2",
           "lod": 2,
           "triangles": 3136,
-          "bytes": 147684,
+          "bytes": 147700,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -7518,11 +7518,11 @@
       "dropGlbs": [
         {
           "path": "public/assets/original/models/weapons/pass65-firearms/minigun/minigun-drop-lod0.glb",
-          "sha256": "db4c0b9b844772b660bec18cc1d5ab684155e8cd9ae59e74b6a81d49ac5e70c9",
+          "sha256": "689255645a56642aab68bc7fd8a7aaa034b4174b69b2e8bbcabd53679ce8e089",
           "variant": "drop-lod0",
           "lod": 0,
           "triangles": 7128,
-          "bytes": 182552,
+          "bytes": 182560,
           "meshNodes": 8,
           "renderPrimitives": 8
         }
@@ -7573,7 +7573,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/minigun.provenance.json",
-        "sha256": "bcc61595a821fbf7227aff2a957dffd9ec935a635c98e7720d10aa191680d70f"
+        "sha256": "06493acca45c8a20e1074b16b14590e5401490a2b82abc99dc461adc560fcadd"
       },
       "sockets": [
         "rightGrip",
@@ -7684,7 +7684,7 @@
           {
             "variant": "first-person-lod0",
             "triangles": 10840,
-            "bytes": 213428,
+            "bytes": 213440,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7715,7 +7715,7 @@
           {
             "variant": "first-person-lod1",
             "triangles": 6994,
-            "bytes": 181848,
+            "bytes": 181876,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7746,7 +7746,7 @@
           {
             "variant": "world-lod0",
             "triangles": 8536,
-            "bytes": 196240,
+            "bytes": 196252,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7777,7 +7777,7 @@
           {
             "variant": "world-lod1",
             "triangles": 7128,
-            "bytes": 182556,
+            "bytes": 182576,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7808,7 +7808,7 @@
           {
             "variant": "world-lod2",
             "triangles": 3136,
-            "bytes": 147684,
+            "bytes": 147700,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7839,7 +7839,7 @@
           {
             "variant": "drop-lod0",
             "triangles": 7128,
-            "bytes": 182552,
+            "bytes": 182560,
             "meshNodes": 8,
             "renderPrimitives": 8,
             "materials": 4,
@@ -7896,7 +7896,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -8014,7 +8014,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/m14-ebr.provenance.json",
-        "sha256": "208533ad29aa673a92fc98fdb2c638932a37615bbfd6e8058259e55a1d368b2b"
+        "sha256": "18658e0908e5849fda6e5c2b6109a19ea141b795e7351e46e51fef05661c4a82"
       },
       "sockets": [
         "rightGrip",
@@ -8336,7 +8336,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -8454,7 +8454,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/slug-shotgun.provenance.json",
-        "sha256": "5194727ed4da1c91759034d8f0c7cb1b1fd605e92c2f06bf7546a7d9e9bbe429"
+        "sha256": "1644767ef9e57832e4fa3c31c0b8eedc4a1fbaaa7641d2b61da215df5022979b"
       },
       "sockets": [
         "rightGrip",
@@ -8776,7 +8776,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -8894,7 +8894,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flashlight-pistol.provenance.json",
-        "sha256": "ec5ccc5ad9aafe808f74cf73a7a198b77221b28d078041763aeeda5917f215b2"
+        "sha256": "bf668a091ea23625e5fc0278ae7afd122673cf3168812d5fa6143866f538e088"
       },
       "sockets": [
         "rightGrip",
@@ -9564,7 +9564,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -9682,7 +9682,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flamethrower.provenance.json",
-        "sha256": "3d83168b27566ddcde27f700cce8fb6e48752ddb151e9ff52efdf947254bb87e"
+        "sha256": "3714061251f3c21d764461f648bdc481d94aedcf5fa51a164d7adef15b480471"
       },
       "sockets": [
         "rightGrip",
@@ -10005,7 +10005,7 @@
       },
       "geometryModule": {
         "path": "scripts/blender/pass65_weapon_production_geometry.py",
-        "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
+        "sha256": "9f3ecc6e520910dc867419efd4541a412de1369f93b893e1f47d5369aa9359a7"
       },
       "sourceSpec": {
         "path": "source-assets/blender/pass65-weapon-family-specs.json",
@@ -10123,7 +10123,7 @@
       },
       "provenance": {
         "path": "source-assets/blender/pass65-weapons/flare-gun.provenance.json",
-        "sha256": "bc60688745d1345a550be4a3e25face3e0f6722534171a88822cd74a15fc1559"
+        "sha256": "272dd1c1ad2b72dde4ed20f1614808c2e99e491131f249e778866d4ff37f8d2f"
       },
       "sockets": [
         "rightGrip",
