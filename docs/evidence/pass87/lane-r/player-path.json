@@ -1,0 +1,46 @@
+{
+  "contract": "farcrysis-player-path-evidence-v1",
+  "measuredAt": "2026-09-02T23:05:00+01:00",
+  "sha": "dbf028ebab688f67ac27e30b651460096614f202",
+  "gate": "scripts/qa/verify-player-path-cdp.mjs (installed Chrome headless over CDP, real callsign + real map card + real deploy button, no debug backdoor)",
+  "url": "http://127.0.0.1:4180 (scripts/qa/run-with-preview-server.mjs over the built dist)",
+  "runs": [
+    {
+      "n": 1,
+      "arenas": [
+        "farcrysis"
+      ],
+      "farcrysis": "FAIL 31701 ms",
+      "note": "browser/page closed while waiting for matchPhase active - a tab death, not a timeout. Not reproduced in the three runs below."
+    },
+    {
+      "n": 2,
+      "arenas": [
+        "atomic-acres",
+        "farcrysis"
+      ],
+      "atomic-acres": "OK 74463 ms",
+      "farcrysis": "OK 82116 ms"
+    },
+    {
+      "n": 3,
+      "arenas": [
+        "farcrysis"
+      ],
+      "farcrysis": "OK 78685 ms"
+    },
+    {
+      "n": 4,
+      "arenas": [
+        "farcrysis"
+      ],
+      "farcrysis": "OK 74616 ms"
+    }
+  ],
+  "verdict": "PASS on 3 of 4 runs; one unreproduced tab death recorded rather than discarded",
+  "canvas": {
+    "width": 1280,
+    "height": 720
+  },
+  "note": "This is the gate src/map-selection.ts named as the condition for un-hiding farcrysis ('Restore ... once the farcrysis lanes land and verify-player-path-cdp.mjs passes it'). It drives the menu the way a person does. The one failure is left in this record on purpose: 3/4 is what was measured, and a reader deciding whether to publish should see it."
+}
