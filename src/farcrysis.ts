@@ -20,6 +20,7 @@ import { bakeFarcrysisWaterDepth, createFarcrysisSeaSurfaceMaterial } from './fa
 import {
   farcrysisTerrainHeight,
   farcrysisTerrainPhysicsTiles,
+  farcrysisTerrainProxyChunks,
   farcrysisBotGroundPlatforms,
   FARCRYSIS_SAFETY_FLOOR_Y,
   FARCRYSIS_WATER_LEVEL,
@@ -974,6 +975,49 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // walls. This is the established split map.ts already uses for ramps.
   const terrainPlates = farcrysisTerrainPhysicsTiles();
   for (const plate of terrainPlates) builder.physicsColliders.push(plate.box);
+
+  // ---- HF-423: the ground is now a RAYCAST surface too ---------------------
+  //
+  // Those plates are rotated, and both consumers of a downward probe skip
+  // rotated boxes: the shared HF-402 `floorBeneath` (spawn quality) and the
+  // hitscan path, which only ever sees `raycastMeshes`. So this arena had no
+  // floor under the spawn rule (MEASURED: 202 of 3,136 dry cells, 6.44 %, all
+  // prop tops) and no ground under gunfire. Every other shipped arena pushes
+  // its ground mesh into `raycastMeshes`; farcrysis simply never did.
+  //
+  // Sixteen invisible chunk meshes carry the collision-only triangulation, so
+  // a ray's per-mesh bounding-box rejection leaves ~2,048 triangles to walk
+  // instead of 32,768. They stay OUT of `colliders` for the same reason the
+  // plates do — LOS, bot avoidance and spawn validation must not read the
+  // ground as walls.
+  const terrainProxyGroup = new THREE.Group();
+  terrainProxyGroup.name = 'farcrysis-terrain-collision-proxy';
+  for (const chunk of farcrysisTerrainProxyChunks()) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(chunk.positions, 3));
+    geometry.setIndex(new THREE.BufferAttribute(chunk.indices, 1));
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    // The mud material is reused rather than authored: the mesh never renders,
+    // and a fresh material here would be a fresh node graph and a fresh render
+    // pipeline on an arena whose admission cost is the thing under repair.
+    const mesh = new THREE.Mesh(geometry, mudMat);
+    mesh.name = chunk.id;
+    mesh.visible = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.collisionProxy = true;
+    mesh.userData.farcrysisTerrainProxy = true;
+    mesh.userData.impactSurface = classifyImpactSurface({ name: chunk.id });
+    terrainProxyGroup.add(mesh);
+    builder.raycastMeshes.push(mesh);
+    const surface = createBallisticSurface(chunk.id, chunk.id, chunk.bounds, { material: 'earth' });
+    builder.shotSurfaces.push(surface);
+    mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
+  }
+  root.add(terrainProxyGroup);
 
   // Bot feet track the same surface through the generic verticalNavigation
   // channel (authoredElevationAt in legacy-main) — platforms for the ground

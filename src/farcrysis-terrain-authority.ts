@@ -454,3 +454,136 @@ export function farcrysisFloorGapBeneath(
   }
   return best;
 }
+
+// ---------------------------------------------------------------------------
+// Terrain collision proxy — the ground this arena never registered for raycasts
+// ---------------------------------------------------------------------------
+
+/**
+ * Chunks per axis. The proxy is split so THREE's per-mesh bounding-box test
+ * rejects all but the one or two chunks a ray actually crosses; a single
+ * 32k-triangle ground mesh would be walked in full on every hitscan.
+ */
+export const TERRAIN_PROXY_CHUNKS_PER_AXIS = 8;
+
+/** Grid steps per chunk edge. 4 chunks x 32 steps over 128 m = a 1 m lattice. */
+export const TERRAIN_PROXY_SEGMENTS_PER_CHUNK = 24;
+
+export type TerrainProxyChunk = Readonly<{
+  id: string;
+  /** World-space triangle soup; the mesh sits at the origin untransformed. */
+  positions: Float32Array;
+  indices: Uint32Array;
+  /** Tight world bounds, used verbatim as the chunk's BallisticSurface box. */
+  bounds: Box2;
+}>;
+
+let proxyCache: readonly TerrainProxyChunk[] | null = null;
+
+/**
+ * A collision-only triangulation of `farcrysisTerrainHeight` over the arena.
+ *
+ * WHY THIS EXISTS. `floorBeneath` in src/spawn-layout-constraints.ts — the
+ * shared HF-402 spawn-quality rule — accepts a floor from a downward ray
+ * against `raycastMeshes`, from the top face of an AXIS-ALIGNED collider box,
+ * or from the fail-safe floor. Every other shipped arena satisfies it the first
+ * way: additional-maps.ts pushes its `ground` / `floor` / `tarmac` mesh into
+ * `raycastMeshes`. farcrysis satisfied none of them — its ground is 5,474
+ * ROTATED tangent-plane plates in `physicsColliders`, which that rule skips by
+ * construction, and its sculpted terrain was presentation-only and absent from
+ * `raycastMeshes`. MEASURED before this proxy existed, over the 3,136 dry 2 m
+ * cells of the island (`scripts/qa/measure-farcrysis-floor-coverage.ts`): 202
+ * cells reported a floor — 6.44 %, every one of them a prop top. So the arena
+ * was the outlier, not the shared rule, and this closes it from the arena side
+ * rather than by loosening a shared threshold.
+ *
+ * The same registration also makes the ground a shot blocker. It was not one:
+ * the plates carry no `BallisticSurface`, so bullets passed through hillsides.
+ *
+ * RESOLUTION. 8 x 8 chunks of 24 steps is a 0.667 m lattice. MEASURED off-
+ * lattice (mid-cell samples, where linear interpolation is worst) against the
+ * analytic field: maximum 0.1086 m, mean 0.0028 m. That is inside the 0.12 m
+ * `PLATE_FIT_TOLERANCE_M` the physics plates themselves are fitted to, and far
+ * inside `floorBeneath`'s 0.45 m autostep and 0.6 m drop tolerances, so proxy
+ * error cannot push the probe off a real floor. The coarser 4 x 32 layout
+ * (same 32,768-triangle budget, a 1 m lattice) was measured first and rejected:
+ * same per-ray cost, 0.3296 m maximum error.
+ *
+ * COST. MEASURED over 2,000 hitscan-shaped rays across the arena's full
+ * `raycastMeshes` set: 0.024 ms/ray without the proxy, 0.293 ms/ray with it.
+ * The chunking is what keeps that bounded - one 73,728-triangle ground mesh
+ * would be walked in full on every shot. The hit rate over those same rays
+ * rises 37.1 % -> 53.3 %: that difference is bullets which used to fly through
+ * the island.
+ */
+export function farcrysisTerrainProxyChunks(): readonly TerrainProxyChunk[] {
+  if (proxyCache) return proxyCache;
+  const chunks: TerrainProxyChunk[] = [];
+  const spanX = (FARCRYSIS_BOUNDS.maxX - FARCRYSIS_BOUNDS.minX) / TERRAIN_PROXY_CHUNKS_PER_AXIS;
+  const spanZ = (FARCRYSIS_BOUNDS.maxZ - FARCRYSIS_BOUNDS.minZ) / TERRAIN_PROXY_CHUNKS_PER_AXIS;
+  const steps = TERRAIN_PROXY_SEGMENTS_PER_CHUNK;
+  const stepX = spanX / steps;
+  const stepZ = spanZ / steps;
+
+  for (let cx = 0; cx < TERRAIN_PROXY_CHUNKS_PER_AXIS; cx += 1) {
+    for (let cz = 0; cz < TERRAIN_PROXY_CHUNKS_PER_AXIS; cz += 1) {
+      const originX = FARCRYSIS_BOUNDS.minX + cx * spanX;
+      const originZ = FARCRYSIS_BOUNDS.minZ + cz * spanZ;
+      const positions = new Float32Array((steps + 1) * (steps + 1) * 3);
+      let minY = Number.POSITIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i <= steps; i += 1) {
+        for (let j = 0; j <= steps; j += 1) {
+          // Sample on the shared lattice, not on a chunk-local offset, so the
+          // seam vertices of neighbouring chunks are bit-identical and no ray
+          // can slip between them.
+          const x = originX + i * stepX;
+          const z = originZ + j * stepZ;
+          const y = farcrysisTerrainHeight(x, z);
+          const base = (i * (steps + 1) + j) * 3;
+          positions[base] = x;
+          positions[base + 1] = y;
+          positions[base + 2] = z;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      const indices = new Uint32Array(steps * steps * 6);
+      let cursor = 0;
+      for (let i = 0; i < steps; i += 1) {
+        for (let j = 0; j < steps; j += 1) {
+          const a = i * (steps + 1) + j;
+          const b = a + 1;
+          const c = a + (steps + 1);
+          const d = c + 1;
+          // Counter-clockwise seen from +Y, so the face normals point UP and a
+          // downward probe hits the FRONT face. The mirrored winding compiles
+          // and renders identically (the mesh never renders) but every
+          // `floorBeneath` ray passes straight through a FrontSide material.
+          indices[cursor] = a;
+          indices[cursor + 1] = b;
+          indices[cursor + 2] = c;
+          indices[cursor + 3] = b;
+          indices[cursor + 4] = d;
+          indices[cursor + 5] = c;
+          cursor += 6;
+        }
+      }
+      chunks.push(Object.freeze({
+        id: `farcrysis-terrain-proxy-${cx}-${cz}`,
+        positions,
+        indices,
+        bounds: Object.freeze({
+          minX: originX,
+          maxX: originX + spanX,
+          minZ: originZ,
+          maxZ: originZ + spanZ,
+          minY,
+          maxY,
+        }) as Box2,
+      }));
+    }
+  }
+  proxyCache = Object.freeze(chunks);
+  return proxyCache;
+}
