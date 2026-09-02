@@ -1,0 +1,20 @@
+
+artifacts/viewpoint-regression/laneR-art-before
+  farcrysis-beach-golden           crushed=36.76% p05=0.0000 p50=0.1942 chroma=0.6763 [n=3 spread 0.00pp]
+  farcrysis-core-interior          crushed=21.31% p05=0.0000 p50=0.0584 chroma=0.7262 [n=3 spread 0.00pp]
+  farcrysis-island-topdown         crushed=2.38% p05=0.0270 p50=0.3187 chroma=0.6035 [n=3 spread 0.00pp]
+  farcrysis-jungle-dapple          crushed=8.54% p05=0.0098 p50=0.1334 chroma=0.7292 [n=3 spread 0.00pp]
+  farcrysis-seaplane-throwback     crushed=33.19% p05=0.0000 p50=0.1632 chroma=0.6593 [n=3 spread 0.01pp]
+  farcrysis-west-shoreline         crushed=21.38% p05=0.0005 p50=0.3406 chroma=0.6676 [n=3 spread 0.01pp]
+  ALL VIEWS                        crushed=20.59% p05=0.0062 p50=0.2014 chroma=0.6770
+  ALL SAMPLES                      crushed=20.59% (n=18); worst single-view sample spread 0.01pp
+
+artifacts/viewpoint-regression/laneR-art-after4
+  farcrysis-beach-golden           crushed=33.32% p05=0.0011 p50=0.2040 chroma=0.7682 [n=3 spread 0.00pp]
+  farcrysis-core-interior          crushed=42.88% p05=0.0002 p50=0.0312 chroma=0.8251 [n=3 spread 0.00pp]
+  farcrysis-island-topdown         crushed=0.59% p05=0.0313 p50=0.3181 chroma=0.6115 [n=3 spread 0.00pp]
+  farcrysis-jungle-dapple          crushed=7.13% p05=0.0139 p50=0.1339 chroma=0.7344 [n=3 spread 0.00pp]
+  farcrysis-seaplane-throwback     crushed=19.78% p05=0.0040 p50=0.1733 chroma=0.7579 [n=3 spread 0.01pp]
+  farcrysis-west-shoreline         crushed=16.45% p05=0.0060 p50=0.3416 chroma=0.6746 [n=3 spread 0.01pp]
+  ALL VIEWS                        crushed=20.02% p05=0.0094 p50=0.2003 chroma=0.7286
+  ALL SAMPLES                      crushed=20.03% (n=18); worst single-view sample spread 0.01pp

@@ -488,20 +488,108 @@ function _applyInstanceColorVariation(group: THREE.Group): void {
  * a material property set once at build.
  */
 const CANOPY_LIFT_PATTERN = /(canopies|crowns|midstorey-clumps)/;
-const CANOPY_LIFT_SCALE = 0.22;
+const CANOPY_LIFT_SCALE = 0.26;
 const TRUNK_LIFT_PATTERN = /(trunks|-stems)/;
-const TRUNK_LIFT_SCALE = 0.12;
+/**
+ * HF-423 art first pass, raised 0.12 -> 0.30 on MEASURED evidence.
+ *
+ * The 0.12 written for HF-396 was set by eye and did not clear the defect it
+ * was written for. On the six authored review cameras in
+ * src/rendering/arenas/farcrysis.ts, captured through
+ * scripts/qa/capture-arena-viewpoints.mjs and measured by
+ * scripts/qa/measure-farcrysis-frame-tone.mjs, 20.59 % of all pixels sat
+ * below linear luma 0.02 and the 5th-percentile luma was 0.0062 - literally
+ * zero on three of the six frames. Every trunk in the arena was a pure black
+ * silhouette against the sky, which is the "burnt forest" HF-396 named.
+ *
+ * A trunk that is DARKER on its shaded side is correct; one that is at zero
+ * carries no hue, no form and no material identity, and no amount of grading
+ * downstream can bring back a channel that is already at zero.
+ */
+const TRUNK_LIFT_SCALE = 0.30;
+/**
+ * The third tier, new at HF-423. The two patterns above named the layers
+ * whose NAMES happened to end in `trunks`/`canopies`; a dozen equally dark
+ * layers - fronds, ferns, fans, vines, the palm impostor at 0x2b4d26, the
+ * undergrowth carpet - matched neither and were left unlifted, so they went
+ * to black exactly like the trunks did. Coverage is now by what the layer IS,
+ * not by how its name happens to end.
+ *
+ * Ground cover (grass, litter, twigs, pebbles, driftwood, rocks) is
+ * deliberately NOT here: it faces the sun and is already the brightest mass
+ * in every frame, and lifting it is what produced the rejected beige wash.
+ */
+const FOLIAGE_LIFT_PATTERN = /(fronds|ferns|fan-palms|vines|vine-clusters|imposters|undergrowth|heliconia|mangrove-lod|banana-leaves|cycad-leaves|scrub)/;
 
-function _applyFoliageShadeLift(group: THREE.Group): void {
+/**
+ * Vegetation-class layers authored OUTSIDE this module, named exactly, because
+ * they hit the identical defect and were unreachable from here.
+ *
+ * The lift used to be gated on `name.startsWith('farcrysis-vege')` and on the
+ * mesh being an `InstancedMesh`, which are facts about WHERE a layer was
+ * authored, not about what it is. Two families fell through:
+ * `farcrysis-canopy-trunk-visuals` / `-crown-lower` / `-crown-upper` (built in
+ * farcrysis.ts, after this module runs) and the `farcrysis-detail-vine-mesh-*`
+ * tubes (built in farcrysis-detail.ts, plain Meshes). MEASURED at emissive 0
+ * with albedo floors of 0.0138 and 0.0156 against the arena's own 0.196
+ * ambient by scripts/qa/measure-farcrysis-albedo-floor.ts - i.e. below the
+ * 0.02 crush line the frame-tone instrument counts, exactly like the trunks
+ * this pass lifted.
+ *
+ * They are listed rather than pattern-matched so that widening the reach of
+ * this pass is always a deliberate, reviewable edit.
+ */
+const EXTERNAL_TRUNK_LIFT = new Set(['farcrysis-canopy-trunk-visuals']);
+const EXTERNAL_CANOPY_LIFT_PATTERN = /^farcrysis-(canopy-crown-(lower|upper)|detail-vine-mesh-)/;
+
+/**
+ * The core building's own interior surfaces, at the WEAKEST scale in this file.
+ *
+ * The arena declares three practicals in src/rendering/arenas/farcrysis.ts, but
+ * none of them carries a `light`, so the research station has no interior light
+ * source at all: inside it there is the sun (blocked by 3.2 m walls and by the
+ * catwalk slab overhead) and the 0.3 ambient, and nothing else. MEASURED floors
+ * against that ambient: catwalk and stair treads 0.0195, desk 0.0110 - all
+ * below the 0.02 crush line, which is why the catwalk underside reads as a hole
+ * in the frame.
+ *
+ * The fix is deliberately NOT a practical light: this arena's in-combat frame
+ * time is already 1.85x atomic-acres (docs/evidence/pass85/lane-r/), and a
+ * shadowed local light is exactly the wrong thing to add to it. A fake bounce
+ * costs nothing per frame. 0.12 is the bark scale - the weakest lift here - so
+ * the interior stays the darkest part of the map, just not a void.
+ *
+ * Walls and doors are NOT in this set: measured, they already sit above the
+ * crush line, and they are seen in full sun from outside.
+ */
+const CORE_STRUCTURE_LIFT_PATTERN = /^farcrysis-core-(catwalk|stair-\d+|desk)$/;
+const CORE_STRUCTURE_LIFT_SCALE = 0.12;
+
+/**
+ * Apply the fake-subsurface shade lift over an arena subtree.
+ *
+ * Idempotent: the emissive is always recomputed from the material's own
+ * `color`, which this pass never changes, so running it again after later
+ * build stages produces the same values. That is what lets it run once inside
+ * `buildVegetation` (so building vegetation alone is still correct) and once
+ * more at the end of the art build, where the layers above finally exist.
+ */
+export function applyFarcrysisShadeLift(group: THREE.Object3D): void {
   group.traverse((obj) => {
-    if (!(obj instanceof THREE.InstancedMesh)) return;
-    if (!obj.name.startsWith('farcrysis-vege')) return;
+    if (!(obj instanceof THREE.Mesh)) return;
     const mat = obj.material as THREE.MeshStandardMaterial;
-    if (!mat || !mat.color) return;
-    if (CANOPY_LIFT_PATTERN.test(obj.name)) {
+    if (!mat || !mat.color || !mat.emissive) return;
+    const vege = obj.name.startsWith('farcrysis-vege') && (obj as THREE.InstancedMesh).isInstancedMesh === true;
+    if (vege && (CANOPY_LIFT_PATTERN.test(obj.name) || FOLIAGE_LIFT_PATTERN.test(obj.name))) {
       mat.emissive.copy(mat.color).multiplyScalar(CANOPY_LIFT_SCALE);
-    } else if (TRUNK_LIFT_PATTERN.test(obj.name)) {
+    } else if (vege && TRUNK_LIFT_PATTERN.test(obj.name)) {
       mat.emissive.copy(mat.color).multiplyScalar(TRUNK_LIFT_SCALE);
+    } else if (EXTERNAL_TRUNK_LIFT.has(obj.name)) {
+      mat.emissive.copy(mat.color).multiplyScalar(TRUNK_LIFT_SCALE);
+    } else if (EXTERNAL_CANOPY_LIFT_PATTERN.test(obj.name)) {
+      mat.emissive.copy(mat.color).multiplyScalar(CANOPY_LIFT_SCALE);
+    } else if (CORE_STRUCTURE_LIFT_PATTERN.test(obj.name)) {
+      mat.emissive.copy(mat.color).multiplyScalar(CORE_STRUCTURE_LIFT_SCALE);
     }
   });
 }
@@ -3068,9 +3156,10 @@ export function buildVegetation(scene: THREE.Group): void {
   // Believability: per-instance colour variation (rides existing draws).
   _applyInstanceColorVariation(scene);
 
-  // HF-396: lift shaded canopy AND trunk faces toward their own hue (fake
-  // subsurface) — trunks at the weaker bark scale.
-  _applyFoliageShadeLift(scene);
+  // HF-396/HF-423: lift shaded canopy, trunk and loose-foliage faces toward
+  // their own hue (fake subsurface). Run again at the end of the art build,
+  // where the layers authored by other modules exist.
+  applyFarcrysisShadeLift(scene);
  }
 
 // ---------------------------------------------------------------------------
