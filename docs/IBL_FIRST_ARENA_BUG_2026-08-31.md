@@ -145,3 +145,46 @@ map-switch path the environment was measured landing at t=20862 ms, after the se
 promise had already resolved. It happens to be in time today, but nothing enforces that,
 and a rejection there would surface as an unhandled promise rejection rather than a visible
 failure.
+
+## Verified across the two load paths, 2026-09-02 (PASS 85, Lane I)
+
+The 2026-08-31 fix was measured on the first-load path *against its own before*.
+What it was never measured against is the other path — which is the invariant the
+owner actually stated, "map 1 must light like map 2". That is now measured, in the
+scene and in pixels, on the shipped build.
+
+**Result: the two paths produce the same light on every arena that can be measured.**
+Eight of nine arenas report an identical live `ArenaEnvironmentObservation` — presence,
+texture name, live intensity, expected intensity, source backdrop, PMREM tier, generated
+cube size — with mean rec.709 luminance agreeing to within 0.1% at every authored review
+camera, inside each frame's own temporal floor. No arena needed a grade or `metalness`
+re-tune; nothing moved. The `metalness: 0` coupling this document flagged as blocking is
+closed: the values were re-derived on the material rule on 2026-08-31 and the retired
+premise no longer props up a number (`src/test-maps-art.ts`).
+
+Full table, frames and method: `docs/evidence/pass85/lane-i/`.
+Gate: `src/rendering/arena-environment-load-parity.test.ts` — both caller orders, a
+sensitivity case that drives the first-load path the pre-fix way and requires the two to
+differ, and call-site pins that fail if the shared bootstrap moves back inside the
+first-arena-only branch or loses its awaited sky admission.
+Probe: `scripts/qa/probe-ibl-load-parity.mjs`.
+
+Two findings that are NOT this bug, recorded so they are not re-attributed to it:
+
+- **A frame carrying the damage overlay is not a lighting measurement.** rustworks-1v1
+  first read −23.09% mean luminance with 42.1% of pixels moved. The delta is a monotonic
+  radial red ramp — +0.1 at the centre, +117.7 at the corners — i.e. `#low-health-vignette`,
+  a DOM overlay, because the probe froze the bots after its settle and the solo bot shot the
+  parked player. Frozen first, the same comparison reads +0.1%.
+- **The in-page map switch into gun-range fails**, leaving the previous arena committed
+  while the match stays active: `WebGPU queue completion exceeded 12000 ms`. Reproduced
+  twice, the second time on a quiet GPU, so contention is not the cause. That is an
+  arena-streaming / renderer-fence defect and is OPEN; it is unrelated to the environment.
+
+One measurement gap stays open: **farcrysis's review captures are not phase-locked.** Its
+two paths differ by 16–22% of pixels while the environment receipt is identical and the
+luminance delta does not reproduce in sign or size across four runs (−0.40%, −2.17%,
+−0.67%, +0.54%), with movement confined to the surf and canopy bands and a same-camera
+15 s floor of 3.9%/6.8%. That is animation phase, not lighting — but it means farcrysis
+cannot be resolved below roughly ±2% by this method until its review clock pins that
+animation.
