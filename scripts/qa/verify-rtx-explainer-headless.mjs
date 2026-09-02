@@ -68,7 +68,19 @@ try {
       // is caught rather than only a changed preset name.
       graphics: JSON.stringify(snapshot.settings?.graphics ?? null),
       badge: document.getElementById('graphics-effective')?.textContent ?? null,
-      dialogOpen: dialog ? (dialog.open === true || dialog.hidden === false) : false,
+      // FAIL-CLOSED. This used to read `dialog.open === true ||
+      // dialog.hidden === false`, and a <dialog> that has NEVER been opened
+      // has hidden === false, so the flag was already true in the "before"
+      // snapshot and the case-1 assertion "did the dialog open" could not
+      // fail. `open` is the only attribute a <dialog> sets on showModal()
+      // and clears on close(), and it is what the UA's
+      // `dialog:not([open]) { display: none }` rule keys off, so it is both
+      // necessary and sufficient. The receipt is the proof: before.dialogOpen
+      // must now be false.
+      dialogOpen: dialog ? dialog.open === true : false,
+      // Recorded alongside so a future regression can tell "never opened"
+      // apart from "opened and then hidden by CSS".
+      dialogHidden: dialog ? dialog.hidden === true : null,
       visibleSummary: [...document.querySelectorAll('.graphics-profile-summary')]
         .filter((node) => !node.hidden)
         .map((node) => node.dataset.graphicsProfile),
@@ -83,6 +95,8 @@ try {
 
   // --- Case 1: no pending change. ---
   const before = await readState();
+  // The falsifier has to start CLOSED or "it opened" proves nothing.
+  if (before.dialogOpen) issues.push('case1:dialog-was-already-open-before-selection');
   await selectProfile(RTX_NATIVE_RUNTIME_OPTION_VALUE);
   const afterRtx = await readState();
   if (!afterRtx.dialogOpen) issues.push('case1:dialog-did-not-open');
@@ -102,6 +116,8 @@ try {
   await selectProfile('balanced');
   const pending = await readState();
   if (pending.selectValue !== 'balanced') issues.push('case2:balanced-not-selectable');
+  // Case 1's close() must have really closed it, or every later 'it opened' is vacuous.
+  if (pending.dialogOpen) issues.push('case2:dialog-still-open-after-case1-close');
   await selectProfile(RTX_NATIVE_RUNTIME_OPTION_VALUE);
   const afterRtx2 = await readState();
   if (!afterRtx2.dialogOpen) issues.push('case2:dialog-did-not-open');
@@ -116,6 +132,7 @@ try {
   const afterProfile = await readState();
   if (afterProfile.selectValue !== 'performance') issues.push('case3:handler-poisoned');
   if (afterProfile.visibleSummary[0] !== 'performance') issues.push('case3:summary-not-updated');
+  if (afterProfile.dialogOpen) issues.push('case3:dialog-still-open-after-case2-close');
 
   receipt = {
     schema: 'hf418-rtx-explainer/1',
