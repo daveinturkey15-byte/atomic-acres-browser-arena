@@ -435,4 +435,33 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     expect(publish).toContain('BACKUP_CHANNEL = f"channels/{BACKUP_TREE}"');
     expect(publish).toContain('if path != BACKUP_CHANNEL:');
   });
+
+  it('keeps the build-freshness guard at exactly the pass83 scope plus the dist-pass84 copy', () => {
+    // A hand-copied dist-passNN published as green is the regression class this guard
+    // closes (2026-08-31). Its scope is what makes it a gate: every directory it skips is
+    // a directory whose files can go newer than the build without the guard noticing. The
+    // pass84 copy of the guard once quietly added `artifacts` to that skip list under a
+    // commit line saying the guard was unchanged; the skeptic caught it. Pin the set so
+    // the next narrowing has to be made here, in the open.
+    const pass83 = readFileSync('scripts/orchestration/publish_pass83.py', 'utf8');
+    const guardOf = (source: string) => source.slice(
+      source.indexOf('def assert_build_is_not_stale():'),
+      source.indexOf('STALE BUILD:'),
+    );
+    const excluded = (guard: string) => {
+      const match = guard.match(/dirs\[:\] = \[d for d in dirs if d not in \{([^}]*)\}/);
+      expect(match, 'the guard must still prune by an explicit directory set').not.toBeNull();
+      return new Set(match![1].match(/"([^"]+)"/g)!.map((literal) => literal.slice(1, -1)));
+    };
+    const pass84Guard = guardOf(publish);
+    const pass83Set = excluded(guardOf(pass83));
+    const pass84Set = excluded(pass84Guard);
+    expect(pass83Set.size).toBeGreaterThan(0);
+    expect(pass84Set).toEqual(new Set([...pass83Set, 'dist-pass84']));
+    expect(pass84Set.has('artifacts')).toBe(false);
+    expect(pass84Guard).toContain('not d.startswith("dist-")');
+    expect(pass84Guard).toContain('if not name.endswith((".ts", ".tsx", ".css", ".html", ".json")):');
+    expect(pass84Guard).toContain('if newest_build < newest_source:');
+    expect(publish).toContain('STALE BUILD:');
+  });
 });

@@ -525,13 +525,19 @@ def assert_build_is_not_stale():
 
     Existence is not freshness. This compares the newest file in the build against the
     newest tracked source file and refuses a build that is older.
+
+    Scope relative to publish_pass83.py (pinned by src/release-topology.test.ts): the
+    directory-exclusion set is the pass83 set plus `dist-pass84` and a `dist-*` prefix
+    skip (a hand-copied build is never source). Nothing else is excluded - in particular
+    NOT `artifacts/`: it is gitignored, but the gate's scope stays exactly the pass83
+    gate's. If a file there is newer than the build, rebuild and copy again.
     """
     newest_source = 0.0
     newest_source_path = None
     for root, dirs, files in os.walk(SRC):
         dirs[:] = [d for d in dirs if d not in {
             "node_modules", ".git", "dist", "dist-pass83", "dist-pass84", ".gh-pages-publish",
-            ".qa-dist", "source-assets", "public", "docs", "baselines", "artifacts",
+            ".qa-dist", "source-assets", "public", "docs", "baselines",
         } and not d.startswith(".") and not d.startswith("dist-")]
         for name in files:
             if not name.endswith((".ts", ".tsx", ".css", ".html", ".json")):
