@@ -14,11 +14,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-weapon-families.py",
-    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+    "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -36,21 +36,21 @@
     "firstPersonGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod0.glb",
-        "sha256": "1fe88eb8442d23e15a387d756735017a15976ea73b08d7a0acbd52aef84a4c5c",
+        "sha256": "c2a1fa7938f381934beee29e8165d4c9a8631ac7e5931b14a813180296639eb2",
         "variant": "first-person-lod0",
         "lod": 0,
-        "triangles": 19352,
-        "bytes": 342360,
+        "triangles": 19728,
+        "bytes": 346004,
         "meshNodes": 9,
         "renderPrimitives": 9
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod1.glb",
-        "sha256": "b3437426529154819b68b61bbb6cfb4ea1cedc3c3868db29f47a0c1a136f200d",
+        "sha256": "cd6345847f60fd65121994397b50bfe7fd720aabaf1b1ea533e91004fdc6a682",
         "variant": "first-person-lod1",
         "lod": 1,
-        "triangles": 11732,
-        "bytes": 280060,
+        "triangles": 12042,
+        "bytes": 282992,
         "meshNodes": 9,
         "renderPrimitives": 9
       }
@@ -58,31 +58,31 @@
     "worldGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod0.glb",
-        "sha256": "bafe9ba42593858cf8c5b3c71e9a94b80d689b792011652fe98a49d3b3ac776b",
+        "sha256": "a842a3e2eead21a9fe9d222e6ff31ab03b6d4aea836d61547e909f2375186a22",
         "variant": "world-lod0",
         "lod": 0,
-        "triangles": 17072,
-        "bytes": 334660,
+        "triangles": 17448,
+        "bytes": 338384,
         "meshNodes": 9,
         "renderPrimitives": 9
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod1.glb",
-        "sha256": "d5b9c14cf2fbd0b5e460b67494de4a22f7de2e177f32fb7a4a1b619ab3c6831f",
+        "sha256": "08da2f7a7741491a8b05bcd93aa2843c903cc28fb57579363a9018b3984bfd92",
         "variant": "world-lod1",
         "lod": 1,
-        "triangles": 11752,
-        "bytes": 277516,
+        "triangles": 12128,
+        "bytes": 281084,
         "meshNodes": 9,
         "renderPrimitives": 9
       },
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod2.glb",
-        "sha256": "2cf7abe947d5ece078eb70066a107a03da54ae9c2e7e1aff3fdea8c28442efaf",
+        "sha256": "abab20ad50707e1fa0c58911ac2b0d17726b6d6cebbe8ea9d97037a7a02dc42a",
         "variant": "world-lod2",
         "lod": 2,
-        "triangles": 7824,
-        "bytes": 235408,
+        "triangles": 8118,
+        "bytes": 235700,
         "meshNodes": 9,
         "renderPrimitives": 9
       }
@@ -90,11 +90,11 @@
     "dropGlbs": [
       {
         "path": "public/assets/original/models/weapons/pass65-firearms/railgun/railgun-drop-lod0.glb",
-        "sha256": "87c1959b8c45d21de0f2b082cb6a70dd574c3d798f2a96f60c22da5836c7604e",
+        "sha256": "db7a888d5f09e60014a952b1b42a9b128001fe7d2eaf6ac702cfc7d25983a3ba",
         "variant": "drop-lod0",
         "lod": 0,
-        "triangles": 11752,
-        "bytes": 277480,
+        "triangles": 12128,
+        "bytes": 281036,
         "meshNodes": 9,
         "renderPrimitives": 9
       }
@@ -183,7 +183,7 @@
     "renders": [
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-hero-quarter.png",
-        "sha256": "b8281669c5807edd02968ca33c08df778ad178c914385e73095916abd8cecffe",
+        "sha256": "165d43c9c11000bb4d7815a6cf65002a4aabf3084a54ab228d8a39408bee4403",
         "width": 480,
         "height": 360,
         "cameraId": "hero-quarter",
@@ -191,7 +191,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-side-silhouette.png",
-        "sha256": "bd5a4c95f16efe50ebf9c01d9ada9541882c9488c848e838bdbffedd3c6725d9",
+        "sha256": "0dc4f7b0757f5a4923d8e96dbd4804b8a52ea4770438a39e5d1fde7809ed3689",
         "width": 480,
         "height": 360,
         "cameraId": "side-silhouette",
@@ -199,7 +199,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-sight-line.png",
-        "sha256": "c598b7ac84606986f43240677d89a3aa9d487f84e92fc1c167374e7695092c8b",
+        "sha256": "c743f7eb4d34171bf3f24d51e6e1a067c13d4d9b7140f16a1738e916732c2a80",
         "width": 480,
         "height": 360,
         "cameraId": "sight-line",
@@ -207,7 +207,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-reload-action.png",
-        "sha256": "1aedf8394916775ca80c5eef69347d3a0693e47ae70ece4fe6499171b1a0bff2",
+        "sha256": "240f64a4834bf461668d8309c739b89a71d28e005636aee06842e8d533fac14c",
         "width": 480,
         "height": 360,
         "cameraId": "reload-action",
@@ -215,7 +215,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-world-lod0-silhouette.png",
-        "sha256": "e864425b1ab0851c4b1b60adf07c99eff0ebadc39beab2f518b75eba9a86ab7b",
+        "sha256": "5e87752ca16ae3323887fd5abee4a50bcb706d746bb61b5b7ff79e46c689e0d8",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod0-silhouette",
@@ -223,7 +223,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-world-lod2-silhouette.png",
-        "sha256": "2ee80c1eac90971557224c0bf718392102296aa228d67e735485a9213bc7a620",
+        "sha256": "05888e3c8b1df16a417e9eff3d1d06473172a0d359e3bd0ae0689d4a79e9ee5d",
         "width": 480,
         "height": 360,
         "cameraId": "world-lod2-silhouette",
@@ -231,7 +231,7 @@
       },
       {
         "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-drop-lod0-silhouette.png",
-        "sha256": "f8ab22b6136bf675548cbf64c8a9718a3f691708bfb6b0e71fa294fcaa66c1f9",
+        "sha256": "c1538e48f278eafead1226e9c61c9749e1b8f429a0b3a5764d24a4f6d3066a14",
         "width": 480,
         "height": 360,
         "cameraId": "drop-lod0-silhouette",
@@ -240,7 +240,7 @@
     ],
     "contactSheet": {
       "path": "docs/assets/pass65-weapons/firearms/railgun/railgun-contact-sheet.png",
-      "sha256": "9496d215a848869d2cb358f303e19cfdf6d9bfaa63db6993a00c78ed4553cdff",
+      "sha256": "79cc85ffbe11aad6f1a1decb5e0fc2b28ab683768e96dc751178487154965b0f",
       "width": 1920,
       "height": 720
     }
@@ -249,8 +249,8 @@
     "deliveries": [
       {
         "variant": "first-person-lod0",
-        "triangles": 19352,
-        "bytes": 342360,
+        "triangles": 19728,
+        "bytes": 346004,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -276,12 +276,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":19352,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":19728,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       },
       {
         "variant": "first-person-lod1",
-        "triangles": 11732,
-        "bytes": 280060,
+        "triangles": 12042,
+        "bytes": 282992,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -307,12 +307,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11732,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12042,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       },
       {
         "variant": "world-lod0",
-        "triangles": 17072,
-        "bytes": 334660,
+        "triangles": 17448,
+        "bytes": 338384,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -338,12 +338,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":17072,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":17448,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       },
       {
         "variant": "world-lod1",
-        "triangles": 11752,
-        "bytes": 277516,
+        "triangles": 12128,
+        "bytes": 281084,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -369,12 +369,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11752,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12128,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       },
       {
         "variant": "world-lod2",
-        "triangles": 7824,
-        "bytes": 235408,
+        "triangles": 8118,
+        "bytes": 235700,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -400,12 +400,12 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":7824,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":8118,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       },
       {
         "variant": "drop-lod0",
-        "triangles": 11752,
-        "bytes": 277480,
+        "triangles": 12128,
+        "bytes": 281036,
         "meshNodes": 9,
         "renderPrimitives": 9,
         "materials": 6,
@@ -431,7 +431,7 @@
         "sightForwardDot": 0.9999999999999962,
         "declaredLength": 1.78,
         "platformAnatomy": "twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic",
-        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":11752,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
+        "silhouetteSignature": "{\"designId\":\"emrg-twin-coil-capacitor-v1\",\"family\":\"marksman\",\"triangles\":12128,\"meshNodes\":9,\"declaredLength\":1.78,\"platformAnatomy\":\"twin-electromagnetic-rails-coil-bridges-capacitor-cassette-thermal-optic\",\"signatures\":[16,17,21,24]}"
       }
     ],
     "externalUris": 0

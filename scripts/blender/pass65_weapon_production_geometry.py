@@ -146,7 +146,11 @@ def hk416(f: Forge):
     f.prism("HK416_HeavyHandguard", ((-.2, .19, .19, .04), (-.48, .22, .205, .045), (-.65, .18, .17, .05)), "polymer", handguard, .12)
     for side in (-1, 1):
         f.cube(f"HK416_SideRail{side}", (side * .116, -.44, .05), (.024, .46, .08), "primary", handguard, bevel=.003)
-    f.rail("HK416_MonolithicTopRail", .23, -.66, .173, .22, platform, teeth=14 if f.hero else 8 if f.high else 4)
+    # HF-396: the rail sits ON the upper and handguard (tops .133-.142) via a
+    # riser instead of floating 18-28 mm above them; the holo base still rides
+    # the rail teeth. Probed by src/weapon-rail-alignment-contract.test.ts.
+    f.cube("HK416_RailRiser", (0, -.215, .135), (.14, .89, .024), "primary", platform, bevel=.003)
+    f.rail("HK416_MonolithicTopRail", .23, -.66, .157, .22, platform, teeth=14 if f.hero else 8 if f.high else 4)
     piston = f.empty("hk416-piston-block", platform, "signature")
     f.cylinder("HK416_GasRegulator", (0, -.635, .105), .048, .09, "metal", piston, rotation=(math.pi/2,0,0))
     f.barrel_y("HK416_BarrelRear", -.22, -.7, .035, .035, parent=platform)
@@ -495,7 +499,13 @@ def railgun(f: Forge):
     thermal=f.empty("emrg-thermal-optic",optic,"signature")
     f.cube("EMRG_ThermalHousing",(0,-.03,.34),(.25,.3,.14),"primary",thermal,bevel=.025)
     f.cube("EMRG_ThermalWindow",(0,-.19,.34),(.17,.012,.08),"lens",thermal,bevel=.008)
-    f.rail("EMRG_DorsalRail",.34,-.75,.23,.28,platform,teeth=10 if f.hero else 6 if f.high else 3)
+    # HF-396: the dorsal rail floated 73 mm above the chassis and the thermal
+    # housing a further 27 mm above the rail. Riser under the rail, rail on the
+    # chassis line, mount block between rail and housing; the housing, window
+    # and every socket stay where they were authored.
+    f.cube("EMRG_RailRiser",(0,-.205,.128),(.19,1.09,.04),"primary",platform,bevel=.003)
+    f.rail("EMRG_DorsalRail",.34,-.75,.1575,.28,platform,teeth=10 if f.hero else 6 if f.high else 3)
+    f.cube("EMRG_ThermalMount",(0,-.03,.222),(.19,.26,.11),"primary",thermal,bevel=.006)
     return stock,magazine,optic,f.socket_set(
         grip=(0,.25,-.43),support=(-.18,-.58,-.08),reload=(-.16,.02,-.33),magazine=(0,0,-.26),
         muzzle=(0,-1.195,.08),eject=(.2,.02,.02),optic=(0,-.04,.34),rear_sight=(0,.2,.28),front_sight=(0,-.75,.28),
@@ -549,7 +559,12 @@ def m14_ebr(f: Forge):
     f.barrel_y("M14EBR_Barrel",-.35,-1.02,.08,.034,"metal",platform)
     f.cylinder("M14EBR_GasBlock",(0,-.71,.02),.052,.12,"primary",platform,rotation=(math.pi/2,0,0))
     f.cylinder("M14EBR_FlashHider",(0,-1.06,.08),.043,.1,"primary",platform,rotation=(math.pi/2,0,0))
-    f.rail("M14EBR_TopRail",.26,-.8,.22,.24,platform,teeth=14 if f.hero else 8 if f.high else 4)
+    # HF-396: the top rail floated 78 mm above the receiver and handguard
+    # (tops .119-.134). Riser under the rail, rail on the receiver line; the
+    # scope mounts below rise from the rail to the tube, the tube, lenses and
+    # sockets are untouched.
+    f.cube("M14EBR_RailRiser",(0,-.27,.115),(.15,1.06,.028),"primary",platform,bevel=.003)
+    f.rail("M14EBR_TopRail",.26,-.8,.1375,.24,platform,teeth=14 if f.hero else 8 if f.high else 4)
     stock=f.empty("weapon-stock",f.frame,"stock")
     skel=f.empty("m14ebr-skeletal-stock",stock,"signature")
     f.barrel_y("M14EBR_StockTube",.25,.72,.04,.032,"metal",skel)
@@ -565,7 +580,8 @@ def m14_ebr(f: Forge):
     f.cylinder("M14EBR_Objective",(0,-.31,.33),.072,.1,"primary",thermal,rotation=(math.pi/2,0,0))
     f.cylinder("M14EBR_Lens",(0,-.365,.33),.06,.008,"lens",thermal,rotation=(math.pi/2,0,0),bevel=0)
     for y in (-.2,.12):
-        f.cube("M14EBR_ScopeMount",(0,y,.265),(.13,.045,.11),"metal",thermal,bevel=.005)
+        # HF-396: the mounts reach down to the rail spine (.15) instead of ending 2 mm above it.
+        f.cube("M14EBR_ScopeMount",(0,y,.235),(.13,.045,.17),"metal",thermal,bevel=.005)
     f.cube("M14EBR_OpRod",(.125,-.08,.08),(.018,.4,.05),"metal",f.action,bevel=.003)
     f.cylinder("M14EBR_ChargingHandle",(.16,.02,.06),.018,.1,"metal",f.action,rotation=(0,math.pi/2,0))
     return stock,magazine,optic,f.socket_set(
@@ -594,13 +610,19 @@ def benelli_m4(f: Forge):
     saddle=f.empty("benelli-m4-shell-saddle",platform,"signature")
     for index in range(4 if f.hero else 3 if f.high else 2): f.cylinder(f"BenelliM4_SaddleShell{index}",(.13,.12-index*.07,.02),.022,.085,"accent",saddle,rotation=(math.pi/2,0,0),vertices=max(10,f.seg//2))
     optic=f.empty("weapon-optic",f.frame,"optic")
-    f.rail("BenelliM4_TopRail",.22,-.25,.22,.18,optic,teeth=7 if f.hero else 4 if f.high else 3)
-    f.torus("BenelliM4_GhostRing",(0,.18,.29),.034,.008,"metal",optic,rotation=(math.pi/2,0,0))
-    f.cube("BenelliM4_FrontPost",(0,-.82,.21),(.045,.045,.13),"primary",optic,bevel=.005)
+    # HF-396: the receiver rail floated 28-39 mm above the receiver (tops
+    # .106-.117) and the ghost ring 86 mm above where the rail now sits. Riser
+    # under the rail, rail on the receiver, ring on a base on the rail, and the
+    # front post lowered to the same sight line; both sight sockets follow.
+    f.cube("BenelliM4_RailRiser",(0,-.015,.112),(.12,.47,.024),"primary",platform,bevel=.003)
+    f.rail("BenelliM4_TopRail",.22,-.25,.1325,.18,optic,teeth=7 if f.hero else 4 if f.high else 3)
+    f.cube("BenelliM4_GhostRingBase",(0,.18,.15),(.05,.05,.03),"primary",optic,bevel=.003)
+    f.torus("BenelliM4_GhostRing",(0,.18,.205),.034,.008,"metal",optic,rotation=(math.pi/2,0,0))
+    f.cube("BenelliM4_FrontPost",(0,-.82,.14),(.045,.045,.13),"primary",optic,bevel=.005)
     f.cylinder("BenelliM4_ChargingHandle",(.15,.03,.08),.02,.11,"metal",f.action,rotation=(0,math.pi/2,0))
     return stock,magazine,optic,f.socket_set(
         grip=(0,.22,-.39),support=(-.1,-.5,-.05),reload=(-.11,.03,-.18),magazine=(0,.03,-.15),
-        muzzle=(0,-1.02,.1),eject=(.13,-.04,.08),optic=(0,-.04,.27),rear_sight=(0,.18,.29),front_sight=(0,-.82,.29),
+        muzzle=(0,-1.02,.1),eject=(.13,-.04,.08),optic=(0,-.04,.27),rear_sight=(0,.18,.205),front_sight=(0,-.82,.205),
     ),"argo-dual-piston-semi-auto-shotgun-fixed-tube-ghost-ring-shell-saddle"
 
 
