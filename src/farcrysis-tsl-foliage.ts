@@ -44,6 +44,28 @@
  *     (ground scatter / undergrowth / canopy) and three sway sizes (blade /
  *     shrub / frond). The eye cannot read a 5 % difference in frond amplitude;
  *     the GPU pays a whole pipeline for it.
+ *
+ * PASS 84 — WHY THE BUCKETS NO LONGER SPLIT THE GRAPH.
+ *
+ * Bucketing bounded the graph count at 16 but did not remove the split: the
+ * live arena still built 9 distinct graphs (measured offline over the real
+ * buildFarcrysis scene), and each one is another ~0.6 s of Dawn/DXC pipeline
+ * compilation inside arena admission. The dapple strength and the three sway
+ * numbers are now read through `materialReference(...)` — module-level TSL
+ * singletons that resolve against the CURRENTLY RENDERED material
+ * (NodeUpdateType.OBJECT), the same per-material mechanism `materialColor`
+ * already uses for the base hue. One node object is shared by every layer, so
+ * the program cache key is identical, while each material keeps its own value
+ * in its own uniform buffer.
+ *
+ * The graph therefore splits ONLY on the two things that genuinely change the
+ * WGSL: whether there is a dapple term at all, and whether there is a sway
+ * term at all. Four graphs is the ceiling; the live arena uses three.
+ *
+ * The VALUES written into those uniforms are still the bucketed ones, so this
+ * is pixel-identical to the bucketed build by construction. Exact per-layer
+ * values are now free — they cost no extra pipeline — but restoring them is an
+ * ART decision and is deliberately not taken in a load-path pass.
  *   - colour-free: the base colour comes from `materialColor`, a module-level
  *     TSL singleton that reads each material's OWN `color` uniform, so every
  *     layer keeps its authored hue (and its per-instance colour variation)
@@ -59,6 +81,7 @@ import {
   fract,
   instanceIndex,
   materialColor,
+  materialReference,
   mix,
   normalize,
   positionLocal,
@@ -78,7 +101,7 @@ import type { Node } from 'three/webgpu';
  * an exported constant so the regression tests assert the same number the
  * bucket ladders below actually produce.
  */
-export const TSL_FOLIAGE_MAX_DISTINCT_GRAPHS = 16;
+export const TSL_FOLIAGE_MAX_DISTINCT_GRAPHS = 4;
 
 /** Dapple families, matching the hand-authored groups in the dapple table. */
 const DAPPLE_BUCKETS = [0.28, 0.5, 0.78] as const;
@@ -86,6 +109,42 @@ const DAPPLE_BUCKETS = [0.28, 0.5, 0.78] as const;
 const SWAY_HEIGHT_BUCKETS = [0.8, 2.5, 8] as const;
 /** Sway speed multipliers. Production only uses 1; the API still allows more. */
 const SWAY_SPEED_BUCKETS = [1] as const;
+
+/**
+ * PASS 84: the four per-material shading values the shared graphs read.
+ *
+ * These are module-level singletons ON PURPOSE. `NodeMaterial`'s program cache
+ * key hashes node-object identity, so reusing the SAME node in every graph is
+ * exactly what keeps the layers on one pipeline; building a fresh
+ * `materialReference()` per material would reinstate the per-layer split this
+ * module exists to prevent.
+ */
+const floatRef = (property: string) =>
+  float(materialReference(property, 'float') as unknown as Node<'float'>);
+
+const dappleRef = /*@__PURE__*/ floatRef('fcDapple');
+const swayHeightRef = /*@__PURE__*/ floatRef('fcSwayHeight');
+const swayAmountRef = /*@__PURE__*/ floatRef('fcSwayAmount');
+const swaySpeedRef = /*@__PURE__*/ floatRef('fcSwaySpeed');
+
+/**
+ * The per-material numbers the shared foliage graphs read through
+ * `materialReference`. Every material `makeTslFoliageMaterial` returns carries
+ * all four; a foliage material without them renders NaN.
+ */
+export interface TslFoliageShadingValues {
+  /** Dappled-transmittance strength, quantised to DAPPLE_BUCKETS. */
+  fcDapple: number;
+  /** Height at which sway reaches full amplitude, quantised. Metres. */
+  fcSwayHeight: number;
+  /** Max lateral sway amplitude derived from the quantised height. Metres. */
+  fcSwayAmount: number;
+  /** Sway speed multiplier, quantised. */
+  fcSwaySpeed: number;
+}
+
+/** A foliage material plus the per-material values its shared graph reads. */
+export type TslFoliageMaterial = MeshStandardNodeMaterial & TslFoliageShadingValues;
 
 function bucket(value: number, ladder: readonly number[]): number {
   let best = ladder[0]!;
@@ -178,8 +237,13 @@ function swayAmountForHeight(height: number): number {
   return Math.min(0.09, 0.02 + height * 0.02);
 }
 
-function foliageGraph(dapple: number, swayHeight: number, swaySpeed: number, sway: boolean): FoliageGraph {
-  const key = `${dapple}|${sway ? swayHeight : 'none'}|${sway ? swaySpeed : 'none'}`;
+/**
+ * PASS 84: keyed on STRUCTURE only — `dappled` and `sway` are the only two
+ * things that change the emitted WGSL now that the numbers are per-material
+ * uniforms. Four keys exist; the live arena reaches three.
+ */
+function foliageGraph(dappled: boolean, sway: boolean): FoliageGraph {
+  const key = `${dappled ? 'dapple' : 'flat'}|${sway ? 'sway' : 'still'}`;
   const cached = _graphCache.get(key);
   if (cached) return cached;
 
@@ -189,7 +253,7 @@ function foliageGraph(dapple: number, swayHeight: number, swaySpeed: number, swa
   // with the dapple bucket; height above ground modulates it slightly so
   // trunks stay grounded-looking while high foliage shimmers more.
   let colorNode: Node<'vec3'> | null = null;
-  if (dapple > 0) {
+  if (dappled) {
     const wx = positionWorld.x;
     const wz = positionWorld.z;
     const wy = positionWorld.y;
@@ -202,7 +266,8 @@ function foliageGraph(dapple: number, swayHeight: number, swaySpeed: number, swa
 
     // Height bias: higher geometry catches slightly more broken light.
     const hBias = smoothstep(0.5, 6.0, wy.sub(1.0));
-    const strength = float(dapple).mul(hBias.mul(0.35).add(0.65));
+    // PASS 84: strength is the material's own `fcDapple`, not a baked literal.
+    const strength = dappleRef.mul(hBias.mul(0.35).add(0.65));
 
     // HF-374: the base colour is read from the material's own `color` uniform
     // through the shared `materialColor` singleton instead of being baked in
@@ -223,14 +288,16 @@ function foliageGraph(dapple: number, swayHeight: number, swaySpeed: number, swa
     wind = { time: t, users: 0 };
     _windUniforms.push(wind);
 
-    const amount = float(swayAmountForHeight(swayHeight));
-    const h = positionLocal.y.div(swayHeight).clamp(0, 1);
+    // PASS 84: amount/height/speed are per-material uniforms, so every sway
+    // size shares this one graph instead of one graph per size bucket.
+    const amount = swayAmountRef;
+    const h = positionLocal.y.div(swayHeightRef).clamp(0, 1);
     const phase = instanceHash(1).mul(Math.PI * 2);
     const phase2 = instanceHash(2).mul(Math.PI * 2);
 
     // Two decorrelated waves → organic non-repeating motion per instance.
-    const w1 = sin(t.mul(swaySpeed * 1.6).add(phase).add(positionLocal.x.mul(0.8)));
-    const w2 = sin(t.mul(swaySpeed * 1.05).add(phase2).add(positionLocal.z.mul(1.1))).mul(0.6);
+    const w1 = sin(t.mul(swaySpeedRef.mul(1.6)).add(phase).add(positionLocal.x.mul(0.8)));
+    const w2 = sin(t.mul(swaySpeedRef.mul(1.05)).add(phase2).add(positionLocal.z.mul(1.1))).mul(0.6);
     const gust = float(1).add(sin(t.mul(0.37).add(phase)).mul(0.35)); // slow global gust
 
     const swayX = w1.add(w2).mul(amount).mul(h).mul(gust);
@@ -250,7 +317,7 @@ function foliageGraph(dapple: number, swayHeight: number, swaySpeed: number, swa
  * node (fragment stage) — both fully GPU-side, zero CPU per-frame cost beyond
  * advancing one uniform per bucket.
  */
-export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMaterial {
+export function makeTslFoliageMaterial(opts: FoliageOptions): TslFoliageMaterial {
   const mat = new MeshStandardNodeMaterial({
     color: opts.color,
     roughness: opts.roughness ?? 0.88,
@@ -265,12 +332,21 @@ export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMa
   mat.type = 'MeshStandardMaterial';
 
   const sway = (opts.swayAmount ?? 0) > 0;
-  const graph = foliageGraph(
-    (opts.dapple ?? 0) > 0 ? bucket(opts.dapple ?? 0, DAPPLE_BUCKETS) : 0,
-    bucket(opts.swayHeight ?? 3.0, SWAY_HEIGHT_BUCKETS),
-    bucket(opts.swaySpeed ?? 1.0, SWAY_SPEED_BUCKETS),
-    sway,
-  );
+  const dapple = (opts.dapple ?? 0) > 0 ? bucket(opts.dapple ?? 0, DAPPLE_BUCKETS) : 0;
+  const swayHeight = bucket(opts.swayHeight ?? 3.0, SWAY_HEIGHT_BUCKETS);
+  const swaySpeed = bucket(opts.swaySpeed ?? 1.0, SWAY_SPEED_BUCKETS);
+
+  // PASS 84: the numbers travel with the MATERIAL, not with the graph. They are
+  // still the bucketed values, so the render is identical to the bucketed
+  // build; they no longer cost a pipeline each. Assigned BEFORE the nodes so a
+  // material can never reach a draw with an undefined reference (NaN).
+  const shaded = mat as TslFoliageMaterial;
+  shaded.fcDapple = dapple;
+  shaded.fcSwayHeight = swayHeight;
+  shaded.fcSwayAmount = swayAmountForHeight(swayHeight);
+  shaded.fcSwaySpeed = swaySpeed;
+
+  const graph = foliageGraph(dapple > 0, sway);
 
   if (graph.colorNode) mat.colorNode = graph.colorNode;
   if (graph.positionNode) mat.positionNode = graph.positionNode;
@@ -295,7 +371,7 @@ export function makeTslFoliageMaterial(opts: FoliageOptions): MeshStandardNodeMa
     });
   }
 
-  return mat;
+  return shaded;
 }
 
 // ---------------------------------------------------------------------------

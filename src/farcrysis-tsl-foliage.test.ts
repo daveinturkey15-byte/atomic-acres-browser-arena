@@ -68,15 +68,50 @@ describe('HF-363 TSL foliage wind uniform registry', () => {
     expect(tslWindUniformCount()).toBe(0);
   });
 
-  it('gives different sway buckets their own uniform', () => {
+  // PASS 84 REPLACES the previous 'gives different sway buckets their own
+  // uniform' case, which pinned the bucket split itself. The split was the
+  // cost: nine live node graphs, ~0.6 s of pipeline compilation each, inside
+  // arena admission. Sway size is now a per-material uniform read through
+  // materialReference, so this asserts the STRONGER property — one graph and
+  // one wind uniform for every sway size, with the per-layer numbers intact.
+  it('puts every sway size on one shared graph and one wind uniform', () => {
     tslResetWindUniforms();
     const blade = makeTslFoliageMaterial({ color: 0x2e8b57, swayAmount: 0.03, swayHeight: 0.7 });
     const frond = makeTslFoliageMaterial({ color: 0x2e8b57, swayAmount: 0.09, swayHeight: 9 });
-    expect(tslWindUniformCount()).toBe(2);
-    expect(graphKey(blade)).not.toBe(graphKey(frond));
+
+    expect(tslWindUniformCount()).toBe(1);
+    expect(graphKey(blade)).toBe(graphKey(frond));
+
+    // Sharing must not have flattened the layers onto one look: each material
+    // still carries its own bucketed height, amplitude and speed, which is
+    // what the shared graph reads at draw time.
+    expect(blade.fcSwayHeight).toBe(0.8);
+    expect(frond.fcSwayHeight).toBe(8);
+    expect(blade.fcSwayAmount).toBeLessThan(frond.fcSwayAmount);
+    expect(blade.fcSwaySpeed).toBe(1);
+    expect(frond.fcSwaySpeed).toBe(1);
+
     blade.dispose();
+    expect(tslWindUniformCount()).toBe(1); // frond still drives it
     frond.dispose();
     expect(tslWindUniformCount()).toBe(0);
+  });
+
+  // The shared graph renders NaN for any material that reaches a draw without
+  // the four referenced properties, and nothing in three warns about it.
+  it('always carries the four values the shared graph dereferences', () => {
+    tslResetWindUniforms();
+    const dappledSway = makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.5, swayAmount: 0.05, swayHeight: 2.5 });
+    const still = makeTslFoliageMaterial({ color: 0x2e8b57, dapple: 0.8 });
+    for (const material of [dappledSway, still]) {
+      for (const property of ['fcDapple', 'fcSwayHeight', 'fcSwayAmount', 'fcSwaySpeed'] as const) {
+        expect(Number.isFinite(material[property]), `${property} must be a finite number`).toBe(true);
+      }
+    }
+    expect(dappledSway.fcDapple).toBe(0.5);
+    expect(still.fcDapple).toBe(0.78);
+    dappledSway.dispose();
+    still.dispose();
   });
 
   it('double dispose cannot drive the reference count negative', () => {
