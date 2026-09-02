@@ -1220,7 +1220,7 @@ describe('presentation prewarm startup contract', () => {
   it('returns active-match Options Escape directly to play through one settings flush', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const resume = source.slice(
-      source.indexOf('function resumeActiveMatchFromMenu()'),
+      source.indexOf('function resumeActiveMatchFromMenu('), // GAMEPAD: optional requestLock param
       source.indexOf("resumeButton.addEventListener('click'"),
     );
     expect(resume.match(/flushPendingGraphics\(\)/g)).toHaveLength(1);

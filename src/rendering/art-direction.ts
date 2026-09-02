@@ -569,16 +569,23 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     id: 'map3',
     brief: 'Stone corridor gallery under hard midmorning sun - cool paving, warm sun on the edges.',
     cdl: {
-      // Blue-led (b > g > r): the inverse ordering of every warm arena, which
-      // is what gives it its own quadrant of the grade space rather than a
-      // slightly different amount of amber.
-      gain: [0.9, 0.98, 1.1],
-      lift: [0.0005, 0.003, 0.006],
-      gamma: [1.04, 1.03, 1.0],
+      // Integration 2026-09-02: the first cut ([0.9, 0.98, 1.1]) graded 0.0147
+      // from skyline-terminal against the 0.0216 distinctiveness floor - the
+      // cool quadrant is already owned by corporate glass and the sea. Pale
+      // stone under a hard sun is BRIGHT and near-neutral: lifted overall gain
+      // neutral (equal gain per channel), lifted shadows and a brighter midtone
+      // gamma. Chosen by an exhaustive in-bounds search
+      // (artifacts/qa/pass84-integration/map3-grade-search2.mts): weakest pair
+      // now 0.02886 against gun-range, at or above the catalog's own
+      // weakest (rustworks-1v1 vs gun-range, 0.02262). Saturation and contrast
+      // do not enter that metric; they stay in the safe band for a hard-lit interior.
+      gain: [1.1, 1.1, 1.1],
+      lift: [0.006, 0.006, 0.006],
+      gamma: [0.93, 0.93, 0.93],
     },
     // Stone, and nothing but stone: pushing saturation here only tints the
     // grey. The identity is in hue ORDER and contrast, not in chroma.
-    saturationScale: 0.92,
+    saturationScale: 0.9,
     contrastScale: 1.05,
     // Positive: a slight channel bleed toward the neighbour average, which is
     // what dusty air over pale stone actually does. Every warm arena is

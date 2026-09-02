@@ -94,7 +94,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },
-      damage: { base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 },
+      damage: { base: 52.1, minimum: 33.6, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 }, // HF-398 (2026-09-02)
     });
     expect(byId['slug-shotgun']).toMatchObject({ displayName: 'Benelli M4 Slug', fireKind: 'slug', pellets: 1 });
     expect(byId['flashlight-pistol']).toMatchObject({
@@ -166,7 +166,7 @@ describe('Pass 65 canonical weapon catalog', () => {
       targetPolicy: 'living-targets-through-smoke',
       authority: 'presentation-only',
     });
-    expect(byId['m14-ebr'].damage).toMatchObject({ base: 37.2, minimum: 24, headMultiplier: 1.7 });
+    expect(byId['m14-ebr'].damage).toMatchObject({ base: 52.1, minimum: 33.6, headMultiplier: 1.7 }); // HF-398
   });
 
   it('retains special pickup and entitlement-only metadata', () => {

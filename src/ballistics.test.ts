@@ -240,7 +240,7 @@ describe('HF-368 per-weapon wall-penetration multiplier', () => {
     expect(after.reachedDistance).toBe(true);
     expect(after.damageMultiplier).toBeCloseTo(0.28683, 4);
     expect(after.damageMultiplier).toBeLessThan(1);
-    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(11);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(15); // HF-398: 52.1 * 0.28683
   });
 
   it('raises but never removes attenuation on a wall the EBR already passed', () => {
@@ -249,8 +249,8 @@ describe('HF-368 per-weapon wall-penetration multiplier', () => {
     const after = traceBallisticPath(origin, direction, 20, WEAPONS['m14-ebr'].penetration, wall);
     expect(before.reachedDistance).toBe(true);
     expect(after.reachedDistance).toBe(true);
-    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, before.damageMultiplier)).toBe(4);
-    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(15);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, before.damageMultiplier)).toBe(6); // HF-398 envelope
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, after.damageMultiplier)).toBe(21);
     expect(after.damageMultiplier).toBeGreaterThan(before.damageMultiplier);
     // Still strictly attenuated: a crossed surface is never free damage.
     expect(after.damageMultiplier).toBeLessThan(1);
@@ -261,7 +261,7 @@ describe('HF-368 per-weapon wall-penetration multiplier', () => {
   it('keeps an unobstructed EBR shot on exactly the canonical damage', () => {
     const clear = traceBallisticPath(origin, direction, 20, WEAPONS['m14-ebr'].penetration, []);
     expect(clear).toMatchObject({ reachedDistance: true, damageMultiplier: 1, impacts: [] });
-    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, clear.damageMultiplier)).toBe(37.2);
+    expect(applyPenetrationDamage(WEAPONS['m14-ebr'].damage, clear.damageMultiplier)).toBe(52.1); // HF-398 canonical base
   });
 
   it('still stops the EBR on brick, concrete and reinforced cover', () => {

@@ -26,7 +26,7 @@ describe('text chat UI contract', () => {
     expect(mainSource).toContain("if (event.key === 'Escape')");
     expect(mainSource).toContain("if (document.pointerLockElement === canvas) void document.exitPointerLock();");
     expect(mainSource).toContain("menu.classList.contains('hidden') && !isTextChatTyping()");
-    expect(mainSource).toContain("if (isTextChatTyping()) return;\n  if (document.pointerLockElement !== canvas)");
+    expect(mainSource).toContain("if (isTextChatTyping()) return;\n  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: mouse click = keyboard/mouse scheme\n  if (document.pointerLockElement !== canvas)"); // typing guard stays FIRST in mousedown
     expect(mainSource).toContain("if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;");
   });
 

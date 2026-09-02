@@ -78,16 +78,16 @@ describe('headshot damage contract', () => {
     expect(computeDamage(WEAPONS.railgun, 220, 'limb')).toBe(50);
   });
 
-  it('reduces the M14 damage envelope by exactly 40% without changing range or headshot policy', () => {
+  it('HF-398: raises the M14 envelope by 40% (base 52.1, floor 33.6) without changing range or headshot policy', () => {
     const m14 = WEAPONS['m14-ebr'];
-    expect(m14.damage).toBeCloseTo(37.2, 8);
-    expect(m14.minimumDamage).toBeCloseTo(24, 8);
+    expect(m14.damage).toBeCloseTo(52.1, 8);
+    expect(m14.minimumDamage).toBeCloseTo(33.6, 8);
     expect(m14.falloffStart).toBe(38);
     expect(m14.falloffEnd).toBe(100);
     expect(m14.headMultiplier).toBe(1.7);
-    expect(computeDamage(m14, 10, 'body')).toBe(37.2);
-    expect(computeDamage(m14, 10, 'head')).toBe(63.2);
-    expect(computeDamage(m14, 100, 'body')).toBe(24);
+    expect(computeDamage(m14, 10, 'body')).toBe(52.1);
+    expect(computeDamage(m14, 10, 'head')).toBe(88.6);
+    expect(computeDamage(m14, 100, 'body')).toBe(33.6);
   });
 
   it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
