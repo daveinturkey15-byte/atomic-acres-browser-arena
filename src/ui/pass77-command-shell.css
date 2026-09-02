@@ -916,14 +916,12 @@
 
 /* MAP3 (HF-409): the standalone showcase link under the arena lede.
  *
- * `display: none` for the hidden state is stated FIRST and with the same
- * specificity discipline as the rule that shows it, because the element is an
- * inline-block here: the `hidden` attribute's UA rule is `display: none` at
- * the lowest possible precedence, and ANY author `display` on the element wins
- * over it. Without this the link would be permanently visible on every arena
- * that has no second page, pointing nowhere. */
-#menu .arena-showcase-link[hidden] { display: none; }
-
+ * No local `[hidden]` rule is needed: src/style.css opens with a global
+ * `[hidden]{display:none!important}`, and the !important is what lets it beat
+ * an author `display` like the one below. That global rule is load-bearing for
+ * far more than this link - it is also the only reason `#scoreline`, which is
+ * `display:flex`, actually disappears when the explore HUD hides it - so it is
+ * pinned by src/ui/hud-mode-banner.test.ts rather than relied on silently. */
 #menu .arena-showcase-link {
   display: inline-block;
   margin-top: 10px;

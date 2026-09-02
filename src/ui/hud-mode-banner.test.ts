@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /**
  * MAP3 (HF-409 finisher 2): the in-match HUD must not claim a match.
  *
@@ -139,5 +140,37 @@ describe('HUD mode banner', () => {
         }
       }
     });
+  });
+});
+
+/**
+ * WHAT MAKES `clock: false` AND `scoreline: false` ACTUALLY HIDE ANYTHING.
+ *
+ * The banner is a pure decision; legacy-main applies it by setting the
+ * `hidden` ATTRIBUTE on #timer and #scoreline. That only works because
+ * src/style.css opens with a global `[hidden]{display:none!important}`.
+ *
+ * The !important is not decoration. `#scoreline` carries an author
+ * `display:flex` in the same stylesheet, and the `hidden` attribute's own rule
+ * lives in the UA stylesheet, which ANY author `display` outranks. Drop the
+ * !important and the scoreline reappears in an arena with no second team - the
+ * HUD would go back to reading "AQUA 0 - 0 CORAL" in explore, and every unit
+ * test here would still pass, because the decision would still be correct and
+ * only its application would be broken.
+ *
+ * So the invariant is pinned where the claim is made.
+ */
+describe('the global [hidden] rule the explore HUD depends on', () => {
+  const styleSheet = readFileSync('src/style.css', 'utf8');
+
+  it('hides [hidden] elements with !important, beating author display rules', () => {
+    expect(styleSheet).toMatch(/\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*\}/u);
+  });
+
+  it('is still needed, because #scoreline really does set its own display', () => {
+    // If this ever stops matching, the note above is stale rather than wrong -
+    // but the !important must not be removed on the strength of that alone,
+    // since other hidden HUD elements set their own display too.
+    expect(styleSheet).toMatch(/#scoreline\s*\{[^}]*display\s*:\s*flex/u);
   });
 });
