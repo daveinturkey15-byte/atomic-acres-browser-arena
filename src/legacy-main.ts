@@ -6410,34 +6410,48 @@ function activeAimAssistTier(): AimAssistTier {
   return 'mouse';
 }
 
+/** Reused per frame by collectAimAssistTargets(): no allocation while a pad or touch overlay is live. */
+type AimAssistScratchTarget = { id: string; point: { x: number; y: number; z: number } };
+const aimAssistTargetPool: AimAssistScratchTarget[] = [];
+const aimAssistTargetsScratch: AimAssistScratchTarget[] = [];
+
+function pushAimAssistTarget(id: string, x: number, y: number, z: number): void {
+  const slot = aimAssistTargetsScratch.length;
+  let target = aimAssistTargetPool[slot];
+  if (!target) {
+    target = { id, point: { x, y, z } };
+    aimAssistTargetPool.push(target);
+  }
+  target.id = id;
+  target.point.x = x;
+  target.point.y = y;
+  target.point.z = z;
+  aimAssistTargetsScratch.push(target);
+}
+
 /**
  * Every live hostile combatant — bots and remote players alike — as an aim
  * point. Reads presentation-side positions only; never touches hit proxies
- * used for registration.
+ * used for registration. The returned array is a shared scratch buffer valid
+ * until the next call (the assist evaluator consumes it synchronously).
  */
 function collectAimAssistTargets(): readonly AimAssistTarget[] {
-  const targets: AimAssistTarget[] = [];
+  aimAssistTargetsScratch.length = 0;
   for (const bot of bots.values()) {
     if (!bot.alive || bot.hp <= 0) continue;
     if (!areCombatantsHostile(player.id, player.team, bot.id, bot.team)) continue;
     const stance = ((bot.root.userData.operatorStance as Stance | undefined) ?? 'stand');
     const centre = hitProxyZoneCentre('body', stance);
-    targets.push({
-      id: bot.id,
-      point: { x: bot.position.x + centre[0], y: bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, z: bot.position.z + centre[2] },
-    });
+    pushAimAssistTarget(bot.id, bot.position.x + centre[0], bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, bot.position.z + centre[2]);
   }
   for (const remote of remotes.values()) {
     if (remote.snapshot.hp <= 0) continue;
     if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team)) continue;
     const centre = hitProxyZoneCentre('body', remote.snapshot.stance ?? 'stand');
     const feet = remote.root.position;
-    targets.push({
-      id: remote.snapshot.id,
-      point: { x: feet.x + centre[0], y: feet.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, z: feet.z + centre[2] },
-    });
+    pushAimAssistTarget(remote.snapshot.id, feet.x + centre[0], feet.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, feet.z + centre[2]);
   }
-  return targets;
+  return aimAssistTargetsScratch;
 }
 
 function evaluateLocalAimAssist(tier: AimAssistTier, dt: number): AimAssistResult {
@@ -22253,6 +22267,7 @@ function updateFieldSupportHud(): void {
     const charges = fieldSupport.availableCharges[support];
     if (state) state.textContent = ready ? charges > 1 ? `READY ×${charges}` : 'READY' : 'LOCKED';
   });
+  if (gamepadRuntime.currentScheme() === 'gamepad') syncHudInputGlyphs(); // GAMEPAD: the selected slot carries the ACTIVATE glyph
   refreshSupportStatusHud(performance.now(), true);
 }
 

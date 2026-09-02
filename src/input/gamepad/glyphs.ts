@@ -81,10 +81,44 @@ export function selectInputScheme(
   return lastPadInputAt >= lastKeyboardMouseInputAt ? 'gamepad' : 'keyboard';
 }
 
-/** Short label for the support-slot key caps ("3".."7" on keyboard; the d-pad glyph on a pad). */
-export function supportSlotGlyph(slotIndex: number, scheme: InputScheme, layout: PadLayout | null): string {
+/**
+ * Label for the prev/next support-cycle pair on a pad ("◀/▶", "LB/RB"), or a
+ * dash when the layout leaves both unbound (hat-axis d-pads on non-standard
+ * PlayStation/Switch tables).
+ */
+export function supportCycleGlyph(layout: PadLayout): string {
+  const prev = layout.buttons['support-prev'];
+  const next = layout.buttons['support-next'];
+  if (prev === null && next === null) return '—';
+  return `${padButtonGlyph(layout, prev)}/${padButtonGlyph(layout, next)}`;
+}
+
+/**
+ * Short label for one support-slot key cap. Keyboard: the slot's own key
+ * ("3".."7"). Pad: slots are not addressed directly — the highlighted slot
+ * carries the ACTIVATE glyph and every other slot shows the prev/next pair
+ * that reaches it, so five identical caps never appear.
+ */
+export function supportSlotGlyph(slotIndex: number, scheme: InputScheme, layout: PadLayout | null, selected = true): string {
   if (scheme === 'gamepad' && layout) {
-    return padButtonGlyph(layout, layout.buttons['support-activate']);
+    return selected ? padButtonGlyph(layout, layout.buttons['support-activate']) : supportCycleGlyph(layout);
   }
   return String(slotIndex + 3);
+}
+
+/**
+ * The `.support-help` caption under the field-support rows. Names only
+ * controls that exist on the pad in hand: a fallback layout with unbound
+ * support buttons says so instead of advertising a d-pad the browser does
+ * not report.
+ */
+export function supportHelpCaption(scheme: InputScheme, layout: PadLayout | null): string {
+  const keys = 'KEYS 3–7';
+  if (!layout) return keys;
+  const activate = layout.buttons['support-activate'];
+  const bound = activate !== null && (layout.buttons['support-prev'] !== null || layout.buttons['support-next'] !== null);
+  const pad = bound
+    ? `PAD ${supportCycleGlyph(layout)} SELECT · ${padButtonGlyph(layout, activate)} ACTIVATE`
+    : 'PAD SUPPORT BUTTONS UNBOUND · REBIND IN OPTIONS';
+  return scheme === 'gamepad' ? `${pad} · ${keys}` : `${keys} · ${pad}`;
 }

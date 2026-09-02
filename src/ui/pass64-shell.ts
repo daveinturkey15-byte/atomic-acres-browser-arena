@@ -462,7 +462,7 @@ function hudMarkup(): string {
     <aside id="support-block" aria-labelledby="support-title" aria-live="polite">
       <div class="support-heading"><span id="support-title">FIELD SUPPORT</span><strong id="support-streak">STREAK 0</strong></div>
       <div class="support-list" role="list">${fieldSupportRowsMarkup()}</div>
-      <small class="support-help">KEYS 3–7 · PAD ◀/▶ SELECT · PAD ▲ ACTIVATE</small>
+      <small class="support-help">KEYS 3–7</small>
     </aside>
     <section id="support-combat-feedback" hidden aria-live="polite" data-support-kind="none" data-possessed="false">
       <header><small id="support-platform-name">SUPPORT PLATFORM</small><b id="support-platform-mode">AI FLIGHT</b></header>

@@ -7,18 +7,34 @@
  */
 
 import type { KeyBindingProfile } from '../../key-bindings';
-import { promptGlyph, supportSlotGlyph, type InputScheme, type PromptAction } from './glyphs';
+import { promptGlyph, supportHelpCaption, supportSlotGlyph, type InputScheme, type PromptAction } from './glyphs';
 import type { PadLayout } from './mapping';
 
-export type HudGlyphTarget = Readonly<{ selector: string; action: PromptAction }>;
+export type HudGlyphTarget = Readonly<{
+  selector: string;
+  action: PromptAction;
+  /** Accessible name for the cap's enclosing group, phrased for the active control. */
+  ariaLabel?: (label: string, scheme: InputScheme) => string;
+}>;
 
 /** Every static `<kbd>` the HUD shows and the action it names. */
 export const HUD_GLYPH_TARGETS: readonly HudGlyphTarget[] = Object.freeze([
   Object.freeze({ selector: '#support-interaction-prompt kbd', action: 'interact' }),
   Object.freeze({ selector: '#pickup-prompt kbd', action: 'interact' }),
-  Object.freeze({ selector: '#gunner-gun-control kbd', action: 'fire' }),
-  Object.freeze({ selector: '#gunner-missile-status kbd', action: 'ads' }),
+  Object.freeze({
+    selector: '#gunner-gun-control kbd',
+    action: 'fire',
+    ariaLabel: (label: string, scheme: InputScheme) => (scheme === 'gamepad' ? `Gun on pad ${label}` : 'Gun on left mouse button'),
+  }),
+  Object.freeze({
+    selector: '#gunner-missile-status kbd',
+    action: 'ads',
+    ariaLabel: (label: string, scheme: InputScheme) => (scheme === 'gamepad' ? `Missiles on pad ${label}` : 'Missiles on right mouse button'),
+  }),
 ]);
+
+/** Selector for the caption under the field-support rows. */
+export const SUPPORT_HELP_SELECTOR = '#support-block .support-help';
 
 export type HudGlyphState = Readonly<{
   scheme: InputScheme;
@@ -28,9 +44,13 @@ export type HudGlyphState = Readonly<{
 
 let current: HudGlyphState = Object.freeze({ scheme: 'keyboard', layout: null, keyProfile: {} as KeyBindingProfile });
 
-function decorate(cap: HTMLElement, action: PromptAction, state: HudGlyphState): void {
-  const glyph = promptGlyph(action, state.scheme, state.layout, state.keyProfile);
+function decorate(cap: HTMLElement, target: HudGlyphTarget, state: HudGlyphState): void {
+  const glyph = promptGlyph(target.action, state.scheme, state.layout, state.keyProfile);
   cap.textContent = glyph.label;
+  if (target.ariaLabel) {
+    const group = cap.closest<HTMLElement>('[role="group"]') ?? cap.parentElement;
+    group?.setAttribute('aria-label', target.ariaLabel(glyph.label, glyph.scheme));
+  }
   cap.classList.toggle('pad-glyph', glyph.scheme === 'gamepad');
   if (glyph.scheme === 'gamepad' && glyph.family) {
     cap.dataset.family = glyph.family;
@@ -50,19 +70,24 @@ export function applyHudInputScheme(doc: Document, state: HudGlyphState): void {
   if (state.layout) doc.documentElement.dataset.padFaces = state.layout.family;
   else delete doc.documentElement.dataset.padFaces;
   for (const target of HUD_GLYPH_TARGETS) {
-    doc.querySelectorAll<HTMLElement>(target.selector).forEach((cap) => decorate(cap, target.action, state));
+    doc.querySelectorAll<HTMLElement>(target.selector).forEach((cap) => decorate(cap, target, state));
   }
   doc.querySelectorAll<HTMLElement>('.support-list [data-support-slot] kbd').forEach((cap) => {
-    const slot = Number(cap.closest<HTMLElement>('[data-support-slot]')?.dataset.supportSlot ?? '1') - 1;
-    cap.textContent = supportSlotGlyph(slot, state.scheme, state.layout);
+    const row = cap.closest<HTMLElement>('[data-support-slot]');
+    const slot = Number(row?.dataset.supportSlot ?? '1') - 1;
+    const selected = row?.classList.contains('controller-selected') ?? false;
+    cap.textContent = supportSlotGlyph(slot, state.scheme, state.layout, selected);
     cap.classList.toggle('pad-glyph', state.scheme === 'gamepad' && state.layout !== null);
     if (state.scheme === 'gamepad' && state.layout) {
       cap.dataset.family = state.layout.family;
-      cap.dataset.button = String(state.layout.buttons['support-activate'] ?? '');
+      cap.dataset.button = selected ? String(state.layout.buttons['support-activate'] ?? '') : '';
     } else {
       delete cap.dataset.family;
       delete cap.dataset.button;
     }
+  });
+  doc.querySelectorAll<HTMLElement>(SUPPORT_HELP_SELECTOR).forEach((caption) => {
+    caption.textContent = supportHelpCaption(state.scheme, state.layout);
   });
 }
 
