@@ -466,3 +466,30 @@ alongside the placement rework (same file). Owner 17:05: lighting and fps
   bug CLOSED as already fixed on 75a4e508 (Lane I, 8/8 arenas identical
   across load paths); "lighting feels off" routes to the art passes
   (HF-407, HF-408) and Lane AB.
+
+## HF-418 — the graphics ladder: Balanced added, Quality "beautiful and smooth", Max for mad PCs, RTX = explained native runtime, beautiful lighting adjustable
+
+- **Statement (verbatim, 2026-09-02 ~19:10 BST):** "for RTX then make it
+  really clear what it is when you select it, something pops up, it tells
+  you and guides you about the runtime ... when i say ray tracing i mean the
+  beautiful lighting etc, get it all working in a nice way that wont murder
+  FPS and you can adjust and on/off stuff, quality maybe its on lightly,
+  maybe make a new balanced profile that doesnt look shit like performance
+  but will run nice and look good? and quality is beautiful and smooth on a
+  decent pc. Max is for mad pcs and RTX mode is in a different runtime app
+  or something you can download with a click or 2, alerted and easy? ...
+  maybe we can even have path tracing in game as an option but not needed
+  ... its more about the assets and sensible lighting than balls to the wall"
+- **Mechanical falsifier:** the settings menu offers Performance, Balanced,
+  Quality, Max with one-line truthful descriptions derived from the audit
+  and a pinned control-set hash; selecting RTX opens an explainer that
+  states it is a separate native runtime, what it adds, and how to get it
+  (link/instructions; "coming soon" until the desktop build exists), and
+  never silently changes the web renderer; lighting features (baked
+  indirect, SSR, AO, contact shadows) are individual controls with tiers,
+  each with a measured cost, defaulted per profile; every profile admits
+  inside the fence; tripwire 0.
+- **Plan:** Lane AI implements the ladder, descriptions and RTX explainer
+  after its audit; Lane AL (`docs/pass84-lanes/LANE-AL-lighting-quality-tiers.md`)
+  builds the lighting features and tiers; in-game path tracing is research
+  only for now.
