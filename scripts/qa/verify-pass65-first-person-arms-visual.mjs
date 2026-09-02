@@ -208,6 +208,29 @@ async function capture(page, name) {
   return path;
 }
 
+/**
+ * HF-413. Progress samples for the reload and melee strips. The brief asks for
+ * a six-frame strip of each so a reversed clip, a hand that reaches the wrong
+ * way or a magazine arriving from the wrong side is visible as MOTION rather
+ * than inferred from one still.
+ */
+const ACTION_STRIP_PROGRESS = Object.freeze([0.08, 0.24, 0.4, 0.56, 0.72, 0.9]);
+/** Families whose reload is captured as a full strip. */
+const RELOAD_STRIP_SUBJECTS = Object.freeze([
+  { family: 'handgun', weapon: 'pistol' },
+  { family: 'long-gun', weapon: 'm4a1' },
+  { family: 'heavy', weapon: 'minigun' },
+]);
+/** Support (left) palm world position at the resting hip pose, per weapon. */
+const hipSupportPalmByWeapon = new Map();
+
+function supportPalm(state) {
+  const arm = state?.weaponPresentation?.riggedArms?.find((candidate) => candidate.side === 'left');
+  return finiteArray(arm?.palm) ? arm.palm : null;
+}
+
+const palmDistance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
 await mkdir(artifactRoot, { recursive: true });
 const server = await createServer({ server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
 let browser;
@@ -277,6 +300,31 @@ try {
     violations.push(...presentationViolations(`${family}/${weapon}/hip`, state));
     const screenshot = await capture(page, `${family}-${weapon}-hip`);
     evidence.push(evidenceFor(`${family}/${weapon}/hip`, state, screenshot, cadence));
+    const hipSupportPalm = supportPalm(state);
+    if (hipSupportPalm) hipSupportPalmByWeapon.set(weapon, hipSupportPalm);
+
+    // HF-413 review: ADS was captured for the m4a1 alone, so "wrong handedness
+    // after ADS" - one of the defect classes the brief names - was unobserved
+    // on six of the seven families. Every representative now gets an aimed
+    // still on the same instrument.
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98,
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.waitForTimeout(300);
+    const adsState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    const adsLabel = `${family}/${weapon}/ads`;
+    violations.push(...presentationViolations(adsLabel, adsState));
+    const adsScreenshot = await capture(page, `${family}-${weapon}-ads`);
+    evidence.push(evidenceFor(adsLabel, adsState, adsScreenshot));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress < 0.02,
+      undefined,
+      { timeout: 15_000 },
+    );
   }
 
   await page.setViewportSize({ width: 2560, height: 1440 });
@@ -305,42 +353,87 @@ try {
   }
   await page.setViewportSize({ width: 1600, height: 900 });
 
-  await page.evaluate(() => { const api = window.__ATOMIC_ACRES_DEBUG__; api.equipWeapon('m4a1'); api.setAds(true); });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98, undefined, { timeout: 12_000 });
-  await page.waitForTimeout(300);
-  let state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
-  violations.push(...presentationViolations('long-gun/m4a1/ads', state));
-  let screenshot = await capture(page, 'long-gun-m4a1-ads');
-  evidence.push(evidenceFor('long-gun/m4a1/ads', state, screenshot));
-
-  await page.evaluate(() => {
-    const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.setAds(false); api.setAmmo('m4a1', 10, 60); api.reload(); api.setReloadCaptureProgress(0.46);
-  });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.actionContract?.state === 'reload', undefined, { timeout: 12_000 });
-  await page.waitForTimeout(250);
-  state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
-  violations.push(...presentationViolations('long-gun/m4a1/reload', state));
-  screenshot = await capture(page, 'long-gun-m4a1-reload');
-  evidence.push(evidenceFor('long-gun/m4a1/reload', state, screenshot));
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
-
-  // The deterministic pose override does not cancel authoritative reload
-  // timing. Await the real reload exit before starting independent melee proof
-  // so no screenshot can combine a knife pose with "Reloading M4A1" state.
-  await page.waitForFunction(() => {
-    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
-    return presentation?.actionContract?.state !== 'reload';
-  }, undefined, { timeout: 6_000 });
-  await page.waitForFunction(() => ![...document.querySelectorAll('#killfeed > *')]
-    .some((row) => row.textContent?.includes('Reloading M4A1')), undefined, { timeout: 7_000 });
+  // HF-413 review: the previous version captured ONE reload frame, for the
+  // m4a1 only, so "magazine inserted from the wrong side" and "clip playing
+  // reversed" had no evidence at all - and the M134, whose ammunition is on a
+  // side-mounted drum rather than a centreline magwell, was never reloaded on
+  // screen even while its reload socket was being edited. Each subject below
+  // now gets the six-frame strip the brief asks for, plus a measurement of how
+  // far the SUPPORT palm actually travels from its own resting hip pose (a
+  // reload that drives no support-hand motion is a dead clip, and that is
+  // invisible in a single still).
+  let state;
+  let screenshot;
+  for (const { family, weapon } of RELOAD_STRIP_SUBJECTS) {
+    await page.evaluate((selected) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setMeleeCaptureProgress(null);
+      api.setReloadCaptureProgress(null);
+      api.equipWeapon(selected);
+    }, weapon);
+    await page.waitForFunction((selected) => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.weapon === selected && presentation?.importedModel?.weapon === selected;
+    }, weapon, { timeout: 30_000 });
+    await page.waitForTimeout(600);
+    await page.evaluate((selected) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAmmo(selected, 1, 90);
+      api.reload();
+      api.setReloadCaptureProgress(0.08);
+    }, weapon);
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.actionContract?.state === 'reload',
+      undefined,
+      { timeout: 12_000 },
+    );
+    let maximumSupportTravel = 0;
+    for (const progress of ACTION_STRIP_PROGRESS) {
+      await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(value), progress);
+      await page.waitForTimeout(140);
+      state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      const label = `${family}/${weapon}/reload-${progress.toFixed(2)}`;
+      violations.push(...presentationViolations(label, state));
+      if (state.weaponPresentation?.actionContract?.state !== 'reload') {
+        violations.push(`${label}: action contract is ${state.weaponPresentation?.actionContract?.state}`);
+      }
+      const palm = supportPalm(state);
+      const hipPalm = hipSupportPalmByWeapon.get(weapon);
+      if (palm && hipPalm) maximumSupportTravel = Math.max(maximumSupportTravel, palmDistance(palm, hipPalm));
+      screenshot = await capture(page, `${family}-${weapon}-reload-${String(progress).replace('.', '_')}`);
+      evidence.push(evidenceFor(label, state, screenshot));
+    }
+    // A reload whose support hand never leaves the rest pose is a clip that is
+    // not playing. 3 cm is far below every authored draw and is a liveness
+    // floor, not a pose assertion - the strip itself is the pose evidence.
+    if (!(maximumSupportTravel > 0.03)) {
+      violations.push(`${family}/${weapon}/reload: support palm moved only ${maximumSupportTravel.toFixed(4)} m from its hip pose across the strip`);
+    }
+    evidence.push(Object.freeze({
+      label: `${family}/${weapon}/reload-support-travel`,
+      maximumSupportPalmTravelMeters: maximumSupportTravel,
+      hipSupportPalm: hipSupportPalmByWeapon.get(weapon) ?? null,
+    }));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
+    // The deterministic pose override does not cancel authoritative reload
+    // timing. Await the real reload exit before the next subject (and before
+    // the melee strip) so no screenshot can combine one action with another
+    // action's state.
+    await page.waitForFunction(() => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.actionContract?.state !== 'reload';
+    }, undefined, { timeout: 10_000 });
+    await page.waitForFunction(() => ![...document.querySelectorAll('#killfeed > *')]
+      .some((row) => row.textContent?.includes('Reloading')), undefined, { timeout: 10_000 });
+  }
 
   await page.evaluate(() => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setAds(false);
     api.setAmmo('m4a1', 30, 60);
     api.melee();
-    api.setMeleeCaptureProgress(0.12);
+    api.setMeleeCaptureProgress(ACTION_STRIP_PROGRESS[0]);
   });
   await page.waitForFunction(() => {
     const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
@@ -348,7 +441,7 @@ try {
       && presentation?.meleeArmSource === 'authored-rigged-arms'
       && presentation?.knifeVisible === true;
   }, undefined, { timeout: 5_000 });
-  for (const progress of [0.12, 0.42, 0.82]) {
+  for (const progress of ACTION_STRIP_PROGRESS) {
     await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setMeleeCaptureProgress(value), progress);
     await page.waitForTimeout(120);
     state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
