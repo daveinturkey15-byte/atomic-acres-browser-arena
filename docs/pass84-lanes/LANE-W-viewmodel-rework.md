@@ -89,3 +89,23 @@ Bounds table per weapon before/after against the capsule; penetration table
 before/after; framing captures per weapon (hip, ADS, crouch, prone, wall,
 corner, floor); which symptom layers were removed; tests re-pinned and why;
 tripwire result; commits. Claim-state every line.
+
+## ADDENDUM (orchestrator, 17:10 BST) — the solver cost is yours too (HF-399 residual)
+Lane A measured (2026-09-02, quiet machine, corrected for profiler inflation):
+`WeaponPresentation.update` is ~22% of a profiled frame, dominated by
+`solveRiggedArms` (~8 ms profiled / ~4.5 ms real) plus `applyModelMatrixFreeze`
+(the freeze-on-transition patch already shipped in PASS 84). Root causes Lane
+A named but could not patch (your file): `solveRiggedArms` calls
+`activeModel.getObjectByName` for 'grip-socket-r' / 'support-socket-l' /
+'reload-socket-l' / 'muzzle-socket' per arm per frame, and the arm IK's
+`updateWorldMatrix(false, true)` subtree walks bypass the static-matrix
+freeze (census: ~17,500 updateWorldMatrix and ~10,000 getObjectByProperty
+calls per frame on a 10,275-node scene). While you are reworking the rig:
+cache the socket lookups per rig (invalidate on weapon/model change), and
+stop the per-frame subtree walks from touching frozen nodes. Measure before
+and after with Lane A's instruments (`scripts/qa/hf399-frame-anatomy-cdp.mjs`
+call census and the cpuprofile inclusive tool under
+`docs/pass84-lanes/hf399-lane-a-evidence/`); report ms/frame and the census
+delta. The owner reads 63-70 fps on Firing Range at 1440p after PASS 84 and
+says fps "feels off"; this is the largest single lever left on the main
+thread.

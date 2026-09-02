@@ -387,3 +387,10 @@ Map 3 is an EXPLORE mode: the showcase corridors are the content; solo,
 applies to walkable and blocking surfaces (the player must not fall through
 or walk through the showcase), but Lane V should not spend budget on
 combat systems, spawn-vs-enemy constraints or field support for map3.
+
+### HF-399 residual assignment (17:10)
+The viewmodel solver cost Lane A measured (~22% of frame: per-frame socket
+lookups and subtree matrix walks in `solveRiggedArms`) is assigned to Lane W
+alongside the placement rework (same file). Owner 17:05: lighting and fps
+"both feel a bit off"; owner's own HUD shows 63-70 fps on Firing Range at
+1440p on PASS 84.
