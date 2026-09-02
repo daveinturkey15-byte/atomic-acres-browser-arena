@@ -37,11 +37,22 @@
 // Error 87), so channel:'chrome' is not optional; a run that does not get a
 // hardware WebGPU device is INVALIDATED rather than written as evidence.
 //
+// MEASUREMENT TOOL, NOT A GATE. Its exit code reports only INVALIDATION -
+// receipt mismatch, a failed arena selection, combat contamination in the
+// frame - never a pixel threshold. A large luminance divergence exits 0 on
+// purpose, because on this build the largest pixel divergences measured were
+// not lighting at all (a DOM damage overlay; unpinned surf and canopy
+// animation on farcrysis) and a threshold here would encode that noise as a
+// contract. Do not wire `measure:ibl:load-parity` into a green/red check. The
+// gate for this lane is `src/rendering/arena-environment-load-parity.test.ts`,
+// which asserts the two caller orders produce the same observation in unit
+// space where there is no animation phase to confound it.
+//
 // Usage:
 //   node scripts/qa/probe-ibl-load-parity.mjs --serve-dist dist [--arenas a,b]
 //        [--shots 2] [--out artifacts/qa/ibl] [--label pass85]
 import { chromium } from '@playwright/test';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -127,7 +138,11 @@ const killServeChild = () => {
   if (!SERVE_CHILD || SERVE_CHILD.pid == null) return;
   // shell:true wraps the server in cmd.exe; killing the wrapper alone orphans
   // the vite child and leaves the port occupied for the next run.
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
+  // SYNCHRONOUS. Measured 2026-09-02 in the Lane I repair: an async spawn here
+  // races `process.exit()` below and the vite preview survives the run (found
+  // holding port 41948 after a clean exit-0 run). A cleanup that only usually
+  // runs is how this lane orphaned servers twice.
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
   else SERVE_CHILD.kill('SIGTERM');
 };
 const serveDist = arg('--serve-dist', null);
@@ -191,6 +206,12 @@ const browser = await chromium.launch({
   channel: 'chrome',
   args: [
     '--mute-audio',
+    // Belt and braces on top of headless. Added 2026-09-02 in the Lane I
+    // repair: the lane report had claimed this flag was already here and it
+    // was not. `headless: true` above is the protection that actually matters;
+    // this only guarantees that a future edit which flips headless off by
+    // accident still cannot put a window on the owner's screen.
+    '--window-position=-32000,-32000',
     '--use-angle=d3d11',
     '--enable-unsafe-webgpu',
     '--ignore-gpu-blocklist',
