@@ -7,7 +7,15 @@
  */
 
 import type { KeyBindingProfile } from '../../key-bindings';
-import { promptGlyph, supportHelpCaption, supportSlotGlyph, type InputScheme, type PromptAction } from './glyphs';
+import {
+  promptGlyph,
+  strikeCancelGlyph,
+  supportHelpCaption,
+  supportSlotGlyph,
+  type InputScheme,
+  type PromptAction,
+  type StrikeTargetingMode,
+} from './glyphs';
 import type { PadLayout } from './mapping';
 
 export type HudGlyphTarget = Readonly<{
@@ -89,6 +97,31 @@ export function applyHudInputScheme(doc: Document, state: HudGlyphState): void {
   doc.querySelectorAll<HTMLElement>(SUPPORT_HELP_SELECTOR).forEach((caption) => {
     caption.textContent = supportHelpCaption(state.scheme, state.layout);
   });
+}
+
+/** Selector for the `<kbd>` inside the strike/support targeting caption. */
+export const STRIKE_HELP_KBD_SELECTOR = '#strike-target-help kbd';
+
+/**
+ * Re-glyphs the strike-map caption's cancel cap. legacy-main rebuilds that
+ * caption from string literals on every map draw, so this is called from the
+ * draw rather than only when the scheme changes.
+ */
+export function applyStrikeTargetingCancelGlyph(doc: Document, mode: StrikeTargetingMode): void {
+  const cap = doc.querySelector<HTMLElement>(STRIKE_HELP_KBD_SELECTOR);
+  if (!cap) return;
+  const glyph = strikeCancelGlyph(mode, current.scheme, current.layout, current.keyProfile);
+  cap.textContent = glyph.label;
+  cap.classList.toggle('pad-glyph', glyph.scheme === 'gamepad');
+  if (glyph.scheme === 'gamepad' && glyph.family) {
+    cap.dataset.family = glyph.family;
+    cap.dataset.button = glyph.buttonIndex === null ? '' : String(glyph.buttonIndex);
+    cap.dataset.unbound = glyph.buttonIndex === null ? 'true' : 'false';
+  } else {
+    delete cap.dataset.family;
+    delete cap.dataset.button;
+    delete cap.dataset.unbound;
+  }
 }
 
 /** The word a runtime-built prompt sentence should use for one action ("F", "X", "□", "LMB"). */

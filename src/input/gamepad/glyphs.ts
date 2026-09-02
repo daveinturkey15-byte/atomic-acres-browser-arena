@@ -122,3 +122,22 @@ export function supportHelpCaption(scheme: InputScheme, layout: PadLayout | null
     : 'PAD SUPPORT BUTTONS UNBOUND · REBIND IN OPTIONS';
   return scheme === 'gamepad' ? `${pad} · ${keys}` : `${keys} · ${pad}`;
 }
+
+/**
+ * Which control cancels the strike/support targeting overlay, per scheme. The
+ * tactical map ('map') is cancelled by Escape on a keyboard and by the pad's
+ * pause button; the in-world Care-Package crosshair ('point') is cancelled by
+ * the right mouse button and by the pad's crouch button. Both are the controls
+ * legacy-main actually listens to, so the caption never names a dead key.
+ */
+export type StrikeTargetingMode = 'map' | 'point';
+
+export function strikeCancelGlyph(
+  mode: StrikeTargetingMode,
+  scheme: InputScheme,
+  layout: PadLayout | null,
+  keyProfile: KeyBindingProfile,
+): PromptGlyph {
+  if (mode === 'map') return promptGlyph('pause', scheme, layout, keyProfile);
+  return promptGlyph(scheme === 'gamepad' && layout ? 'crouch' : 'ads', scheme, layout, keyProfile);
+}

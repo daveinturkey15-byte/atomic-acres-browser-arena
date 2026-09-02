@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_KEY_BINDINGS, rebindAction } from '../../key-bindings';
-import { promptGlyph, selectInputScheme, supportCycleGlyph, supportHelpCaption, supportSlotGlyph } from './glyphs';
+import { promptGlyph, selectInputScheme, strikeCancelGlyph, supportCycleGlyph, supportHelpCaption, supportSlotGlyph } from './glyphs';
+import { applyHudInputScheme, applyStrikeTargetingCancelGlyph, STRIKE_HELP_KBD_SELECTOR } from './hud-glyphs';
 import { detectPadLayout } from './mapping';
 
 describe('prompt glyph selection', () => {
@@ -65,5 +66,62 @@ describe('prompt glyph selection', () => {
     expect(selectInputScheme(true, 100, 50)).toBe('gamepad');
     expect(selectInputScheme(true, 100, 150)).toBe('keyboard');
     expect(selectInputScheme(true, 150, 150)).toBe('gamepad');
+  });
+});
+
+// PASS 84 skeptic finding 2026-09-02: the strike-map overlay still hardcoded
+// <kbd>ESC</kbd> and was in no glyph target list, so a pad player was told to
+// press a key he does not have. legacy-main rebuilds that caption from string
+// literals on every map draw, which is why it is re-glyphed from the draw.
+describe('strike-map targeting cancel glyph', () => {
+  const xbox = detectPadLayout('Xbox Wireless Controller 045e', 'standard');
+  const ps = detectPadLayout('Wireless Controller 054c', 'standard');
+
+  it('names the control legacy-main actually listens to, per scheme and mode', () => {
+    // Tactical map: Escape on a keyboard, the pad's pause button on a pad.
+    expect(strikeCancelGlyph('map', 'keyboard', null, DEFAULT_KEY_BINDINGS).label).toBe('ESC');
+    expect(strikeCancelGlyph('map', 'gamepad', xbox, DEFAULT_KEY_BINDINGS)).toMatchObject({ label: 'MENU', family: 'xbox' });
+    // In-world Care Package crosshair: RMB cancels, and on a pad it is crouch.
+    expect(strikeCancelGlyph('point', 'keyboard', null, DEFAULT_KEY_BINDINGS).label).toBe('RMB');
+    expect(strikeCancelGlyph('point', 'gamepad', xbox, DEFAULT_KEY_BINDINGS).label).toBe('B');
+    expect(strikeCancelGlyph('point', 'gamepad', ps, DEFAULT_KEY_BINDINGS)).toMatchObject({ label: '○', family: 'playstation' });
+    // A pad claimed by the gamepad scheme with no detected layout falls back to
+    // the mouse label rather than inventing a button.
+    expect(strikeCancelGlyph('point', 'gamepad', null, DEFAULT_KEY_BINDINGS).label).toBe('RMB');
+  });
+
+  it('rewrites the caption cap in the DOM for the scheme in hand', () => {
+    const cap = {
+      textContent: 'ESC',
+      classList: { pad: false, toggle(_name: string, on: boolean) { this.pad = on; } },
+      dataset: {} as Record<string, string | undefined>,
+    };
+    const doc = {
+      documentElement: { dataset: {} as Record<string, string | undefined> },
+      querySelectorAll: () => [],
+      querySelector: (selector: string) => (selector === STRIKE_HELP_KBD_SELECTOR ? cap : null),
+    } as unknown as Document;
+
+    applyHudInputScheme(doc, { scheme: 'keyboard', layout: null, keyProfile: DEFAULT_KEY_BINDINGS });
+    applyStrikeTargetingCancelGlyph(doc, 'map');
+    expect(cap.textContent).toBe('ESC');
+    expect(cap.classList.pad).toBe(false);
+    expect(cap.dataset.family).toBeUndefined();
+
+    applyHudInputScheme(doc, { scheme: 'gamepad', layout: xbox, keyProfile: DEFAULT_KEY_BINDINGS });
+    applyStrikeTargetingCancelGlyph(doc, 'map');
+    expect(cap.textContent).toBe('MENU');
+    expect(cap.classList.pad).toBe(true);
+    expect(cap.dataset).toMatchObject({ family: 'xbox', unbound: 'false' });
+
+    applyStrikeTargetingCancelGlyph(doc, 'point');
+    expect(cap.textContent).toBe('B');
+
+    // Back to the keyboard and every pad attribute is removed again.
+    applyHudInputScheme(doc, { scheme: 'keyboard', layout: null, keyProfile: DEFAULT_KEY_BINDINGS });
+    applyStrikeTargetingCancelGlyph(doc, 'point');
+    expect(cap.textContent).toBe('RMB');
+    expect(cap.dataset.family).toBeUndefined();
+    expect(cap.dataset.unbound).toBeUndefined();
   });
 });
