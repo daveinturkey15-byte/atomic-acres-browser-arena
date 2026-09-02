@@ -39,6 +39,13 @@ const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
 // reason the comment above records: a new byte under an old key is exactly
 // what the cache-family lock exists to prevent.
 const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
+// NUKETOWN2 (owner 2026-09-02, HF-407): the fifth additive family, same reason
+// again. The Nuke Town Rebuild's own flyover, captured from its own
+// authoritative WebGPU runtime arena by
+// scripts/assets/generate-pass65-runtime-menu-previews.ts and encoded by
+// scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs with the Pass 66
+// profiles.
+const PASS85_CACHE_KEY = 'pass85-nuketown2-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -196,29 +203,30 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // NUKETOWN2 (PREVIEW), owner 2026-09-02 via HF-407. mediaAvailable FALSE and
-  // EMPTY urls, which is the honest state and the one the test's
-  // MEDIA_PENDING_ARENAS allowlist exists for: the flyover is captured from an
-  // arena's own authoritative runtime by an offline recipe, and this arena was
-  // authored today. Empty strings can never collide with a shipped path, so
-  // this card can never silently become another arena's flyover - which is
-  // exactly the failure Test1 and Test2 shipped on 2026-08-30. The card renders
-  // a labelled PREVIEW STANDBY until the capture lands.
+  // NUKETOWN2 (PREVIEW), owner 2026-09-02 via HF-407. This card shipped for one
+  // commit with mediaAvailable FALSE and a labelled PREVIEW STANDBY, which was
+  // the honest state while its flyover did not exist. It now has one: 240 frames
+  // captured headless from the actual Nuke Town Rebuild authoritative runtime
+  // arena on the canonical WebGPU route (nvidia adapter, no software fallback),
+  // encoded with the Pass 66 profiles into its own cache family. What it never
+  // did, at any point, was point at another arena's bytes - which is what Test1
+  // and Test2 shipped on 2026-08-30, and which
+  // finalize-pass85-nuketown2-menu-preview.mjs asserts against the bytes it
+  // wrote.
   'nuketown2': Object.freeze({
     arenaId: 'nuketown2',
     frame: 'helicopter',
     label: 'PRERECORDED HELO // NUKE TOWN REBUILD',
-    motionLabel: 'FLYOVER CAPTURE PENDING',
-    reducedMotionLabel: 'FLYOVER CAPTURE PENDING',
+    motionLabel: 'STREET AND BACK-YARD FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     // The presentation id names the CHOREOGRAPHY RECIPE, not the bytes, and it
     // must equal the one in source-assets/menu/pass85-nuketown2-preview - the
-    // test pins those two together. `mediaAvailable: false` is the field that
-    // says there is no capture yet; the id does not change when one lands.
+    // test pins those two together.
     presentationId: 'menu-video-runtime-helo-nuketown2-v1',
-    mediaAvailable: false,
-    webm: '',
-    mp4: '',
-    poster: '',
+    mediaAvailable: true,
+    webm: `${ROOT}/nuketown2.webm?v=${PASS85_CACHE_KEY}`,
+    mp4: `${ROOT}/nuketown2.mp4?v=${PASS85_CACHE_KEY}`,
+    poster: `${ROOT}/nuketown2.webp?v=${PASS85_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,
