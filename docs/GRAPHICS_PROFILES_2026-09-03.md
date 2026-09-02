@@ -250,6 +250,27 @@ by reading the live pixel-ratio tier rather than inferring it from the canvas;
 the snapshot does not currently expose it, which is itself a gap.
 
 
+### Side by side: what each profile actually buys
+
+`scripts/qa/capture-graphics-profile-views.mjs`, one browser per profile, the
+same AUTHORED review camera each time (`nuke-town-overview` and
+`nuke-town-street-axis` on atomic-acres), viewmodel hidden, bot frozen, the
+presentation loop's own camera-commit receipt re-read immediately before every
+screenshot. 5 profiles x 2 cameras, all OK, zero page errors. Halved PNGs in
+`docs/evidence/pass87/graphics-profiles/views/`; manifest alongside.
+
+| Comparison | What the pixels show | Claim-state |
+|---|---|---|
+| PERFORMANCE vs BALANCED | **The largest visual step in the whole ladder, and it is not close.** PERFORMANCE has no shadows at all, flat untextured surfaces, no road markings or decals, and visibly fewer props (reduced geometry detail drops the roof vehicle, the street lights, the wind turbine). BALANCED restores shadows, brick and asphalt detail, road markings, the full prop set and the storm sky. This is the owner's "doesn't look shit like performance", demonstrated. | VERIFIED |
+| BALANCED vs QUALITY | **Near-identical at this camera.** The three things QUALITY adds — 4x multisampling, half-res SSR and a 24-step sun-shaft march — are edge-level and reflection-level effects that do not change the read of the scene at overview distance. That is the profile working exactly as designed: it was built to carry QUALITY's LOOK without QUALITY's per-frame structures. | VERIFIED |
+| QUALITY vs RAY TRACED vs MAX | Differences are present but subtle at these two cameras, because atomic-acres is a largely matte, outdoor arena — there is little for a reflection to be reflected in. This is the coverage precondition the shared skill names: a correct tracer with nothing to reflect looks like a bug report. A wet-surface or interior camera would separate them; these two do not. | VERIFIED (as a limitation of the chosen cameras, not of the profiles) |
+
+One corroborating detail that needed no analysis: the PERFORMANCE PNGs are
+roughly half the byte size of every other profile's at the same camera
+(421-545 KB vs 1078-1159 KB). A softer, upsampled, unshadowed frame has far
+less high-frequency content to encode. It is the render-scale finding again,
+arriving through a completely independent channel.
+
 ---
 
 ## 4. Honesty column: what "verified" means for each control
