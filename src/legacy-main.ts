@@ -31242,7 +31242,7 @@ function sampleDmrThermalReadiness() {
  * HF-412: the CHEAP per-frame read of a third-person body's stance blend, for
  * the drop-shot body and guest harnesses.
  *
- * `snapshot()` rebuilds the whole operator report (every bone chain in the
+ * The full operator snapshot rebuilds the whole report (every bone chain in the
  * scene) and stretched the body harness's sampling frame to ~65 ms, which made
  * its "single frame" numbers sample deltas rather than frames. This walks
  * nothing: it reads the rig runtime's five stance fields directly.
@@ -31597,7 +31597,7 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
-    // MP-LAB: the cheap pose read for movement probes. snapshot() walks every
+    // MP-LAB: the cheap pose read for movement probes. The full snapshot walks every
     // rigged actor's skinned meshes and costs ~60 ms per call (measured
     // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
     // it is measuring. This returns only what a deadlock check needs.
