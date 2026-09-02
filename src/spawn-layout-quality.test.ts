@@ -1,24 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { ARENA_SELECTIONS } from './map-selection';
-import { buildArena } from './map';
-import { buildGunRange, buildRustworks1v1, buildSkylineTerminal } from './additional-maps';
-import { buildFarcrysis } from './farcrysis';
-import { buildHighSeas } from './high-seas';
-import { buildTest1, buildTest2 } from './test-maps';
 import { validArenaSpawnPoint } from './spawn-safety';
+import {
+  ARENA_BUILDERS,
+  SPAWN_LAYOUT_THRESHOLDS,
+  arenaFieldsBots,
+  measureSpawnLayout,
+} from './spawn-layout-constraints';
 
 type SpawnPoint = { x: number; z: number };
-const BUILDERS: Record<string, (scene: THREE.Scene) => { spawns: Record<number, SpawnPoint[]>; bounds: { minX: number; maxX: number; minZ: number; maxZ: number }; colliders: readonly unknown[] }> = {
-  'atomic-acres': buildArena as never,
-  'rustworks-1v1': buildRustworks1v1 as never,
-  'gun-range': buildGunRange as never,
-  'skyline-terminal': buildSkylineTerminal as never,
-  farcrysis: buildFarcrysis as never,
-  'high-seas': ((scene: THREE.Scene) => buildHighSeas(scene)) as never,
-  test1: buildTest1 as never,
-  test2: buildTest2 as never,
-};
+// HF-402: the builder table is `Record<ArenaId, ...>` in
+// spawn-layout-constraints.ts - exhaustive by type, so a new registry id
+// without a builder fails tsc instead of silently escaping this gate.
+const BUILDERS = ARENA_BUILDERS;
 
 /**
  * THE SPAWN LAYOUT GATE.
@@ -128,6 +123,74 @@ describe('authored spawn layouts, on every playable arena', () => {
           for (const right of teams[1]) closest = Math.min(closest, distance(left, right));
         }
         expect(closest, `${selection.id} teams share a spawn point`).toBeGreaterThan(MINIMUM_PAIR_SEPARATION_M);
+      });
+    });
+  }
+});
+
+/**
+ * HF-402 (2026-09-02). Owner: "please ensure all maps have more reasonable
+ * spawns for both players and bots, currently raid spawns me in outside".
+ *
+ * Everything above passed on Raid while five of its six team-0 spawns stood
+ * in the void outside the boundary wall: "walkable" was measured as "not
+ * inside a collider", and nothing is inside a collider where there is no map.
+ * Measured on the shipped b138b9c0 tables before this block existed:
+ *
+ *     test2 (Raid)   team 0: 5/6 no floor, 6/6 no autostep route to the enemy
+ *                    team 1: 4/6 no floor, 6/6 no route (the two with a floor
+ *                            sit in a garage only a jump leaves)
+ *     every other selectable arena: 12/12 or 24/24 on every rule below
+ *
+ * The rules and their thresholds live in src/spawn-layout-constraints.ts and
+ * are calibrated on Nuke Town. The roster is derived from ARENA_SELECTIONS.
+ */
+describe('HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight', () => {
+  for (const selection of PLAYABLE) {
+    describe(selection.displayName, () => {
+      const arena = BUILDERS[selection.id](new THREE.Scene());
+      const report = measureSpawnLayout(selection.id, arena);
+      const describePoint = (point: (typeof report.points)[number]): string => `${selection.id} team ${point.team} spawn (${point.x}, ${point.z})`;
+
+      it('stands every spawn on a floor within autostep of its feet - outside the footprint there is none', () => {
+        for (const point of report.points) {
+          expect(point.floorGapM, `${describePoint(point)} has nothing beneath it (a fail-safe floor more than 0.6 m down does not count)`).not.toBeNull();
+        }
+      });
+
+      it('connects every spawn to an enemy spawn by a route that needs no jump - a bot cannot jump', () => {
+        for (const point of report.points) {
+          expect(point.reachable, `${describePoint(point)} has no autostep route to any enemy spawn${point.reachableByJump ? ' (a jump would reach one: a bot trap)' : ''}`).toBe(true);
+        }
+      });
+
+      it(`puts hard cover within ${SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM} m of every spawn`, () => {
+        for (const point of report.points) {
+          expect(point.coverDistanceM, `${describePoint(point)} is ${point.coverDistanceM} m from the nearest cover`).toBeLessThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM);
+        }
+      });
+
+      if (arenaFieldsBots(selection.id)) {
+        it(`keeps every enemy spawn with a direct eye-height line at least ${SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM} m away - bots draw from that table`, () => {
+          for (const point of report.points) {
+            if (point.nearestVisibleEnemyM === null) continue;
+            expect(point.nearestVisibleEnemyM, `${describePoint(point)} sees an enemy spawn ${point.nearestVisibleEnemyM} m away`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM);
+          }
+        });
+
+        it(`separates the two tables by at least ${SPAWN_LAYOUT_THRESHOLDS.minimumCrossTeamSeparationFraction * 100}% of the longer axis`, () => {
+          expect(report.summary.crossTeamMinFraction, `${selection.id} tables are ${report.summary.crossTeamMinDistanceM} m apart`).toBeGreaterThanOrEqual(SPAWN_LAYOUT_THRESHOLDS.minimumCrossTeamSeparationFraction);
+        });
+      }
+
+      it('reports no failure the rules above did not already name', () => {
+        // The per-point failure list is what the solver and the runtime
+        // verifier consume; it must agree with the assertions above.
+        const named = new Set(['no-floor', 'no-autostep-route-to-enemy', 'no-cover-in-reach', 'enemy-spawn-in-sight', 'inside-geometry-or-out-of-bounds']);
+        for (const point of report.points) {
+          for (const failure of point.failures) expect(named.has(failure), `${describePoint(point)}: unknown failure ${failure}`).toBe(true);
+        }
+        expect(report.failures.filter((failure) => !failure.startsWith('teams-too-close'))).toEqual([]);
       });
     });
   }
