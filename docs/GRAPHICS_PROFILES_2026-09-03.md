@@ -348,6 +348,13 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   admission frame. The shared skill's fix — precompile during the menu preview,
   where the fence does not apply — is not implemented. See
   `docs/NEURAL_RENDERING_OPTIONS_2026-09-03.md` §3 recommendation 2.
+- **OPEN (HF-418 item 4, blocked on Lane AL):** the individual lighting-feature
+  controls with tiers and measured costs (baked indirect, SSR, AO, contact
+  shadows) are Lane AL's deliverable and had not landed when this lane ran.
+  BALANCED carries a `TODO(HF-418 item 4, Lane AL)` at its definition naming
+  the decision that has to be argued when they do, and its control-set hash is
+  the tripwire: the moment a lighting default changes,
+  `graphics-profile-contract.test.ts` fails until this document is re-measured.
 - **OPEN:** 39 of 40 controls are grep-verified only (§4).
 - **OPEN:** `AGENTS.md` still says "The top-level graphics surface exposes
   exactly Performance, Quality, Max and Custom". That sentence went stale when

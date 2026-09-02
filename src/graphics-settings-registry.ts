@@ -778,6 +778,18 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   //     instance count is, so Balanced thins the count rather than hiding the
   //     storm state Performance caps away.
   //     Grain and vignette sit between the two profiles' authored values.
+  //
+  // TODO(HF-418 item 4, Lane AL): the lighting-feature controls Lane AL is
+  // building - baked indirect, SSR tiers, AO tiers, contact shadows, each with
+  // a measured cost and a per-profile default - had not landed when this
+  // profile was authored. When they do, BALANCED is the profile whose defaults
+  // have to be argued first: it is the rung where "beautiful lighting that
+  // wont murder FPS" (owner, 19:10) is actually decided, and its current
+  // lighting position is deliberately conservative (indirect HIGH, everything
+  // screen-space OFF) precisely so that adding a cheap baked tier is a clear
+  // improvement rather than a swap. The control-set hash in
+  // graphics-profile-contract.test.ts will fail the moment that edit lands,
+  // which is the intended tripwire: the audit doc must be re-measured with it.
   balanced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
