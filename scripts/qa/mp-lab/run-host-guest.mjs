@@ -448,6 +448,14 @@ function installProbe(page, options) {
     let inputSince = null;
     let window5 = [];
     let lastDeadlockAt = -Infinity;
+    // MP-LAB: a detected deadlock is ambiguous - a player wedged in arena
+    // geometry and a player frozen by the network look identical from a
+    // position series. On every deadlock the driver turns the player through
+    // eight headings while holding forward for 1.6 s. Escaping means the world
+    // held it (an arena/collision report, not a netcode one); not escaping
+    // under every heading is a real freeze. The verdict still fails on the
+    // deadlock either way: this only says which team owns it.
+    let escape = null;
     // cfg.driver === false: sampler only (used to prove the driver's own
     // snapshot() polling is not what a page is paying for).
     const driverTimer = cfg.driver === false ? 0 : window.setInterval(() => {
@@ -482,6 +490,53 @@ function installProbe(page, options) {
           api.setTriggerHeld?.(false);
           if (step % 20 === 0) { try { api.respawn(); probe.respawns += 1; } catch { /* ignore */ } }
           return;
+        }
+        // MP-LAB: escape sweep owns the driver while it runs.
+        if (escape) {
+          const dx = pos ? pos.x - escape.from.x : 0;
+          const dy = pos ? pos.y - escape.from.y : 0;
+          const dz = pos ? pos.z - escape.from.z : 0;
+          escape.movedM = Math.max(escape.movedM, Math.sqrt(dx * dx + dy * dy + dz * dz));
+          // aimAtRemoteWithOffset is the only yaw control without pointer lock and
+          // it no-ops when there is no remote (solo). Track the yaw actually
+          // reached: a sweep that never turned the player proves nothing.
+          if (typeof pose?.yaw === 'number') {
+            if (escape.startYaw === null) escape.startYaw = pose.yaw;
+            let delta = Math.abs(pose.yaw - escape.startYaw) % (Math.PI * 2);
+            if (delta > Math.PI) delta = Math.PI * 2 - delta;
+            escape.maxYawDeltaRad = Math.max(escape.maxYawDeltaRad, delta);
+          }
+          const elapsed = now - escape.startedAt;
+          if (elapsed >= 1600 || typeof api.aimAtRemoteWithOffset !== 'function') {
+            const record = probe.deadlocks[escape.index];
+            if (record) {
+              const turned = escape.maxYawDeltaRad > 0.5;
+              record.escape = {
+                headings: escape.headings,
+                movedM: Math.round(escape.movedM * 1000) / 1000,
+                maxYawDeltaRad: Math.round(escape.maxYawDeltaRad * 100) / 100,
+                yawControl: turned,
+                // 0.5 m in 1.6 s of sprint is a tenth of the distance a free
+                // player covers: anything above it means the world let go.
+                // Without real yaw control the sweep only re-walked the same
+                // heading, so the answer is unknown, never 'frozen'.
+                freed: turned ? escape.movedM > 0.5 : null,
+              };
+            }
+            escape = null;
+            inputSince = now;
+            window5 = [];
+          } else {
+            const heading = Math.floor(elapsed / 200) % 8;
+            if (heading !== escape.lastHeading) {
+              escape.lastHeading = heading;
+              escape.headings += 1;
+              try { api.aimAtRemoteWithOffset(-Math.PI + (heading * Math.PI) / 4, 0); } catch { /* no remote */ }
+            }
+            api.setMovement(true, true);
+            for (const code of [...held]) hold(code, false);
+            return;
+          }
         }
         // 12 s pattern: 3 s forward+sprint, 3 s forward+left, 3 s backward, 3 s forward+right.
         const phase = Math.floor(step / 60) % 4;
@@ -520,7 +575,18 @@ function installProbe(page, options) {
               position: [Math.round(first.x * 100) / 100, Math.round(first.y * 100) / 100, Math.round(first.z * 100) / 100],
               awaitingCanonicalGuestAuthority: pose?.awaitingCanonicalGuestAuthority ?? null,
               menuHidden: menuHidden(),
+              escape: null,
             });
+            escape = {
+              startedAt: now,
+              from: { ...first },
+              index: probe.deadlocks.length - 1,
+              movedM: 0,
+              headings: 0,
+              lastHeading: -1,
+              startYaw: null,
+              maxYawDeltaRad: 0,
+            };
           }
         }
       } catch (error) {
@@ -575,6 +641,9 @@ function stopProbe(page) {
       longTasksOver100Ms: probe.longTasks.filter((task) => task.durationMs >= 100).length,
       longTasks: probe.longTasks.slice(0, 20),
       deadlockCount: probe.deadlocks.length,
+      deadlocksFreedByTurning: probe.deadlocks.filter((entry) => entry.escape?.freed === true).length,
+      deadlocksNotFreed: probe.deadlocks.filter((entry) => entry.escape?.freed === false).length,
+      deadlocksUnclassified: probe.deadlocks.filter((entry) => !entry.escape || entry.escape.freed === null).length,
       deadlocks: probe.deadlocks.slice(0, 10),
       deaths: probe.deaths,
       respawns: probe.respawns,
