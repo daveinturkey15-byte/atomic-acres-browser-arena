@@ -28,16 +28,18 @@ const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
 // versions we had". This chooser - the one a DIRECT LINK or bookmark lands on,
 // distinct from the root release shell - offered `rollback`, which is
 // channels/pass63-rollback. That tree is not on gh-pages and 404s live, so the
-// second card was a dead link. Verified against the branch: the only channels
-// that actually exist are pass81, the-big-one (PASS 73), pass72-retained and
-// recent-stable; rollback, retained and historical all point at trees that were
-// never published or have been removed.
+// second card was a dead link.
 //
-// Prefer the newest LIVE predecessor - PASS 73 - which is also the one he asked
-// for, and keep `stable` as the last resort. `rollback` is deliberately no longer
-// consulted here; it stays in release-channels.json because project-map.ts
+// HF-400, owner 2026-09-02: "pin this version and remove all past versions, this
+// can be the safe backup". After the pass84 publish the ONLY trees on gh-pages
+// are channels/pass84 and channels/pass83, so the second card must be the PASS 83
+// safe backup; `stable` (recent-stable) is retired by that publish and stays here
+// only as a last resort the publish guard will refuse. `rollback` is deliberately
+// not consulted; it stays in release-channels.json because project-map.ts
 // documents it, but it must not be offered to a player until its tree exists.
-const stableFallback = releaseChannels.pass73Retained ?? releaseChannels.stable;
+// scripts/orchestration/publish_pass84.py parses this line and refuses to publish
+// unless it resolves to channels/pass83.
+const stableFallback = releaseChannels.pass83Backup ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
 // The pass name used to be hand-written into both of these strings, and had been stale for
 // ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
@@ -46,7 +48,7 @@ const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_R
 // does too, so the description cannot drift from the build it describes.
 const latestDescription = newestBuildIsPublished
   ? releaseChannels.latest.description
-  : `${releaseChannels.latest.description} Local HITL candidate - not yet published.`;
+  : `${releaseChannels.latest.description} Release candidate - not yet published.`;
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
@@ -107,7 +109,7 @@ function showReleaseChooser(): void {
             <span>${latestDescription}</span>
           </button>
           <button type="button" class="release-channel-option" data-release-choice="stable">
-            <small>${stableFallback.pass} · STABLE WEBGL</small>
+            <small>${stableFallback.pass} · SAFE BACKUP</small>
             <strong>${stableFallback.label}</strong>
             <span>${stableFallback.description}</span>
           </button>

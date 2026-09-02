@@ -28,12 +28,14 @@ export type ReleaseChannelConfig = {
   historical: PinnedReleaseChannel;
   stable: PinnedReleaseChannel;
   /**
-   * PASS 73, retained live at channels/the-big-one. Optional because the key
-   * post-dates schemaVersion 5 consumers, but it IS on gh-pages today and it is
-   * the newest live predecessor - which is why the direct-link chooser in
-   * bootstrap.ts prefers it over `rollback`, whose tree 404s.
+   * PASS 83, the single pinned safe backup at channels/pass83 (HF-400, owner
+   * 2026-09-02: "pin this version and remove all past versions, this can be the
+   * safe backup"). Optional because the key post-dates schemaVersion 5 consumers,
+   * but it IS on gh-pages and it is the only predecessor the pass84 publish
+   * keeps - which is why the direct-link chooser in bootstrap.ts prefers it over
+   * `rollback`, whose tree 404s.
    */
-  pass73Retained?: Readonly<{ label: string; description: string; pass: string; path: string }>;
+  pass83Backup?: Readonly<{ label: string; description: string; pass: string; path: string }>;
   rollback?: PinnedReleaseChannel & {
     rebuiltFromSource: boolean;
   };
