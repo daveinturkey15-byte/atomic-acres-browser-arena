@@ -97,8 +97,12 @@ test('every selectable arena is covered by the derived roster', () => {
   // Guards the derivation itself: if the regex ever stops matching the file's
   // shape it would silently yield an EMPTY roster, and an empty roster tests
   // nothing while reporting success.
-  assert.ok(selectable.length >= 7, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
-  for (const required of ['atomic-acres', 'test1', 'test2']) {
+  // MAP3: ratcheted 7 -> 8 when Map 3 joined the selectable roster, mirroring the
+  // identical guard in eye-clearance-sweep-contract.test.mjs. The floor and the
+  // required set are the only things standing between a collapsed derivation and
+  // a gate that reports success while browser-testing nothing.
+  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
   assert.ok(!selectable.includes('farcrysis'), 'farcrysis is selectable:false and must stay out of the required set');
