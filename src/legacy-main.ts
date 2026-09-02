@@ -247,6 +247,9 @@ import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation'
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
+// HF-418 — the RTX explainer is information, not a preset. See the change
+// handler on #graphics-profile: it restores the select and opens the dialog.
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, bindRtxNativeRuntimeExplainer } from './ui/rtx-native-runtime-explainer';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
   MobileTouchControls,
@@ -27969,6 +27972,7 @@ function flushPendingGraphics(): void {
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
   pendingGraphicsPreset = 'custom';
   graphicsProfileInput.value = 'custom';
+  refreshGraphicsProfileCopy('custom');
   refreshGraphicsPendingBadge();
 });
 document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
@@ -28018,7 +28022,32 @@ hardRefreshButton.addEventListener('click', () => {
     reloadFresh();
   }
 });
+// HF-418 — the RTX row is an EXPLAINER, not a preset. Selecting it must leave
+// the renderer exactly as it was: no staged preset, no advanced-panel refresh,
+// no reload. The select is put back to the mode that is actually active and
+// then the dialog opens. `RTX_NATIVE_RUNTIME_OPTION_VALUE` is deliberately not
+// a member of GraphicsPreset, so even if this branch were ever removed the
+// value could not be persisted - normalizePass65Settings would reject it.
+const rtxNativeRuntimeExplainer = bindRtxNativeRuntimeExplainer(document);
+
+// HF-414/HF-418 — one honest line per mode, plus the expandable detail. Every
+// block is rendered into the shell and all but the active one carry `hidden`,
+// so this only toggles visibility and never composes player-facing copy in the
+// 35k-line module.
+function refreshGraphicsProfileCopy(preset: string): void {
+  for (const node of document.querySelectorAll<HTMLElement>('[data-graphics-profile]')) {
+    node.hidden = node.dataset.graphicsProfile !== preset;
+  }
+}
+refreshGraphicsProfileCopy(displayedGraphicsPreset);
+
 graphicsProfileInput.addEventListener('change', () => {
+  if (graphicsProfileInput.value === RTX_NATIVE_RUNTIME_OPTION_VALUE) {
+    graphicsProfileInput.value = pendingGraphicsPreset ?? displayedGraphicsPreset;
+    refreshGraphicsProfileCopy(graphicsProfileInput.value);
+    rtxNativeRuntimeExplainer.open();
+    return;
+  }
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
   if (preset !== 'custom' && preset in GRAPHICS_PRESET_VALUES) {
@@ -28026,6 +28055,7 @@ graphicsProfileInput.addEventListener('change', () => {
     // can see what they were before deciding to tweak them into a custom set.
     advancedGraphicsBinding.refresh({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset as keyof typeof GRAPHICS_PRESET_VALUES] });
   }
+  refreshGraphicsProfileCopy(preset);
   refreshGraphicsPendingBadge();
 });
 

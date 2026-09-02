@@ -275,3 +275,127 @@
     min-height: 60px;
   }
 }
+
+/* ==========================================================================
+   HF-414 / HF-418 — graphics profile copy and the RTX native-runtime dialog.
+
+   The copy blocks are all rendered and hidden with the `hidden` attribute, so
+   these rules only have to make the visible one readable. The AGENTS.md HUD
+   rule applies: menu labels and critical text stay at least 9px at 1280x720,
+   and nothing here may regress the panel to a near-black monolith.
+   ========================================================================== */
+.graphics-preset-row #graphics-profile-copy .graphics-profile-summary {
+  margin: 6px 0 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #dbe7f2;
+}
+
+#graphics-profile-detail-panel {
+  margin-top: 4px;
+  border-top: 1px solid rgba(120, 160, 200, 0.28);
+  padding-top: 6px;
+}
+
+#graphics-profile-detail-panel > summary {
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #8fb6d8;
+}
+
+#graphics-profile-detail-panel h5 {
+  margin: 8px 0 2px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #7fd4ff;
+}
+
+#graphics-profile-detail-panel ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+#graphics-profile-detail-panel li,
+#graphics-profile-detail-panel p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c6d6e4;
+}
+
+.rtx-runtime-dialog {
+  max-width: 680px;
+  border: 1px solid rgba(120, 190, 255, 0.5);
+  border-radius: 6px;
+  background: #101822;
+  color: #dce8f4;
+  padding: 0;
+}
+
+.rtx-runtime-dialog::backdrop {
+  background: rgba(4, 8, 14, 0.72);
+}
+
+.rtx-runtime-body {
+  padding: 18px 20px 14px;
+}
+
+.rtx-runtime-body header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  border-bottom: 1px solid rgba(120, 160, 200, 0.3);
+  padding-bottom: 8px;
+}
+
+.rtx-runtime-body header b {
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  color: #9fe0ff;
+}
+
+.rtx-runtime-body header span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #ffcf87;
+}
+
+.rtx-runtime-lead {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #f0f6fb;
+}
+
+.rtx-runtime-body h4 {
+  margin: 14px 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #7fd4ff;
+}
+
+.rtx-runtime-body li {
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 4px;
+}
+
+.rtx-runtime-body footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(120, 160, 200, 0.3);
+  padding-top: 10px;
+}
+
+.rtx-runtime-body footer small {
+  font-size: 11px;
+  color: #9fb2c4;
+}
+
+.rtx-runtime-body footer button {
+  min-height: 34px;
+  padding: 0 18px;
+}
