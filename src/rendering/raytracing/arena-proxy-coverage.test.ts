@@ -184,6 +184,10 @@ beforeAll(async () => {
     import('../pass64-tsl-scene'),
   ]);
 
+  // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
+  // needs a wasm module resolved first, so it throws until prepare has run.
+  await (await import('../../map3-arena')).prepareMap3();
+
   const factories: Record<string, (scene: THREE.Scene) => unknown> = {
     'atomic-acres': buildArena,
     'rustworks-1v1': buildRustworks1v1,

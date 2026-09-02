@@ -77,6 +77,27 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
     { name: 'map3-godrays-rolling-body', count: 2, reason: 'the two marched bodies that roll through the light shafts; their whole purpose is to move, and they are the volumetric exhibit, not cover' },
     { name: 'map3-shoreline-floating-barrel', count: 3, reason: 'floats on the Gerstner surface: heaves and drifts with the waves every frame' },
     { name: 'map3-shoreline-floating-buoy', count: 2, reason: 'moored buoy riding the swell; bobs every frame' },
+    // MAP3 (HF-409 finisher 2, 2026-09-02): the Rapier playground is the
+    // arena's eighth corridor now. Four of these five rows are the same class
+    // as every row above - a body that MOVES, so a static shot rectangle would
+    // rate the ground it left.
+    { name: 'map3-physics-jenga-block', count: 1, reason: 'the jenga tower: 45 dynamic bodies in one instanced mesh, authored to be knocked down' },
+    { name: 'map3-physics-wall-brick', count: 1, reason: 'the running-bond wall: 76 dynamic bricks in one instanced mesh, authored to be knocked down' },
+    { name: 'map3-physics-paddle-wheel', count: 1, reason: 'paddle wheel on a revolute joint; it spins every frame the balls hit it' },
+    { name: 'map3-physics-gear-large', count: 1, reason: 'gear driven by the wheel rotation it measures; turns every frame' },
+    // The fifth is NOT a moving body and is the one that needs its own reason.
+    // `map3-physics-machine-frame` is a MERGED BATCH of the machine bay's
+    // separated static fixtures - two wheel bearings, a gear stanchion, a
+    // tachometer dial on a post, the see-saw fulcrum and two guide rails. Its
+    // AABB (6.11 x 2.34 x 4.28 m) is therefore mostly the walkable bay floor
+    // BETWEEN those fixtures, and it is 2.34 m tall only because the dial sits
+    // at 1.85 m on a 10 cm post. Every part of it over the audit's own 0.35 m
+    // substantiality floor - the fulcrum and both guide rails - carries a
+    // movement collider AND a shot surface authored from
+    // `src/map3/corridor-solids.ts`; the rest are 0.10-0.14 m posts. A round
+    // crossing the air between them is the correct behaviour, and rating the
+    // batch's AABB would put a 26 m2 steel plate across an empty bay.
+    { name: 'map3-physics-machine-frame', count: 1, reason: 'merged batch of separated static machine fixtures; the fulcrum and both guide rails are individually collided and rated, the rest are sub-0.35 m posts, and the AABB is the walkable bay between them' },
   ],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every

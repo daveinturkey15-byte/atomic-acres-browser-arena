@@ -43,16 +43,28 @@
  * world axes, and every rotation here is a MULTIPLE OF 90 DEGREES, which maps
  * an axis-aligned box to an axis-aligned box exactly.
  *
- * WHAT IS NOT HERE. The physics playground corridor (`corridor-physics.ts`)
- * stays on `/map3.html`. It owns a Rapier world and `createPhysicsCorridor()`
- * is async because `RAPIER.init()` streams a wasm module; arena construction
- * is SYNCHRONOUS on purpose, inside the fenced transaction between the WebGPU
- * fence and the authority commit. Making it async there, or splitting Rapier
- * out of that module, would force an async preparation step into the parity
- * audit's factory table, the spawn-layout builder map and the eye-clearance
- * sweep - three call sites this lane does not own. The exact patch is in the
- * lane report; until it lands, the bay is one page click away and the arena
- * does not pretend to contain it.
+ * THE EIGHTH CORRIDOR, AND PREPARE-THEN-BUILD (HF-409 finisher 2).
+ *
+ * The physics playground (`corridor-physics.ts`) used to be the one corridor
+ * the arena did not contain, because it owns a Rapier world and
+ * `RAPIER.init()` streams a wasm module - and arena construction is
+ * SYNCHRONOUS on purpose, inside the fenced transaction between the WebGPU
+ * fence and the authority commit. That was not a reason to ship seven
+ * corridors and call it the showcase; it was a reason to move the asynchrony
+ * OUT of the build.
+ *
+ * So Map 3 is PREPARE, then BUILD. `prepareMap3()` is async and does all of
+ * the waiting: it resolves the Rapier chunk and initialises its wasm.
+ * `buildMap3()` is synchronous, exactly as every other arena builder is, and
+ * THROWS if prepare has not run. It never returns a seven-corridor arena -
+ * silently omitting an eighth of the content, its colliders and its shot
+ * surfaces would pass every gate that counts what it can see, and the arena
+ * would be measured, ledgered and published as complete when it is not.
+ *
+ * Callers that build map3 synchronously (the arena transition's preparation
+ * phase, `__ATOMIC_ACRES_DEBUG__.prepareArena`, the parity audit's factory
+ * table, the spawn-layout builder map, the eye-clearance sweeps) await
+ * `prepareMap3()` first. It is idempotent and costs ~70 ms once per process.
  */
 import * as THREE from 'three';
 import {
@@ -68,6 +80,7 @@ import type { ArenaFrameContext } from './arena-frame-animation';
 import { createGrammarCorridor, createMathsCorridor, createNatureCorridor, type Corridor } from './map3/corridors';
 import { createVolumeCorridor, createWaterCorridor, createWeatherCorridor } from './map3/corridors-extra';
 import { createColosseumCorridor } from './map3/corridor-colosseum';
+import { createPhysicsCorridorSync, isMap3RapierReady, loadMap3Rapier } from './map3/corridor-physics';
 import type { CorridorSolid } from './map3/corridor-solids';
 
 /**
@@ -111,13 +124,20 @@ export type Map3LaneSpec = Readonly<{
 }>;
 
 /**
- * The seven showcase corridors, placed.
+ * The EIGHT showcase corridors, placed.
  *
  * Wide corridors get room (the shoreline is 41 m across, the forest 30);
  * narrow ones sit at +/-13 m, which is more than the widest of them needs. The
  * colosseum shares the north edge with the shoreline because almost all of it
  * - the bowl, the arcade, the skyline - is beyond the bounds, and only its
  * overlook terrace is in the playfield at all.
+ *
+ * The physics playground takes the south edge's free flank at +24 m: it is
+ * 10.8 m across between its kerbs, so it spans 18.6-29.4 m local, the forest
+ * beside it reaches 15, and its far flank stops 4.6 m inside the 34 m start
+ * that keeps a lane clear of its neighbouring EDGE.
+ * `src/map3-lane-layout.test.ts` measures the real meshes rather than these
+ * numbers and fails on any overlap.
  */
 export const MAP3_LANES: readonly Map3LaneSpec[] = Object.freeze([
   { id: 'shoreline', label: 'Shoreline', edge: 0, lateral: -26, build: () => createWaterCorridor() },
@@ -125,9 +145,26 @@ export const MAP3_LANES: readonly Map3LaneSpec[] = Object.freeze([
   { id: 'raymarch', label: 'Raymarched SDF', edge: 1, lateral: -13, build: () => createMathsCorridor() },
   { id: 'grammar', label: 'Shape grammar', edge: 1, lateral: 13, build: () => createGrammarCorridor(11) },
   { id: 'vegetation', label: 'Vegetation', edge: 2, lateral: 0, build: () => createNatureCorridor(7) },
+  // MAP3 (HF-409 finisher 2): the eighth corridor. Needs prepareMap3() first.
+  // `bindKeys: false`: B and F are the game's emote and interact bindings.
+  // See PhysicsCorridorOptions in src/map3/corridor-physics.ts.
+  { id: 'physics', label: 'Rapier playground', edge: 2, lateral: 24, build: () => createPhysicsCorridorSync({ bindKeys: false }) },
   { id: 'godrays', label: 'God rays', edge: 3, lateral: -13, build: () => createVolumeCorridor() },
   { id: 'seasons', label: 'Seasons', edge: 3, lateral: 14, build: () => createWeatherCorridor(21) },
 ]);
+
+/**
+ * Resolve everything `buildMap3` needs, so the build itself can stay
+ * synchronous. Idempotent and safe to call concurrently; see the header.
+ */
+export async function prepareMap3(): Promise<void> {
+  await loadMap3Rapier();
+}
+
+/** True when `buildMap3` will not throw for want of preparation. */
+export function isMap3Prepared(): boolean {
+  return isMap3RapierReady();
+}
 
 /** Corridor-local -> world for a lane. Quarter turns, so this is exact. */
 export function laneToWorld(
@@ -289,6 +326,18 @@ type PlacedLane = {
 };
 
 export function buildMap3(scene: THREE.Scene): ArenaMap {
+  // PREPARE-THEN-BUILD. Loud, never silent: an arena that quietly came back
+  // with seven of its eight corridors would be measured, ledgered and
+  // published as whole. See the header.
+  if (!isMap3Prepared()) {
+    throw new Error(
+      'buildMap3: Map 3 has not been prepared. Its eighth corridor (the Rapier playground) '
+      + 'needs a wasm module, and fetching one is asynchronous while arena construction is not. '
+      + 'Await prepareMap3() before calling buildMap3(). In the game that happens in the arena '
+      + "transition's preparation phase; in QA call __ATOMIC_ACRES_DEBUG__.prepareArena('map3') "
+      + 'first, or await prepareMap3() in the script.',
+    );
+  }
   const builder = makeBuilder(scene, 'Map3 arena');
   const materials = map3Materials();
 

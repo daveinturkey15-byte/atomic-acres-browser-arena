@@ -25,7 +25,18 @@ import {
   MAP3_LANE_START,
   buildMap3,
   laneToWorld,
+  prepareMap3,
 } from './map3-arena';
+
+/**
+ * MAP3 (HF-409 finisher 2): PREPARE, then BUILD.
+ *
+ * `buildMap3` is synchronous like every other arena builder, but its eighth
+ * corridor (the Rapier playground) needs a wasm module first, so it THROWS
+ * rather than quietly returning seven corridors. One top-level await here
+ * resolves it for every build below. Idempotent; ~70 ms once per process.
+ */
+await prepareMap3();
 
 type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
 

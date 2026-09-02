@@ -241,6 +241,9 @@ import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/kill
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+// MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
+// current arena's mode IS. See src/ui/hud-mode-banner.ts.
+import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
@@ -3326,7 +3329,17 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   test1: eagerArena(buildTest1),
   test2: eagerArena(buildTest2),
   // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
-  map3: lazyArena(async () => (await import('./map3-arena')).buildMap3),
+  //
+  // The loader RESOLVES AND PREPARES. `prepareMap3()` initialises the Rapier
+  // wasm the eighth corridor is built from, and doing it here means
+  // `isResolved(id)` keeps its one meaning for every caller - "the builder can
+  // be called right now" - instead of a lazy arena having a second, invisible
+  // readiness step that only the arena transition knew about.
+  map3: lazyArena(async () => {
+    const module = await import('./map3-arena');
+    await module.prepareMap3();
+    return module.buildMap3;
+  }),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -6869,6 +6882,14 @@ function selectLobbyCodeForManualCopy(code: string): void {
 }
 
 function currentMatchRules() {
+  // MAP3 (HF-409 finisher 2): an EXPLORE arena has no clock and no score
+  // limit, so nothing can run out and nobody can win. The registry row keeps
+  // `matchRules.durationMs` because the arena id is also the replay/storage
+  // boundary and a saved match naming map3 must still decode - the RUNTIME
+  // rules are what the match state machine reads, and they follow the KIND.
+  // Without this, walking the showcase ends in a VICTORY/DEFEAT card at five
+  // minutes, which is the same lie as the TEAM DEATHMATCH banner.
+  if (selectedArena.kind === 'explore') return EXPLORE_MATCH_RULES;
   if (gameMode === 'solo') return selectedArena.matchRules;
   // HF-377: the lobby config is the replicated match contract; its kill limit
   // applies identically to TDM (squad score) and FFA (leader kills) because
@@ -16912,10 +16933,22 @@ async function startGame(
   respawnTimer = null;
   respawnEndsAt = 0;
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+  // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
+  // This runs once, before the first frame, so an explore arena never shows a
+  // single frame of TEAM DEATHMATCH / 05:00 / AQUA-CORAL before the per-frame
+  // writer below corrects it.
+  const startBanner = hudModeBanner({
+    arena: selectedArena, site: 'match-start',
+    domination: dominationModeActive(), freeForAll: false, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  element<HTMLElement>('#timer').hidden = !startBanner.clock;
+  element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
+  element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
+  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
   element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -26483,7 +26516,13 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  if (matchState.phase === 'warmup') {
+  // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
+  // match to start, so the 3-2-1 cue and its audio would be announcing one.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
       const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
@@ -26494,9 +26533,14 @@ function updateMatchState(now: number): void {
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
   if (matchState.phase === 'active') {
-    const engageSequence = presentMatchCountdownCue('engage');
-    audio.matchCountdown('engage');
-    lastMatchCountdownCue = 'engage';
+    // MAP3 (HF-409 finisher 2): "ENGAGE" is a combat word and the big centre
+    // cue is a match-start cue. An explore arena gets neither - it is opened,
+    // not started - so it is welcomed in instead and nothing counts down.
+    const engageSequence = countdownCueAllowed ? presentMatchCountdownCue('engage') : null;
+    if (countdownCueAllowed) {
+      audio.matchCountdown('engage');
+      lastMatchCountdownCue = 'engage';
+    }
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
@@ -26504,12 +26548,13 @@ function updateMatchState(now: number): void {
     // announcement that took over or queued behind it.
     presentBanner(
       'match-flow',
-      'ENGAGE',
+      countdownCueAllowed ? 'ENGAGE' : 'EXPLORE',
       privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
       900,
     );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
+      if (engageSequence === null) return;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -27214,7 +27259,15 @@ function updateHud(now: number): void {
     ? [rangeScore, targetHits]
     : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
       : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+  // MAP3 (HF-409 finisher 2): see src/ui/hud-mode-banner.ts. Reproduces this
+  // site's previous conditional exactly for every team arena.
+  const banner = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  element<HTMLElement>('#timer').hidden = !banner.clock;
+  element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
@@ -27227,11 +27280,11 @@ function updateHud(now: number): void {
   });
   previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective;
+      : presentation.objective);
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
@@ -31177,6 +31230,7 @@ const debugWindow = window as Window & {
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
+    prepareArena: (arenaId: ArenaId) => Promise<void>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -33631,6 +33685,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  /**
+   * MAP3 (HF-409 finisher 2): make a NON-ACTIVE arena buildable.
+   *
+   * `traceBallistics(..., arenaId)` builds an arena it is not standing in, on
+   * the spot and synchronously, and that is how the eye-clearance stage-2
+   * sweep probes every arena from one page. A lazily loaded arena (map3) has a
+   * chunk to fetch and a wasm module to initialise before its builder exists,
+   * and neither can happen inside a synchronous call. So the wait is a
+   * separate, awaitable step: call this first and the probe below works.
+   * Resolving an eager arena is a no-op that costs one microtask.
+   */
+  prepareArena: async (arenaId) => { await arenaFactories.resolve(arenaId); },
   traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;

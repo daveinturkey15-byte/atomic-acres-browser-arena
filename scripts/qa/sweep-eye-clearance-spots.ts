@@ -25,7 +25,7 @@ import { buildRustworks1v1, buildGunRange, buildSkylineTerminal } from '../../sr
 import { buildHighSeas } from '../../src/high-seas';
 import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
-import { buildMap3 } from '../../src/map3-arena';
+import { buildMap3, prepareMap3 } from '../../src/map3-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // `ShedArenaId` is re-declared, not re-exported, by destructible-shed-registry;
@@ -301,5 +301,9 @@ export function runSweep(): void {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
+  // needs a wasm module first, so it throws until prepareMap3() has resolved.
+  // Stage 1 stays fully synchronous below this line.
+  await prepareMap3();
   runSweep();
 }

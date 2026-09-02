@@ -63,6 +63,21 @@ const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [numbe
     // moving bodies and nothing else.
     { name: 'map3-forest-rover-frame', centre: [0, 1.24, 33.8], reason: 'self-driving rover; a static collider would sit where it no longer is' },
     { name: 'map3-shoreline-rover-body', centre: [-26, 1.06, -33.87], reason: 'self-driving rover fording the shallows; a static collider would sit where it no longer is' },
+    // MAP3 (HF-409 finisher 2, 2026-09-02): the eighth corridor - the Rapier
+    // playground - joined the arena, and it is 131 rigid bodies in its own
+    // physics world. These two are the same class as the rovers above and for
+    // the same reason: a Box2 collider is a STATIC world rectangle, and the
+    // paddle wheel is spinning on a revolute joint while the jenga instances
+    // are a tower you knock over. Pinning either where it stood at t = 0
+    // leaves an invisible obstacle in the aisle AND the real object
+    // intangible, which is strictly worse than presentation.
+    //
+    // Everything in that corridor that does NOT move is collided: both kerbs
+    // over its 51 m, the mouth threshold, the far back wall, the see-saw
+    // fulcrum and both guide rails - seven new colliders, 225 -> 232 for the
+    // arena, still zero invisible.
+    { name: 'map3-physics-paddle-wheel', centre: [-24, 0.88, 75], reason: 'paddle wheel on a revolute joint; it spins every frame the balls hit it' },
+    { name: 'map3-physics-jenga-block', centre: [-24, 0.88, 43], reason: 'the jenga tower: 45 dynamic bodies in one instanced mesh, authored to be knocked down' },
   ],
   'gun-range': [
     // Merged static presentation batch (userData.presentationOnly): a batched
