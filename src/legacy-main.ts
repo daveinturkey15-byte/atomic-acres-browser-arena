@@ -4205,7 +4205,13 @@ function applyLightingConditionUniforms(force = false): void {
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
   }
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
-  renderRuntime.setExposure(effectiveGraphicsExposure(baseline.exposure * writes.exposureScale));
+  // A deterministic review camera owns the exposure while it is set -- that is
+  // the capture contract every viewpoint baseline in the repo rests on -- and it
+  // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
+  // would silently discard it the next time weather nudged the gate open, so the
+  // hour's lift composes ON TOP of whichever exposure actually owns the frame.
+  const ownedExposure = activeArenaReviewExposure ?? baseline.exposure;
+  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale));
 }
 
 /** Telemetry for the QA probes and the debug panel. Read-only. */
