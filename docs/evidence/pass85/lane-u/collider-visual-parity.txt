@@ -1,5 +1,5 @@
 
-=== nuketown2: 0 invisible collider(s), 0 walk-through mesh(es) [181 colliders, 4 boundary, 0 runtime-replaced statics, 186 visible meshes]
+=== nuketown2: 0 invisible collider(s), 0 walk-through mesh(es) [187 colliders, 4 boundary, 0 runtime-replaced statics, 192 visible meshes]
   rule-excluded substantial meshes: terrain/sky-scale surface=1, above reachable height (no standing contact)=2
 
 Gate: any unexplained collider fails the run (exit 1). Walk-through meshes are reported for triage (--gate-walkthrough hardens this); src/collider-visual-parity-gate.test.ts hardens both directions in vitest.

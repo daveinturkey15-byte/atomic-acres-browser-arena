@@ -24,7 +24,7 @@
     {
       "arena": "nuketown2",
       "since": "2026-09-02",
-      "note": "NUKETOWN2 (HF-407) registered selectable on 2026-09-02, the same day it was authored. No stage of the eye-clearance pipeline has been run against it - stages 2 and 3 need a browser and this lane's machine rules forbid a headed one - so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for nuketown2 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here. The arena's own mechanical parity audit is green (0 invisible colliders, 0 walk-through meshes over 186 colliders and 188 visible meshes), which is evidence about COLLIDERS, not about where the camera eye ends up."
+      "note": "NUKETOWN2 (HF-407) registered selectable on 2026-09-02, the same day it was authored. No stage of the eye-clearance pipeline has been run against it - stages 2 and 3 need a browser and this lane's machine rules forbid a headed one - so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for nuketown2 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here. The arena's own mechanical parity audit is green (0 invisible colliders, 0 walk-through meshes over 187 colliders and 192 visible meshes, re-measured 2026-09-02 in the repair pass), which is evidence about COLLIDERS, not about where the camera eye ends up."
     }
   ],
   "accepted": [

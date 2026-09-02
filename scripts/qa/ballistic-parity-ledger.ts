@@ -65,7 +65,11 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   map3: [],
   // NUKETOWN2 (owner 2026-09-02, HF-407): same rule, and it held on the first
   // run - the audit reports 0 invisible colliders and 0 walk-through meshes
-  // over 186 colliders and 188 visible meshes, so there is nothing to accept.
+  // over 187 colliders and 192 visible meshes, so there is nothing to accept.
+  // (Re-measured in the 2026-09-02 repair pass after the bus roof-access treads
+  // were added and the front lawn was clipped out of the houses; the earlier
+  // 186/188 in this comment predated the ground-dressing demotion to decals and
+  // never matched a run.)
   nuketown2: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
