@@ -1229,6 +1229,69 @@ export function viewmodelMeleeLateralOffset(aspect: number): number {
   return THREE.MathUtils.clamp(1.37 * aspectRatio + Math.max(0, aspectRatio - 1) * 0.58, 1.18, 2.05);
 }
 
+/**
+ * HF-413. The depth and field of view the lane above was calibrated at.
+ *
+ * `viewmodelMeleeLateralOffset` returns METRES, and a metric camera-space
+ * offset only holds a screen-space lane while the viewmodel stays at the depth
+ * it was calibrated for. That assumption broke.
+ *
+ * MEASURED at base 75a4e508 (`qa:pass65:first-person-arms-visual`, headless
+ * Chrome/WebGPU, gun-range, 1600x900): the live viewmodel root sits at
+ * z = -0.407 m with the camera at fov 82, not at the authored hip z = -1.08 m
+ * with fov 75. Half the frustum width at the live depth is 0.629 m, so the
+ * 1.37 m melee offset displaced the root by 2.18 NDC and parked it at NDC
+ * x = 2.51 - two and a half half-widths PAST the right edge. The captured
+ * frames say the same thing: `melee-knife-0_42.png` shows the whole knife arm
+ * jammed against the right edge with no readable blade, and
+ * `melee-knife-0_12.png` / `_0_82.png` show a detached floating sleeve
+ * fragment. That is the owner's "animations ... for ... knife ... strange".
+ *
+ * The fix keeps the authored SCREEN displacement and re-derives the metres for
+ * whatever depth and fov the viewmodel is actually presenting at. The aspect
+ * term cancels between the two frustum widths, so the calibrated ultrawide
+ * behaviour of the lane above is preserved exactly and only the depth/fov
+ * compensation is new. Placement of the viewmodel itself (that z = -0.407,
+ * which is Lane W's HF-410 territory) is deliberately NOT touched here.
+ */
+export const VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS = 1.08;
+
+/** Half the camera frustum width at `depthMeters`, in metres. */
+function cameraHalfWidthMeters(depthMeters: number, fovDegrees: number, aspect: number): number {
+  return Math.abs(depthMeters) * Math.tan(THREE.MathUtils.degToRad(fovDegrees) / 2) * aspect;
+}
+
+/**
+ * Metres of camera-space melee entry travel that reproduce the authored
+ * screen-space lane at the presented depth and field of view.
+ */
+export function viewmodelMeleeEntryMeters(
+  aspect: number,
+  fovDegrees: number,
+  depthMeters: number,
+): number {
+  const normalizedAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : VIEWMODEL_REFERENCE_ASPECT;
+  const normalizedFov = Number.isFinite(fovDegrees) && fovDegrees > 1 && fovDegrees < 179
+    ? fovDegrees
+    : VIEWMODEL_REFERENCE_FOV_DEGREES;
+  const authoredMeters = viewmodelMeleeLateralOffset(normalizedAspect);
+  const referenceHalfWidth = cameraHalfWidthMeters(
+    VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    VIEWMODEL_REFERENCE_FOV_DEGREES,
+    normalizedAspect,
+  );
+  const presentedHalfWidth = cameraHalfWidthMeters(
+    Number.isFinite(depthMeters) && Math.abs(depthMeters) > 1e-4
+      ? depthMeters
+      : VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    normalizedFov,
+    normalizedAspect,
+  );
+  if (!(referenceHalfWidth > 1e-6) || !Number.isFinite(presentedHalfWidth)) return authoredMeters;
+  // The authored screen displacement, replayed at the presented frustum.
+  return authoredMeters * (presentedHalfWidth / referenceHalfWidth);
+}
+
 function viewmodelScreenScale(camera: THREE.Camera): number {
   if (!(camera instanceof THREE.PerspectiveCamera)) return 1;
   return viewmodelViewportScale(camera.aspect, camera.fov);
@@ -1238,8 +1301,11 @@ function viewmodelScreenDrop(camera: THREE.Camera): number {
   return THREE.MathUtils.clamp((viewmodelScreenScale(camera) - 1) * 0.18, -0.025, 0.14);
 }
 
-function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
-  return viewmodelMeleeLateralOffset(camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT);
+function viewmodelMeleeScreenOffset(camera: THREE.Camera, depthMeters: number): number {
+  if (!(camera instanceof THREE.PerspectiveCamera)) {
+    return viewmodelMeleeEntryMeters(VIEWMODEL_REFERENCE_ASPECT, VIEWMODEL_REFERENCE_FOV_DEGREES, depthMeters);
+  }
+  return viewmodelMeleeEntryMeters(camera.aspect, camera.fov, depthMeters);
 }
 
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
@@ -5933,7 +5999,7 @@ export class WeaponPresentation {
     }
     const stanceHip = (1 - this.adsBlend) * (1 - this.sprintBlend) * (1 - meleeArc);
     const targetPosition = this.frameTargetPosition.set(
-      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral
+      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera, this.root.position.z) + grenadeArc * 0.18 + reloadStage.lateral
         + this.stancePose.lateralMeters * stanceHip,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters - this.contactResponse.additionalDropMeters
