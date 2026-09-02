@@ -730,3 +730,24 @@ possibly too if time permits! night night"
   (matchPhase wait) - unverified, re-run on a quiet machine through the committed
   harness (build+stage exceeds the 180 s webServer timeout under load; not
   changed).
+
+### HF-417 / load-time deep cut — Lane H decision 22:18 BST: HOLD from PASS 86 (regressed first loads)
+The skeptic's re-analysis of Lane H's own data: generalising the off-fence
+precompile to every arena took the 56-pair switch matrix to 56/56 with zero
+fence failures (real win; the failing class was atomic-acres -> high-seas, not
+Gun Range), BUT paired whole-switch time is SLOWER (median +488 ms, 31/55 edges),
+and first loads regressed badly on the two arenas that most needed help:
+gun-range 43.0 -> 65.4 s (+52%), high-seas ~48 -> 71.0 s (+45%); the ~3 s
+staged-light warm-up migrates to whichever rehearsal runs first (killstreak
+vocabulary now 6.8-7.0 s). The baseline sweep also shared the GPU with eight
+Lane V browsers. Owner intent is "load every map much faster", so this does not
+ship as-is. **Cut instruction: do NOT merge Lane H into PASS 86.** Keep for
+PASS 87 as Lane H2: (1) re-measure baseline and candidate on a quiet GPU with
+the fixed instrument (sync/async pipeline sinks separated); (2) keep the roster-
+derived switch-matrix gate, the flare-gun reach fix and the stricter prewarm
+contract pin; (3) precompile off the fence WITHOUT serialising it into first
+load (parallel compileAsync, menu-time prewarm scoped to the arena the player
+picked); (4) the ~3.5 s serialized rehearsal cut on the four heavy arenas; (5)
+match admission (deploy) at 14-20 s per arena is the largest unexamined block -
+attribute it and cut it. Gate: no arena's first load or switch slower than the
+quiet-GPU baseline, tripwire 0 on every arena, switch matrix 56/56.
