@@ -34,6 +34,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import {
   eyeClearanceArenaIds, MINIMUM_EYE_CLEARANCE_ARENAS, UNMEASURED_CEILING,
+  partitionAnnotatedViolations,
 } from './eye-clearance-roster.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -504,6 +505,216 @@ test('the gate that names this pipeline actually runs all three of its stages', 
     verify,
     /row\.runtime\?\.distance \?\? 0/u,
     'the "missing measurement means zero" coercion must not come back',
+  );
+});
+
+test('stage 3 forgives on the surface it actually hit, not the one stage 2 flagged', () => {
+  // Lane J repair 2026-09-02. Stage 3 partitioned annotations on `row.surface`
+  // - the STAGE-2 surface - while reporting and judging `row.runtime.surface`.
+  // The two are the same today only because the two gun-range rows happen to
+  // hit the same panel at both stages; the runtime seat can be a third of a
+  // metre from the authored one after depenetration plus resolveEyeClearance,
+  // and a fan from there can land anywhere. A row forgiven under an annotation
+  // that does not name the surface it hit is a clip nobody examined.
+  const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
+  assert.match(
+    verify,
+    /partitionAnnotatedViolations\(\s*LEDGER,\s*arena,\s*result\.remaining,\s*\(row\) => row\.runtime\?\.surface \?\? row\.surface,?\s*\)/u,
+    'stage 3 must partition on the RUNTIME surface, falling back to the sweep surface only when it has no probe',
+  );
+  // ...and the helper must honour it, so the pin above is not decoration.
+  const ledger = {
+    annotations: [{ id: 'a', arena: 'gun-range', surfaces: ['annotated-panel'], maxRows: 2 }],
+  };
+  const rows = [
+    { surface: 'annotated-panel', runtime: { surface: 'annotated-panel' } },
+    { surface: 'annotated-panel', runtime: { surface: 'some-other-wall' } },
+    { surface: 'annotated-panel' },
+  ];
+  const runtimeFirst = partitionAnnotatedViolations(
+    ledger, 'gun-range', rows, (row) => row.runtime?.surface ?? row.surface,
+  );
+  assert.equal(
+    runtimeFirst.unannotated.length, 1,
+    'the row whose RUNTIME probe hit an unannotated wall must stay unannotated and reach the verdict',
+  );
+  assert.equal(runtimeFirst.unannotated[0].runtime.surface, 'some-other-wall');
+  assert.equal(
+    runtimeFirst.matched.get('a').length, 2,
+    'the annotated hit and the row with no runtime probe both stay under the annotation',
+  );
+  // The default accessor is stage 2's own behaviour, unchanged.
+  assert.equal(partitionAnnotatedViolations(ledger, 'gun-range', rows).unannotated.length, 0);
+});
+
+test('a row stage 3 could not measure is ratcheted, not just warned about', () => {
+  // Lane J repair 2026-09-02. The first shipped version of the stage-3 verdict
+  // separated unmeasured rows out (correct - reading a missing measurement as
+  // 0 m reports the worst possible clip at a seat nobody can take) and then let
+  // them through unbounded: four atomic-acres rows with sweep distances of
+  // 0.053-0.099, three of them BELOW the 0.08 m near plane the verdict exists
+  // to enforce, were console.warn'd while the gate exited 0. With the stance
+  // machine's own order-dependence, a regression that pushed every row into
+  // that bucket would have produced a fully green stage 3 that measured
+  // nothing - the exact "green gate that never looked" class this pipeline was
+  // built to catch, reintroduced inside the fix for it.
+  const roster = selectableArenaIdsFromSource();
+  const allowances = LEDGER.unverifiedCeiling ?? {};
+  const missing = roster.filter((id) => !Object.hasOwn(allowances, id));
+  const extra = Object.keys(allowances).filter((id) => !roster.includes(id));
+  assert.deepEqual(missing, [], `selectable arenas with no unverified allowance: ${missing.join(', ')}`);
+  assert.deepEqual(extra, [], `unverified allowances for arenas that are not selectable: ${extra.join(', ')}`);
+  for (const [arena, allowance] of Object.entries(allowances)) {
+    assert.ok(
+      Number.isInteger(allowance) && allowance >= 0,
+      `${arena}: an unverified allowance must be a non-negative integer, got ${JSON.stringify(allowance)}`,
+    );
+  }
+  assert.ok(
+    String(LEDGER.unverifiedCeilingNote ?? '').length > 80,
+    'the unverified allowances need a dated note saying they are measurements, not budget',
+  );
+
+  const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
+  assert.match(verify, /unverifiedCeilingFor/u, 'stage 3 must read the per-arena unverified allowance');
+  assert.match(
+    verify,
+    /has no unverifiedCeiling entry/u,
+    'an arena with no recorded allowance must FAIL rather than default to unlimited',
+  );
+  assert.match(
+    verify,
+    /unverifiedCount > allowance/u,
+    'more unmeasured rows than the allowance must fail: that is coverage loss, not clearance',
+  );
+});
+
+test('a spot stage 2 stops flagging is still re-probed at runtime', () => {
+  // Lane J repair 2026-09-02. Stage 3 teleports only to spots stage 2 flagged,
+  // so FIXING an arena's analytic clearance deletes the pipeline's runtime view
+  // of that arena in the same commit: skyline-terminal went to zero analytic
+  // violations and stage 3 stopped visiting the nacelles on the very run that
+  // moved them. Forced probes are the standing counter - named coordinates
+  // measured every run, judged by the same near-plane floor, and failing when
+  // one stops being visited.
+  const roster = selectableArenaIdsFromSource();
+  const forced = LEDGER.forcedProbes ?? [];
+  assert.ok(forced.length > 0, 'the forced-probe mechanism must have at least one live entry to be exercised');
+  const seen = new Set();
+  for (const probe of forced) {
+    assert.ok(probe.id && !seen.has(probe.id), `duplicate or missing forced-probe id: ${probe.id}`);
+    seen.add(probe.id);
+    assert.ok(roster.includes(probe.arena), `${probe.id}: arena ${probe.arena} is not selectable`);
+    for (const key of ['x', 'z']) {
+      assert.ok(Number.isFinite(probe[key]), `${probe.id}: ${key} must be a finite coordinate`);
+    }
+    assert.ok(['stand', 'crouch', 'prone'].includes(probe.stance), `${probe.id}: needs a real stance`);
+    assert.ok(
+      Array.isArray(probe.dir) && probe.dir.length === 3 && probe.dir.every(Number.isFinite),
+      `${probe.id}: needs a 3-component look direction`,
+    );
+    assert.match(String(probe.since), /^\d{4}-\d{2}-\d{2}$/u, `${probe.id}: needs a date`);
+    assert.ok(String(probe.reason ?? '').length > 80, `${probe.id}: needs a real reason`);
+  }
+
+  const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
+  assert.match(verify, /forcedProbesForArena/u, 'stage 3 must read the forced probes');
+  assert.match(
+    verify,
+    /!violations\.length && forcedRows\.length === 0/u,
+    'an arena stage 2 found clean must still be booted when it carries forced probes',
+  );
+  assert.match(
+    verify,
+    /was never run/u,
+    'a forced probe that stops being measured must fail, not disappear',
+  );
+  assert.match(
+    verify,
+    /forced probe \$\{forced\.id\}/u,
+    'forced probes must be judged by the same near-plane floor as the swept rows',
+  );
+});
+
+test('stage 3 measures a seat only after the body it teleported has stopped moving', () => {
+  // Lane J repair 2026-09-02. `teleportPlayer` sets the EYE and clears
+  // grounding, so the body then falls and depenetrates. Stage 3 read
+  // `cameraSeat()` four frames later - which is how this lane's own nacelle
+  // captures recorded a "prone" seat at y 1.66, ~0.04 m under the 1.7 m
+  // teleport height: a camera photographed mid-fall, a metre above the stance
+  // the receipt claimed, and then reasoned about as if it were a resolve push.
+  const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
+  assert.match(verify, /const settle = async \(\)/u, 'stage 3 must settle the body before reading a seat');
+  assert.match(
+    verify,
+    /unsettled:\$\{posed\.frames\}-frames/u,
+    'a seat that never stopped moving is an UNMEASURED row, not a measurement',
+  );
+  assert.match(
+    verify,
+    /\[0, -1, 0\], \[1, 0, 0\], \[-1, 0, 0\], \[0, 0, 1\], \[0, 0, -1\]/u,
+    'the runtime probe fan must cover all six axes: after a lateral push the nearest surface is '
+    + 'usually the one the seat was pushed away from, and a fan blind to it reports "nearest: null"',
+  );
+});
+
+test('the gap between the modelled eye and the shipped camera stays the number that was measured', () => {
+  // Lane J repair 2026-09-02, found by settling the body before reading a seat.
+  // Every stage here models the eye at the movement profile's stance height
+  // (1.7 / 1.16 / 0.61), but the shipped camera applies a flat floor standoff on
+  // top of it before resolveEyeClearance runs, so the real camera sits 0.14 m
+  // higher than anything this pipeline traces from - measured on three arenas
+  // and three stances in one run. That makes the sweep optimistic about
+  // overhead surfaces by exactly that much, which is why a nacelle with 0.17 m
+  // of analytic prone clearance still needs the runtime resolve to push the
+  // camera down. Re-modelling the eye moves every arena's numbers and belongs
+  // in its own pass; until then the constant is PINNED, so it cannot drift
+  // while the ledger's account of it silently goes stale.
+  const legacyMain = readFileSync(resolve(REPO_ROOT, 'src/legacy-main.ts'), 'utf8');
+  const match = /camera\.position\.y = Math\.max\(player\.position\.y \+ ([\d.]+), camera\.position\.y\);/u
+    .exec(legacyMain);
+  assert.ok(
+    match,
+    'the camera floor standoff must still be findable in src/legacy-main.ts. If it moved or was rewritten, '
+    + 're-measure the eye-model divergence and update docs/eye-clearance/ledger.json eyeModelDivergence.',
+  );
+  const record = LEDGER.eyeModelDivergence ?? {};
+  assert.equal(
+    Number(match[1]), record.constantM,
+    `the shipped camera standoff is ${match[1]} m but the ledger records ${record.constantM} m. `
+    + 'Every eye-clearance number in this pipeline is traced from the modelled eye, not this one; '
+    + 're-measure before changing the constant.',
+  );
+  assert.match(String(record.measuredAt), /^\d{4}-\d{2}-\d{2}$/u, 'the divergence record needs a date');
+  assert.ok(String(record.measured ?? '').length > 80, 'the divergence record needs its measurements');
+});
+
+test('every arena-conditional ballistic splice in legacy-main has a stage-1 authority model', () => {
+  // The seam this lane found, generalised. `activeBallisticSurfaces` splices
+  // extra state-posed surfaces in for a named arena; stage 2 can hit them and
+  // stage 1's legality model could not see them, so the sweep emitted 51 hug
+  // spots inside a closed door. The fix covers gun-range. Nothing stopped the
+  // NEXT such fixture from reopening the seam, so the two lists are compared.
+  const legacyMain = readFileSync(resolve(REPO_ROOT, 'src/legacy-main.ts'), 'utf8');
+  const start = legacyMain.indexOf('function activeBallisticSurfaces(');
+  assert.ok(start >= 0, 'activeBallisticSurfaces must exist in src/legacy-main.ts');
+  const end = legacyMain.indexOf('\nfunction ', start + 1);
+  const body = legacyMain.slice(start, end > start ? end : undefined);
+  const splicedArenas = [...new Set(
+    [...body.matchAll(/selectedArena\.id === '([a-z0-9-]+)'/gu)].map((match) => match[1]),
+  )].sort();
+
+  const modelled = [...new Set(
+    [...SWEEP_CODE.slice(SWEEP_CODE.indexOf('export function dynamicAuthorityColliders'))
+      .slice(0, 600)
+      .matchAll(/'([a-z0-9-]+)'/gu)].map((match) => match[1]),
+  )].sort();
+  assert.deepEqual(
+    splicedArenas, modelled,
+    `src/legacy-main.ts splices extra ballistic surfaces for [${splicedArenas.join(', ')}] but `
+    + `sweep-eye-clearance-spots.ts models dynamic authority for [${modelled.join(', ')}]. `
+    + 'Stage 2 can shoot authority stage 1 cannot see, which is exactly how 51 unreachable '
+    + 'hug spots were reported as clips. Add the new fixture to dynamicAuthorityColliders.',
   );
 });
 
