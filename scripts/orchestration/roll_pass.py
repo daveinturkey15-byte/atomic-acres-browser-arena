@@ -183,6 +183,21 @@ def main() -> None:
     if f"+const stableFallback = releaseChannels.pass{a}Backup" not in d:
         raise SystemExit("outside-ownership patch: bootstrap diff missing the new backup key")
     write(os.path.join(ROOT, "docs", f"pass{n}-outside-ownership.patch"), d)
+    # 10. changelog.test.ts: the previous pass's highlight pin on `latest` moves onto its own entry,
+    #     and `latest` gets one pin from this pass's first highlight.
+    p = os.path.join(ROOT, "src", "changelog.test.ts")
+    s = read(p)
+    nl = chr(92) + "n"
+    marker = "    expect(latest.highlights.join('" + nl + "')).toContain("
+    first = s.find(marker)
+    if first < 0:
+        raise SystemExit("changelog.test.ts: no latest.highlights pin to move")
+    head_pin = args.highlight[0][:40].replace("'", chr(92) + "'")
+    s = s.replace(marker, f"    expect(pass{a}Highlights).toContain(")
+    s = s[:first] + (marker + f"'{head_pin}');" + chr(10)
+                     + f"    const pass{a}Highlights = CHANGELOG.find((entry) => entry.id === 'pass{a}')?.highlights.join('" + nl + "') ?? '';" + chr(10)) + s[first:]
+    write(p, s)
+
     print(f"rolled to PASS {n}: publish_pass{n}.py, its contract test, identity, channels, fallback key pass{a}Backup, topology/handshake/project-map/changelog tests, changelog entry, docs/pass{n}-outside-ownership.patch")
 
 
