@@ -26486,7 +26486,38 @@ function updateMatchState(now: number): void {
   updateDominationHud();
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
     .filter((score) => !score.id.startsWith('host-bot-')));
-  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
+  // MAP3 (HF-409 finisher 3): THE EXPLORE WARMUP DEADLOCK.
+  //
+  // `preserveSoloCountdownCue` exists so a long solo render stall cannot
+  // consume an unseen 3-2-1 edge: while the next cue has not been presented it
+  // pushes warmup's endsAt back to now + N seconds, EVERY FRAME, until that cue
+  // is shown. `lastMatchCountdownCue` starts null, so the cue it waits for is
+  // '3'.
+  //
+  // An explore arena presents no countdown at all - that is the point, there is
+  // no match to count in - so '3' is never presented, `lastMatchCountdownCue`
+  // stays null, and warmup is extended forever. `advanceMatch` only leaves
+  // warmup when `now >= state.endsAt`, which by construction never happens.
+  //
+  // Measured on this tree before this fix: Map 3 sat in `warmup` for the full
+  // 120 s of a boot probe and never reached `active`. That is not cosmetic -
+  // `gameplayInputEnabled()` requires `phase === 'active'`, so the arena the
+  // owner asked to be able to WALK rendered at 53 fps with a correct explore
+  // HUD and would not accept a single movement input, permanently. The
+  // pass74 arena boot smoke fails on map3 for exactly this reason.
+  //
+  // So the hold is gated on there being a cue to hold FOR. This is the same
+  // declared decision the HUD uses, not a second opinion about explore arenas.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  matchState = preserveSoloCountdownCue(
+    matchState,
+    now,
+    lastMatchCountdownCue,
+    gameMode === 'solo' && countdownCueAllowed,
+  );
   const preAdvanceState = matchState;
   const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
@@ -26518,10 +26549,8 @@ function updateMatchState(now: number): void {
   }
   // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
   // match to start, so the 3-2-1 cue and its audio would be announcing one.
-  const countdownCueAllowed = hudModeBanner({
-    arena: selectedArena, site: 'frame',
-    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
-  }).countdownCue;
+  // `countdownCueAllowed` is computed once, above, because the warmup hold and
+  // the cue presentation must agree - when they disagreed, warmup never ended.
   if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
