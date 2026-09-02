@@ -320,3 +320,24 @@ That near-miss is why the probe now derives its roster from
 refuses to run on a mismatch — and why `src/arena-switch-matrix-roster.test.ts`
 pins that the Eulerian walk covers every ordered pair exactly once. The
 corrupted dist did not error. It just measured less and called itself green.
+
+## Open items for the orchestrator
+
+1. **OPEN — the ~3.5 s follow-up cut.** Remove both arena-side serialized
+   first-shot rehearsals; `prewarmMatchBoundFirstShotPresentations` at deploy
+   already rehearses both exact compositions on every arena before admission.
+   Predicted ~3.5 s off every switch on atomic-acres, rustworks-1v1, gun-range
+   and high-seas. Risk: the fixed warm-up may migrate onto
+   `killstreak-vocabulary` (2.1–2.3 s today). Needs one 50-minute matrix run.
+2. **OPEN — visual regression not measured.** No screenshot comparison was run
+   (argument given in Verification, not a measurement).
+3. **OPEN — deploy/match-admission is 14.4–20.4 s**, roughly 30–40% of the wall
+   time between pressing deploy and playing, and no lane has examined it. It is
+   the largest unexamined block in "faster map loads".
+4. **OPEN — commit trailer conflict.** The lane brief mandates
+   `Co-Authored-By: Claude Opus 5.1`; the harness system prompt mandates
+   `Claude Fable 5.1`. All four commits follow the brief. Lane A flagged the
+   same conflict as an orchestrator decision; it is unresolved.
+5. **Wire the gate in.** `npm run qa:pass85:arena-switch-matrix` is registered
+   but is in no CI group or workflow. The eight-arena boot smoke spent months in
+   exactly that state and was therefore never once executed; do not repeat it.
