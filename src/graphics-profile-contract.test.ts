@@ -99,6 +99,52 @@ describe('HF-418 graphics ladder', () => {
     expect(() => graphicsProfileDescription('rtx' as never)).toThrow(/unknown graphics profile/);
   });
 
+  it('ties every number in the in-game copy to a number in the audit document', () => {
+    // WHY. The control-set hash already stops a PRESET drifting away from the
+    // doc. Nothing stopped the COPY drifting: a reference note could quote
+    // "12.6 ms" long after the doc was re-measured to something else, and no
+    // test would notice. Every numeric token a player is shown must be a
+    // token that exists in docs/GRAPHICS_PROFILES_2026-09-03.md, which is the
+    // source these lines are summaries of.
+    const doc = readFileSync(AUDIT_DOC_PATH, 'utf8');
+    for (const profile of GRAPHICS_PROFILE_DESCRIPTIONS) {
+      // Ranges ("36-58") are matched whole, so a note may not invent a range
+      // the doc does not state.
+      const tokens = [...profile.referenceFrameNote.matchAll(/\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?/g)]
+        .map((match) => match[0]);
+      expect(tokens.length, `${profile.id}: a reference note with no figure is not a reference`)
+        .toBeGreaterThan(3);
+      for (const token of tokens) {
+        expect(doc, `${profile.id}: "${token}" is quoted in the menu but is not in ${AUDIT_DOC_PATH}`)
+          .toContain(token);
+      }
+    }
+  });
+
+  it('pins the display clamp that decides whether a render scale above 1 can ever appear', () => {
+    // MEASURED FINDING, 2026-09-03. MAX asks for renderScale 1.15 and its
+    // canvas came out 2560x1440, not 2944x1656, on all three audited arenas.
+    // The cause is NOT the adaptive valve (a downshift would have produced a
+    // canvas SMALLER than native): every site that applies the scale is
+    //   setPixelRatio(Math.min(window.devicePixelRatio, cap))
+    // and every audit row records devicePixelRatio 1, so min(1, 1.15) = 1
+    // deterministically. The same expression is why PERFORMANCE's 0.75 DOES
+    // appear. The in-game MAX copy now states this, so if the clamp is ever
+    // removed or reshaped the copy becomes false - hence this pin.
+    const source = readFileSync('src/legacy-main.ts', 'utf8');
+    const applications = [...source.matchAll(/setPixelRatio\(([^;]*?)\);/g)].map((match) => match[1]);
+    expect(applications.length, 'legacy-main.ts must still apply the render scale somewhere')
+      .toBeGreaterThan(0);
+    for (const expression of applications) {
+      expect(expression, `setPixelRatio(${expression}) must clamp to the display`)
+        .toMatch(/Math\.min\(\s*window\.devicePixelRatio\s*,/);
+    }
+    // And the copy the clamp makes true has to keep saying it.
+    const max = graphicsProfileDescription('max');
+    expect(max.turnsOn.join(' ')).toMatch(/device pixel ratio/i);
+    expect(max.turnsOn.join(' ')).not.toMatch(/adaptive valve/i);
+  });
+
   it('pins every profile control set and makes the audit document carry the same fingerprints', () => {
     expect(graphicsControlSetHashes()).toEqual(PINNED_CONTROL_SET_HASHES);
     // Every shipped preset has a pin; a new preset cannot be added silently.

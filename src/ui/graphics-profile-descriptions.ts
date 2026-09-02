@@ -81,7 +81,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
     leavesOff: Object.freeze([
       'Shadows, anti-aliasing, sun shafts, reflections, ambient occlusion — the whole screen-space stack is structurally absent here, not merely turned down.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.2 ms median frame. On that card it is barely cheaper than BALANCED — the point of this profile is the machines that are not one.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.2 ms median frame. On a card that fast it is barely distinguishable from BALANCED or QUALITY — the gaps between the lower rungs are inside this machine\u2019s run-to-run noise, and the point of this profile is the machines that are not a 5080. What it definitely gives you is the smaller canvas: it renders at 75% of your window.',
   }),
   Object.freeze({
     id: 'balanced',
@@ -101,7 +101,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Sun shafts: a per-pixel raymarch of the shadow map.',
       'Ambient occlusion, screen-space GI, depth of field, motion blur.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.6 ms median frame, and the BEST 95th-percentile frame in the whole ladder at 27.0 ms. It buys steadiness rather than headline frame rate, and it exists for machines below a 5080, where the passes it drops are the ones that hurt.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 12.6 ms median frame and 27.0 ms at the 95th percentile. On a 5080 that is within run-to-run noise of PERFORMANCE and QUALITY, so no frame-rate promise is made here: what this profile claims is its control set — QUALITY\u2019s look without the four passes listed below. It exists for machines below a 5080, where those passes are the ones that hurt.',
   }),
   Object.freeze({
     id: 'high',
@@ -118,7 +118,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
     leavesOff: Object.freeze([
       'Screen-space global illumination, depth of field and motion blur — the expensive gather and the two effects that replace pixels. Those belong to a profile you pick on purpose.',
     ]),
-    referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.1 ms median frame, 0.5 ms above BALANCED, with zero pipelines compiled during play. A slower card gives up frame rate here before it gives up looks.',
+    referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.1 ms median frame, with zero pipelines compiled during play on any arena measured. Its distance from BALANCED on that card is inside the noise and is not claimed. A slower card gives up frame rate here before it gives up looks.',
   }),
   Object.freeze({
     id: 'raytraced',
@@ -132,21 +132,32 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'The richest colour grade in the ladder.',
     ]),
     leavesOff: Object.freeze([
-      'It BUYS the trace rather than adding it: 4x multisampling drops to SMAA and screen-space reflections turn off, because the trace supersedes them and running both would pay for reflected light twice.',
+      'It mostly BUYS the trace rather than adding it: 4x multisampling drops to SMAA and screen-space reflections turn off, because the trace supersedes them and running both would pay for reflected light twice. Ten controls differ from QUALITY in all, two of them reductions; rain and airborne detail do go slightly up, so it is not a pure trade.',
       'No indirect bounce (classic recursive ray tracing computes none) and no path tracing.',
       'Players, bots and vehicles are not in the traced set, so no reflection can show you an enemy that PERFORMANCE could not.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame — 0.6 ms above QUALITY and 7.3 ms BELOW MAX. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer; on a WebGL2 fallback it is demoted to QUALITY and the badge says so.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame, which is far BELOW MAX (21.0 ms) on every arena measured and sits in the same band as QUALITY. The step up from QUALITY is inside the run-to-run noise on this machine and is not claimed as a number. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer; on a WebGL2 fallback it is demoted to QUALITY and the badge says so.',
   }),
   Object.freeze({
     id: 'max',
     label: 'MAX',
-    summary: 'Every effect at its highest tier, supersampled above native. For very high-end machines only — it is the most expensive thing this build can ask a GPU to do.',
+    summary: 'Every effect at its highest tier. For very high-end machines only — it is the most expensive thing this build can ask a GPU to do.',
     intendedFor: 'Top-end desktop GPUs. If your frame rate drops when you select it, that is the profile working as intended, not a bug.',
     costClass: 'highest',
     turnsOn: Object.freeze([
+      // MEASURED, not inferred. Every setPixelRatio site in legacy-main.ts
+      // (2042, 2552, 2556, 28108) is Math.min(window.devicePixelRatio, cap),
+      // and the audit rows all record devicePixelRatio 1, so min(1, 1.15) = 1
+      // and MAX's canvas came out exactly 2560x1440 rather than 2944x1656.
+      // A scale BELOW 1 passes the clamp (PERFORMANCE's 0.75 did); a scale
+      // ABOVE 1 cannot. The valve is positively ruled out: a downshift would
+      // have produced 0.98/0.86/0.75/0.58 and a smaller canvas than native.
+      // The first draft of this line blamed the valve. It was wrong, and
+      // saying so to a player who can read his own resolution matters more
+      // than the sentence sounding impressive.
       'Asks for 115% of your window and downsamples, on top of 4x multisampling. '
-      + 'Under sustained load the adaptive valve may hold it at or below native — that is the valve working, not the setting failing.',
+      + 'That extra resolution only materialises on a high-DPI or OS-scaled display: on an ordinary 1:1 monitor '
+      + 'the renderer clamps to your device pixel ratio, so MAX draws at native and its cost is all effect tiers.',
       'Screen-space reflections and screen-space global illumination at high, sun shafts at high, ambient occlusion at ultra.',
       'Dynamic shadow updates, depth of field, and a low bounded amount of motion blur.',
       'Rain at 135% of authored density and the thickest ambient air.',
@@ -155,7 +166,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Ray tracing: MAX is the heaviest profile already, and adding the trace on top would make its first frame worse, not its picture better. RAY TRACED is a different trade, not a lower rung.',
       'Spatial upscaling, which renders below native and would contradict the supersample.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080 — the machine this profile is aimed at — averaged over three arenas: 21.0 ms median frame and 42.8 ms at the 95th percentile. That is 7.3 ms and 14.6 ms worse than the next rung down, and nearly twice the draw calls. It is the only profile that separates from the rest of the ladder. Anything less than a top-end card should expect to choose QUALITY.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080 at device pixel ratio 1 — the machine this profile is aimed at, and one where the 115% supersample is clamped away, so these figures are the effect tiers alone. Averaged over three arenas: 21.0 ms median frame and 42.8 ms at the 95th percentile, against 12-14 ms and 27-30 ms for every rung below it. That gap reproduces on all three arenas separately, which is why it is the one ordering in the ladder this build states as measured rather than as designed. Anything less than a top-end card should expect to choose QUALITY.',
   }),
 ]);
 
