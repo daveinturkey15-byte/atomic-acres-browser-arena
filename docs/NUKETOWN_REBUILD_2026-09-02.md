@@ -234,10 +234,37 @@ review-camera frames, and the two diagrams this lane drew).
 8. **Weather is pinned clear**, unlike the shipped Nuke Town's four-rung shower
    ladder. Reason and the measurement behind it are in the row in
    `src/weather/weather-state.ts`.
-9. **The menu flyover does not exist.** The card renders a labelled PREVIEW
-   STANDBY through the sanctioned pending-media path; the camera recipe is
-   authored (`source-assets/menu/pass85-nuketown2-preview/`), so the capture is
-   a mechanical step whenever somebody wants to run it.
+9. **The menu flyover exists** as of the 2026-09-02 repair pass: 240 frames
+   captured headless from this arena's own authoritative WebGPU runtime and
+   encoded into the `pass85-nuketown2-preview-v1` family, plus a deployment
+   loading backdrop from the same capture. It shipped standby for exactly one
+   commit and never once pointed at another arena's bytes.
 10. **Eye clearance is unmeasured.** The ledger carries the -1 sentinel with a
     dated note, so the ratchet is RED for this arena until a browser run
     measures it.
+11. **The bus is a LOW-FLOOR bus**, floor 0.05 m rather than the raised floor a
+    school bus has. This is not styling: the 2x-damage core sits at a single
+    global {0, 3.75, 0} and `claimOverdrive` is a pure height-and-radius rule,
+    so a raised aisle puts a player standing INSIDE the bus inside the pickup
+    window. Measured at the first cut's 0.85 m floor: claimed. At 0.05 m:
+    rejected, dy 2.00 against a 1.90 m window. Full derivation at
+    `NUKETOWN2_CENTRAL_BUS`. Consequence carried on purpose: the doors are
+    walk-in rather than a 0.85 m lip you have to jump.
+12. **Three treads stand against the bus's west flank**, which the reference has
+    no equivalent of. Also not styling: the jump apex from flat ground is
+    0.823 m and the roof is at 3.15 m, so without them the core rides a roof
+    nobody can reach - measured, a hopping player peaked at eye 3.92 m against
+    the 4.85 m the roof gives. Every tread footprint is outside the 1.65 m
+    pickup radius in plan, so the climb cannot be short-circuited half way up.
+13. **A pre-existing property of the global core rule, recorded rather than
+    hidden:** a player JUMPING under the core still claims it through the roof
+    slab (apex eye 2.57 m, dy 1.18). That is true of the shipped Nuke Town's bus
+    aisle too - measured on the same rule with the shipped aisle's ground-level
+    floor - so it is a property of `OVERDRIVE_PICKUP_HEIGHT_WINDOW_M`, not of
+    this arena, and `src/overdrive.ts` is not this lane's file. Handed to the
+    overdrive owner in the lane report with an exact patch.
+14. **The rare-gun runtime switch is not landed.** The arena exports correct,
+    derived, standable sites (`NUKETOWN2_RARE_GUN_SITES`) and the fidelity test
+    proves a player can stand at each, but `src/railgun-authority.ts` is weapons
+    code and outside this lane. Exact patch in the lane report; until it lands,
+    the owner's third named kept feature is absent on this arena.
