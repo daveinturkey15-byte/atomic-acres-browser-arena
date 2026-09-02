@@ -81,6 +81,44 @@ describe('Map 3 explore capture harness', () => {
     }
   });
 
+  // FOUND BY RUNNING IT. `__ATOMIC_ACRES_DEBUG__.selectArena()` routes to
+  // performArenaSelection, whose first statement returns early when
+  // `arenaSelectionReady` is false - and that flag is only set by
+  // bootstrapMenuPreview(). Between the debug API appearing and the menu
+  // becoming ready, selectArena RESOLVES SUCCESSFULLY AND DOES NOTHING.
+  //
+  // The first run of this harness hit exactly that: it would have captured
+  // eight stills of NUKE TOWN and filed them as Map 3 corridors, and nothing
+  // in the run would have said otherwise.
+  it('verifies the arena selection actually took, rather than assuming it did', () => {
+    // The check reads #arena-title, which syncArenaSelectionUi writes from the
+    // registry row: snapshot() exposes no top-level arena id.
+    expect(harness).toContain("=== 'MAP 3'");
+    expect(harness).toContain('selectArena did not take');
+    // And the retry is in node, NOT an async waitForFunction predicate: such a
+    // predicate returns a Promise, which playwright takes as truthy, so it
+    // passes on the first poll and proves nothing.
+    expect(harness).not.toMatch(/waitForFunction\(async \(\)/u);
+  });
+
+  // The first run of this harness pointed every camera at the hub: `depth` was
+  // positive along lane z and the yaw came from increasing z, but corridor
+  // content runs to NEGATIVE lane z. Eight plausible-looking stills of the
+  // plaza and the skybox, with the corridor behind the camera.
+  it('points its cameras INTO the corridors, not back at the hub', () => {
+    expect(harness).toContain('laneToWorld(lane, 0, -lane.depth)');
+    expect(harness).toContain('const b = laneToWorld(lane, 0, -1);');
+    expect(harness).not.toContain('const b = laneToWorld(lane, 0, 1);');
+  });
+
+  it('passes playwright options in the third argument, not the second', () => {
+    // waitForFunction(fn, arg, options): a {timeout} in second position is the
+    // page function's ARG and the default 30 s silently applies instead. That
+    // capped a deliberate 180 s boot wait at 30 s.
+    expect(harness).not.toMatch(/waitForFunction\([^,]*,\s*\{\s*timeout/u);
+    expect(harness).toContain('undefined, { timeout: 180_000 }');
+  });
+
   it('asserts the explore HUD claims instead of only screenshotting them', () => {
     // A capture script that only writes PNGs proves nothing on its own.
     expect(harness).toContain("receipt.hud.modeLabel.text !== 'EXPLORE · MAP 3'");

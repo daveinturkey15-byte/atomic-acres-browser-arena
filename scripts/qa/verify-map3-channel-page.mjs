@@ -181,7 +181,10 @@ async function main() {
     // The real proof the page LEFT its loading banner: the showcase publishes
     // window.__MAP3 only once its scene is up. A 200 with dead chunks never
     // gets here, which is exactly the bug being closed.
-    await page.waitForFunction(() => typeof window.__MAP3 !== 'undefined', { timeout: 120_000 });
+    // Third argument: playwright is waitForFunction(fn, arg, options), so a
+    // {timeout} in second position is the page function's ARG and the default
+    // 30 s applies instead.
+    await page.waitForFunction(() => typeof window.__MAP3 !== 'undefined', undefined, { timeout: 120_000 });
     await page.waitForTimeout(6000);
 
     receipt.page = await page.evaluate(() => {

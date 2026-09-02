@@ -67,16 +67,34 @@ if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No index.html under 
  * its mouth. Everything else is derived.
  */
 const MAP3_LANE_START = 34;
+
+/**
+ * `depth` is METRES INTO THE CORRIDOR from its mouth, and the mouth is at lane
+ * z = 0. Corridor content runs from there to NEGATIVE lane z - measured from
+ * the built scene, per lane:
+ *
+ *   shoreline  z 1.7 .. -58.4     colosseum  z 2.0 .. -302 (bowl beyond bounds)
+ *   raymarch   z 0   .. -48       grammar    z 0   .. -52
+ *   vegetation z 4.7 .. -55.8     physics    z 1.0 .. -50
+ *   godrays    z 0.6 .. -44.4     seasons    z 0.5 .. -56
+ *
+ * The first run of this harness had `depth` POSITIVE along lane z and derived
+ * its yaw from increasing z, so every camera stood at the hub edge looking
+ * back OUT of its corridor. The stills were of the plaza and the skybox, with
+ * the corridor behind the camera - they looked plausible, and framed nothing.
+ * Depths are chosen just inside the mouth, where the corridor reads as a
+ * corridor rather than as a wall.
+ */
 const LANES = [
-  { id: 'shoreline', label: 'Shoreline', edge: 0, lateral: -26, depth: 26, pitch: -0.04 },
-  { id: 'colosseum', label: 'Colosseum', edge: 0, lateral: 26, depth: 18, pitch: -0.02 },
-  { id: 'raymarch', label: 'Raymarched SDF', edge: 1, lateral: -13, depth: 16, pitch: -0.02 },
-  { id: 'grammar', label: 'Shape grammar', edge: 1, lateral: 13, depth: 16, pitch: 0.02 },
-  { id: 'vegetation', label: 'Vegetation', edge: 2, lateral: 0, depth: 18, pitch: -0.04 },
+  { id: 'shoreline', label: 'Shoreline', edge: 0, lateral: -26, depth: 8, pitch: -0.04 },
+  { id: 'colosseum', label: 'Colosseum', edge: 0, lateral: 26, depth: 6, pitch: 0.02 },
+  { id: 'raymarch', label: 'Raymarched SDF', edge: 1, lateral: -13, depth: 8, pitch: -0.02 },
+  { id: 'grammar', label: 'Shape grammar', edge: 1, lateral: 13, depth: 10, pitch: 0.04 },
+  { id: 'vegetation', label: 'Vegetation', edge: 2, lateral: 0, depth: 14, pitch: -0.04 },
   // THE EIGHTH. Never photographed before this pass.
-  { id: 'physics', label: 'Rapier playground', edge: 2, lateral: 24, depth: 16, pitch: -0.10 },
-  { id: 'godrays', label: 'God rays', edge: 3, lateral: -13, depth: 20, pitch: 0.04 },
-  { id: 'seasons', label: 'Seasons', edge: 3, lateral: 14, depth: 20, pitch: -0.02 },
+  { id: 'physics', label: 'Rapier playground', edge: 2, lateral: 24, depth: 12, pitch: -0.08 },
+  { id: 'godrays', label: 'God rays', edge: 3, lateral: -13, depth: 12, pitch: 0.04 },
+  { id: 'seasons', label: 'Seasons', edge: 3, lateral: 14, depth: 14, pitch: -0.02 },
 ];
 
 /** Corridor-local -> world. The exact quarter turns of `laneToWorld`. */
@@ -100,8 +118,11 @@ function laneToWorld(lane, x, z) {
  * per-edge constant to get wrong.
  */
 function laneYaw(lane) {
+  // DEEPER is decreasing lane z (see the LANES note), so the direction is taken
+  // from the mouth toward z = -1, not z = +1. With +1 every camera faced the
+  // hub and photographed the plaza.
   const a = laneToWorld(lane, 0, 0);
-  const b = laneToWorld(lane, 0, 1);
+  const b = laneToWorld(lane, 0, -1);
   return Math.atan2(-(b.x - a.x), -(b.z - a.z));
 }
 
@@ -175,12 +196,44 @@ async function main() {
     });
 
     await page.goto(`http://${HOST}:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), { timeout: 120_000 });
+    // NOTE THE THIRD ARGUMENT. playwright's signature is
+    // waitForFunction(fn, arg, options) - passing {timeout} as the SECOND
+    // argument makes it the page function's ARG and silently leaves the
+    // default 30 s timeout in force. That is what capped this run's 180 s boot
+    // wait at 30 s on its first attempt.
+    await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 120_000 });
 
-    // Selecting map3 RESOLVES AND PREPARES the lazy arena - which is the whole
-    // point of prepare-then-build: after this, buildMap3 is callable and will
-    // not throw for want of Rapier.
-    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.selectArena('map3'));
+    // SELECT, THEN VERIFY IT TOOK.
+    //
+    // __ATOMIC_ACRES_DEBUG__.selectArena() routes to performArenaSelection,
+    // which begins `if (... || !arenaSelectionReady || ...) return;` - and
+    // `arenaSelectionReady` is only set true by bootstrapMenuPreview(). So
+    // between the debug API appearing and the menu becoming ready there is a
+    // window in which selectArena RESOLVES SUCCESSFULLY AND DOES NOTHING.
+    // Waiting for the debug object is not waiting for a selectable menu.
+    //
+    // Measured here: the first run of this harness probed the menu and found
+    // the showcase link still hidden with a null href, because the arena had
+    // never actually changed - it would have captured eight stills of NUKE
+    // TOWN and filed them as Map 3 corridors.
+    //
+    // The check is the ARENA TITLE, which syncArenaSelectionUi writes from the
+    // registry row, because `snapshot()` exposes no top-level arena id. The
+    // retry lives in node rather than in a waitForFunction predicate: an ASYNC
+    // predicate returns a Promise, which playwright takes as truthy, so an
+    // `async () => { ... }` poll passes instantly and proves nothing. That is
+    // the second way this same check has been wrong.
+    let arenaSelected = false;
+    for (let attempt = 0; attempt < 60 && !arenaSelected; attempt += 1) {
+      await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.selectArena('map3')).catch(() => {});
+      arenaSelected = await page.evaluate(
+        () => (document.querySelector('#arena-title')?.textContent ?? '').trim().toUpperCase() === 'MAP 3',
+      );
+      if (!arenaSelected) await page.waitForTimeout(1000);
+    }
+    const arenaTitle = await page.evaluate(() => (document.querySelector('#arena-title')?.textContent ?? '').trim());
+    if (!arenaSelected) throw new Error(`selectArena did not take: #arena-title is ${JSON.stringify(arenaTitle)}`);
+    receipt.arenaTitle = arenaTitle;
     receipt.map3Prepared = true;
 
     // ---- 0. THE MENU'S LINK TO THE SHOWCASE PAGE ---------------------------
@@ -218,7 +271,7 @@ async function main() {
       const status = document.querySelector('#status')?.textContent ?? '';
       if (/deployment preparation failed|renderer blocked/i.test(status)) return `deploy-failed: ${status}`;
       return null;
-    }, { timeout: 180_000 });
+    }, undefined, { timeout: 180_000 });
     const boot = await bootHandle.jsonValue();
     receipt.boot = boot;
     if (boot !== 'active') throw new Error(`Map 3 did not boot: ${boot}`);
@@ -253,7 +306,9 @@ async function main() {
 
     // ---- 2. THE EIGHT CORRIDORS -------------------------------------------
     for (const lane of LANES) {
-      const world = laneToWorld(lane, 0, lane.depth);
+      // Negative: `depth` is metres INTO the corridor, and the corridor runs
+      // toward negative lane z.
+      const world = laneToWorld(lane, 0, -lane.depth);
       const yaw = laneYaw(lane);
       await page.evaluate(({ x, z, yaw: y, pitch }) => {
         window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, 1.7, z, y, pitch);
