@@ -59,7 +59,9 @@ describe('Pass 69.3 real-authored near-plane evidence boundary', () => {
       "socketContractReady: true",
       "presentation.armsSource, `${label}: authored two-chain arms`).toBe('authored-two-chain')",
       "contract: 'authored-glb-contact-retreat-2026-08-09-v1'",
-      'cameraNear: 0.08',
+      // HF-410: the spec now derives this from FIRST_PERSON_CAMERA_NEAR_METERS
+      // instead of restating 0.08. The token this grep pins moves with it.
+      'cameraNear: FIRST_PERSON_CAMERA_NEAR_METERS,',
       'requiredMargin: 0.02',
       'baseRetreat: 0.06',
       'maximumSurfaceRetreat: 0.28',

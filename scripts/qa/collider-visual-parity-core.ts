@@ -658,11 +658,16 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
   };
 }
 
-type ArenaFactories = Record<string, { build: ArenaBuild; enrich?: ArenaEnrich }>;
+export type ArenaFactories = Record<string, { build: ArenaBuild; enrich?: ArenaEnrich }>;
 
 let factoriesPromise: Promise<ArenaFactories> | null = null;
 
-async function loadFactories(): Promise<ArenaFactories> {
+/**
+ * The one place the audits learn how the game builds each arena. Exported so a
+ * sibling audit (walkable-surface-parity-core.ts) measures the SAME graph
+ * instead of keeping a second roster that can silently miss a new arena.
+ */
+export async function loadArenaFactories(): Promise<ArenaFactories> {
   if (!factoriesPromise) {
     factoriesPromise = (async () => {
       const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }] = await Promise.all([
@@ -709,14 +714,11 @@ async function loadFactories(): Promise<ArenaFactories> {
 export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3'] as const;
 
 /**
- * Runs the mechanical audit for the requested arenas inside plain Node/vitest.
- * Installs the minimal window/document shims environment-assets needs (it reads
- * window.location.search at call time) BEFORE any arena factory is imported or
- * invoked, so the constructed graph matches what the browser builds.
+ * Installs the minimal window/document surface the arena art layers read at
+ * call time, so a headless audit constructs the same graph the browser does.
+ * Idempotent, and shared by every audit that builds an arena in plain Node.
  */
-export async function runColliderVisualParityAudit(
-  arenaIds: readonly string[] = ALL_ARENA_IDS,
-): Promise<ArenaAuditResult[]> {
+export function installHeadlessArenaShims(): void {
   // environment-assets reads window.location.search at call time; this audit
   // runs in plain Node, so shim the minimal surface before any layer attaches.
   (globalThis as { window?: unknown }).window ??= { location: { search: '' } };
@@ -751,8 +753,19 @@ export async function runColliderVisualParityAudit(
       createElement: () => makeCanvas(),
     } as unknown as Document;
   })();
+}
 
-  const factories = await loadFactories();
+/**
+ * Runs the mechanical audit for the requested arenas inside plain Node/vitest.
+ * Installs the minimal window/document shims environment-assets needs (it reads
+ * window.location.search at call time) BEFORE any arena factory is imported or
+ * invoked, so the constructed graph matches what the browser builds.
+ */
+export async function runColliderVisualParityAudit(
+  arenaIds: readonly string[] = ALL_ARENA_IDS,
+): Promise<ArenaAuditResult[]> {
+  installHeadlessArenaShims();
+  const factories = await loadArenaFactories();
   const results: ArenaAuditResult[] = [];
   for (const id of arenaIds) {
     const entry = factories[id];

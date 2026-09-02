@@ -7,6 +7,7 @@ import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
+import { stanceTransitionDurationMs } from './prone-transition'; // HF-412
 import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
 import {
@@ -345,6 +346,15 @@ type RiggedOperatorRuntime = {
   weaponSocket: THREE.Group;
   canonicalEvidence: RiggedOperatorCanonicalEvidence;
   stance: 'stand' | 'crouch' | 'prone';
+  /**
+   * HF-412: the stance the body is transitioning OUT of, and how far along that
+   * transition it is (0..1). Together they turn what used to be a frame-rate
+   * coupled exponential settle into the same FIXED window the local player's
+   * camera drop uses, so a guest watching a host drop-shot sees the body fall
+   * over the reference's duration rather than ease in asymptotically.
+   */
+  stanceBlendFrom: 'stand' | 'crouch' | 'prone';
+  stanceBlendProgress: number;
   crouchBlend: number;
   proneBlend: number;
   speed: number;
@@ -752,9 +762,59 @@ function plantCrouchLeg(
   foot.updateWorldMatrix(false, true);
 }
 
+/**
+ * HF-412. Smoothstep, and the incremental step that FOLLOWS a smoothstep from
+ * wherever the pose currently sits.
+ *
+ * `applyStancePose` lerps a dozen values toward their targets each frame and
+ * keeps no copy of where each one started, so a normalized `lerp(start, end, s)`
+ * would need a snapshot of all of them. Advancing by the fraction of the
+ * REMAINING distance that this frame's smoothstep step covers reproduces the
+ * same curve exactly, needs no snapshot, and lands on the target at progress 1
+ * instead of approaching it forever.
+ */
+function stanceSmoothstep(t: number): number {
+  const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void {
   const target = riggedStanceTarget(runtimeState.stance);
-  const alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
+  // HF-412: one fixed window, shared with the player's own drop-shot
+  // transition, for the PRONE pairs only.
+  //
+  // `riggedOperatorRuntime` is stamped onto userData by several call sites
+  // (including the Gun Range training dummy, which hand-builds one), so a
+  // runtime object authored before these two fields existed must read as
+  // SETTLED rather than as NaN. Without this the whole pose chain silently
+  // becomes non-finite - which is exactly what it did the first time.
+  const blendFrom = runtimeState.stanceBlendFrom ?? runtimeState.stance;
+  // A plain stand<->crouch step keeps the shipped `1 - exp(-dt * 12)` settle
+  // exactly as it was. HF-412 is a prone-transition row, and this file is Lane
+  // Z's (rig and clips) - changing how every operator in the game crouches, in
+  // both directions, on every arena, is not in scope for a drop shot and was
+  // never measured. Only the pairs the drop shot actually uses move onto the
+  // fixed window.
+  const proneInvolved = blendFrom === 'prone' || runtimeState.stance === 'prone';
+  let alpha: number;
+  if (!proneInvolved) {
+    runtimeState.stanceBlendProgress = 1;
+    alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
+  } else {
+    const durationSeconds = Math.max(
+      0.001,
+      stanceTransitionDurationMs(blendFrom, runtimeState.stance) / 1_000,
+    );
+    const previousProgress = Number.isFinite(runtimeState.stanceBlendProgress)
+      ? runtimeState.stanceBlendProgress
+      : 1;
+    runtimeState.stanceBlendProgress = Math.min(1, previousProgress + Math.max(0, dt) / durationSeconds);
+    const easedBefore = stanceSmoothstep(previousProgress);
+    const easedNow = stanceSmoothstep(runtimeState.stanceBlendProgress);
+    alpha = runtimeState.stanceBlendProgress >= 1
+      ? 1
+      : Math.min(1, Math.max(0, (easedNow - easedBefore) / Math.max(1e-6, 1 - easedBefore)));
+  }
   runtimeState.crouchBlend = THREE.MathUtils.lerp(runtimeState.crouchBlend, target.crouch, alpha);
   runtimeState.proneBlend = THREE.MathUtils.lerp(runtimeState.proneBlend, target.prone, alpha);
   // HF-345. The prone pose lays the whole rig down about the pelvis pivot, so
@@ -2025,6 +2085,9 @@ export function createRiggedOperator(
     weaponSocket,
     canonicalEvidence,
     stance: 'stand',
+    // HF-412: fixed-duration stance transition bookkeeping.
+    stanceBlendFrom: 'stand',
+    stanceBlendProgress: 1,
     crouchBlend: 0,
     proneBlend: 0,
     speed: 0,
@@ -2200,6 +2263,13 @@ export function updateRiggedOperator(
   const now = performance.now();
   const dt = Math.min(0.05, Math.max(0, (now - runtimeState.lastUpdatedAt) / 1_000));
   runtimeState.lastUpdatedAt = now;
+  // HF-412: a NEW stance restarts the fixed transition window from the pose
+  // the body is actually in, so a stance change part-way through another one
+  // blends on from there instead of snapping back to the start.
+  if (stance !== runtimeState.stance) {
+    runtimeState.stanceBlendFrom = runtimeState.stance;
+    runtimeState.stanceBlendProgress = 0;
+  }
   runtimeState.stance = stance;
   runtimeState.speed = Math.max(0, Number.isFinite(speed) ? speed : 0);
   // Published by the runtime on the operator root (the same userData channel
@@ -2663,6 +2733,9 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   runtimeState.lastGroundX = root.position.x;
   runtimeState.lastGroundZ = root.position.z;
   runtimeState.stance = 'stand';
+  // HF-412: a reset operator is already standing, not mid-transition.
+  runtimeState.stanceBlendFrom = 'stand';
+  runtimeState.stanceBlendProgress = 1;
   runtimeState.crouchBlend = 0;
   runtimeState.proneBlend = 0;
   runtimeState.poseBeforeStance = undefined;
@@ -2680,6 +2753,36 @@ export function meleeRiggedOperator(root: THREE.Object3D): boolean {
   ensureAnimationRuntime(runtimeState, root);
   pushOperatorOneShot(runtimeState.director, 'melee');
   return true;
+}
+
+/**
+ * HF-412: the CHEAP read of a rig's stance blend, for QA harnesses.
+ *
+ * `snapshot()` in `legacy-main` walks every bone chain in the scene to build
+ * its operator report; sampling the body through it stretched the sampling
+ * frame to ~65 ms, which turned a per-frame blend step into a sample delta and
+ * made the resulting numbers unusable as "per frame" evidence. This reads the
+ * five fields the body transition is made of and touches nothing else.
+ */
+export function riggedOperatorStanceSample(root: THREE.Object3D | null | undefined): Readonly<{
+  stance: 'stand' | 'crouch' | 'prone';
+  blendFrom: 'stand' | 'crouch' | 'prone';
+  blendProgress: number;
+  crouchBlend: number;
+  proneBlend: number;
+  pivotHeight: number;
+}> | null {
+  if (!root) return null;
+  const runtimeState = runtime(root);
+  if (!runtimeState) return null;
+  return Object.freeze({
+    stance: runtimeState.stance,
+    blendFrom: runtimeState.stanceBlendFrom ?? runtimeState.stance,
+    blendProgress: Number.isFinite(runtimeState.stanceBlendProgress) ? runtimeState.stanceBlendProgress : 1,
+    crouchBlend: runtimeState.crouchBlend,
+    proneBlend: runtimeState.proneBlend,
+    pivotHeight: runtimeState.stancePivot.position.y,
+  });
 }
 
 export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, unknown> | null {
