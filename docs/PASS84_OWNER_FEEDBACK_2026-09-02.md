@@ -611,3 +611,41 @@ auditor's order, each only if it merges clean and the full suite stays green:
 - Lane Y follow-up rows: bots have no stance; HUD/menu overflow with 8 arena
   cards (menuOverflowX 250-312) - pass64-hud-menu spec 13 failed / 8 passed since
   PASS 84 - assign to the PASS 87 streamline/UI pass.
+
+## HF-419..HF-422 — owner links 2026-09-02 ~21:50 BST: four techniques to ingest as shared skills, then try (Map 3 first if not clearly safe)
+**Statement (verbatim):** "some more bangers and things to consider with opus and
+ingest as skills for our 3d work and map remakes and polishes etc. GTA art
+https://x.com/mattshumer_/status/2095187868746383758 . Better water like this guy
+and have little pools or ponds at very least in each level. Upgrade all water
+across maps https://x.com/dangreenheck/status/2095028187063280085 dont pay, figure
+out how. this looked incredible? how can we get this style of lighting and high
+graphics? Subway game. https://x.com/bijanbowen/status/2094931925513261273 . also,
+Motion bricks instead or with Komodo. https://x.com/jichiep/status/2095157236658315288
+? maybe if you have some time you can do some animation improvements for our skins
+and bots etc? aswell as ingesting all these skills and trying some stuff out etc,
+we can of course test stuff in map 3 if not clear to be widely deployed"
+- **HF-419 GTA-style art technique** (mattshumer_ thread): resolve what it
+  observably is (method, tooling, licence), register it, write/extend a shared
+  skill, and feed Lane AK (Nuke Town art by the brief method).
+- **HF-420 water**: study the dangreenheck water (what shader/technique; no paid
+  product - derive the technique from public material and our own TSL), write the
+  skill, then: a pool or pond in EVERY level at minimum, and one shared upgraded
+  water module used by every arena's water (High Seas, Raid, Nuke Town, Map 3
+  shoreline, Skyline). Test in Map 3 first; readability/parity and the pipeline
+  tripwire apply.
+- **HF-421 subway-game lighting style**: resolve what produced the look (engine,
+  GI/baked, post chain, materials), write the findings into the lighting skill set
+  and feed Lanes AL (lighting quality tiers) and AB (dynamic lighting); prototype
+  the closest TSL/WebGPU equivalent in one Map 3 corridor.
+- **HF-422 Motion bricks / Komodo animation**: resolve what "Motion bricks" is
+  versus our Komodo route, write the animation-pipeline skill (with the ComfyUI
+  Lane AH findings), then improve skin/bot animations (locomotion blends, stance
+  transitions, reload/melee body) - Map 3 / bot skirmish first.
+- **Mechanical falsifier:** four technique-register rows with pinned sources and
+  licences; four skill files in the vault store with eval records and scoped guard
+  accepts; a measured Map 3 experiment per technique with before/after captures
+  and the tripwire at 0; the water module shipping in every arena with a pond in
+  each level (gated by a roster-derived test) before any wide rollout of the rest.
+- **Access rule:** X sources are read through public mirrors; if a thread is
+  auth-blocked, the lane reports BLOCKED and the owner is asked to log in (never a
+  search substitute).
