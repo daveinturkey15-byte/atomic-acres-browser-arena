@@ -751,3 +751,11 @@ picked); (4) the ~3.5 s serialized rehearsal cut on the four heavy arenas; (5)
 match admission (deploy) at 14-20 s per arena is the largest unexamined block -
 attribute it and cut it. Gate: no arena's first load or switch slower than the
 quiet-GPU baseline, tripwire 0 on every arena, switch matrix 56/56.
+
+## PASS 86 publish record — 00:50 BST 2026-09-03 (see docs/PASS86_CUT_REPORT_2026-09-02.md)
+Integration e1361b0f -> gh-pages {pass86 live, pass85 backup}; chooser generation
+cb0967af4030. Shipped: Nuke Town Rebuild PREVIEW (HF-407), Map 3 EXPLORE with the
+honest HUD and the in-channel showcase page (HF-409), viewmodel fit (HF-410),
+eye-clearance triage (J), QA corpus (N), IBL verification (I). Held: H (load
+regressions), T (permissive threshold). Boot smoke 12/12 on all ten arenas.
+Rollback: `python scripts/orchestration/publish_pass86.py --rollback`.
