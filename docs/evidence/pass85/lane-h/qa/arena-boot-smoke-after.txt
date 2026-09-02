@@ -1,3 +1,16 @@
+# eight-arena boot smoke — PASS 85 lane H candidate
+# provenance (added on repair, 2026-09-02 22:05 BST; the raw transcript below is unedited)
+#   command      npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0
+#   dist         built by Playwright's own webServer from this worktree
+#                (C:/Users/david/projects/aa-claude-loadcut), NOT a scratchpad dist
+#   source       worktree at b082bc83 PLUS the uncommitted lane changes later
+#                committed as ff938fd9 and 2f8cc780. There is no exact-SHA receipt
+#                for this run: the build predates the commits. See the lane report's
+#                provenance section; a re-run at an exact SHA is an OPEN item.
+#   captured     2026-09-02 ~21:00 BST (file written 21:24:46 +0100)
+#   result       11/11 passed, all 9 arenas incl. farcrysis (hidden)
+#   renderer     headless installed Chrome, SwiftShader-class boot budget (240 s/arena)
+# ---------------------------------------------------------------------------
 [WebServer] (node:54168) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 [WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
 [WebServer] [plugin builtin:vite-reporter] 

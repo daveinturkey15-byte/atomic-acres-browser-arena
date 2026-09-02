@@ -1,7 +1,7 @@
 {
   "tsc_clean": true,
-  "focused_test_files_passed": 12,
-  "focused_tests_passed": 115,
+  "focused_test_files_passed": 14,
+  "focused_tests_passed": 133,
   "focused_tests_failed": 0,
   "rendering_suite_files_passed": 26,
   "rendering_suite_tests_passed": 359,
@@ -13,5 +13,19 @@
   "in_combat_pipelines_after": 1,
   "in_combat_pipelines_in_stall_after": 0,
   "failing_files": [],
-  "discounted_flaky": []
+  "discounted_flaky": [],
+  "in_combat_pipelines_after_note": "1, UNCHANGED from the shipped-build baseline of 1; the brief states the invariant as 0, which neither build meets",
+  "in_combat_tripwire_arenas": [
+    "atomic-acres"
+  ],
+  "paired_switch_delta_median_ms": 488,
+  "paired_switch_delta_median_ci95": [
+    -863,
+    1374
+  ],
+  "paired_edges_slower_after": 31,
+  "paired_edges": 55,
+  "whole_switch_direction_established": false,
+  "after_evidence_exact_sha": false,
+  "baseline_sweep_gpu_contended": true
 }
