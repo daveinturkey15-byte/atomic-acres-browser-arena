@@ -90,3 +90,50 @@ export function resolveArenaRoster(explicit) {
 export function readLedger() {
   return JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
 }
+
+/**
+ * Per-spot RED exemptions, Lane J 2026-09-02.
+ *
+ * The standing instruction on the eye-clearance ratchet is "triage, do not
+ * re-baseline": no ceiling, threshold or baseline goes UP to make a spot green.
+ * That leaves one honest gap - a row that is red because the fixture is
+ * deliberately walk-through (gun-range's wallbang panels are authored
+ * `solid: false, shots: true`; standing inside one is what the range IS). A
+ * bigger arena number would forgive that row and every future row beside it,
+ * unexamined. So such a row is exempted here instead: by ARENA and by the exact
+ * SURFACE NAME it hits, with a dated reason, a row cap that may only shrink,
+ * and the sweep printing every matched row under the annotation's id.
+ *
+ * Three properties keep this stricter than a raised ceiling, not looser:
+ *  - it is surface-scoped, so a NEW clip on a different surface in the same
+ *    arena is still counted and still red;
+ *  - `maxRows` is a ratchet in its own right - more matched rows than the cap
+ *    fails;
+ *  - an annotation that matches NOTHING fails as stale, so an exemption cannot
+ *    outlive the geometry that justified it. That is the failure mode this
+ *    repo has hit repeatedly with frozen rosters.
+ *
+ * The contract test additionally proves, from the real arena build, that every
+ * annotated surface is genuinely non-solid - i.e. that a player can legally
+ * stand inside it by design. Make the panel solid and the annotation fails.
+ */
+export function annotationsForArena(ledger, arena) {
+  return (ledger.annotations ?? []).filter((entry) => entry.arena === arena);
+}
+
+/**
+ * Split one arena's measured violations into annotated and unannotated rows.
+ * Only the unannotated ones reach the ceiling comparison; the annotated ones
+ * are printed, capped and checked for staleness by the caller.
+ */
+export function partitionAnnotatedViolations(ledger, arena, violations) {
+  const annotations = annotationsForArena(ledger, arena);
+  const matched = new Map(annotations.map((entry) => [entry.id, []]));
+  const unannotated = [];
+  for (const row of violations) {
+    const hit = annotations.find((entry) => entry.surfaces.includes(row.surface));
+    if (hit) matched.get(hit.id).push(row);
+    else unannotated.push(row);
+  }
+  return { annotations, matched, unannotated };
+}
