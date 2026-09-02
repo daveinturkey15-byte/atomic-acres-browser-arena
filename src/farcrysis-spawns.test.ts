@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { segmentBoxHitTime } from './collision';
 import { buildFarcrysis } from './farcrysis';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
-import { FARCRYSIS_WATER_LEVEL, farcrysisTerrainHeight } from './farcrysis-terrain-authority';
 import {
-  SPAWN_EYE_HEIGHT,
+  FARCRYSIS_WATER_LEVEL,
+  farcrysisFloorGapBeneath,
+  farcrysisTerrainHeight,
+} from './farcrysis-terrain-authority';
+import {
   SPAWN_LAYOUT_THRESHOLDS,
   arenaPointsOfInterest,
   measureSpawnLayout,
@@ -33,9 +35,6 @@ import {
  * downward segment and the same autostep/drop tolerances the shared rule uses.
  */
 
-/** `floorBeneath`'s own tolerances (src/spawn-layout-constraints.ts). */
-const AUTOSTEP_M = 0.45;
-const FLOOR_DROP_TOLERANCE_M = 0.6;
 /** `spawnRecord` in farcrysis.ts seats every point this far above the surface. */
 const EYE_ABOVE_GROUND_M = 1.7;
 /** The solver's dry-land margin: no spawn in the wade shelf. */
@@ -56,34 +55,6 @@ const LONGEST_AXIS = Math.max(
   FARCRYSIS_BOUNDS.maxX - FARCRYSIS_BOUNDS.minX,
   FARCRYSIS_BOUNDS.maxZ - FARCRYSIS_BOUNDS.minZ,
 );
-
-/** The gap between the feet and the terrain plate beneath them, or null when there is none. */
-function plateGapBeneath(point: THREE.Vector3): number | null {
-  const far = SPAWN_EYE_HEIGHT + FLOOR_DROP_TOLERANCE_M + 0.01;
-  const feetY = point.y - SPAWN_EYE_HEIGHT;
-  let best: number | null = null;
-  for (const box of arena.physicsColliders) {
-    if (box.maxY === undefined) continue;
-    let surfaceY: number;
-    if (box.rotation) {
-      const time = segmentBoxHitTime(
-        { x: point.x, y: point.y, z: point.z },
-        { x: point.x, y: point.y - far, z: point.z },
-        box,
-        0,
-      );
-      if (time === null) continue;
-      surfaceY = point.y - time * far;
-    } else {
-      if (point.x < box.minX || point.x > box.maxX || point.z < box.minZ || point.z > box.maxZ) continue;
-      surfaceY = box.maxY;
-    }
-    const gap = feetY - surfaceY;
-    if (gap < -AUTOSTEP_M || gap > FLOOR_DROP_TOLERANCE_M) continue;
-    if (best === null || Math.abs(gap) < Math.abs(best)) best = gap;
-  }
-  return best;
-}
 
 const describePoint = (point: THREE.Vector3, team: number): string =>
   `farcrysis team ${team} spawn (${point.x}, ${point.z})`;
@@ -107,7 +78,10 @@ describe('farcrysis spawn table (PASS 85 Lane R)', () => {
   it('stands every spawn on a terrain plate within autostep of its feet', () => {
     for (const [team, points] of teams.entries()) {
       for (const point of points) {
-        expect(plateGapBeneath(point), `${describePoint(point, team)} has no terrain plate beneath it`).not.toBeNull();
+        expect(
+          farcrysisFloorGapBeneath(point, arena.physicsColliders),
+          `${describePoint(point, team)} has no terrain plate beneath it`,
+        ).not.toBeNull();
       }
     }
   });

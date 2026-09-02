@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { farcrysisInstancedMesh } from './farcrysis-instancing';
 import { FARCRYSIS_ART_FEEL } from './farcrysis-art';
-import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
+import { FARCRYSIS_BOUNDS, FARCRYSIS_PATROL_XZ, FARCRYSIS_SPAWNS_ALL } from './farcrysis-constants';
 import { farcrysisTerrainHeight as terrainHeightAt, FARCRYSIS_WATER_LEVEL } from './farcrysis-terrain-authority';
 import {
   FARCRYSIS_ARENA_HALF,
@@ -344,19 +344,16 @@ function mulberry32(seed: number): () => number {
 // queries now resolve through the single terrain authority (imported above
 // under the old local name so the many call sites read unchanged).
 
-// Spawn positions and patrol points (from farcrysis.ts) for clearance checks.
-// HF-396: kept in sync with the 128 m island rescale in buildFarcrysis —
-// update both together when spawns move.
-const SPAWNS_ALL: Array<[number, number]> = [
-  [-52, -52], [-44, -48], [-48, -40], [-36, -52], // team 0 NW
-  [52, 52], [44, 48], [48, 40], [36, 52], // team 1 SE
-];
+// Spawn positions and patrol points for clearance checks. PASS 85 Lane R:
+// these are now IMPORTED from the arena's leaf constants module, not
+// hand-copied. The copy that used to live here carried the comment "kept in
+// sync with buildFarcrysis - update both together when spawns move", and the
+// first time the spawns moved it was not: an undergrowth card landed 2.68 m
+// from a spawn against a 3.19 m rule.
+const SPAWNS_ALL = FARCRYSIS_SPAWNS_ALL;
 const SPAWN_CLEAR = 5.5; // metres clearance around each spawn point
 
-const PATROL_PTS: Array<[number, number]> = [
-  [-52, -52], [-36, -40], [-24, -32], [-8, -24], [0, 0], [24, 32], [36, 40], [52, 52],
-  [-40, 36], [40, -36], [-16, -48], [16, 48],
-];
+const PATROL_PTS = FARCRYSIS_PATROL_XZ;
 const PATROL_CLEAR = 3.0;
 
 const PATH_CLEAR_WIDTH = 6.5; // wider than the terrain path to keep foliage visually off the corridors

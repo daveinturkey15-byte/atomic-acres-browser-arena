@@ -27,15 +27,47 @@ import { dirname, resolve } from 'node:path';
 import * as THREE from 'three';
 import { isBlocked, type Point3 } from '../../src/collision';
 import { buildFarcrysis } from '../../src/farcrysis';
-import { FARCRYSIS_WATER_LEVEL, farcrysisTerrainHeight } from '../../src/farcrysis-terrain-authority';
+import {
+  FARCRYSIS_WATER_LEVEL,
+  farcrysisFloorGapBeneath,
+  farcrysisTerrainHeight,
+} from '../../src/farcrysis-terrain-authority';
 import {
   SPAWN_EYE_HEIGHT,
+  SPAWN_LAYOUT_THRESHOLDS,
   arenaFieldsBots,
-  floorBeneath,
   measureSpawnLayout,
+  openArcFraction,
   spawnPointFailures,
   walkableRegionFrom,
+  wallStandoffDistance,
 } from '../../src/spawn-layout-constraints';
+
+/**
+ * The shared `spawnPointFailures` reports 'no-floor' for every point on this
+ * island: its `floorBeneath` skips rotated boxes and farcrysis's ground is
+ * 5,474 rotated tangent-plane slabs. The floor is therefore measured here with
+ * `farcrysisFloorGapBeneath`, against those plates, using the same segment and
+ * the same tolerances - and NOTHING else is dropped: every other rule comes
+ * back from the shared function unchanged and a candidate must pass all of
+ * them. `docs/evidence/pass85/lane-r/spawn-layout-constraints-rotated-plate-floor.patch`
+ * removes the need for this once it lands in that (Lane D-owned) module.
+ */
+function failuresFor(eye: Point3, enemies: readonly Point3[], arena: ReturnType<typeof buildFarcrysis>, botArena: boolean): string[] {
+  const failures = spawnPointFailures(eye, arena, enemies, botArena, true)
+    .filter((failure) => failure !== 'no-floor');
+  if (farcrysisFloorGapBeneath(eye, arena.physicsColliders) === null) failures.push('no-floor');
+  // `spawnPointFailures` only reaches the standoff and open-arc rules when
+  // nothing cheaper failed - and on this arena 'no-floor' ALWAYS fails, so
+  // those two are never reached from inside it. Applying them here, with the
+  // module's own functions and thresholds, is the whole reason the first run of
+  // this solver proposed a point 0.54 m off a view-blocking face.
+  if (failures.length === 0) {
+    if (wallStandoffDistance(eye, arena.colliders) < SPAWN_LAYOUT_THRESHOLDS.minimumWallStandoffM) failures.push('wall-in-the-face');
+    else if (openArcFraction(eye, arena.colliders) < SPAWN_LAYOUT_THRESHOLDS.minimumOpenArcFraction) failures.push('boxed-in');
+  }
+  return failures;
+}
 
 const argv = process.argv.slice(2);
 const arg = (name: string): string | null => {
@@ -103,7 +135,7 @@ function fillSeed(): Point3 {
       const radius = Math.hypot(x, z);
       if (radius >= bestRadius) continue;
       const eye = eyeAt({ x, z });
-      if (!floorBeneath(eye, arena)) continue;
+      if (farcrysisFloorGapBeneath(eye, arena.physicsColliders) === null) continue;
       if (isBlocked({ x, y: eye.y, z }, arena.colliders, 0.44)) continue;
       best = eye;
       bestRadius = radius;
@@ -127,7 +159,7 @@ for (let x = arena.bounds.minX + STEP_M; x <= arena.bounds.maxX - STEP_M; x += S
     const xz = { x, z };
     if (!region.has(cellKey(xz))) continue;
     const eye = eyeAt(xz);
-    if (!floorBeneath(eye, arena)) continue;
+    if (farcrysisFloorGapBeneath(eye, arena.physicsColliders) === null) continue;
     grid.push({ xz, eye, u: (x + z) / 2 });
   }
 }
@@ -139,10 +171,10 @@ console.log(`grid: ${grid.length} dry walkable candidate cells (step ${STEP_M} m
  * is solved against the first, then the first is re-checked against the second,
  * exactly as Lane D's solver does.
  */
-function solveTeam(team: 0 | 1, enemies: readonly Point3[]): Point3[] {
+function solveTeam(team: 0 | 1, enemies: readonly Point3[], seeds: readonly Point3[] = []): Point3[] {
   const sign = team === 0 ? -1 : 1;
   const pool = grid.filter((cell) => sign * cell.u >= DIAGONAL_BAND_M);
-  const admissible = pool.filter((cell) => spawnPointFailures(cell.eye, arena, enemies, botArena, true).length === 0);
+  const admissible = pool.filter((cell) => failuresFor(cell.eye, enemies, arena, botArena).length === 0);
   console.log(`  team ${team}: ${pool.length} cells on its end, ${admissible.length} pass every rule`);
   // Bootstrap on the FURTHEST-APART admissible pair, then greedy
   // farthest-point. Seeding on a single corner cell instead (the obvious
@@ -151,13 +183,24 @@ function solveTeam(team: 0 | 1, enemies: readonly Point3[]): Point3[] {
   // shelf and the greedy walk never reached both of its ends.
   const chosen: Point3[] = [];
   let widest = -Infinity;
-  for (let left = 0; left < admissible.length; left += 1) {
-    for (let right = left + 1; right < admissible.length; right += 1) {
-      const span = distance(admissible[left]!.xz, admissible[right]!.xz);
-      if (span <= widest) continue;
-      widest = span;
-      chosen.length = 0;
-      chosen.push(admissible[left]!.eye, admissible[right]!.eye);
+  // Seeds (the mirrored partner's points) come first and are kept as long as
+  // they hold the pair spacing: the arena is authored rotationally symmetric
+  // about the core and every mirror that survives every rule keeps it so.
+  for (const seed of seeds) {
+    if (chosen.every((existing) => distance(existing, seed) >= MIN_PAIR)) chosen.push(seed);
+  }
+  if (chosen.length > 0) widest = chosen.length < 2 ? 0 : Math.max(
+    ...chosen.flatMap((a, i) => chosen.slice(i + 1).map((b) => distance(a, b))),
+  );
+  if (chosen.length === 0) {
+    for (let left = 0; left < admissible.length; left += 1) {
+      for (let right = left + 1; right < admissible.length; right += 1) {
+        const span = distance(admissible[left]!.xz, admissible[right]!.xz);
+        if (span <= widest) continue;
+        widest = span;
+        chosen.length = 0;
+        chosen.push(admissible[left]!.eye, admissible[right]!.eye);
+      }
     }
   }
   while (chosen.length > 0 && chosen.length < WANTED) {
@@ -176,8 +219,24 @@ function solveTeam(team: 0 | 1, enemies: readonly Point3[]): Point3[] {
 }
 
 const team0 = solveTeam(0, arena.spawns[1]);
-const team1 = solveTeam(1, team0);
-const recheck0 = team0.filter((point) => spawnPointFailures(point, arena, team1, botArena, true).length === 0);
+// The arena was authored rotationally symmetric about the core (src/farcrysis.test.ts
+// pins it), so team 1 is team 0 rotated 180 degrees where the terrain allows
+// it - the ground field is NOT symmetric, so each mirror still has to pass
+// every rule on its own. Any mirror that does not is replaced by a solved
+// point, and the run says which.
+const mirrored = team0
+  .map((point) => ({ x: -point.x, z: -point.z }))
+  // Mirrors skip the candidate grid, so they have to be held to the same two
+  // conditions the grid applies before the rule set runs: dry land, and inside
+  // the one walkable region. Without the dry-land check the mirror of a ridge
+  // spawn landed at 0.73 m, inside the wade shelf.
+  .filter((xz) => farcrysisTerrainHeight(xz.x, xz.z) >= FARCRYSIS_WATER_LEVEL + DRY_FREEBOARD_M)
+  .filter((xz) => region.has(cellKey(xz)))
+  .map((xz) => eyeAt(xz))
+  .filter((eye) => failuresFor(eye, team0, arena, botArena).length === 0);
+console.log(`  team 1 mirrors: ${mirrored.length} of ${team0.length} team-0 points mirror onto admissible ground`);
+const team1 = solveTeam(1, team0, mirrored);
+const recheck0 = team0.filter((point) => failuresFor(point, team1, arena, botArena).length === 0);
 
 const proposal: Record<0 | 1, THREE.Vector3[]> = {
   0: recheck0.map((point) => new THREE.Vector3(point.x, point.y, point.z)),
@@ -192,9 +251,10 @@ console.log(`\nproposal: ${after.summary.spawnCount} spawns, in-envelope ${after
   + `(${after.summary.crossTeamMinFraction} of the longer axis), enemy-LOS pairs ${after.summary.enemyLosPairs}`);
 for (const point of after.points) {
   console.log(`  team ${point.team}  [${point.x.toFixed(1)}, ${point.z.toFixed(1)}]  eye y ${point.y.toFixed(2)}  `
-    + `floor ${point.floorGapM === null ? 'NONE' : `${point.floorGapM.toFixed(2)} ${point.floorSource}`}  `
+    + `plate-floor ${(() => { const gap = farcrysisFloorGapBeneath({ x: point.x, y: point.y, z: point.z }, arena.physicsColliders); return gap === null ? 'NONE' : gap.toFixed(2); })()}  `
     + `cover ${point.coverDistanceM.toFixed(1)}  poi ${point.poiDistanceM.toFixed(1)}  standoff ${point.wallStandoffM.toFixed(2)}  `
-    + `arc ${point.openArcFraction.toFixed(2)}  ${point.failures.length === 0 ? 'ok' : point.failures.join(',')}`);
+    + `arc ${point.openArcFraction.toFixed(2)}  `
+    + `${(() => { const f = failuresFor({ x: point.x, y: point.y, z: point.z }, proposal[point.team === 0 ? 1 : 0], arena, botArena); return f.length === 0 ? 'ok' : f.join(','); })()}`);
 }
 const longestAxis = Math.max(arena.bounds.maxX - arena.bounds.minX, arena.bounds.maxZ - arena.bounds.minZ);
 for (const team of [0, 1] as const) {

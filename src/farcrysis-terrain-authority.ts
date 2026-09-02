@@ -39,7 +39,7 @@
  * on every peer. No Math.random anywhere.
  */
 
-import type { Box2 } from './collision';
+import { segmentBoxHitTime, type Box2, type Point3 } from './collision';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_WATER } from './water/water-authoring';
 import { SWIM_TUNING, feetDepthFromEyeDepth } from './water/swim-state';
@@ -402,4 +402,55 @@ export function farcrysisBotGroundPlatforms(): readonly BotGroundPlatform[] {
   }
   platformCache = Object.freeze(out);
   return platformCache;
+}
+
+// ---------------------------------------------------------------------------
+// Floor probe — what HF-402's `floorBeneath` cannot see on this arena
+// ---------------------------------------------------------------------------
+
+/**
+ * The gap between a standing player's FEET and the terrain plate beneath them,
+ * or null when no plate is within reach. Positive = the surface is below the
+ * feet; negative = the feet are inside it, up to autostep.
+ *
+ * PASS 85 Lane R. `floorBeneath` in src/spawn-layout-constraints.ts finds a
+ * floor from a downward ray against `raycastMeshes`, an axis-aligned collider
+ * top, or the physics fail-safe floor — and skips any box carrying a
+ * `rotation`. farcrysis has none of the three under the player: the visual
+ * terrain is presentation-only and deliberately absent from `raycastMeshes`,
+ * the fail-safe floor is 4.5 m down, and the ground IS 5,474 rotated
+ * tangent-plane slabs from `farcrysisTerrainPhysicsTiles`. Measured with the
+ * shipped rule: 7 of 1,244 dry 2 m cells on this island report a floor, all of
+ * them prop tops. This probe answers the same question against the plates,
+ * with the same segment and the same tolerances, so farcrysis instruments do
+ * not have to wait on a change to a shared module.
+ */
+export function farcrysisFloorGapBeneath(
+  eye: Point3,
+  physicsColliders: readonly Box2[],
+  eyeHeightM = 1.7,
+  autostepM = 0.45,
+  dropToleranceM = 0.6,
+): number | null {
+  const far = eyeHeightM + dropToleranceM + 0.01;
+  const feetY = eye.y - eyeHeightM;
+  const start = { x: eye.x, y: eye.y, z: eye.z };
+  const end = { x: eye.x, y: eye.y - far, z: eye.z };
+  let best: number | null = null;
+  for (const box of physicsColliders) {
+    if (box.maxY === undefined) continue;
+    let surfaceY: number;
+    if (box.rotation) {
+      const time = segmentBoxHitTime(start, end, box, 0);
+      if (time === null) continue;
+      surfaceY = eye.y - time * far;
+    } else {
+      if (eye.x < box.minX || eye.x > box.maxX || eye.z < box.minZ || eye.z > box.maxZ) continue;
+      surfaceY = box.maxY;
+    }
+    const gap = feetY - surfaceY;
+    if (gap < -autostepM || gap > dropToleranceM) continue;
+    if (best === null || Math.abs(gap) < Math.abs(best)) best = gap;
+  }
+  return best;
 }

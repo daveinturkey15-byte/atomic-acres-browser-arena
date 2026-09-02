@@ -24,7 +24,13 @@ import {
   FARCRYSIS_SAFETY_FLOOR_Y,
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
-import { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE } from './farcrysis-constants';
+import {
+  FARCRYSIS_BOUNDS,
+  FARCRYSIS_COVER_MIN,
+  FARCRYSIS_MAX_SIGHTLINE,
+  FARCRYSIS_PATROL_XZ,
+  FARCRYSIS_SPAWNS_XZ,
+} from './farcrysis-constants';
 
 // HF-395 relational mid-map composition: every mid-map prop derives its world
 // position from one of four quadrant landmark frames (see the module header).
@@ -948,19 +954,13 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   //
   // The NW/SE diagonal split of the old table is kept: team 0 owns
   // (x + z) / 2 <= -17, team 1 owns >= +17.
-  const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(
-    [
-      [-36, -22], [-8, -26], [-26, -8], [-26, -34], [-20, -20], [-32, -14],
-    ],
-    [
-      [2, 46], [32, 2], [34, 34], [14, 30], [44, 18], [22, 46],
-    ],
-  );
+  //
+  // The coordinates themselves live in farcrysis-constants.ts, the arena's leaf
+  // module, because farcrysis-vegetation.ts needs them too and used to keep a
+  // hand-copied second table (see FARCRYSIS_SPAWNS_XZ).
+  const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(FARCRYSIS_SPAWNS_XZ[0], FARCRYSIS_SPAWNS_XZ[1]);
 
-  const patrolPoints = [
-    [-52, -52], [-36, -40], [-24, -32], [-8, -24], [0, 0], [24, 32], [36, 40], [52, 52],
-    [-40, 36], [40, -36], [-16, -48], [16, 48],
-  ].map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const patrolPoints = FARCRYSIS_PATROL_XZ.map(([x, z]) => new THREE.Vector3(x, 0, z));
 
   // --- Pass 69 art/feel lane (presentation only — no colliders, spawns, or gameplay authority) ---
   applyFarcrysisArtwork(root);
