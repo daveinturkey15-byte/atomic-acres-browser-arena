@@ -84,6 +84,7 @@ import {
   standard,
   type Builder,
 } from './additional-maps';
+import type { Box2 } from './collision';
 import type { ArenaMap } from './map';
 import { applyTest1Dressing, applyTest2Dressing, test1Materials, test2Materials, worldTiled } from './test-maps-art';
 
@@ -131,6 +132,15 @@ const HARD_COVER = 1.9;
 /** ISO container: the yard's cover module and the top of the climb ladder. */
 const CONTAINER_SIZE: readonly [number, number, number] = [6, 2.6, 2.6];
 
+/**
+ * HF-411: dressing meshes on Test1 that a player reads as a floor and must
+ * therefore be able to stand on. Names only - every number comes off the mesh
+ * (see `adoptWalkableDressing`). Adding a row here is how a future art pass
+ * declares "this panel is walkable"; the walkable-surface gate
+ * (src/walkable-surface-parity-gate.test.ts) fails if one is missing.
+ */
+export const TEST1_WALKABLE_DRESSING: readonly string[] = Object.freeze(['test1-camo-net-tarp']);
+
 function makeBuilder(scene: THREE.Scene, name: string): Builder {
   const root = new THREE.Group();
   root.name = name;
@@ -157,6 +167,56 @@ function block(
   options: Parameters<typeof box>[5] = {},
 ): THREE.Mesh {
   return worldTiled(box(builder, name, position, size, material, options), size);
+}
+
+/**
+ * Gives movement authority to a DRESSING mesh that reads as a floor (HF-411).
+ *
+ * The collider is DERIVED from the mesh that is actually in the graph - its own
+ * geometry extent, world placement and world rotation - and never re-typed from
+ * the art module's literals. An art pass that moves, resizes or tilts the panel
+ * moves the collider with it; an art pass that RENAMES or deletes it removes
+ * the collider and the walkable-surface gate re-fires, which is the behaviour a
+ * hand-copied number cannot give.
+ *
+ * Only movement authority is granted. Shot authority stays with whatever the
+ * mesh already registered, so a netting panel keeps its cloth semantics - a
+ * round crosses it, a body does not - exactly like real grating.
+ *
+ * Returns how many meshes were adopted so the caller can assert the census.
+ */
+function adoptWalkableDressing(builder: Builder, names: readonly string[]): number {
+  const wanted = new Set(names);
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  let adopted = 0;
+  builder.root.updateMatrixWorld(true);
+  builder.root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || !wanted.has(object.name)) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    const local = object.geometry.boundingBox;
+    if (!local) return;
+    object.matrixWorld.decompose(position, quaternion, scale);
+    const size = local.getSize(new THREE.Vector3()).multiply(scale);
+    const centre = local.getCenter(new THREE.Vector3()).multiply(scale).applyQuaternion(quaternion).add(position);
+    const euler = new THREE.Euler().setFromQuaternion(quaternion, 'XYZ');
+    // Same convention `box()` writes and CharacterPhysics.create reads: an
+    // axis-aligned extent plus the mesh's own rotation about its centre.
+    const bounds: Box2 = {
+      minX: centre.x - size.x / 2,
+      maxX: centre.x + size.x / 2,
+      minZ: centre.z - size.z / 2,
+      maxZ: centre.z + size.z / 2,
+      minY: centre.y - size.y / 2,
+      maxY: centre.y + size.y / 2,
+      rotation: [euler.x, euler.y, euler.z],
+    };
+    builder.colliders.push(bounds);
+    builder.physicsColliders.push(bounds);
+    adopted += 1;
+  });
+  return adopted;
 }
 
 function perimeter(builder: Builder, name: string, bounds: { minX: number; maxX: number; minZ: number; maxZ: number }, height: number, material: THREE.Material): void {
@@ -348,6 +408,32 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
   }
 
   applyTest1Dressing(builder.root, materials);
+  // HF-411 (owner, 2026-09-02): "on firing range sometimes you go to run onto a
+  // metal fence layed as a floor on the roof level of the map and you fall
+  // through it, fix all that shit."
+  //
+  // MEASURED, not guessed. The walkable-surface sweep
+  // (scripts/qa/audit-walkable-surface-parity.ts) censused 48 elevated walkable
+  // visuals on this map and found exactly two with no movement authority: the
+  // camo netting strung over the container yard, authored as dressing in
+  // test-maps-art.ts. Two 9.0 x 6.4 m panels, tilted 2 degrees, top face
+  // running 2.79 m (west) to 3.11 m (east) - 97% of each panel unsupported,
+  // 3.0 m of clear air to the hardpan. Evidence:
+  // docs/evidence/pass85/hf411/before.json.
+  //
+  // The art's own justification for leaving them non-solid was that the
+  // underside "sits at 2.92 m - above the 2.6 m reachable ceiling", and that is
+  // false by measurement: the yard's reachable ceiling is the TOP OF CONTAINER
+  // A at 2.60 m, which the four-rung climb ladder beside it exists to put a
+  // player on. From those boots the netting's west edge is 0.19 m up - inside
+  // the 0.42 m autostep - and it reads as a floor running 9 m east across open
+  // air. That is the "sometimes": approach the panel over the container and you
+  // step onto a floor; approach it anywhere else and you never touch it.
+  //
+  // The visual is not moved, hidden, levelled or resized. It is given the
+  // movement authority it always looked like it had, derived from the mesh
+  // itself so art and authority cannot drift apart.
+  adoptWalkableDressing(builder, TEST1_WALKABLE_DRESSING);
   batchPresentationOnlyBoxes(builder.root, 'test1-presentation');
 
   return {
