@@ -166,8 +166,11 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   // Open water with nothing to occlude the sky, so the widest BAND.
   'high-seas': profile('high-seas', 'open-ocean-morning-through-dusk', false, 13, [7.5, 19], [5.5, 20.5], [8, 66], 58, 7),
   // Firing Range: dry range under hard sun. Its weather profile is pinned clear
-  // by design, so the hour is the only variation this arena gets at all.
-  test1: profile('test1', 'dry-range-hard-morning-sun', false, 10.5, [9, 13], [6, 19], [12, 70], 34, 6),
+  // by design, so the hour is the only variation this arena gets at all -- which
+  // is why its arc window is TIGHT (07:00-17:00 rather than the 06:00-19:00 the
+  // wetter arenas use). A wide window put the whole 09:00-13:00 band within four
+  // degrees of the arc's peak and the sun scale moved by 5% end to end.
+  test1: profile('test1', 'dry-range-hard-morning-sun', false, 10.5, [9, 13], [7, 17], [12, 70], 34, 6),
   // Raid: golden-hour hillside estate. Narrow — golden hour IS the identity.
   test2: profile('test2', 'golden-hour-hillside', false, 17, [16, 18.5], [6, 19.5], [8, 60], 26, 6),
   // MAP3 (PREVIEW). PINNED on purpose: Lane V owns this map's look while it is
@@ -326,7 +329,12 @@ function directSunTint(elevationDegrees: number): Rgb3 {
  * is most of what makes a dusk read as a dusk instead of as an orange filter.
  */
 function skylightTint(elevationDegrees: number): Rgb3 {
-  const amount = clamp01((30 - clamp(elevationDegrees, 2, 60)) / 28);
+  // The knee is at 45 degrees rather than at 30: above roughly 45 the direct
+  // beam dominates and the dome reads neutral, and a knee that low left five of
+  // the seven outdoor arenas with a mathematically real but invisible sky shift
+  // because their whole band sits above it (measured: High Seas moved 0.000 on
+  // every channel at 07:30 with a 30-degree knee).
+  const amount = clamp01((45 - clamp(elevationDegrees, 2, 70)) / 40);
   return [mix(1, 0.86, amount), mix(1, 0.93, amount), mix(1, 1.13, amount)];
 }
 
