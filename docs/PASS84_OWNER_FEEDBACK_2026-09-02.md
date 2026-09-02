@@ -347,3 +347,19 @@ page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
   reports zero unexplained walkable visuals; the same sweep on every arena
   lists any sibling.
 - **Plan:** Lane X (`docs/pass84-lanes/LANE-X-firing-range-fallthrough.md`).
+
+## HF-412 — drop shots the way Black Ops 2 did them
+
+- **Statement (verbatim, 2026-09-02 ~16:45 BST):** "Also ensure 'drop shots'
+  work like they did back in black ops 2 days, no weird sliding or diving,
+  just however drop shots worked and what keys you had to press, important"
+  and "its where you go prone and shoot i think, and has an animation too of
+  the body".
+- **Mechanical falsifier:** pressing the prone input mid-burst drops the eye
+  to prone height over a fixed short transition with no fire interruption
+  (shot timestamps continuous across the drop), no slide or dive path
+  reachable, the reference's default key on PC and hold-crouch on pad both
+  bound and remappable, and a guest in the two-client harness sees the
+  host's body play a prone transition rather than snap.
+- **Plan:** Lane Y (`docs/pass84-lanes/LANE-Y-drop-shot.md`); Lane W owns
+  the viewmodel's prone pose in parallel.
