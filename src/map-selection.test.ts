@@ -272,6 +272,24 @@ describe('opening arena selection', () => {
     expect(map3.rulesLabel).toContain('EXPLORE');
     expect(map3.soloBotCount).toBe(0);
     expect(map3.maximumSoloBots).toBe(0);
+
+    // MAP3 (HF-409 finisher 3): the card links to the standalone showcase page,
+    // and the href is RELATIVE. The published game document is at
+    // `channels/<pass>/index.html`, so a rooted '/map3.html' 404s on every
+    // channel - which is the whole reason the page looked destroyed.
+    expect(map3.showcasePath).toBe('map3.html');
+    expect(map3.showcasePath?.startsWith('/')).toBe(false);
+    expect(map3.showcasePath).not.toContain('://');
+    // No other arena claims a second page, so a copy-paste into a team arena
+    // (which has no such page built) fails here rather than shipping a 404.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.showcasePath).map((entry) => entry.id)).toEqual(['map3']);
+
+    // The lede counts the corridors, and there are EIGHT since the Rapier
+    // playground landed as a real lane in `MAP3_LANES`. An undercounting lede
+    // is the same class of untruth as the matchbar that called this a
+    // deathmatch, and is the kind of copy that silently rots as content lands.
+    expect(map3.menuLede).toContain('eight corridors');
+    expect(map3.menuLede).not.toContain('seven corridors');
     // An explore arena must not carry a match clock into its HUD. The registry
     // keeps `matchRules.durationMs` because the id is also the replay/storage
     // boundary and a saved match naming map3 must still decode - so the HUD

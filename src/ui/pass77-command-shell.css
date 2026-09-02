@@ -914,6 +914,38 @@
   color: var(--p77-ink-soft);
 }
 
+/* MAP3 (HF-409): the standalone showcase link under the arena lede.
+ *
+ * `display: none` for the hidden state is stated FIRST and with the same
+ * specificity discipline as the rule that shows it, because the element is an
+ * inline-block here: the `hidden` attribute's UA rule is `display: none` at
+ * the lowest possible precedence, and ANY author `display` on the element wins
+ * over it. Without this the link would be permanently visible on every arena
+ * that has no second page, pointing nowhere. */
+#menu .arena-showcase-link[hidden] { display: none; }
+
+#menu .arena-showcase-link {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--p77-accent) 55%, transparent);
+  border-radius: 4px;
+  color: var(--p77-accent);
+  background: color-mix(in srgb, var(--p77-accent) 8%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+#menu .arena-showcase-link:hover,
+#menu .arena-showcase-link:focus-visible {
+  border-color: var(--p77-accent);
+  background: color-mix(in srgb, var(--p77-accent) 18%, transparent);
+}
+
 /* The Pass 75 diamond section marker, retuned: a 2px accent rule reads as
    instrument chrome where a rotated square read as a bullet point. */
 #menu .manifest-heading small::before,

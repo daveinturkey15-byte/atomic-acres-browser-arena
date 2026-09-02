@@ -115,6 +115,19 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="eyebrow">SELECTED THEATRE // 01</div>
         <h1 id="arena-title">NUKE <span>TOWN</span></h1>
         <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
+        <!--
+          MAP3 (HF-409): the only route a player has to the standalone showcase
+          page. Hidden here and given its href at selection time from the
+          selected arena's showcasePath, so an arena without a second page
+          renders no link rather than an empty one. The href is RELATIVE on
+          purpose - the game document lives at channels/PASS/index.html on the
+          published site, so a rooted href would 404 on every channel.
+          target=_blank because the showcase owns the whole window (it captures
+          pointer lock and W/A/S/D), and losing the menu you launched it from
+          would be a one-way trip; rel per the usual opener hygiene.
+          NOTE: no backticks in this comment - it is inside a template literal.
+        -->
+        <a class="arena-showcase-link" id="arena-showcase-link" hidden target="_blank" rel="noopener noreferrer">OPEN THE STANDALONE SHOWCASE ↗</a>
       </header>
       <aside id="menu-showcase" aria-hidden="true">
         <canvas id="match-pause-frame-fallback" aria-hidden="true" hidden width="1" height="1"></canvas>

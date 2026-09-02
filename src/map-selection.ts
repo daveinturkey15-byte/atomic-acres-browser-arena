@@ -37,6 +37,27 @@ export type ArenaSelection = Readonly<{
    * be used to duck a gate while shipping combat.
    */
   kind: 'team' | 'explore';
+  /**
+   * A SECOND PAGE THIS ARENA HAS, relative to the document that links it.
+   *
+   * Map 3's corridors also ship as a standalone showcase page (`map3.html`, a
+   * declared Vite build input) that flies a camera through them with no player
+   * and no colliders. The game's own menu is the only place a player would ever
+   * learn it exists, so the card links to it.
+   *
+   * RELATIVE, AND DELIBERATELY SO. The published site is not served from a
+   * root: `scripts/release/stage-release-topology.mjs` moves index.html, the
+   * assets directory and map3.html together into `channels/<pass>/`, and the
+   * repository is a project Pages site under `/atomic-acres/` on top of that.
+   * A leading-slash href would be `/map3.html` and 404 on every channel; the
+   * value here is resolved against the game document's own URL, so it lands in
+   * whichever channel the player is actually in. This is the same reason
+   * `vite.config.ts` sets `base: './'`.
+   *
+   * Optional because most arenas have no second page, and absent means no link
+   * is rendered at all - not an empty one.
+   */
+  showcasePath?: string;
   soloBotCount: number;
   maximumSoloBots: number;
   multiplayer: boolean;
@@ -288,9 +309,16 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     displayName: 'Map 3',
     titleLead: 'MAP',
     titleAccent: '3',
-    menuLede: 'Walk the showcase: a paved hub with seven corridors running off it — a Gerstner shoreline with a pier and a fording rover, a raymarched SDF gallery, a shape-grammar skyline, a forest that bends as you pass, four seasons under a downpour, a colonnade cut by god rays, and an overlook onto a colosseum. No bots, no timer pressure: explore.',
+    // EIGHT, not seven: the Rapier playground landed as a real in-arena
+    // corridor (`MAP3_LANES` in src/map3-arena.ts), and a lede that undercounts
+    // the content by one corridor is the same class of untruth as the matchbar
+    // that called this a team deathmatch.
+    menuLede: 'Walk the showcase: a paved hub with eight corridors running off it — a Gerstner shoreline with a pier and a fording rover, a raymarched SDF gallery, a shape-grammar skyline, a forest that bends as you pass, four seasons under a downpour, a colonnade cut by god rays, a Rapier physics playground you can shove around, and an overlook onto a colosseum. No bots, no timer pressure: explore.',
     summary: 'Corridor showcase · explore · no bots',
     rulesLabel: 'EXPLORE PREVIEW · NO BOTS',
+    // The standalone fly-through page, resolved against the game document so it
+    // lands in whichever channel the player is in. See `showcasePath` above.
+    showcasePath: 'map3.html',
     soloBotCount: 0,
     maximumSoloBots: 0,
     multiplayer: false,

@@ -28581,6 +28581,19 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  // MAP3 (HF-409): the standalone showcase link. Present only for an arena that
+  // declares a second page, and relative to THIS document, so it resolves
+  // inside whatever release channel the player loaded the game from.
+  const showcaseLink = element<HTMLAnchorElement>('#arena-showcase-link');
+  const showcasePath = selectedArena.showcasePath;
+  if (showcasePath) {
+    showcaseLink.setAttribute('href', showcasePath);
+    showcaseLink.title = `Open the ${selectedArena.displayName} showcase fly-through in a new tab`;
+    showcaseLink.hidden = false;
+  } else {
+    showcaseLink.removeAttribute('href');
+    showcaseLink.hidden = true;
+  }
   canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
