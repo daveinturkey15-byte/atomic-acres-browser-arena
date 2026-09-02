@@ -1,0 +1,17 @@
+{
+  "tsc_clean": true,
+  "focused_test_files_passed": 12,
+  "focused_tests_passed": 115,
+  "focused_tests_failed": 0,
+  "rendering_suite_files_passed": 26,
+  "rendering_suite_tests_passed": 359,
+  "full_suite_run": false,
+  "switch_matrix_edges": 56,
+  "switch_matrix_failed_before": 1,
+  "switch_matrix_failed_after": 0,
+  "arena_boot_smoke_passed": 11,
+  "in_combat_pipelines_after": 1,
+  "in_combat_pipelines_in_stall_after": 0,
+  "failing_files": [],
+  "discounted_flaky": []
+}

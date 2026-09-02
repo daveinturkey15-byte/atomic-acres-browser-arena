@@ -1,0 +1,74 @@
+# arena switch matrix — pass85-before vs pass85-after
+
+pass85-before: sha c13ec02c, 56 edges, 1 failed, ComfyUI idle, rival browsers 0, GPU 5845/16303 MiB free
+  FAILED: atomic-acres->high-seas
+
+pass85-after: sha b082bc83, 56 edges, 0 failed, ComfyUI idle, rival browsers 0, GPU 8648/16303 MiB free
+
+## switch INTO each arena (median over every source)
+
+arena              edges fail  switch ms  pipelines  modules  in-fence  after ms    delta
+gun-range              7    0    22611.1        227      252        80   23756.1       5%
+high-seas              7    1      21610        195      210        39     28534      32%
+rustworks-1v1          7    0    21276.4        245      261       108   23265.7       9%
+atomic-acres           7    0    20173.4        288      299       107   21614.9       7%
+skyline-terminal       7    0      18806        228      237        83   16904.6     -10%
+test1                  7    0      11829        167      165        53   11308.3      -4%
+test2                  7    0    10959.6        177      179        66   12108.2      10%
+map3                   7    0     8902.8        138      141        33    9390.8       5%
+
+## transition phases, median ms over every edge
+
+phase                                median      max    after
+prewarm-batched-effects                9151  18169.5   7347.9
+visual-definition                    4079.6  13932.3   6517.8
+coverage-submit-fence                3069.4   6471.8   2770.9
+weapon-catalog-prewarm               2229.7   5207.9   1532.7
+material-tuning                       175.9    249.1    178.4
+rollback                                 46       46        -
+presentation-batching                  11.2     25.8     10.8
+physics-construction                     10     26.9      9.9
+arena-construction                        8    682.9      9.2
+match-authority-reset                   3.4      5.1      3.2
+quality-presentation                    2.3    220.9      2.4
+authority-commit                        0.9      3.1      0.9
+shared-gameplay-assets                  0.7      1.4      0.7
+commit-bookkeeping                      0.6      2.5      0.6
+interactive-world-construction          0.1      5.6      0.1
+art-texture-settle                      0.1      0.3      0.1
+retire-previous-arenas                  0.1      2.2      0.1
+previous-webgpu-fence                     0      0.1        0
+finalize                                  0    146.6        0
+
+## render pipelines created, by transition phase (median per switch)
+
+phase                                median    total    after    total
+prewarm-batched-effects                 131     6915      131     7035
+visual-definition                        41     2379       74     4033
+coverage-submit-fence                    30     1852       24     1580
+weapon-catalog-prewarm                    6      336        6      334
+rollback                                  4        4        -        -
+
+## effect prewarm families, median ms per switch
+
+family                       median    after
+smoke-volumes                3524.7     2893
+world-ordnance               2755.5   2146.9
+bot-world-weapons            2755.1   2146.6
+nuke-overdrive-bolts         2719.7   2105.4
+flare-first-shot             2560.6        0
+killstreak-vocabulary        2288.1   2136.5
+tracers-impacts               515.8    502.8
+explosions                    515.5    502.4
+flamethrower-first-shot       415.4   2253.2
+death-drops-glass               0.9      0.8
+
+## first load per arena (boot -> live match)
+
+arena               menu ms  trans ms  deploy ms  total ms  pipes<adm  mods<adm  materials  triangles
+atomic-acres            920   28973.1      18809     47908        360       415        104     537259
+high-seas               920   29902.3      19295     49294       2426      2655         60     212682
+skyline-terminal       3550   28733.2      20397     49276        289       330         97      55658
+rustworks-1v1          1625   34958.6      18895     54000        280       325         67     194606
+gun-range              1683   28360.1      14402     42972        255       287        192     117678
+
