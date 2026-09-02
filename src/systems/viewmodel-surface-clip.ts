@@ -39,27 +39,82 @@
  * fixed on 2026-08-31 that had 85.7% of all pipeline creations landing inside a
  * stall. So the caller keeps a FIXED-LENGTH array and this module fills it,
  * returning how many slots are live; the caller parks the rest.
+ *
+ * HF-395 (2026-09-02), the second measurement, with the instrument's stance
+ * defect fixed (it had been sampling every "prone" and "stand" row airborne at
+ * eye height 1.8 m, so the floor plane never engaged in any stance):
+ *
+ *  - Standing on flat ground looking down, the arms sleeve reached 0.49 m BELOW
+ *    the floor. The floor plane was refused because the eye was 1.84 m up and
+ *    the wall reach is 1.4 m - but the rig, pitched down, reaches ~2.1 m. The
+ *    ground gets its own, longer reach.
+ *  - At the Nuke Town garage door, 89% of the rig's vertices were cut: a box
+ *    whose top sat 0.08 m under the eye offered its TOP as the nearest
+ *    separating face, and a plane at eye level keeps nothing of a rig that
+ *    hangs below the eye. A top face that close is BESIDE the rig, not under
+ *    it: it is no longer a separating face.
+ *  - In the bus/van gap two near-coplanar ceilings 0.03 m apart took two of
+ *    the four slots, and the wall the rig was actually inside (0.87 m away)
+ *    was dropped. Planes with the same normal are nested half-spaces, so only
+ *    the nearest one can ever matter: one plane per axis-aligned normal, and
+ *    six slots so nothing is ever dropped. Six is still a FIXED count.
  */
 
 import type { Box2, Point3 } from '../collision';
 
-export const VIEWMODEL_SURFACE_CLIP_CONTRACT = 'viewmodel-surface-aligned-clip-v1' as const;
+export const VIEWMODEL_SURFACE_CLIP_CONTRACT = 'viewmodel-surface-aligned-clip-v2' as const;
 
 /**
- * How many surface planes the rig can be cut by at once. Three covers an inside
- * corner plus its floor, which is the worst real case; a fourth has never been
- * needed in measurement and every slot costs a clipping-plane uniform.
+ * How many surface planes the rig can be cut by at once.
+ *
+ * Every candidate is an axis-aligned face, so there are exactly six possible
+ * normals, and two planes with the same normal are nested half-spaces (only the
+ * one nearer the eye ever cuts anything). Six slots therefore hold EVERY
+ * distinct surface a frame can produce; nothing is ever dropped for lack of a
+ * slot, which is what emptied the bus/van gap measurement of its real wall.
+ * The count is fixed for the rig's lifetime - that, not the value, is what
+ * keeps the material permutation constant.
  */
-export const VIEWMODEL_SURFACE_CLIP_PLANE_COUNT = 4;
+export const VIEWMODEL_SURFACE_CLIP_PLANE_COUNT = 6;
 
 /**
  * Radius around the eye within which a solid can clip the rig, in metres.
  *
  * The rig reaches about 0.9 m forward and sits 0.33 m to the side, so 1.4 m
- * covers every surface any part of it can reach with margin. Larger would start
- * selecting walls that cannot touch the rig and waste the three slots on them.
+ * covers every wall any part of it can reach with margin. Larger would start
+ * selecting walls that cannot touch the rig and waste slots on them.
  */
 export const VIEWMODEL_SURFACE_CLIP_REACH_METERS = 1.4;
+
+/**
+ * How far below the eye the standing surface can be and still get a plane.
+ *
+ * Measured (HF-395, `artifacts/qa/hf395/diagnose-before-carbine.json`): a
+ * standing player (eye 1.84 m up) looking down at flat ground had the arms
+ * sleeve 0.49 m below the floor - the pitched rig reaches ~2.1 m from the eye,
+ * far beyond the 1.4 m wall reach. 2.4 m admits the floor in every stance and
+ * still refuses a floor the player has dropped a storey away from.
+ */
+export const VIEWMODEL_SURFACE_CLIP_GROUND_REACH_METERS = 2.4;
+
+/**
+ * A top face (normal +Y) nearer than this to the eye is BESIDE the rig, not
+ * under it, and is not a separating face.
+ *
+ * The rig hangs about 0.45 m below the eye in the hip pose, so a plane at a
+ * top face 0.08 m under the eye keeps only the scope and cuts the rest - the
+ * Nuke Town garage-door case, 13838 of 15538 vertices cut. The face can be no
+ * closer than the rig's own hang, so the plane always keeps the rig's body and
+ * cuts only what is genuinely beneath the surface.
+ */
+export const VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS = 0.5;
+
+/**
+ * The same rule for a bottom face (normal -Y, a ceiling or overhang): the rig
+ * rises about 0.1 m above the eye (a scope at ADS), so a ceiling nearer than
+ * this is level with the rig and would cut the optic off the receiver.
+ */
+export const VIEWMODEL_SURFACE_CLIP_BOTTOM_FACE_MINIMUM_RISE_METERS = 0.12;
 
 /**
  * Metres the plane is pushed OUT of the solid, toward the eye.
@@ -96,9 +151,23 @@ function boxBound(box: Box2, axis: 0 | 1 | 2, sign: -1 | 1): number {
 }
 
 /**
- * The face of `box` that separates it from `eye`, or null when the eye is
- * inside the box on every axis (nothing can be clipped against a solid you are
- * standing inside - every choice would cut the whole rig).
+ * The least distance the eye must be outside a face for that face to count as
+ * separating. Side faces need only be outside at all; the vertical faces need
+ * the rig's own hang or rise, see the constants above.
+ */
+function minimumOutside(axis: 0 | 1 | 2, sign: -1 | 1): number {
+  if (axis !== 1) return 0;
+  return sign > 0
+    ? VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS
+    : VIEWMODEL_SURFACE_CLIP_BOTTOM_FACE_MINIMUM_RISE_METERS;
+}
+
+/**
+ * The face of `box` that separates it from `eye`, or null when no face does:
+ * the eye is inside the box on every axis (nothing can be clipped against a
+ * solid you are standing inside - every choice would cut the whole rig), or
+ * the only faces the eye is outside of are a top or bottom too close to be
+ * under or over the rig.
  *
  * "Separating" means a face the eye is OUTSIDE of, and of those, the NEAREST -
  * because that is the surface the rig can actually reach. For a wall to the
@@ -124,6 +193,9 @@ export function separatingFaceFor(box: Box2, eye: Point3): ViewmodelSurfacePlane
     // on the outside of it, which is the only case a plane can separate.
     const outside = sign > 0 ? axisValue(eye, axis) - bound : bound - axisValue(eye, axis);
     if (outside <= 0) continue;
+    // A top or bottom face level with the rig is beside it, not under or over
+    // it; the box's side faces (if any) are what the rig runs into.
+    if (outside < minimumOutside(axis, sign)) continue;
     if (best !== null && outside >= best.eyeDistanceMeters) continue;
     const normal: Point3 = {
       x: axis === 0 ? sign : 0,
@@ -153,11 +225,24 @@ function withinReach(box: Box2, eye: Point3, reach: number): boolean {
   return dx * dx + dy * dy + dz * dz <= reach * reach;
 }
 
+/** Index of a plane's normal among the six axis-aligned faces. */
+function normalSlot(normal: Point3): number {
+  if (normal.x !== 0) return normal.x < 0 ? 0 : 1;
+  if (normal.y !== 0) return normal.y < 0 ? 2 : 3;
+  return normal.z < 0 ? 4 : 5;
+}
+
 /**
  * The surface planes the rig should be cut by this frame, nearest first.
  *
  * Pure and allocation-light by design: this is called every frame, and the
  * module it replaces part of allocates nothing in the per-frame path.
+ *
+ * One plane per axis-aligned normal: two planes with the same normal are nested
+ * half-spaces, and a vertex the nearer one keeps is always kept by the farther
+ * one too, so the farther one can never cut anything the nearer does not. That
+ * makes the ground (a +Y plane) and every box top one family, in which the
+ * nearest to the eye wins - which is also the most restrictive.
  *
  * Returns at most `VIEWMODEL_SURFACE_CLIP_PLANE_COUNT`. Fewer means the caller
  * parks the remaining slots - it must NOT shorten the array.
@@ -179,23 +264,31 @@ export function viewmodelSurfaceClipPlanes(input: Readonly<{
    */
   groundPlaneY?: number | null;
   reachMeters?: number;
+  groundReachMeters?: number;
   maximumPlanes?: number;
 }>): readonly ViewmodelSurfacePlane[] {
   const reach = input.reachMeters ?? VIEWMODEL_SURFACE_CLIP_REACH_METERS;
+  const groundReach = input.groundReachMeters ?? VIEWMODEL_SURFACE_CLIP_GROUND_REACH_METERS;
   const limit = input.maximumPlanes ?? VIEWMODEL_SURFACE_CLIP_PLANE_COUNT;
   if (limit <= 0) return [];
-  const found: ViewmodelSurfacePlane[] = [];
+  // One candidate per normal; a nearer plane with the same normal replaces it.
+  const nearestByNormal: Array<ViewmodelSurfacePlane | null> = [null, null, null, null, null, null];
+  const offer = (plane: ViewmodelSurfacePlane): void => {
+    const slot = normalSlot(plane.normal);
+    const held = nearestByNormal[slot];
+    if (held === null || held === undefined || plane.eyeDistanceMeters < held.eyeDistanceMeters) {
+      nearestByNormal[slot] = plane;
+    }
+  };
 
-  // The ground goes in FIRST so that when there are more surfaces than slots it
-  // is never the one dropped: a weapon through the floor is visible on every
-  // frame the player looks down, while a third wall is a corner case.
   const groundY = input.groundPlaneY;
   if (groundY !== null && groundY !== undefined && Number.isFinite(groundY)) {
     const above = input.eye.y - groundY;
     // Below its own floor means the reference is stale - walked downstairs,
-    // dropped off a ledge. A plane there would cut the whole rig.
-    if (above > 0 && above <= reach) {
-      found.push(Object.freeze({
+    // dropped off a ledge. A plane there would cut the whole rig. Nearer than
+    // the rig's hang means the reference is level with the rig, same answer.
+    if (above >= VIEWMODEL_SURFACE_CLIP_TOP_FACE_MINIMUM_DEPTH_METERS && above <= groundReach) {
+      offer(Object.freeze({
         normal: Object.freeze({ x: 0, y: 1, z: 0 }),
         constant: -(groundY - VIEWMODEL_SURFACE_CLIP_BIAS_METERS),
         eyeDistanceMeters: above,
@@ -207,28 +300,17 @@ export function viewmodelSurfaceClipPlanes(input: Readonly<{
     for (const box of boxes) {
       if (!withinReach(box, input.eye, reach)) continue;
       const plane = separatingFaceFor(box, input.eye);
-      if (!plane) continue;
-      // Deduplicate coplanar faces: a wall split into many collider segments
-      // yields the same plane many times and would spend every slot on one
-      // surface. Same normal and effectively the same constant is one plane.
-      const duplicate = found.some((existing) => existing.normal.x === plane.normal.x
-        && existing.normal.y === plane.normal.y
-        && existing.normal.z === plane.normal.z
-        && Math.abs(existing.constant - plane.constant) < 1e-4);
-      if (duplicate) continue;
-      found.push(plane);
+      if (plane) offer(plane);
     }
   };
   consider(input.colliders);
   if (input.dressingBoxes) consider(input.dressingBoxes);
 
-  // Nearest surface first: with more candidates than slots, the ones closest to
-  // the eye are the ones the rig can actually be inside.
-  // Nearest surface first, EXCEPT the ground, which was pushed first and stays
-  // first: a weapon through the floor shows every time the player looks down.
-  const groundCount = found.length > 0 && found[0]!.normal.y === 1 && found[0]!.normal.x === 0 ? 1 : 0;
-  const rest = found.slice(groundCount);
-  rest.sort((left, right) => left.eyeDistanceMeters - right.eyeDistanceMeters);
-  const ordered = [...found.slice(0, groundCount), ...rest];
-  return ordered.length > limit ? ordered.slice(0, limit) : ordered;
+  // Nearest surface first: purely for diagnostics and for a caller that asks
+  // for fewer slots than normals, in which case the ones closest to the eye
+  // are the ones the rig can actually be inside.
+  const found: ViewmodelSurfacePlane[] = [];
+  for (const plane of nearestByNormal) if (plane) found.push(plane);
+  found.sort((left, right) => left.eyeDistanceMeters - right.eyeDistanceMeters);
+  return found.length > limit ? found.slice(0, limit) : found;
 }
