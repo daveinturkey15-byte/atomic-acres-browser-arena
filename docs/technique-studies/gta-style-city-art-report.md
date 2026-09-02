@@ -151,8 +151,12 @@ This is a Map-3-only trial. Nothing ships to another arena on the strength of it
    C:/Users/david/projects/aa-claude-hf419-street-cell <integration head>`, plus a
    `node_modules` junction from the main worktree.
 4. **`QA_PREVIEW_PORT=4219`** (lane AK). Preview server, not the dev server — HMR kills long
-   Playwright contexts (known gotcha). One browser at a time, headless only,
-   `PASS73_NATIVE_WEBGPU=1`. Close it and stop the server before returning.
+   Playwright contexts (known gotcha). One browser at a time. Headless is not something you
+   set: `scripts/qa/capture-map3-views.mjs` launches `headless: true` unconditionally and
+   refuses to start below 3000 MiB of free VRAM on its own. Do **not** set
+   `PASS73_NATIVE_WEBGPU=1` for this harness — it is read only by the `run-pass73-*` native
+   gates and one test, and is inert here. Close the browser and stop the server before
+   returning.
 5. Prefix **every** command with `cd C:/Users/david/projects/aa-claude-hf419-street-cell &&`
    — the shell cwd resets between calls.
 

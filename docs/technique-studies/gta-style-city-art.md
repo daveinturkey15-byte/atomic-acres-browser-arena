@@ -89,6 +89,11 @@ transferable finding:
 **Lighting.** Overcast and ambient-dominant: near-white sky, no hard sun, almost no cast
 shadows, low saturation.
 
+**Completeness note.** Pedestrian figures are present on the pavements in the reference.
+They are omitted from the ordering above because that ordering is by screen area and they
+occupy a negligible share of it, and they are out of scope for the street-cell
+decomposition — not because the reference lacks them.
+
 ### The measurement that matters
 
 The demo's own telemetry line, under the street name, reads:
@@ -160,9 +165,14 @@ Hard constraints the loop must not be allowed to negotiate away:
 - **Determinism**: `mulberry32(ownSeed)` per system, never `Math.random`, never consume a
   shared module-level RNG after another system — it moves every existing placement and the
   before/after captures stop being comparable.
-- **Headless only**, `PASS73_NATIVE_WEBGPU=1`, via `scripts/qa/capture-map3-views.mjs`,
-  which already logs a HUD telemetry line per view into `hud.json` — so an fps claim has a
-  file behind it. A capture with no telemetry behind it is not evidence.
+- **Headless only**, via `scripts/qa/capture-map3-views.mjs`, which launches
+  `headless: true` unconditionally (line 113) and refuses to start below 3000 MiB of free
+  VRAM on this shared machine (lines 98–103), and which already logs a HUD telemetry line
+  per view into `hud.json` — so an fps claim has a file behind it. A capture with no
+  telemetry behind it is not evidence. `PASS73_NATIVE_WEBGPU=1` is **not** read by this
+  harness or by the pipeline tripwire — `grep -rl PASS73_NATIVE_WEBGPU scripts/ src/`
+  returns only the `run-pass73-*` native gates and one test — so setting it for a Map 3
+  capture is inert.
 - **Parity audits** are part of the pass, not a follow-up:
   `scripts/qa/audit-collider-visual-parity.ts` and
   `scripts/qa/audit-walkable-surface-parity.ts`. Kerb heights, tree pits and parked vehicles
