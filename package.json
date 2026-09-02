@@ -58,6 +58,8 @@
     "qa:pass70:firefox-geckodriver": "npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs",
     "qa:pass70:iphone15-webkit": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs iphone15",
     "qa:pass70:opera": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs opera",
+    "measure:ibl:load-parity": "npm run build && node scripts/qa/probe-ibl-load-parity.mjs --serve-dist dist",
+    "measure:ibl:environment-contribution": "npm run build && node scripts/qa/probe-ibl-environment-contribution.mjs --serve-dist dist",
     "qa:cross-browser:contract": "node --test scripts/qa/cross-browser-gate-contract.test.mjs",
     "qa:arena-roster:contract": "node --test scripts/qa/arena-roster-contract.test.mjs",
     "qa:cross-browser": "npm run qa:cross-browser:contract && node scripts/qa/run-with-dev-server.mjs node scripts/qa/run-cross-browser-gate.mjs",
