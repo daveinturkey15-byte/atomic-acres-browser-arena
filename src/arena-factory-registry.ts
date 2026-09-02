@@ -129,7 +129,11 @@ export function createArenaFactoryRegistry<TArena, TScene, TId extends string = 
       if (!build) {
         throw new Error(
           `arena factory registry: '${id}' is a lazily loaded arena and its builder has not been `
-          + 'resolved yet. Await resolve() in the arena transition before construction.',
+          + 'resolved yet. Await resolve() in the arena transition before construction. '
+          + 'KNOWN CALLER (HF-409): __ATOMIC_ACRES_DEBUG__.traceBallistics(..., arenaId) builds a '
+          + 'NON-ACTIVE arena synchronously, so tracing against a lazy arena that was never '
+          + 'selected this session lands here. Call resolve(arenaId) first, or trace the arena '
+          + 'you are standing in.',
         );
       }
       return build;

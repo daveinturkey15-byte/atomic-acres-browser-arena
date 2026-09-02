@@ -57,8 +57,10 @@ const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [numbe
     // Box2 collider is a STATIC world rectangle. Colliding them where they
     // stood at t=0 would put an invisible car in the middle of the trail and
     // leave the real one intangible: strictly worse than presentation. Every
-    // static solid these corridors own IS collided - 209 colliders, zero
-    // invisible - so this ledger covers the moving bodies and nothing else.
+    // static solid these corridors own IS collided - 225 colliders, zero
+    // invisible (re-measured 2026-09-02; an earlier note said 209, taken
+    // before the sixteen hub waymarkers existed) - so this ledger covers the
+    // moving bodies and nothing else.
     { name: 'map3-forest-rover-frame', centre: [0, 1.24, 33.8], reason: 'self-driving rover; a static collider would sit where it no longer is' },
     { name: 'map3-shoreline-rover-body', centre: [-26, 1.06, -33.87], reason: 'self-driving rover fording the shallows; a static collider would sit where it no longer is' },
   ],

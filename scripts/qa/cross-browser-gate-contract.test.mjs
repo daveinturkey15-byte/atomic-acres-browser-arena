@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { computeMatrixVerdict } from './cross-browser-gate-contract.mjs';
+import { MINIMUM_EYE_CLEARANCE_ARENAS, eyeClearanceArenaIds } from './eye-clearance-roster.mjs';
 
 const lane = (name, verdict) => ({ lane: name, verdict });
 
@@ -109,6 +110,21 @@ test('every selectable arena is covered by the derived roster', () => {
   // still offered in the menu, and the explicit exclusion below is what pins
   // this particular drop to a deliberate decision.
   assert.ok(selectable.length >= 7, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  // MAP3 (HF-409 repair, 2026-09-02): a bare floor only guards DOWNWARD, so a
+  // silently lowered literal would still pass while covering fewer arenas. The
+  // sibling eye-clearance contract was given a floor-equals-derived-roster
+  // equality on the same day; this is that assertion, so the two independent
+  // derivations and the shared floor constant must all agree, and the literal
+  // above cannot be edited on its own in either direction.
+  assert.equal(
+    selectable.length, MINIMUM_EYE_CLEARANCE_ARENAS,
+    `this file's derived roster (${selectable.length}: ${selectable.join(', ')}) must equal `
+    + `the shared roster floor (${MINIMUM_EYE_CLEARANCE_ARENAS}) that eye-clearance-roster.mjs pins`,
+  );
+  assert.deepEqual(
+    [...selectable].sort(), [...eyeClearanceArenaIds()].sort(),
+    'this file and the shared roster derivation must name the SAME arenas, not merely the same count',
+  );
   for (const required of ['atomic-acres', 'test1', 'test2']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }

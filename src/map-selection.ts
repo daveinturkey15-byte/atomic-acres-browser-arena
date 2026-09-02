@@ -268,26 +268,46 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: false,
     fieldSupport: false,
     overdrive: false,
-    // THE CARD IS STILL WITHDRAWN, AND EXACTLY ONE THING IS IN THE WAY.
+    // THE CARD IS STILL WITHDRAWN. TEN ASSERTIONS IN SIX FILES ARE IN THE WAY,
+    // not one. An earlier version of this comment said "exactly one" and was
+    // wrong; this is the corrected, measured record.
     //
-    // The arena itself is finished and green: the showcase corridors are in
-    // it, 209 colliders and shot surfaces authored from the corridors' own
-    // solids, zero invisible colliders, zero unrated ghosts, and an authored
-    // spawn ring every one of whose ten points the spawn-quality measure
-    // passes (36.8 m spread, 4.6 m to cover, 36.8 m cross-team).
+    // The arena itself is finished: the showcase corridors are in it, with 225
+    // movement colliders and 225 shot surfaces authored from the corridors'
+    // own published solids. Re-measured 2026-09-02 on this exact tree with
+    // `npx tsx scripts/qa/audit-collider-visual-parity.ts --arenas map3`:
+    // 225 colliders, 0 invisible, 130 visible meshes, 2 triaged walk-throughs.
+    // An earlier note here said 209 colliders / 114 meshes; that was a stale
+    // intermediate reading taken before the sixteen hub waymarkers existed.
     //
-    // What is not green is ONE meta-assertion in a gate this lane does not
-    // own: `src/spawn-layout-quality.test.ts` asserts that every SELECTABLE
-    // arena either runs team modes or is the free-for-all Gun Range. Map 3 is
-    // the first arena with no hosted lobby AND no bots, so there is no second
-    // team for its spawns to be separated FROM and the assertion's premise no
-    // longer holds. Flipping this field without that gate change would land a
-    // RED gate on the integration branch, which is worse than a hidden arena.
+    // WHAT ACTUALLY BLOCKS THE CARD, measured by flipping this field to `true`
+    // on a clean checkout, running the gates, and reverting:
+    //   vitest - 5 failures in 4 files
+    //     * `src/spawn-layout-quality.test.ts` "exempts nothing else: every
+    //       other selectable arena is held to team separation". This is the
+    //       only one that needs a RULE change: Map 3 is the first arena with
+    //       no hosted lobby AND no bots, so there is no second team for its
+    //       spawns to be separated FROM. The exact 16-line patch is in the
+    //       Lane V report; that file is outside this lane's ownership.
+    //     * `src/arena-selectability.test.ts` - two assertions that pin map3
+    //       into the hidden set.
+    //     * `src/map-selection.test.ts` "keeps Map 3 a real solo-preview arena
+    //       while its card is withdrawn".
+    //     * `src/ui/pass64-shell.test.ts` "renders the new command hierarchy
+    //       and ordered player-facing arenas" - the offered route order is
+    //       pinned explicitly.
+    //   node --test - 5 failures in 2 files
+    //     * `scripts/qa/cross-browser-gate-contract.test.mjs` x2.
+    //     * `scripts/qa/eye-clearance-sweep-contract.test.mjs` x3, including
+    //       "the ledger carries exactly one ceiling per selectable arena" and
+    //       "the runtime-resolve record covers the roster too".
     //
-    // The exact patch (a 16-line branch in that one test, pinned to the
-    // registry so an arena that gains a lobby or a single bot re-enters the
-    // rule) is in the lane report, and was measured green: 102/102. Landing it
-    // plus flipping this one field to `true` is the whole remaining step.
+    // Flipping the field therefore also means restoring
+    // MINIMUM_EYE_CLEARANCE_ARENAS and MINIMUM_SWEPT_ARENAS to 8 and
+    // re-entering map3 in `docs/eye-clearance/ledger.json` at the unmeasured
+    // sentinel, with a real eye-clearance sweep behind it. Every one of those
+    // ten is a gate doing its job on a roster change; none of them may be
+    // weakened to make the card appear.
     selectable: false,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
     authoring: 'code' as const,
