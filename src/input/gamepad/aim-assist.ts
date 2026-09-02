@@ -24,6 +24,14 @@
  *    Pitch friction is deliberately zero: strafing does not move a target
  *    vertically, and vertical magnetism reads as the game "pulling".
  *
+ * 4. Line of sight. A hostile the player cannot see must not bend his aim, or
+ *    the assist reads as the game pulling at nothing. `isVisible` is injected
+ *    by the caller (legacy-main tests the eye -> aim-point segment against the
+ *    live world colliders) and is evaluated lazily: only a candidate that is
+ *    already closer than the best visible one so far pays for the test, so the
+ *    common frame costs one segment test, not one per hostile. Callers that
+ *    omit the predicate keep the previous no-LOS behaviour.
+ *
  * 3. Trigger micro-snap (TOUCH ONLY). On the trigger's press edge, if the
  *    nearest target is inside `snapConeDeg`, the view rotates toward it by at
  *    most `snapMaxDeg`. This is still a look adjustment: the shot the client
@@ -83,6 +91,12 @@ export type AimAssistInput = Readonly<{
   velocity: Readonly<{ x: number; z: number }>;
   dt: number;
   targets: readonly AimAssistTarget[];
+  /**
+   * Optional line-of-sight predicate. Called at most once per candidate that
+   * improves on the nearest visible target found so far. Omit it to keep the
+   * pre-2026-09-02 behaviour (assist through walls).
+   */
+  isVisible?: (target: AimAssistTarget) => boolean;
 }>;
 
 export type AimAssistResult = Readonly<{
@@ -131,18 +145,53 @@ export function angularDistanceDeg(yaw: number, pitch: number, bearing: Readonly
   return Math.hypot(deltaYaw, deltaPitch) * RAD_TO_DEG;
 }
 
-type NearestTarget = Readonly<{ index: number; angleDeg: number; bearing: ReturnType<typeof bearingTo>; target: AimAssistTarget }>;
+type MutableBearing = { yaw: number; pitch: number; distance: number };
+type NearestTarget = { index: number; angleDeg: number; bearing: MutableBearing; target: AimAssistTarget };
+
+const NULL_TARGET: AimAssistTarget = Object.freeze({ point: Object.freeze({ x: 0, y: 0, z: 0 }) });
+
+/**
+ * Scratch records. `nearestTarget()` runs every frame a pad or touch overlay is
+ * live, so it writes into these instead of allocating a bearing per hostile and
+ * a frozen result per improving candidate. The returned record is only valid
+ * until the next call, and both callers consume it synchronously.
+ */
+const bearingScratch: MutableBearing = { yaw: 0, pitch: 0, distance: 0 };
+const nearestScratch: NearestTarget = {
+  index: -1, angleDeg: 0, bearing: { yaw: 0, pitch: 0, distance: 0 }, target: NULL_TARGET,
+};
+
+function writeBearing(out: MutableBearing, eye: Vec3, point: Vec3): MutableBearing {
+  const dx = point.x - eye.x;
+  const dy = point.y - eye.y;
+  const dz = point.z - eye.z;
+  out.yaw = Math.atan2(-dx, -dz);
+  out.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+  out.distance = Math.hypot(dx, dy, dz);
+  return out;
+}
 
 function nearestTarget(input: AimAssistInput, maxRangeM: number): NearestTarget | null {
-  let best: NearestTarget | null = null;
-  input.targets.forEach((target, index) => {
-    const bearing = bearingTo(input.eye, target.point);
-    if (!Number.isFinite(bearing.distance) || bearing.distance <= 0.05 || bearing.distance > maxRangeM) return;
+  let found = false;
+  const targets = input.targets;
+  for (let index = 0; index < targets.length; index += 1) {
+    const target = targets[index];
+    const bearing = writeBearing(bearingScratch, input.eye, target.point);
+    if (!Number.isFinite(bearing.distance) || bearing.distance <= 0.05 || bearing.distance > maxRangeM) continue;
     const angleDeg = angularDistanceDeg(input.yaw, input.pitch, bearing);
-    if (!Number.isFinite(angleDeg)) return;
-    if (!best || angleDeg < best.angleDeg) best = Object.freeze({ index, angleDeg, bearing, target });
-  });
-  return best;
+    if (!Number.isFinite(angleDeg)) continue;
+    if (found && angleDeg >= nearestScratch.angleDeg) continue;
+    // Last, so an occlusion test costs once per improving candidate.
+    if (input.isVisible && !input.isVisible(target)) continue;
+    found = true;
+    nearestScratch.index = index;
+    nearestScratch.angleDeg = angleDeg;
+    nearestScratch.bearing.yaw = bearing.yaw;
+    nearestScratch.bearing.pitch = bearing.pitch;
+    nearestScratch.bearing.distance = bearing.distance;
+    nearestScratch.target = target;
+  }
+  return found ? nearestScratch : null;
 }
 
 export function evaluateAimAssist(input: AimAssistInput): AimAssistResult {
@@ -186,6 +235,8 @@ export type TriggerSnapInput = Readonly<{
   yaw: number;
   pitch: number;
   targets: readonly AimAssistTarget[];
+  /** Same lazy line-of-sight predicate as `AimAssistInput`. */
+  isVisible?: (target: AimAssistTarget) => boolean;
 }>;
 
 export type TriggerSnapResult = Readonly<{ yaw: number; pitch: number; snappedDeg: number; targetId: string | null }>;

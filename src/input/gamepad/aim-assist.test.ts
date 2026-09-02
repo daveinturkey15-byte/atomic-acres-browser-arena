@@ -162,3 +162,59 @@ describe('trigger micro-snap', () => {
     expect(outside.yaw).toBe(0);
   });
 });
+
+// PASS 84 skeptic finding 2026-09-02: the assist had no line-of-sight test, so
+// a hostile behind a wall inside the cone still slowed the look rate and dragged
+// yaw — the game appearing to pull at nothing.
+describe('line of sight', () => {
+  it('skips an occluded nearest target and assists the nearest VISIBLE one instead', () => {
+    const near = targetAt(10, 1);
+    const far = targetAt(10, 4);
+    const blind = evaluateAimAssist(input({ targets: [near, far], isVisible: () => false }));
+    expect(blind.lookRateScale, 'every target occluded means no assist at all').toBe(1);
+    expect(blind.nearestTargetId).toBeNull();
+    expect(blind.nearestAngleDeg).toBeNull();
+
+    const partial = evaluateAimAssist(input({ targets: [near, far], isVisible: (t) => t.id !== near.id }));
+    expect(partial.nearestTargetId).toBe(far.id);
+    expect(partial.nearestAngleDeg).toBeCloseTo(4, 6);
+    const open = evaluateAimAssist(input({ targets: [near, far] }));
+    expect(open.nearestTargetId, 'no predicate keeps the previous behaviour').toBe(near.id);
+    expect(partial.lookRateScale, 'the visible target is farther out, so it slows less')
+      .toBeGreaterThan(open.lookRateScale);
+  });
+
+  it('pays for the occlusion test only on candidates that improve on the best visible so far', () => {
+    const asked: string[] = [];
+    // Ordered nearest-first: only the first is ever an improvement.
+    const targets = [targetAt(10, 1), targetAt(10, 2), targetAt(10, 3), targetAt(10, 4)];
+    evaluateAimAssist(input({ targets, isVisible: (t) => { asked.push(t.id!); return true; } }));
+    expect(asked).toEqual(['t-1']);
+    // Ordered farthest-first: every one improves, so every one is tested.
+    asked.length = 0;
+    evaluateAimAssist(input({ targets: [...targets].reverse(), isVisible: (t) => { asked.push(t.id!); return true; } }));
+    expect(asked).toEqual(['t-4', 't-3', 't-2', 't-1']);
+    // Out-of-range candidates never reach the predicate.
+    asked.length = 0;
+    evaluateAimAssist(input({
+      targets: [targetAt(200, 0.5), targetAt(10, 2)],
+      isVisible: (t) => { asked.push(t.id!); return true; },
+    }));
+    expect(asked).toEqual(['t-2']);
+  });
+
+  it('the touch trigger micro-snap honours the same predicate', () => {
+    const base = { eye, yaw: 0, pitch: 0, tier: 'touch' as const, targets: [targetAt(10, 1.5)] };
+    expect(applyTriggerSnap({ ...base, isVisible: () => false })).toMatchObject({ snappedDeg: 0, targetId: null, yaw: 0 });
+    expect(applyTriggerSnap({ ...base, isVisible: () => true }).targetId).toBe('t-1.5');
+  });
+
+  it('returns an independent reading each call despite the shared scratch record', () => {
+    const a = evaluateAimAssist(input({ targets: [targetAt(10, 1)] }));
+    const b = evaluateAimAssist(input({ targets: [targetAt(10, 4)] }));
+    expect(a.nearestAngleDeg).toBeCloseTo(1, 6);
+    expect(b.nearestAngleDeg).toBeCloseTo(4, 6);
+    expect(a.nearestTargetId).toBe('t-1');
+    expect(a.lookRateScale).toBeLessThan(b.lookRateScale);
+  });
+});
