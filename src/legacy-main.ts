@@ -19809,12 +19809,26 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
 function botCombatDamage(rawDamage: number): number {
   return botScaledDamage(rawDamage);
 }
+// HF-399: the haze sprite is attached by addNeonBotHaze when the bot rig is
+// built and never moves within it, so it is resolved once per rig instead of
+// with a getObjectByName walk over ~190 rig nodes per bot per frame.
+const botHazeSpriteByRoot = new WeakMap<THREE.Object3D, THREE.Sprite | null>();
+function botHazeSprite(root: THREE.Object3D): THREE.Sprite | null {
+  let haze = botHazeSpriteByRoot.get(root);
+  if (haze === undefined) {
+    const found = root.getObjectByName('neon-purple-bot-haze');
+    haze = found instanceof THREE.Sprite && found.material instanceof THREE.SpriteMaterial ? found : null;
+    botHazeSpriteByRoot.set(root, haze);
+  }
+  return haze;
+}
+
 function updateBots(dt: number, now: number): void {
   if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
-    const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+    const haze = botHazeSprite(bot.root);
     if (haze instanceof THREE.Sprite && haze.material instanceof THREE.SpriteMaterial) {
       const pulse = Math.sin(now * 0.0022 + Number(haze.userData.phase ?? 0));
       haze.material.opacity = 0.33 + pulse * 0.055;
