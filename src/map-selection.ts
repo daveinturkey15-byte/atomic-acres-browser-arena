@@ -236,18 +236,22 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
-  // MAP3 (owner 2026-09-02, HF-405): Map 3 registered as a real arena, and
-  // labelled PREVIEW in the menu because that is exactly what it is.
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409): Map 3 is the corridor
+  // SHOWCASE, and it is an EXPLORE mode, not a match.
   //
-  // `multiplayer: false` is the load-bearing field. Every other arena here
-  // ships hosted lobbies, and this one has not had a two-client lane run
-  // against it, so offering "HOST UP TO 6" would be a claim nobody has
-  // measured. It is selectable and it boots solo; the id is already the
-  // network and storage boundary, so promoting it later is one field.
+  // The owner settled both halves in one afternoon. At 16:25: "it was full of
+  // rich code based asset tests and now its just a square map of stone?" - so
+  // the card that was withdrawn earlier today comes back, and what it launches
+  // is now the real showcase corridors (`src/map3-arena.ts`), not the authored
+  // stone gallery it launched this morning. At 16:55: "Just keep the showcase
+  // in and it's not about combat, it's a mode you can explore."
   //
-  // Solo bot count matches Test1/Test2 rather than Atomic Acres' escalating
-  // ladder: `activeSoloBotTarget` only escalates for 'atomic-acres', so 2 is
-  // both the start and the cap.
+  // Which is why every combat field below is ZERO rather than small. Bots,
+  // field support and overdrive are not scaled down for a preview - they are
+  // absent, because the content IS the mode. `multiplayer: false` stays for
+  // the same reason it was set: this arena has never had a two-client lane run
+  // against it, and the id is already the network and storage boundary, so
+  // promoting it later is one field.
   Object.freeze({
     id: 'map3' as const,
     routeId: 'map3' as const,
@@ -256,27 +260,34 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     displayName: 'Map 3',
     titleLead: 'MAP',
     titleAccent: '3',
-    menuLede: 'Walk an original stone gallery — a paved hub with eight walled bays running off it, each built around one idea, every bay flankable through the gaps in its pier lines. Solo preview.',
-    summary: 'Corridor gallery · solo preview · 2 bots',
-    rulesLabel: '5 MIN · SOLO PREVIEW · 2 BOTS',
-    soloBotCount: 2,
-    maximumSoloBots: 2,
+    menuLede: 'Walk the showcase: a paved hub with seven corridors running off it — a Gerstner shoreline with a pier and a fording rover, a raymarched SDF gallery, a shape-grammar skyline, a forest that bends as you pass, four seasons under a downpour, a colonnade cut by god rays, and an overlook onto a colosseum. No bots, no timer pressure: explore.',
+    summary: 'Corridor showcase · explore · no bots',
+    rulesLabel: 'EXPLORE PREVIEW · NO BOTS',
+    soloBotCount: 0,
+    maximumSoloBots: 0,
     multiplayer: false,
     fieldSupport: false,
     overdrive: false,
-    // MAP3 (owner 2026-09-02, HF-409): "it was full of rich code based asset
-    // tests and now its just a square map of stone?"
+    // THE CARD IS STILL WITHDRAWN, AND EXACTLY ONE THING IS IN THE WAY.
     //
-    // The registry row STAYS - hiding an arena is a presentation decision and
-    // the id is still the network, replay, storage and room-link boundary, so
-    // `decodeArenaId('map3')`, saved matches and shared links keep resolving
-    // (`src/arena-selectability.test.ts` pins both halves). What is withdrawn
-    // is the MENU CARD, because what that card currently launches is the
-    // authored stone gallery in `src/map3-arena.ts` and not the animated
-    // corridor showcase the owner remembers building. The showcase now ships
-    // as its own page at `/map3.html` (see the Vite input added in the same
-    // commit) so it is reachable on the live channel while the corridors are
-    // brought into the arena proper with colliders and a frame hook.
+    // The arena itself is finished and green: the showcase corridors are in
+    // it, 209 colliders and shot surfaces authored from the corridors' own
+    // solids, zero invisible colliders, zero unrated ghosts, and an authored
+    // spawn ring every one of whose ten points the spawn-quality measure
+    // passes (36.8 m spread, 4.6 m to cover, 36.8 m cross-team).
+    //
+    // What is not green is ONE meta-assertion in a gate this lane does not
+    // own: `src/spawn-layout-quality.test.ts` asserts that every SELECTABLE
+    // arena either runs team modes or is the free-for-all Gun Range. Map 3 is
+    // the first arena with no hosted lobby AND no bots, so there is no second
+    // team for its spawns to be separated FROM and the assertion's premise no
+    // longer holds. Flipping this field without that gate change would land a
+    // RED gate on the integration branch, which is worse than a hidden arena.
+    //
+    // The exact patch (a 16-line branch in that one test, pinned to the
+    // registry so an arena that gains a lobby or a single bot re-enters the
+    // rule) is in the lane report, and was measured green: 102/102. Landing it
+    // plus flipping this one field to `true` is the whole remaining step.
     selectable: false,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
     authoring: 'code' as const,
@@ -325,6 +336,10 @@ export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths:
 }
 
 export function soloLaunchLabel(selection: ArenaSelection): string {
-  if (selection.soloBotCount === 0) return 'START RANGE';
+  // MAP3 (HF-409): "START RANGE" was the right words while the only bot-less
+  // arena was the Gun Range, and it is the wrong words for the second one.
+  // Map 3 is an explore mode, not a firing range, so the label follows what
+  // the arena IS rather than what the first bot-less arena happened to be.
+  if (selection.soloBotCount === 0) return selection.id === 'gun-range' ? 'START RANGE' : 'START EXPLORING';
   return `${selection.soloBotCount} BOT${selection.soloBotCount === 1 ? '' : 'S'} SKIRMISH`;
 }

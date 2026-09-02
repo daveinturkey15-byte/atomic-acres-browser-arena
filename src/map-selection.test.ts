@@ -231,8 +231,11 @@ describe('opening arena selection', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
-      // MAP3 (HF-405).
-      '2 BOTS SKIRMISH',
+      // MAP3 (HF-405, then HF-409): Map 3 fields no bots at all and is not a
+      // firing range - it explores. "START RANGE" was the right words while
+      // the Gun Range was the only bot-less arena and the wrong words for the
+      // second one.
+      'START EXPLORING',
     ]);
   });
 
@@ -256,7 +259,13 @@ describe('opening arena selection', () => {
     expect(map3.overdrive).toBe(false);
     // The card has to SAY preview, or "solo only" is a surprise at the lobby.
     expect(map3.selectorLabel).toContain('PREVIEW');
-    expect(map3.rulesLabel).toContain('SOLO PREVIEW');
+    // HF-409, owner 16:55: "it's not about combat, it's a mode you can
+    // explore". The card says EXPLORE and the arena fields no bots at all -
+    // not two, not one. A preview that quietly kept a bot ladder would be the
+    // old claim wearing the new label.
+    expect(map3.rulesLabel).toContain('EXPLORE');
+    expect(map3.soloBotCount).toBe(0);
+    expect(map3.maximumSoloBots).toBe(0);
     // Stable id is the network/storage boundary from the first commit.
     expect(decodeArenaId('map3')).toBe('map3');
     expect(isArenaId('map3')).toBe(true);
