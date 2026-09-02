@@ -310,3 +310,40 @@ page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
   stone shell is hidden from the menu and the showcase page ships as
   `/map3.html` on the channel so the owner can see it live.
 - **Plan:** Lane V (`docs/pass84-lanes/LANE-V-map3-showcase-into-arena.md`).
+
+## HF-410 — viewmodel rework: no clipping through walls or floor, no "holding it up" near walls, floor or prone
+
+- **Statement (verbatim, 2026-09-02 ~16:35 BST, with two PASS 84 screenshots
+  on Firing Range):** "gun clipping through walls and floor aswell as holding
+  it up when near floor or prone or walls is super bad, needs a re work and fix"
+- **Root cause hypothesis to VERIFY first (orchestrator, from source):**
+  `HIP_VIEWMODEL_POSITION = { x: 0.34, y: -0.44, z: -1.08 }` places the rig
+  about 1.08 m ahead of the eye and 0.34 m right, while the standing capsule
+  radius is about 0.38 m: the weapon extends roughly 0.7 m OUTSIDE the
+  player's own collision body, so every wall the capsule can approach
+  intersects it. Every fix so far (surface clip planes, 0.28 m retreat then
+  halved, the contact lift and fold pose, a depth-cleared overlay that paints
+  the gun over walls) treats the symptom. Screenshot 1 is the contact lift
+  pose against a wall; screenshot 2 is the overlay painting the gun through a
+  wall corner.
+- **Mechanical falsifier:** with the largest weapons (LMG, minigun, launcher)
+  the viewmodel's world-space bounds stay inside the standing capsule radius
+  minus a margin at hip and ADS, and above the floor at crouch and prone eye
+  heights, so the penetration instrument reports 0 m at every graded pose
+  with NO retreat and NO lift applied; the contact lift is removed or capped
+  at a few centimetres; on-screen framing is preserved by a dedicated
+  viewmodel field of view; no material recompiles; anatomy and prone-contact
+  contracts re-pinned with the reason.
+- **Plan:** Lane W (`docs/pass84-lanes/LANE-W-viewmodel-rework.md`).
+
+## HF-411 — Firing Range: a metal grating laid as a roof-level floor lets the player fall through
+
+- **Statement (verbatim, ~16:40 BST):** "on firing range sometimes you go to
+  run onto a metal fence layed as a floor on the roof level of the map and
+  you fall through it, fix all that shit"
+- **Mechanical falsifier:** every walkable presentation surface on Firing
+  Range (test1) has a matching movement collider; a headless traversal across
+  each roof grating stays on it; the collider/visual parity audit on test1
+  reports zero unexplained walkable visuals; the same sweep on every arena
+  lists any sibling.
+- **Plan:** Lane X (`docs/pass84-lanes/LANE-X-firing-range-fallthrough.md`).
