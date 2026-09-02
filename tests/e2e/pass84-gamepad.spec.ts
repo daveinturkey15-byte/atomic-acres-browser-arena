@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { AIM_ASSIST_PROFILES, smoothstep, type AimAssistTier } from '../../src/input/gamepad/aim-assist';
 
 /**
  * PASS 84 Lane E — gamepad support + tiered aim assist.
@@ -148,6 +149,26 @@ function wrapAngle(value: number): number {
   return Math.atan2(Math.sin(value), Math.cos(value));
 }
 
+/**
+ * The documented slowdown curve, read from the shipped profile table rather
+ * than restated here, so the gate tracks the source of truth:
+ *   lookRateScale = min + (1 - min) * smoothstep(inner, outer, angleDeg)
+ */
+function expectedLookRateScale(tier: AimAssistTier, angleDeg: number): number {
+  const profile = AIM_ASSIST_PROFILES[tier];
+  return profile.minLookScale + (1 - profile.minLookScale) * smoothstep(profile.slowdownInnerDeg, profile.slowdownOuterDeg, angleDeg);
+}
+
+/**
+ * `aimAtBot('body')` points the view at the hit-proxy body centre while the
+ * assist aims at that point lifted by AIM_ASSIST_POINT_LIFT_M (0.3 m), so the
+ * staged angle is a pure function of the staged distance — atan(0.3 / d) —
+ * instead of depending on head geometry or stance. At 6 m that is 2.86°, well
+ * inside the pad zone (1.6°–5.5°) rather than at its noisy upper edge.
+ */
+const STAGED_DISTANCE_M = 6;
+const STAGED_ANGLE_DEG = (Math.atan(0.3 / STAGED_DISTANCE_M) * 180) / Math.PI;
+
 test.describe('pass84 gamepad (desktop, no pointer lock)', () => {
   test('a pad that connects mid-match looks and fires without pointer lock, and drops out cleanly', async ({ page }) => {
     test.setTimeout(180_000);
@@ -223,54 +244,125 @@ test.describe('pass84 gamepad (desktop, no pointer lock)', () => {
     await ready(page);
     await page.evaluate(() => window.__FAKE_GAMEPAD__.connect());
     await page.waitForTimeout(250);
-    const staged = await page.evaluate(() => {
+    const staged = await page.evaluate((distance) => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      const placed = api.placeBotAhead(6);
-      api.aimAtBot('head');
+      const placed = api.placeBotAhead(distance);
+      api.aimAtBot('body');
       return placed;
-    });
+    }, STAGED_DISTANCE_M);
     expect(staged, 'a bot must be staged ahead of the player').not.toBeNull();
-    await page.waitForTimeout(150);
-    await page.evaluate(() => window.__FAKE_GAMEPAD__.setAxes([0, 0, 0.2, 0]));
-    await page.waitForTimeout(150);
+    // Sample with the stick at rest: the assist is evaluated every frame a pad
+    // is connected, so holding the stick first only smears the staged angle by
+    // however far the view had already turned.
+    await page.waitForTimeout(200);
     const nearSample = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleGamepad());
-    await page.evaluate(() => window.__FAKE_GAMEPAD__.setAxes([0, 0, 0, 0]));
-    await page.waitForTimeout(150);
     expect(nearSample.assist.tier).toBe('pad');
-    expect(nearSample.assist.lookRateScale, 'reticle on a hostile must slow the look rate').toBeLessThan(0.9);
+    const nearAngle = nearSample.assist.nearestAngleDeg;
+    // Staging precondition: the deterministic 0.3 m lift puts the reticle at
+    // atan(0.3/d) from the assist point, inside the pad zone with margin.
+    expect(nearAngle, 'the staged reticle offset must be the 0.3 m aim-point lift').toBeGreaterThan(STAGED_ANGLE_DEG - 0.6);
+    expect(nearAngle!).toBeLessThan(STAGED_ANGLE_DEG + 0.6);
+    expect(nearAngle!).toBeLessThan(AIM_ASSIST_PROFILES.pad.slowdownOuterDeg);
+    // The gate itself: the live look-rate scale is exactly the documented curve
+    // evaluated at the angle the runtime measured — no tolerance band, no
+    // dependence on how far the staged reticle happened to land.
+    const expectedScale = expectedLookRateScale('pad', nearAngle!);
+    expect(nearSample.assist.lookRateScale, `pad curve at ${nearAngle!.toFixed(4)}°`).toBeCloseTo(expectedScale, 6);
+    expect(expectedScale, 'the staged angle must produce a real slowdown').toBeLessThan(0.8);
+    expect(nearSample.assist.nearestTargetId).toBe(staged!.bot.id);
 
     await page.evaluate(() => {
       const api = window.__ATOMIC_ACRES_DEBUG__;
-      api.aimAtBot('head');
+      api.aimAtBot('body');
     });
     await page.waitForTimeout(100);
     const near = await holdRightStick(page, 0.2, 400);
 
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearBots());
-    await page.waitForTimeout(150);
-    await page.evaluate(() => window.__FAKE_GAMEPAD__.setAxes([0, 0, 0.2, 0]));
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(200);
     const farSample = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleGamepad());
-    await page.evaluate(() => window.__FAKE_GAMEPAD__.setAxes([0, 0, 0, 0]));
-    await page.waitForTimeout(150);
-    expect(farSample.assist.lookRateScale).toBe(1);
+    expect(farSample.assist.lookRateScale, 'open air is unassisted').toBe(1);
+    expect(farSample.assist.nearestAngleDeg, 'no target means no nearest angle').toBeNull();
     const far = await holdRightStick(page, 0.2, 400);
 
+    const ratio = Math.abs(wrapAngle(near)) / Math.max(1e-9, Math.abs(wrapAngle(far)));
     const evidence = {
       tier: nearSample.assist.tier,
       nearLookRateScale: nearSample.assist.lookRateScale,
       nearAngleDeg: nearSample.assist.nearestAngleDeg,
+      expectedLookRateScale: expectedScale,
+      stagedAngleDegClosedForm: STAGED_ANGLE_DEG,
       farLookRateScale: farSample.assist.lookRateScale,
       nearYawDeltaRad: wrapAngle(near),
       farYawDeltaRad: wrapAngle(far),
-      ratio: Math.abs(wrapAngle(near)) / Math.max(1e-9, Math.abs(wrapAngle(far))),
+      ratio,
       stick: 0.2,
       holdMs: 400,
     };
     mkdirSync(resolve('artifacts/pass84-gamepad'), { recursive: true });
     writeFileSync(resolve('artifacts/pass84-gamepad/assist-evidence.json'), JSON.stringify(evidence, null, 2));
+    // The yaw-delta comparison is the wiring proof: the same stick input must
+    // turn the view less while a hostile is under the reticle. It is a path
+    // integral over a sweep that leaves the zone, so it is bounded on both
+    // sides rather than pinned — the exact-curve assertion above is the gate.
     expect(Math.abs(wrapAngle(far))).toBeGreaterThan(0.02);
-    expect(Math.abs(wrapAngle(near)), `near ${near.toFixed(4)} vs far ${far.toFixed(4)}`).toBeLessThan(Math.abs(wrapAngle(far)) * 0.85);
+    expect(ratio, `near ${near.toFixed(4)} vs far ${far.toFixed(4)}`).toBeLessThan(0.85);
+    expect(ratio, 'the assist must never slow more than its own curve floor').toBeGreaterThan(AIM_ASSIST_PROFILES.pad.minLookScale - 0.1);
+  });
+});
+
+test.describe('pass84 gamepad options panel (lobby, no match)', () => {
+  const BINDINGS_KEY = 'atomic-acres-gamepad-bindings.v1';
+
+  test('the Options gamepad section rebinds a button from the pad itself and resets', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(installFakeGamepad);
+    await page.goto('/?release=latest&map=atomic-acres&renderer=webgl2&render=performance&externalServices=off&seed=pass84-gamepad-options');
+    await page.waitForFunction(() => {
+      const solo = document.querySelector<HTMLButtonElement>('#solo');
+      return solo?.disabled === false && window.__ATOMIC_ACRES_DEBUG__?.snapshot().bootstrap.stage === 'ready';
+    }, undefined, { timeout: 60_000 });
+
+    await page.locator('#menu-tab-options').click();
+    const section = page.locator('#gamepad-settings');
+    await expect(section).toBeVisible();
+    await expect(page.locator('#gamepad-status')).toHaveText(/NO PAD DETECTED/u);
+
+    // No gameplay poll runs in the lobby: the panel's own presence timer (which
+    // only ticks while the section is on screen) has to notice the pad.
+    await page.evaluate(() => window.__FAKE_GAMEPAD__.connect());
+    await expect(page.locator('#gamepad-status')).toHaveText(/CONNECTED/u, { timeout: 5_000 });
+    const rows = page.locator('#gamepad-binding-rows .key-binding-row');
+    await expect(rows).toHaveCount(17);
+    const grenadeRow = page.locator('#gamepad-binding-rows [data-pad-action="grenade"]');
+    await expect(grenadeRow.locator('kbd')).toHaveText('LB');
+    await expect(page.locator('#gamepad-bindings-status')).toHaveText('DEFAULT LAYOUT');
+
+    await grenadeRow.locator('button[data-pad-rebind="grenade"]').click();
+    await expect(grenadeRow.locator('kbd')).toHaveText('PRESS A PAD BUTTON…');
+    await page.evaluate(() => window.__FAKE_GAMEPAD__.press(16, 1));
+    await expect(grenadeRow.locator('kbd')).toHaveAttribute('data-button', '16', { timeout: 5_000 });
+    await expect(page.locator('#gamepad-bindings-status')).toHaveText('CUSTOM LAYOUT');
+    expect(await page.evaluate((key) => localStorage.getItem(key), BINDINGS_KEY)).toContain('"grenade":16');
+
+    await page.evaluate(() => window.__FAKE_GAMEPAD__.release(16));
+    await page.locator('#gamepad-bindings-reset').click();
+    await expect(grenadeRow.locator('kbd')).toHaveText('LB');
+    await expect(page.locator('#gamepad-bindings-status')).toHaveText('DEFAULT LAYOUT');
+    expect(await page.evaluate((key) => localStorage.getItem(key), BINDINGS_KEY)).toBeNull();
+
+    // Every one of the six per-stick curve numbers has a control (DoD 3).
+    for (const id of [
+      'gamepad-move-deadzone', 'gamepad-move-outer', 'gamepad-move-curve',
+      'gamepad-look-deadzone', 'gamepad-look-outer', 'gamepad-look-curve',
+    ]) {
+      await expect(page.locator(`#${id}`), id).toHaveAttribute('type', 'range');
+    }
+    await page.locator('#gamepad-move-curve').fill('2.5');
+    await expect.poll(async () => page.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? '{}').moveCurve?.exponent,
+      'atomic-acres-gamepad-settings.v1',
+    )).toBe(2.5);
   });
 });
 
@@ -283,6 +375,41 @@ test.describe('pass84 gamepad (mobile emulation)', () => {
     await expect(page.locator('body')).toHaveClass(/mtc-live/u);
     await expect(page.locator('#mobile-touch-controls')).toBeVisible();
 
+    // TOUCH is the strongest tier and the only one with a trigger micro-snap.
+    // Staged at the placement clamp (9 m) the 0.3 m aim-point lift subtends
+    // 1.9°, inside the 2.0° snap cone, so both halves are deterministic.
+    const stagedTouch = await page.evaluate(() => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      const placed = api.placeBotAhead(9);
+      api.aimAtBot('body');
+      return placed;
+    });
+    expect(stagedTouch, 'a bot must be staged ahead of the player').not.toBeNull();
+    await page.waitForTimeout(250);
+    const touchSample = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleGamepad());
+    expect(touchSample.tier, 'the touch overlay owns the strongest tier').toBe('touch');
+    const touchAngle = touchSample.touchAssist.nearestAngleDeg;
+    expect(touchAngle).not.toBeNull();
+    expect(touchSample.touchAssist.tier).toBe('touch');
+    expect(touchSample.touchAssist.lookRateScale, `touch curve at ${touchAngle!.toFixed(4)}°`)
+      .toBeCloseTo(expectedLookRateScale('touch', touchAngle!), 6);
+    // Fairness ordering at one instant: the touch tier slows, the pad tier
+    // (no pad connected) does not.
+    expect(touchSample.touchAssist.lookRateScale).toBeLessThan(expectedLookRateScale('pad', touchAngle!));
+    expect(touchSample.assist.lookRateScale).toBe(1);
+
+    expect(touchAngle!, 'staging must land inside the touch snap cone').toBeLessThan(AIM_ASSIST_PROFILES.touch.snapConeDeg);
+    const ammoBeforeTap = (await playerPose(page)).ammo;
+    await page.locator('#mobile-touch-controls .mtc-fire').tap();
+    await page.waitForTimeout(200);
+    const snapped = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleGamepad());
+    expect(snapped.touchSnapDeg, 'a tap inside the cone nudges the view toward the target')
+      .toBeCloseTo(AIM_ASSIST_PROFILES.touch.snapMaxDeg, 6);
+    expect(snapped.touchAssist.nearestAngleDeg!, 'the snap closes the gap by at most snapMaxDeg')
+      .toBeLessThan(touchAngle!);
+    expect((await playerPose(page)).ammo, 'the tap still fires the weapon').toBeLessThan(ammoBeforeTap);
+
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.clearBots());
     await page.evaluate(() => window.__FAKE_GAMEPAD__.connect());
     await expect(page.locator('#mobile-touch-controls')).toBeHidden({ timeout: 5_000 });
     // The pad still steers the view while the overlay is suppressed.
