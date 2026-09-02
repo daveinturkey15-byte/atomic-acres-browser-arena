@@ -101,3 +101,29 @@ Opus/Gemini critics via the Workflow tool) with no Blender at all.
 Skill path and eval record, register row, guard results, the bay's final
 captures, the rubric history per cycle, hours and tokens, the method verdict,
 commits. Claim-state every line.
+
+## ADDENDUM (orchestrator, 18:45 BST) — small chunks first, and what "that level of detail" means here
+Owner: "if we can bring that level of detail to our scenes, quickly and
+easily and better, using its production style, worth testing, even in small
+chunks then maybe in a longer one in map 3". So: before the corridor, run
+ONE SMALL CHUNK through the full method in about 60-90 minutes - a single
+set piece the size of the bar counter in the source brief (e.g. a bar
+counter with back-bar shelving, stools, bottles, glassware, practical
+lights, mise en place), procedural TSL, with its own four working documents,
+a six-camera judgeset, three critic lenses on Gemini 3.8 Flash via agy
+(cheap), one Opus critic at the end, a 100-point rubric with 85% gates and a
+90 exit, at least two cycles. Commit its evidence and the rubric history
+BEFORE starting the corridor. If the chunk cannot reach 85% in every
+dimension in two cycles, stop, write down why (usually: the critics lack a
+hard failure list, or the brief under-specified reading distances), fix the
+skill, and only then start the corridor.
+
+Expectation to write into the skill and the verdict: the source result is an
+OFFLINE Cycles path-traced render. Ours is real-time WebGPU. The METHOD
+(production contract, judgeset, fresh critics on renders, gated rubric,
+auto-reject list, cold-start validation) transfers whole; the LOOK is
+bounded by real-time budgets, so the rubric's "photoreal" dimensions become
+"readable, dense, lived-in, three reading distances, no default materials,
+no floating or intersecting props", and the biggest visual lever available
+to us for static detail is the baked-lighting route Lane AI evaluates
+(path-traced lightmaps/probes at build time, zero runtime cost).
