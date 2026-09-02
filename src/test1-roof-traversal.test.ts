@@ -9,6 +9,8 @@ import {
   type DropResult,
   type WalkResult,
 } from '../scripts/qa/roof-traversal-probe';
+import { traceBallisticPath } from './ballistics';
+import { LEGACY_WEAPONS } from './combat/legacy-weapon-adapter';
 import { TEST1_WALKABLE_DRESSING, buildTest1 } from './test-maps';
 
 /**
@@ -104,6 +106,45 @@ describe('HF-411 Test1 roof-level traversal (Rapier, stand and crouch)', () => {
         `${row.surface} ${row.stance} dropped ${row.maxDropM} m mid-walk`,
       ).toBeLessThanOrEqual(FALL_THROUGH_DROP_M);
     }
+    // "Did not fall" is not "walked". A leg blocked at its first step reports
+    // zero drop and would read as clean, so the distance actually covered is
+    // asserted too. The legs that legitimately cannot finish are ledgered by
+    // name below with the geometry that stops them - a NEW blocked leg fails,
+    // and a ledgered leg that starts completing fails as stale.
+    const BLOCKED_LEG_TOLERANCE_M = 0.5;
+    const blocked = evidence.walks
+      .filter((row) => row.remainingM > BLOCKED_LEG_TOLERANCE_M)
+      .map((row) => `${row.surface} ${row.stance} ${row.from.join(',')}->${row.to.join(',')} stopped ${row.remainingM} m short`)
+      .sort();
+    // MEASURED on the fixed tree, 2026-09-02; 12 of 88 legs, every one of them
+    // a capsule meeting authored geometry that stands ON the surface it is
+    // crossing, not a hole:
+    //   backstop berm  - the berm is a 43 m long wall of earth walked along its
+    //     own length; the capsule leaves the flat cap almost immediately.
+    //   firing line roof - the tower and its stair head sit on this roof.
+    //   spawn shed roofs - the shed's own ridge/parapet at each end.
+    //   stores roofs - the stores' cinder side walls rise past the roof slab.
+    // None is on the camo netting: all eight net legs complete with 0 m
+    // remaining, which is the HF-411 headline. A NEW blocked leg fails here,
+    // and a row that starts completing fails as stale, so this cannot rot.
+    expect(blocked, 'walk legs that did not cover their leg').toEqual([
+      'test1 backstop berm crouch -29.75,-21.55->-29.75,21.55 stopped 34.94 m short',
+      'test1 backstop berm stand -29.75,-21.55->-29.75,21.55 stopped 34.97 m short',
+      'test1 firing line roof crouch -13.8,-16.55->-13.8,16.55 stopped 24.97 m short',
+      'test1 firing line roof stand -13.8,-16.55->-13.8,16.55 stopped 24.94 m short',
+      'test1 spawn shed roof -1 crouch -4.85,-20->4.85,-20 stopped 1.57 m short',
+      'test1 spawn shed roof -1 stand -4.85,-20->4.85,-20 stopped 1.54 m short',
+      'test1 spawn shed roof 1 crouch -4.85,20->4.85,20 stopped 1.54 m short',
+      'test1 spawn shed roof 1 stand -4.85,20->4.85,20 stopped 1.57 m short',
+      'test1 stores roof -1 crouch 16.75,-16.7->27.25,-16.7 stopped 2.34 m short',
+      'test1 stores roof -1 stand 16.75,-16.7->27.25,-16.7 stopped 2.35 m short',
+      'test1 stores roof 1 crouch 16.75,16.7->27.25,16.7 stopped 2.4 m short',
+      'test1 stores roof 1 stand 16.75,16.7->27.25,16.7 stopped 2.38 m short',
+    ]);
+    expect(
+      blocked.filter((row) => row.includes('camo-net')),
+      'no camo-netting leg may be blocked',
+    ).toEqual([]);
     expect(evidence.walks.length).toBeGreaterThan(40);
   });
 
@@ -179,10 +220,99 @@ describe('HF-411 Test1 roof-level traversal (Rapier, stand and crouch)', () => {
       expect(Math.abs(collider.rotation![2] - net.rotation.z)).toBeLessThan(1e-6);
       expect(Math.abs(collider.maxY! - net.position.y - 0.03)).toBeLessThan(0.01);
     }
-    // Movement only. Netting stays shoot-through, which is what the art says
-    // and what the ballistic census already excludes as cloth.
+    // MATCHING AUTHORITY (AGENTS.md). The first version of this fix granted
+    // movement and deliberately withheld shot authority, which would have made
+    // the netting the only surface in the game a body stops on and a round
+    // ignores - a player standing on it could be shot through the floor under
+    // their boots with nothing to register the hit. Both halves are now
+    // authored from the same bounds.
     for (const net of nets) {
-      expect(net.userData.ballisticSurfaceId, `${net.name} must stay shoot-through`).toBeUndefined();
+      const surfaceId = net.userData.ballisticSurfaceId as string | undefined;
+      expect(surfaceId, `${net.name} needs shot authority to match its movement authority`).toBeDefined();
+      const surface = map.shotSurfaces.find((entry) => entry.id === surfaceId);
+      expect(surface, `${net.name} shot surface is registered on the arena`).toBeDefined();
+      // Rated, not guessed: `reinforced` is the fallback and would make camo
+      // netting the hardest cover on the map.
+      expect(surface!.material).toBe('fence');
+      expect(surface!.classification).toBe('explicit');
+      // Same box, same tilt as the movement collider.
+      expect(surface!.bounds.rotation?.[2]).toBeCloseTo(net.rotation.z, 6);
+      // Knife and world raycasts reach it now that it is a floor.
+      expect(net.userData.blocksShots, `${net.name} must be raycastable`).toBe(true);
+      expect(map.raycastMeshes.includes(net), `${net.name} is a raycast target`).toBe(true);
+      expect(Object.hasOwn(net, 'raycast'), `${net.name} keeps the real Mesh.raycast`).toBe(false);
     }
+  });
+
+  it('keeps the netting penetrable: every catalogue weapon still shoots through it', () => {
+    // The gameplay half of matching authority. A floor that stops rounds would
+    // be a NEW defect on a shipped arena, so this measures the actual crossing
+    // rather than asserting the material name and hoping.
+    //
+    // The shot is fired straight up through one net panel from the container
+    // yard floor, which is exactly the "shoot the player standing on it" case.
+    const scene = new THREE.Scene();
+    const map = buildTest1(scene);
+    scene.updateMatrixWorld(true);
+    const netSurfaces = map.shotSurfaces.filter((surface) => TEST1_WALKABLE_DRESSING.includes(surface.name));
+    expect(netSurfaces.length, 'rated netting panels').toBe(2);
+    const panel = netSurfaces[0]!;
+    const origin = {
+      x: (panel.bounds.minX + panel.bounds.maxX) / 2,
+      y: 1.2,
+      z: (panel.bounds.minZ + panel.bounds.maxZ) / 2,
+    };
+    const stopped: string[] = [];
+    const costs: Array<[string, number]> = [];
+    for (const [id, weapon] of Object.entries(LEGACY_WEAPONS)) {
+      const trace = traceBallisticPath(origin, { x: 0, y: 1, z: 0 }, 6, weapon.penetration, [panel]);
+      const crossing = trace.impacts.find((impact) => impact.surface.id === panel.id);
+      expect(crossing, `${id} never met the netting on a vertical shot`).toBeDefined();
+      if (!crossing!.penetrated) stopped.push(id);
+      costs.push([id, Number((1 - trace.damageMultiplier).toFixed(4))]);
+    }
+    // MEASURED. Exactly four weapons are stopped, and all four are the
+    // catalogue's `power: 0, maximumSurfaces: 0` entries - an explosive bolt
+    // that detonates on contact, two fuel streams and a signal flare. They are
+    // already stopped by EVERY rated surface in the game; a floor a player is
+    // standing on stopping them is consistent, not a new rule. No bullet
+    // weapon is stopped.
+    const ZERO_PENETRATION = ['crimson-flamethrower', 'explosive-crossbow', 'flamethrower', 'flare-gun'];
+    expect([...stopped].sort(), 'weapons the camo netting now stops').toEqual(ZERO_PENETRATION);
+    for (const id of ZERO_PENETRATION) {
+      expect(LEGACY_WEAPONS[id as keyof typeof LEGACY_WEAPONS].penetration.maxPenetratedSurfaces, id).toBe(0);
+    }
+    // Everything else pays for the crossing and keeps almost all of its
+    // damage. The WHOLE table is pinned rather than a ceiling, so a future
+    // change to the material, the panel thickness or the resistance table
+    // shows up as a named diff instead of sliding under a threshold.
+    //
+    // The one outlier is the M14 EBR at 21.2%, and it is the weapon's own
+    // design, not the netting's: its penetration power is 0.55 against 2.15-9.4
+    // for every other bullet weapon (it is the deliberately poor wallbanger),
+    // so a fixed 0.203 entry cost is a fifth of its budget. Railgun 0 is the
+    // 100,000-power sabot.
+    const ranked = costs
+      .filter(([id]) => !ZERO_PENETRATION.includes(id))
+      .sort((a, b) => b[1] - a[1]);
+    expect(ranked.map(([id, cost]) => `${id} ${cost}`), 'damage lost crossing the netting').toEqual([
+      'm14-ebr 0.2119',
+      'scattergun 0.0943',
+      'mini-uzi 0.0822',
+      'machine-pistol 0.0696',
+      'smg 0.0616',
+      'mp5 0.0596',
+      'pistol 0.0514',
+      'flashlight-pistol 0.0458',
+      'magnum 0.04',
+      'm4a1 0.0318',
+      'carbine 0.0312',
+      'minigun 0.0279',
+      'lmg 0.0258',
+      'ak-47 0.024',
+      'slug-shotgun 0.0228',
+      'sniper 0.0186',
+      'railgun 0',
+    ]);
   });
 });

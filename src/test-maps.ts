@@ -84,6 +84,7 @@ import {
   standard,
   type Builder,
 } from './additional-maps';
+import { createBallisticSurface, type BallisticMaterialId } from './ballistics';
 import type { Box2 } from './collision';
 import type { ArenaMap } from './map';
 import { applyTest1Dressing, applyTest2Dressing, test1Materials, test2Materials, worldTiled } from './test-maps-art';
@@ -170,22 +171,50 @@ function block(
 }
 
 /**
- * Gives movement authority to a DRESSING mesh that reads as a floor (HF-411).
+ * Promotes a DRESSING mesh that reads as a floor into full arena authority
+ * (HF-411).
  *
- * The collider is DERIVED from the mesh that is actually in the graph - its own
+ * Every number is DERIVED from the mesh that is actually in the graph - its own
  * geometry extent, world placement and world rotation - and never re-typed from
  * the art module's literals. An art pass that moves, resizes or tilts the panel
- * moves the collider with it; an art pass that RENAMES or deletes it removes
- * the collider and the walkable-surface gate re-fires, which is the behaviour a
+ * moves the authority with it; an art pass that RENAMES or deletes it removes
+ * the authority and the walkable-surface gate re-fires, which is the behaviour a
  * hand-copied number cannot give.
  *
- * Only movement authority is granted. Shot authority stays with whatever the
- * mesh already registered, so a netting panel keeps its cloth semantics - a
- * round crosses it, a body does not - exactly like real grating.
+ * WHAT AUTHORITY THIS ACTUALLY GRANTS - all four channels, named, because the
+ * first version of this function claimed "movement only" and that was false:
+ *
+ *  1. `physicsColliders` - the Rapier world. This is the movement half the
+ *     owner asked for: the capsule stands on the panel instead of falling
+ *     3.0 m.
+ *  2. `colliders` - the general world-solid list. `activeWorldColliders()` in
+ *     legacy-main reads it for far more than movement: explosion and blast
+ *     occlusion, the swept-sphere grenade/projectile test, spawn validity and
+ *     `visibleThreats` scoring, interaction and bot line-of-sight, and
+ *     carpet-bomber damage occlusion. There is no movement-only channel; a
+ *     solid floor is solid to all of them, which is what a floor should be.
+ *  3. `shotSurfaces` - the analytic ballistic authority. AGENTS.md requires
+ *     matching movement and shot authority for every substantial
+ *     player-reachable object, and the overhead-dressing exemption stops
+ *     applying the moment the panel becomes a floor a player stands on. The
+ *     panel is rated with `ballisticMaterial` so the round PAYS for the
+ *     crossing instead of being ignored; for netting that material is `fence`,
+ *     the cheapest rated non-glass material there is (0.18 entry +
+ *     0.38/metre), so 0.06 m of net costs 0.203 of a 2.15-9.4 energy budget:
+ *     a hit registers, a round still goes through. See
+ *     `src/test1-roof-traversal.test.ts` for the per-weapon measurement.
+ *  4. `raycastMeshes` + `blocksShots` - knife and world raycasts. The art
+ *     module neutered `mesh.raycast` when it authored the panel as pure
+ *     presentation; a floor needs it back, or a melee swing passes through the
+ *     thing the player is standing on.
  *
  * Returns how many meshes were adopted so the caller can assert the census.
  */
-function adoptWalkableDressing(builder: Builder, names: readonly string[]): number {
+function adoptWalkableDressing(
+  builder: Builder,
+  names: readonly string[],
+  ballisticMaterial: BallisticMaterialId,
+): number {
   const wanted = new Set(names);
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -214,6 +243,28 @@ function adoptWalkableDressing(builder: Builder, names: readonly string[]): numb
     };
     builder.colliders.push(bounds);
     builder.physicsColliders.push(bounds);
+    // Shot authority, same bounds and same rotation as the movement collider,
+    // so the two can never disagree about where the panel is. `fence` is
+    // passed explicitly: `classifyBallisticMaterial` has no rule that matches
+    // "net", so a rule-classified panel would fall through to `reinforced` and
+    // turn camo netting into the hardest cover on the map.
+    const surface = createBallisticSurface(
+      `${builder.root.name}:${builder.ballisticSurfaceSequence}:${object.name}`,
+      object.name,
+      bounds,
+      { material: ballisticMaterial },
+    );
+    builder.ballisticSurfaceSequence += 1;
+    builder.shotSurfaces.push(surface);
+    object.userData.ballisticSurfaceId = surface.id;
+    object.userData.ballisticMaterial = surface.material;
+    // The art module set `raycast = () => undefined` and `blocksShots = false`
+    // when this was dressing. It is a floor now: restore the real raycast so a
+    // knife swing and an impact decal land on it.
+    object.userData.blocksShots = true;
+    object.userData.presentationOnly = false;
+    delete (object as { raycast?: THREE.Mesh['raycast'] }).raycast;
+    if (!builder.raycastMeshes.includes(object)) builder.raycastMeshes.push(object);
     adopted += 1;
   });
   return adopted;
@@ -431,9 +482,16 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
   // step onto a floor; approach it anywhere else and you never touch it.
   //
   // The visual is not moved, hidden, levelled or resized. It is given the
-  // movement authority it always looked like it had, derived from the mesh
-  // itself so art and authority cannot drift apart.
-  adoptWalkableDressing(builder, TEST1_WALKABLE_DRESSING);
+  // authority it always looked like it had, derived from the mesh itself so art
+  // and authority cannot drift apart - movement, world-solid (blast occlusion,
+  // grenade sweeps, spawn threat scoring, line of sight), shot and raycast.
+  // The netting is rated `fence`, the cheapest rated non-glass material in
+  // BALLISTIC_MATERIALS: 0.06 m of it costs a round 0.203 energy out of the
+  // 2.15-9.4 the catalogue's weapons carry, so a hit registers and the round
+  // still goes through. That is grating semantics done with authority instead
+  // of with absence - and it is what AGENTS.md's matching-authority clause
+  // requires the moment a panel becomes a floor.
+  adoptWalkableDressing(builder, TEST1_WALKABLE_DRESSING, 'fence');
   batchPresentationOnlyBoxes(builder.root, 'test1-presentation');
 
   return {
