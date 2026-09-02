@@ -34,13 +34,23 @@ import { execSync } from 'node:child_process';
  * whole run". An unreadable GPU is treated as NOT FREE by the caller, which is
  * the safe direction: it keeps waiting instead of launching blind.
  */
+let reportedUnreadableReason = false;
+
 export function freeVramMib() {
   let out;
   try {
     out = execSync('nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits', {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15_000,
     });
-  } catch {
+  } catch (error) {
+    // Say WHY, once. A guard that reports "unreadable" forever without a reason
+    // is indistinguishable from a broken machine, and the reason IS the fix -
+    // here it was several orphaned QA processes from interrupted runs, all
+    // polling nvidia-smi every 30 s against a GPU already at 63% util.
+    if (!reportedUnreadableReason) {
+      reportedUnreadableReason = true;
+      console.log(`[guard] nvidia-smi unreadable: ${error instanceof Error ? error.message : String(error)}`);
+    }
     return null;
   }
   const values = out.trim().split('\n').map((line) => Number.parseInt(line.trim(), 10)).filter(Number.isFinite);
