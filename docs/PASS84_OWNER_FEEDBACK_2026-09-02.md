@@ -248,3 +248,40 @@ owns its root cause for PASS 85. The earlier contested window (38 fps, 322 ms,
 was riding; it is void. "errors 1+0" in every row is the gate's death-induction
 hook (`damageLocalPlayer`) not being present in the shipped debug API, not a
 page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
+
+## HF-407 — Nuke Town: total layout rejig to the Black Ops 2 Nuketown flow, code-authored
+
+- **Owner lane:** the main map; layout, flow, cover, art direction.
+- **Statement (verbatim, 2026-09-02 ~16:10 BST):** "I don't think it's very
+  true in layout or style to the original nuketown map from black ops 2. I
+  would like to totally remake the layout and feel to be much more similar in
+  terms of size and how the buildings and vehicle are to nuke town from black
+  ops 2, the flow of the map and its cover and houses and stuff are important.
+  We can then make our own artstyle and gameplay enhancements and totally
+  modify it ... still keeping things like the 2x damage, the rare gun spawn,
+  the sheds, but the layout needs a total rejig and the bus can probably be
+  made with code instead of blender and be better ... just mirror what it has
+  and the way the closed/open vehicles work as cover, the black ops 2 version"
+- **Context:** Nuke Town is the only arena built from an imported Blender bake
+  (`authoring: 'import'`, `public/assets/original/models/atomic-acres-blender-arena.glb`
+  7.3 MB from `scripts/blender/create-atomic-acres-blender-arena.py`); every
+  other arena is code. The 2026-08-29 redesign rotated the flow and lengthened
+  the street but the owner still reads it as untrue to the reference.
+- **Mechanical falsifier:** a code-authored arena whose measured layout
+  (street length, house footprints and positions, garage and yard placement,
+  central vehicle and kerb cars, spawn yards) matches the reference
+  proportions within a stated tolerance per element; all three lanes (street,
+  house-west, house-east) exist with the reference's cover rhythm; existing
+  fidelity, spawn-quality, eye-clearance, collider/visual parity and boot
+  gates pass; 2x core, rare gun spawn and sheds retained; original art only.
+- **Plan:** Lane U (`docs/pass84-lanes/LANE-U-nuketown-rejig.md`) builds it as a
+  new PREVIEW arena beside the shipped one; the owner picks the moment to make
+  it the main map.
+
+## HF-408 — Raid: layout and art style closer to the original (shelved until Nuke Town lands)
+
+- **Statement (16:10):** "raid just feels like loads of walls, need to ensure
+  the layout and artstyle is more similar to the original."
+- **State:** shelved by the owner with Farcrysis preview (Lane R) and bus
+  doors (Lane K); Lane L (Raid art on the accepted layout) is superseded by
+  this row, which is a LAYOUT rethink, not an art pass.
