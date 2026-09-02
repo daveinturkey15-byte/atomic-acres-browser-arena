@@ -56,6 +56,16 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'gun-range-test-bay-door-bay-face',
     'gun-range-test-bay-overview',
   ]),
+  // Map 3 (Lane V, PASS 85) authored four review cameras and landed on the
+  // shipping line with NO entry here at all, so this instrument never saw the
+  // arena: `catalog covers every authored review camera` has been RED since
+  // that merge. Derived from src/rendering/arenas/map3.ts, in authored order.
+  map3: Object.freeze([
+    'map3-hub-vista',
+    'map3-bay-nature',
+    'map3-volume-hall',
+    'map3-into-sun-hub',
+  ]),
   'high-seas': Object.freeze([
     'high-seas-starboard-overview',
     'high-seas-stern-main-deck',
