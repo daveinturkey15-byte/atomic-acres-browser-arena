@@ -251,3 +251,100 @@ function socketTranslation(
 function separationMeters(a: number[], b: number[]): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
+
+describe('HF-413 the shoulder reach search reaches its lane whenever a direction exists', () => {
+  /**
+   * Review finding, measured on the live gate: at the Railgun's hip pose and
+   * the sidearm's ADS pose the support shoulder was left INSIDE the frame at
+   * NDC y -0.975..-0.983, because the reach search stopped at the anatomical
+   * shoulder direction and that direction happened to project above the lane.
+   * The fix continues the same walk toward straight down.
+   *
+   * The invariant pinned here is the one that matters and cannot be satisfied
+   * by hiding a violation: if the straight-down candidate on the reachable
+   * sphere clears the lane, the solver must return a result that clears it
+   * too. Sockets whose whole reachable sphere projects above the lane stay
+   * unreachable and stay reported.
+   */
+  it('never leaves the shoulder inside the frame when the reachable sphere allows it', async () => {
+    const { WeaponPresentation, FIRST_PERSON_ARM_UNIFORM_SCALE } = await import('./weapon-presentation');
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    const parent = new THREE.Group();
+    parent.position.z = -1;
+    camera.add(parent);
+    const shoulder = new THREE.Bone();
+    const elbow = new THREE.Bone();
+    const wrist = new THREE.Bone();
+    const finger = new THREE.Bone();
+    const palmContact = new THREE.Object3D();
+    shoulder.position.set(0.28, -0.18, 0);
+    elbow.position.set(0, -0.31, 0);
+    wrist.position.set(0, -0.28, 0);
+    finger.position.set(0, -0.12, 0);
+    palmContact.position.set(0, -0.08, 0);
+    parent.add(shoulder);
+    shoulder.add(elbow);
+    elbow.add(wrist);
+    wrist.add(finger, palmContact);
+    const rig = {
+      shoulder, elbow, wrist, finger, palmContact, side: 'left' as const,
+      bindShoulder: shoulder.quaternion.clone(),
+      bindElbow: elbow.quaternion.clone(),
+      bindWrist: wrist.quaternion.clone(),
+      bindShoulderPosition: shoulder.position.clone(),
+      bindElbowPosition: elbow.position.clone(),
+      bindWristPosition: wrist.position.clone(),
+      bindShoulderScale: shoulder.scale.clone(),
+      bindElbowScale: elbow.scale.clone(),
+      bindWristScale: wrist.scale.clone(),
+    };
+    const internals = presentation as unknown as {
+      riggedArmRigs: Array<typeof rig>;
+      placeRiggedShoulderEntryBelowFrame(
+        arm: typeof rig, cameraRotation: THREE.Quaternion, targetNdcY?: number,
+      ): { ndc: readonly [number, number, number] };
+      constrainRiggedShoulderEntryToReach(
+        arm: typeof rig, cameraRotation: THREE.Quaternion, socketTarget: THREE.Vector3,
+        maximumSocketReach: number, targetNdcY?: number,
+      ): { ndc: readonly [number, number, number]; adjusted: boolean };
+    };
+    internals.riggedArmRigs.push(rig);
+    camera.updateMatrixWorld(true);
+    const bindReach = shoulder.getWorldPosition(new THREE.Vector3())
+      .distanceTo(wrist.getWorldPosition(new THREE.Vector3()));
+    parent.scale.setScalar(FIRST_PERSON_ARM_UNIFORM_SCALE);
+    camera.updateMatrixWorld(true);
+
+    const lane = FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC.left;
+    const cameraDown = new THREE.Vector3(0, -1, 0).applyQuaternion(camera.quaternion).normalize();
+    let exercised = 0;
+    for (const y of [-0.05, 0, 0.05, 0.1]) {
+      for (const z of [-0.35, -0.45, -0.55]) {
+        for (const reachRatio of [0.4, 0.55, 0.7, 0.82]) {
+          const socketTarget = new THREE.Vector3(-0.1, y, z);
+          const maximumSocketReach = bindReach * FIRST_PERSON_ARM_UNIFORM_SCALE * reachRatio;
+          // Is there a solution at all? The lowest point of the reachable
+          // sphere is the straight-down candidate.
+          const straightDown = socketTarget.clone()
+            .addScaledVector(cameraDown, Math.max(0.05, maximumSocketReach))
+            .project(camera);
+          shoulder.position.copy(rig.bindShoulderPosition);
+          camera.updateMatrixWorld(true);
+          internals.placeRiggedShoulderEntryBelowFrame(rig, camera.quaternion, lane);
+          const solved = internals.constrainRiggedShoulderEntryToReach(
+            rig, camera.quaternion, socketTarget, maximumSocketReach, lane,
+          );
+          const context = `socket=(-0.1,${y},${z}) reach=${reachRatio}`;
+          if (straightDown.y <= lane - 0.005) {
+            exercised += 1;
+            expect(solved.ndc[1], context).toBeLessThanOrEqual(lane - 0.005);
+          }
+        }
+      }
+    }
+    // Guards this guard: if the grid stopped producing solvable cases the
+    // assertion above would pass vacuously.
+    expect(exercised).toBeGreaterThanOrEqual(20);
+  });
+});

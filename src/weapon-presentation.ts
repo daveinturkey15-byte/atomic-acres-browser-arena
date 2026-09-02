@@ -5136,11 +5136,37 @@ export class WeaponPresentation {
     const candidate = scratch.shoulderReachCandidate;
     const blended = scratch.shoulderBlendedDirection;
     let projected = scratch.shoulderProjected;
+    let clearedLane = false;
     for (let step = 0; step <= 16; step += 1) {
       blended.copy(initialDirection).lerp(anatomicalDirection, step / 16).normalize();
       candidate.copy(socketTarget).addScaledVector(blended, safeReach);
       projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
-      if (projected.y <= targetNdcY - 0.005) break;
+      if (projected.y <= targetNdcY - 0.005) { clearedLane = true; break; }
+    }
+    // HF-413. The search above stops at the ANATOMICAL direction, which since
+    // HF-365 carries a real shoulder-width lateral component so the arm enters
+    // diagonally instead of as a vertical "pale post". For most poses that
+    // already clears the lane. But when the grip is high and close (measured:
+    // Railgun at hip, sidearm at ADS) the anatomical terminal projects ABOVE
+    // the lane - the loop exhausted, the shoulder was left inside the frame at
+    // NDC y -0.975..-0.983, and the gate correctly reported a sleeve that does
+    // not continue below the frame.
+    //
+    // Continue the same walk from the anatomical direction toward straight
+    // down, still stopping at the FIRST step that clears the lane. This is the
+    // behaviour the HF-365 comment already describes ("walks the shoulder
+    // toward straight-down until the joint clears that lane"); only the
+    // preferred resting direction was ever meant to be anatomical. Poses that
+    // clear the lane anatomically never enter this loop, so no pose that reads
+    // correctly today is moved at all, and a pose that cannot clear the lane at
+    // any direction still reports the violation rather than being hidden.
+    if (!clearedLane) {
+      for (let step = 1; step <= 16; step += 1) {
+        blended.copy(anatomicalDirection).lerp(cameraDown, step / 16).normalize();
+        candidate.copy(socketTarget).addScaledVector(blended, safeReach);
+        projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
+        if (projected.y <= targetNdcY - 0.005) break;
+      }
     }
 
     parent.updateWorldMatrix(true, false);
