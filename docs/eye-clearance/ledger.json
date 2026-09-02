@@ -11,16 +11,10 @@
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": -1
+    "map3": 24
   },
   "unmeasuredCeiling": -1,
-  "unmeasured": [
-    {
-      "arena": "map3",
-      "since": "2026-09-02",
-      "note": "HF-409 / PASS 86: map3 rejoins the ratchet WITH its card, at the sentinel, because only stage 1 has actually run against it. Stage 1 (scripts/qa/sweep-eye-clearance-spots.ts, 2026-09-02, this tree): 225 colliders (2 floor), 3013 legal hug spots at every-3rd thinning, 3 colliders with no legal adjacent stance. Stage 2 (sweep-eye-clearance-live.mjs) has NOT run: it probes through __ATOMIC_ACRES_DEBUG__.traceBallistics, which builds a NON-ACTIVE arena synchronously, and map3 is code-split behind src/arena-factory-registry.ts, so buildMap3 throws unless the chunk is already resolved. Until the loadMap3Rapier()/prepare-then-build split lands, a stage-2 number for map3 cannot be produced at all - so this row is the sentinel and NOT a guessed ceiling. Do not hand it a number without saying which stage produced it."
-    }
-  ],
+  "unmeasured": [],
   "accepted": [
     {
       "arena": "gun-range",
@@ -57,7 +51,7 @@
       "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
       "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
       "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - stage 3 teleports the real player to the spots stage 2 flagged, and stage 2 has never run against map3 (see the unmeasured note above), so there is nothing to teleport to yet."
+      "map3": "0 (measured 2026-09-03: stage 2 flagged 24 prone spots, stage 3 teleported the real player to all 24 and re-probed from the actual camera seat - every one resolved, 0 remaining)"
     },
     "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
   },
@@ -73,6 +67,12 @@
       "at": "2026-08-31",
       "violations": 0,
       "note": "RE-MEASURED after the 100 x 76 m layout rebuild (was 76 x 58 m). 3467 legal hug spots, 24269 traces, ZERO violations across all three stances; stage 3 teleported the real player to every flagged spot and had none to check. The ceiling stays at 0 - it is not re-pinned, because the measurement did not move off it. The SPOT COUNT moved (3665 -> 3467) and that is expected: the bounds changed, the thinning stride went 4 -> 5 with the larger collider set, and 21 paving slabs replaced 10 terrace bands. The rebuild also cut colliders-with-no-legal-adjacent-stance from 24 to 9; the 24 were all veranda balustrade, and the veranda is demolished. The 9 that remain are the same instrument limitation the old note recorded - the sweep evaluates hug candidates against a hardcoded ground plane of 0, so it asks whether a player can stand beside a +3.40 m upper-room wall from grade. Tracked as the per-candidate standing-surface follow-up, not a map defect."
+    },
+    {
+      "arena": "map3",
+      "at": "2026-09-03",
+      "violations": 24,
+      "note": "FIRST REAL MEASUREMENT, and the reason the sentinel could finally be retired: stage 2 probes a non-active arena through __ATOMIC_ACRES_DEBUG__.traceBallistics, which builds it synchronously, and buildMap3 threw until the prepare-then-build split landed. Stage 1 (this tree): 232 colliders (2 floor), 3399 legal hug spots at every-3rd thinning, 3 colliders with no legal adjacent stance. Stage 2: 3399 spots, 23721 traces, 24 violations - ALL PRONE, none standing or crouched. Stage 3 teleported the real player to all 24 and re-probed from the actual camera seat: 0 remaining. So the analytic sweep flags 24 prone eye seats and src/camera-eye-clearance.ts resolves every one of them at runtime. Entered at the measured 24, which is the strictest honest ceiling - NOT at 0, because 24 is what the instrument actually reports and lowering it to 0 would be recording the runtime result against a stage-2 gate. An earlier helper reported \"0 violations / 3516 spots\" for map3; that reading was taken on the pre-split tree where buildMap3 threw, and it does not reproduce here."
     }
   ],
   "openRegressions": [
