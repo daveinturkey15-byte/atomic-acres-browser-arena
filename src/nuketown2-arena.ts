@@ -626,8 +626,19 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
  */
 function street(builder: Builder, m: Nuketown2Materials): void {
   const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
+  // GROUND DRESSING IS PRESENTATION-ONLY, and that is a decision with a
+  // measurement behind it. Asphalt, aprons and lawns are 20 mm proud of the
+  // solid 200 x 200 m ground slab, purely so they do not z-fight it; they are
+  // decals, and AGENTS.md allows exactly that ("tiny grass, decals ... may
+  // remain non-solid"). Left solid they add a collider spanning y [-0.12,
+  // 0.02] over the whole yard, which is enough to make the destructible-shed
+  // registry's off-static-collision check report a shed standing on the lawn
+  // as a shed standing INSIDE something. Movement and shot authority are
+  // unchanged: the ground slab underneath is solid and shot-rated, and the
+  // collider/visual parity audit still measures 0 walk-through meshes.
+  const decal = { solid: false, shots: false, cast: false } as const;
   centred(builder, 'street asphalt', [0, -0.06, 0], [width, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2],
-    m.asphalt, { cast: false });
+    m.asphalt, decal);
   // Kerb: a 0.12 m lip, under the 0.42 m autostep, so it reads without ever
   // being a wall.
   pair(builder, 'street kerb', [0, 0.06, -NUKETOWN2_STREET_HALF_WIDTH + 0.15], [width, 0.24, 0.3],
@@ -638,12 +649,12 @@ function street(builder: Builder, m: Nuketown2Materials): void {
       { solid: false, shots: false, cast: false });
   }
   // Driveway apron in front of each garage.
-  pair(builder, 'street driveway', [-16, -0.05, HOUSE_FRONT_Z + 1.2], [7.0, 0.14, 2.4], m.drive, { cast: false });
+  pair(builder, 'street driveway', [-16, -0.05, HOUSE_FRONT_Z + 1.2], [7.0, 0.14, 2.4], m.drive, decal);
   // Front lawn either side of the driveway; the front garden of the house.
-  pair(builder, 'street lawn front', [8, -0.05, HOUSE_FRONT_Z - 2.4], [24, 0.14, 4.8], m.lawn, { cast: false });
+  pair(builder, 'street lawn front', [8, -0.05, HOUSE_FRONT_Z - 2.4], [24, 0.14, 4.8], m.lawn, decal);
   // Back yard lawn.
   pair(builder, 'yard lawn', [0, -0.05, (HOUSE_BACK_Z + YARD_FENCE_Z) / 2],
-    [width, 0.14, YARD_DEPTH], m.lawn, { cast: false });
+    [width, 0.14, YARD_DEPTH], m.lawn, decal);
 }
 
 /**
@@ -685,7 +696,10 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 3.2], [2.4, LOW_COVER, 2.0], m.planter);
   pair(builder, 'yard cover wall', [7, HARD_COVER / 2, HOUSE_BACK_Z - 2.6], [6.0, HARD_COVER, 0.35], m.block);
   // Water butt beside the shed placement, so the shed corner has a partner.
-  pair(builder, 'yard butt', [-22, LOW_COVER, HOUSE_BACK_Z - 4.5], [1.2, LOW_COVER * 2, 1.2], m.block);
+  // x = -20.5 is NOT arbitrary: the shed at (-24, -18.5) with yaw pi/2 occupies
+  // x [-26.1, -21.9] (destructible-shed-registry.ts, shedPlacementFootprint),
+  // so the butt stands 0.8 m clear of its wall instead of inside it.
+  pair(builder, 'yard butt', [-20.5, LOW_COVER, HOUSE_BACK_Z - 4.5], [1.2, LOW_COVER * 2, 1.2], m.block);
 }
 
 /** The perimeter: a 3.2 m wall on all four sides, just inside the bounds. */
