@@ -4756,6 +4756,9 @@ function invalidateKeyBindingProfile(): void {
 }
 const remotes = new Map<string, RemotePlayer>();
 // Lane J (HF-347 residual): silent state/join admission drops, made observable.
+// MP-LAB: see the outside-arena-bounds admission below. Must stay at or below
+// the smallest character capsule radius in physics.ts (0.36) or legal poses drop.
+const STATE_ADMISSION_BOUNDS_MARGIN = 0;
 const stateAdmissionDropTelemetry: {
   total: number;
   byReason: Record<string, number>;
@@ -12248,7 +12251,15 @@ function onNetworkMessage(message: GameMessage): void {
           deaths: authoritativeScore?.deaths ?? 0,
         }
       : claimedIncoming;
-    if (!pointInsideBounds(incoming, arena.bounds, 0.44)) {
+    // MP-LAB: a peer hugging a perimeter wall is a legal pose. Movement authority
+    // is the Rapier capsule (physics.ts playerRadius 0.38, crouch/prone 0.36)
+    // against physics-only boundary walls whose inner faces ARE arena.bounds, so
+    // a centre can rest at bounds.max - 0.38. The old 0.44 margin rejected that
+    // pose and the peer froze for everyone else: measured 2026-09-02 (host+guest
+    // harness, atomic-acres) 5 'outside-arena-bounds' drops of the host's state
+    // at x = 36.595 against maxX 37. Inside the world at all is the admission
+    // question; the capsule already keeps every legal pose off the wall.
+    if (!pointInsideBounds(incoming, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN)) {
       recordStateAdmissionDrop('outside-arena-bounds');
       return;
     }

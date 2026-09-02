@@ -111,5 +111,6 @@ test('a verdict fails on any stall over the floor, any deadlock, any page error,
 test('package.json exposes the harness and this contract', () => {
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts['qa:mp-lab'], 'node scripts/qa/mp-lab/run-host-guest.mjs');
-  assert.equal(pkg.scripts['qa:mp-lab:contract'], 'node --test tests/e2e/mp-lab-registry-contract.test.mjs');
+  assert.equal(pkg.scripts['qa:mp-lab:contract'], 'node --test tests/e2e/mp-lab-registry-contract.test.mjs tests/e2e/mp-lab-state-admission-contract.test.mjs');
+  assert.equal(pkg.scripts['qa:mp-lab:perimeter'], 'node scripts/qa/mp-lab/probe-perimeter-replication.mjs');
 });
