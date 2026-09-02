@@ -130,3 +130,28 @@ attempt is on the record: test1's own triangle count varied 82,461-107,090
 between runs of the same build, a 28% content difference that swamps a
 sub-millisecond CPU saving. The deterministic census above is the cross-arena
 evidence instead.
+
+### Tripwire, re-run on the repaired HEAD dist
+
+`tripwire-hf399-repair-head.json`: 374 render pipelines before the window, **1
+during, 0 inside a stall (enrichment 0x)**, shader modules 431 before / 0
+during, 3 stalls / 0.44% frozen over 75.0 s. Identical creation counts to the
+base run (`tripwire-hf399-before-base.json`, 374/1/0). NOT regressed. The stall
+count fell from 12-20 earlier in the day to 3 on the quiet machine, which is
+further confirmation that stall counts here track machine load, not the build.
+
+### Visual parity of the streamlined label transform
+
+The streamline routed EVERY non-Nuke-Town arena's landmark labels through the
+same closed form. `skyline-terminal` is the arena that actually draws labels on
+that branch (TERM, CRGO, JET, FUEL). `r12-{before,head}-skyline-terminal-deployed-idle.png`
+were captured at the same pose (PLAYER UP 063 degrees on both) and compared:
+
+- a +/-3 px alignment search over the CRGO and TERM label boxes puts the best
+  offset at **dx 0, dy 0** - no positional shift at all;
+- the untouched DOM caption "TERMINAL" is the control and shows the same
+  best offset (0,0) and the same order of residual (mean abs delta 6.16 against
+  the labels' 8.07 and 10.82), i.e. the residual is screenshot antialiasing
+  present across the whole frame, not label movement.
+
+Screenshots stay in `artifacts/qa/hf399/` (too large to track).
