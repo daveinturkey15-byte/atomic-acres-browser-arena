@@ -712,6 +712,13 @@ export function firstPersonHipTriggerHandLift(
 /** Camera-space Z clearance preventing thicker arm geometry from crossing the near plane. */
 export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
 /**
+ * HF-397 (2026-09-02): the owner asked for the near-wall pullback to be
+ * halved. Multiplies the clamped surface retreat at its single application
+ * site; the raw probed value still feeds telemetry and the clip planes.
+ */
+export const VIEWMODEL_WALL_PULLBACK_SCALE = 0.5;
+
+/**
  * Maximum camera-space wall retreat that still keeps the armed hands/stock
  * clear of the near plane. The prone-contact spec requires a real retreat
  * (> 0.25) while the weapon framing must stay near-plane-clear, so the
@@ -3971,7 +3978,14 @@ export class WeaponPresentation {
     (this.smokePoints.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (this.smokePoints.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 
-    const surfaceRetreatClamped = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    // HF-397: the owner finds the full wall pullback too strong; the APPLIED
+    // retreat is halved. Anti-clipping stays owned by the surface clip planes
+    // (viewmodel-surface-clip), and the near-plane framing contract only gets
+    // safer as the weapon moves away from the camera. Telemetry keeps reporting
+    // the raw probed surfaceRetreat, so the prone-contact spec's >0.25 telemetry
+    // floor is untouched.
+    const appliedWallRetreat = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT)
+      * VIEWMODEL_WALL_PULLBACK_SCALE;
     this.root.position.set(
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters
@@ -3979,8 +3993,8 @@ export class WeaponPresentation {
       // The wall retreat is capped at the near-plane-safe distance: pushing
       // the weapon further back would drive the arms/stock through the near
       // plane and fail the prone framing contract.
-      HIP_VIEWMODEL_POSITION.z + surfaceRetreatClamped - VIEWMODEL_NEAR_PLANE_CLEARANCE
-        - authoredNearPlaneContactRetreat(this.active, surfaceRetreatClamped),
+      HIP_VIEWMODEL_POSITION.z + appliedWallRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat(this.active, appliedWallRetreat),
     );
     this.root.rotation.set(
       this.contactResponse.pitchRadians,

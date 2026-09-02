@@ -119,6 +119,11 @@ export type ThermalGhostTelemetry = Readonly<{
   maxObservedBodyLayers: number;
   bodyLayerBudgetExceeded: boolean;
   oversizedBodyRejections: number;
+  /** Lifetime ghost-rig builds; churn evidence for the pilot instrument.
+   * Optional: meaningful only once the presentation has synced at least once. */
+  ghostBuildCount?: number;
+  /** Lifetime ghost-rig releases; churn evidence for the pilot instrument. */
+  ghostReleaseCount?: number;
 }>;
 
 type GhostLayer = {
@@ -494,6 +499,8 @@ export class ThermalGhostPresentation {
     maxObservedBodyLayers: 0,
     bodyLayerBudgetExceeded: false,
     oversizedBodyRejections: 0,
+    ghostBuildCount: 0,
+    ghostReleaseCount: 0,
   };
   private generation = 0;
   private activeTargets = 0;
@@ -503,10 +510,17 @@ export class ThermalGhostPresentation {
   private activeSourceBodyLayers = 0;
   private activeNormalMaterialSlots = 0;
   private materialBudgetExceeded = false;
+  /** Lifetime ghost-rig build/release counters. The pass84 pilot investigation
+   * showed per-frame releaseUnseen churn rebuilt whole skinned rigs whenever an
+   * actor dropped out of the selection; these counters are the churn evidence
+   * the pilot instrument reads. */
+  ghostBuildCount = 0;
+  ghostReleaseCount = 0;
   private materialBudgetWarned = false;
   private maxObservedBodyLayers = 0;
   private bodyLayerBudgetExceeded = false;
   private oversizedBodyRejections = 0;
+
   private readonly warnedBodyLayerCounts = new Set<number>();
   private haloMaterialDisposed = false;
   private evidenceControlHidden = false;
@@ -576,6 +590,7 @@ export class ThermalGhostPresentation {
   }
 
   private buildGhosts(target: ThermalGhostTarget): GhostRecord {
+    this.ghostBuildCount += 1;
     const layers: GhostLayer[] = [];
     target.root.updateWorldMatrix(true, false);
     // Attached guns, haze and shadow proxies are not the operator body. The
@@ -672,6 +687,7 @@ export class ThermalGhostPresentation {
   }
 
   private releaseRecord(record: GhostRecord): void {
+    this.ghostReleaseCount += 1;
     for (const layer of record.layers) {
       layer.model.removeFromParent();
       layer.halo.removeFromParent();
@@ -1008,6 +1024,8 @@ export class ThermalGhostPresentation {
     state.maxObservedBodyLayers = this.maxObservedBodyLayers;
     state.bodyLayerBudgetExceeded = this.bodyLayerBudgetExceeded;
     state.oversizedBodyRejections = this.oversizedBodyRejections;
+    state.ghostBuildCount = this.ghostBuildCount;
+    state.ghostReleaseCount = this.ghostReleaseCount;
     return state;
   }
 

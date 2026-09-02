@@ -3404,7 +3404,7 @@
           "color": 10283775,
           "crouchRecoilMultiplier": 0.74,
           "crouchSpreadMultiplier": 0.7,
-          "damage": 37.2,
+          "damage": 52.1,
           "falloffEnd": 100,
           "falloffStart": 38,
           "fireKind": "hitscan",
@@ -3415,7 +3415,7 @@
           "limbMultiplier": 0.82,
           "mag": 20,
           "maximumSpread": 0.062,
-          "minimumDamage": 24,
+          "minimumDamage": 33.6,
           "movementMultiplier": 0.94,
           "movementSpreadMultiplier": 1.85,
           "muzzleFlashScale": 1.08,
@@ -3447,7 +3447,7 @@
           "reload": 2.35,
           "reportGain": 1.08,
           "reserve": 80,
-          "rpm": 37,
+          "rpm": 46,
           "spinUpMs": 0,
           "sustainedSpreadPerShot": 0.004,
           "switchSeconds": 0.66
@@ -4135,7 +4135,8 @@
       "pass68-flamethrower-triple-damage-and-five-second-ground-fire",
       "pass68-flare-gun-five-second-burn",
       "pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second",
-      "pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction"
+      "pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction",
+      "pass84-ebr-40-percent-damage-25-percent-fire-rate"
     ]
   }
 }

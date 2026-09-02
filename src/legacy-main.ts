@@ -967,7 +967,7 @@ import {
 } from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, deriveDmrThermalRevealActive, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
-import { ThermalGhostPresentation } from './thermal-ghost-presentation';
+import { ThermalGhostPresentation, type ThermalGhostTelemetry } from './thermal-ghost-presentation';
 import {
   pass73AdsRevealReadbackRegion,
   quantizePass73AdsRevealReadback,
@@ -17932,6 +17932,9 @@ function thermalRevealCandidates(): ThermalRevealCandidate[] {
   return candidates;
 }
 
+/** True while any through-wall thermal reveal is active. The ghost-record
+ * flush runs on the falling edge, not every frame - see updateThermalGhosts. */
+let thermalRevealWasActive = false;
 function updateThermalGhosts(): void {
   // One presentation layer serves every firearm-authorized through-wall
   // reveal. Selection remains each weapon's existing authority policy; only
@@ -17947,6 +17950,7 @@ function updateThermalGhosts(): void {
   if (!thermalRevealActive(activation)) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
+    thermalRevealWasActive = false;
     return;
   }
   const targets = selectThermalRevealTargets(
@@ -17955,10 +17959,17 @@ function updateThermalGhosts(): void {
     deriveThermalRevealMode(gameMode, privateMatchMode),
     thermalRevealCandidates(),
   );
-  // Admission prewarm may retain attached corpse-corpus records. The live
-  // target set owns the visible reveal and releases every unseen prewarm ID so
-  // one ADS cannot carry hidden duplicate model/material residency.
-  thermalGhostPresentation.sync(targets, true, true);
+  // Admission prewarm may retain attached corpse-corpus records, and those
+  // must not survive into a ride/ADS as hidden duplicate residency. But
+  // flushing EVERY frame (the old `releaseUnseen = true` on every sync) made
+  // the chopper ride destroy and rebuild whole skinned ghost rigs whenever an
+  // actor dropped out of the selection - the pilot-side churn the pass84
+  // instrument measured (8 record releases in one short ride, each rebuild a
+  // fresh material lease + sibling attach). The flush now runs once per
+  // activation edge; steady-state frames retain unseen records hidden and
+  // LRU-capped instead of churning them.
+  thermalGhostPresentation.sync(targets, true, !thermalRevealWasActive);
+  thermalRevealWasActive = true;
   // The default telemetry path is allocation-bounded. Root/life/pose traversal
   // is reserved for explicit debug receipt calls with identityAudit enabled.
   railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
@@ -30849,6 +30860,14 @@ const debugWindow = window as Window & {
     forceRemoteDeathForReconnect: (playerId?: string) => { targetId: string; nextLifeId: number } | null;
     togglePilotedDroneControl: (entityId?: string) => boolean;
     toggleChopperGunnerControl: (entityId?: string) => boolean;
+    sampleChopperPilotLoad: () => {
+      possessed: boolean;
+      matchPhase: string;
+      alive: boolean;
+      ghost: ThermalGhostTelemetry;
+      sceneDrawCalls: number;
+      sceneTriangles: number;
+    };
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -33952,6 +33971,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArmEvidenceCapture: (mode) => weaponView.setArmEvidenceCapture(mode),
   setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
+  sampleChopperPilotLoad: () => ({
+    possessed: localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner',
+    matchPhase: matchState.phase,
+    alive: player.alive,
+    ghost: thermalGhostPresentation.telemetry(),
+    sceneDrawCalls: Number(arenaVisualBudgetAudit().drawCalls ?? 0),
+    sceneTriangles: Number(arenaVisualBudgetAudit().triangles ?? 0),
+  }),
   stagePass73NativeAdsRevealTarget,
   samplePass73AdsRevealTarget,
   setPass73AdsRevealNormalBodyHidden,
