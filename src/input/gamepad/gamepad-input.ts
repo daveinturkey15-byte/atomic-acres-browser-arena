@@ -13,6 +13,7 @@
 import {
   buttonPressed,
   clearGamepadSettings,
+  normalizeGamepadSettings,
   readGamepadSettings,
   shapeStick,
   TRIGGER_PRESS_THRESHOLD,
@@ -381,8 +382,13 @@ export class GamepadInputRuntime {
     return this.settings;
   }
 
+  /**
+   * Normalises on the way IN, not only on the way to storage: an out-of-limit
+   * curve from any non-range writer used to sit in the live settings until the
+   * next reload silently clamped it.
+   */
   updateSettings(patch: Partial<Omit<GamepadSettings, 'version'>>): GamepadSettings {
-    this.settings = Object.freeze({ ...this.settings, ...patch, version: 1 as const });
+    this.settings = normalizeGamepadSettings({ ...this.settings, ...patch });
     this.rumbleAdapter.setEnabled(this.settings.rumble);
     writeGamepadSettings(this.settings, this.storage);
     return this.settings;

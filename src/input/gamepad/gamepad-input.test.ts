@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GAMEPAD_SETTINGS_STORAGE_KEY } from './curves';
+import { GAMEPAD_SETTINGS_STORAGE_KEY, STICK_CURVE_LIMITS } from './curves';
 import { GamepadInputRuntime, type GamepadLike } from './gamepad-input';
 
 class FakeStorage implements Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
@@ -241,6 +241,30 @@ describe('GamepadInputRuntime', () => {
     expect(h.runtime.telemetry().activeIndex).toBe(1);
     expect(promoted.held('fire')).toBe(true);
     expect(promoted.pressed('fire')).toBe(false);
+  });
+
+  // PASS 84 skeptic finding 2026-09-02: updateSettings stored the caller's patch
+  // verbatim and only the persisted JSON was normalised, so an out-of-limit
+  // curve drove the live shaping until the next reload silently clamped it.
+  it('clamps an out-of-limit patch in the LIVE settings, not only in storage', () => {
+    const h = harness();
+    const live = h.runtime.updateSettings({
+      moveCurve: { deadzone: 9, exponent: 99, outer: -4 },
+      lookCurve: { deadzone: -1, exponent: 0.01, outer: 5 },
+    });
+    expect(live.moveCurve).toEqual({
+      deadzone: STICK_CURVE_LIMITS.deadzone.max,
+      exponent: STICK_CURVE_LIMITS.exponent.max,
+      outer: STICK_CURVE_LIMITS.outer.min,
+    });
+    expect(live.lookCurve).toEqual({
+      deadzone: STICK_CURVE_LIMITS.deadzone.min,
+      exponent: STICK_CURVE_LIMITS.exponent.min,
+      outer: STICK_CURVE_LIMITS.outer.max,
+    });
+    expect(h.runtime.getSettings()).toBe(live);
+    // The live object and the persisted one now agree, which was the defect.
+    expect(JSON.parse(h.storage.getItem(GAMEPAD_SETTINGS_STORAGE_KEY)!)).toEqual(live);
   });
 
   it('reset-to-defaults clears the persisted settings key through the shared helper', () => {
