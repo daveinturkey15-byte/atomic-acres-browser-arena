@@ -181,7 +181,8 @@ review-camera frames, and the two diagrams this lane drew).
 | size / pace | one of the smallest maps in the series (R12) | diagonal 77.9 m: **8.95 s** sprint, 12.67 s walk, 25.29 s perimeter lap (shipped Nuke Town: 10.95 s) | - | VERIFIED |
 | collider / visual parity | - | **0 invisible colliders, 0 walk-through meshes** over 181 colliders and 186 visible meshes | - | VERIFIED |
 | spawn quality | - | 10 spawns, 100 % in-envelope (floor 100 %, reach 100 %), cross-team min 38 m, **enemy-LOS pairs 0** | - | VERIFIED |
-| 60 s solo run | - | native WebGPU (nvidia/blackwell), **median 75 fps**, 5 % low 60, min 35, **0 page errors, 0 console errors**; 84 visible meshes, 43,980 triangles | - | VERIFIED |
+| 60 s solo run | - | native WebGPU (nvidia/blackwell), **0 page errors and 0 console errors in all three runs**; 84 visible meshes, 43,980 triangles | - | VERIFIED |
+| 60 s solo run, fps | - | median **75 / 52 / 60** fps across three runs (5 % lows 60 / 44 / 52) | - | CLAIMED - the workstation was NOT quiet: GPU utilisation measured 37 % with the owner's Chrome, Edge and overlay processes resident between runs. The spread is machine load, not the arena. A quiet-window number needs a quiet window. |
 | art-direction distinctiveness | must clear the catalog floor | weakest pair **0.02446** vs atomic-acres (floor 0.02157; catalog's own weakest 0.02262) | - | VERIFIED |
 
 ---
