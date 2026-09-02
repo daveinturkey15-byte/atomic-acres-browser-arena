@@ -103,7 +103,7 @@ test('the boot roster names every arena module on disk', () => {
 });
 
 const MENU_URL =
-  '/?release=latest&renderer=webgl2&render=compat&grass=off&mist=off&clouds=off&rays=off&seed=arena-boot-smoke&previewTime=0';
+  '/?release=latest&renderer=webgpu&grass=off&mist=off&clouds=off&rays=off&seed=arena-boot-smoke&previewTime=0';
 
 type DebugApi = {
   startSolo: () => void;

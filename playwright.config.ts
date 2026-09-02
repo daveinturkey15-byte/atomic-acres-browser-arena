@@ -77,7 +77,10 @@ export default defineConfig({
         channel: pass73NativeWebGpu
           ? pass73NativeChromePath ? undefined : 'chrome'
           : multiplayerChromeChannel ?? installedEdgeChannel,
-        headless: pass73NativeWebGpu ? false : undefined,
+        // HF-404 / owner 2026-09-02 12:40: QA browsers are never headed on this machine (a headed
+        // Firefox stole the owner's mouse). Native-WebGPU runs use installed Chrome HEADLESS; it
+        // acquires a real adapter here. Set QA_HEADED=1 only on a machine nobody is using.
+        headless: pass73NativeWebGpu ? process.env.QA_HEADED !== '1' : undefined,
         userAgent: resolvePass70ChromiumProjectUserAgent({
           desktopChromeUserAgent: devices['Desktop Chrome'].userAgent,
           installedEdgeChannel,
