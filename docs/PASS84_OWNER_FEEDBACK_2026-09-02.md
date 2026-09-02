@@ -96,3 +96,28 @@ instruction, and the in-build fallback re-pinned to the backup.
   hidden records otherwise, LRU-capped); pilot-side instrument now exists
   (`scripts/qa/profile-chopper-pilot-thermal-cdp.mjs`) for before/after rides
   with enemies staged in reveal range.
+
+## HF-402 — reasonable spawns for players and bots on every map
+
+- **Owner lane:** spawn layout; all maps, all modes.
+- **Statement:** Raid currently spawns the player outside (bad experience);
+  every map needs reasonable spawns for both players and bots.
+- **Mechanical falsifier:** spawn-layout quality gate passes per map with
+  spawn points inside/adjacent to POI cover, and the collider-aware solver
+  (`scripts/qa/solve-spawn-layouts.ts`) output is committed with the map.
+- **Plan:** re-run the solver with POI-proximity constraints per map; verify
+  with the existing spawn-safety gate and a real join on each map.
+
+## HF-403 — great multiplayer host+guest lobby experience, no freezing
+
+- **Owner lane:** multiplayer core; all maps.
+- **Statement:** the host/guest lobby experience must be great: no freezing,
+  no frozen-in-spot movement, none of the previous issues; all maps playable
+  and joinable the same way. Owner asks for real automated tests with at least
+  two clients in a lobby across all maps.
+- **Mechanical falsifier:** automated two-client host+guest run (local PeerJS)
+  joins, deploys and moves on every multiplayer-enabled map with zero
+  presentation stalls >250ms and no movement deadlock; join flow identical
+  per map.
+- **Plan:** delegate a two-page host+guest E2E harness (local peerjs server)
+  to Claude; fix what it finds; wire it as a repeatable QA script.
