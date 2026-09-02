@@ -80,3 +80,41 @@ then junction `node_modules`.
 The profile table with costs and the owner's three answers, side-by-side
 captures, the neural options table with the recommended three, the
 verifier-grep list, commits. Claim-state every line.
+
+## ADDENDUM (orchestrator, 18:35 BST) — the RTX skill's four routes are your option set
+Read the shared skill `threejs-rtx-runtime-route` v1.2.0 (vault
+`Skills/game-development/threejs-rtx-runtime-route/SKILL.md`, ~49 KB) and
+technique-register rows 15 and 19 BEFORE the audit. It already settles the
+vocabulary and the constraints:
+- Route 1, native RTX runtime (SamG's ThreeRuntime, Node -> C++ -> Vulkan +
+  RTX, "no browser rendering", MIT verified): owner-only product decision;
+  not a browser preset. Report it as the future native option, nothing more.
+- Route 2, in-browser hybrid ray tracing (G-buffer + BVH-traced soft-shadow
+  and one-bounce GI rays + temporal denoise; the restated `three-realtime-rt`
+  technique, ~60 fps at 1080p on a 3060 per its author): implementable by an
+  agent under a declared budget; on our stack it would be WebGPU compute +
+  a BVH (three-mesh-bvh pattern) + TSL passes.
+- Route 3, in-browser classic recursive (Whitted) ray tracing:
+  `erichlof/THREE.js-RayTracing-Renderer` @ 490ca081, **CC0 - the only
+  source in the register whose code may be adapted directly** (trademark
+  carve-out stands; re-read the licence at any newer pin). The owner asked on
+  2026-08-24 for this as a PLAYER-FACING option with "beautiful
+  implementations". Low noise, deterministic, true reflections/refractions/
+  caustics/DoF, no GI colour bleed. Runs in WebGL2 fragment shaders in the
+  original; ours would be a TSL/WebGPU port of the method.
+- Route 4, screen-space + baked (SSR, GTAO/SSAO, baked irradiance/probes,
+  area-light approximations): the honest default AND route 3's
+  indirect-lighting supply.
+Your audit must state which of these the CURRENT "RTX" preset actually is
+(likely a route-4-plus-extras preset carrying the name), and the doc must
+stop the name implying browser hardware ray tracing (the skill's naming
+rule). Then the "cooler looking options" recommendation: (a) route 4 done
+properly with a path-traced LIGHTMAP/probe BAKE for the code-authored
+arenas at build time (three-gpu-pathtracer-class offline bake; zero runtime
+cost; the biggest visible win for static maps), (b) a route-3 classic
+ray-traced preset as the owner requested, sized to the admission fence
+with menu-time precompile, (c) route-2 hybrid soft shadows + one bounce as
+the stretch. Apply the skill's readability and parity rules (no intel
+through reflections that the low preset cannot give; silhouette contrast
+holds at engagement distance) and the cold-compile fence trap (measure
+cold, weakest hardware, never raise the fence, precompile in the menu).
