@@ -14,10 +14,10 @@
   "diagonalSprintS": 8.953720503057676,
   "diagonalWalkS": 12.666238760423052,
   "lapS": 25.287356321839084,
-  "colliders": 181,
-  "physicsColliders": 181,
-  "shotSurfaces": 181,
-  "meshes": 224,
+  "colliders": 187,
+  "physicsColliders": 187,
+  "shotSurfaces": 187,
+  "meshes": 230,
   "physicalCover": [
     "nuketown2-central-bus",
     "nuketown2-cul-de-sac-truck-west",
@@ -35,7 +35,7 @@
   "bus": {
     "length": 11,
     "width": 2.5,
-    "floorY": 0.85,
+    "floorY": 0.05,
     "roofY": 3.15
   },
   "spawns": [
@@ -97,14 +97,14 @@
     2.7127410853347
   ],
   "longestEye165": {
-    "metres": 63.52952069707436,
+    "metres": 56.568542494923804,
     "from": [
       28,
-      -15
+      -23
     ],
     "to": [
       -28,
-      15
+      -15
     ]
   },
   "longestEye110": {
