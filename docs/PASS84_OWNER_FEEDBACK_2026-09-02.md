@@ -285,3 +285,28 @@ page error from the game. Receipts: `aa-claude-xbrowser/artifacts/qa/live-ab/`.
 - **State:** shelved by the owner with Farcrysis preview (Lane R) and bus
   doors (Lane K); Lane L (Raid art on the accepted layout) is superseded by
   this row, which is a LAYOUT rethink, not an art pass.
+
+## HF-409 — Map 3 in the game must be the rich showcase, not a stone shell
+
+- **Statement (verbatim, 2026-09-02 ~16:25 BST):** "wtf happened to map 3? i
+  think antigravity murdered it? it was full of rich code based asset tests
+  and now its just a square map of stone? can we roll it back and figure out
+  what happened?"
+- **What happened (VERIFIED):** nothing was deleted. `src/map3/**` (13
+  modules, ~10k lines) and `map3.html` are intact with no deletions in
+  history. Lane P (Claude Opus) registered `map3` as a NEW authored stone
+  arena (`src/map3-arena.ts`) and deliberately did not import the showcase,
+  citing: no colliders in the showcase modules; `ArenaMap` has no per-frame
+  hook so the animated corridors would freeze; the static `arenaFactories`
+  map would put ~10k lines in every arena's main chunk. The showcase page is
+  not a Vite build input, so it is not in dist and returns 404 on the live
+  channel. Gemini's waves 1-2 are in the tree and verified; its wave 3 left an
+  uncommitted diff that Lane P kept.
+- **Mechanical falsifier:** the in-game Map 3 renders the showcase corridors
+  (water with buoyancy, weather bays, god rays, physics playground, forest
+  with the 4x4, colosseum) animated at play time with collision parity for
+  every reachable surface, loads via a code-split factory so no other arena's
+  load grows, and passes the same gates Map 3 passed today; until then the
+  stone shell is hidden from the menu and the showcase page ships as
+  `/map3.html` on the channel so the owner can see it live.
+- **Plan:** Lane V (`docs/pass84-lanes/LANE-V-map3-showcase-into-arena.md`).
