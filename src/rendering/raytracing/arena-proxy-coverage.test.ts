@@ -96,6 +96,19 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // measurement rather than left at the old one, so this coverage cannot be
   // silently spent later.
   test2: { meshes: 5, footprintM2: 280 },
+  // NUKETOWN2 (owner 2026-09-02, HF-407). MEASURED on the authored build, not
+  // guessed. This arena first measured ZERO - every surface on it is matte by
+  // design (board siding, dry asphalt, painted vehicle panels), so the tracer
+  // had nothing at all to reflect and this gate caught it on the arena's first
+  // sweep. The fix was to author the two parked cars' PAINT correctly
+  // (roughness 0.20, metalness 0.62 - car paint really is polished and really
+  // is metallic) rather than to gloss a road that should not be glossy. Their
+  // 4.4 x 1.9 m bodies clear the extraction's 6 m2 footprint floor where the
+  // 2.2 x 1.7 m glazing does not. Re-measured: 2 meshes / 16.72 m2, so the
+  // floor is pinned at that measurement and this coverage cannot be silently
+  // spent later. A bleached noon test town is a MATTE map and is never going to
+  // be a chrome one; "never zero anywhere" is the contract, and it is met.
+  nuketown2: { meshes: 2, footprintM2: 16 },
   // MAP3 (owner 2026-09-02, HF-405). MEASURED on the authored build, not
   // guessed: the water bay's two sunken basins either side of its walkway are
   // the arena's whole reflective budget, authored at roughness 0.10 against
@@ -167,6 +180,8 @@ beforeAll(async () => {
     { buildTest1, buildTest2 },
     // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the proxy-coverage sweep.
     { buildMap3 },
+    // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins it too.
+    { buildNuketown2 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -177,6 +192,7 @@ beforeAll(async () => {
     import('../../high-seas'),
     import('../../test-maps'),
     import('../../map3-arena'),
+    import('../../nuketown2-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -194,6 +210,11 @@ beforeAll(async () => {
     test2: buildTest2,
     // MAP3 (owner 2026-09-02, HF-405).
     map3: buildMap3,
+    // NUKETOWN2 (owner 2026-09-02, HF-407). This roster is keyed off
+    // ALL_ARENA_IDS, so adding an arena there without a factory here is a hard
+    // TypeError at sweep time rather than a silently unswept arena - which is
+    // the better failure, and the one that fired.
+    nuketown2: buildNuketown2,
   };
 
   for (const id of ALL_ARENA_IDS) {

@@ -332,8 +332,17 @@ function nuketown2Materials(): Nuketown2Materials {
     busTrim: standard(0x2f2f31, 0.7, 0.2),
     truckCab: standard(0xa33327, 0.55, 0.24),
     truckBox: standard(0xcfc7b4, 0.72, 0.1),
-    carA: standard(0x3f6f86, 0.5, 0.36),
-    carGlass: standard(0x24333c, 0.22, 0.5),
+    // The two parked cars are the only POLISHED surfaces on the map, and that
+    // is deliberate rather than decorative: the ray-traced preset's proxy
+    // extraction admits a surface at roughness <= 0.22 with a footprint over
+    // 6 m2, and with everything else here authored matte (board siding, dry
+    // asphalt, painted vehicle panels) the arena first measured ZERO reflective
+    // meshes - the tracer had nothing to reflect at all. Car paint really is
+    // ~0.2 rough and genuinely metallic, and a 4.4 x 1.9 m body clears the
+    // footprint floor where the 2.2 x 1.7 m glass house does not, so the honest
+    // fix was to author the paint correctly rather than to gloss a road.
+    carA: standard(0x3f6f86, 0.2, 0.62),
+    carGlass: standard(0x24333c, 0.14, 0.5),
     rubber: standard(0x191a1c, 0.96, 0.02),
     sign: standard(0xd9d2bd, 0.78, 0.06),
     planter: standard(0x4a4034, 0.96, 0.01),
