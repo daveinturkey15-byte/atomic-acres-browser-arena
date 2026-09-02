@@ -108,7 +108,11 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass84ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass86ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 85. */
+const pass85ReleasedAt = '2026-09-02T20:16:44+01:00';
+/** gh-pages publish receipt for PASS 84. */
+const pass84ReleasedAt = '2026-09-02T15:12:39+01:00';
 const pass84Copy = pass84ReleaseCopy(pass84ReleasedAt);
 /** gh-pages publish receipts: 718a5295, 302c1f45 and 8709317d respectively. */
 const pass83ReleasedAt = '2026-09-01T21:36:44+01:00';
@@ -126,6 +130,41 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass86',
+    pass: 'PASS 86',
+    title: 'Pass 86 · Nuke Town Rebuild Preview, Map 3 Explore & Viewmodel Fit',
+    releasedAt: pass86ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'EXPLORE', 'FIRST-PERSON']),
+    summary: 'Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body.',
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW: a new arena beside the shipped Nuke Town with the reference layout - back-yard spawns, the bus on the origin with the 2x core on its roof, open trucks and closed cars as cover, the sheds, and the rare gun in the front upper rooms',
+      'Map 3 is back on the menu as an EXPLORE arena: eight showcase corridors (shoreline sea, colosseum, raymarched gallery, shape-grammar city, forest, physics playground, god rays, seasons), an honest HUD with no clock, and its showcase page live inside the release channel',
+      'The first-person rig is fitted inside the player body: no gun through walls or floors, no held-up pose against a wall, with the camera near plane set on measured evidence',
+      'Eye clearance, walkable surfaces and first-person arms are gated on every arena, the QA corpus is streamlined, and the image-based lighting first-arena path is verified',
+      'Pass 85 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass85',
+    pass: 'PASS 85',
+    title: 'Pass 85 · Drop Shots, Firing Range Roof & First-Person Arms',
+    releasedAt: pass85ReleasedAt,
+    areas: Object.freeze(['MOVEMENT', 'ARENAS', 'FIRST-PERSON']),
+    summary: 'Pass 85 lands the first of the 2026-09-02 evening list: Black Ops 2 style drop shots, the Firing Range roof netting that swallowed players, and first-person arms and knife that stay in frame.',
+    highlights: Object.freeze([
+      'Drop shots work the Black Ops 2 way: hold crouch to go prone while you keep firing, the camera falls through a real transition instead of snapping, hip fire widens while you drop, and other players see your body go down',
+      'The camo netting over the Firing Range container yard is a real floor now; you no longer fall three metres through it',
+      'The firing arm no longer ends in mid-air and the knife swing happens on screen instead of off the right edge; every weapon model was checked for mirrored geometry and none was found',
+      'Pass 84 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -

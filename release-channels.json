@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 84",
-    "description": "Pass 84: the freeze fixes of Pass 82/83 plus the 2026-09-02 owner list - viewmodel wall and floor clipping, rail/scope attachment, halved wall pullback, EBR +40% damage and +25% fire rate, chopper pilot lag, reasonable spawns on every map, lobby host/guest reliability, gamepad and aim assist, and the Quality-profile frame-rate regression. Farcrysis hidden until ready."
+    "label": "PASS 86",
+    "description": "Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body."
   },
   "experimental": {
-    "pass": "PASS 84",
-    "label": "PASS 84",
-    "description": "Pass 84: the freeze fixes of Pass 82/83 plus the 2026-09-02 owner list - viewmodel wall and floor clipping, rail/scope attachment, halved wall pullback, EBR +40% damage and +25% fire rate, chopper pilot lag, reasonable spawns on every map, lobby host/guest reliability, gamepad and aim assist, and the Quality-profile frame-rate regression. Farcrysis hidden until ready.",
-    "path": "channels/pass84"
+    "pass": "PASS 86",
+    "label": "PASS 86",
+    "description": "Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body.",
+    "path": "channels/pass86"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass83Backup": {
-    "label": "PASS 83 · SAFE BACKUP",
+  "pass85Backup": {
+    "label": "PASS 85 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 83",
-    "path": "channels/pass83"
+    "pass": "PASS 85",
+    "path": "channels/pass85"
   }
 }

@@ -1095,6 +1095,9 @@
     font-size: 12px;
   }
   #menu-panel-options .key-binding-row .binding-action { font-weight: 700; }
+  /* HF-412: the hold-crouch-to-prone hint rides inside the action label; it
+     must stay legible at 1280x720 (>= 9px) per the HUD forging contract. */
+  #menu-panel-options .key-binding-row .binding-hint { font-weight: 500; font-size: 11px; opacity: 0.78; letter-spacing: 0.02em; }
   #menu-panel-options .key-binding-row kbd {
     padding: 4px 9px;
     border: 1px solid rgba(232, 120, 31, 0.35);

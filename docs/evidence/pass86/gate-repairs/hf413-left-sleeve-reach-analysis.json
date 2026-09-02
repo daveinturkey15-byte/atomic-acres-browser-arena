@@ -1,0 +1,216 @@
+{
+  "schema": "pass86/hf413-left-sleeve-reach-analysis@1",
+  "sourceRevision": "006c1ca1a5387e9c4b4be0a14f9f3ead5cb19461",
+  "gateFloorNdcY": -0.98,
+  "laneLeftNdcY": -1.04,
+  "laneRightNdcY": -1.04,
+  "laneRaisedNdcY": -0.99,
+  "solverAcceptanceNdcY": "projected.y <= lane - 0.005",
+  "note": "shoulderEntryNdc is the MINIMUM projection the solver found over 3 direction arcs x 17 steps on the reachable sphere (constrainRiggedShoulderEntryToReach, src/weapon-presentation.ts). shoulderReachAdjusted true means the socket was out of reach and the shoulder was placed on that sphere.",
+  "rows": [
+    {
+      "label": "long-gun/m4a1/hip",
+      "side": "left",
+      "shoulderEntryNdcY": -1.0475457397017605,
+      "shoulderReachAdjusted": true,
+      "maximumSocketReach": 0.9046216208127025,
+      "physicalReach": 1.0614131660021953,
+      "upperLength": 0.535238503171555,
+      "lowerLength": 0.5261746628306403,
+      "socketReachRatio": 0.8522803841033499,
+      "reachRatio": 0.9795793530036041,
+      "socket": "support-socket-l",
+      "socketTarget": [
+        7.690559482184789,
+        1.429244309802732,
+        14.97320698189967
+      ],
+      "shoulder": [
+        7.411751346085523,
+        0.6462170716838549,
+        15.330242896690576
+      ],
+      "contactError": 1.9719315016703254e-11,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    },
+    {
+      "label": "long-gun/m4a1/hip",
+      "side": "right",
+      "shoulderEntryNdcY": -1.0514252203737409,
+      "shoulderReachAdjusted": false,
+      "maximumSocketReach": 0.9046216452075505,
+      "physicalReach": 1.0614134123054053,
+      "upperLength": 0.5352385918517504,
+      "lowerLength": 0.5261748204536549,
+      "socketReachRatio": 0.6484774195598344,
+      "reachRatio": 0.764091482086597,
+      "socket": "grip-socket-r",
+      "socketTarget": [
+        7.865132755577897,
+        1.136622347514025,
+        15.41659349468455
+      ],
+      "shoulder": [
+        8.070922692756435,
+        0.6309377681495116,
+        14.997434671116697
+      ],
+      "contactError": 1.036820111284306e-9,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-hip",
+      "side": "left",
+      "shoulderEntryNdcY": -0.6830159389752091,
+      "shoulderReachAdjusted": true,
+      "maximumSocketReach": 0.7765747027875312,
+      "physicalReach": 0.9128154491264963,
+      "upperLength": 0.46030517644938124,
+      "lowerLength": 0.452510272677115,
+      "socketReachRatio": 0.8507466690344243,
+      "reachRatio": 0.9822672421737494,
+      "socket": "support-socket-l",
+      "socketTarget": [
+        -21.099042512923184,
+        0.7091943158171932,
+        -14.926363236148273
+      ],
+      "shoulder": [
+        -20.958187372288695,
+        -0.026619034957043985,
+        -14.721896096517558
+      ],
+      "contactError": 6.630447502622436e-12,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-hip",
+      "side": "right",
+      "shoulderEntryNdcY": -1.019317259661464,
+      "shoulderReachAdjusted": true,
+      "maximumSocketReach": 0.7765747237671078,
+      "physicalReach": 0.9128156609472886,
+      "upperLength": 0.46030525271436135,
+      "lowerLength": 0.45251040823292726,
+      "socketReachRatio": 0.850746494600242,
+      "reachRatio": 0.9730653449974142,
+      "socket": "grip-socket-r",
+      "socketTarget": [
+        -20.71122852429639,
+        0.43236694118640845,
+        -14.861276903255053
+      ],
+      "shoulder": [
+        -20.791697056362768,
+        -0.26153405436163774,
+        -15.200532743762588
+      ],
+      "contactError": 4.653707799862512e-9,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-ads",
+      "side": "left",
+      "shoulderEntryNdcY": -0.8989823961823408,
+      "shoulderReachAdjusted": true,
+      "maximumSocketReach": 0.5691923830235687,
+      "physicalReach": 0.672149451751582,
+      "upperLength": 0.33894460516080926,
+      "lowerLength": 0.3332048465907727,
+      "socketReachRatio": 0.8468241423693604,
+      "reachRatio": 0.979655421814131,
+      "socket": "support-socket-l",
+      "socketTarget": [
+        -21.006048684980943,
+        0.6118020722787079,
+        -14.599565072585074
+      ],
+      "shoulder": [
+        -20.914216613793872,
+        0.06611285851064447,
+        -14.466260453119974
+      ],
+      "contactError": 2.243521505681292e-12,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-ads",
+      "side": "right",
+      "shoulderEntryNdcY": -1.0006485254539912,
+      "shoulderReachAdjusted": false,
+      "maximumSocketReach": 0.5691923984718262,
+      "physicalReach": 0.6721496077253095,
+      "upperLength": 0.3389446613183417,
+      "lowerLength": 0.33320494640696774,
+      "socketReachRatio": 0.8159179439616081,
+      "reachRatio": 0.9389430901769136,
+      "socket": "grip-socket-r",
+      "socketTarget": [
+        -20.733040339396467,
+        0.41447594767505624,
+        -14.528731678808983
+      ],
+      "shoulder": [
+        -20.914980833810368,
+        -0.01169964207946872,
+        -14.822049495437494
+      ],
+      "contactError": 2.3300505365112137e-9,
+      "withinStableReach": true,
+      "segmentLengthScale": 1,
+      "authoredSegmentDirectionsPreserved": true
+    }
+  ],
+  "contactFold": [
+    {
+      "where": "contact/m4a1/wall-hip",
+      "foldEngaged": true,
+      "wallBlend": 1,
+      "requestedSurfaceRetreat": 0.82,
+      "appliedSurfaceRetreat": 0,
+      "surfaceLift": 0,
+      "capsuleMarginM": 0.138,
+      "floorClearanceMinM": 1.643,
+      "viewportForwardMinM": 0.078,
+      "nearPlaneCutInViewport": 0
+    },
+    {
+      "where": "contact/m4a1/prone-wall-floor-hip",
+      "foldEngaged": true,
+      "wallBlend": 1,
+      "requestedSurfaceRetreat": 0.82,
+      "appliedSurfaceRetreat": 0,
+      "surfaceLift": 0.2,
+      "capsuleMarginM": 0.138,
+      "floorClearanceMinM": 0.573,
+      "viewportForwardMinM": 0.078,
+      "nearPlaneCutInViewport": 0
+    },
+    {
+      "where": "contact/m4a1/prone-wall-floor-ads",
+      "foldEngaged": true,
+      "wallBlend": 1,
+      "requestedSurfaceRetreat": 0.82,
+      "appliedSurfaceRetreat": 0,
+      "surfaceLift": 0.2,
+      "capsuleMarginM": 0.168,
+      "floorClearanceMinM": 0.618,
+      "viewportForwardMinM": 0.0979,
+      "nearPlaneCutInViewport": 0
+    }
+  ],
+  "violations": [
+    "contact/m4a1/prone-wall-floor-hip/left: sleeve entry [0.10975872564330075,-0.6830159389752091,0.9848210992153141] does not continue below frame",
+    "contact/m4a1/prone-wall-floor-ads/left: sleeve entry [-0.02494393672871245,-0.8989823961823408,0.9842892965533653] does not continue below frame"
+  ]
+}

@@ -30,9 +30,12 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * Floor on the derived roster, matching `MINIMUM_SWEPT_ARENAS` in
  * sweep-eye-clearance-spots.ts. 8 = the nine ids in arena-identity.ts minus
  * hidden farcrysis. Raise it when an arena is added; never lower it to get a
- * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped.
+ * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, back to 7
+ * while its card was withdrawn (HF-409), 8 again when the corridor showcase became
+ * the arena, and 9 the same day (HF-407) when the Nuke Town Rebuild shipped: the
+ * floor is an alarm on the SCRAPE collapsing, so it has to equal the real roster.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 8;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 9;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the
@@ -89,4 +92,89 @@ export function resolveArenaRoster(explicit) {
 
 export function readLedger() {
   return JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
+}
+
+/**
+ * Per-spot RED exemptions, Lane J 2026-09-02.
+ *
+ * The standing instruction on the eye-clearance ratchet is "triage, do not
+ * re-baseline": no ceiling, threshold or baseline goes UP to make a spot green.
+ * That leaves one honest gap - a row that is red because the fixture is
+ * deliberately walk-through (gun-range's wallbang panels are authored
+ * `solid: false, shots: true`; standing inside one is what the range IS). A
+ * bigger arena number would forgive that row and every future row beside it,
+ * unexamined. So such a row is exempted here instead: by ARENA and by the exact
+ * SURFACE NAME it hits, with a dated reason, a row cap that may only shrink,
+ * and the sweep printing every matched row under the annotation's id.
+ *
+ * Three properties keep this stricter than a raised ceiling, not looser:
+ *  - it is surface-scoped, so a NEW clip on a different surface in the same
+ *    arena is still counted and still red;
+ *  - `maxRows` is a ratchet in its own right - more matched rows than the cap
+ *    fails;
+ *  - an annotation that matches NOTHING fails as stale, so an exemption cannot
+ *    outlive the geometry that justified it. That is the failure mode this
+ *    repo has hit repeatedly with frozen rosters.
+ *
+ * The contract test additionally proves, from the real arena build, that every
+ * annotated surface is genuinely non-solid - i.e. that a player can legally
+ * stand inside it by design. Make the panel solid and the annotation fails.
+ */
+export function annotationsForArena(ledger, arena) {
+  return (ledger.annotations ?? []).filter((entry) => entry.arena === arena);
+}
+
+/**
+ * Split one arena's measured violations into annotated and unannotated rows.
+ * Only the unannotated ones reach the ceiling comparison; the annotated ones
+ * are printed, capped and checked for staleness by the caller.
+ *
+ * `surfaceOf` exists because the two stages do not necessarily measure the same
+ * surface at the same spot. Stage 2 traces from the AUTHORED eye seat; stage 3
+ * traces from the seat the runtime actually gave the player, which can be a
+ * third of a metre away after `resolveEyeClearance` and the character
+ * depenetration have both had their say - and a fan from there can land on a
+ * different surface entirely. Forgiving such a row under an annotation that
+ * names only the stage-2 surface would exempt a clip nobody examined, so stage
+ * 3 passes the RUNTIME surface here. Default keeps stage 2's own behaviour.
+ */
+export function partitionAnnotatedViolations(ledger, arena, violations, surfaceOf = (row) => row.surface) {
+  const annotations = annotationsForArena(ledger, arena);
+  const matched = new Map(annotations.map((entry) => [entry.id, []]));
+  const unannotated = [];
+  for (const row of violations) {
+    const hit = annotations.find((entry) => entry.surfaces.includes(surfaceOf(row)));
+    if (hit) matched.get(hit.id).push(row);
+    else unannotated.push(row);
+  }
+  return { annotations, matched, unannotated };
+}
+
+/**
+ * Rows stage 3 must re-probe at runtime even when stage 2 flags nothing there.
+ *
+ * Lane J repair, 2026-09-02. Stage 3 only teleports to spots stage 2 flagged,
+ * so FIXING an arena's analytic clearance removes the pipeline's only view of
+ * that arena's runtime behaviour: skyline-terminal went to zero analytic
+ * violations and stage 3 stopped visiting the nacelles entirely, on exactly the
+ * geometry this lane had just moved. A forced probe is the standing counter to
+ * that: a named coordinate that is measured on every run, judged by the same
+ * near-plane verdict, and reported UNVERIFIED (never silently dropped) when the
+ * runtime refuses the stance or the body has not settled.
+ */
+export function forcedProbesForArena(ledger, arena) {
+  return (ledger.forcedProbes ?? []).filter((entry) => entry.arena === arena);
+}
+
+/**
+ * The per-arena cap on rows stage 3 could not measure.
+ *
+ * A row whose stance the runtime refused carries no probe, so it is neither
+ * clean nor a clip - but "reported and never judged" with no cap is a green
+ * gate that can measure nothing at all, which is the failure class this whole
+ * pipeline exists to catch. The count is ratcheted like the violation ceiling:
+ * an arena with no recorded allowance may have none.
+ */
+export function unverifiedCeilingFor(ledger, arena) {
+  return (ledger.unverifiedCeiling ?? {})[arena];
 }

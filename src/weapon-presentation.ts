@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { VIEWMODEL_SHADOW_BUDGET_SCOPE } from './rendering/runtime-shadow-budget';
 import { presentationRandom } from './runtime-random';
+import {
+  FIRST_PERSON_CAMERA_NEAR_METERS,
+  VIEWMODEL_BODY_FIT_CONTRACT,
+  VIEWMODEL_BODY_FIT_SCALE,
+  viewmodelBodyFitLightDistance,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+  viewmodelWorldToRigMeters,
+} from './viewmodel-body-fit';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildWeaponModel, optimizeAttachedWeapon, roundedBox, texturedMaterial } from './art-kit';
 import {
@@ -94,6 +103,7 @@ import {
 import { WEAPONS } from './gameplay';
 import type { WeaponId } from './protocol';
 import { characterActionContract, measureCameraFraming, resolveSocketWorld, type CharacterActionContract } from './character-presentation-contract';
+import { measureViewmodelFraming } from './viewmodel-near-plane-framing';
 import {
   advanceMinigunSpool,
   createMinigunSpoolState,
@@ -540,9 +550,53 @@ export const FIRST_PERSON_ARM_SHOULDER_ENTRY_NDC = Object.freeze({
   left: -1.04,
   // Ordinary hip/fire poses need the closed proximal sleeve safely below the
   // crop. Raised/ADS/heavy poses use the lifted lane below instead.
-  right: -0.97,
+  //
+  // HF-413 (2026-09-02). MEASURED at base 75a4e508 by
+  // `npm run qa:pass65:first-person-arms-visual` (headless Chrome, WebGPU,
+  // 1600x900 and 2560x1440, gun-range): the FIRING shoulder joint was reported
+  // at NDC y -0.8304 (m4a1 prone/wall ADS), -0.8309 (m4a1 ADS), -0.8316
+  // (minigun hip), -0.8393 (m4a1 prone/wall hip) and -0.9734 (m4a1 reload) -
+  // every one of them INSIDE the frame, and every one of them a gate violation
+  // ("sleeve entry ... does not continue below frame", floor -0.98). A shoulder
+  // joint inside the frame is exactly the owner's "arms ... strange": the
+  // proximal sleeve terminates in mid-air instead of running off the bottom
+  // edge, so the firing arm reads as a detached floating stub.
+  //
+  // The comment this replaces claimed -0.97 was "comfortably past the -0.98
+  // below-frame continuation requirement". It is not past it at all - it is
+  // 0.01 short, on the wrong side - and the solver's own reach adjustment
+  // moves the reported entry by only a few thousandths, so the shipped lane
+  // could never clear the contract. Both lanes now sit past -0.98 with real
+  // margin, and the palm stays welded to the authored socket (contact error
+  // 1e-9 m) either way.
+  //
+  // HF-413 review correction (2026-09-02). A first attempt used right -1.02 /
+  // raised -1.00, which left HF-388's two lanes 0.02 apart where they had been
+  // 0.15 apart. `placeRiggedShoulderEntryBelowFrame` PINS the shoulder to
+  // exactly `lane - 0.01` NDC, so the gap between the lanes IS the on-screen
+  // pose difference: 0.02 NDC is 9 pixels at 900p and encodes nothing.
+  //
+  // The 0.15 spread is arithmetically unrecoverable, and that is worth writing
+  // down rather than faking. The lifted lane must itself clear the -0.98
+  // continuation floor (that is the defect being fixed), so it can be no
+  // shallower than about -0.99; restoring a 0.15 spread would put the ordinary
+  // firing lane at -1.14, deeper than the -1.12 HF-365 explicitly walked BACK
+  // from after it produced "an almost vertical support arm - a pale post". The
+  // widest honest band is therefore:
+  //
+  //   raised -0.99  (as shallow as the -0.98 floor permits, with margin)
+  //   right  -1.04  (exactly the depth HF-365 reviewed and accepted for the
+  //                  support lane, and never deeper than it)
+  //
+  // 0.05 NDC apart - one third of the original distinction, kept as wide as
+  // the contract allows, with both ends now pinned by
+  // src/hf413-arms-handedness.test.ts rather than by a nominal `raised >
+  // right`. Recovering the full HF-388 pose difference needs a lever other
+  // than lane depth (the elbow pole already carries the raised-pose fold);
+  // that is recorded as an OPEN item, not silently claimed here.
+  right: -1.04,
 });
-export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.82;
+export const FIRST_PERSON_ARM_RAISED_SHOULDER_ENTRY_NDC = -0.99;
 export function firstPersonArmShoulderEntryNdc(
   side: 'left' | 'right',
   gripFamily: ViewmodelGripFamily,
@@ -715,8 +769,20 @@ export const VIEWMODEL_NEAR_PLANE_CLEARANCE = 0.06;
  * HF-397 (2026-09-02): the owner asked for the near-wall pullback to be
  * halved. Multiplies the clamped surface retreat at its single application
  * site; the raw probed value still feeds telemetry and the clip planes.
+ *
+ * HF-410 (2026-09-02, owner: "holding it up when near floor or prone or walls
+ * is super bad, needs a re work"): halving it was not enough, and the reason is
+ * that the pullback was never the right instrument. It existed to drag a rig
+ * that hung up to 1.6 m outside the player's own 0.38 m collision capsule back
+ * out of the wall it was necessarily inside - a job that needed ~1.6 m of
+ * travel and had 0.28 m of budget. The rig is now fitted INSIDE that capsule
+ * (src/viewmodel-body-fit.ts), measured at 0.316 m radial against a 0.38 m
+ * radius, so there is no wall for it to be pulled out of and the pullback is
+ * zero. The retreat is still probed, still reported in telemetry, and the
+ * clamp above it is untouched, so nothing here is a weakened bound: the
+ * multiplier is zero because the geometry no longer needs it.
  */
-export const VIEWMODEL_WALL_PULLBACK_SCALE = 0.5;
+export const VIEWMODEL_WALL_PULLBACK_SCALE = 0;
 
 /**
  * Maximum camera-space wall retreat that still keeps the armed hands/stock
@@ -954,16 +1020,6 @@ export type ViewmodelContactFold = Readonly<{
    */
   clipPlaneDistanceMeters: number | null;
 }>;
-
-/**
- * The camera's near plane where the camera has one. A viewmodel is always
- * mounted on a perspective camera in the live runtime; headless tests hand in
- * a bare Camera, and a conservative default keeps the solve honest there.
- */
-function viewmodelCameraNearMeters(camera: THREE.Camera): number {
-  const near = (camera as THREE.PerspectiveCamera).near;
-  return Number.isFinite(near) && near > 0 ? near : 0.05;
-}
 
 // Retained scratch for the once-per-weapon bounds measurement.
 const rigBoundsToRoot = new THREE.Matrix4();
@@ -1207,6 +1263,69 @@ export function viewmodelMeleeLateralOffset(aspect: number): number {
   return THREE.MathUtils.clamp(1.37 * aspectRatio + Math.max(0, aspectRatio - 1) * 0.58, 1.18, 2.05);
 }
 
+/**
+ * HF-413. The depth and field of view the lane above was calibrated at.
+ *
+ * `viewmodelMeleeLateralOffset` returns METRES, and a metric camera-space
+ * offset only holds a screen-space lane while the viewmodel stays at the depth
+ * it was calibrated for. That assumption broke.
+ *
+ * MEASURED at base 75a4e508 (`qa:pass65:first-person-arms-visual`, headless
+ * Chrome/WebGPU, gun-range, 1600x900): the live viewmodel root sits at
+ * z = -0.407 m with the camera at fov 82, not at the authored hip z = -1.08 m
+ * with fov 75. Half the frustum width at the live depth is 0.629 m, so the
+ * 1.37 m melee offset displaced the root by 2.18 NDC and parked it at NDC
+ * x = 2.51 - two and a half half-widths PAST the right edge. The captured
+ * frames say the same thing: `melee-knife-0_42.png` shows the whole knife arm
+ * jammed against the right edge with no readable blade, and
+ * `melee-knife-0_12.png` / `_0_82.png` show a detached floating sleeve
+ * fragment. That is the owner's "animations ... for ... knife ... strange".
+ *
+ * The fix keeps the authored SCREEN displacement and re-derives the metres for
+ * whatever depth and fov the viewmodel is actually presenting at. The aspect
+ * term cancels between the two frustum widths, so the calibrated ultrawide
+ * behaviour of the lane above is preserved exactly and only the depth/fov
+ * compensation is new. Placement of the viewmodel itself (that z = -0.407,
+ * which is Lane W's HF-410 territory) is deliberately NOT touched here.
+ */
+export const VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS = 1.08;
+
+/** Half the camera frustum width at `depthMeters`, in metres. */
+function cameraHalfWidthMeters(depthMeters: number, fovDegrees: number, aspect: number): number {
+  return Math.abs(depthMeters) * Math.tan(THREE.MathUtils.degToRad(fovDegrees) / 2) * aspect;
+}
+
+/**
+ * Metres of camera-space melee entry travel that reproduce the authored
+ * screen-space lane at the presented depth and field of view.
+ */
+export function viewmodelMeleeEntryMeters(
+  aspect: number,
+  fovDegrees: number,
+  depthMeters: number,
+): number {
+  const normalizedAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : VIEWMODEL_REFERENCE_ASPECT;
+  const normalizedFov = Number.isFinite(fovDegrees) && fovDegrees > 1 && fovDegrees < 179
+    ? fovDegrees
+    : VIEWMODEL_REFERENCE_FOV_DEGREES;
+  const authoredMeters = viewmodelMeleeLateralOffset(normalizedAspect);
+  const referenceHalfWidth = cameraHalfWidthMeters(
+    VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    VIEWMODEL_REFERENCE_FOV_DEGREES,
+    normalizedAspect,
+  );
+  const presentedHalfWidth = cameraHalfWidthMeters(
+    Number.isFinite(depthMeters) && Math.abs(depthMeters) > 1e-4
+      ? depthMeters
+      : VIEWMODEL_MELEE_ENTRY_REFERENCE_DEPTH_METERS,
+    normalizedFov,
+    normalizedAspect,
+  );
+  if (!(referenceHalfWidth > 1e-6) || !Number.isFinite(presentedHalfWidth)) return authoredMeters;
+  // The authored screen displacement, replayed at the presented frustum.
+  return authoredMeters * (presentedHalfWidth / referenceHalfWidth);
+}
+
 function viewmodelScreenScale(camera: THREE.Camera): number {
   if (!(camera instanceof THREE.PerspectiveCamera)) return 1;
   return viewmodelViewportScale(camera.aspect, camera.fov);
@@ -1216,8 +1335,29 @@ function viewmodelScreenDrop(camera: THREE.Camera): number {
   return THREE.MathUtils.clamp((viewmodelScreenScale(camera) - 1) * 0.18, -0.025, 0.14);
 }
 
-function viewmodelMeleeScreenOffset(camera: THREE.Camera): number {
-  return viewmodelMeleeLateralOffset(camera instanceof THREE.PerspectiveCamera ? camera.aspect : VIEWMODEL_REFERENCE_ASPECT);
+/**
+ * HF-413. Two properties of this call that a later change can silently break,
+ * written down because neither is visible from the call site:
+ *
+ * 1. ONE-FRAME LAG. The caller passes `this.root.position.z`, which is the
+ *    depth the viewmodel was lerped to on the PREVIOUS frame - `root.position`
+ *    is only updated further down `update()`. That is harmless today because
+ *    the Z composition does not read the melee X term, so the two never form a
+ *    feedback loop, and the depth moves by millimetres per frame. If Z is ever
+ *    made to depend on the melee lane, re-derive this from the depth being
+ *    composed on THIS frame instead.
+ * 2. FOV SOURCE. `camera` here is the world camera. If Lane W's HF-410 rework
+ *    introduces a dedicated viewmodel field of view (its own falsifier proposes
+ *    exactly that), this compensation must be handed the camera/FOV that
+ *    actually renders the viewmodel. Reading the world FOV against a viewmodel
+ *    frustum silently returns the wrong metres and the knife leaves the frame
+ *    again, with no test failing.
+ */
+function viewmodelMeleeScreenOffset(camera: THREE.Camera, depthMeters: number): number {
+  if (!(camera instanceof THREE.PerspectiveCamera)) {
+    return viewmodelMeleeEntryMeters(VIEWMODEL_REFERENCE_ASPECT, VIEWMODEL_REFERENCE_FOV_DEGREES, depthMeters);
+  }
+  return viewmodelMeleeEntryMeters(camera.aspect, camera.fov, depthMeters);
 }
 
 const FIRST_PERSON_ADS_BORE_RADIUS: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
@@ -1777,6 +1917,16 @@ export class WeaponPresentation {
     'explosive-crossbow',
     'railgun',
   ]);
+  /**
+   * HF-410: the body fit. One uniform scale about the eye, sitting between
+   * the camera and the rig, so that every pose the presentation composes -
+   * bob, sway, recoil, reload, melee, stance, contact - stays authored in
+   * the frame it was measured and tuned in, and the whole composed result
+   * lands inside the player's own collision capsule. A perspective
+   * projection is invariant under a uniform scale about its centre, so the
+   * rendered image does not move; see src/viewmodel-body-fit.ts.
+   */
+  readonly bodyFitRoot = new THREE.Group();
   readonly root = new THREE.Group();
   /**
    * The single camera-facing plane that cuts the rig at the contacting
@@ -2087,8 +2237,15 @@ export class WeaponPresentation {
     clippingRoot.clipShadows = false;
     clippingRoot.clippingPlanes = [this.contactClipPlane, ...this.surfaceClipPlanes];
     this.root.userData.viewmodelContactClipContract = VIEWMODEL_CONTACT_CLIP_CONTRACT;
-    camera.add(this.root);
-    this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, 3.2, 2);
+    this.bodyFitRoot.name = 'viewmodel-body-fit';
+    this.bodyFitRoot.userData.viewmodelBodyFitContract = VIEWMODEL_BODY_FIT_CONTRACT;
+    this.bodyFitRoot.scale.setScalar(VIEWMODEL_BODY_FIT_SCALE);
+    camera.add(this.bodyFitRoot);
+    this.bodyFitRoot.add(this.root);
+    // HF-410: viewmodel-only lights live inside the fit, so their world
+    // radius and physical intensity move with it. Without this the rig
+    // would be lit as though the fill lamp were 1/k times closer.
+    this.viewmodelFill = new THREE.PointLight(0xfff0dc, 0, viewmodelBodyFitLightDistance(3.2), 2);
     this.viewmodelFill.name = 'first-person-viewmodel-fill';
     this.viewmodelFill.position.set(0.12, 0.66, 0.4);
     this.viewmodelFill.castShadow = false;
@@ -2101,7 +2258,7 @@ export class WeaponPresentation {
     // without flattening the metal/fabric response or touching world lighting.
     this.viewmodelFill.userData.authoredIntensity = flattenMaterials
       ? 0
-      : FIRST_PERSON_VIEWMODEL_FILL_INTENSITY;
+      : viewmodelBodyFitLightIntensity(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY);
     this.root.add(this.viewmodelFill);
     const fabricMaterial = (color: number, roughness: number, repeatX: number, repeatY: number, normalScale: number): THREE.MeshStandardMaterial => {
       if (typeof document === 'undefined') return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -2404,7 +2561,7 @@ export class WeaponPresentation {
     this.passiveKnife.add(passiveKnifeModel);
     this.passiveKnife.visible = false;
     this.root.add(this.passiveKnife);
-    this.muzzleLight = new THREE.PointLight(0xffc36a, 0, 4.5, 2);
+    this.muzzleLight = new THREE.PointLight(0xffc36a, 0, viewmodelBodyFitLightDistance(4.5), 2);
     this.muzzleLight.name = 'first-person-muzzle-light';
     this.muzzleLight.position.set(0, 0.08, -1.15);
     if (!flattenMaterials) this.root.add(this.muzzleLight);
@@ -2862,7 +3019,7 @@ export class WeaponPresentation {
       updateImportedWeapon(model, 1 / 60);
       this.muzzleFlash.visible = true;
       this.muzzleLight.visible = true;
-      this.muzzleLight.intensity = 1;
+      this.muzzleLight.intensity = viewmodelBodyFitLightIntensity(1);
       if (id === 'flamethrower') {
         this.enforceNearPlaneClearance(model, this.root.getObjectByName('first-person-arms'));
         this.flamethrowerHeldFireClearancePrewarmChecks += 1;
@@ -3554,7 +3711,12 @@ export class WeaponPresentation {
 
   private applyViewmodelContactClip(): void {
     const clippingRoot = this.root as ViewmodelClippingRoot;
-    const surfaceMeters = this.contactFold.clipPlaneDistanceMeters;
+    // HF-410: the solve now works in rig metres (its depth inputs are
+    // converted on the way in), and this plane is placed in world space.
+    const solvedMeters = this.contactFold.clipPlaneDistanceMeters;
+    const surfaceMeters = solvedMeters === null || !Number.isFinite(solvedMeters)
+      ? solvedMeters
+      : viewmodelRigToWorldMeters(solvedMeters);
     if (surfaceMeters === null || !Number.isFinite(surfaceMeters)) {
       // Park the plane instead of disarming the group - see the constructor.
       // Disabling would flip every viewmodel material's shader permutation and
@@ -3562,9 +3724,18 @@ export class WeaponPresentation {
       this.parkViewmodelContactClip();
       return;
     }
-    const nearPlane = viewmodelCameraNearMeters(this.camera);
+    // HF-410 REPAIR: this plane is placed in WORLD metres, and the plane that
+    // can actually clip the rig is the ON-FOOT GAMEPLAY CAMERA's - the
+    // depth-cleared overlay submission does not run on the shipped WebGPU
+    // route (atomicSignal is hardcoded null), so the rig is drawn at
+    // FIRST_PERSON_CAMERA_NEAR_METERS. Using the larger, real plane raises
+    // this floor from 0.002 m to 0.02 m, which is the stricter direction: the
+    // cut can never be placed closer to the eye than the plane that already
+    // discards everything there. The clearance is authored in rig metres, so
+    // it converts.
+    const nearPlane = FIRST_PERSON_CAMERA_NEAR_METERS;
     const cutMeters = Math.max(
-      nearPlane + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+      nearPlane + viewmodelRigToWorldMeters(VIEWMODEL_NEAR_PLANE_CLEARANCE),
       surfaceMeters - VIEWMODEL_CONTACT_CLIP_MARGIN_METERS,
     );
     this.camera.updateWorldMatrix(true, false);
@@ -3670,14 +3841,23 @@ export class WeaponPresentation {
     const y = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.y, ADS_VIEWMODEL_BASE_POSITION.y, this.adsBlend);
     const z = THREE.MathUtils.lerp(HIP_VIEWMODEL_POSITION.z, ADS_VIEWMODEL_BASE_POSITION.z, this.adsBlend)
       - VIEWMODEL_NEAR_PLANE_CLEARANCE;
+    // HF-410: THE ENVELOPE IS THE PROBE'S REACH, AND THE PROBE IS WORLD SPACE.
+    //
+    // Every number above is composed in the rig's own frame; the body fit
+    // then scales that frame about the eye. The consumer (the contact probe
+    // lattice in legacy-main) casts real world rays, so it must be handed
+    // the volume the rig REALLY occupies. This conversion is the whole
+    // reason the wall lift and the high-ready fold stop appearing on normal
+    // poses: with the rig inside the capsule, a probe sized to it cannot
+    // reach a surface the capsule is allowed to stand next to.
     return Object.freeze({
       contract: VIEWMODEL_CONTACT_ENVELOPE_CONTRACT,
       weapon: this.active,
-      minX: x + bounds.minX * scale,
-      maxX: x + bounds.maxX * scale,
-      minY: y + bounds.minY * scale,
-      maxY: y + bounds.maxY * scale,
-      forwardReachMeters: -(z + bounds.minZ * scale),
+      minX: viewmodelRigToWorldMeters(x + bounds.minX * scale),
+      maxX: viewmodelRigToWorldMeters(x + bounds.maxX * scale),
+      minY: viewmodelRigToWorldMeters(y + bounds.minY * scale),
+      maxY: viewmodelRigToWorldMeters(y + bounds.maxY * scale),
+      forwardReachMeters: viewmodelRigToWorldMeters(-(z + bounds.minZ * scale)),
     });
   }
 
@@ -4028,9 +4208,9 @@ export class WeaponPresentation {
     }
     if (this.authoredMeleeKnife) resetImportedWeaponAnimations(this.authoredMeleeKnife);
     const reloadPose = reloadPoseAt(this.active, 0);
-    const bolt = activeModel?.getObjectByName('bolt-or-slide');
+    const bolt = this.cachedNamedNode(activeModel, 'bolt-or-slide');
     if (bolt) bolt.position.z = Number(bolt.userData.restZ ?? 0);
-    const pump = activeModel?.getObjectByName('pump');
+    const pump = this.cachedNamedNode(activeModel, 'pump');
     if (pump) pump.position.z = Number(pump.userData.restZ ?? -0.48);
     const magazineName = this.active === 'carbine'
       ? 'curved-magazine'
@@ -4039,7 +4219,7 @@ export class WeaponPresentation {
         : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
           ? 'pistol-magazine'
           : 'straight-magazine';
-    const magazine = activeModel?.getObjectByName(magazineName);
+    const magazine = this.cachedNamedNode(activeModel, magazineName);
     if (magazine?.userData.restY !== undefined) {
       magazine.position.set(
         Number(magazine.userData.restX),
@@ -4048,9 +4228,9 @@ export class WeaponPresentation {
       );
       magazine.rotation.z = Number(magazine.userData.restRotationZ);
     }
-    const reloadShell = activeModel?.getObjectByName('reload-shell');
+    const reloadShell = this.cachedNamedNode(activeModel, 'reload-shell');
     if (reloadShell) reloadShell.visible = false;
-    const arms = this.root.getObjectByName('first-person-arms');
+    const arms = this.cachedNamedNode(this.root, 'first-person-arms');
     if (arms) {
       arms.visible = true;
       arms.position.set(0, -0.075, 0);
@@ -4150,7 +4330,9 @@ export class WeaponPresentation {
     this.shotsPresented += 1;
     this.recoil = Math.min(1, this.recoil + 0.24 + amount * 5.2);
     this.shotStarted = performance.now();
-    this.muzzleLight.intensity = this.flattenMaterials ? 0 : 4.8 * WEAPONS[this.active].muzzleFlashScale;
+    this.muzzleLight.intensity = this.flattenMaterials
+      ? 0
+      : viewmodelBodyFitLightIntensity(4.8 * WEAPONS[this.active].muzzleFlashScale);
     this.muzzleFlash.visible = true;
     this.muzzleFlash.scale.setScalar(profile.flashScale);
     this.muzzleFlash.rotation.z = (this.shotsPresented * 2.399963229728653) % Math.PI;
@@ -4237,7 +4419,7 @@ export class WeaponPresentation {
     }
     meleeImportedWeapon(this.authoredMeleeKnife ?? this.meleeKnife);
     if (this.authoredArmsRoot) playFirstPersonArmAction(this.authoredArmsRoot, 'melee');
-    const arms = this.root.getObjectByName('first-person-arms');
+    const arms = this.cachedNamedNode(this.root, 'first-person-arms');
     if (arms) arms.visible = this.browserRuntime;
     const activeModel = this.mountedModel();
     if (activeModel) activeModel.visible = false;
@@ -4294,8 +4476,92 @@ export class WeaponPresentation {
   }
 
   muzzleWorldPosition(target = new THREE.Vector3()): THREE.Vector3 | null {
-    const socket = this.mountedModel()?.getObjectByName('muzzle-socket');
+    const socket = this.cachedNamedNode(this.mountedModel(), 'muzzle-socket');
     return socket ? socket.getWorldPosition(target) : null;
+  }
+
+  /**
+   * HF-410 REPAIR - WHERE A WORLD-SPACE EFFECT MUST BE BORN, NOW THAT THE RIG
+   * IS NOT WHERE IT LOOKS LIKE IT IS.
+   *
+   * `muzzleWorldPosition` is the truth about the RIG: the socket's real world
+   * position. Under the body fit that is roughly 0.25 m from the eye, and world
+   * systems that consume it are not measuring a viewmodel - they are measuring
+   * the world. `PARTICLE_READABILITY.nearCullM` is a hard 0.35 m "not drawn at
+   * all, in any family, at any opacity" (src/particles/combat-readability.ts),
+   * so every particle emitted at the fitted socket is born INSIDE the near-lens
+   * cull and silently never renders. Before the fit the socket sat 0.96-1.80 m
+   * out and cleared it comfortably. HF-371 powder smoke and the flamethrower
+   * stream origin both feed off this point.
+   *
+   * The correct anchor is the point the muzzle would occupy without the fit,
+   * which is exact and not a fudge: the fit is a uniform scale k about the eye,
+   * so undoing it is `eye + (socket - eye) / k`. That point lies on the SAME
+   * ray from the eye, so it projects to the same pixel - the effect still
+   * starts at the muzzle on screen - while sitting at the world distance the
+   * effect systems were tuned against, which is where it sat when this build
+   * shipped. The rig itself does not move.
+   *
+   * Do NOT solve this by lowering nearCullM: that guard is a combat-readability
+   * contract about the player's view of the fight, not a viewmodel constant.
+   */
+  muzzleEffectWorldPosition(target = new THREE.Vector3()): THREE.Vector3 | null {
+    const socket = this.muzzleWorldPosition(target);
+    if (!socket) return null;
+    const eye = this.camera.getWorldPosition(this.muzzleEffectScratch);
+    return socket.sub(eye).divideScalar(VIEWMODEL_BODY_FIT_SCALE).add(eye);
+  }
+
+  private readonly muzzleEffectScratch = new THREE.Vector3();
+
+  /**
+   * HF-399 RESIDUAL (assigned to this lane by the brief addendum, 17:10) -
+   * STOP RE-SEARCHING THE SAME SCENE FOR THE SAME FOUR SOCKETS EVERY FRAME.
+   *
+   * `Object3D.getObjectByName` is a full depth-first traversal of the subtree.
+   * `solveRiggedArms` ran one per arm per frame for 'grip-socket-r' /
+   * 'support-socket-l', another for 'muzzle-socket' per arm, and a fourth for
+   * 'reload-socket-l' whenever a reload is blending; `muzzleWorldPosition` runs
+   * one more per shot-visual. Lane A's census read ~10,000 name/property
+   * searches per frame on a 10,275-node scene, with `solveRiggedArms` the
+   * dominant caller, inside a `WeaponPresentation.update` that is ~22% of the
+   * frame. None of those searches can return a different node between frames
+   * unless the mounted model changes.
+   *
+   * WHY THIS CANNOT GO STALE, which is the only thing that matters here. The
+   * cache is keyed on the MODEL OBJECT itself, so a different weapon (or a
+   * re-imported GLB) is a different key with an empty cache - no invalidation
+   * call to forget. Within one model, a hit is returned only after walking the
+   * cached node's parent chain back to that model, which is O(depth of the
+   * socket) - about five links - instead of O(nodes). A socket that has been
+   * detached, re-parented or swapped by an attachment rebuild therefore fails
+   * that check and is re-resolved on the spot.
+   *
+   * MISSES ARE NOT CACHED, on purpose. A negative result would have to be
+   * invalidated when an attachment mounts a socket later in the model's life,
+   * and a wrong `null` here is a missing hand or a missing muzzle. The weapons
+   * that legitimately lack a socket pay the old traversal; every rig that has
+   * one pays it once.
+   */
+  private readonly socketCache = new WeakMap<THREE.Object3D, Map<string, THREE.Object3D>>();
+
+  private cachedNamedNode(model: THREE.Object3D | undefined, name: string): THREE.Object3D | undefined {
+    if (!model) return undefined;
+    let cache = this.socketCache.get(model);
+    if (!cache) {
+      cache = new Map();
+      this.socketCache.set(model, cache);
+    }
+    const cached = cache.get(name);
+    if (cached) {
+      for (let node: THREE.Object3D | null = cached; node; node = node.parent) {
+        if (node === model) return cached;
+      }
+      cache.delete(name);
+    }
+    const resolved = model.getObjectByName(name);
+    if (resolved) cache.set(name, resolved);
+    return resolved;
   }
 
   adsProgress(): number {
@@ -4422,7 +4688,7 @@ export class WeaponPresentation {
     this.camera.updateMatrixWorld(true);
     sight?.updateWorldMatrix(true, false);
     const projected = sight?.getWorldPosition(new THREE.Vector3()).project(this.camera);
-    const arms = this.root.getObjectByName('first-person-arms');
+    const arms = this.cachedNamedNode(this.root, 'first-person-arms');
     const isAuthoredArmMesh = (candidate: THREE.Object3D): candidate is THREE.Mesh => {
       if (!(candidate instanceof THREE.Mesh)) return false;
       let ancestor: THREE.Object3D | null = candidate;
@@ -4523,7 +4789,14 @@ export class WeaponPresentation {
       ] as const;
       const raycaster = new THREE.Raycaster();
       raycaster.layers.mask = this.camera.layers.mask;
-      raycaster.near = this.camera instanceof THREE.PerspectiveCamera ? this.camera.near : 0;
+      // HF-410 REPAIR: the fitted rig spans roughly 0.02-0.32 m from the eye,
+      // inside the 0.08 m plane this camera carried before the fit. The probe
+      // uses the plane the rig is really drawn with now,
+      // FIRST_PERSON_CAMERA_NEAR_METERS, or it would report every aperture as
+      // empty. Not the overlay's 0.002 m: that submission does not run on the
+      // shipped route, and the nearest measured weapon vertex in any graded
+      // pose is 0.0921 m, so the honest larger plane changes no reading.
+      raycaster.near = FIRST_PERSON_CAMERA_NEAR_METERS;
       raycaster.far = this.camera instanceof THREE.PerspectiveCamera ? this.camera.far : Number.POSITIVE_INFINITY;
       const samples = offsets.map(([label, x, y]) => {
         raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
@@ -4677,11 +4950,23 @@ export class WeaponPresentation {
         arms: armWorldBounds,
         weapon: weaponWorldBounds,
       },
+      // HF-410 REPAIR: graded against FIRST_PERSON_CAMERA_NEAR_METERS - the
+      // plane the shipped WebGPU route really submits this rig with - on real
+      // deformed vertices, split by whether they land inside the viewport.
+      // The first pass graded these against VIEWMODEL_OVERLAY_NEAR_METERS,
+      // which is the plane of a submission this lane itself proved never runs
+      // (atomicSignal is hardcoded null in legacy-main). See
+      // src/viewmodel-near-plane-framing.ts for the numbers that forced both
+      // halves of the correction.
       armFraming: arms?.visible
-        ? measureCameraFraming(arms, this.camera, isAuthoredArmMesh)
+        ? measureViewmodelFraming(arms, this.camera, FIRST_PERSON_CAMERA_NEAR_METERS, isAuthoredArmMesh)
         : null,
-      weaponFraming: model?.visible ? measureCameraFraming(model, this.camera) : null,
-      meleeKnifeFraming: this.meleeKnife.visible ? measureCameraFraming(this.meleeKnife, this.camera) : null,
+      weaponFraming: model?.visible
+        ? measureViewmodelFraming(model, this.camera, FIRST_PERSON_CAMERA_NEAR_METERS)
+        : null,
+      meleeKnifeFraming: this.meleeKnife.visible
+        ? measureViewmodelFraming(this.meleeKnife, this.camera, FIRST_PERSON_CAMERA_NEAR_METERS)
+        : null,
       viewmodelViewport: {
         aspect: this.camera instanceof THREE.PerspectiveCamera ? this.camera.aspect : null,
         fov: this.camera instanceof THREE.PerspectiveCamera ? this.camera.fov : null,
@@ -4761,7 +5046,8 @@ export class WeaponPresentation {
     const diagnostics: Array<Record<string, unknown>> = [];
     for (const rig of this.armRigs) {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
-      const socket = activeModel.getObjectByName(socketName);
+      // HF-399: cached per mounted model; see modelSocket().
+      const socket = this.cachedNamedNode(activeModel, socketName);
       if (!socket) continue;
       const socketTargetWorld = resolveSocketWorld(socket);
       const targetWorld = socketTargetWorld.clone();
@@ -4774,7 +5060,7 @@ export class WeaponPresentation {
         targetWorld.add(modelOffset);
       }
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
-        const reloadSocket = activeModel.getObjectByName('reload-socket-l');
+        const reloadSocket = this.cachedNamedNode(activeModel, 'reload-socket-l');
         if (reloadSocket) targetWorld.lerp(resolveSocketWorld(reloadSocket), reloadPose.handToReload);
       }
       const targetInArms = arms.worldToLocal(targetWorld.clone());
@@ -5008,11 +5294,57 @@ export class WeaponPresentation {
     const candidate = scratch.shoulderReachCandidate;
     const blended = scratch.shoulderBlendedDirection;
     let projected = scratch.shoulderProjected;
-    for (let step = 0; step <= 16; step += 1) {
-      blended.copy(initialDirection).lerp(anatomicalDirection, step / 16).normalize();
+    // HF-413. Arc 0 is the historical search and is unchanged: walk from the
+    // pinned lane direction toward the ANATOMICAL direction (HF-365 gave that
+    // a shoulder-width lateral component so the arm enters diagonally instead
+    // of as a vertical "pale post") and stop at the FIRST step that clears the
+    // lane. Any pose that clears the lane on arc 0 - the overwhelming majority
+    // - resolves exactly as it did before this block existed.
+    //
+    // MEASURED problem being fixed: when the grip is high and close (Railgun at
+    // hip, sidearm and flare gun at ADS) the anatomical terminal itself
+    // projects ABOVE the lane. Arc 0 exhausted and its LAST candidate was
+    // accepted unchecked, leaving the support shoulder inside the frame at NDC
+    // y -0.975..-0.983 against the -0.98 floor: a proximal sleeve ending in
+    // mid-air, the same defect class as the firing-side one.
+    //
+    // Arcs 1 and 2 are only ever reached when arc 0 exhausted. They sample two
+    // further families of direction, and if nothing clears the lane the search
+    // falls back to the LOWEST candidate it saw anywhere rather than to
+    // whichever candidate happened to be last. Direction is deliberately not
+    // assumed: an earlier attempt at this walked straight down and made the
+    // reading WORSE (-0.980 -> -0.917), because pure camera-down drops the
+    // anatomical direction's camera-back component, pushing the joint further
+    // from the eye where the same metres project to a smaller screen offset.
+    // Choosing by measured projection instead of by assumed direction cannot
+    // make a pose worse than the old "accept the last candidate" behaviour.
+    let clearedLane = false;
+    let bestNdcY = Number.POSITIVE_INFINITY;
+    let bestArc = 0;
+    let bestStep = 0;
+    for (let arc = 0; arc < 3 && !clearedLane; arc += 1) {
+      for (let step = 0; step <= 16; step += 1) {
+        if (arc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, step / 16);
+        else if (arc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, step / 16);
+        else blended.copy(initialDirection).lerp(cameraDown, step / 16);
+        blended.normalize();
+        candidate.copy(socketTarget).addScaledVector(blended, safeReach);
+        projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
+        if (projected.y < bestNdcY) {
+          bestNdcY = projected.y;
+          bestArc = arc;
+          bestStep = step;
+        }
+        if (projected.y <= targetNdcY - 0.005) { clearedLane = true; break; }
+      }
+    }
+    if (!clearedLane) {
+      if (bestArc === 0) blended.copy(initialDirection).lerp(anatomicalDirection, bestStep / 16);
+      else if (bestArc === 1) blended.copy(anatomicalDirection).lerp(cameraDown, bestStep / 16);
+      else blended.copy(initialDirection).lerp(cameraDown, bestStep / 16);
+      blended.normalize();
       candidate.copy(socketTarget).addScaledVector(blended, safeReach);
       projected = scratch.shoulderProjected.copy(candidate).project(this.camera);
-      if (projected.y <= targetNdcY - 0.005) break;
     }
 
     parent.updateWorldMatrix(true, false);
@@ -5190,7 +5522,8 @@ export class WeaponPresentation {
           this.meleeKnife.rotateZ(-0.2);
         }
       }
-      const grip = this.authoredMeleeKnife.getObjectByName('grip-socket-r');
+      // HF-399: per-frame melee diagnostic; cached per knife model.
+      const grip = this.cachedNamedNode(this.authoredMeleeKnife, 'grip-socket-r');
       if (grip) {
         this.authoredMeleeGripError = grip.getWorldPosition(this.meleeGripWorld)
           .distanceTo(this.authoredMeleeSocket.getWorldPosition(this.meleeSocketWorld));
@@ -5275,11 +5608,12 @@ export class WeaponPresentation {
       rig.elbow.position.copy(rig.bindElbowPosition);
       rig.wrist.position.copy(rig.bindWristPosition);
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
-      const socket = activeModel.getObjectByName(socketName);
+      // HF-399: cached per mounted model; see modelSocket().
+      const socket = this.cachedNamedNode(activeModel, socketName);
       if (!socket) continue;
       const target = socket.getWorldPosition(scratch.target);
       if (rig.side === 'left' && reloadPose.handToReload > 0) {
-        const reloadSocket = activeModel.getObjectByName('reload-socket-l');
+        const reloadSocket = this.cachedNamedNode(activeModel, 'reload-socket-l');
         if (reloadSocket) target.lerp(reloadSocket.getWorldPosition(scratch.handTarget), reloadPose.handToReload);
       }
       const shoulderEntryTargetNdcY = firstPersonArmShoulderEntryNdc(
@@ -5367,7 +5701,7 @@ export class WeaponPresentation {
         bendHint.applyAxisAngle(poleAxis.normalize(), totalPoleRadians);
       }
       const weaponRotation = activeModel.getWorldQuaternion(scratch.weaponRotation);
-      const muzzle = activeModel.getObjectByName('muzzle-socket');
+      const muzzle = this.cachedNamedNode(activeModel, 'muzzle-socket');
       const weaponForward = muzzle
         ? scratch.weaponForward.copy(muzzle.getWorldPosition(scratch.handTarget)).sub(socketTarget).normalize()
         : scratch.weaponForward.set(0, 0, 1).applyQuaternion(weaponRotation).normalize();
@@ -5490,7 +5824,49 @@ export class WeaponPresentation {
     if (diagnostics) this.riggedArmDiagnostics = diagnostics;
   }
 
+  /**
+   * HF-410 - THE FIT IS A PRESENTATION TRANSFORM, AND THE SOLVE IS NOT INSIDE IT.
+   *
+   * The body fit (src/viewmodel-body-fit.ts) is a uniform scale about the eye
+   * carried by `bodyFitRoot`. Everything below solves in WORLD space against
+   * AUTHORED METRE CONSTANTS - the arm IK's 0.1 m shoulder drop and its socket
+   * reach, the near-plane clearance push, the ADS sight centring - and those
+   * constants were measured against an unfitted rig. Solving inside the fit
+   * would silently multiply every one of them by 1/k.
+   *
+   * So the rig is posed in exactly the frame it was authored and tuned in, and
+   * the fit is applied to the finished result. `finally`, not a trailing
+   * statement: an early return or a throw must never leave the rig rendering a
+   * frame at full size, which is a visible pop.
+   */
   update(pose: WeaponPose): WeaponActionEvent[] {
+    this.applyBodyFit(1);
+    try {
+      return this.updateSolvedPose(pose);
+    } finally {
+      this.applyBodyFit(VIEWMODEL_BODY_FIT_SCALE);
+    }
+  }
+
+  /**
+   * Sets the fit AND republishes the node's own world matrix, in constant time.
+   *
+   * `Object3D.updateMatrixWorld` does not walk UP the tree, so a consumer that
+   * calls it on the rig root - the renderer does not, but the regression gates
+   * and several probes do - composes against whatever this node's `matrixWorld`
+   * happens to hold. Flipping `scale` without republishing left that matrix
+   * describing a different fit from the one in force, and the rig then measured
+   * as though it had drifted off its own mount. Two matrix composes per frame.
+   */
+  private applyBodyFit(scale: number): void {
+    this.bodyFitRoot.scale.setScalar(scale);
+    this.bodyFitRoot.updateMatrix();
+    const parent = this.bodyFitRoot.parent;
+    if (parent) this.bodyFitRoot.matrixWorld.multiplyMatrices(parent.matrixWorld, this.bodyFitRoot.matrix);
+    else this.bodyFitRoot.matrixWorld.copy(this.bodyFitRoot.matrix);
+  }
+
+  private updateSolvedPose(pose: WeaponPose): WeaponActionEvent[] {
     // Owner 2026-08-30 ("randomly top of shotgun detached ... m14 scope part
     // is flying in the air above the gun"). Hidden weapon models have their
     // subtree matrices DEEP-FROZEN (matrixAutoUpdate off) so a parked model
@@ -5595,8 +5971,11 @@ export class WeaponPresentation {
     // materials are clear from model instantiation onward.
     this.root.scale.setScalar(this.unsuppressedViewmodelScale());
     this.sprintBlend = THREE.MathUtils.lerp(this.sprintBlend, pose.sprinting ? 1 : 0, smoothing(13));
-    this.muzzleFlash.visible = this.muzzleLight.intensity > 0.45;
-    const arms = this.root.getObjectByName('first-person-arms');
+    // HF-410: this gate is a threshold on a PHYSICAL light intensity, and the
+    // body fit divides every viewmodel-only intensity by k^2. Left as a bare
+    // 0.45 the muzzle flash mesh would never appear again.
+    this.muzzleFlash.visible = this.muzzleLight.intensity > viewmodelBodyFitLightIntensity(0.45);
+    const arms = this.cachedNamedNode(this.root, 'first-person-arms');
     if (arms) {
       // Keep the licensed chains close to physical scale in ADS. The previous
       // 16% shrink and deep shoulder drop made the long-gun support socket
@@ -5659,7 +6038,7 @@ export class WeaponPresentation {
     const activeModel = this.mountedModel();
     if (activeModel) updateImportedWeapon(activeModel, pose.dt);
     updateImportedWeapon(this.authoredMeleeKnife ?? this.meleeKnife, pose.dt);
-    const minigunBarrels = this.models.get('minigun')?.getObjectByName('minigun-barrel-cluster');
+    const minigunBarrels = this.cachedNamedNode(this.models.get('minigun'), 'minigun-barrel-cluster');
     if (minigunBarrels) minigunBarrels.rotation.z = this.minigunSpool.angleRadians;
     const profile = weaponFamilyPresentation(this.active);
     const hipYaw = weaponHipYaw(this.active);
@@ -5687,12 +6066,12 @@ export class WeaponPresentation {
       this.ejectCasing(true);
       this.pendingScattergunShell = false;
     }
-    const bolt = activeModel?.getObjectByName('bolt-or-slide');
+    const bolt = this.cachedNamedNode(activeModel, 'bolt-or-slide');
     if (bolt) {
       const restZ = Number(bolt.userData.restZ ?? 0);
       bolt.position.z = restZ + fireCycle.boltTravel * profile.actionTravel;
     }
-    const pump = activeModel?.getObjectByName('pump');
+    const pump = this.cachedNamedNode(activeModel, 'pump');
     if (pump) {
       const restZ = Number(pump.userData.restZ ?? -0.48);
       pump.position.z = restZ + fireCycle.boltTravel * profile.actionTravel;
@@ -5739,7 +6118,7 @@ export class WeaponPresentation {
       : this.active === 'pistol' || this.active === 'machine-pistol' || this.active === 'magnum'
         ? 'pistol-magazine'
         : 'straight-magazine';
-    const magazine = activeModel?.getObjectByName(magazineName);
+    const magazine = this.cachedNamedNode(activeModel, magazineName);
     if (magazine) {
       if (magazine.userData.restY === undefined) {
         magazine.userData.restX = magazine.position.x;
@@ -5752,7 +6131,7 @@ export class WeaponPresentation {
       magazine.position.z = Number(magazine.userData.restZ) + reloadPose.magazineForward;
       magazine.rotation.z = Number(magazine.userData.restRotationZ) + reloadPose.magazineTwist;
     }
-    const reloadShell = activeModel?.getObjectByName('reload-shell');
+    const reloadShell = this.cachedNamedNode(activeModel, 'reload-shell');
     if (reloadShell) {
       reloadShell.visible = reloadPose.shellVisible;
       reloadShell.position.set(-0.16 + reloadPose.shellTravel * 0.13, -0.13 + reloadPose.shellTravel * 0.035, -0.02);
@@ -5854,19 +6233,37 @@ export class WeaponPresentation {
       - VIEWMODEL_NEAR_PLANE_CLEARANCE - authoredContactRetreat;
     this.contactFold = solveViewmodelContactFold({
       bounds: this.measureRigBounds(),
-      contactDepthMeters: pose.surfaceContactDepth ?? null,
+      // HF-410: the solve compares the rig's ROOT-LOCAL bounds against this
+      // depth, and the body fit means one rig metre is now
+      // VIEWMODEL_BODY_FIT_SCALE world metres. Converting here is what makes
+      // the fold measure the fitted rig instead of the rig that used to hang
+      // outside the body: it disengages because the geometry genuinely no
+      // longer reaches the surface, not because a threshold was moved.
+      contactDepthMeters: pose.surfaceContactDepth === null || pose.surfaceContactDepth === undefined
+        ? null
+        : viewmodelWorldToRigMeters(pose.surfaceContactDepth),
       // The fold keeps the conservative minimum above; the cut is placed by
       // the on-axis depth. Passed through UNDEFAULTED on purpose: `undefined`
       // has to keep meaning "this caller has no separate cut depth", which the
       // solve answers by falling back to `contactDepthMeters` exactly as
       // before, while an explicit `null` means "nothing a plane can represent"
       // and correctly disarms the cut.
-      contactCutDepthMeters: pose.surfaceContactCutDepth,
+      contactCutDepthMeters: pose.surfaceContactCutDepth === undefined
+        ? undefined
+        : (pose.surfaceContactCutDepth === null
+          ? null
+          : viewmodelWorldToRigMeters(pose.surfaceContactCutDepth)),
       baseRootZ: contactFoldBaseZ,
       authoredRootZ: contactFoldBaseZ + surfaceRetreatDemand,
       basePitchRadians: this.contactResponse.pitchRadians,
       baseScale: this.unsuppressedViewmodelScale(),
-      nearPlaneMeters: viewmodelCameraNearMeters(this.camera) + VIEWMODEL_NEAR_PLANE_CLEARANCE,
+      // HF-410 REPAIR: the fold's near-plane admission is expressed in rig
+      // metres and must describe the plane in force on the shipped route
+      // (FIRST_PERSON_CAMERA_NEAR_METERS), not the overlay submission's, which
+      // never runs. This raises the admission from 0.075 to 0.214 rig metres -
+      // strictly more conservative.
+      nearPlaneMeters: viewmodelWorldToRigMeters(FIRST_PERSON_CAMERA_NEAR_METERS)
+        + VIEWMODEL_NEAR_PLANE_CLEARANCE,
     });
     this.applyViewmodelContactClip();
     this.applyViewmodelSurfaceClip(pose.surfaceClipPlanes);
@@ -5911,7 +6308,7 @@ export class WeaponPresentation {
     }
     const stanceHip = (1 - this.adsBlend) * (1 - this.sprintBlend) * (1 - meleeArc);
     const targetPosition = this.frameTargetPosition.set(
-      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera) + grenadeArc * 0.18 + reloadStage.lateral
+      viewmodelBaseX + adsX + (bobX + this.swayX) * aimSteady - pose.lateralSpeed * 0.012 * aimSteady + meleeArc * viewmodelMeleeScreenOffset(this.camera, this.root.position.z) + grenadeArc * 0.18 + reloadStage.lateral
         + this.stancePose.lateralMeters * stanceHip,
       viewmodelBaseY + adsY + (bobY + breath) * aimSteady + sprintDrop + crouchLift + proneLift
         + this.contactResponse.additionalLiftMeters + this.contactResponse.proneFloorGuardMeters - this.contactResponse.additionalDropMeters

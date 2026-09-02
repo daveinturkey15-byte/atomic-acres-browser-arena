@@ -13,13 +13,13 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 84 candidate first and freezes every published timestamp behind it', () => {
+  it('keeps the pending Pass 86 candidate first and freezes every published timestamp behind it', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass84');
+    expect(latest.id).toBe('pass86');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 84');
-    expect(latest.summary).toContain('Pass 84');
+    expect(latest.title).toContain('Pass 86');
+    expect(latest.summary).toContain('Pass 86');
     // HF-406: Pass 73 stopped being the current entry on 2026-09-02. Its Pages
     // publication receipt is e138853f ("PASS 73 from 506d6142", 2026-08-21T20:27:27Z),
     // so it is history with a real timestamp, not a candidate that never shipped.
@@ -41,11 +41,15 @@ describe('changelog', () => {
     // HF-406: the badge leads with the pass number the build is stamped with. The old
     // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
     // the owner read as "pass 73 HITL".
-    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 84 · RELEASE CANDIDATE');
-    expect(latest.highlights.join('\n')).toContain('pulls back half as far when you brush a wall');
-    expect(latest.highlights.join('\n')).toContain('M14 EBR hits 40 percent harder');
-    expect(latest.highlights.join('\n')).toContain('chopper gunner ride stops flushing prewarmed thermal-reveal records');
-    expect(latest.highlights.join('\n')).toContain('read one source, so the build can no longer name an older pass');
+    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 86 · RELEASE CANDIDATE');
+    expect(latest.highlights.join('\n')).toContain('NUKE TOWN REBUILD · PREVIEW');
+    const pass85Highlights = CHANGELOG.find((entry) => entry.id === 'pass85')?.highlights.join('\n') ?? '';
+    expect(pass85Highlights).toContain('Drop shots work the Black Ops 2 way');
+    const pass84Highlights = CHANGELOG.find((entry) => entry.id === 'pass84')?.highlights.join('\n') ?? '';
+    expect(pass84Highlights).toContain('pulls back half as far when you brush a wall');
+    expect(pass84Highlights).toContain('M14 EBR hits 40 percent harder');
+    expect(pass84Highlights).toContain('chopper gunner ride stops flushing prewarmed thermal-reveal records');
+    expect(pass84Highlights).toContain('read one source, so the build can no longer name an older pass');
     const pass73 = CHANGELOG.find((entry) => entry.id === 'pass73');
     expect(pass73?.highlights.join('\n')).toContain('sleeves are thicker and extend beyond the lower frame');
     expect(pass73?.highlights.join('\n')).toContain('Railgun and M14 EBR ADS');

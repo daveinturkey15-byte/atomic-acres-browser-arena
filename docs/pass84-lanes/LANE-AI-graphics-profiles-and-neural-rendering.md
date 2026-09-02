@@ -118,3 +118,30 @@ the stretch. Apply the skill's readability and parity rules (no intel
 through reflections that the low preset cannot give; silhouette contrast
 holds at engagement distance) and the cold-compile fence trap (measure
 cold, weakest hardware, never raise the fence, precompile in the menu).
+
+## ADDENDUM 2 (owner direction 19:10 BST, HF-418) — you also IMPLEMENT the ladder
+After the audit, implement in this lane:
+1. A new **Balanced** profile between Performance and Quality: "doesn't look
+   shit like Performance but runs nice and looks good". Define its control
+   set from the audit's cost table (the cheapest controls that carry most
+   of Quality's look: grade, shadows at medium, grass density medium, no
+   volumetrics or low, post chain light), measure it, and pin it.
+2. Truthful one-line descriptions for Performance / Balanced / Quality /
+   Max in the settings UI, plus a hover/expand detail listing what each
+   turns on and its measured cost class; Quality's line must be true on a
+   "decent PC" (state the reference frame time), Max's says it is for very
+   high-end machines.
+3. **RTX becomes an explainer, not a renderer preset:** selecting it opens
+   a modal that says plainly it is a separate native runtime (Three.js/TSL
+   on top, native Vulkan + RTX underneath, no browser), what it adds, that
+   it is not available in the browser, and how to get it (a link target and
+   "coming soon" text until Lane-owner decides on the desktop build), with
+   the web renderer left exactly as it was. No preset silently switches.
+   Register the copy in the changelog/HITL-free identity surfaces (Lane Q's
+   test forbids stale pass numbers and the acronym).
+4. Wire the lighting-feature controls Lane AL delivers (if AL has landed)
+   into the profile defaults; otherwise leave the hooks with a TODO the
+   ratchet can see.
+5. Tests: control-set hash per profile, the explainer opens on RTX select
+   and changes no renderer setting, descriptions derive from the audit
+   table (source-pinned), boot smoke on each profile headless.

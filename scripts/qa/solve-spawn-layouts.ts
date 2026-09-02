@@ -163,6 +163,8 @@ function greedySpread(chosen: XZ[], candidates: readonly XZ[]): XZ[] {
   return chosen;
 }
 
+// MAP3 (HF-409 finisher 2): buildMap3 throws until its wasm is resolved.
+await (await import('../../src/map3-arena')).prepareMap3();
 for (const [id, build] of SELECTABLE_ARENA_BUILDERS()) {
   if (ONLY && !ONLY.includes(id)) continue;
   const arena = build(new THREE.Scene());

@@ -25,7 +25,7 @@ describe('project map', () => {
   it('keeps the current snapshot first and the complete older history in the archive', () => {
     const bundle = createProjectMapBundle('2026-07-24T17:00:00Z');
     expect(bundle.current.release).toEqual(PROJECT_MAP_RELEASE);
-    expect(bundle.current.previousRelease).toBe('PASS 83');
+    expect(bundle.current.previousRelease).toBe('PASS 85');
     expect(bundle.archive).toEqual(CHANGELOG);
     // The current snapshot replaces the pending PASS 80 ledger entry at the
     // front of the combined changes list instead of duplicating the pass.
@@ -35,7 +35,7 @@ describe('project map', () => {
     ]);
     expect(bundle.current.releaseState).toBe('release-candidate');
     expect(bundle.publishedChannels.liveTarget).toMatchObject({
-      pass: 'PASS 84', label: 'PASS 84', path: 'channels/pass84', state: 'release-candidate',
+      pass: 'PASS 86', label: 'PASS 86', path: 'channels/pass86', state: 'release-candidate',
     });
     expect(bundle.publishedChannels.failedRegressionEvidence).toMatchObject({
       pass: 'PASS 64', role: 'published-failed-regression-evidence',
@@ -50,7 +50,7 @@ describe('project map', () => {
 
   it('reads its current release from the changelog instead of keeping a second copy', () => {
     // HF-406: `projectMapReleaseCopy` used to hand-write a second Pass 73 release note
-    // that the map rendered next to the PASS 84 stamp ('PASS 84 · Pass 73 · release
+    // that the map rendered next to the PASS 86 stamp ('PASS 86 · Pass 73 · release
     // candidate'). There is now exactly one record.
     expect(PROJECT_MAP_RELEASE).toBe(CHANGELOG[0]);
     expect(PROJECT_MAP_RELEASE.areas).not.toContain('HITL');
@@ -77,7 +77,7 @@ describe('project map', () => {
     expect(markdown.indexOf('## Current release snapshot')).toBeLessThan(markdown.indexOf('## Release archive'));
     expect(markdown).toContain(`### ${CHANGELOG[0]?.pass}: ${CHANGELOG[0]?.title}`);
     expect(markdown).toContain('TypeScript and Rapier own physics');
-    expect(markdown).toMatch(/Live target: PASS 84 \(PASS 84\); release-candidate/);
+    expect(markdown).toMatch(/Live target: PASS 86 \(PASS 86\); release-candidate/);
     expect(markdown).toContain('Failed-regression evidence: PASS 64');
   });
 

@@ -1,0 +1,38 @@
+{
+  "verifiedAt": "2026-09-02T23:19:58.176Z",
+  "channelPath": "channels/pass85",
+  "temporaryRoot": "C:\\Users\\david\\AppData\\Local\\Temp\\aa-map3-channel-Nfk2UF",
+  "url": "http://127.0.0.1:4196/channels/pass85/map3.html",
+  "staged": {
+    "channelIndexHtml": true,
+    "channelMap3Html": true,
+    "channelAssets": true,
+    "rootMap3HtmlLeftBehind": false
+  },
+  "requests": {
+    "total": 10,
+    "failed": []
+  },
+  "page": {
+    "title": "Map 3 Demo Showcase",
+    "hasMap3Global": true,
+    "canvasPresent": true,
+    "canvasSize": {
+      "width": 1280,
+      "height": 720
+    },
+    "bannerText": null,
+    "hud": "180 fps · 143 draws · 338k tris · WebGPU · shim 29/118 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D  |  1-8 solo corridor · 0 all · O shadows · P foliage · H half-res"
+  },
+  "assets": {
+    "localReferences": 8,
+    "missingInChannel": [],
+    "missingIfLeftAtDistRoot": 8
+  },
+  "machine": {
+    "freeVramMib": 8701,
+    "comfyQueueDepth": 0,
+    "waitedAttempts": 0
+  },
+  "pageErrors": []
+}

@@ -25,6 +25,8 @@ import {
   createTree, createShrub, createConifer, createFallenLog, createGrassTuft, poissonScatter,
 } from './plants';
 import { createLitterSkirt, hash11, mergeGeometries } from './leaf-geometry';
+// MAP3 (HF-409): the solids a corridor publishes so an arena can collide it.
+import { clusterSolid, uprightSolid, type CorridorSolid } from './corridor-solids';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, createBarkMaterial, createFlatFoliageMaterial,
   createFoliageMaterial, createFoliageUniforms, createForestFloorMaterial,
@@ -66,6 +68,13 @@ export interface Corridor {
   length: number;
   title: string;
   skill: string;
+  /**
+   * MAP3 (HF-409): the corridor's solid parts, in corridor-local metres, for an
+   * arena to turn into movement colliders and shot surfaces. Absent means the
+   * corridor has published none yet - not that it has none.
+   * See `src/map3/corridor-solids.ts`.
+   */
+  solids?: readonly CorridorSolid[];
 }
 
 const CORRIDOR_WIDTH = 9;
@@ -114,6 +123,11 @@ export function createNatureCorridor(seed = 7): Corridor {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  // MAP3 (HF-409): named at creation so an arena's parity audit reports a thing
+  // and not `(unnamed Mesh)`. Names say what the mesh IS - the repo's parity
+  // rules read them, and a name chosen to dodge a rule is a lie the gate cannot
+  // catch.
+  floor.name = 'map3-forest-floor';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo);
@@ -134,6 +148,12 @@ export function createNatureCorridor(seed = 7): Corridor {
     return g;
   };
 
+  // MAP3 (HF-409): every trunk this corridor plants, as a solid. The batched
+  // wood mesh below is ONE merged geometry spanning the whole corridor, so its
+  // bounding box is useless as collision; the scatter that places the trees is
+  // the only place the trunks are individually known.
+  const solids: CorridorSolid[] = [];
+
   /* ---- ZONE A: broadleaf, and the before/after split ------------------ */
   poissonScatter(28, { minX: -11, maxX: 11, minZ: Z1, maxZ: 1 }, 2.6, seed).forEach((p, i) => {
     if (Math.abs(p.x) < 2.0) return; // Keep central trail open for vehicle
@@ -144,6 +164,7 @@ export function createNatureCorridor(seed = 7): Corridor {
       trunkRadius: 0.12 + hash11(seed * 2 + i) * 0.19,
       depth: 3, leavesPerClump: 11, deadFraction: 0.08,
     });
+    solids.push(uprightSolid('trunk-broadleaf', p.x, p.y, 0.12 + hash11(seed * 2 + i) * 0.19, 4.5 + hash11(seed + i) * 6.5, 'wood'));
     wood.push(place(parts.wood, p.x, p.y));
     (before ? flat : green).push(place(parts.foliage, p.x, p.y));
     if (!before) green.push(place(parts.litter, p.x, p.y));
@@ -158,6 +179,7 @@ export function createNatureCorridor(seed = 7): Corridor {
       height: 7 + hash11(seed * 5 + i) * 8,
       trunkRadius: 0.16 + hash11(seed * 6 + i) * 0.14,
     });
+    solids.push(uprightSolid('trunk-conifer', p.x, p.y, 0.16 + hash11(seed * 6 + i) * 0.14, 7 + hash11(seed * 5 + i) * 8, 'wood'));
     darkWood.push(place(parts.wood, p.x, p.y));
     green.push(place(parts.foliage, p.x, p.y));
     green.push(place(parts.litter, p.x, p.y));
@@ -178,6 +200,11 @@ export function createNatureCorridor(seed = 7): Corridor {
       depth: 3, leavesPerClump: young ? 8 : 12,
       deadFraction: young ? 0.05 : 0.55,
     });
+    // A sapling is 7 cm of stem: it bends out of the way in the showcase and it
+    // is not cover here either, so only the grown trees of this grove are solid.
+    if (!young) {
+      solids.push(uprightSolid('trunk-grove', p.x, p.y, 0.13 + hash11(seed * 3 + i) * 0.16, 5 + hash11(seed + i) * 7, 'wood'));
+    }
     wood.push(place(parts.wood, p.x, p.y));
     (young ? spring : autumn).push(place(parts.foliage, p.x, p.y));
     autumn.push(place(parts.litter, p.x, p.y));
@@ -200,23 +227,24 @@ export function createNatureCorridor(seed = 7): Corridor {
     (p.y < Z2 ? autumn : green).push(place(g, p.x, p.y));
   });
 
-  function addBatch(parts: THREE.BufferGeometry[], material: THREE.Material, cast: boolean): void {
+  function addBatch(parts: THREE.BufferGeometry[], material: THREE.Material, cast: boolean, name: string): void {
     if (!parts.length) return;
     const merged = mergeGeometries(parts);
     parts.forEach((g) => g.dispose());
     const mesh = new THREE.Mesh(merged, material);
+    mesh.name = name;
     mesh.castShadow = cast;
     mesh.receiveShadow = !cast;
     group.add(mesh);
     disposables.push(merged);
   }
 
-  addBatch(wood, barkMat, true);
-  addBatch(darkWood, darkBarkMat, true);
-  addBatch(green, foliageMat, false);
-  addBatch(autumn, autumnMat, false);
-  addBatch(spring, springMat, false);
-  addBatch(flat, flatMat, false);
+  addBatch(wood, barkMat, true, 'map3-forest-trunk-batch');
+  addBatch(darkWood, darkBarkMat, true, 'map3-forest-trunk-batch-conifer');
+  addBatch(green, foliageMat, false, 'map3-forest-canopy-leaves-summer');
+  addBatch(autumn, autumnMat, false, 'map3-forest-canopy-leaves-autumn');
+  addBatch(spring, springMat, false, 'map3-forest-canopy-leaves-spring');
+  addBatch(flat, flatMat, false, 'map3-forest-canopy-leaves-flat');
 
   /* ---------------------------------------------------------------- */
   /* 2. Interactive Instanced Vegetation (Saplings, Shrubs, Grass)     */
@@ -257,6 +285,9 @@ export function createNatureCorridor(seed = 7): Corridor {
 
   const saplingWoodMesh = new THREE.InstancedMesh(saplingTemplate.wood, barkMat, saplingPlants.length);
   const saplingFoliageMesh = new THREE.InstancedMesh(saplingTemplate.foliage, foliageMat, saplingPlants.length);
+  // A 7 cm sapling stem that bends out of the way: foliage, not cover.
+  saplingWoodMesh.name = 'map3-forest-sapling-branch-instances';
+  saplingFoliageMesh.name = 'map3-forest-sapling-foliage-instances';
   saplingWoodMesh.castShadow = true;
   saplingWoodMesh.receiveShadow = true;
   group.add(saplingWoodMesh, saplingFoliageMesh);
@@ -286,6 +317,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   }));
 
   const shrubMesh = new THREE.InstancedMesh(shrubGeo, foliageMat, shrubPlants.length);
+  shrubMesh.name = 'map3-forest-shrub-instances';
   group.add(shrubMesh);
   disposables.push(shrubMesh);
 
@@ -313,6 +345,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   }));
 
   const grassMesh = new THREE.InstancedMesh(grassGeo, foliageMat, grassPlants.length);
+  grassMesh.name = 'map3-forest-grass-instances';
   group.add(grassMesh);
   disposables.push(grassMesh);
 
@@ -382,6 +415,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   const bodyMerged = mergeSimple(bodyParts);
   bodyParts.forEach((g) => g.dispose());
   const bodyMesh = new THREE.Mesh(bodyMerged, carBodyMat);
+  bodyMesh.name = 'map3-forest-rover-body';
   bodyMesh.castShadow = true;
   bodyMesh.receiveShadow = true;
   carGroup.add(bodyMesh);
@@ -436,6 +470,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   const steelMerged = mergeSimple(steelParts);
   steelParts.forEach((g) => g.dispose());
   const steelMesh = new THREE.Mesh(steelMerged, carSteelMat);
+  steelMesh.name = 'map3-forest-rover-frame';
   steelMesh.castShadow = true;
   steelMesh.receiveShadow = true;
   carGroup.add(steelMesh);
@@ -459,6 +494,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   const timberMerged = mergeSimple(timberParts);
   timberParts.forEach((g) => g.dispose());
   const timberMesh = new THREE.Mesh(timberMerged, carTimberMat);
+  timberMesh.name = 'map3-forest-rover-tray';
   timberMesh.castShadow = true;
   timberMesh.receiveShadow = true;
   carGroup.add(timberMesh);
@@ -481,6 +517,7 @@ export function createNatureCorridor(seed = 7): Corridor {
   const lightMerged = mergeSimple(lightParts);
   lightParts.forEach((g) => g.dispose());
   const lightMesh = new THREE.Mesh(lightMerged, headlightMat);
+  lightMesh.name = 'map3-forest-rover-lamps';
   carGroup.add(lightMesh);
   disposables.push(lightMerged);
 
@@ -505,6 +542,7 @@ export function createNatureCorridor(seed = 7): Corridor {
     const tireGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 14);
     tireGeo.rotateZ(Math.PI / 2);
     const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.name = 'map3-forest-rover-tyre';
     tire.castShadow = true;
     tire.receiveShadow = true;
     assembly.add(tire);
@@ -512,6 +550,7 @@ export function createNatureCorridor(seed = 7): Corridor {
     const rimGeo = new THREE.CylinderGeometry(WHEEL_R * 0.58, WHEEL_R * 0.58, WHEEL_W * 1.05, 10);
     rimGeo.rotateZ(Math.PI / 2);
     const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.name = 'map3-forest-rover-rim';
     assembly.add(rim);
 
     wheels.push(tire);
@@ -622,6 +661,7 @@ export function createNatureCorridor(seed = 7): Corridor {
     group,
     length: LEN,
     foliage: uniforms,
+    solids,
     title: 'Vegetation bending, leaf translucency & vehicle interaction',
     skill: 'threejs-procedural-vegetation',
     update(elapsed, dt, playerPos) {
@@ -732,6 +772,7 @@ export function createMathsCorridor(): Corridor {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.name = 'map3-raymarch-floor';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo, floorMat);
@@ -860,7 +901,13 @@ export function createMathsCorridor(): Corridor {
   plinthMat.colorNode = vec3(0.1, 0.11, 0.13);
   disposables.push(plinthMat);
 
+  // MAP3 (HF-409): the marcher's proxy box IS the exhibit's mass - the SDF is
+  // rendered on its BackSide, so the player sees a solid block of raymarched
+  // world and must not walk into it - and each block stands on a stone drum.
+  const solids: CorridorSolid[] = [];
   STATIONS.forEach((st) => {
+    solids.push({ name: 'sdf-block', x: 0, y: 2.9, z: st.z, sx: 5.4, sy: 4.8, sz: 5.4, material: 'stone' });
+    solids.push({ name: 'sdf-drum', x: 0, y: 0.25, z: st.z, sx: 4.6, sy: 0.5, sz: 4.6, material: 'stone' });
     const centre = uniform(new THREE.Vector3(0, 2.9, st.z));
     const mat = new MeshStandardNodeMaterial();
     mat.side = THREE.BackSide;
@@ -868,6 +915,7 @@ export function createMathsCorridor(): Corridor {
 
     const geo = new THREE.BoxGeometry(5.4, 4.8, 5.4);
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'map3-raymarch-sdf-block';
     mesh.position.set(0, 2.9, st.z);
     mesh.frustumCulled = false;
     group.add(mesh);
@@ -876,6 +924,7 @@ export function createMathsCorridor(): Corridor {
 
     const pg = new THREE.CylinderGeometry(2.1, 2.5, 0.5, 20);
     const plinth = new THREE.Mesh(pg, plinthMat);
+    plinth.name = 'map3-raymarch-drum';
     plinth.position.set(0, 0.25, st.z);
     plinth.receiveShadow = true;
     group.add(plinth);
@@ -887,6 +936,7 @@ export function createMathsCorridor(): Corridor {
   return {
     group,
     length: LEN,
+    solids,
     title: 'Raymarched SDF — three fields, no geometry',
     skill: 'procedural-sdf-raymarched-worlds',
     update(elapsed) {
@@ -926,6 +976,7 @@ export function createGrammarCorridor(seed = 11): Corridor {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.03, -LEN / 2);   // clear of the hub plane at y=0
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.name = 'map3-grammar-floor';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo, floorMat);
@@ -1068,11 +1119,22 @@ export function createGrammarCorridor(seed = 11): Corridor {
 
   // Three rule sets down the corridor, so walking it shows one pipeline
   // producing a skyline, a village and a ruin.
+  // MAP3 (HF-409): every emitted cluster is masonry and is solid.
+  const solids: CorridorSolid[] = [];
+  let clusterIndex = 0;
   const emit = (parts: THREE.BufferGeometry[], mat: THREE.Material,
                 x: number, z: number, ry: number) => {
     const geo = mergeGeometriesSimple(parts);
     parts.forEach((p) => p.dispose());
+    geo.computeBoundingBox();
+    const bounds = geo.boundingBox;
+    if (bounds) {
+      solids.push(clusterSolid(`cluster-${clusterIndex}`, bounds, x, z, ry,
+        mat === glassMat ? 'glass' : 'stone'));
+    }
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = `map3-grammar-cluster-${clusterIndex}`;
+    clusterIndex += 1;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.position.set(x, 0, z);
@@ -1103,6 +1165,7 @@ export function createGrammarCorridor(seed = 11): Corridor {
   return {
     group,
     length: LEN,
+    solids,
     title: 'Shape grammar — three rule sets, one pipeline',
     skill: 'atomic-acres-procedural-art-authoring',
     update() { /* static exhibit */ },

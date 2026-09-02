@@ -131,6 +131,19 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-40, 12, 2.4, 4.2, 1.4], [40, -12, 2.4, 4.2, 3.9],
     ] as SmokeCard[]),
   }),
+  // NUKETOWN2 (PREVIEW, HF-407): mist sits in the two back yards and the two
+  // cul-de-sacs - the low, still, fenced-in corners - and never on the road.
+  // The road is the only lane whose full 58 m has to read from either end, and
+  // haze across it would soften exactly the sightline the bus exists to break.
+  'nuketown2': Object.freeze({
+    mist: Object.freeze([
+      [-14, -19, 11, 3.4], [14, 19, 11, 3.4], [-24, -2, 9, 3.0],
+      [24, 2, 9, 3.0], [-8, -22, 8, 2.8], [8, 22, 8, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-20, -21, 2.2, 3.8, 1.1], [20, 21, 2.2, 3.8, 3.6],
+    ] as SmokeCard[]),
+  }),
 });
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));

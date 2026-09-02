@@ -1,4 +1,5 @@
-// Mechanical collider/visual parity audit core across ALL SIX arenas.
+// Mechanical collider/visual parity audit core across EVERY arena the game can
+// name - derived, not listed (see ALL_ARENA_IDS below).
 //
 // Shared by:
 //   - scripts/qa/audit-collider-visual-parity.ts (CLI sweep, exit-coded gate)
@@ -34,6 +35,7 @@
 import * as THREE from 'three';
 import type { Box2 } from '../../src/collision';
 import type { ArenaMap } from '../../src/map';
+import { ARENA_IDS } from '../../src/arena-identity';
 
 // ---------------------------------------------------------------------------
 // Calibration constants. These were set against the first measured sweep on
@@ -658,14 +660,19 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
   };
 }
 
-type ArenaFactories = Record<string, { build: ArenaBuild; enrich?: ArenaEnrich }>;
+export type ArenaFactories = Record<string, { build: ArenaBuild; enrich?: ArenaEnrich }>;
 
 let factoriesPromise: Promise<ArenaFactories> | null = null;
 
-async function loadFactories(): Promise<ArenaFactories> {
+/**
+ * The one place the audits learn how the game builds each arena. Exported so a
+ * sibling audit (walkable-surface-parity-core.ts) measures the SAME graph
+ * instead of keeping a second roster that can silently miss a new arena.
+ */
+export async function loadArenaFactories(): Promise<ArenaFactories> {
   if (!factoriesPromise) {
     factoriesPromise = (async () => {
-      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }] = await Promise.all([
+      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }, { buildNuketown2 }] = await Promise.all([
         import('../../src/map'),
         import('../../src/additional-maps'),
         import('../../src/farcrysis'),
@@ -673,7 +680,14 @@ async function loadFactories(): Promise<ArenaFactories> {
         import('../../src/environment-assets'),
         import('../../src/test-maps'),
         import('../../src/map3-arena'),
+        // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins the audit.
+        import('../../src/nuketown2-arena'),
       ]);
+      // MAP3 (HF-409 finisher 2): map3's builder is synchronous but its eighth
+      // corridor needs a wasm module resolved first, so prepare it here - the
+      // one place both the CLI sweep and src/collider-visual-parity-gate.test.ts
+      // reach the factory table through.
+      await (await import('../../src/map3-arena')).prepareMap3();
       return {
         'atomic-acres': {
           build: buildArena,
@@ -692,6 +706,8 @@ async function loadFactories(): Promise<ArenaFactories> {
         test2: { build: buildTest2 },
         // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the audit.
         map3: { build: buildMap3 },
+        // NUKETOWN2 (owner 2026-09-02, HF-407).
+        nuketown2: { build: buildNuketown2 },
       } satisfies ArenaFactories;
     })();
   }
@@ -701,17 +717,23 @@ async function loadFactories(): Promise<ArenaFactories> {
 // Owner 2026-08-30: Test1/Test2 join the mechanical parity audit.
 // MAP3 (owner 2026-09-02, HF-405): Map 3 joins it too. A roster that does not
 // name a shipped arena is a gate that never looked at it.
-export const ALL_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3'] as const;
+//
+// PASS 85 Lane N repair: it was a nine-id literal that happened to be complete
+// on the day it was written, and it had already been hand-edited twice to catch
+// up with a shipped arena. It is now the canonical identity list itself, so the
+// audit covers a new arena on the commit that registers it rather than on the
+// commit somebody remembers this file. Registry ORDER (atomic-acres,
+// skyline-terminal, rustworks-1v1, gun-range, ...) replaces the old hand order;
+// the results array follows the ids it is given, and both consumers derive
+// their expectations from this same constant.
+export const ALL_ARENA_IDS = ARENA_IDS;
 
 /**
- * Runs the mechanical audit for the requested arenas inside plain Node/vitest.
- * Installs the minimal window/document shims environment-assets needs (it reads
- * window.location.search at call time) BEFORE any arena factory is imported or
- * invoked, so the constructed graph matches what the browser builds.
+ * Installs the minimal window/document surface the arena art layers read at
+ * call time, so a headless audit constructs the same graph the browser does.
+ * Idempotent, and shared by every audit that builds an arena in plain Node.
  */
-export async function runColliderVisualParityAudit(
-  arenaIds: readonly string[] = ALL_ARENA_IDS,
-): Promise<ArenaAuditResult[]> {
+export function installHeadlessArenaShims(): void {
   // environment-assets reads window.location.search at call time; this audit
   // runs in plain Node, so shim the minimal surface before any layer attaches.
   (globalThis as { window?: unknown }).window ??= { location: { search: '' } };
@@ -746,8 +768,19 @@ export async function runColliderVisualParityAudit(
       createElement: () => makeCanvas(),
     } as unknown as Document;
   })();
+}
 
-  const factories = await loadFactories();
+/**
+ * Runs the mechanical audit for the requested arenas inside plain Node/vitest.
+ * Installs the minimal window/document shims environment-assets needs (it reads
+ * window.location.search at call time) BEFORE any arena factory is imported or
+ * invoked, so the constructed graph matches what the browser builds.
+ */
+export async function runColliderVisualParityAudit(
+  arenaIds: readonly string[] = ALL_ARENA_IDS,
+): Promise<ArenaAuditResult[]> {
+  installHeadlessArenaShims();
+  const factories = await loadArenaFactories();
   const results: ArenaAuditResult[] = [];
   for (const id of arenaIds) {
     const entry = factories[id];

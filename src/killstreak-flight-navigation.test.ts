@@ -55,7 +55,9 @@ describe('support flight navigation', () => {
     // owner 2026-08-30: Test1/Test2 arenas added.
     // owner 2026-09-02 (HF-405): Map 3 added.
     expect(Object.keys(PASS65_FLIGHT_NAVIGATION).sort()).toEqual([
-      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
+      // NUKETOWN2 (HF-407) added 2026-09-02; the list is sorted, so it lands
+      // between map3 and rustworks-1v1.
+      'atomic-acres', 'farcrysis', 'gun-range', 'high-seas', 'map3', 'nuketown2', 'rustworks-1v1', 'skyline-terminal', 'test1', 'test2',
     ]);
     for (const entry of Object.values(PASS65_FLIGHT_NAVIGATION)) {
       expect(entry.noFlyPolicy).toBe('authoritative-static-and-dynamic-solids');

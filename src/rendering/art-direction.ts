@@ -608,6 +608,58 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       density: 0.7,
     },
   }),
+  // NUKETOWN2 (PREVIEW, HF-407): the Nuke Town rebuild has to read as a
+  // DIFFERENT PLACE from the shipped Nuke Town standing next to it in the
+  // menu, or the owner cannot judge the layout change on its own. The shipped
+  // map is a warm suburban sunset; this one is the same suburb at hard noon on
+  // a test range - bleached, over-lit, the shadows going violet rather than
+  // amber because there is nothing warm left in the sky to bounce.
+  //
+  // The values below are not felt, they are searched: artifacts/
+  // nuketown2-grade-search.mts runs the art-direction test's own probe set and
+  // metric over an in-bounds grid and reports the WEAKEST pair against the nine
+  // shipped arenas. See the numbers recorded beside `gain`.
+  'nuketown2': frozen({
+    id: 'nuketown2',
+    brief: 'Suburban test town under bleached noon - over-lit board siding, violet shade, one saturated bus.',
+    cdl: {
+      // Searched 2026-09-02, not felt: the brightest in-bounds gain in the
+      // catalog (over-lit), the maximum legal lift (noon haze never lets the
+      // blacks close), and a gamma RAMP that opens red and closes blue, which
+      // is what puts the violet in the shade while the sunlit siding stays
+      // near-white. Weakest pair 0.02446 against atomic-acres - above the
+      // test's 0.02157 floor AND above the shipped catalog's own weakest pair
+      // (rustworks-1v1 vs gun-range, 0.02262), measured by the same instrument.
+      // Being closest to atomic-acres is the correct outcome to check hardest:
+      // these two are the SAME PLACE rebuilt, so they had to be pushed apart on
+      // purpose - the shipped map is warm sunset, this one is bleached noon.
+      gain: [1.18, 1.16, 1.12],
+      lift: [0.006, 0.006, 0.006],
+      gamma: [0.92, 0.98, 1.04],
+    },
+    // Saturation and contrast do not enter the distinctiveness metric, so they
+    // are set for readability rather than for separation: barely above neutral,
+    // because an over-lit map is already fighting for contrast.
+    saturationScale: 1.06,
+    contrastScale: 1.06,
+    crosstalkDelta: -0.13,
+    splitTone: {
+      shadowTint: 0x3c2f4e,      // violet shade under a colourless noon sky
+      highlightTint: 0xf6f0e2,   // bleached board siding, almost no hue left
+      strengthScale: 1.0,
+      shadowBalance: 0.52,
+      highlightBalance: 0.42,
+    },
+    midtoneContrastDelta: 0.08,
+    vignette: { base: 0.07, settingScale: 1 },
+    bloom: { intensityScale: 1.0, thresholdScale: 1.06 },
+    atmosphere: {
+      mistNear: 0xd6d2c4, mistFar: 0xf4f0e4,
+      smokeNear: 0x3c3a34, smokeFar: 0x9c988c,
+      dustNear: 0xe2dcc8, dustFar: 0xfaf6ea,
+      density: 0.75,
+    },
+  }),
 });
 
 // Fail closed at module init: an out-of-bounds authored value is a build

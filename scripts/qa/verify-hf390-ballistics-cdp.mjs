@@ -27,7 +27,11 @@ const arg = (name, fallback) => {
 
 const BASE = arg('--url', 'http://127.0.0.1:41973');
 const PER_ARENA_MS = Number(arg('--per-arena', '150000'));
-const ARENAS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas'];
+// PASS 85 Lane N repair: a hardcoded six-arena literal that predated Test1,
+// Test2 and Map 3, so this ballistics sweep could never fire a round in them.
+// Derived from the registry (scripts/qa/arena-roster.mjs); `--arenas` overrides.
+const ARENAS = arg('--arenas', defaultBootRoster())
+  .split(',').map((entry) => entry.trim()).filter(Boolean);
 
 const browser = await chromium.launch({
   headless: true,

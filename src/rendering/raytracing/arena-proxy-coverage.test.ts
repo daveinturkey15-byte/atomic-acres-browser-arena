@@ -96,16 +96,31 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // measurement rather than left at the old one, so this coverage cannot be
   // silently spent later.
   test2: { meshes: 5, footprintM2: 280 },
-  // MAP3 (owner 2026-09-02, HF-405). MEASURED on the authored build, not
-  // guessed: the water bay's two sunken basins either side of its walkway are
-  // the arena's whole reflective budget, authored at roughness 0.10 against
-  // the 0.22 mirror ceiling. 2 meshes / 272.0 m2 (3.4 m x 40 m each), so the
-  // floor is pinned at 272. A stone gallery is a VALUE map and is never going
-  // to be a chrome one, but "never zero anywhere" is the contract this file
-  // exists to hold, and the basins are what holds it here: deleting them
-  // silently would put Map 3 in the exact pass79 state this gate was written
-  // for - a correctly-implemented reflection layer rendering nothing.
-  map3: { meshes: 2, footprintM2: 272 },
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409). RE-MEASURED after the arena
+  // became the corridor showcase: the two authored basins of the stone gallery
+  // are gone and what replaced them is the real thing - the shoreline
+  // corridor's 41 x 54 m Gerstner sea, plus the shape-grammar corridor's glass
+  // tower. 2 meshes / 2,203.6 m2 against the old 272, so the floor RISES to
+  // 2,200 rather than staying where it was: this arena now carries the second
+  // largest reflective body in the game and that coverage must not be
+  // silently spent later. The sea needs its name registered in
+  // ARENA_WATER_SURFACES to be seen at all - its gloss is a TSL Fresnel chain
+  // and `material.roughness` reads it as matte, the same blind spot the
+  // shared ocean's registration exists for.
+  map3: { meshes: 2, footprintM2: 2200 },
+  // NUKETOWN2 (owner 2026-09-02, HF-407). MEASURED on the authored build, not
+  // guessed. This arena first measured ZERO - every surface on it is matte by
+  // design (board siding, dry asphalt, painted vehicle panels), so the tracer
+  // had nothing at all to reflect and this gate caught it on the arena's first
+  // sweep. The fix was to author the two parked cars' PAINT correctly
+  // (roughness 0.20, metalness 0.62 - car paint really is polished and really
+  // is metallic) rather than to gloss a road that should not be glossy. Their
+  // 4.4 x 1.9 m bodies clear the extraction's 6 m2 footprint floor where the
+  // 2.2 x 1.7 m glazing does not. Re-measured: 2 meshes / 16.72 m2, so the
+  // floor is pinned at that measurement and this coverage cannot be silently
+  // spent later. A bleached noon test town is a MATTE map and is never going to
+  // be a chrome one; "never zero anywhere" is the contract, and it is met.
+  nuketown2: { meshes: 2, footprintM2: 16 },
 };
 
 type Coverage = {
@@ -167,6 +182,8 @@ beforeAll(async () => {
     { buildTest1, buildTest2 },
     // MAP3 (owner 2026-09-02, HF-405): Map 3 joins the proxy-coverage sweep.
     { buildMap3 },
+    // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins it too.
+    { buildNuketown2 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -177,10 +194,15 @@ beforeAll(async () => {
     import('../../high-seas'),
     import('../../test-maps'),
     import('../../map3-arena'),
+    import('../../nuketown2-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
   ]);
+
+  // MAP3 (HF-409 finisher 2): buildMap3 is synchronous but its eighth corridor
+  // needs a wasm module resolved first, so it throws until prepare has run.
+  await (await import('../../map3-arena')).prepareMap3();
 
   const factories: Record<string, (scene: THREE.Scene) => unknown> = {
     'atomic-acres': buildArena,
@@ -194,6 +216,11 @@ beforeAll(async () => {
     test2: buildTest2,
     // MAP3 (owner 2026-09-02, HF-405).
     map3: buildMap3,
+    // NUKETOWN2 (owner 2026-09-02, HF-407). This roster is keyed off
+    // ALL_ARENA_IDS, so adding an arena there without a factory here is a hard
+    // TypeError at sweep time rather than a silently unswept arena - which is
+    // the better failure, and the one that fired.
+    nuketown2: buildNuketown2,
   };
 
   for (const id of ALL_ARENA_IDS) {

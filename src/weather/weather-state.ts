@@ -228,6 +228,26 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // the arena is authored for hard midmorning light and rain would contradict
   // the whole grade. Clear and overcast only until it leaves preview.
   'map3': arenaProfile('map3', 'open-scrub-midmorning-clear', false, ['clear', 'overcast']),
+  // NUKETOWN2 (PREVIEW, HF-407): PINNED CLEAR, the same authored posture as
+  // Test1 and Test2 and for the same reason. This arena is authored for hard
+  // bleached noon - its visual module declares `clouds: false`, it flies the
+  // same 'range-midmorning' sky preset Test1 does, and its grade is built on a
+  // colourless high sun - so rain here would fall out of a sky with nothing in
+  // it. Deliberately NOT the shipped Nuke Town's four-rung shower ladder even
+  // though the two are the same place: the rebuild is a different time of day,
+  // and that is the one difference between them that is on purpose.
+  //
+  // Measured while landing this row, and worth the next weather owner's time:
+  // with any multi-rung ladder this arena fails
+  // `never repeats the derived weather signal at any lag inside a match`. The
+  // schedule is seeded by the ARENA ID string, and 'nuketown2' happens to draw
+  // three consecutive 129-149 s phases, so no phase boundary is ever straddled
+  // by a lag-5 sample pair inside the test's 0-320 s window. That is a property
+  // of the gate's fixed seed and sample cadence, not of this arena - four
+  // different rung sets were tried and all four fail identically. Recorded in
+  // the HF-407 lane report rather than fixed here: the gate is not this lane's
+  // to change, and pinning clear is the right authoring call regardless.
+  'nuketown2': arenaProfile('nuketown2', 'test-town-bleached-noon', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

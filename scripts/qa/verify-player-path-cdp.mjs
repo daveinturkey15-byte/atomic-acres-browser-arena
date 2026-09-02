@@ -25,6 +25,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { defaultSelectableRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -36,7 +37,11 @@ const BASE = arg('--url', 'https://daveinturkey15-byte.github.io/atomic-acres-br
 const RENDERER = arg('--renderer', 'webgpu');
 const PER_ARENA_MS = Number(arg('--per-arena', '240000'));
 const CALLSIGN = arg('--callsign', 'qa-player');
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,high-seas')
+// PASS 85 Lane N: this default was a hardcoded FIVE-arena literal, so Test1,
+// Test2 and Map 3 were never swept by it and nothing said so. It is now
+// derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
+// superset of what it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultSelectableRoster())
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 
 const browser = await chromium.launch({

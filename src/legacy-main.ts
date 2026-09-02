@@ -16,6 +16,20 @@ import {
   stanceEyeHeight,
   verifiedStickyAttachment,
 } from './legacy-pure-helpers-2'; // HF-355 round 2
+// HF-412: the Black Ops 2 drop shot - a fixed-duration prone transition that
+// never takes the trigger away. Every timing constant lives in that module.
+import {
+  IDLE_CROUCH_HOLD,
+  beginStanceTransition,
+  crouchHeld,
+  crouchPressed,
+  crouchReleased,
+  restingStanceTransitionSample,
+  sampleStanceTransition,
+  type CrouchHoldState,
+  type StanceTransition,
+  type StanceTransitionSample,
+} from './prone-transition';
 import './style.css';
 // GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
 import {
@@ -146,8 +160,19 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
-// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
-import { buildMap3 } from './map3-arena';
+// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
+// imported here: Map 3 is the one lazily loaded arena (HF-409, see
+// `arenaFactories` below and `src/arena-factory-registry.ts`).
+// MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
+import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
+// MAP3 (HF-409): eager/lazy arena builders behind one registry.
+import {
+  createArenaFactoryRegistry,
+  eagerArena,
+  lazyArena,
+} from './arena-factory-registry';
+// NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407.
+import { buildNuketown2 } from './nuketown2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -232,6 +257,9 @@ import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/kill
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+// MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
+// current arena's mode IS. See src/ui/hud-mode-banner.ts.
+import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
@@ -852,6 +880,7 @@ import {
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
+  CHARACTER_PHYSICS_CONFIG,
   CharacterPhysics,
   MAX_MAJOR_DEBRIS_BODIES,
   worldBoundaryColliders,
@@ -859,6 +888,14 @@ import {
   type MajorDebrisBodySnapshot,
   type DynamicWorldCollider,
 } from './physics';
+import {
+  FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+  FIRST_PERSON_CAMERA_NEAR_METERS,
+  VIEWMODEL_BODY_FIT_SCALE,
+  viewmodelBodyFitLightDistance,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
 import { evaluateInvisibleWallRuntimeGap, INVISIBLE_WALL_RUNTIME_GAP_MESSAGE } from './invisible-wall-runtime-gap';
 import { shedPlacementsForArena } from './destructible-shed-registry';
@@ -876,7 +913,7 @@ import {
 } from './interactive-world-protocol';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorStanceSample, riggedOperatorTelemetry } from './operator-model';
 import { OPERATOR_SKIN_CATALOG, OPERATOR_SKIN_SOURCES, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 import {
   DEFAULT_OPERATOR_EMOTE,
@@ -1024,7 +1061,7 @@ import {
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
-  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  railgunSpawnSitesForArena,
   admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
@@ -2088,7 +2125,10 @@ function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsE
     decalLifetimeScale: budget.decalLifetimeScale * graphicsRuntime.decalScale,
   });
 }
-const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
+// HF-410: the on-foot near plane is a VIEWMODEL number and now lives with the
+// body fit that sizes it. See FIRST_PERSON_CAMERA_NEAR_METERS for the
+// measurement, the reason and the stated depth-precision cost.
+const camera = new THREE.PerspectiveCamera(76, 1, FIRST_PERSON_CAMERA_NEAR_METERS, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
@@ -3291,19 +3331,48 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
-const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
-  'atomic-acres': buildArena,
-  'rustworks-1v1': buildRustworks1v1,
-  'gun-range': buildGunRange,
-  'skyline-terminal': buildSkylineTerminal,
-  farcrysis: buildFarcrysis,
-  'high-seas': buildHighSeas,
+/**
+ * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
+ *
+ * Every arena but Map 3 is `eagerArena(...)`: the same static function
+ * reference this map has always held, resolved with no await and no behaviour
+ * change of any kind. Map 3 alone is `lazyArena(...)`, because its builder
+ * reaches the showcase corridors (~10k lines of TSL) and a static entry here
+ * would park all of it in the boot graph of a player who picked Nuke Town -
+ * directly against the live owner priority, "faster map loads".
+ *
+ * The fetch happens in `performArenaSelection`'s asynchronous preparation
+ * phase, BEFORE construction, so `constructArena` stays synchronous inside the
+ * fenced transaction between the WebGPU fence and the authority commit.
+ * `resolved()` throws rather than returning undefined if that ordering is ever
+ * broken, which is the failure mode worth being loud about.
+ */
+const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'atomic-acres': eagerArena(buildArena),
+  'rustworks-1v1': eagerArena(buildRustworks1v1),
+  'gun-range': eagerArena(buildGunRange),
+  'skyline-terminal': eagerArena(buildSkylineTerminal),
+  farcrysis: eagerArena(buildFarcrysis),
+  'high-seas': eagerArena(buildHighSeas),
   // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
-  test1: buildTest1,
-  test2: buildTest2,
-  // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
-  // architecture rather than the src/map3 showcase corridors.
-  map3: buildMap3,
+  test1: eagerArena(buildTest1),
+  test2: eagerArena(buildTest2),
+  // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
+  //
+  // The loader RESOLVES AND PREPARES. `prepareMap3()` initialises the Rapier
+  // wasm the eighth corridor is built from, and doing it here means
+  // `isResolved(id)` keeps its one meaning for every caller - "the builder can
+  // be called right now" - instead of a lazy arena having a second, invisible
+  // readiness step that only the arena transition knew about.
+  map3: lazyArena(async () => {
+    const module = await import('./map3-arena');
+    await module.prepareMap3();
+    return module.buildMap3;
+  }),
+  // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407. Code-authored replacement
+  // layout for the Nuke Town flow, registered beside the shipped arena so the
+  // main map is never broken mid-pass. See src/nuketown2-arena.ts.
+  nuketown2: eagerArena(buildNuketown2),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -3333,7 +3402,7 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
   const stagingScene = new THREE.Scene();
   let candidate: ArenaMap | null = null;
   try {
-    candidate = arenaFactories[arenaId](stagingScene);
+    candidate = arenaFactories.resolved(arenaId)(stagingScene);
     candidate.root.removeFromParent();
     prepareArenaPresentation(candidate);
     if (recordConstruction) arenaConstructionHistory.push(arenaId);
@@ -3517,6 +3586,15 @@ function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
 // The menu owns prerecorded media. Do not construct, stream, compile, upload,
 // or submit any gameplay arena until the player explicitly deploys.
 let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+/**
+ * MAP3 (HF-409): drives `ArenaMap.update` for the ACTIVE arena only.
+ *
+ * There is exactly one of these and exactly one call site (search `// MAP3:`
+ * in `frame()`). Arenas that do not set `update` - every arena but Map 3 -
+ * pay one property read per frame and nothing else; the context below is
+ * built by a callback the animator only invokes when a hook exists.
+ */
+const arenaFrameAnimator = createArenaFrameAnimator();
 let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
@@ -6076,6 +6154,15 @@ let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
 let stanceRecoveryUntil = 0;
+// HF-412: the in-flight stance transition and this frame's sample of it. The
+// CAPSULE commits to the new stance on the press (authority never lags); only
+// the rendered eye and the third-person body catch up over the fixed window.
+let stanceTransition: StanceTransition | null = null;
+let stanceTransitionSample: StanceTransitionSample = restingStanceTransitionSample('stand');
+// HF-412: hold-crouch-to-prone. The reference's console control, offered on the
+// keyboard too, so the drop shot is reachable from the crouch input alone.
+let crouchHoldState: CrouchHoldState = IDLE_CROUCH_HOLD;
+let gamepadCrouchHeld = false;
 let sprintRecoveryUntil = 0;
 let deferredFireAt = 0;
 let lastGroundedAt = 0;
@@ -6837,6 +6924,14 @@ function selectLobbyCodeForManualCopy(code: string): void {
 }
 
 function currentMatchRules() {
+  // MAP3 (HF-409 finisher 2): an EXPLORE arena has no clock and no score
+  // limit, so nothing can run out and nobody can win. The registry row keeps
+  // `matchRules.durationMs` because the arena id is also the replay/storage
+  // boundary and a saved match naming map3 must still decode - the RUNTIME
+  // rules are what the match state machine reads, and they follow the KIND.
+  // Without this, walking the showcase ends in a VICTORY/DEFEAT card at five
+  // minutes, which is the same lie as the TEAM DEATHMATCH banner.
+  if (selectedArena.kind === 'explore') return EXPLORE_MATCH_RULES;
   if (gameMode === 'solo') return selectedArena.matchRules;
   // HF-377: the lobby config is the replicated match contract; its kill limit
   // applies identically to TDM (squad score) and FFA (leader kills) because
@@ -8198,6 +8293,11 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
   player.selectedGrenade = hostState.grenade;
   player.weapon = hostState.weapon;
   player.stance = hostState.stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.grenades = hostState.grenades;
   player.ammo = { ...hostState.ammo };
   player.reserve = { ...hostState.reserve };
@@ -8974,6 +9074,11 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.selectedGrenade = canonical.grenade;
   player.weapon = canonical.weapon;
   player.stance = stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.seq = Math.max(player.seq, canonical.seq);
   for (const weapon of ORDINARY_WEAPON_IDS) {
     player.ammo[weapon] = projection.combatInventory.ammo[weapon];
@@ -10990,8 +11095,20 @@ player.selectedGrenade = initialLoadoutSelection.grenade;
 player.weapon = player.primaryWeapon;
 renderFieldKitSelection();
 
-const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
-viewFill.position.set(0, 0.4, 0.2);
+// HF-410: this fill lamp lights the first-person layer and nothing else, so it
+// lives inside the body fit with the rig it lights. Position, cutoff radius and
+// physical intensity all scale (irradiance is intensity / r^2), which is what
+// keeps the rig lit exactly as it was before the fit rather than 39x brighter.
+const viewFill = new THREE.PointLight(
+  0xe3f1ff,
+  viewmodelBodyFitLightIntensity(1.35),
+  viewmodelBodyFitLightDistance(5),
+);
+viewFill.position.set(
+  viewmodelRigToWorldMeters(0),
+  viewmodelRigToWorldMeters(0.4),
+  viewmodelRigToWorldMeters(0.2),
+);
 viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
@@ -11337,6 +11454,286 @@ function sampleViewmodelPenetration(): Record<string, unknown> {
     lastGroundedFeetY,
     perMesh: perMesh.slice(0, 12),
     contactFold: weaponView.contactFoldState(),
+  };
+}
+
+/**
+ * HF-410 - THE RIG'S OWN ENVELOPE, measured, in the frames that decide it.
+ *
+ * The penetration sampler answers "is the gun inside something". This answers
+ * the question underneath it: HOW BIG IS THE RIG, and does it fit inside the
+ * body that carries it. Two frames, because two different things are being
+ * asked:
+ *
+ *  - the EYE frame (camera space) decides framing and near-plane safety;
+ *  - the WORLD frame decides collision, and the capsule is vertical in world
+ *    space no matter where the camera is pointing, so the radial number is
+ *    taken as the horizontal distance from the player's own axis and compared
+ *    directly against CHARACTER_PHYSICS_CONFIG.playerRadius.
+ *
+ * A rig whose capsuleRadialMaxM exceeds the capsule radius sticks out of the
+ * player's own collision body, and every wall the capsule may stand next to
+ * therefore intersects it. No retreat, fold, or clip plane can repair that;
+ * only shrinking the envelope can. Debug only; walks full vertex buffers.
+ */
+function sampleViewmodelRigExtent(): Record<string, unknown> {
+  camera.updateWorldMatrix(true, false);
+  const toEye = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+  const vertex = new THREE.Vector3();
+  const eyeVertex = new THREE.Vector3();
+  // HF-410: THE FRAMING, in the only units framing has.
+  //
+  // The fit is a uniform scale about the eye, and a perspective projection is
+  // invariant under exactly that, so the claim "the framing does not change" is
+  // falsifiable here rather than by eye: the rig's normalised-device bounding
+  // box must be the same before and after. This is the side-by-side capture,
+  // expressed as numbers a gate can read.
+  const ndcVertex = new THREE.Vector3();
+  // HF-410: WHAT THE WORLD NEAR PLANE ACTUALLY CUTS.
+  //
+  // `atomicSignal` is hardcoded null, so the depth-cleared first-person overlay
+  // does not run on the shipped WebGPU route: the rig is submitted with the
+  // gameplay camera and its 0.08 m near plane. The fit brings rig points closer
+  // to the eye, so the honest question is not "is anything past the plane" but
+  // "is anything the PLAYER CAN SEE past it". A vertex below the frame is cut
+  // either way and costs nothing; one inside the viewport is a visible defect.
+  const nearPlaneCutMeshes = new Set<string>();
+  let nearPlaneCutVertices = 0;
+  let nearPlaneCutInViewport = 0;
+  // HF-410 REPAIR - THE COUNTERFACTUAL, MEASURED.
+  //
+  // Moving the on-foot plane from 0.08 m to 0.02 m spends a SHARED budget:
+  // depth resolution scales as 1/near, so distant precision goes 4x coarser.
+  // The first pass justified that with "42 of 60 poses had weapon geometry
+  // clipped inside the viewport at 0.08 m" and then shipped no run carrying
+  // that number - the only 0.08 m rows in the tree predate these fields. An
+  // integrator was asked to approve a shared cost against evidence that was not
+  // there.
+  //
+  // It is measurable exactly, in this same pass, from these same vertices: a
+  // perspective matrix's x/y mapping does not depend on `near` (the frustum
+  // extents scale with it), so with the fit in force the set of vertices a
+  // 0.08 m plane would discard is precisely {forward < 0.08}, and each one's
+  // screen position is the one it already has. This is not a simulation of the
+  // old build - it is the old plane applied to the current rig, which is the
+  // question the decision actually turns on.
+  const referenceNearPlaneCutMeshes = new Set<string>();
+  let referenceNearPlaneCutVertices = 0;
+  let referenceNearPlaneCutInViewport = 0;
+  let referenceCutMinY = Number.POSITIVE_INFINITY;
+  let referenceCutMaxY = Number.NEGATIVE_INFINITY;
+  // The nearest ON-SCREEN vertex. This, not the whole rig's nearest point, is
+  // what a near plane has to clear: the sleeve continues below the frame by
+  // contract and cutting it costs nothing.
+  let viewportForwardMin = Number.POSITIVE_INFINITY;
+  let viewportForwardMinMesh: string | null = null;
+  let cutMinX = Number.POSITIVE_INFINITY;
+  let cutMaxX = Number.NEGATIVE_INFINITY;
+  let cutMinY = Number.POSITIVE_INFINITY;
+  let cutMaxY = Number.NEGATIVE_INFINITY;
+  let ndcMinX = Number.POSITIVE_INFINITY;
+  let ndcMaxX = Number.NEGATIVE_INFINITY;
+  let ndcMinY = Number.POSITIVE_INFINITY;
+  let ndcMaxY = Number.NEGATIVE_INFINITY;
+  // HF-410 REPAIR - A FRAMING BOX A GATE CAN ACTUALLY READ.
+  //
+  // The box above deliberately accumulates every vertex in front of the eye,
+  // including ones inside the near plane, so both sides of a before/after
+  // comparison cover the same geometry. The cost is that a vertex approaching
+  // the projection singularity (forward -> 0) throws |ndc| to hundreds and
+  // swamps the box: comparing the fit-disabled and fitted runs at matching
+  // poses, the sniper hip rows differ by -11.55 in ndcMaxX and +16.96 in
+  // ndcMinY, which says nothing about framing and cannot be ratcheted.
+  //
+  // So the DRAWABLE box is reported alongside it: the same measurement
+  // restricted to vertices at or beyond the plane in force, which is exactly
+  // the geometry the rasteriser keeps. That one is stable enough to gate on.
+  let drawnNdcMinX = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxX = Number.NEGATIVE_INFINITY;
+  let drawnNdcMinY = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxY = Number.NEGATIVE_INFINITY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let forwardMin = Number.POSITIVE_INFINITY;
+  let forwardMax = Number.NEGATIVE_INFINITY;
+  let radialMax = 0;
+  let radialMesh: string | null = null;
+  let radialPoint: [number, number, number] | null = null;
+  let forwardMesh: string | null = null;
+  let floorClearance = Number.POSITIVE_INFINITY;
+  let floorMesh: string | null = null;
+  let vertexCount = 0;
+  let meshCount = 0;
+  const feetY = lastGroundedFeetY;
+  const viewmodelPose = weaponView.presentationState();
+  weaponView.root.updateWorldMatrix(true, true);
+  weaponView.root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!materials.some((material) => material && material.visible && material.colorWrite !== false)) return;
+    let ancestor: THREE.Object3D | null = mesh.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return;
+    meshCount += 1;
+    const stride = position.count > 6_000 ? 3 : 1;
+    const name = mesh.name || '(unnamed)';
+    for (let index = 0; index < position.count; index += stride) {
+      worldVertex(mesh, position, index, vertex);
+      vertexCount += 1;
+      const radial = Math.hypot(vertex.x - player.position.x, vertex.z - player.position.z);
+      if (radial > radialMax) {
+        radialMax = radial;
+        radialMesh = name;
+        radialPoint = [vertex.x, vertex.y, vertex.z];
+      }
+      if (feetY !== null) {
+        const clearance = vertex.y - (feetY as number);
+        if (clearance < floorClearance) { floorClearance = clearance; floorMesh = name; }
+      }
+      eyeVertex.copy(vertex).applyMatrix4(toEye);
+      if (eyeVertex.x < minX) minX = eyeVertex.x;
+      if (eyeVertex.x > maxX) maxX = eyeVertex.x;
+      if (eyeVertex.y < minY) minY = eyeVertex.y;
+      if (eyeVertex.y > maxY) maxY = eyeVertex.y;
+      const forward = -eyeVertex.z;
+      if (forward < forwardMin) forwardMin = forward;
+      if (forward > forwardMax) { forwardMax = forward; forwardMesh = name; }
+      if (forward < camera.near && forward > 1e-4) {
+        nearPlaneCutVertices += 1;
+        nearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          nearPlaneCutInViewport += 1;
+          if (ndcVertex.x < cutMinX) cutMinX = ndcVertex.x;
+          if (ndcVertex.x > cutMaxX) cutMaxX = ndcVertex.x;
+          if (ndcVertex.y < cutMinY) cutMinY = ndcVertex.y;
+          if (ndcVertex.y > cutMaxY) cutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward < FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS && forward > 1e-4) {
+        referenceNearPlaneCutVertices += 1;
+        referenceNearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          referenceNearPlaneCutInViewport += 1;
+          if (ndcVertex.y < referenceCutMinY) referenceCutMinY = ndcVertex.y;
+          if (ndcVertex.y > referenceCutMaxY) referenceCutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward > 1e-4 && forward < viewportForwardMin) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          viewportForwardMin = forward;
+          viewportForwardMinMesh = name;
+        }
+      }
+      // Only points in FRONT OF THE EYE project meaningfully. The near plane is
+      // deliberately not the filter: a perspective matrix's x/y mapping is
+      // independent of `near`, so a point inside the plane still reports the
+      // screen position it would occupy, and excluding it would make the two
+      // sides of this comparison cover different geometry.
+      if (forward > 1e-4) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x < ndcMinX) ndcMinX = ndcVertex.x;
+        if (ndcVertex.x > ndcMaxX) ndcMaxX = ndcVertex.x;
+        if (ndcVertex.y < ndcMinY) ndcMinY = ndcVertex.y;
+        if (ndcVertex.y > ndcMaxY) ndcMaxY = ndcVertex.y;
+        if (forward >= camera.near) {
+          if (ndcVertex.x < drawnNdcMinX) drawnNdcMinX = ndcVertex.x;
+          if (ndcVertex.x > drawnNdcMaxX) drawnNdcMaxX = ndcVertex.x;
+          if (ndcVertex.y < drawnNdcMinY) drawnNdcMinY = ndcVertex.y;
+          if (ndcVertex.y > drawnNdcMaxY) drawnNdcMaxY = ndcVertex.y;
+        }
+      }
+    }
+  });
+  const round = (value: number): number | null => (
+    Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null
+  );
+  return {
+    contract: 'viewmodel-rig-extent-v1',
+    /** HF-410: the fit in force when this row was measured. 1 is unfitted. */
+    bodyFitScale: VIEWMODEL_BODY_FIT_SCALE,
+    weapon: player.weapon,
+    stance: player.stance,
+    adsBlend: Math.round(weaponView.adsProgress() * 1000) / 1000,
+    meshesMeasured: meshCount,
+    verticesMeasured: vertexCount,
+    /** Metres the forward-most visible vertex sits ahead of the eye. */
+    eyeForwardMaxM: round(forwardMax),
+    /** Metres the rear-most visible vertex sits ahead of the eye (negative: behind it). */
+    eyeForwardMinM: round(forwardMin),
+    eyeLateralMinM: round(minX),
+    eyeLateralMaxM: round(maxX),
+    eyeDownMaxM: round(-minY),
+    eyeUpMaxM: round(maxY),
+    /** THE NUMBER THIS LANE EXISTS FOR: horizontal metres from the player's own axis. */
+    capsuleRadialMaxM: round(radialMax),
+    capsuleRadiusM: CHARACTER_PHYSICS_CONFIG.playerRadius,
+    /** Positive: the rig fits inside the capsule. Negative: it sticks out by this much. */
+    capsuleMarginM: round(CHARACTER_PHYSICS_CONFIG.playerRadius - radialMax),
+    radialMesh,
+    radialPoint,
+    forwardMesh,
+    /** Metres the lowest visible vertex sits above the tracked standing surface. */
+    floorClearanceMinM: round(floorClearance),
+    floorMesh,
+    // HF-410: WHAT THE POSE WAS DOING WHEN THIS FRAME WAS MEASURED.
+    //
+    // Without these the extent numbers cannot be read: a rig that sits lower on
+    // screen might have been fitted, or might simply have stopped being shoved
+    // upward by a floor probe. The owner's complaint is about the second.
+    surfaceRetreatM: viewmodelPose.surfaceRetreat,
+    surfaceLiftM: viewmodelPose.surfaceLift,
+    contactLiftM: viewmodelPose.contactResponse.additionalLiftMeters,
+    contactDropM: viewmodelPose.contactResponse.additionalDropMeters,
+    contactPitchRadians: viewmodelPose.contactResponse.pitchRadians,
+    contactWallBlend: viewmodelPose.contactResponse.wallBlend,
+    contactFloorBlend: viewmodelPose.contactResponse.floorBlend,
+    foldPitchRadians: weaponView.contactFoldState().foldPitchRadians,
+    foldRetreatM: weaponView.contactFoldState().retreatMeters,
+    /** Visible vertices the gameplay camera's near plane discards, and how many are on screen. */
+    nearPlaneCutVertices,
+    nearPlaneCutInViewport,
+    nearPlaneCutMeshes: [...nearPlaneCutMeshes],
+    /**
+     * HF-410 REPAIR: the same counts under the plane this build shipped with
+     * BEFORE the fit (0.08 m), computed exactly from the same vertices. This is
+     * what the near-plane change bought, in the tree, per pose.
+     */
+    referenceNearM: FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+    referenceNearPlaneCutVertices,
+    referenceNearPlaneCutInViewport,
+    referenceNearPlaneCutMeshes: [...referenceNearPlaneCutMeshes],
+    referenceCutNdcMinY: round(referenceCutMinY),
+    referenceCutNdcMaxY: round(referenceCutMaxY),
+    /** WHERE on screen the cut lands. Bottom-edge only is invisible; anything higher is not. */
+    cutNdcMinX: round(cutMinX), cutNdcMaxX: round(cutMaxX),
+    cutNdcMinY: round(cutMinY), cutNdcMaxY: round(cutMaxY),
+    /** THE NEAR PLANE THE RIG ACTUALLY NEEDS: nearest ON-SCREEN vertex, metres. */
+    viewportForwardMinM: Number.isFinite(viewportForwardMin)
+      ? Math.round(viewportForwardMin * 10_000) / 10_000
+      : null,
+    viewportForwardMinMesh,
+    /** THE FRAMING. Identical before and after the fit, or the fit changed the picture. */
+    ndcMinX: round(ndcMinX), ndcMaxX: round(ndcMaxX),
+    ndcMinY: round(ndcMinY), ndcMaxY: round(ndcMaxY),
+    /** The same box over DRAWN geometry only - free of the projection singularity. */
+    drawnNdcMinX: round(drawnNdcMinX), drawnNdcMaxX: round(drawnNdcMaxX),
+    drawnNdcMinY: round(drawnNdcMinY), drawnNdcMaxY: round(drawnNdcMaxY),
+    /** Metres between the nearest visible vertex and the render camera near plane. */
+    nearPlaneMarginM: round(forwardMin - camera.near),
+    cameraNearM: camera.near,
+    cameraFovDegrees: camera.fov,
+    eyeHeightM: round(camera.position.y),
+    lastGroundedFeetY: feetY,
   };
 }
 
@@ -16342,20 +16739,52 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   if (!playerGrounded && target !== 'crouch') return false;
   if (target === player.stance) return true;
   const previous = player.stance;
-  const before = characterPhysics.eyePosition();
   if (!characterPhysics.setStance(target)) {
     setStatus('Low clearance — stance change blocked.', 'warn');
     return false;
   }
   const after = characterPhysics.eyePosition();
-  // Keep the rendered camera inside the newly authoritative capsule. A large
-  // cosmetic eye-height lag could leave the camera in ceilings/walls on prone.
-  cameraHeightOffset = THREE.MathUtils.clamp(cameraHeightOffset + before.y - after.y, -0.12, 0.12);
+  // HF-412: the DROP SHOT. What used to happen here was a teleport plus a fire
+  // block: the eye moved the whole 1.09 m in one frame (only 0.12 m of it was
+  // ever smoothed) and `stanceRecoveryUntil` refused the trigger for 260 ms
+  // going down and 290 ms coming up. Measured on the shipped build (75a4e508),
+  // that was 30 consecutive refused shots across one drop - the tracked receipt
+  // is docs/evidence/pass85/hf412/before-test1-quiet.json, and an independent
+  // re-measurement of the same base reported 29. (Commit 98f88e4e's message and
+  // three source comments quoted 54 from an earlier noisy run that was
+  // discarded; that run is not in the tree and is superseded by the receipt
+  // named here.) Black Ops 2's drop shot is the opposite of both: the body
+  // falls over a short FIXED window and the trigger is never taken away.
+  //
+  // The capsule, the hit proxies, the replicated stance and every authority
+  // decision still commit on the press - only the presented eye and the visible
+  // body catch up - so nothing about hit registration or netcode moves.
+  const now = performance.now();
+  stanceTransition = beginStanceTransition(previous, target, now);
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, target);
+  // The generic bob/land offset is deliberately left alone: it used to absorb a
+  // clamped 0.12 m of the stance change, which is why the shipped drop still
+  // read as a teleport. The transition above owns the whole height delta now,
+  // and adding a second copy of it here would double-count the fall.
   player.position.set(after.x, after.y, after.z);
   player.stance = target;
-  stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
+  // A plain crouch step keeps its small readiness cost; a prone transition -
+  // the drop shot itself - deliberately sets NONE, which is what makes firing
+  // continuous across the drop. `src/prone-transition.test.ts` pins that both
+  // prone arms of the old expression stay gone.
+  if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
   currentSprinting = false;
   return true;
+}
+
+/**
+ * HF-412: go prone, never toggle back out. `requestStance('toggle-prone')` is a
+ * toggle, so the hold-crouch control needs an absolute "get down" so that
+ * holding crouch while already prone does not stand the player up mid-burst.
+ */
+function dropToProne(): boolean {
+  if (player.stance === 'prone') return true;
+  return requestStance('toggle-prone');
 }
 
 function respawn(
@@ -16407,6 +16836,12 @@ function respawn(
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
   stanceRecoveryUntil = 0;
+  // HF-412: a respawned player is standing, not mid-drop, and is not holding
+  // the crouch button they may have died with down.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample('stand');
+  crouchHoldState = IDLE_CROUCH_HOLD;
+  gamepadCrouchHeld = false;
   sprintRecoveryUntil = 0;
   deferredFireAt = 0;
   cameraHeightOffset = 0;
@@ -16880,10 +17315,22 @@ async function startGame(
   respawnTimer = null;
   respawnEndsAt = 0;
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+  // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
+  // This runs once, before the first frame, so an explore arena never shows a
+  // single frame of TEAM DEATHMATCH / 05:00 / AQUA-CORAL before the per-frame
+  // writer below corrects it.
+  const startBanner = hudModeBanner({
+    arena: selectedArena, site: 'match-start',
+    domination: dominationModeActive(), freeForAll: false, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  element<HTMLElement>('#timer').hidden = !startBanner.clock;
+  element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
+  element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
+  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
   element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -18607,7 +19054,20 @@ function tryFire(now: number): void {
   // is still exactly camera-forward and the shot is still cast this same frame,
   // so neither the authoritative ray nor hit timing moves. Open space reports a
   // zero penalty, which leaves this byte-for-byte identical to the old cone.
-  const admittedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
+  const obstructedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
+  // HF-412: the reference's drop-shot cost. Players describe drop shotting as a
+  // close-range technique precisely because the rounds that go out WHILE you
+  // are falling are inaccurate - the answer is a wider cone, never a refused
+  // shot. Applies only during a prone transition (1.0 otherwise), peaks at the
+  // middle of the fall and is back to 1.0 the instant the body is down.
+  //
+  // HIP FIRE ONLY. `computeSpread` has already resolved the ads/moving/stance
+  // inputs above, so multiplying its output unconditionally would also widen
+  // the ADS cone - an accuracy penalty nobody documented or asked for. A shot
+  // taken with the sights settled therefore keeps the cone it earned.
+  const dropShotSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  const dropShotSpreadMultiplier = adsSettled ? 1 : dropShotSample.spreadMultiplier;
+  const admittedSpread = obstructedSpread * dropShotSpreadMultiplier;
   const shotTimeline = network.role === 'client'
     ? freezeAuthoredShotTimeline(
         currentHostTimeMs(),
@@ -18645,8 +19105,14 @@ function tryFire(now: number): void {
   // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
   // the barrel axis, so the protected centre cone still applies unchanged.
   if (!flamethrowerShot && !projectileShot) {
+    // HF-410 REPAIR: the WORLD anchor, not the rig socket. Under the body fit
+    // the socket sits ~0.25 m from the eye, inside PARTICLE_READABILITY's hard
+    // 0.35 m near-lens cull, so smoke emitted there is never drawn at all.
+    // muzzleEffectWorldPosition() undoes the uniform scale about the eye, which
+    // puts the anchor back at the world distance it shipped at while keeping
+    // the same pixel on screen.
     hfParticleRuntime.emitMuzzleSmoke(
-      weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin,
+      weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin,
       baseDirection,
       cameraUp,
     );
@@ -18682,7 +19148,10 @@ function tryFire(now: number): void {
       end: Object.freeze({ x: authoritativeEnd.x, y: authoritativeEnd.y, z: authoritativeEnd.z }),
     }));
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
-    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    // HF-410 REPAIR: same reason as emitMuzzleSmoke above - the tracer and the
+    // flamethrower stream are world-space presentations and must start from the
+    // unfitted muzzle point, which is the same pixel and the shipped distance.
+    const visualStart = weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin;
     if (flamethrowerShot) {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
@@ -19517,6 +19986,11 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
+    // HF-412: 'stand' is hardcoded because BotPlayer carries no stance at all -
+    // the bot AI never crouches or goes prone, so there is no stance to pose
+    // from. Remote PEERS do carry a replicated stance and do play the prone
+    // transition (see the remote pose call in renderRemotes). Giving bots a
+    // simulated stance is its own ledger row, not part of this one.
     poseOperator(bot.root, 'stand', speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
@@ -20209,6 +20683,9 @@ function updateBots(dt: number, now: number): void {
     const lookPitch = lineOfSight
       ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
       : 0;
+    // HF-412: as above - bots have no stance state, so this is the honest pose,
+    // not a drop-shot omission. Only the QA presentation override can put a bot
+    // body prone.
     poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
@@ -23791,8 +24268,9 @@ function resetKillstreakPossessionPresentation(): void {
   // somewhere".
   cameraShakeState = createCameraShakeState(cameraShakeState.seed);
   cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
 }
@@ -23817,7 +24295,8 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  // HF-410: the gunner cockpit mirrored the on-foot plane; the drone keeps its own.
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? FIRST_PERSON_CAMERA_NEAR_METERS : 0.35;
   if (camera.near !== supportCameraNear) {
     camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
@@ -25674,8 +26153,9 @@ function clearFieldSupport(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
   document.documentElement.dataset.killstreakPossession = 'none';
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
   weaponView.setPresentationVisible(player.alive);
@@ -25801,6 +26281,18 @@ function updatePhysics(dt: number): void {
   const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
+  // HF-412: hold-crouch-to-prone, polled here because a held key produces no
+  // further keydown events and a pad button produces no edge. Tapping crouch
+  // crouches (handled on the press edge); keeping it down past
+  // DROP_SHOT_TIMING.holdCrouchToProneMs drops to prone, once per hold.
+  const crouchInputDown = actionHeld('crouch', keys, keyProfile) || gamepadCrouchHeld;
+  if (crouchInputDown) {
+    const held = crouchHeld(crouchHoldState, now);
+    crouchHoldState = held.state;
+    if (held.action === 'prone') dropToProne();
+  } else if (crouchHoldState.pressedAtMs !== null) {
+    crouchHoldState = crouchReleased().state;
+  }
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
   const wantsSprint = (
@@ -26083,8 +26575,15 @@ function updatePhysics(dt: number): void {
     baseFovDegrees: preferredFov,
     cameraFovDegrees: camera.fov,
   }));
+  // HF-412: sample the drop-shot transition once per frame. The authoritative
+  // eye (player.position) is already at the new stance; this is the lag the
+  // PLAYER sees, and it eases to exactly zero, so the camera lands on the
+  // authoritative seat rather than settling near it.
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  if (!stanceTransitionSample.active) stanceTransition = null;
   camera.position.copy(player.position);
-  camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
+  camera.position.y += stanceTransitionSample.eyeOffsetMeters
+    + cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
   camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
   camera.rotation.z = cameraRoll * accessibilityRuntime.weaponMotionScale;
@@ -26122,7 +26621,11 @@ function updatePhysics(dt: number): void {
   // across-all-maps answer the per-arena geometry fixes kept missing (see
   // docs/eye-clearance/ledger.json deferred classes).
   // Floor and terrain near-plane standoff: prevent camera frustum from dipping below floor
-  camera.position.y = Math.max(player.position.y + 0.14, camera.position.y);
+  // HF-412: measured from the RENDERED eye. Taken from the authoritative eye
+  // it clamped the whole prone->stand transition away in one frame, because
+  // during that rise the presented camera is deliberately BELOW the standing
+  // seat it is climbing toward.
+  camera.position.y = Math.max(player.position.y + stanceTransitionSample.eyeOffsetMeters + 0.14, camera.position.y);
   // ... and the surface resolve runs LAST with the final say: when the fixed
   // standoff shoves the eye into a sloped underside (skyline airstair belly,
   // ramp bellies), the resolve's own down probe still keeps it off floors
@@ -26421,7 +26924,38 @@ function updateMatchState(now: number): void {
   updateDominationHud();
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
     .filter((score) => !score.id.startsWith('host-bot-')));
-  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
+  // MAP3 (HF-409 finisher 3): THE EXPLORE WARMUP DEADLOCK.
+  //
+  // `preserveSoloCountdownCue` exists so a long solo render stall cannot
+  // consume an unseen 3-2-1 edge: while the next cue has not been presented it
+  // pushes warmup's endsAt back to now + N seconds, EVERY FRAME, until that cue
+  // is shown. `lastMatchCountdownCue` starts null, so the cue it waits for is
+  // '3'.
+  //
+  // An explore arena presents no countdown at all - that is the point, there is
+  // no match to count in - so '3' is never presented, `lastMatchCountdownCue`
+  // stays null, and warmup is extended forever. `advanceMatch` only leaves
+  // warmup when `now >= state.endsAt`, which by construction never happens.
+  //
+  // Measured on this tree before this fix: Map 3 sat in `warmup` for the full
+  // 120 s of a boot probe and never reached `active`. That is not cosmetic -
+  // `gameplayInputEnabled()` requires `phase === 'active'`, so the arena the
+  // owner asked to be able to WALK rendered at 53 fps with a correct explore
+  // HUD and would not accept a single movement input, permanently. The
+  // pass74 arena boot smoke fails on map3 for exactly this reason.
+  //
+  // So the hold is gated on there being a cue to hold FOR. This is the same
+  // declared decision the HUD uses, not a second opinion about explore arenas.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  matchState = preserveSoloCountdownCue(
+    matchState,
+    now,
+    lastMatchCountdownCue,
+    gameMode === 'solo' && countdownCueAllowed,
+  );
   const preAdvanceState = matchState;
   const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
@@ -26451,7 +26985,11 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  if (matchState.phase === 'warmup') {
+  // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
+  // match to start, so the 3-2-1 cue and its audio would be announcing one.
+  // `countdownCueAllowed` is computed once, above, because the warmup hold and
+  // the cue presentation must agree - when they disagreed, warmup never ended.
+  if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
       const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
@@ -26462,9 +27000,14 @@ function updateMatchState(now: number): void {
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
   if (matchState.phase === 'active') {
-    const engageSequence = presentMatchCountdownCue('engage');
-    audio.matchCountdown('engage');
-    lastMatchCountdownCue = 'engage';
+    // MAP3 (HF-409 finisher 2): "ENGAGE" is a combat word and the big centre
+    // cue is a match-start cue. An explore arena gets neither - it is opened,
+    // not started - so it is welcomed in instead and nothing counts down.
+    const engageSequence = countdownCueAllowed ? presentMatchCountdownCue('engage') : null;
+    if (countdownCueAllowed) {
+      audio.matchCountdown('engage');
+      lastMatchCountdownCue = 'engage';
+    }
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
@@ -26472,12 +27015,13 @@ function updateMatchState(now: number): void {
     // announcement that took over or queued behind it.
     presentBanner(
       'match-flow',
-      'ENGAGE',
+      countdownCueAllowed ? 'ENGAGE' : 'EXPLORE',
       privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
       900,
     );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
+      if (engageSequence === null) return;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -27182,7 +27726,15 @@ function updateHud(now: number): void {
     ? [rangeScore, targetHits]
     : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
       : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+  // MAP3 (HF-409 finisher 2): see src/ui/hud-mode-banner.ts. Reproduces this
+  // site's previous conditional exactly for every team arena.
+  const banner = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  element<HTMLElement>('#timer').hidden = !banner.clock;
+  element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
@@ -27195,11 +27747,11 @@ function updateHud(now: number): void {
   });
   previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective;
+      : presentation.objective);
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
@@ -27371,8 +27923,14 @@ function renderKeyBindingRows(): void {
   rows.innerHTML = GAMEPLAY_ACTIONS.map((action) => {
     const keysLabel = profile[action].map(prettyKeyCode).join(' / ');
     const capturing = keyBindingCaptureAction === action;
+    // HF-412: the drop shot's second control is a HOLD of an existing bind, so
+    // it has no row of its own. Say so on the row it actually belongs to,
+    // reading the live crouch bind rather than a hardcoded key.
+    const proneHint = action === 'prone'
+      ? ` <span class="binding-hint">or hold ${profile.crouch.map(prettyKeyCode).join(' / ')}</span>`
+      : '';
     return `<div class="key-binding-row${capturing ? ' capturing' : ''}" data-action="${action}">
-      <span class="binding-action">${ACTION_LABELS[action]}</span>
+      <span class="binding-action">${ACTION_LABELS[action]}${proneHint}</span>
       <kbd>${capturing ? 'PRESS A KEY…' : keysLabel}</kbd>
       <button type="button" data-rebind="${action}">${capturing ? 'CANCEL' : 'REBIND'}</button>
     </div>`;
@@ -27948,6 +28506,8 @@ function pollGamepad(dt: number): void {
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
   gamepadTriggerHeld = padTriggerActive;
   gamepadSprint = canControlPlayer && frame.held('sprint');
+  // HF-412: published for the hold-crouch poll in updatePhysics.
+  gamepadCrouchHeld = canControlPlayer && frame.held('crouch');
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
   gamepadMove = canControlPlayer ? { x: frame.move.x, y: frame.move.y } : { x: 0, y: 0 };
@@ -27999,7 +28559,16 @@ function pollGamepad(dt: number): void {
         if (player.stance !== 'stand') requestStance('stand');
         jumpQueuedAt = now;
       }
-      if (frame.pressed('crouch')) requestStance('toggle-crouch');
+      // HF-412: same control as the keyboard. The pad's dedicated prone
+      // button still works and stays remappable; holding the crouch button is
+      // the reference's own console drop-shot control.
+      if (frame.pressed('crouch')) {
+        // The stance AT THE PRESS decides whether the hold may deepen to prone:
+        // from prone this press is how the player gets up.
+        const pressed = crouchPressed(crouchHoldState, now, player.stance);
+        crouchHoldState = pressed.state;
+        if (pressed.action === 'crouch') requestStance('toggle-crouch');
+      }
       if (frame.pressed('prone')) requestStance('toggle-prone');
       // Reload and interact may share one face button: interact wins while a
       // prompt is showing, otherwise the press reloads.
@@ -28301,7 +28870,15 @@ window.addEventListener('keydown', (event) => {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
     }
-    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) requestStance('toggle-crouch');
+    // HF-412: the press still toggles crouch exactly as it always has; holding
+    // it past DROP_SHOT_TIMING.holdCrouchToProneMs converts to prone (the
+    // reference's console control, offered on the keyboard too). The hold is
+    // polled in the frame loop, which is where key-repeat cannot reach it.
+    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) {
+      const pressed = crouchPressed(crouchHoldState, performance.now(), player.stance);
+      crouchHoldState = pressed.state;
+      if (pressed.action === 'crouch') requestStance('toggle-crouch');
+    }
     if (actionMatchesCode('prone', event.code, keyProfile) && !event.repeat) requestStance('toggle-prone');
     if (actionMatchesCode('weapon-1', event.code, keyProfile)) switchWeapon(0);
     if (actionMatchesCode('weapon-2', event.code, keyProfile)) switchWeapon(1);
@@ -28496,6 +29073,19 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  // MAP3 (HF-409): the standalone showcase link. Present only for an arena that
+  // declares a second page, and relative to THIS document, so it resolves
+  // inside whatever release channel the player loaded the game from.
+  const showcaseLink = element<HTMLAnchorElement>('#arena-showcase-link');
+  const showcasePath = selectedArena.showcasePath;
+  if (showcasePath) {
+    showcaseLink.setAttribute('href', showcasePath);
+    showcaseLink.title = `Open the ${selectedArena.displayName} showcase fly-through in a new tab`;
+    showcaseLink.hidden = false;
+  } else {
+    showcaseLink.removeAttribute('href');
+    showcaseLink.hidden = true;
+  }
   canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
@@ -28709,6 +29299,15 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    // MAP3 (HF-409): fetch a lazily loaded arena's builder chunk HERE, in the
+    // preparation phase, so the construction below stays synchronous inside the
+    // fence. The guard matters: an eager arena must not gain even a microtask
+    // boundary it did not have before, so it never touches this await at all.
+    if (!arenaFactories.isResolved(nextSelection.id)) {
+      profileArenaTransition('arena-factory-load');
+      await arenaFactories.resolve(nextSelection.id);
+      assertAdmission();
+    }
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
@@ -30031,6 +30630,15 @@ function frame(now: number, scheduleNext = true): void {
     updateTargets(selectedArena.id === 'gun-range'
       ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
       : visualNow);
+    // MAP3 (HF-409): advance arena-authored animation for the active arena.
+    // `arena` is the admitted arena; staged and cached arenas are never passed
+    // here, so a not-yet-admitted world cannot advance its clock behind the
+    // loading transition. The context factory allocates only when a hook exists.
+    arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
+      arenaId: arena.id,
+      cameraPosition: camera.position,
+      playerVelocity: player.velocity,
+    }));
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
@@ -30803,6 +31411,50 @@ function sampleDmrThermalReadiness() {
   });
 }
 
+/**
+ * HF-412: the CHEAP per-frame read of a third-person body's stance blend, for
+ * the drop-shot body and guest harnesses.
+ *
+ * The full operator snapshot rebuilds the whole report (every bone chain in the
+ * scene) and stretched the body harness's sampling frame to ~65 ms, which made
+ * its "single frame" numbers sample deltas rather than frames. This walks
+ * nothing: it reads the rig runtime's five stance fields directly.
+ *
+ * `kind: 'remote'` is the guest's view of another PLAYER (the path that matters
+ * for the ledger's two-client falsifier); `kind: 'bot'` is the local rig the
+ * QA presentation override drives.
+ */
+function sampleBodyStancePose(kind: 'bot' | 'remote' = 'bot') {
+  let id: string | null = null;
+  let operator: THREE.Object3D | undefined;
+  if (kind === 'remote') {
+    for (const [remoteId, remote] of remotes) {
+      id = remoteId;
+      operator = remote.root.userData.operator as THREE.Object3D | undefined;
+      break;
+    }
+  } else {
+    for (const [botId, bot] of bots) {
+      id = botId;
+      operator = bot.root;
+      break;
+    }
+  }
+  const sample = riggedOperatorStanceSample(operator);
+  return Object.freeze({
+    kind,
+    id,
+    found: sample !== null,
+    atMs: performance.now(),
+    stance: sample?.stance ?? null,
+    blendFrom: sample?.blendFrom ?? null,
+    blendProgress: sample?.blendProgress ?? null,
+    crouchBlend: sample?.crouchBlend ?? null,
+    proneBlend: sample?.proneBlend ?? null,
+    pivotHeight: sample?.pivotHeight ?? null,
+  });
+}
+
 function sampleWeaponActionReadiness() {
   const now = performance.now();
   return Object.freeze({
@@ -30818,6 +31470,18 @@ function sampleWeaponActionReadiness() {
     possessed: localKillstreakActorSnapshot()?.possession?.kind ?? null,
     stanceRecoveryRemainingMs: Math.max(0, stanceRecoveryUntil - now),
     sprintRecoveryRemainingMs: Math.max(0, sprintRecoveryUntil - now),
+    // HF-412: the drop-shot transition, so a harness can assert the shape of
+    // the fall instead of inferring it from camera samples alone.
+    dropShot: {
+      active: stanceTransitionSample.active,
+      from: stanceTransitionSample.from,
+      to: stanceTransitionSample.to,
+      progress: stanceTransitionSample.progress,
+      eyeOffsetMeters: stanceTransitionSample.eyeOffsetMeters,
+      spreadMultiplier: stanceTransitionSample.spreadMultiplier,
+      dropping: stanceTransitionSample.dropping,
+      durationMs: stanceTransition?.durationMs ?? 0,
+    },
     nextShotRemainingMs: Math.max(0, player.nextShotAt - now),
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
@@ -31106,7 +31770,7 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
-    // MP-LAB: the cheap pose read for movement probes. snapshot() walks every
+    // MP-LAB: the cheap pose read for movement probes. The full snapshot walks every
     // rigged actor's skinned meshes and costs ~60 ms per call (measured
     // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
     // it is measuring. This returns only what a deadlock check needs.
@@ -31133,6 +31797,8 @@ const debugWindow = window as Window & {
     };
     sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
     sampleViewmodelPenetration: () => Record<string, unknown>;
+    /** HF-410: the rig's own envelope against the capsule that carries it. */
+    sampleViewmodelRigExtent: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
@@ -31146,7 +31812,10 @@ const debugWindow = window as Window & {
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    /** HF-412: cheap third-person stance-blend read; see sampleBodyStancePose. */
+    sampleBodyStancePose: (kind?: 'bot' | 'remote') => ReturnType<typeof sampleBodyStancePose>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
+    prepareArena: (arenaId: ArenaId) => Promise<void>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -32343,6 +33012,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     triggerHeld: gamepadTriggerHeld,
   }),
   sampleViewmodelPenetration,
+  sampleViewmodelRigExtent,
   // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
   // runtime coefficient revert). This probe ends the guessing: live bus
   // gains, context state, the music scheduler flag and a real output
@@ -32444,6 +33114,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleBodyStancePose,
   sampleGrenadeColdPathTelemetry,
   // MP-LAB: see the type; nothing here allocates beyond the returned object.
   samplePlayerPose: () => ({
@@ -33601,6 +34272,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  /**
+   * MAP3 (HF-409 finisher 2): make a NON-ACTIVE arena buildable.
+   *
+   * `traceBallistics(..., arenaId)` builds an arena it is not standing in, on
+   * the spot and synchronously, and that is how the eye-clearance stage-2
+   * sweep probes every arena from one page. A lazily loaded arena (map3) has a
+   * chunk to fetch and a wasm module to initialise before its builder exists,
+   * and neither can happen inside a synchronous call. So the wait is a
+   * separate, awaitable step: call this first and the probe below works.
+   * Resolving an eager arena is a no-op that costs one microtask.
+   */
+  prepareArena: async (arenaId) => { await arenaFactories.resolve(arenaId); },
   traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;
@@ -35113,9 +35796,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastOverdriveState(now);
   },
   stageRailgunSpawn: (siteIndex = 0) => {
-    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
-    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
-    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
+    // HF-407: the staging path is arena-scoped, not Nuke-Town-scoped. Hard-coding
+    // 'atomic-acres' here while the player stood in another railgun arena would have
+    // staged the pickup at the SHIPPED map's coordinates - a debug backdoor telling a
+    // QA run the weapon works where a real match would put it somewhere else.
+    const stagedSites = gameStarted ? railgunSpawnSitesForArena(selectedArena.id) : null;
+    if (!stagedSites) return railgunState;
+    const boundedIndex = Math.max(0, Math.min(stagedSites.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState(selectedArena.id, 0, (boundedIndex + 0.01) / stagedSites.length, railgunState.generation + 1);
     const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();

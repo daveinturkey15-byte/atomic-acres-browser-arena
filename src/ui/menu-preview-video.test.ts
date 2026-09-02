@@ -39,6 +39,12 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   // standby (no media, empty URLs) for one commit and then captured its own
   // flyover; it never carried another arena's bytes under any key.
   map3: 'pass84-map3-preview-v1',
+  // NUKETOWN2 (owner 2026-09-02, HF-407): its own additive family, same story.
+  // The rebuild shipped standby (no media, empty URLs) for one commit and then
+  // captured its own flyover; it never carried another arena's bytes under any
+  // key, and finalize-pass85-nuketown2-menu-preview.mjs proves that on the
+  // installed bytes rather than asserting it.
+  nuketown2: 'pass85-nuketown2-preview-v1',
 });
 
 /**
@@ -59,7 +65,14 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * act; forgetting to remove one fails `has no arena stuck in standby that
  * already ships media` below. It is empty, and should stay empty.
  */
-const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>();
+// HF-407: 'nuketown2' was on this list for one commit, while its arena existed
+// and its flyover did not. The capture landed on 2026-09-02 (240 frames,
+// headless, canonical WebGPU route; encoded by
+// scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs into the
+// pass85-nuketown2-preview-v1 family), so it came off in the same commit - which
+// is the rule this list is written to enforce. The list is empty again, and
+// should stay empty.
+const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([]);
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
@@ -110,7 +123,11 @@ describe('prerecorded map-selection previews', () => {
     // rosters rather than written down again.
     expect(assets).toHaveLength((ARENA_SELECTIONS.length - MEDIA_PENDING_ARENAS.size) * 3);
     // owner 2026-09-02 (HF-405): eight arenas shipping media became nine.
-    expect(assets).toHaveLength(27);
+    // owner 2026-09-02 (HF-407): nine became TEN when the Nuke Town Rebuild's
+    // own flyover landed. This pin is RAISED, never lowered - it is the second,
+    // hand-written half of the count above, and its whole job is to fail if a
+    // new arena is quietly parked in MEDIA_PENDING_ARENAS instead of captured.
+    expect(assets).toHaveLength(30);
   });
 
   // MAP3 (HF-405). Two obligations the allowlist above would otherwise leave

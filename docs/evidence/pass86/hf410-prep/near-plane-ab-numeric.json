@@ -1,0 +1,237 @@
+{
+  "schema": "atomic-acres/hf410-near-plane-ab@1",
+  "question": "Does FIRST_PERSON_CAMERA_NEAR_METERS 0.08 -> 0.02 cost visible depth precision on distant geometry?",
+  "method": "Two builds off the same merged commit differing ONLY in the camera near plane (review cameras bridged to FIRST_PERSON_CAMERA_NEAR_METERS for the A/B so they exercise it). Installed Chrome headless, native WebGPU (nvidia/blackwell), 2560x1440, authored deterministic review cameras with frozen time/seed/exposure, HUD and viewmodel hidden, bots frozen.",
+  "farHalfDefinition": "upper half of the frame (rows 0..H/2), where distant geometry projects for every camera used",
+  "frames": 14,
+  "totals": {
+    "farHalfPixelsGt8": 10924,
+    "farHalfPixelsGt32": 3605
+  },
+  "rows": [
+    {
+      "arena": "high-seas",
+      "camera": "high-seas-bow-lane",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2075,
+      "pixelsGt8": 1370,
+      "pixelsGt8Pct": 0.0372,
+      "farHalf": {
+        "meanAbsDelta": 0.2249,
+        "pixelsGt8": 1167,
+        "pixelsGt8Pct": 0.0633,
+        "pixelsGt32": 226,
+        "maxDelta": 70
+      }
+    },
+    {
+      "arena": "high-seas",
+      "camera": "high-seas-starboard-overview",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.1995,
+      "pixelsGt8": 1405,
+      "pixelsGt8Pct": 0.0381,
+      "farHalf": {
+        "meanAbsDelta": 0.2094,
+        "pixelsGt8": 676,
+        "pixelsGt8Pct": 0.0367,
+        "pixelsGt32": 140,
+        "maxDelta": 98
+      }
+    },
+    {
+      "arena": "high-seas",
+      "camera": "high-seas-stern-main-deck",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2098,
+      "pixelsGt8": 832,
+      "pixelsGt8Pct": 0.0226,
+      "farHalf": {
+        "meanAbsDelta": 0.2166,
+        "pixelsGt8": 637,
+        "pixelsGt8Pct": 0.0346,
+        "pixelsGt32": 21,
+        "maxDelta": 59
+      }
+    },
+    {
+      "arena": "high-seas",
+      "camera": "high-seas-upper-deck-occlusion",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2356,
+      "pixelsGt8": 3550,
+      "pixelsGt8Pct": 0.0963,
+      "farHalf": {
+        "meanAbsDelta": 0.2181,
+        "pixelsGt8": 549,
+        "pixelsGt8Pct": 0.0298,
+        "pixelsGt32": 44,
+        "maxDelta": 64
+      }
+    },
+    {
+      "arena": "map3",
+      "camera": "map3-bay-nature",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.1939,
+      "pixelsGt8": 4763,
+      "pixelsGt8Pct": 0.1292,
+      "farHalf": {
+        "meanAbsDelta": 0.2243,
+        "pixelsGt8": 97,
+        "pixelsGt8Pct": 0.0053,
+        "pixelsGt32": 0,
+        "maxDelta": 15
+      }
+    },
+    {
+      "arena": "map3",
+      "camera": "map3-hub-vista",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.4496,
+      "pixelsGt8": 17709,
+      "pixelsGt8Pct": 0.4804,
+      "farHalf": {
+        "meanAbsDelta": 0.2534,
+        "pixelsGt8": 844,
+        "pixelsGt8Pct": 0.0458,
+        "pixelsGt32": 0,
+        "maxDelta": 26
+      }
+    },
+    {
+      "arena": "map3",
+      "camera": "map3-into-sun-hub",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 4.7129,
+      "pixelsGt8": 1167392,
+      "pixelsGt8Pct": 31.6675,
+      "farHalf": {
+        "meanAbsDelta": 0.2426,
+        "pixelsGt8": 704,
+        "pixelsGt8Pct": 0.0382,
+        "pixelsGt32": 1,
+        "maxDelta": 33
+      }
+    },
+    {
+      "arena": "map3",
+      "camera": "map3-volume-hall",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.1976,
+      "pixelsGt8": 12,
+      "pixelsGt8Pct": 0.0003,
+      "farHalf": {
+        "meanAbsDelta": 0.2318,
+        "pixelsGt8": 8,
+        "pixelsGt8Pct": 0.0004,
+        "pixelsGt32": 0,
+        "maxDelta": 12
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-boarding-open",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2326,
+      "pixelsGt8": 280,
+      "pixelsGt8Pct": 0.0076,
+      "farHalf": {
+        "meanAbsDelta": 0.234,
+        "pixelsGt8": 214,
+        "pixelsGt8Pct": 0.0116,
+        "pixelsGt32": 3,
+        "maxDelta": 47
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-cabin-ceiling",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2237,
+      "pixelsGt8": 880,
+      "pixelsGt8Pct": 0.0239,
+      "farHalf": {
+        "meanAbsDelta": 0.219,
+        "pixelsGt8": 190,
+        "pixelsGt8Pct": 0.0103,
+        "pixelsGt32": 27,
+        "maxDelta": 51
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-concourse-wall-closed",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2793,
+      "pixelsGt8": 94,
+      "pixelsGt8Pct": 0.0025,
+      "farHalf": {
+        "meanAbsDelta": 0.267,
+        "pixelsGt8": 18,
+        "pixelsGt8Pct": 0.001,
+        "pixelsGt32": 0,
+        "maxDelta": 14
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-overview",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2545,
+      "pixelsGt8": 4205,
+      "pixelsGt8Pct": 0.1141,
+      "farHalf": {
+        "meanAbsDelta": 0.1836,
+        "pixelsGt8": 74,
+        "pixelsGt8Pct": 0.004,
+        "pixelsGt32": 3,
+        "maxDelta": 44
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-port-wing-authority",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.8352,
+      "pixelsGt8": 31637,
+      "pixelsGt8Pct": 0.8582,
+      "farHalf": {
+        "meanAbsDelta": 0.3459,
+        "pixelsGt8": 4250,
+        "pixelsGt8Pct": 0.2306,
+        "pixelsGt32": 2780,
+        "maxDelta": 222
+      }
+    },
+    {
+      "arena": "skyline-terminal",
+      "camera": "terminal-starboard-wing-authority",
+      "width": 2560,
+      "height": 1440,
+      "meanAbsDelta": 0.2399,
+      "pixelsGt8": 1496,
+      "pixelsGt8Pct": 0.0406,
+      "farHalf": {
+        "meanAbsDelta": 0.2526,
+        "pixelsGt8": 1496,
+        "pixelsGt8Pct": 0.0812,
+        "pixelsGt32": 360,
+        "maxDelta": 200
+      }
+    }
+  ]
+}

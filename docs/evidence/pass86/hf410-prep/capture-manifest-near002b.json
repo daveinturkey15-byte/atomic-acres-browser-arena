@@ -1,0 +1,234 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "near002b",
+  "sha": "21730228-near002b",
+  "url": "http://127.0.0.1:4190",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-ceHUDJAx.js",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "seed": "viewpoint",
+  "settleMs": 5000,
+  "samples": 1,
+  "capturedAt": "2026-09-02T19:39:25.428Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "high-seas",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "high-seas-starboard-overview",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-starboard-overview.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-starboard-overview.png"
+          ],
+          "committedFrame": 382,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 436
+        },
+        {
+          "cameraId": "high-seas-stern-main-deck",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-stern-main-deck.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-stern-main-deck.png"
+          ],
+          "committedFrame": 439,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 504
+        },
+        {
+          "cameraId": "high-seas-upper-deck-occlusion",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-upper-deck-occlusion.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-upper-deck-occlusion.png"
+          ],
+          "committedFrame": 507,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 565
+        },
+        {
+          "cameraId": "high-seas-bow-lane",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-bow-lane.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\high-seas\\high-seas-bow-lane.png"
+          ],
+          "committedFrame": 568,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 641
+        }
+      ],
+      "ms": 63385,
+      "errors": []
+    },
+    {
+      "arena": "map3",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "map3-hub-vista",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-hub-vista.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-hub-vista.png"
+          ],
+          "committedFrame": 466,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.02,
+          "frame": 527
+        },
+        {
+          "cameraId": "map3-bay-nature",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-bay-nature.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-bay-nature.png"
+          ],
+          "committedFrame": 530,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.02,
+          "frame": 579
+        },
+        {
+          "cameraId": "map3-volume-hall",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-volume-hall.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-volume-hall.png"
+          ],
+          "committedFrame": 582,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.02,
+          "frame": 635
+        },
+        {
+          "cameraId": "map3-into-sun-hub",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-into-sun-hub.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\map3\\map3-into-sun-hub.png"
+          ],
+          "committedFrame": 638,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.02,
+          "frame": 694
+        }
+      ],
+      "ms": 41933,
+      "errors": []
+    },
+    {
+      "arena": "skyline-terminal",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "terminal-overview",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-overview.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-overview.png"
+          ],
+          "committedFrame": 360,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 428
+        },
+        {
+          "cameraId": "terminal-cabin-ceiling",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-cabin-ceiling.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-cabin-ceiling.png"
+          ],
+          "committedFrame": 431,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 483
+        },
+        {
+          "cameraId": "terminal-concourse-wall-closed",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-concourse-wall-closed.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-concourse-wall-closed.png"
+          ],
+          "committedFrame": 486,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 529
+        },
+        {
+          "cameraId": "terminal-boarding-open",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-boarding-open.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-boarding-open.png"
+          ],
+          "committedFrame": 532,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 593
+        },
+        {
+          "cameraId": "terminal-port-wing-authority",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-port-wing-authority.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-port-wing-authority.png"
+          ],
+          "committedFrame": 596,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 651
+        },
+        {
+          "cameraId": "terminal-starboard-wing-authority",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-starboard-wing-authority.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-wprep\\docs\\evidence\\pass86\\hf410-prep\\frames\\near002b\\skyline-terminal\\terminal-starboard-wing-authority.png"
+          ],
+          "committedFrame": 654,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.06,
+          "frame": 709
+        }
+      ],
+      "ms": 58788,
+      "errors": []
+    }
+  ]
+}

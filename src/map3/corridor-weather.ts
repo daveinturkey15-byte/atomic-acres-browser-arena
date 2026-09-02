@@ -27,6 +27,8 @@ const {
 import type { Corridor } from './corridors';
 import { createTree, poissonScatter } from './plants';
 import { mergeGeometries, hash11 } from './leaf-geometry';
+// MAP3 (HF-409): the solids this corridor publishes for an arena to collide.
+import { uprightSolid, type CorridorSolid } from './corridor-solids';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, WINTER_PALETTE,
   createBarkMaterial, createFoliageMaterial, createFoliageUniforms, rgb,
@@ -82,6 +84,8 @@ export function createWeatherCorridor(seed = 21): Corridor {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.03, -LEN / 2);
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  // MAP3 (HF-409): named at creation - the parity rules read these names.
+  floor.name = 'map3-seasons-ground';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo);
@@ -99,6 +103,9 @@ export function createWeatherCorridor(seed = 21): Corridor {
 
   const woodBatch: THREE.BufferGeometry[] = [];
   const xf = new THREE.Matrix4();
+  // MAP3 (HF-409): all three seasons' trunks end up in ONE merged wood mesh
+  // 51 m long, so the scatter is the only place a trunk is individually known.
+  const solids: CorridorSolid[] = [];
 
   SEASONS.forEach((season, s) => {
     const mat = createFoliageMaterial(uniforms, season.palette);
@@ -117,6 +124,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
           depth: 3, leavesPerClump: 11,
           deadFraction: season.dead, bare: season.bare,
         });
+        solids.push(uprightSolid('trunk', p.x, p.y, 0.14 + hash11(seed * 2 + i) * 0.14, 5 + hash11(seed + s + i) * 5, 'wood'));
         xf.makeTranslation(p.x, 0, p.y);
         parts.wood.applyMatrix4(xf);
         woodBatch.push(parts.wood);
@@ -134,6 +142,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
       const merged = mergeGeometries(leaves);
       leaves.forEach((g) => g.dispose());
       const mesh = new THREE.Mesh(merged, mat);
+      mesh.name = `map3-seasons-canopy-leaves-${s}`;
       mesh.receiveShadow = true;
       group.add(mesh);
       disposables.push(merged);
@@ -143,6 +152,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
   const woodMerged = mergeGeometries(woodBatch);
   woodBatch.forEach((g) => g.dispose());
   const woodMesh = new THREE.Mesh(woodMerged, barkMat);
+  woodMesh.name = 'map3-seasons-trunk-batch';
   woodMesh.castShadow = true;
   group.add(woodMesh);
   disposables.push(woodMerged);
@@ -255,6 +265,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
   }
 
   const rain = new THREE.Mesh(rainGeo, rainMat);
+  rain.name = 'map3-seasons-precipitation-particles';
   rain.frustumCulled = false;
   rain.renderOrder = 6;
   group.add(rain);
@@ -319,6 +330,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
   }
 
   const splashRings = new THREE.Mesh(splashRingGeo, splashRingMat);
+  splashRings.name = 'map3-seasons-splash-rings';
   splashRings.frustumCulled = false;
   splashRings.renderOrder = 6;
   group.add(splashRings);
@@ -336,6 +348,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
     group,
     length: LEN,
     foliage: uniforms,
+    solids,
     title: 'Seasons & weather with torrential downpour & ground splashes',
     skill: 'atomic-acres-procedural-art-authoring',
     update(elapsed) {

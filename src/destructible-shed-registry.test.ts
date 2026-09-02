@@ -10,6 +10,7 @@ import {
   validateShedPlacementRegistry,
 } from './destructible-shed-registry';
 import { buildArena, type ArenaMap } from './map';
+import { buildNuketown2 } from './nuketown2-arena';
 
 function overlap(left: Box2, right: Box2): boolean {
   return left.minX < right.maxX && left.maxX > right.minX
@@ -26,9 +27,19 @@ describe('frozen Pass 65 shed placement registry', () => {
     expect(shedPlacementsForArena('gun-range')).toEqual([]);
     expect(shedPlacementsForArena('farcrysis')).toEqual([]);
     expect(shedPlacementsForArena('high-seas')).toEqual([]);
+    // NUKETOWN2 (owner 2026-09-02, HF-407): "still keeping ... the sheds".
+    expect(shedPlacementsForArena('nuketown2')).toHaveLength(2);
     expect(PASS65_SHED_ELIGIBILITY.map((row) => row.arenaId)).toEqual([
-      'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas',
+      'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'nuketown2',
     ]);
+    // The two rebuild sheds are a 180-degree rotation of each other, which is
+    // the same involution every solid in that arena is emitted through. Checked
+    // mechanically: a hand-placed pair is exactly what drifts.
+    const [north, south] = shedPlacementsForArena('nuketown2');
+    expect(south!.position.x).toBeCloseTo(-north!.position.x, 10);
+    expect(south!.position.z).toBeCloseTo(-north!.position.z, 10);
+    expect(Math.cos(south!.yaw)).toBeCloseTo(Math.cos(north!.yaw + Math.PI), 10);
+    expect(Math.sin(south!.yaw)).toBeCloseTo(Math.sin(north!.yaw + Math.PI), 10);
     expect(shedPlacementsForArena('skyline-terminal').every((placement) => placement.zone === 'terminal-apron' && placement.position.z >= 0)).toBe(true);
   });
 
@@ -38,6 +49,11 @@ describe('frozen Pass 65 shed placement registry', () => {
       buildRustworks1v1(new THREE.Scene()),
       buildSkylineTerminal(new THREE.Scene()),
       buildGunRange(new THREE.Scene()),
+      // NUKETOWN2 (HF-407): the rebuild's two sheds go through the same
+      // in-bounds / off-collider / clear-of-spawns / disjoint check as every
+      // other arena's. Registering a placement without building the arena it
+      // sits in is how a shed ends up inside a fence.
+      buildNuketown2(new THREE.Scene()),
     ];
     for (const arena of arenas) {
       const placements = shedPlacementsForArena(arena.id);

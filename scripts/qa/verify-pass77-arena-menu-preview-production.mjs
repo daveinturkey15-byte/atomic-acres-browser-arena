@@ -35,6 +35,7 @@ import {
   digestFinalMediaSet,
   sha256File,
 } from '../assets/pass65-menu-preview-integrity.mjs';
+import { arenaRegistryEntries } from './arena-roster.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const provenancePath = path.join(root, 'source-assets/menu/pass77-arena-previews/provenance.json');
@@ -322,30 +323,23 @@ else {
 /**
  * The arena roster, derived from ARENA_SELECTIONS rather than listed here.
  *
- * This verifier is plain ESM and src/map-selection.ts pulls in the gameplay and
- * bot modules, so the roster is read out of the source text. Each entry is an
- * `Object.freeze({ ... })` whose `id` and `selectable` both precede its
- * `matchRules: Object.freeze({`, so splitting on that token yields one chunk per
- * arena carrying both. A shape change makes the roster empty or short, which
- * fails loudly immediately below rather than silently passing an empty loop.
+ * PASS 85 Lane N repair: this file used to carry its OWN scrape of
+ * src/map-selection.ts - its own regex, its own chunk-splitting assumption,
+ * the fourth copy of a derivation that already existed three times. It now
+ * calls the single copy in scripts/qa/arena-roster.mjs, which throws (rather
+ * than returning short) when the scrape stops matching; the catch below turns
+ * that into this verifier's own failure list so it still reports every issue
+ * instead of only the first.
  */
-function selectableArenaRoster(source) {
-  const start = source.indexOf('export const ARENA_SELECTIONS');
-  const end = source.indexOf('\n]);', start);
-  if (start < 0 || end < 0) return null;
-  const roster = [];
-  for (const chunk of source.slice(start, end).split('Object.freeze({')) {
-    const id = /^\s*id: '([a-z0-9-]+)' as const,$/m.exec(chunk)?.[1];
-    if (!id) continue;
-    roster.push({ id, selectable: !/^\s*selectable: false,$/m.test(chunk) });
-  }
-  return roster;
+let roster = null;
+try {
+  roster = arenaRegistryEntries();
+} catch (error) {
+  roster = null;
+  fail(`could not derive the arena roster from ${slash(path.relative(root, mapSelectionPath))}: ${error.message}; the shelf invariants cannot run`);
 }
-
-const selectionSource = await readFile(mapSelectionPath, 'utf8').catch(() => null);
-const roster = selectionSource === null ? null : selectableArenaRoster(selectionSource);
-if (!roster || roster.length < RETAINED_ARENAS.length + ARENAS.length) {
-  fail(`could not derive the arena roster from src/map-selection.ts (found ${roster?.length ?? 0}); the shelf invariants cannot run`);
+if (roster && roster.length < RETAINED_ARENAS.length + ARENAS.length) {
+  fail(`derived only ${roster.length} arenas from src/map-selection.ts; the shelf invariants cannot run`);
 }
 const selectableArenas = (roster ?? []).filter((arena) => arena.selectable).map((arena) => arena.id);
 

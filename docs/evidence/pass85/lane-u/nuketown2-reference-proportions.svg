@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="580" viewBox="0 0 640 580">
+<title>Reference proportions as measured for HF-407 - a diagram of recorded ratios, not a trace</title>
+<rect width="640" height="580" fill="#f3f1ea"/>
+<rect x="30" y="30" width="580" height="40.0" fill="#cfd6c2" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="54.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">border path 4 m (R7)</text>
+<rect x="30" y="70" width="580" height="75.0" fill="#b9c9a4" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="111.5" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">back yard + spawns 7.5 m (R8)</text>
+<rect x="30" y="145" width="580" height="100.0" fill="#d9cfb4" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="199.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">house 16 x 10 m, 2 storeys + garage (R3/R4/R6)</text>
+<rect x="30" y="245" width="580" height="90.0" fill="#b7b8bb" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="294.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">street 9 m - bus, trucks, cars (R2/R9)</text>
+<rect x="30" y="335" width="580" height="100.0" fill="#d9cfb4" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="389.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">house, 180-degree rotation (R11)</text>
+<rect x="30" y="435" width="580" height="75.0" fill="#b9c9a4" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="476.5" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">back yard + spawns, rotated</text>
+<rect x="30" y="510" width="580" height="40.0" fill="#cfd6c2" fill-opacity="0.55" stroke="#9a978d" stroke-width="0.5"/><text x="320.0" y="534.0" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#1d1d1f">border path, rotated</text>
+<text x="30" y="20" font-family="system-ui, sans-serif" font-size="12" fill="#1d1d1f">Reference cross-street section as measured for HF-407 (design doc 2.2). Published playspace 2,972 m2; this section x 58 m = 3,016 m2, +1.5%.</text>
+<text x="30" y="570" font-family="system-ui, sans-serif" font-size="11" fill="#55534d">Drawn from the recorded ratios only. No image, map file or asset from any source was opened or traced.</text>
+</svg>
