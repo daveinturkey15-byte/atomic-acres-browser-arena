@@ -118,36 +118,66 @@ describe('production release workflow', () => {
     expect(staticTopologyVerifier).toContain('rollbackProvenance.treeSha256 !== treeDigest(rollbackRoot, rollbackFiles)');
     expect(topologyBrowserVerifier).toContain('rollbackOriginal.releasedAt, expectedRollbackReleasedAt');
     expect(topologyBrowserVerifier).toContain('expectsPendingCandidate = isCurrentCandidate && !expectedReleasedAt');
-    expect(topologyBrowserVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
+    // HF-406: the label pin used to be the literal `HITL CANDIDATE · NOT LIVE`, a string
+    // that named no pass. The gate now requires the badge to LEAD with the pass of the
+    // channel under test in both the pending and the published branch, and forbids the
+    // internal review acronym from ever being a pinned player-facing label again.
+    expect(topologyBrowserVerifier).toContain('badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`)');
+    expect(topologyBrowserVerifier).toContain('if (!badgeLeadsWithItsPass');
+    expect(topologyBrowserVerifier).toContain("? !lastReleaseLabel.includes('RELEASE CANDIDATE')");
+    expect(topologyBrowserVerifier).toContain("lastReleaseLabel.includes('PENDING_PRODUCTION') || lastReleaseLabel.includes('RELEASE CANDIDATE')");
+    expect(topologyBrowserVerifier).not.toContain('HITL');
     expect(topologyBrowserVerifier).toContain('verifyProductionReleaseTimestamp');
+    expect(topologyBrowserVerifier).toContain('expectedPass,');
     expect(workflow.match(/test -n "\$\{RELEASE_BUILT_AT:-\}"/g)).toHaveLength(2);
     expect(topologyBrowserVerifier).toContain('process.env.RELEASE_BUILT_AT?.trim()');
     expect(workflow).toContain('node scripts/release/write-production-receipt.mjs');
     expect(receiptWriter).toContain('releaseBuiltAt: process.env.RELEASE_BUILT_AT');
   });
 
-  it('requires the published build to expose its exact UK-local day, date, and time instead of the pending sentinel', () => {
+  it('requires the published build to expose its own pass plus its exact UK-local day, date, and time instead of the pending sentinel', () => {
     const releasedAt = '2026-08-03T16:52:00Z';
-    const label = 'LAST RELEASE · 3 AUG 2026 · 17:52 BST';
-    expect(expectedLastReleaseLabel(releasedAt)).toBe(label);
+    // HF-406: the published badge leads with the pass the build IS, then the instant it
+    // went live. The old expected label was `LAST RELEASE · <date>` - it named no pass, so
+    // a build that published under the PREVIOUS pass number (PASS 82 shipped stamped
+    // PASS 81, and PASS 81 before it) satisfied this contract. The pass is now required
+    // and pinned, so that class fails here as loudly as a wrong timestamp does.
+    const label = 'PASS 84 · 3 AUG 2026 · 17:52 BST';
+    expect(expectedLastReleaseLabel(releasedAt, 'PASS 84')).toBe(label);
+    // A JS caller (every consumer here is .mjs) can still omit the pass; the runtime
+    // guard, not the type, is what stops a publish from being verified without one.
+    const untyped = expectedLastReleaseLabel as unknown as (releasedAt: string) => string;
+    expect(() => untyped(releasedAt)).toThrow('needs the pass it publishes as');
+    expect(() => expectedLastReleaseLabel(releasedAt, 'LAST RELEASE')).toThrow('needs the pass it publishes as');
     expect(verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: releasedAt,
       observedLabel: label,
       observedState: 'CURRENT LIVE',
     })).toEqual({ releasedAt, label, state: 'CURRENT LIVE' });
     expect(() => verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: 'PENDING_PRODUCTION',
-      observedLabel: 'LAST RELEASE · PENDING_PRODUCTION',
+      observedLabel: 'PASS 84 · PENDING_PRODUCTION',
       observedState: 'CURRENT BUILD',
     })).toThrow('Production candidate still exposes PENDING_PRODUCTION');
     expect(() => verifyProductionReleaseTimestamp({
       expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
       observedReleasedAt: '2026-08-03T16:53:00Z',
       observedLabel: label,
       observedState: 'CURRENT LIVE',
     })).toThrow('Production release timestamp mismatch');
+    // The new half: right instant, previous pass on the badge.
+    expect(() => verifyProductionReleaseTimestamp({
+      expectedReleasedAt: releasedAt,
+      expectedPass: 'PASS 84',
+      observedReleasedAt: releasedAt,
+      observedLabel: 'PASS 83 · 3 AUG 2026 · 17:52 BST',
+      observedState: 'CURRENT LIVE',
+    })).toThrow('Production Last Release label mismatch');
   });
 
   it('binds production and immutable preview diagnostics to the exact source SHA', () => {
@@ -391,9 +421,12 @@ describe('production release workflow', () => {
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('normal'");
     expect(liveTopologyVerifier).toContain("verifyLegacyRoute('room'");
     expect(liveTopologyVerifier).toContain('Last Release timestamp is not a published instant');
-    expect(liveTopologyVerifier).toContain("lastReleaseLabel !== 'HITL CANDIDATE · NOT LIVE'");
+    // HF-406: same re-pin as above, on the live verifier's own copy of the check.
+    expect(liveTopologyVerifier).toContain('badgeLeadsWithItsPass = normalizedPass(lastReleaseLabel).startsWith(`${normalizedPass(expectedPass)}·`)');
+    expect(liveTopologyVerifier).not.toContain('HITL');
     expect(liveTopologyVerifier).toContain("releaseState !== 'LOCAL CANDIDATE'");
     expect(liveTopologyVerifier).toContain("timeText.includes('NOT PUBLISHED')");
+    expect(liveTopologyVerifier).toContain("timeText.includes('RELEASE CANDIDATE')");
     expect(liveTopologyVerifier).not.toContain("'channels/the-big-one', 'PASS 65'");
   });
 
