@@ -223,11 +223,12 @@ export function oceanScatteredRadiance(
   pathLength: number,
 ): Readonly<{ r: number; g: number; b: number }> {
   const transmission = oceanTransmission(optics, pathLength);
-  const deep = {
-    r: ((optics.scatter >> 16) & 0xff) / 255,
-    g: ((optics.scatter >> 8) & 0xff) / 255,
-    b: (optics.scatter & 0xff) / 255,
-  };
+  // Decoded through THREE.Color so this mirror carries the SAME numbers as the
+  // vec3 uniform the graph uploads: the authored hex is sRGB and three converts
+  // it into the renderer's working space. A mirror that skipped that step would
+  // quietly disagree with the shader it claims to mirror.
+  const decoded = new THREE.Color(optics.scatter);
+  const deep = { r: decoded.r, g: decoded.g, b: decoded.b };
   const floor = {
     r: Math.min(1, base.r + density),
     g: Math.min(1, base.g + density),
@@ -243,11 +244,8 @@ export function oceanScatteredRadiance(
 
 /** The asymptotic colour of a water type: what an optically deep column shows. */
 export function oceanDeepScatterColor(optics: WaterOptics): Readonly<{ r: number; g: number; b: number }> {
-  return Object.freeze({
-    r: ((optics.scatter >> 16) & 0xff) / 255,
-    g: ((optics.scatter >> 8) & 0xff) / 255,
-    b: (optics.scatter & 0xff) / 255,
-  });
+  const decoded = new THREE.Color(optics.scatter);
+  return Object.freeze({ r: decoded.r, g: decoded.g, b: decoded.b });
 }
 
 /**
@@ -413,8 +411,13 @@ export function createOceanTslWater(
   // what `scatter` is. The blend weight is the MEASURED transmission - not a
   // view angle and not a wave slope, which is the whole difference between this
   // and the palette lerp it replaced.
-  const deepScatter = uniform(new THREE.Color(optics?.scatter ?? 0));
-  const physicalWater = mix(deepScatter, scatteredRadiance, transmission);
+  const deepScatterColor = new THREE.Color(optics?.scatter ?? 0);
+  const deepScatter = uniform(new THREE.Vector3(deepScatterColor.r, deepScatterColor.g, deepScatterColor.b));
+  // L = L_floor * T + L_scatter * (1 - T), written out rather than as mix():
+  // the blend weight is a per-CHANNEL transmission vector and mix()'s typed
+  // overloads only accept a scalar weight.
+  const physicalWater = scatteredRadiance.mul(transmission)
+    .add(deepScatter.mul(transmission.oneMinus()));
   const darkWater = mix(paletteWater, physicalWater, useExtinction);
   const keyLight = body.night
     ? vec3(0.25, 0.85, 0.35).normalize()
