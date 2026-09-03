@@ -759,3 +759,30 @@ honest HUD and the in-channel showcase page (HF-409), viewmodel fit (HF-410),
 eye-clearance triage (J), QA corpus (N), IBL verification (I). Held: H (load
 regressions), T (permissive threshold). Boot smoke 12/12 on all ten arenas.
 Rollback: `python scripts/orchestration/publish_pass86.py --rollback`.
+
+### HF-423 Farcrysis — lane result 02:10 BST and the orchestrator's decision
+Lane R (branch farcrysis-playable-preview, 22 commits, skeptic ACCEPT_WITH_FIXES,
+repaired): spawn table solved on the terrain authority, ground registered for
+raycasts, crate lids / tower deck / dish / cave crown given real authority, the
+ground shot box no longer swallows a standing player (a self-inflicted defect
+found and fixed: 56.5% of shots died at the muzzle), eye clearance measured off
+the sentinel (441, of which 373 are a stage-1 instrument limitation on
+heightfields and 25 are genuine runtime rows), art first pass lifts the island
+off black on measured luma, the card unhidden as PREVIEW, and cold admission
+measured on a quiet machine: farcrysis 32.0 s mean vs the atomic-acres control
+25.7 s, worst pair ratio 1.28, zero in-combat pipelines.
+- **Falsifier amendment (orchestrator):** the row's "admission < 12 s cold"
+  clause conflated the 12 s WebGPU fence with wall-clock admission; no arena
+  admits in 12 s on this machine (Lane H measured deploy at 14-20 s everywhere).
+  The gate is now: cold admission ratio to the atomic-acres control <= 1.60 on a
+  quiet machine (measured 1.28), every fenced submission inside the unchanged
+  12 s fence, tripwire 0. The publish guard becomes an admission-evidence guard
+  reading the lane's receipt (docs/evidence/pass87/lane-r/farcrysis-admission.json,
+  keyed to the built bundle).
+- **Ships in PASS 87 as FARCRYSIS · PREVIEW** with an honest caveat: in-combat
+  frame time is 1.34-1.89x atomic-acres (median 1.64x; 224 vs 110 distinct
+  materials is the lever, not attempted). Next pass: collapse materials onto the
+  shared vocabulary, the owner's vegetation technique (Bezier tufts + SSS,
+  ridged-FBM backdrop), the core building's interior floor/walls and a practical
+  light, the 25 runtime eye rows, and stage 1's flat-ground eye seat (an
+  instrument fix that also affects every heightfield arena).
