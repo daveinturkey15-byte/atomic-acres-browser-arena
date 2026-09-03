@@ -89,6 +89,13 @@ const TARGETS = list(arg('--targets', null));
 const INCLUDE_HIDDEN = flag('--include-hidden');
 const OUT = resolve(arg('--out', `artifacts/qa/switch-matrix/${LABEL}.json`));
 const MIN_FREE_VRAM_MIB = Number(arg('--min-free-vram', '3000'));
+// How long to YIELD to another lane's browser before measuring anyway. The
+// default is unchanged (20 x 60 s); the flag exists so a run taken under
+// DECLARED contention is possible on a machine three lanes share, and every
+// such run still stamps `machine.playwrightChromeRivalSamples` so a reader
+// can see how loud the room was. It is not a threshold: nothing passes or
+// fails on it.
+const RIVAL_WAIT_ATTEMPTS = Number(arg('--rival-wait-attempts', '20'));
 
 if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No build at ${DIST}`);
 
@@ -189,7 +196,7 @@ const server = createServer((request, response) => {
 await new Promise((ready) => server.listen(PORT, '127.0.0.1', ready));
 
 const comfy = await waitForComfyIdle();
-const rivalBrowsers = await waitForQuietBrowsers();
+const rivalBrowsers = await waitForQuietBrowsers(RIVAL_WAIT_ATTEMPTS);
 const gpu = await waitForGpuHeadroom(MIN_FREE_VRAM_MIB);
 console.error(`[switch-matrix] ComfyUI ${comfy.comfy}; rival browsers ${rivalBrowsers}; GPU ${gpu.free}/${gpu.total} MiB free`);
 
@@ -228,6 +235,7 @@ const report = {
     // least part of the sweep; treat every duration in the report as an upper
     // bound and do not set it beside a quiet-machine run.
     rivalPlaywrightBrowsersAtLaunch: rivalBrowsers,
+    rivalWaitAttempts: RIVAL_WAIT_ATTEMPTS,
     // Sampled every 60 s FOR THE WHOLE RUN and filled in at the end. A
     // launch-only check is how lane H's baseline sweep was reported "quiet"
     // while eight of another lane's headless Chromes were live through the
@@ -395,6 +403,22 @@ const sceneCensus = (page) => page.evaluate(() => {
   };
 });
 
+/**
+ * Match admission's own phase breakdown, published by the game since lane H2.
+ * `deployMs` alone is 14-20 s per arena and says nothing about WHERE it goes;
+ * this is the same shape the transition profiler publishes. Null on a build
+ * that predates the profiler, so a before/after against an older dist degrades
+ * to "no rows" instead of throwing.
+ */
+const matchAdmissionProfile = (page) => page.evaluate(() => {
+  const profile = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.bootstrap?.matchAdmissionProfile ?? null;
+  if (!profile) return null;
+  return {
+    arenaId: profile.arenaId, mode: profile.mode, durationMs: profile.durationMs,
+    steps: (profile.steps ?? []).map((step) => [step.name, step.durationMs]),
+  };
+});
+
 /** Deploy the currently selected arena and wait for a live match on it. */
 async function deploy(page, arena) {
   const startedAt = Date.now();
@@ -434,6 +458,7 @@ async function switchEdge(page, errors, source, target) {
   const timeline = await creationTimeline(page, before);
   const switchCounters = await counters(page);
   const deployed = committed ? await deploy(page, target) : { deployMs: null, matchActive: false, matchArenaId: state.committedArenaId, requested: target };
+  const admission = committed ? await matchAdmissionProfile(page) : null;
   const after = await counters(page);
   return {
     source, target, committed,
@@ -443,6 +468,7 @@ async function switchEdge(page, errors, source, target) {
     outcome: state.outcome, phase: state.phase, failure: state.failure,
     committedArenaId: state.committedArenaId,
     matchActive: deployed.matchActive, matchArenaId: deployed.matchArenaId,
+    matchAdmission: admission,
     residentArenaRoots: state.residentArenaRoots,
     effectPrewarm: state.effectPrewarm,
     pipelinesCreated: switchCounters.pipelines - before.pipelines,
@@ -535,6 +561,7 @@ try {
           const state = await transitionState(page);
           const beforeAdmission = await counters(page);
           const deployed = await deploy(page, source);
+          const admission = await matchAdmissionProfile(page);
           const afterAdmission = await counters(page);
           const census = deployed.matchActive ? await sceneCensus(page) : null;
           report.firstLoads.push({
@@ -544,6 +571,7 @@ try {
             deployMs: deployed.deployMs,
             matchActive: deployed.matchActive, phases: state.phases,
             effectPrewarm: state.effectPrewarm,
+            matchAdmission: admission,
             // "Before admission" is everything the page compiled from boot up
             // to the first live match frame — the number the owner feels as
             // "how long until I am playing".

@@ -231,3 +231,73 @@ if (after) {
   if (missing.length) console.log(`\n  no after first-load row (never fell on a chunk boundary): ${missing.join(', ')}`);
 }
 console.log('');
+
+// LANE H2: the first-load TOTAL is the number the owner feels, but it cannot
+// say WHICH block moved. Every first-load row already carries the same phase
+// profile the switch edges do, so print it per arena instead of leaving the
+// attribution to be argued from a single total. `deploy` is not a transition
+// phase - it is the whole match-admission block after the transition commits -
+// so it is printed beside the phases rather than inside them.
+section('first load, per-phase attribution (ms; before / after / delta)');
+const phaseNamesInOrder = (entry) => (entry?.phases ?? []).map((phase) => phase.phase ?? phase.name);
+const phaseMs = (entry) => {
+  const map = new Map();
+  for (const phase of entry?.phases ?? []) {
+    const name = phase.phase ?? phase.name;
+    const ms = typeof phase.durationMs === 'number' ? phase.durationMs
+      : (typeof phase.completedAt === 'number' && typeof phase.startedAt === 'number'
+        ? Number((phase.completedAt - phase.startedAt).toFixed(1)) : null);
+    if (name && ms !== null) map.set(name, ms);
+  }
+  return map;
+};
+for (const [arena, entry] of beforeFirst) {
+  const other = afterFirst.get(arena);
+  const beforeMap = phaseMs(entry);
+  const afterMap = phaseMs(other);
+  const names = [...new Set([...phaseNamesInOrder(entry), ...phaseNamesInOrder(other)])]
+    .filter((name) => (beforeMap.get(name) ?? 0) >= 100 || (afterMap.get(name) ?? 0) >= 100);
+  console.log(`${arena}:`);
+  for (const name of names) {
+    const b = beforeMap.get(name);
+    const a = afterMap.get(name);
+    const delta = typeof b === 'number' && typeof a === 'number' ? Number((a - b).toFixed(1)) : null;
+    console.log(`  ${pad(name, 32)}${padStart(b, 10)}${padStart(a, 10)}${padStart(delta, 10)}`);
+  }
+  const bDeploy = entry?.deployMs;
+  const aDeploy = other?.deployMs;
+  console.log(`  ${pad('deploy (match admission)', 32)}${padStart(bDeploy, 10)}${padStart(aDeploy, 10)}`
+    + `${padStart(typeof bDeploy === 'number' && typeof aDeploy === 'number' ? Number((aDeploy - bDeploy).toFixed(1)) : null, 10)}`);
+  console.log('');
+}
+
+// LANE H2: match admission (deploy) is 14-20 s per arena and was, until this
+// lane, one number. The game now publishes its steps; print them the same way
+// the effect-prewarm families are printed, so the next cut into "faster map
+// loads" starts from an attributed block instead of a total.
+section('match admission steps, median ms (deploy block)');
+const admissionBuckets = (report) => {
+  const buckets = new Map();
+  const rows = [...(report.edges ?? []), ...(report.firstLoads ?? [])];
+  for (const row of rows) for (const [name, ms] of row.matchAdmission?.steps ?? []) {
+    if (!buckets.has(name)) buckets.set(name, []);
+    buckets.get(name).push(ms);
+  }
+  return buckets;
+};
+const beforeAdmission = admissionBuckets(before);
+const afterAdmission = after ? admissionBuckets(after) : new Map();
+if (beforeAdmission.size === 0 && afterAdmission.size === 0) {
+  console.log('no match-admission profile in either report (build predates the lane H2 profiler)');
+} else {
+  console.log(`${pad('step', 30)}${padStart('median', 10)}${padStart('n', 6)}` + (after ? `${padStart('after', 10)}${padStart('n', 6)}` : ''));
+  const names = [...new Set([...beforeAdmission.keys(), ...afterAdmission.keys()])];
+  for (const name of names.sort((a, b) => median(afterAdmission.get(b) ?? beforeAdmission.get(b) ?? [0])
+    - median(afterAdmission.get(a) ?? beforeAdmission.get(a) ?? [0]))) {
+    const b = beforeAdmission.get(name);
+    const a = afterAdmission.get(name);
+    console.log(`${pad(name, 30)}${padStart(b ? median(b) : null, 10)}${padStart(b ? b.length : 0, 6)}`
+      + (after ? `${padStart(a ? median(a) : null, 10)}${padStart(a ? a.length : 0, 6)}` : ''));
+  }
+}
+console.log('');
