@@ -1,0 +1,209 @@
+{
+  "at": "2026-09-03T03:26:04.358Z",
+  "settleMs": 45000,
+  "sampleMs": 14000,
+  "viewport": "2560x1440",
+  "arena": "atomic-acres",
+  "repeatsPerCell": 3,
+  "rows": {
+    "off": {
+      "medianMs": [
+        16.6,
+        22.1,
+        16.7
+      ],
+      "medianOfMedians": 16.7,
+      "p95Ms": [
+        22.2,
+        27.9,
+        22.3
+      ],
+      "p95Median": 22.3,
+      "rateHz": [
+        67.2,
+        48.8,
+        54.7
+      ],
+      "rateMedian": 54.7,
+      "over33": [
+        2,
+        30,
+        4
+      ],
+      "over33Median": 4,
+      "pipelinesAtAdmission": [
+        374,
+        374,
+        374
+      ],
+      "pipelinesInCombat": [
+        0,
+        0,
+        0
+      ],
+      "deploySeconds": [
+        58.1,
+        57.9,
+        52
+      ],
+      "receipt": [
+        "off",
+        "off",
+        "off"
+      ],
+      "receiptVerdict": [
+        "OK",
+        "OK",
+        "OK"
+      ],
+      "errors": [
+        0,
+        0,
+        0
+      ],
+      "comfyBefore": [
+        0,
+        0,
+        0
+      ],
+      "comfyAfter": [
+        0,
+        0,
+        0
+      ]
+    },
+    "low": {
+      "medianMs": [
+        16.7,
+        22.2,
+        22.2
+      ],
+      "medianOfMedians": 22.2,
+      "p95Ms": [
+        27.7,
+        27.9,
+        27.9
+      ],
+      "p95Median": 27.9,
+      "rateHz": [
+        52.8,
+        45.3,
+        45.5
+      ],
+      "rateMedian": 45.5,
+      "over33": [
+        12,
+        25,
+        18
+      ],
+      "over33Median": 18,
+      "pipelinesAtAdmission": [
+        371,
+        371,
+        371
+      ],
+      "pipelinesInCombat": [
+        0,
+        0,
+        0
+      ],
+      "deploySeconds": [
+        56.5,
+        64.1,
+        64.1
+      ],
+      "receipt": [
+        "24x12x24:7536c242:24:0.380",
+        "24x12x24:7536c242:24:0.380",
+        "24x12x24:7536c242:24:0.380"
+      ],
+      "receiptVerdict": [
+        "OK",
+        "OK",
+        "OK"
+      ],
+      "errors": [
+        0,
+        0,
+        0
+      ],
+      "comfyBefore": [
+        0,
+        0,
+        0
+      ],
+      "comfyAfter": [
+        0,
+        0,
+        0
+      ]
+    },
+    "high": {
+      "medianMs": [
+        22.3,
+        22.2,
+        22.2
+      ],
+      "medianOfMedians": 22.2,
+      "p95Ms": [
+        33.4,
+        27.8,
+        28
+      ],
+      "p95Median": 28,
+      "rateHz": [
+        40.2,
+        45.1,
+        44.3
+      ],
+      "rateMedian": 44.3,
+      "over33": [
+        47,
+        11,
+        31
+      ],
+      "over33Median": 31,
+      "pipelinesAtAdmission": [
+        371,
+        371,
+        371
+      ],
+      "pipelinesInCombat": [
+        0,
+        0,
+        0
+      ],
+      "deploySeconds": [
+        62.1,
+        68.3,
+        58
+      ],
+      "receipt": [
+        "24x12x24:104e394b:24:0.500",
+        "24x12x24:104e394b:24:0.500",
+        "24x12x24:104e394b:24:0.500"
+      ],
+      "receiptVerdict": [
+        "OK",
+        "OK",
+        "OK"
+      ],
+      "errors": [
+        0,
+        0,
+        0
+      ],
+      "comfyBefore": [
+        0,
+        0,
+        0
+      ],
+      "comfyAfter": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "note": "Sampled 45 s after admission so the bake has converged at both tiers (LOW ~7 s, HIGH ~28 s at 3 ms/frame). Medians are bimodal at 16.7 and 22.2 ms, i.e. the machine settles into a ~60 Hz or a ~45 Hz bucket; within-cell spread therefore exceeds the between-cell difference for off vs low, and no per-cell delta smaller than one bucket can be read from three repeats."
+}

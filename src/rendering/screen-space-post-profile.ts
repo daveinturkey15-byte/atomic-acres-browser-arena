@@ -37,6 +37,12 @@
 
 import type { LightingTier } from '../graphics-settings-registry';
 import {
+  BAKED_INDIRECT_MAXIMUM_GAIN,
+  resolveBakedIndirectTuning,
+  type BakedIndirectTier,
+  type BakedIndirectTuning,
+} from './lighting/baked-indirect';
+import {
   type RayTracingTier,
   type RayTracingTuning,
   RAY_TRACING_DISABLED,
@@ -180,6 +186,18 @@ export type SpatialUpscalingTuning = Readonly<{
 }>;
 
 export type ScreenSpacePostRuntime = Readonly<{
+  /**
+   * HF-418 / Lane AL. Baked indirect light rides in this runtime for the same
+   * reason the trace does: it composites into the same additive bounce term
+   * SSGI uses, and everything that decides whether it can run - the normal
+   * attachment, the scene depth - is already resolved here. Its own numbers and
+   * bounds live in `lighting/baked-indirect.ts`.
+   *
+   * It is the ONE entry in this runtime whose per-frame cost does not scale
+   * with its tier: both tiers are three texture fetches, and the tier decides
+   * only how long the offline trace took.
+   */
+  bakedIndirect: BakedIndirectTuning;
   godrays: GodraysTuning;
   reflections: ScreenSpaceReflectionTuning;
   globalIllumination: ScreenSpaceGiTuning;
@@ -480,6 +498,11 @@ export function assertScreenSpacePostCombatSafety(runtime: ScreenSpacePostRuntim
   if (runtime.globalIllumination.giIntensity > SSGI_MAXIMUM_GI_INTENSITY) {
     throw new Error(`HF-364 SSGI intensity ${runtime.globalIllumination.giIntensity} exceeds ${SSGI_MAXIMUM_GI_INTENSITY}`);
   }
+  if (runtime.bakedIndirect.composite > BAKED_INDIRECT_MAXIMUM_GAIN) {
+    throw new Error(
+      `HF-418 baked indirect composite ${runtime.bakedIndirect.composite} exceeds ${BAKED_INDIRECT_MAXIMUM_GAIN}`,
+    );
+  }
   if (runtime.motionBlur.maximumUvOffset > MOTION_BLUR_MAXIMUM_UV_OFFSET) {
     throw new Error(
       `HF-364 motion blur offset ${runtime.motionBlur.maximumUvOffset} exceeds ${MOTION_BLUR_MAXIMUM_UV_OFFSET}`,
@@ -490,6 +513,8 @@ export function assertScreenSpacePostCombatSafety(runtime: ScreenSpacePostRuntim
 }
 
 export type ScreenSpacePostSelection = Readonly<{
+  /** HF-418 - the baked irradiance-probe tier. */
+  bakedIndirect: BakedIndirectTier;
   volumetricLightShafts: ScreenSpaceTier;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
@@ -511,6 +536,7 @@ export function resolveScreenSpacePostRuntime(
   capability: Readonly<{ shadowsEnabled: boolean }>,
 ): ScreenSpacePostRuntime {
   const runtime: ScreenSpacePostRuntime = Object.freeze({
+    bakedIndirect: resolveBakedIndirectTuning(selection.bakedIndirect),
     godrays: resolveGodraysTuning(selection.volumetricLightShafts, capability),
     reflections: resolveScreenSpaceReflectionTuning(selection.screenSpaceReflections),
     globalIllumination: resolveScreenSpaceGiTuning(selection.screenSpaceGi),
@@ -552,6 +578,12 @@ export function resolveScreenSpacePostRuntime(
  */
 export function screenSpaceTopologyKey(screenSpace: ScreenSpacePostRuntime): string {
   return [
+    // HF-418. Building this layer allocates three 3D textures and adds a stage
+    // to the composite; removing it takes them away. That is a graph change,
+    // not a uniform write, so it belongs in the topology key exactly as SSR
+    // does. The TIER is not in the key: both tiers bind the same three textures
+    // at the same fixed grid and differ only in what was traced into them.
+    screenSpace.bakedIndirect.enabled ? 'baked' : '-',
     screenSpace.godrays.enabled ? 'shafts' : '-',
     screenSpace.reflections.enabled ? 'ssr' : '-',
     screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
@@ -569,6 +601,7 @@ export function screenSpaceTopologyKey(screenSpace: ScreenSpacePostRuntime): str
 
 /** Every effect off. The compatibility route and the disabled state share it. */
 export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze({
+  bakedIndirect: resolveBakedIndirectTuning('off'),
   godrays: GODRAYS_OFF,
   reflections: SSR_OFF,
   globalIllumination: SSGI_OFF,

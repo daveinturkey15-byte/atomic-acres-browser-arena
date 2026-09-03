@@ -51,9 +51,15 @@ import {
   RAY_TRACED_LIGHT_STAGE,
   buildRayTracedLightNode,
 } from './raytracing/raytraced-light-node';
+import { publishBakedIndirectReceipt } from './lighting/baked-indirect-node';
+import {
+  buildBakedIndirectRuntime,
+  type BakedIndirectRuntime,
+} from './lighting/baked-indirect-runtime';
 
 /** Stage names this module contributes, matching `LINEAR_SOURCE_STAGE_ORDER`. */
 export const MOTION_BLUR_STAGE = 'motion-blur-velocity-smear';
+export const BAKED_INDIRECT_STAGE = 'baked-indirect-probe-add';
 export const SSGI_STAGE = 'ssgi-screen-space-bounce-add';
 export const SSR_STAGE = 'ssr-screen-space-reflection-add';
 export const GODRAYS_STAGE = 'godrays-volumetric-shaft-add';
@@ -137,7 +143,11 @@ export function screenSpaceMrtRequirement(runtime: ScreenSpacePostRuntime): Scre
     // metalness/roughness pair to know which surfaces spawn one at all. Without
     // the material attachment every surface would read as a perfectly smooth
     // dielectric and the whole arena would turn to chrome.
-    normal: runtime.reflections.enabled || runtime.globalIllumination.enabled || runtime.rayTracing.enabled,
+    // HF-418: the baked probe volume is sampled per PIXEL, so it needs that
+    // pixel's world normal to evaluate the SH lobe. It needs no material
+    // attachment - a baked bounce lands on every surface, glossy or not.
+    normal: runtime.reflections.enabled || runtime.globalIllumination.enabled || runtime.rayTracing.enabled
+      || runtime.bakedIndirect.enabled,
     material: runtime.reflections.enabled || runtime.rayTracing.enabled,
     velocity: runtime.motionBlur.enabled,
   });
@@ -147,6 +157,7 @@ export function screenSpaceMrtRequirement(runtime: ScreenSpacePostRuntime): Scre
 export function screenSpacePostStages(runtime: ScreenSpacePostRuntime): readonly string[] {
   const stages: string[] = [];
   if (runtime.motionBlur.enabled) stages.push(MOTION_BLUR_STAGE);
+  if (runtime.bakedIndirect.enabled) stages.push(BAKED_INDIRECT_STAGE);
   if (runtime.globalIllumination.enabled) stages.push(SSGI_STAGE);
   if (runtime.reflections.enabled) stages.push(SSR_STAGE);
   if (runtime.rayTracing.enabled) stages.push(RAY_TRACED_LIGHT_STAGE);
@@ -319,7 +330,26 @@ export function buildScreenSpacePostGraph(
 
   // --- screen-space global illumination ------------------------------------
   const giGain = uniform(runtime.globalIllumination.enabled ? 1 : 0);
+  // --- baked indirect (HF-418) --------------------------------------------
+  // The first term in the bounce, and the only one in this whole module whose
+  // per-frame cost does not depend on its tier: three 3D texture fetches into a
+  // volume a path tracer filled before the frame started. It composites into
+  // the same additive bounce term SSGI uses, so it needs no new expression in
+  // the assembler - only a stage name, because it IS a new stage and a receipt
+  // that hid it would describe a graph that is not the one on screen.
+  let bakedIndirectRuntime: BakedIndirectRuntime | null = null;
   let bounceLight: Node<'vec3'> | null = null;
+  if (runtime.bakedIndirect.enabled && sources.sceneNormal) {
+    bakedIndirectRuntime = buildBakedIndirectRuntime({
+      sceneColor: sources.sceneColor as unknown as Node<'vec4'>,
+      sceneNormal: sources.sceneNormal as unknown as Node<'vec4'>,
+      sceneViewZ: sources.sceneViewZ as unknown as Node<'float'>,
+      camera: sources.camera,
+      sun: sources.volumetricLight,
+    }, runtime.bakedIndirect);
+    bounceLight = bakedIndirectRuntime.graph.light;
+    stages.push(BAKED_INDIRECT_STAGE);
+  }
   let ssgiNode: (DisposableNode & Record<string, { value: number }>) | null = null;
   if (runtime.globalIllumination.enabled && sources.sceneNormal) {
     const node = ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal, sources.camera as THREE.PerspectiveCamera);
@@ -341,7 +371,10 @@ export function buildScreenSpacePostGraph(
       ? denoise(rawGi, sources.sceneDepth, sources.sceneNormal, sources.camera)
       : rawGi;
     if (filtered !== rawGi) disposables.push(filtered as unknown as DisposableNode);
-    bounceLight = nodeObject(filtered as unknown as Node<'vec4'>).rgb.mul(giGain);
+    const giLight = nodeObject(filtered as unknown as Node<'vec4'>).rgb.mul(giGain);
+    bounceLight = bounceLight === null
+      ? (giLight as unknown as Node<'vec3'>)
+      : nodeObject(bounceLight).add(giLight) as unknown as Node<'vec3'>;
     stages.push(SSGI_STAGE);
   }
 
@@ -555,7 +588,14 @@ export function buildScreenSpacePostGraph(
       return node as unknown as Node<'vec4'>;
     },
     applyRuntime(next: ScreenSpacePostRuntime): void {
+      // THE ASSERT COMES FIRST. It used to run second for the baked layer and
+      // first for everything else, so an over-gain baked tuning reached the
+      // live uniform and the throw happened afterwards: the guard reported a
+      // breach it had already let through. `BakedIndirectGraph.applyTuning`
+      // clamps as well, because a fail-closed value should not depend on the
+      // order two lines happen to be written in.
       assertScreenSpacePostCombatSafety(next);
+      bakedIndirectRuntime?.applyTuning(next.bakedIndirect);
       active = next;
       // Only values behind live uniforms and render-target scales move here.
       // Turning an effect on or off is a graph topology change and belongs to
@@ -598,6 +638,23 @@ export function buildScreenSpacePostGraph(
     },
     beforeRender(): void {
       rayTracedGraph?.beforeRender();
+      // Advances the arena's bake by at most a few milliseconds and republishes
+      // the receipt, so what a headless check reads is what the frame just used
+      // rather than what was true when the graph was built.
+      //
+      // The receipt is published even when the layer is NOT built, as 'off'.
+      // Measured 2026-09-03: with the tier switched off through the real
+      // Options surface, `dataset.bakedIndirect` was ABSENT, and absent is the
+      // one value a headless check cannot interpret - it means "off", "the
+      // build predates this feature", or "the publish never ran", and those are
+      // three different bugs. Publishing 'off' collapses them to one.
+      bakedIndirectRuntime?.beforeRender();
+      publishBakedIndirectReceipt(
+        typeof document === 'undefined'
+          ? { dataset: {} }
+          : (document.documentElement as unknown as { dataset: Record<string, string | undefined> }),
+        bakedIndirectRuntime?.graph ?? null,
+      );
       if (!godraysNode) {
         shaftGain = 0;
         return;
@@ -631,6 +688,8 @@ export function buildScreenSpacePostGraph(
       shaftDisposables = [];
       rayTracedGraph?.dispose();
       rayTracedGraph = null;
+      bakedIndirectRuntime?.dispose();
+      bakedIndirectRuntime = null;
       depthOfFieldNode = null;
       ssgiNode = null;
       ssrNode = null;

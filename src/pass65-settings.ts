@@ -490,6 +490,11 @@ export function resolveGraphicsRuntime(
     // hard capability input here rather than a taste preference: with shadows
     // off there is nothing to occlude the volume and the resolver reports why.
     screenSpace: resolveScreenSpacePostRuntime({
+      // HF-418 / Lane AL. Baked indirect is resolved with the screen-space
+      // family because it composites into the same additive bounce term, but
+      // it is the one member whose cost is paid offline: both tiers are three
+      // texture fetches per pixel and differ only in bake time.
+      bakedIndirect: settings.bakedIndirect,
       volumetricLightShafts: settings.volumetricLightShafts,
       screenSpaceReflections: settings.screenSpaceReflections,
       screenSpaceGi: settings.screenSpaceGi,

@@ -1,0 +1,37 @@
+{
+  "arena": "atomic-acres",
+  "tier": "off",
+  "ambientOcclusion": null,
+  "viewport": "2560x1440",
+  "comfyQueueBefore": 0,
+  "at": "2026-09-03T03:04:35.321Z",
+  "baseProfile": "QUALITY defaults with exactly the named controls overridden through the real Options surface",
+  "optionsDrive": {
+    "applied": {
+      "graphics-baked-indirect": "off"
+    },
+    "problems": [],
+    "hasSave": true
+  },
+  "settingsAfterSave": null,
+  "deploySeconds": 58.1,
+  "pipelinesAtAdmission": 374,
+  "backend": "webgpu",
+  "settleMs": 45000,
+  "bakeConverged": "off",
+  "receiptDuringSettle": "off",
+  "frames": 941,
+  "elapsedMs": 14007.5,
+  "medianMs": 16.6,
+  "p95Ms": 22.2,
+  "p99Ms": 22.3,
+  "over33": 2,
+  "rateHz": 67.2,
+  "pipelinesInCombat": 0,
+  "receipt": "off",
+  "rayTracedProxy": null,
+  "errors": 0,
+  "errorSamples": [],
+  "receiptVerdict": "OK",
+  "comfyQueueAfter": 0
+}

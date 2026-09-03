@@ -1,0 +1,13 @@
+{
+  "tier": "high",
+  "digest": "61f979bb",
+  "digestStable": true,
+  "coefficientsIdentical": true,
+  "probes": 6912,
+  "grid": "24x12x24",
+  "firstBakeMs": 5082.9822,
+  "secondBakeMs": 6616.173400000001,
+  "occluderShapes": 6,
+  "filledProbes": 548,
+  "serialisedBytes": 442705
+}
