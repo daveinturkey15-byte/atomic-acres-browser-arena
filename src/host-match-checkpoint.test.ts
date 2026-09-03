@@ -154,6 +154,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
         y: 0,
         z: -4,
         yaw: 1.2,
+        stance: 'stand' as const,
         hp: 100,
         kills: index === 0 ? 1 : 3,
         deaths: index === 0 ? 3 : 1,

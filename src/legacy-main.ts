@@ -859,6 +859,7 @@ import {
   type HostedBotSnapshot,
 } from './hosted-bots';
 import { admitHostedBotDamage } from './hosted-bot-damage-admission';
+import { botStanceEyeHeightM, botStanceSpeedCap, resolveBotStance } from './bot-stance';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import { MATCH_DIAGNOSTICS_ENDPOINT, MatchDiagnosticUploader } from './match-diagnostics-upload';
@@ -1287,6 +1288,10 @@ type BotPlayer = {
   perceptionAimError: number;
   networkInterpolation: SnapshotInterpolationBuffer<HostedBotSnapshot>;
   networkContinuity: number;
+  // Lane AR item 3: bots had no stance at all - see src/bot-stance.ts.
+  stance: Stance;
+  stanceHeldUntil: number;
+  lastDamagedAt: number;
 };
 
 type GrenadeEntity = {
@@ -8371,9 +8376,12 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
     bot.nextGrenadeAt = nowMonoMs + recoveryRemainingMs(stored.nextGrenadeRemainingMs, checkpoint);
     bot.grenadeActive = false;
     bot.deathVisibleUntil = 0;
+    bot.stance = 'stand';
+    bot.stanceHeldUntil = 0;
+    bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
     bot.positionHistory = [{
-      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-      yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+      yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
     }];
     bot.perception = createBotPerceptionState(interactiveWorldMatchEpoch, bot.id, bot.continuity);
     bot.perceptionCanFire = true;
@@ -19728,6 +19736,9 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
     perception: createBotPerceptionState(interactiveWorldMatchEpoch, id, 1),
     perceptionCanFire: true,
     perceptionAimError: 0,
+    stance: 'stand',
+    stanceHeldUntil: 0,
+    lastDamagedAt: Number.NEGATIVE_INFINITY,
     networkInterpolation: new SnapshotInterpolationBuffer<HostedBotSnapshot>(interpolateHostedBotSnapshot),
     networkContinuity: 0,
   });
@@ -19804,6 +19815,9 @@ function activateDormantBot(index: number): boolean {
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
   bot.blockedSince = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bots.set(id, bot);
   return true;
@@ -19892,6 +19906,7 @@ function hostedBotSnapshot(bot: BotPlayer, seq: number): HostedBotSnapshot {
     y: bot.position.y,
     z: bot.position.z,
     yaw: bot.root.rotation.y,
+    stance: bot.stance,
     hp: bot.hp,
     kills: bot.kills,
     deaths: bot.deaths,
@@ -19991,12 +20006,11 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
-    // HF-412: 'stand' is hardcoded because BotPlayer carries no stance at all -
-    // the bot AI never crouches or goes prone, so there is no stance to pose
-    // from. Remote PEERS do carry a replicated stance and do play the prone
-    // transition (see the remote pose call in renderRemotes). Giving bots a
-    // simulated stance is its own ledger row, not part of this one.
-    poseOperator(bot.root, 'stand', speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
+    // Lane AR item 3: replicated like a peer's. The host sends the stance it
+    // simulated; the guest poses from it, so both ends play the same body
+    // transition instead of the guest inventing a permanent stand.
+    bot.stance = snapshot.stance;
+    poseOperator(bot.root, snapshot.stance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -20139,6 +20153,9 @@ function applyBotDamage(
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
+  // Lane AR item 3: the single funnel every bot damage path goes through, so
+  // this is the one place "under fire" has to be recorded.
+  bot.lastDamagedAt = now;
   reactOperator(bot.root, zone);
   const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
@@ -20248,6 +20265,9 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.blockedSince = 0;
   bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
   bot.deathVisibleUntil = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bot.root.visible = true;
 }
@@ -20561,13 +20581,13 @@ function updateBots(dt: number, now: number): void {
     }
     if (network.role === 'host' && remotes.size > 0) {
       recordCombatantPose(bot.positionHistory, {
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
       });
     }
     if (botsFrozen) {
       if (pass73AdsRevealCaptureFrozenTargetId !== bot.id) {
-        poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+        poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, debugBotSpeedOverride, now * 0.001, 1, 0, dt);
       }
       continue;
     }
@@ -20647,7 +20667,18 @@ function updateBots(dt: number, now: number): void {
       : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
           : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    // Lane AR item 3. Resolved BEFORE the move, because the stance caps it:
+    // a prone bot that slid at running speed is exactly the authored-mass /
+    // movement-authority mismatch the forging review exists to catch.
+    const stanceDecision = resolveBotStance({
+      hp: bot.hp, alive: bot.alive, lastDamagedAt: bot.lastDamagedAt, now,
+      hasLineOfSight: lineOfSight, travelling: routeMovement === 'advance' || routeMovement === 'retreat',
+      stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil,
+    });
+    bot.stance = stanceDecision.stance;
+    bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
+    const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    const speed = Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     const botCapsuleHeight = 1.7;
     const movementColliders = collidersOverlappingVerticalSpan(
@@ -20688,10 +20719,11 @@ function updateBots(dt: number, now: number): void {
     const lookPitch = lineOfSight
       ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
       : 0;
-    // HF-412: as above - bots have no stance state, so this is the honest pose,
-    // not a drop-shot omission. Only the QA presentation override can put a bot
-    // body prone.
-    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
+    // Lane AR item 3 (was HF-412's honest "bots have no stance state"): the
+    // body now poses from the same field the snapshot replicates and the shot
+    // resolver rewinds to, so a bot plays the crouch and prone transitions a
+    // player does. debugBotStanceOverride still wins for QA captures.
+    poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -24752,7 +24784,7 @@ function trainingDummySupportPoint(target: ArenaMap['targets'][number]): THREE.V
 
 function supportTargetState(id: string): { point: THREE.Vector3; stance: Stance } | null {
   const bot = bots.get(id);
-  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: 'stand' };
+  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: bot.stance };
   const remote = remotes.get(id);
   if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) {
     return { point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: remote.snapshot.stance ?? 'stand' };
@@ -34500,7 +34532,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = operatorYawToward(bot.position, origin);
-    poseOperator(bot.root, 'stand', 0, performance.now() * 0.001);
+    // QA staging poses the body upright deliberately; the field follows it so
+    // the pose and the replicated/rewound stance can never disagree.
+    bot.stance = 'stand';
+    poseOperator(bot.root, bot.stance, 0, performance.now() * 0.001);
     bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
     return {
@@ -35301,7 +35336,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const haze = bot.root.getObjectByName('neon-purple-bot-haze');
       if (haze) haze.visible = false;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
     }
     botsFrozen = true;
@@ -35877,16 +35912,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bot.nextGrenadeAt = now + 60_000;
       bot.grenadeActive = false;
       bot.continuity += 1;
+      bot.stance = 'stand';
+      bot.stanceHeldUntil = 0;
+      bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
       bot.positionHistory = [{
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: operatorYawToward(bot.position, origin), stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: operatorYawToward(bot.position, origin), stance: bot.stance, continuity: bot.continuity,
       }];
       bot.root.position.copy(bot.position);
       bot.root.rotation.set(0, operatorYawToward(bot.position, origin), 0);
       bot.root.scale.setScalar(1);
       bot.root.visible = true;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
       if (index < 3) railgunQaHeldDeadBots.add(bot.id);
     }

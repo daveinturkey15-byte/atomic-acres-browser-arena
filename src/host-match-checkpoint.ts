@@ -316,7 +316,11 @@ function isHostPlayerCheckpoint(value: unknown): value is HostPlayerCheckpoint {
 
 function isExactHostedBotSnapshot(value: unknown): value is HostedBotSnapshot {
   return isRecord(value)
-    && hasExactKeys(value, ['id', 'name', 'team', 'weapon', 'x', 'y', 'z', 'yaw', 'hp', 'kills', 'deaths', 'alive', 'seq'])
+    // PASS 87 Lane AR item 3: 'stance' joins the exact key set with the field
+    // itself. hasExactKeys is why this had to change in lockstep - a snapshot
+    // carrying the new field would otherwise be refused as malformed, which is
+    // the gate doing its job.
+    && hasExactKeys(value, ['id', 'name', 'team', 'weapon', 'x', 'y', 'z', 'yaw', 'stance', 'hp', 'kills', 'deaths', 'alive', 'seq'])
     && isHostedBotSnapshot(value);
 }
 

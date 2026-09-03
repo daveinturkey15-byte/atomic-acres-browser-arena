@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_434;
+const LINE_CEILING = 36_472;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -116,6 +116,15 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'PASS 87 Lane AR item 5: overdriveClaimSight() - the eye-to-core line-of-sight test '
       + 'that stops the 2x Damage Core being claimed through the bus roof slab - plus its '
       + 'scratch vector and the comment recording the measured defect.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 36_472,
+    note:
+      'PASS 87 Lane AR item 3: bots gain a stance. Field on BotPlayer, the resolve call in '
+      + 'the AI loop with its speed cap, under-fire recording in applyBotDamage, stance reset '
+      + 'on respawn and on the two QA staging paths, and replication through the hosted-bot '
+      + 'snapshot. The decision itself lives in src/bot-stance.ts, not here.',
   },
 ];
 
