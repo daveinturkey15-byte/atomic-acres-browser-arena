@@ -651,7 +651,14 @@ describe('presentation prewarm startup contract', () => {
       arenaDeployment.indexOf("profileArenaTransition('quality-presentation');"),
     );
     expect(coldWebGpuWarmFrame).not.toHaveLength(0);
-    expect(coldWebGpuWarmFrame).toContain('if (pass64TslSystems) {');
+    // LANE H2: the guard now also asks whether a COLD session needs the relief.
+    // The switch case (`hadPreparedArena`) is unconditional and unchanged; the
+    // cold-session case is answered by an evidenced authority module, never by
+    // an id in this region - which the zero-arena-id assertion below still pins.
+    expect(coldWebGpuWarmFrame)
+      .toContain('if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {');
+    expect(coldWebGpuWarmFrame)
+      .toContain('const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);');
     expect(coldWebGpuWarmFrame)
       .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(precompileRoot));');
     expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(0);

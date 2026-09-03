@@ -69,6 +69,7 @@ import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -29451,7 +29452,19 @@ async function performArenaSelection(
       // is not, and an arena factory that parents its root elsewhere would turn
       // a load-time cut into a failed transition. Falling back to the whole
       // scene is the safe direction (more compiled, never less).
-      if (pass64TslSystems) {
+      //
+      // MEASURED AGAIN (lane H2, 2026-09-03): scoping the cold-session root to
+      // the arena recovered only a third of the cost - gun-range's
+      // `visual-definition` went 12981 -> 10049 ms against a 4404 ms baseline,
+      // internal control x0.99 - and `coverage-submit-fence` stayed flat at
+      // x1.00, so the remaining 5.6 s is ADDED work, not moved work. On a cold
+      // session the coverage precompile downstream realises the same set off the
+      // fence anyway and the warm frame in between clears 12 s on every arena
+      // except the one `cold-session-precompile-reach.ts` names with its
+      // evidence. So the cold-session relief is asked of that authority, and
+      // this region still contains no arena id (pinned twice).
+      const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
+      if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
         const scenePassPrecompile = pass64TslSystems;
         let arenaRootAncestor: THREE.Object3D = arena.root;
         while (arenaRootAncestor.parent) arenaRootAncestor = arenaRootAncestor.parent;
