@@ -829,10 +829,25 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   // improvement rather than a swap. The control-set hash in
   // graphics-profile-contract.test.ts will fail the moment that edit lands,
   // which is the intended tripwire: the audit doc must be re-measured with it.
+  // PASS 89 INTEGRATION. Lane AI authored BALANCED before Lane AL's
+  // `bakedIndirect` control existed, and left a TODO above saying BALANCED is
+  // the rung whose baked-indirect default has to be argued first. Argued here:
+  // LOW, the same tier QUALITY takes.
+  //   * It is not a per-frame cost. Lane AL pins that LOW and HIGH differ only
+  //     in BAKE cost, never in per-frame cost
+  //     (src/rendering/lighting/baked-indirect.test.ts, "LOW and HIGH differ
+  //     only in BAKE cost"), and the bake itself is chunked under a 3 ms
+  //     per-frame wall-clock bound that is now enforced per RAY.
+  //   * BALANCED's whole argument is "QUALITY's look without the passes that
+  //     cost the most per frame". A baked volume is exactly that: an offline
+  //     cost that buys bounce light. Taking OFF here would have made the rung
+  //     darker than the one below it once QUALITY got the volume.
+  //   * HIGH is not taken: it is the RAY TRACED / MAX bake, and its extra cost
+  //     is bake time on a machine that by definition has less of it to spare.
   balanced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',

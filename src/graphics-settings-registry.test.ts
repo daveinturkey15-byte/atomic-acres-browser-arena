@@ -224,6 +224,15 @@ describe('Advanced Graphics canonical registry', () => {
       // PERFORMANCE's. If a future edit promotes one of these into Balanced,
       // this line is where it has to be argued.
       balanced: {
+        // PASS 89: the ONE exception to "identical to PERFORMANCE's row", and
+        // the reason it is not a promotion of the family above. Lane AL pins
+        // that LOW and HIGH baked indirect differ only in BAKE cost and never
+        // in per-frame cost, and the bake runs chunked under a per-ray 3 ms
+        // wall-clock bound. BALANCED takes QUALITY's tier because a baked
+        // volume is an offline cost that buys bounce light - which is exactly
+        // this profile's proposition - and because leaving it OFF would have
+        // made this rung darker than PERFORMANCE is bright once QUALITY got it.
+        bakedIndirect: 'low',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',

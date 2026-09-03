@@ -45,11 +45,11 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: 'dac3ca1e',
-  balanced: '7cc8f8b7',
-  high: 'df46a580',
-  raytraced: 'e4ccbbd2',
-  max: '5aa0e356',
+  performance: '445a9754',
+  balanced: '0753ee34',
+  high: 'de90e589',
+  raytraced: 'd65fbd25',
+  max: '2be3a371',
 });
 
 describe('HF-418 graphics ladder', () => {

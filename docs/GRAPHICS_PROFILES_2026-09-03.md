@@ -180,11 +180,29 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `dac3ca1e` |
-| `balanced` | `7cc8f8b7` |
-| `high` (QUALITY) | `df46a580` |
-| `raytraced` | `e4ccbbd2` |
-| `max` | `5aa0e356` |
+| `performance` | `445a9754` |
+| `balanced` | `0753ee34` |
+| `high` (QUALITY) | `de90e589` |
+| `raytraced` | `d65fbd25` |
+| `max` | `2be3a371` |
+
+> **PASS 89 re-fingerprint.** Every hash above changed at the PASS 89
+> integration, and not because a measured value moved: Lane AL added ONE new
+> control, `bakedIndirect`, to the control set, so every preset's key-sorted
+> fingerprint is new. The tiers are `performance` off, `balanced` low, `high`
+> (QUALITY) low, `raytraced` high, `max` high; BALANCED's is argued at its row
+> in `src/graphics-settings-registry.ts`. The tier ladder is pinned in
+> `src/graphics-settings-registry.test.ts`, and Lane AL pins separately that LOW
+> and HIGH differ only in BAKE cost, never in per-frame cost
+> (`src/rendering/lighting/baked-indirect.test.ts`).
+>
+> **What is therefore NOT re-measured.** Section 3's frame times were captured
+> before this control existed. Lane AL measured the layer itself at +0.7% median
+> and +0.3% p95 on QUALITY against the layer switched off
+> (`docs/evidence/pass85/lane-al/`), which is inside this machine's run-to-run
+> noise, so no figure in section 3 was rewritten from it. A full re-capture of
+> the 5x3 ladder with the baked layer live is an OPEN ITEM, not a claim made
+> here.
 
 ---
 
