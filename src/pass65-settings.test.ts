@@ -22,14 +22,17 @@ describe('Pass 65 settings contract', () => {
     expect(settings.graphics).toMatchObject({
       schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 240,
       frameRateLimit: 0, antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high',
-      shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'off', volumetricQuality: 'high',
+      // HF-438: QUALITY carries the retired RAY TRACED rung's trace (light
+      // tier) and its AO tier.
+      shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'high', volumetricQuality: 'high',
       anisotropy: 8, bloomQuality: 'cinematic', toneMapping: 'aces',
     });
+    expect(settings.graphics.rayTracing).toBe('reflections');
     expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({
       renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
       shadowMapSize: 2048, maximumAnisotropy: 8,
       ambientOcclusion: {
-        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
       },
     });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
@@ -106,7 +109,9 @@ describe('Pass 65 settings contract', () => {
     expect(quality.graphics).toMatchObject({
       preset: 'high', renderScale: 1, adaptiveResolution: true,
       shadows: 'high', shadowUpdateMode: 'static', particleQuality: 'high',
-      ambientOcclusion: 'off', targetFps: 240, frameRateLimit: 0,
+      // HF-438: the canonical QUALITY value is now HIGH, so a stored override
+      // of anything else is discarded in favour of it.
+      ambientOcclusion: 'high', targetFps: 240, frameRateLimit: 0,
     });
   });
 
@@ -200,8 +205,14 @@ describe('Pass 65 settings contract', () => {
   });
 
   it('normalizes and resolves every bounded WebGPU GTAO tier', () => {
+    // A hostile tier falls back to the QUALITY preset's canonical tier, never
+    // to the most expensive one a hostile payload could name. HF-438 made that
+    // canonical tier HIGH (QUALITY carries the trace with its AO), still one
+    // step below MAX's ultra — the fail-safe property is re-pinned, not moved.
     expect(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'invented' } }).graphics.ambientOcclusion)
-      .toBe('off');
+      .toBe(GRAPHICS_PRESET_VALUES.high.ambientOcclusion);
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'invented' } }).graphics.ambientOcclusion)
+      .not.toBe('ultra');
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'off' } }).graphics).ambientOcclusion)
       .toEqual({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false });
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'low' } }).graphics).ambientOcclusion)

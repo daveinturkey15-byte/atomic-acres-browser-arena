@@ -240,19 +240,22 @@ describe('Advanced Graphics canonical registry', () => {
       high: {
         // QUALITY, the auto-selected default. LOW baked bounce: measured at
         // +0.7% median / +0.3% p95 against the layer switched off, and zero
-        // added pipelines at admission.
+        // added pipelines at admission. HF-438 folds the retired RAY TRACED
+        // rung's trace in at the LIGHT tier: the reflections tier on, SSR LOW
+        // and MSAA 4x both kept, AO raised off to HIGH in the AO pin below.
         bakedIndirect: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
-        rayTracing: 'off',
+        rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
         bakedIndirect: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
-        // MAX is untouched by HF-398. It already cannot deploy against the
-        // 4000 ms admission bound; adding a large new fragment shader to it
-        // would make a failing preset fail harder.
-        rayTracing: 'off',
+        // HF-438: MAX carries the trace at the FULL tier, on top of a stack
+        // that already held every raised tier the retired rung had argued for
+        // (ultra AO, ultra PMREM, high SSGI). The audit counts the added
+        // pipelines at admission; the tripwire requires zero in combat.
+        rayTracing: 'reflections',
         depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
       },
     } as const;
