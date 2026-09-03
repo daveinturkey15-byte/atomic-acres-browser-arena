@@ -89,6 +89,7 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { applyRaid2Dressing } from './raid2-dressing';
 
 /**
  * 100 x 76 m, deliberately IDENTICAL to the shipped Raid's bounds.
@@ -776,6 +777,8 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   }
   rect('raid2 garage workbench', 46, 48.4, 0, MOUNT, -6, -2, m.timber);
   rect('raid2 garage crate stack', 46.8, 49.2, 0, HARD_COVER, 4, 6.4, m.timber);
+
+  applyRaid2Dressing(builder);
 
   batchPresentationOnlyBoxes(builder.root, 'raid2-presentation');
 
