@@ -8,7 +8,10 @@ import type { ArenaId } from './map-selection';
 import type { LowHealthFeedbackPresentation } from './sensory-feedback';
 import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-settings';
 import {
-  selectChiptuneTrack,
+  CHIPTUNE_TRACKS,
+  ChiptuneRotation,
+  chiptuneBarSeconds,
+  chiptuneLoopSeconds,
   type ChiptuneEvent,
   type ChiptuneTrackId,
   GAME_MUSIC_BUS_GAIN,
@@ -666,11 +669,9 @@ export class ArenaAudio {
   private musicLoopStartedAtSeconds = 0;
   private musicScheduledUntilSeconds = 0;
   private musicRunning = false;
+  private musicRotation = new ChiptuneRotation();
   private musicTrack: ChiptuneTrackId | null = null;
-  // Remembered ACROSS matches so rotation is felt over a session rather than
-  // re-rolled from nothing each time. Straight random would replay the same track
-  // back to back about half the time, which reads as the music never changing.
-  private musicLastTrack: ChiptuneTrackId | null = null;
+  private musicTrackHistory: Array<{ track: ChiptuneTrackId; atSeconds: number }> = [];
   private readonly busIdentity = new Map<AudioNode, AudioBusId>();
   private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -1283,12 +1284,12 @@ export class ArenaAudio {
       // Square lead over a square bass, the two-channel palette this loop was
       // written for. The bass sits two octaves down so they never mask each other.
       this.musicChannels = Object.freeze({ lead: build('square'), bass: build('square') });
-      // Pick a track for this match, excluding whatever played last.
-      this.musicTrack = selectChiptuneTrack(this.musicLastTrack, Math.random());
-      this.musicLastTrack = this.musicTrack;
+      // Pick a track for this match from shuffle rotation
+      this.musicTrack = this.musicRotation.nextTrack();
       this.musicRunning = true;
       this.musicLoopStartedAtSeconds = this.context.currentTime + 0.12;
       this.musicScheduledUntilSeconds = this.musicLoopStartedAtSeconds;
+      this.musicTrackHistory = [{ track: this.musicTrack, atSeconds: this.musicLoopStartedAtSeconds }];
       this.pumpGameMusic();
     } catch {
       // A device policy can still reject nodes after the context exists.
@@ -1345,7 +1346,15 @@ export class ArenaAudio {
   /** QA: live music channel state - proves whether the notes reach the
    * channel gain params at authored amplitude (input side) or die between
    * the channel and the bus (graph side). */
-  debugMusicState(): { running: boolean; leadGain: number; bassGain: number; leadHz: number; scheduledAhead: number } | null {
+  debugMusicState(): {
+    running: boolean;
+    leadGain: number;
+    bassGain: number;
+    leadHz: number;
+    scheduledAhead: number;
+    track: ChiptuneTrackId | null;
+    history: ReadonlyArray<{ track: ChiptuneTrackId; atSeconds: number }>;
+  } | null {
     const channels = this.musicChannels;
     if (!channels || !this.context) return null;
     return {
@@ -1354,6 +1363,8 @@ export class ArenaAudio {
       bassGain: channels.bass.gain.gain.value,
       leadHz: channels.lead.osc.frequency.value,
       scheduledAhead: Number((this.musicScheduledUntilSeconds - this.context.currentTime).toFixed(3)),
+      track: this.musicTrack,
+      history: Object.freeze([...this.musicTrackHistory]),
     };
   }
 
@@ -1375,22 +1386,65 @@ export class ArenaAudio {
    * audio clock ahead of time and the frame loop only tops the window up. A frame
    * hitch therefore cannot make the music stutter, which matters because a hitch
    * during a firefight is exactly when it would be most audible.
+   *
+   * HF-430: Automatically swaps tracks seamlessly on bar boundaries when each ~90 s
+   * track finishes its loop, following the 10-track shuffle rotation.
    */
   private pumpGameMusic(): void {
     const channels = this.musicChannels;
-    const track = this.musicTrack;
+    let track = this.musicTrack;
     if (!this.musicRunning || !this.context || !channels || !track) return;
     const horizon = this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS;
-    const step = advanceChiptuneSchedule(
-      track,
-      this.musicScheduledUntilSeconds,
-      this.musicLoopStartedAtSeconds,
-      horizon,
-    );
-    for (const { event, atSeconds } of step.events) {
-      this.scheduleChiptuneNote(channels[event.channel], event, atSeconds);
+    let guard = 0;
+    while (this.musicScheduledUntilSeconds < horizon && this.musicRunning && guard < 64) {
+      guard += 1;
+      const trackDuration = chiptuneLoopSeconds(track);
+      const trackEnd = this.musicLoopStartedAtSeconds + trackDuration;
+      const subHorizon = Math.min(horizon, trackEnd);
+
+      const step = advanceChiptuneSchedule(
+        track,
+        this.musicScheduledUntilSeconds,
+        this.musicLoopStartedAtSeconds,
+        subHorizon,
+      );
+      for (const { event, atSeconds } of step.events) {
+        this.scheduleChiptuneNote(channels[event.channel], event, atSeconds);
+      }
+      this.musicScheduledUntilSeconds = step.scheduledUntilSeconds;
+
+      if (this.musicScheduledUntilSeconds >= trackEnd - 1e-6) {
+        // Track finished on bar boundary — swap seamlessly to next track in rotation
+        const nextTrack = this.musicRotation.nextTrack();
+        this.musicTrack = nextTrack;
+        this.musicLoopStartedAtSeconds = trackEnd;
+        this.musicScheduledUntilSeconds = trackEnd;
+        this.musicTrackHistory.push({ track: nextTrack, atSeconds: trackEnd });
+        track = nextTrack;
+        const leadWave = CHIPTUNE_TRACKS[nextTrack].leadWaveform ?? 'square';
+        const bassWave = CHIPTUNE_TRACKS[nextTrack].bassWaveform ?? 'square';
+        try {
+          if (channels.lead.osc.type !== leadWave) channels.lead.osc.type = leadWave;
+          if (channels.bass.osc.type !== bassWave) channels.bass.osc.type = bassWave;
+        } catch { /* partial browser node */ }
+      } else {
+        break;
+      }
     }
-    this.musicScheduledUntilSeconds = step.scheduledUntilSeconds;
+  }
+
+  /** Swaps the playing music track to the next rotation track on the upcoming bar boundary. */
+  swapGameMusicOnNextBar(nextTrackId?: ChiptuneTrackId): number | null {
+    if (!this.musicRunning || !this.context || !this.musicTrack) return null;
+    const bar = chiptuneBarSeconds(this.musicTrack);
+    const elapsed = Math.max(0, this.context.currentTime - this.musicLoopStartedAtSeconds);
+    const nextBar = this.musicLoopStartedAtSeconds + (Math.floor(elapsed / bar) + 1) * bar;
+    const nextTrack = nextTrackId ?? this.musicRotation.nextTrack();
+    this.musicTrack = nextTrack;
+    this.musicLoopStartedAtSeconds = nextBar;
+    this.musicScheduledUntilSeconds = nextBar;
+    this.musicTrackHistory.push({ track: nextTrack, atSeconds: nextBar });
+    return nextBar;
   }
 
   /** Commits one note to a channel's oscillator: pitch, then a short envelope. */

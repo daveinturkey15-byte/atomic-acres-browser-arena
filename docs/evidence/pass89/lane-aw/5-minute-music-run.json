@@ -1,0 +1,200 @@
+{
+  "timestamp": "2026-09-03T05:59:22.726Z",
+  "lane": "AW",
+  "ticket": "HF-430",
+  "description": "Chiptune music at half volume, 10 variations of ~90s, random order",
+  "simulation": {
+    "durationSeconds": 300,
+    "totalFrames": 18000,
+    "fps": 60,
+    "seed": 20260903,
+    "totalNotesScheduled": 1651
+  },
+  "gain": {
+    "previousGain": 0.054,
+    "halvedGain": 0.027,
+    "ratio": 0.5,
+    "dbReduction": -6.0206,
+    "sfxBaseGainUntouched": 0.78
+  },
+  "budget": {
+    "leadConcurrency": 1,
+    "bassConcurrency": 1,
+    "totalVoices": 2,
+    "budgetLimit": 2,
+    "pass": true
+  },
+  "tenTracks": [
+    {
+      "id": "siren-groves",
+      "title": "Siren Groves",
+      "tempoBpm": 124,
+      "bars": 46,
+      "barSeconds": 1.9355,
+      "durationSeconds": 89.0323,
+      "eventsCount": 782,
+      "withinDurationBand": true
+    },
+    {
+      "id": "fallout-drift",
+      "title": "Fallout Drift",
+      "tempoBpm": 96,
+      "bars": 36,
+      "barSeconds": 2.5,
+      "durationSeconds": 90,
+      "eventsCount": 396,
+      "withinDurationBand": true
+    },
+    {
+      "id": "cobalt-circuit",
+      "title": "Cobalt Circuit",
+      "tempoBpm": 128,
+      "bars": 48,
+      "barSeconds": 1.875,
+      "durationSeconds": 90,
+      "eventsCount": 960,
+      "withinDurationBand": true
+    },
+    {
+      "id": "rust-horizon",
+      "title": "Rust Horizon",
+      "tempoBpm": 100,
+      "bars": 37,
+      "barSeconds": 2.4,
+      "durationSeconds": 88.8,
+      "eventsCount": 444,
+      "withinDurationBand": true
+    },
+    {
+      "id": "neon-wasteland",
+      "title": "Neon Wasteland",
+      "tempoBpm": 120,
+      "bars": 45,
+      "barSeconds": 2,
+      "durationSeconds": 90,
+      "eventsCount": 855,
+      "withinDurationBand": true
+    },
+    {
+      "id": "static-vault",
+      "title": "Static Vault",
+      "tempoBpm": 112,
+      "bars": 42,
+      "barSeconds": 2.1429,
+      "durationSeconds": 90,
+      "eventsCount": 630,
+      "withinDurationBand": true
+    },
+    {
+      "id": "terminal-pulse",
+      "title": "Terminal Pulse",
+      "tempoBpm": 135,
+      "bars": 51,
+      "barSeconds": 1.7778,
+      "durationSeconds": 90.6667,
+      "eventsCount": 969,
+      "withinDurationBand": true
+    },
+    {
+      "id": "gamma-canopy",
+      "title": "Gamma Canopy",
+      "tempoBpm": 106,
+      "bars": 40,
+      "barSeconds": 2.2642,
+      "durationSeconds": 90.566,
+      "eventsCount": 680,
+      "withinDurationBand": true
+    },
+    {
+      "id": "rad-storm-echo",
+      "title": "Rad-Storm Echo",
+      "tempoBpm": 116,
+      "bars": 44,
+      "barSeconds": 2.069,
+      "durationSeconds": 91.0345,
+      "eventsCount": 660,
+      "withinDurationBand": true
+    },
+    {
+      "id": "bunker-lullaby",
+      "title": "Bunker Lullaby",
+      "tempoBpm": 88,
+      "bars": 33,
+      "barSeconds": 2.7273,
+      "durationSeconds": 90,
+      "eventsCount": 297,
+      "withinDurationBand": true
+    }
+  ],
+  "fiveMinuteRun": {
+    "tracksPlayed": 4,
+    "trackHistory": [
+      {
+        "index": 1,
+        "trackId": "bunker-lullaby",
+        "title": "Bunker Lullaby",
+        "tempoBpm": 88,
+        "barSeconds": 2.727272727272727,
+        "totalBars": 33,
+        "durationSeconds": 90,
+        "startedAtSeconds": 0.12
+      },
+      {
+        "index": 2,
+        "trackId": "fallout-drift",
+        "title": "Fallout Drift",
+        "tempoBpm": 96,
+        "barSeconds": 2.5,
+        "totalBars": 36,
+        "durationSeconds": 90,
+        "startedAtSeconds": 90.12
+      },
+      {
+        "index": 3,
+        "trackId": "static-vault",
+        "title": "Static Vault",
+        "tempoBpm": 112,
+        "barSeconds": 2.142857142857143,
+        "totalBars": 42,
+        "durationSeconds": 90,
+        "startedAtSeconds": 180.12
+      },
+      {
+        "index": 4,
+        "trackId": "cobalt-circuit",
+        "title": "Cobalt Circuit",
+        "tempoBpm": 128,
+        "barSeconds": 1.875,
+        "totalBars": 48,
+        "durationSeconds": 90,
+        "startedAtSeconds": 270.12
+      }
+    ],
+    "swaps": [
+      {
+        "swapIndex": 1,
+        "fromTrack": "bunker-lullaby",
+        "toTrack": "fallout-drift",
+        "swapAtSeconds": 90.12,
+        "barsPlayed": 33,
+        "barExactMultiple": true
+      },
+      {
+        "swapIndex": 2,
+        "fromTrack": "fallout-drift",
+        "toTrack": "static-vault",
+        "swapAtSeconds": 180.12,
+        "barsPlayed": 36,
+        "barExactMultiple": true
+      },
+      {
+        "swapIndex": 3,
+        "fromTrack": "static-vault",
+        "toTrack": "cobalt-circuit",
+        "swapAtSeconds": 270.12,
+        "barsPlayed": 42,
+        "barExactMultiple": true
+      }
+    ]
+  }
+}
