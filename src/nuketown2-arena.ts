@@ -109,8 +109,8 @@ export {
 } from './nuketown2-layout';
 
 const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
-/** Width of a house along the street. 16 x 10 = 160 m², 5.3 % of the playspace. */
-const HOUSE_WIDTH = 16;
+/** Width of a house along the street. 14 x 10 = 140 m². */
+const HOUSE_WIDTH = 14;
 /** Back yard depth: enough for a spawn line, the shed and a fence gate. */
 const YARD_DEPTH = 7.5;
 /**
@@ -144,14 +144,13 @@ const LOW_COVER = 0.95;
 /** Hard cover: clears the 1.65 m standing eye line. */
 const HARD_COVER = 1.9;
 
-
 /** House extents along the street, north house. The south house is its negation. */
-const HOUSE_X0 = NUKETOWN2_HOUSE_LAYOUT[0].x - HOUSE_WIDTH / 2;  // -12
-const HOUSE_X1 = NUKETOWN2_HOUSE_LAYOUT[0].x + HOUSE_WIDTH / 2;  // 4
-/** Garage: 8 m wide, attached to the outboard end of its house, same depth. */
-const GARAGE_WIDTH = 8;
-const GARAGE_X1 = HOUSE_X0;                                       // -12
-const GARAGE_X0 = GARAGE_X1 - GARAGE_WIDTH;                       // -20
+const HOUSE_X0 = NUKETOWN2_HOUSE_LAYOUT[0].x - HOUSE_WIDTH / 2;  // -10.5
+const HOUSE_X1 = NUKETOWN2_HOUSE_LAYOUT[0].x + HOUSE_WIDTH / 2;  // 3.5
+/** Garage: 7 m wide, attached to the East flank of north house, same depth. */
+const GARAGE_WIDTH = 7;
+const GARAGE_X0 = HOUSE_X1;                                       // 3.5
+const GARAGE_X1 = GARAGE_X0 + GARAGE_WIDTH;                       // 10.5
 
 /**
  * The authored section, in metres. Every number here is the one the build
@@ -238,8 +237,8 @@ const BUS_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.fr
  * separation floor.
  */
 export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
-  Object.freeze([[-14, -19] as const, [-7, -20] as const, [0, -19] as const, [7, -20] as const, [14, -19] as const]),
-  Object.freeze([[14, 19] as const, [7, 20] as const, [0, 19] as const, [-7, 20] as const, [-14, 19] as const]),
+  Object.freeze([[-12, -19.5] as const, [-6, -20.5] as const, [0, -19.5] as const, [6, -20.5] as const, [12, -19.5] as const]),
+  Object.freeze([[12, 19.5] as const, [6, 20.5] as const, [0, 19.5] as const, [-6, 20.5] as const, [-12, 19.5] as const]),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -388,12 +387,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const zMid = (HOUSE_FRONT_Z + HOUSE_BACK_Z) / 2;
 
   // Ground slab and roof deck.
-  pair(builder, 'house floor', [-4, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interior, { cast: false });
-  pair(builder, 'house roof deck', [-4, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH], m.roof);
+  pair(builder, 'house floor', [-3.5, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interior, { cast: false });
+  pair(builder, 'house roof deck', [-3.5, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH], m.roof);
 
   // Side walls, full height both storeys.
   for (const x of [HOUSE_X0 + WALL_T / 2, HOUSE_X1 - WALL_T / 2]) {
-    const side = x < -4 ? 'west' : 'east';
+    const side = x < -3.5 ? 'west' : 'east';
     pair(builder, `house wall ${side}`, [x, (ROOF_Y0) / 2, zMid], [WALL_T, ROOF_Y0, HOUSE_DEPTH], siding);
   }
 
@@ -401,9 +400,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Segments are authored as [x0, x1] runs; the gaps between them ARE the
   // openings, which is the whole point — a window you cannot shoot through is
   // a painting.
-  const FRONT_DOOR: [number, number] = [-4.8, -3.2];
-  const FRONT_WINDOW_A: [number, number] = [-9.5, -7.5];
-  const FRONT_WINDOW_B: [number, number] = [-0.5, 1.5];
+  const FRONT_DOOR: [number, number] = [-4.5, -2.5];
+  const FRONT_WINDOW_A: [number, number] = [-8.5, -6.5];
+  const FRONT_WINDOW_B: [number, number] = [-1.0, 1.0];
   const groundFrontRuns: [number, number][] = [
     [HOUSE_X0, FRONT_WINDOW_A[0]],
     [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
@@ -426,7 +425,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, 2.6, zFront], [FRONT_DOOR[1] - FRONT_DOOR[0], 0.8, WALL_T], m.trim);
 
   // --- front wall, upper floor: the power window ---------------------------
-  const UPPER_WINDOW: [number, number] = [-5.6, -2.4];
+  const UPPER_WINDOW: [number, number] = [-5.0, -2.0];
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0, UPPER_WINDOW[0]],
     [UPPER_WINDOW[1], HOUSE_X1],
@@ -444,7 +443,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   }
 
   // --- back wall: back door and one upper window ---------------------------
-  const BACK_DOOR: [number, number] = [-1.6, 0];
+  const BACK_DOOR: [number, number] = [-2.0, 0.0];
   const groundBackRuns: [number, number][] = [
     [HOUSE_X0, BACK_DOOR[0]],
     [BACK_DOOR[1], HOUSE_X1],
@@ -455,7 +454,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   });
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, 2.6, zBack], [BACK_DOOR[1] - BACK_DOOR[0], 0.8, WALL_T], m.trim);
-  const BACK_UPPER_WINDOW: [number, number] = [-9, -6.5];
+  const BACK_UPPER_WINDOW: [number, number] = [-8.5, -6.0];
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
@@ -470,8 +469,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // --- stair, hard against the east wall -----------------------------------
   // 11 risers of 0.30 m. Autostep is 0.42 m, so this walks; it is not a jump
   // puzzle and it is not a ramp the bots cannot read.
-  const STAIR_X0 = 1.6;
-  const STAIR_X1 = HOUSE_X1 - WALL_T;               // 3.7
+  const STAIR_X0 = 1.4;
+  const STAIR_X1 = HOUSE_X1 - WALL_T;               // 3.2
   const STAIR_W = STAIR_X1 - STAIR_X0;
   const STAIR_CX = (STAIR_X0 + STAIR_X1) / 2;
   const RISER = 0.3;
@@ -499,7 +498,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
 
   // --- internal partitions, both storeys, one doorway each -----------------
   const PARTITION_Z = zMid;
-  const INNER_DOOR: [number, number] = [-8, -6.4];
+  const INNER_DOOR: [number, number] = [-7.5, -5.9];
   for (const [storey, y0, h] of [['ground', 0, GROUND_H], ['upper', UPPER_Y0, UPPER_H]] as const) {
     const x1 = storey === 'upper' ? STAIR_X0 : HOUSE_X1;
     [[HOUSE_X0, INNER_DOOR[0]], [INNER_DOOR[1], x1]].forEach((run, index) => {
@@ -510,9 +509,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   }
 
   // One waist-high body per ground room, so a room is a fight and not a box.
-  pair(builder, 'house front room counter', [-9.4, LOW_COVER / 2, HOUSE_FRONT_Z - 2.4], [3.2, LOW_COVER, 1.0], m.interior);
-  pair(builder, 'house back room bench', [0.4, LOW_COVER / 2, HOUSE_BACK_Z + 2.2], [3.0, LOW_COVER, 1.0], m.interior);
-  pair(builder, 'house upper crate', [-9.6, UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, zMid - 2.6],
+  pair(builder, 'house front room counter', [-8.5, LOW_COVER / 2, HOUSE_FRONT_Z - 2.4], [3.2, LOW_COVER, 1.0], m.interior);
+  pair(builder, 'house back room bench', [-0.5, LOW_COVER / 2, HOUSE_BACK_Z + 2.2], [3.0, LOW_COVER, 1.0], m.interior);
+  pair(builder, 'house upper crate', [-8.5, UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, zMid - 2.6],
     [1.4, LOW_COVER, 1.4], m.interior);
 }
 
@@ -534,18 +533,18 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 
   pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, HOUSE_DEPTH], m.drive, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, HOUSE_DEPTH], m.roof);
-  pair(builder, 'garage wall outboard', [GARAGE_X0 + WALL_T / 2, H / 2, zMid], [WALL_T, H, HOUSE_DEPTH], m.sidingB);
+  pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, HOUSE_DEPTH], m.sidingB);
 
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box.
   const LINK_DOOR: [number, number] = [-11.5, -9.9];
   [[HOUSE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], HOUSE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `garage link pier ${index}`,
-      [GARAGE_X1 - WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.sidingB);
+      [GARAGE_X0 + WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.sidingB);
   });
 
   // Garage door: a 5 m opening onto the road, headed at 2.6 m.
-  const DOOR: [number, number] = [-18.5, -13.5];
+  const DOOR: [number, number] = [4.5, 9.5];
   [[GARAGE_X0, DOOR[0]], [DOOR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.sidingB);
@@ -553,7 +552,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.trim);
 
   // Rear door into the back yard.
-  const REAR: [number, number] = [-19, -17.4];
+  const REAR: [number, number] = [5.0, 7.0];
   [[GARAGE_X0, REAR[0]], [REAR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.sidingB);
@@ -562,7 +561,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 
   // Workbench: the one body that makes the garage a position rather than a
   // corridor between two doors.
-  pair(builder, 'garage bench', [-15.5, LOW_COVER / 2, HOUSE_BACK_Z + 1.4], [4.0, LOW_COVER, 0.9], m.interior);
+  pair(builder, 'garage bench', [7.0, LOW_COVER / 2, HOUSE_BACK_Z + 1.4], [3.5, LOW_COVER, 0.9], m.interior);
 }
 
 /**
@@ -596,7 +595,7 @@ function bus(builder: Builder, m: Nuketown2Materials): void {
   const HEAD_BOTTOM = 2.5;
   [[-L / 2, DOOR[0]], [DOOR[1], L / 2]].forEach((run, index) => {
     pair(builder, `bus flank lower ${index}`,
-      [(run[0]! + run[1]!) / 2, (floorY + SILL_TOP) / 2, flankZ], [run[1]! - run[0]!, SILL_TOP - floorY, T], m.busShell);
+      [(run[0]! + run[1]!) / 2, (floorY + SILL_TOP) / 2, flankZ], [run[1] - run[0]!, SILL_TOP - floorY, T], m.busShell);
   });
   pair(builder, 'bus cant rail', [0, (HEAD_BOTTOM + roofY) / 2, flankZ], [L, roofY - HEAD_BOTTOM, T], m.busShell);
   // Two window mullions, so the band reads as windows and not as a slot.
@@ -623,29 +622,33 @@ function bus(builder: Builder, m: Nuketown2Materials): void {
 }
 
 /**
- * A moving truck in each cul-de-sac. The cab is CLOSED cover; the cargo box is
- * OPEN at the rear, so it is a one-room hide with a single mouth facing the
- * middle of the map. Authored once at the west end; the east truck is its
- * rotational partner and its mouth therefore faces the other way, toward the
- * centre, which is the property that matters.
+ * The moving truck in the centre of the street, staggered opposite the bus.
+ * In Black Ops 2 Nuketown 2025, there is exactly ONE moving truck located in
+ * the center of the road (south lane), opposite the school bus.
+ * Cab is CLOSED cover; cargo box trailer is OPEN at the rear facing East (+x),
+ * with an interior floor deck and ramp.
  */
 function truck(builder: Builder, m: Nuketown2Materials): void {
-  const cx = -24;
-  const cz = -1.2;
+  const cz = 2.4;
   const W = 2.4;
   const T = 0.15;
-  // Cab, solid.
-  pair(builder, 'truck cab', [cx - 2.5, 1.75, cz], [2.4, 2.3, W], m.truckCab);
+  const cabX = 0.0;
+  const cabL = 2.2;
+  const boxL = 5.2;
+  const boxX = cabX + cabL / 2 + boxL / 2; // 3.7
+  // Cab, solid closed cover.
+  box(builder, 'truck cab', [cabX, 1.75, cz], [cabL, 2.3, W], m.truckCab);
   // Deck and cargo box: front wall, two flanks, roof; the rear (+x) is open.
-  pair(builder, 'truck deck', [cx + 1.2, 0.85, cz], [5.0, 0.2, W], m.truckBox, { cast: false });
-  pair(builder, 'truck box front', [cx - 1.225, 2.0, cz], [T, 2.1, W], m.truckBox);
+  box(builder, 'truck deck', [boxX, 0.85, cz], [boxL, 0.2, W], m.truckBox, { cast: false });
+  box(builder, 'truck box front', [cabX + cabL / 2 + T / 2, 2.0, cz], [T, 2.1, W], m.truckBox);
   for (const [index, side] of [-1, 1].entries()) {
-    pair(builder, `truck box flank ${index}`, [cx + 1.2, 2.0, cz + side * (W / 2 - T / 2)],
-      [5.0, 2.1, T], m.truckBox);
+    box(builder, `truck box flank ${index}`, [boxX, 2.0, cz + side * (W / 2 - T / 2)],
+      [boxL, 2.1, T], m.truckBox);
   }
-  pair(builder, 'truck box roof', [cx + 1.2, 3.125, cz], [5.0, 0.15, W], m.truckBox);
-  for (const [index, x] of [cx - 2.6, cx + 0.4, cx + 2.6].entries()) {
-    pair(builder, `truck wheel ${index}`, [x, 0.42, cz], [0.9, 0.84, W + 0.2], m.rubber,
+  box(builder, 'truck box roof', [boxX, 3.125, cz], [boxL, 0.15, W], m.truckBox);
+  box(builder, 'truck ramp', [boxX + boxL / 2 + 0.6, 0.42, cz], [1.2, 0.15, W - 0.2], m.trim, { cast: false });
+  for (const [index, x] of [cabX - 0.6, boxX - 1.2, boxX + 1.6].entries()) {
+    box(builder, `truck wheel ${index}`, [x, 0.42, cz], [0.9, 0.84, W + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
   }
 }
@@ -656,7 +659,7 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
  * it, and which you cannot get inside.
  */
 function cars(builder: Builder, m: Nuketown2Materials): void {
-  const cx = -16;
+  const cx = 7.0;
   const cz = -3.0;
   pair(builder, 'car body', [cx, 0.72, cz], [4.4, 1.0, 1.9], m.carA);
   pair(builder, 'car cabin', [cx - 0.2, 1.55, cz], [2.2, 0.66, 1.7], m.carGlass);
@@ -681,9 +684,11 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
  */
 export const NUKETOWN2_GROUND_DRESSING = Object.freeze([
   // Driveway apron: the dropped-kerb crossing in front of each garage.
-  Object.freeze({ id: 'street driveway', material: 'drive' as const, x0: -19.5, x1: -12.5, z0: HOUSE_FRONT_Z, z1: HOUSE_FRONT_Z + 2.4 }),
-  // Front lawn: from the house's east wall out to the verge.
-  Object.freeze({ id: 'street lawn front', material: 'lawn' as const, x0: HOUSE_X1, x1: 20, z0: HOUSE_FRONT_Z - 4.8, z1: HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'street driveway', material: 'drive' as const, x0: GARAGE_X0, x1: GARAGE_X1, z0: HOUSE_FRONT_Z, z1: HOUSE_FRONT_Z + 2.4 }),
+  // Front lawn east: flanking garage out to cul-de-sac.
+  Object.freeze({ id: 'street lawn east', material: 'lawn' as const, x0: GARAGE_X1, x1: 24, z0: HOUSE_FRONT_Z - 4.8, z1: HOUSE_FRONT_Z }),
+  // Front lawn west: alley approach.
+  Object.freeze({ id: 'street lawn west', material: 'lawn' as const, x0: -24, x1: HOUSE_X0, z0: HOUSE_FRONT_Z - 4.8, z1: HOUSE_FRONT_Z }),
   // Back yard lawn: the whole strip between the house back wall and the fence.
   Object.freeze({ id: 'yard lawn', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: NUKETOWN2_BOUNDS.maxX, z0: YARD_FENCE_Z, z1: HOUSE_BACK_Z }),
 ]);
@@ -705,21 +710,9 @@ export const NUKETOWN2_BUILDING_FOOTPRINTS = Object.freeze([
  */
 function street(builder: Builder, m: Nuketown2Materials): void {
   const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
-  // GROUND DRESSING IS PRESENTATION-ONLY, and that is a decision with a
-  // measurement behind it. Asphalt, aprons and lawns are 20 mm proud of the
-  // solid 200 x 200 m ground slab, purely so they do not z-fight it; they are
-  // decals, and AGENTS.md allows exactly that ("tiny grass, decals ... may
-  // remain non-solid"). Left solid they add a collider spanning y [-0.12,
-  // 0.02] over the whole yard, which is enough to make the destructible-shed
-  // registry's off-static-collision check report a shed standing on the lawn
-  // as a shed standing INSIDE something. Movement and shot authority are
-  // unchanged: the ground slab underneath is solid and shot-rated, and the
-  // collider/visual parity audit still measures 0 walk-through meshes.
   const decal = { solid: false, shots: false, cast: false } as const;
   centred(builder, 'street asphalt', [0, -0.06, 0], [width, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2],
     m.asphalt, decal);
-  // Kerb: a 0.12 m lip, under the 0.42 m autostep, so it reads without ever
-  // being a wall.
   pair(builder, 'street kerb', [0, 0.06, -NUKETOWN2_STREET_HALF_WIDTH + 0.15], [width, 0.24, 0.3],
     m.kerb, { cast: false });
   // Centre line, as two dash runs; presentation only.
@@ -731,47 +724,28 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, piece.id, [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2],
       [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], m[piece.material], decal);
   }
+  // Cul-de-sac turnaround barriers at the ends of the road. Authentically
+  // terminates the street carriageway and breaks the long centre-line run.
+  pair(builder, 'street cul-de-sac barrier', [21.5, HARD_COVER / 2, 0], [1.2, HARD_COVER, 3.6], m.block);
+  pair(builder, 'street cul-de-sac sign', [21.5, 3.1, 0], [0.3, 1.4, 3.2], m.sign);
 }
 
 /**
- * The verge that faces each house across the street — the reference's front
- * lawn and cul-de-sac approach. Without furniture it is a 25 m open run, which
- * is the single longest lane on the map; the block wall breaks it into three
- * and the planters give the breaks something to fight over.
+ * Front yard and cul-de-sac perimeter dressing. Picket fencing and hedges frame
+ * the suburban lots and driveway aprons, with landmark signs at the cul-de-sac.
  */
 function verge(builder: Builder, m: Nuketown2Materials): void {
-  const z = HOUSE_FRONT_Z - 4.0;
-  pair(builder, 'verge wall inner', [10, HARD_COVER / 2, z], [10, HARD_COVER, 0.35], m.block);
-  pair(builder, 'verge wall outer', [23, HARD_COVER / 2, z], [8, HARD_COVER, 0.35], m.block);
-  pair(builder, 'verge planter', [17, LOW_COVER / 2, HOUSE_FRONT_Z - 8.0], [4.0, LOW_COVER, 2.2], m.planter);
-  pair(builder, 'verge planter far', [26, LOW_COVER / 2, HOUSE_FRONT_Z - 2.0], [3.0, LOW_COVER, 2.2], m.planter);
-  // KERB-SIDE HEDGE. The reference's kerbs carry props, and without this the
-  // driveway apron is a 9 m open shoulder you cross with nothing to break
-  // stride behind.
-  //
-  // What it is NOT: a fix for the map's longest lane. Measured on the built
-  // colliders (perimeter ring, 1.65 m eye) adding this hedge did not move the
-  // longest clear standing lane by a centimetre, because that lane passes
-  // through the ORIGIN - through the bus's own window band, between its
-  // mullions - and the bus is authored OPEN, so it is see-through at standing
-  // eye height by design. That is the reference's property, not a defect, and
-  // the honest instrument is the fidelity test's street-centre-line
-  // measurement (the bus doing its job) rather than a corner-to-corner diagonal
-  // that happens to line up with two panes of glass. Recorded here so nobody
-  // spends an afternoon "fixing" a number by walling in a vehicle the owner
-  // asked to be enterable. The current numbers are re-measured after every
-  // geometry change and quoted in `nuketown2-fidelity.test.ts`, not here, so
-  // this comment cannot go stale against the build.
-  pair(builder, 'verge kerb hedge', [-9.5, HARD_COVER / 2, HOUSE_FRONT_Z + 1.1], [9.0, HARD_COVER, 1.1], m.planter);
-  // Bin store beside the garage, at the closed end of the road.
-  pair(builder, 'verge bin store', [-24, HARD_COVER / 2, HOUSE_FRONT_Z - 5.5], [5.0, HARD_COVER, 0.4], m.block);
-  // The town sign at the far end of each verge: two posts and a board, the one
-  // authored landmark that tells you which end you are looking at.
+  pair(builder, 'verge lawn hedge east', [17, HARD_COVER / 2, HOUSE_FRONT_Z - 4.8], [12, HARD_COVER, 0.35], m.block);
+  pair(builder, 'verge lawn hedge west', [-17, HARD_COVER / 2, HOUSE_FRONT_Z - 4.8], [12, HARD_COVER, 0.35], m.block);
+  pair(builder, 'verge driveway planter', [11.5, LOW_COVER / 2, HOUSE_FRONT_Z - 1.2], [1.8, LOW_COVER, 2.2], m.planter);
+  pair(builder, 'verge alley planter', [-11.5, LOW_COVER / 2, HOUSE_FRONT_Z - 1.2], [1.8, LOW_COVER, 2.2], m.planter);
+  pair(builder, 'verge kerb hedge', [14, HARD_COVER / 2, HOUSE_FRONT_Z + 1.1], [6.0, HARD_COVER, 1.1], m.planter);
+  pair(builder, 'verge bin store', [11.5, HARD_COVER / 2, HOUSE_FRONT_Z - 7.5], [1.8, HARD_COVER, 3.0], m.block);
   for (const [index, dx] of [-1.4, 1.4].entries()) {
-    pair(builder, `verge sign post ${index}`, [26.5 + dx * 0, 1.9, HOUSE_FRONT_Z - 11.5 + dx],
+    pair(builder, `verge sign post ${index}`, [25.0 + dx * 0, 1.9, HOUSE_FRONT_Z - 11.5 + dx],
       [0.28, 3.8, 0.28], m.trim);
   }
-  pair(builder, 'verge sign board', [26.5, 4.3, HOUSE_FRONT_Z - 11.5], [0.3, 1.8, 3.6], m.sign);
+  pair(builder, 'verge sign board', [25.0, 4.3, HOUSE_FRONT_Z - 11.5], [0.3, 1.8, 3.6], m.sign);
 }
 
 /**
@@ -781,18 +755,11 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
  */
 function yard(builder: Builder, m: Nuketown2Materials): void {
   const fz = YARD_FENCE_Z + 0.125;
-  // Two fence runs; the gaps at x < -24, x in [-10, 2] and x > 18 are the ways
-  // onto the border path.
-  pair(builder, 'yard fence run 0', [-17, HARD_COVER / 2, fz], [14, HARD_COVER, 0.25], m.fence);
+  pair(builder, 'yard fence run 0', [-15, HARD_COVER / 2, fz], [14, HARD_COVER, 0.25], m.fence);
   pair(builder, 'yard fence run 1', [10, HARD_COVER / 2, fz], [16, HARD_COVER, 0.25], m.fence);
-  // Porch step under the back door, so leaving the house is a walk not a drop.
-  pair(builder, 'yard porch', [-0.8, 0.1, HOUSE_BACK_Z - 0.9], [2.6, 0.2, 1.8], m.drive, { cast: false });
+  pair(builder, 'yard porch', [-1.0, 0.1, HOUSE_BACK_Z - 0.9], [2.6, 0.2, 1.8], m.drive, { cast: false });
   pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 3.2], [2.4, LOW_COVER, 2.0], m.planter);
   pair(builder, 'yard cover wall', [7, HARD_COVER / 2, HOUSE_BACK_Z - 2.6], [6.0, HARD_COVER, 0.35], m.block);
-  // Water butt beside the shed placement, so the shed corner has a partner.
-  // x = -20.5 is NOT arbitrary: the shed at (-24, -18.5) with yaw pi/2 occupies
-  // x [-26.1, -21.9] (destructible-shed-registry.ts, shedPlacementFootprint),
-  // so the butt stands 0.8 m clear of its wall instead of inside it.
   pair(builder, 'yard butt', [-20.5, LOW_COVER, HOUSE_BACK_Z - 4.5], [1.2, LOW_COVER * 2, 1.2], m.block);
 }
 
@@ -844,33 +811,18 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       NUKETOWN2_SPAWN_LAYOUT[0]!.map(([x, z]) => [x, z] as [number, number]),
       NUKETOWN2_SPAWN_LAYOUT[1]!.map(([x, z]) => [x, z] as [number, number]),
     ),
-    // Patrol: both upper rooms are deliberately absent — bots use the ground
-    // route — but every ground position that decides a round is here: the two
-    // garages, the two back yards, the two cul-de-sacs, the bus and the two
-    // verge walls.
     patrolPoints: [
       [0, 0], [-8, 0], [8, 0],
-      [-16, -9.5], [16, 9.5],
-      [-4, -9.5], [4, 9.5],
-      [-14, -18.5], [14, 18.5],
-      [-24, 0], [24, 0],
-      [12, -8.5], [-12, 8.5],
-      [-20, -24], [20, 24],
+      [7, -9.5], [-7, 9.5],
+      [-3.5, -9.5], [3.5, 9.5],
+      [-12, -18.5], [12, 18.5],
+      [-20, 0], [20, 0],
+      [7, -3.0], [-7, 3.0],
+      [-18, -22], [18, 22],
     ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets: [],
     houses: [],
     breakableWindows: [],
-    // Vehicle-scale bodies, declared so the arena can state which cover in the
-    // road is which without a consumer having to re-derive it from mesh names.
-    //
-    // WHAT `blocksShots` MEANS HERE, because the bus makes it look like a lie:
-    // this list is a MINIMAP AND DIAGNOSTICS declaration of a vehicle-scale
-    // obstacle, one AABB per vehicle. It is not the shot-authority surface set -
-    // that is `shotSurfaces`, which is per-body and correctly leaves the bus's
-    // window band open. `blocksShots: true` on the bus says "this vehicle is a
-    // shootable solid in the road", not "no ray crosses this box"; the standing
-    // lanes that pass through the window band are the same build telling the
-    // truth at the resolution that decides a fight.
     physicalCover: [
       {
         id: 'nuketown2-central-bus',
@@ -881,16 +833,16 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
         blocksMovement: true,
         blocksShots: true,
       },
-      ...[-1, 1].map((side) => ({
-        id: `nuketown2-cul-de-sac-truck-${side < 0 ? 'west' : 'east'}`,
+      {
+        id: 'nuketown2-central-truck',
         bounds: {
-          minX: side < 0 ? -27.7 : 20.3, maxX: side < 0 ? -20.3 : 27.7,
-          minZ: side < 0 ? -2.4 : 0, maxZ: side < 0 ? 0 : 2.4,
+          minX: -1.2, maxX: 6.9,
+          minZ: 1.1, maxZ: 3.7,
           minY: 0, maxY: 3.2,
         },
         blocksMovement: true as const,
         blocksShots: true as const,
-      })),
+      },
     ],
     bounds: { ...NUKETOWN2_BOUNDS },
     physicsSafetyFloorY: -0.35,

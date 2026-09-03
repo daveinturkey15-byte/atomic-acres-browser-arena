@@ -229,16 +229,20 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(longestRun, 'clear run along the street centre-line').toBeLessThanOrEqual(MAX_STREET_CENTRE_RUN_METRES);
   });
 
-  it('treats the vehicles the way the reference does: the bus and the trucks are cover, the cars are solid', () => {
+  it('treats the vehicles the way the reference does: the central bus and moving truck are cover, the cars are solid', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // Design doc 2.5 / R9: a bus, a truck in each cul-de-sac, and two cars.
-    const truckIds = map.physicalCover.filter((cover) => cover.id.includes('truck')).map((cover) => cover.id);
-    expect(truckIds).toHaveLength(2);
-    // One truck at each END of the street, not two at the same end.
-    const trucks = map.physicalCover.filter((cover) => truckIds.includes(cover.id));
-    const centresX = trucks.map((truck) => (truck.bounds.minX + truck.bounds.maxX) / 2);
-    expect(Math.min(...centresX)).toBeLessThan(-15);
-    expect(Math.max(...centresX)).toBeGreaterThan(15);
+    // REFERENCE_SCHEMATIC.md §2, §5.1: Black Ops 2 Nuketown features the central
+    // school bus and the central moving truck opposite it framing B-flag, plus
+    // two civilian cars on the driveway aprons.
+    const truck = map.physicalCover.find((cover) => cover.id === 'nuketown2-central-truck');
+    expect(truck, 'authentic central moving truck in the street').toBeDefined();
+    // Centred in the south lane of the street opposite the bus.
+    const truckCentreX = (truck!.bounds.minX + truck!.bounds.maxX) / 2;
+    const truckCentreZ = (truck!.bounds.minZ + truck!.bounds.maxZ) / 2;
+    expect(truckCentreX).toBeGreaterThan(1.0);
+    expect(truckCentreX).toBeLessThan(4.5);
+    expect(truckCentreZ).toBeGreaterThan(1.0);
+    expect(truckCentreZ).toBeLessThan(NUKETOWN2_STREET_HALF_WIDTH);
     // Every declared vehicle body is real cover in both authorities. A body the
     // player can see and shoot but walk through is the failure this pins.
     for (const cover of map.physicalCover) {
@@ -250,6 +254,10 @@ describe('Nuke Town Rebuild fidelity', () => {
     const meshNames = map.root.children.map((node) => node.name);
     expect(meshNames.some((name) => name.includes('bus floor'))).toBe(true);
     expect(meshNames.some((name) => name.includes('bus roof'))).toBe(true);
+    // The truck has an OPEN rear box cargo room and a CLOSED cab.
+    expect(meshNames.some((name) => name.includes('truck cab'))).toBe(true);
+    expect(meshNames.some((name) => name.includes('truck deck'))).toBe(true);
+    expect(meshNames.some((name) => name.includes('truck box roof'))).toBe(true);
     // The cars are CLOSED: solid, and not declared as enterable cover volumes.
     expect(map.physicalCover.some((cover) => cover.id.includes('car'))).toBe(false);
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
@@ -367,11 +375,11 @@ describe('Nuke Town Rebuild fidelity', () => {
 
   it('gives both teams the same map: every solid body has an exact 180-degree partner', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // This arena has no mirrored house generator and nothing is yawed, so the
-    // symmetry claim can be exact rather than allowanced: every solid mesh must
-    // have a partner of the same size at the negated position. Unlike the
-    // shipped map's version of this test there is NO lane-identity escape
-    // hatch, because there is nothing on this map that earns one.
+    // The reference is ~95% rotationally symmetric: the two houses, garages,
+    // driveways, cars, sheds, verges and perimeter fences are exact pairs.
+    // The one authentic exception documented in REFERENCE_SCHEMATIC.md §5.3
+    // is the midfield vehicles: the bus sits north of the centre line and the
+    // moving truck sits south of it, so truck meshes are asymmetric by design.
     const solids = map.root.children.filter((node): node is THREE.Mesh => {
       const mesh = node as THREE.Mesh;
       if (mesh.isMesh !== true) return false;
@@ -388,6 +396,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     );
     const present = new Set(solids.map((mesh) => `${size(mesh)}|${at(mesh.position.x, mesh.position.y, mesh.position.z)}`));
     const asymmetric = solids
+      .filter((mesh) => !mesh.name.startsWith('truck'))
       .filter((mesh) => !present.has(`${size(mesh)}|${at(-mesh.position.x, mesh.position.y, -mesh.position.z)}`))
       .map((mesh) => `${mesh.name} @(${mesh.position.x}, ${mesh.position.z})`);
     expect(asymmetric).toEqual([]);

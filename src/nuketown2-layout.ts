@@ -45,15 +45,14 @@ const UPPER_Y0 = NUKETOWN2_UPPER_Y0;
  * The two houses, as the arena actually builds them. `facing: 1` means the front
  * wall looks toward +z (the road); the south house is the exact 180-degree image.
  *
- * The 8 m offset along the street between the two house centres is DERIVED (see
- * the design doc §2.3): it is the smallest offset that makes each front window
- * look diagonally across the road at the other house's driveway rather than
- * straight into its own mirror image, which is what makes the place read as a
- * street instead of a pair of facing boxes.
+ * The 7 m offset along the street between the two house centres is DERIVED:
+ * half a house width (HOUSE_WIDTH = 14), which makes each front window look
+ * diagonally across the road at the other house's driveway rather than straight
+ * into its own mirror image.
  */
 export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
-  Object.freeze({ id: 'north', team: 0 as const, x: -4, z: HOUSE_FRONT_Z - HOUSE_DEPTH / 2, facing: 1 as const }),
-  Object.freeze({ id: 'south', team: 1 as const, x: 4, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
+  Object.freeze({ id: 'north', team: 0 as const, x: -3.5, z: HOUSE_FRONT_Z - HOUSE_DEPTH / 2, facing: 1 as const }),
+  Object.freeze({ id: 'south', team: 1 as const, x: 3.5, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
 ]);
 
 /**
