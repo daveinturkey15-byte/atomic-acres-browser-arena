@@ -102,21 +102,7 @@ const row = {
   comfyQueueBefore: queueBefore, at: new Date().toISOString(),
 };
 
-// The BASE is the full QUALITY control set, imported from the registry rather
-// than retyped, so an A/B row differs from QUALITY in exactly the controls
-// named on the command line and in nothing else. Selecting a preset through
-// the Options surface would change a dozen controls at once, which is
-// precisely what an A/B must not do.
-const { GRAPHICS_PRESET_VALUES } = await import('../../src/graphics-settings-registry.ts');
-const seeded = { preset: 'custom', ...GRAPHICS_PRESET_VALUES.high, bakedIndirect: TIER };
-if (AO) seeded.ambientOcclusion = AO;
-row.baseProfile = 'high (QUALITY) control set, one control overridden';
-await context.addInitScript(([key, graphics]) => {
-  try {
-    const existing = JSON.parse(window.localStorage.getItem(key) ?? '{}');
-    window.localStorage.setItem(key, JSON.stringify({ ...existing, graphics }));
-  } catch { /* a browser with storage disabled measures the defaults; the row says so */ }
-}, [SETTINGS_KEY, seeded]);
+row.baseProfile = 'QUALITY defaults with exactly the named controls overridden through the real Options surface';
 
 const page = await context.newPage();
 const errors = [];
@@ -127,6 +113,54 @@ try {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: TIMEOUT });
+
+  // DRIVE THE REAL OPTIONS SURFACE, exactly as the owner does.
+  //
+  // An earlier version of this harness seeded the persisted settings blob into
+  // localStorage. It did not work - the value never survived boot - and the row
+  // came back reporting the profile default while claiming to be an A/B. The
+  // receipt check below caught it, but the lesson is the general one: the ONLY
+  // writer whose value survives is the app's own Options transaction
+  // (`flushPendingGraphics`), so the harness uses it. One control is changed,
+  // then SAVE GRAPHICS is pressed; nothing else about the profile moves.
+  row.optionsDrive = await page.evaluate(async ([tier, ao]) => {
+    const applied = {};
+    const tab = document.querySelector('[data-menu-tab="options"]');
+    if (!tab) return { error: 'no options tab' };
+    tab.click();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const set = (id, value) => {
+      const control = document.getElementById(id);
+      if (!(control instanceof HTMLSelectElement)) return `missing ${id}`;
+      control.value = value;
+      if (control.value !== value) return `${id} rejected ${value}`;
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+      applied[id] = control.value;
+      return null;
+    };
+    const problems = [set('graphics-baked-indirect', tier)];
+    if (ao) problems.push(set('graphics-ambient-occlusion', ao));
+    return { applied, problems: problems.filter(Boolean), hasSave: Boolean(document.getElementById('graphics-save')) };
+  }, [TIER, AO]);
+
+  // SAVE, and expect a navigation. `bakedIndirect` is a declared
+  // pipeline-rebuild owner, so committing it stages a renderer reconstruction
+  // and the app reloads the page to perform it. Clicking inside an evaluate and
+  // then awaiting anything in the same call destroys the execution context
+  // mid-await - which is exactly how the previous version of this harness
+  // failed. Click from outside, then wait for the NEW document's debug global.
+  await page.click('#graphics-save', { timeout: 15_000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: TIMEOUT });
+  row.settingsAfterSave = await page.evaluate((key) => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(key) ?? 'null');
+      return stored?.graphics
+        ? { preset: stored.graphics.preset, bakedIndirect: stored.graphics.bakedIndirect, ambientOcclusion: stored.graphics.ambientOcclusion }
+        : null;
+    } catch { return 'unreadable'; }
+  }, SETTINGS_KEY);
+
   await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, ARENA);
   await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
   await page.waitForFunction(() => {

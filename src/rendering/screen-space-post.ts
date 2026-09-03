@@ -632,18 +632,23 @@ export function buildScreenSpacePostGraph(
     },
     beforeRender(): void {
       rayTracedGraph?.beforeRender();
-      if (bakedIndirectRuntime) {
-        // Advances the arena's bake by at most a few milliseconds and republishes
-        // the receipt, so what a headless check reads is what the frame just
-        // used rather than what was true when the graph was built.
-        bakedIndirectRuntime.beforeRender();
-        publishBakedIndirectReceipt(
-          typeof document === 'undefined'
-            ? { dataset: {} }
-            : (document.documentElement as unknown as { dataset: Record<string, string | undefined> }),
-          bakedIndirectRuntime.graph,
-        );
-      }
+      // Advances the arena's bake by at most a few milliseconds and republishes
+      // the receipt, so what a headless check reads is what the frame just used
+      // rather than what was true when the graph was built.
+      //
+      // The receipt is published even when the layer is NOT built, as 'off'.
+      // Measured 2026-09-03: with the tier switched off through the real
+      // Options surface, `dataset.bakedIndirect` was ABSENT, and absent is the
+      // one value a headless check cannot interpret - it means "off", "the
+      // build predates this feature", or "the publish never ran", and those are
+      // three different bugs. Publishing 'off' collapses them to one.
+      bakedIndirectRuntime?.beforeRender();
+      publishBakedIndirectReceipt(
+        typeof document === 'undefined'
+          ? { dataset: {} }
+          : (document.documentElement as unknown as { dataset: Record<string, string | undefined> }),
+        bakedIndirectRuntime?.graph ?? null,
+      );
       if (!godraysNode) {
         shaftGain = 0;
         return;

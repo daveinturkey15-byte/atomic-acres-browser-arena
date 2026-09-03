@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GRAPHICS_PRESET_VALUES } from '../../graphics-settings-registry';
 import { LINEAR_SOURCE_STAGE_ORDER, OPTIONAL_LINEAR_SOURCE_STAGES } from '../grade-profile';
+import { publishBakedIndirectReceipt } from './baked-indirect-node';
 import {
   BAKED_INDIRECT_STAGE,
   screenSpaceMrtRequirement,
@@ -101,6 +102,17 @@ describe('HF-418 baked indirect: topology and the receipt', () => {
     expect(stage).toBeGreaterThan(-1);
     expect(stage).toBeLessThan(occlusion);
     expect(OPTIONAL_LINEAR_SOURCE_STAGES).toContain(BAKED_INDIRECT_STAGE);
+  });
+
+  it('publishes an OFF receipt when the layer is not built, so absent is never a valid state', () => {
+    // Measured 2026-09-03 on the built bundle: with the tier switched off
+    // through the real Options surface, dataset.bakedIndirect was ABSENT.
+    // Absent is the one value a headless check cannot interpret - it means
+    // "off", "this build predates the feature", or "the publish never ran", and
+    // those are three different bugs.
+    const target = { dataset: {} as Record<string, string | undefined> };
+    publishBakedIndirectReceipt(target, null);
+    expect(target.dataset.bakedIndirect).toBe('off');
   });
 
   it('is structurally absent from the disabled runtime, not zeroed', () => {

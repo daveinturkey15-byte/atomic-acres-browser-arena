@@ -98,8 +98,9 @@ for a texture upload would be a real cost paid for nothing.
 **Method (VERIFIED).** `scripts/qa/measure-baked-indirect.mjs`, one fresh
 headless Chrome per row, 2560x1440, real WebGPU backend confirmed per row, the
 owner's ComfyUI queue read before AND after each row (a row taken with work
-queued is voided, not annotated), cold shader cache. Five rows on the built
-bundle at branch head.
+queued is voided, not annotated), cold shader cache. Eight rows on the built
+bundle at branch head: five with the profile default, and three that drive the
+real Options surface for the A/B in SS 3.5.
 
 ### 3.1 The number that matters most: pipelines at admission
 
@@ -120,7 +121,7 @@ the fence for the same reason the profile below it does.
 
 ### 3.2 The tripwire
 
-`pipelinesInCombat = 0` on **all five rows**. Nothing is compiled while a settled
+`pipelinesInCombat = 0` on **all eight rows**. Nothing is compiled while a settled
 match is being played. **VERIFIED.** This is the measurement that matters most
 for the owner's freeze reports, and it is the one the layer could most easily
 have broken: a naive implementation that rebuilt the node when the arena changed
@@ -164,18 +165,74 @@ black. The frame is never stalled. **VERIFIED** (the chunked bake is proven
 byte-identical to the one-shot bake, so the committed cache and the runtime path
 are the same volume).
 
-### 3.5 What these rows do NOT support
+### 3.5 The tier A/B - UNBLOCKED, and what it says
 
-**The tier A/B is BLOCKED WITH EVIDENCE.** The harness could not seed a persisted
-graphics blob into the page: the row requested with `--tier off` came back
-reporting the QUALITY default (`bakedIndirect` low, gain 0.380), and the
-harness's own fail-closed receipt check caught it rather than letting the row be
-published as an A/B. The app's Options transaction (`flushPendingGraphics`) is
-the only writer whose value survives boot; driving that surface is a separate
-harness and is an OPEN item (§7).
+The first attempt at this seeded the persisted settings blob into localStorage
+and did not work: the row requested with `--tier off` came back reporting the
+QUALITY default, and the harness's own fail-closed receipt check caught it
+rather than letting it be published as an A/B. The **only** writer whose value
+survives a boot is the app's own Options transaction, so the harness now drives
+the real Options surface exactly as the owner does: open OPTIONS, set
+`#graphics-baked-indirect`, press SAVE GRAPHICS, ride the renderer-reconstruction
+reload, then deploy. One control moves; nothing else about the profile does.
 
-The three `atomic-acres` rows are therefore three runs of **one** configuration,
-which makes them a **noise measurement**, and a useful one:
+One build, one arena (`atomic-acres`), one control changed, 2560x1440 headless,
+real WebGPU, ComfyUI quiet, zero page errors on every row. **VERIFIED.**
+
+| Tier | Median | p95 | Frames/s | >33 ms | Pipelines @admission | Tripwire | Cold deploy | Receipt |
+|---|---|---|---|---|---|---|---|---|
+| `off` | 27.5 ms | 38.9 ms | 35.9 | 87 | **374** | 0 | 80.5 s | absent |
+| `low` | **27.7 ms** | **39.0 ms** | 35.6 | 131 | **371** | 0 | 68.2 s | `24x12x24:7536c242:24:0.380` |
+| `high` | 33.3 ms | 55.3 ms | 29.7 | 229 | **371** | 0 | 63.3 s | `24x12x24:104e394b:24:0.500` |
+
+**Reading 1 - LOW is free, and that is now measured rather than argued.**
++0.2 ms on the median (+0.7%) and +0.1 ms on p95 (+0.3%) against the layer
+switched off. Both are far inside the ~25% run-to-run noise this same machine
+produces on an identical control set (SS 3.6), so the honest statement is
+**indistinguishable from off**, which is exactly the claim the in-game copy
+makes. This is the row that matters, because LOW is what QUALITY and BALANCED
+ship.
+
+**Reading 2 - HIGH's +5.8 ms is the BAKE, not the sample, and that is a real
+finding rather than an excuse.** LOW and HIGH do identical per-frame work: the
+same three texture fetches into the same three textures at the same grid, with
+the tier deciding only what was traced into them. So a per-frame difference
+between them cannot come from sampling. It comes from the converging bake: HIGH
+is 5.0 s of tracing spread at 3 ms per presented frame, about 1700 frames, and
+the sample window opens 6 s after admission. **The HIGH row was measured with
+the bake still running**, and ~3 ms of a ~27 ms frame is ~11% of it. Two
+consequences:
+
+- The measured HIGH cost is transient, not steady state. A HIGH row sampled
+  after convergence should land on LOW's numbers. **OPEN** - not re-measured,
+  because it needs a settle wait longer than this lane's remaining budget.
+- The convergence should finish behind the loading screen rather than in the
+  first half-minute of play. That is what a committed build-time volume buys
+  (SS 7), and this row is the argument for building the extraction stage.
+
+**Reading 3 - the tier genuinely reaches the bake.** LOW and HIGH produced
+DIFFERENT digests on the same arena (`7536c242` vs `104e394b`) and different live
+gains (0.380 vs 0.500). A tier that was being silently ignored would have
+produced the same digest twice - which is precisely the failure the first attempt
+at this A/B was reporting.
+
+**Reading 4 - the pipeline count does not rise.** 374 with the layer off, 371
+with it on, on the same build minutes apart. The layer adds no pipeline; if
+anything the count moved down by three, which is admission-ordering noise.
+
+**Defect this A/B found, fixed in the same pass:** with the tier off, the
+receipt was **absent** rather than `off`. Absent is the one value a headless
+check cannot interpret - it means "off", "this build predates the feature", or
+"the publish never ran", which are three different bugs. The receipt is now
+published unconditionally, `off` when the layer is not built. **VERIFIED** as a
+unit; **CLAIMED** in the browser, because the fix landed after this row was taken
+and was not re-measured in a browser.
+
+### 3.6 The noise floor on this machine
+
+Three earlier rows, taken before the Options drive existed, turned out to be
+three runs of one identical configuration. That makes them a noise measurement,
+and it is the most useful thing they produce:
 
 | Run (identical control set) | Median | p95 | Frames/s | Deploy |
 |---|---|---|---|---|
@@ -184,11 +241,10 @@ which makes them a **noise measurement**, and a useful one:
 | 3 | 22.4 ms | 33.4 ms | 38.3 | 75.7 s |
 
 **~25% spread on the median and ~50% on p95, on an identical build with
-identical settings**, with five other PASS 87 lanes sharing the GPU. No A/B
-smaller than that is readable on this machine in this state, which independently
-corroborates Lane AI's refusal to read any single-cell comparison under about
-15%. Do not read a frame-time claim for this feature off any single row; read
-§3.1, which is not noise-sensitive.
+identical settings**, with five other PASS 87 lanes sharing the GPU. That
+independently corroborates Lane AI's refusal to read any single-cell comparison
+under about 15%, and it is the yardstick SS 3.5 is read against: LOW's +0.7% is
+noise, HIGH's +21% is not.
 
 ---
 
