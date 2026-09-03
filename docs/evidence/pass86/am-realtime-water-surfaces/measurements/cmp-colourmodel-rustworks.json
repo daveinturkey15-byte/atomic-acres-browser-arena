@@ -1,6 +1,6 @@
 {
   "before": "artifacts\\hf420\\c1-rustworks",
-  "after": "artifacts\\hf420\\c1-rustworks-run2",
+  "after": "artifacts\\hf420\\c4-rustworks",
   "shots": {
     "storm-down": {
       "meanBefore": [
@@ -9,9 +9,9 @@
         0.237698
       ],
       "meanAfter": [
-        0.041894,
-        0.161091,
-        0.23774
+        0.039438,
+        0.248532,
+        0.186974
       ],
       "roiMeanBefore": [
         7e-06,
@@ -19,22 +19,22 @@
         0.24474
       ],
       "roiMeanAfter": [
-        8e-06,
-        0.155299,
-        0.244762
+        0.0,
+        0.233683,
+        0.1782
       ],
-      "meanAbsDelta": 0.00033521,
-      "maxAbsDelta": 0.3254902,
-      "changedPixelFraction": 0.21528049,
-      "visiblyChangedPixelFraction": 0.00029758,
-      "visiblyChangedPixels": 1097,
-      "roiMeanAbsDelta": 0.00027029,
+      "meanAbsDelta": 0.04851442,
+      "maxAbsDelta": 0.20392157,
+      "changedPixelFraction": 0.99827393,
+      "visiblyChangedPixelFraction": 0.99087131,
+      "visiblyChangedPixels": 3652748,
+      "roiMeanAbsDelta": 0.04832254,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "frameDriftFraction": 0.14786079,
+      "frameDriftFraction": 0.13044786,
       "frameDriftFractionBefore": 0.17875651
     },
     "storm-grazing": {
@@ -44,9 +44,9 @@
         0.304751
       ],
       "meanAfter": [
-        0.110748,
-        0.19828,
-        0.30475
+        0.108922,
+        0.238277,
+        0.277221
       ],
       "roiMeanBefore": [
         0.106435,
@@ -54,22 +54,22 @@
         0.326706
       ],
       "roiMeanAfter": [
-        0.106438,
-        0.207794,
-        0.326707
+        0.102742,
+        0.254981,
+        0.303822
       ],
-      "meanAbsDelta": 0.00037421,
-      "maxAbsDelta": 0.51372549,
-      "changedPixelFraction": 0.24204183,
-      "visiblyChangedPixelFraction": 0.00014974,
-      "visiblyChangedPixels": 552,
-      "roiMeanAbsDelta": 0.00037699,
+      "meanAbsDelta": 0.02387505,
+      "maxAbsDelta": 0.67843137,
+      "changedPixelFraction": 0.63051704,
+      "visiblyChangedPixelFraction": 0.48767253,
+      "visiblyChangedPixels": 1797756,
+      "roiMeanAbsDelta": 0.02580556,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "frameDriftFraction": 0.21564887,
+      "frameDriftFraction": 0.18553277,
       "frameDriftFractionBefore": 0.16333659
     },
     "storm-wide": {
@@ -79,9 +79,9 @@
         0.286762
       ],
       "meanAfter": [
-        0.121338,
-        0.192521,
-        0.286788
+        0.11726,
+        0.249234,
+        0.273488
       ],
       "roiMeanBefore": [
         0.124311,
@@ -89,22 +89,22 @@
         0.284996
       ],
       "roiMeanAfter": [
-        0.124435,
-        0.195728,
-        0.285043
+        0.118175,
+        0.259572,
+        0.27366
       ],
-      "meanAbsDelta": 0.00021305,
-      "maxAbsDelta": 0.52156863,
-      "changedPixelFraction": 0.11442139,
-      "visiblyChangedPixelFraction": 0.00045898,
-      "visiblyChangedPixels": 1692,
-      "roiMeanAbsDelta": 0.00026773,
+      "meanAbsDelta": 0.02709513,
+      "maxAbsDelta": 0.75686275,
+      "changedPixelFraction": 0.67547445,
+      "visiblyChangedPixelFraction": 0.53467773,
+      "visiblyChangedPixels": 1971036,
+      "roiMeanAbsDelta": 0.03063734,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "frameDriftFraction": 0.24390435,
+      "frameDriftFraction": 0.2754579,
       "frameDriftFractionBefore": 0.24296712
     }
   }

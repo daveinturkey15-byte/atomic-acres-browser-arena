@@ -1,0 +1,120 @@
+{
+  "before": "artifacts\\hf420\\c1-high-seas",
+  "after": "artifacts\\hf420\\final2-high-seas",
+  "shots": {
+    "sea-down": {
+      "meanBefore": [
+        0.00929,
+        0.112431,
+        0.286497
+      ],
+      "meanAfter": [
+        0.009287,
+        0.112404,
+        0.286471
+      ],
+      "roiMeanBefore": [
+        0.0,
+        0.092199,
+        0.267328
+      ],
+      "roiMeanAfter": [
+        0.0,
+        0.092176,
+        0.267307
+      ],
+      "meanAbsDelta": 0.00026991,
+      "maxAbsDelta": 0.29019608,
+      "changedPixelFraction": 0.18469347,
+      "visiblyChangedPixelFraction": 9.684e-05,
+      "visiblyChangedPixels": 357,
+      "roiMeanAbsDelta": 0.00025977,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.16442871,
+      "frameDriftFractionBefore": 0.14697076,
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    },
+    "sea-grazing": {
+      "meanBefore": [
+        0.309898,
+        0.503321,
+        0.618181
+      ],
+      "meanAfter": [
+        0.309876,
+        0.503275,
+        0.618133
+      ],
+      "roiMeanBefore": [
+        0.301194,
+        0.501875,
+        0.621138
+      ],
+      "roiMeanAfter": [
+        0.301167,
+        0.501817,
+        0.621079
+      ],
+      "meanAbsDelta": 0.00025825,
+      "maxAbsDelta": 0.40784314,
+      "changedPixelFraction": 0.17353082,
+      "visiblyChangedPixelFraction": 0.00013726,
+      "visiblyChangedPixels": 506,
+      "roiMeanAbsDelta": 0.00026695,
+      "silhouetteMaxShiftPx": 2,
+      "silhouetteMeanShiftPx": 0.015625,
+      "silhouetteColumnsMoved": 39,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.17943278,
+      "frameDriftFractionBefore": 0.20435059,
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    },
+    "sea-wide": {
+      "meanBefore": [
+        0.281184,
+        0.442357,
+        0.557051
+      ],
+      "meanAfter": [
+        0.281202,
+        0.442391,
+        0.557084
+      ],
+      "roiMeanBefore": [
+        0.179325,
+        0.379929,
+        0.516881
+      ],
+      "roiMeanAfter": [
+        0.179339,
+        0.379958,
+        0.516912
+      ],
+      "meanAbsDelta": 0.00037747,
+      "maxAbsDelta": 0.22352941,
+      "changedPixelFraction": 0.25022108,
+      "visiblyChangedPixelFraction": 0.00014974,
+      "visiblyChangedPixels": 552,
+      "roiMeanAbsDelta": 0.0003456,
+      "silhouetteMaxShiftPx": 1,
+      "silhouetteMeanShiftPx": 0.046875,
+      "silhouetteColumnsMoved": 120,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.19142334,
+      "frameDriftFractionBefore": 0.1743986,
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    }
+  }
+}

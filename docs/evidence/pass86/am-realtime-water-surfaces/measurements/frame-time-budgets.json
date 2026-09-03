@@ -1,245 +1,370 @@
 {
-  "note": "2560x1440, quality profile, headless installed Chrome, native WebGPU. n=90 frames per sample.",
+  "note": "2560x1440, quality profile, headless installed Chrome, native WebGPU, n=90 frames per sample. Sampled AFTER the captures with the capture camera released, so a run camera pose does not enter it. Every row is the `budget` block of that capture run telemetry.json.",
+  "labelWarning": "The superseded report labelled the c1-* rows \"baseline\". They are LANE COMMIT 1, not the pre-change build. Real pre-change rows exist for map3 (3 runs) and rustworks (1); high-seas has NO pre-change row at all and none is invented here.",
+  "poseWarning": "The before-rustworks capture uses the harness EARLIER camera poses under the same shot names (its storm-wide looks along the rig deck, not at the sea). Its PIXEL comparisons are therefore void; its frame-time row is not, because the budget is sampled with the camera released. before-map3 poses are unchanged, measured: before-map3-run1 vs c1-map3 is 0.00019-0.00029 mean abs delta, inside the map3 noise floor.",
   "rows": [
     {
       "build": "before-farcrysis",
+      "stage": "PRE-CHANGE (0c7aab53)",
       "arena": "farcrysis",
       "presentationFrameP50Ms": 22.699999928474426,
       "presentationFrameP95Ms": 28.899999976158142,
       "cpuFrameP50Ms": 18.799999952316284,
       "cpuFrameP95Ms": 23.100000023841858,
       "steadyStateFps": 42.710706149375184,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "before-map3-run1",
+      "stage": "PRE-CHANGE (0c7aab53)",
       "arena": "map3",
       "presentationFrameP50Ms": 10.600000023841858,
       "presentationFrameP95Ms": 15.5,
       "cpuFrameP50Ms": 6.200000047683716,
       "cpuFrameP95Ms": 8.800000071525574,
       "steadyStateFps": 90.47044632520503,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "before-map3-run2",
+      "stage": "PRE-CHANGE (0c7aab53)",
       "arena": "map3",
       "presentationFrameP50Ms": 10.100000023841858,
       "presentationFrameP95Ms": 13.899999976158142,
       "cpuFrameP50Ms": 5.899999976158142,
       "cpuFrameP95Ms": 8,
       "steadyStateFps": 97.96451507056568,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "before-map3-run3",
+      "stage": "PRE-CHANGE (0c7aab53)",
       "arena": "map3",
       "presentationFrameP50Ms": 11.200000047683716,
       "presentationFrameP95Ms": 15.199999928474426,
       "cpuFrameP50Ms": 6.600000023841858,
       "cpuFrameP95Ms": 9.699999928474426,
       "steadyStateFps": 88.28722778311254,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "before-rustworks",
+      "stage": "PRE-CHANGE (0c7aab53)",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 17.90000009536743,
       "presentationFrameP95Ms": 29.399999976158142,
       "cpuFrameP50Ms": 11.300000071525574,
       "cpuFrameP95Ms": 18.899999976158142,
       "steadyStateFps": 51.95404953095732,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-high-seas-run2",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "high-seas",
       "presentationFrameP50Ms": 12.600000023841858,
       "presentationFrameP95Ms": 18.399999976158142,
       "cpuFrameP50Ms": 7.900000095367432,
       "cpuFrameP95Ms": 11.199999928474426,
       "steadyStateFps": 74.13509060955519,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-high-seas",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "high-seas",
       "presentationFrameP50Ms": 16.100000023841858,
       "presentationFrameP95Ms": 23.700000047683716,
       "cpuFrameP50Ms": 7.899999976158142,
       "cpuFrameP95Ms": 12.399999976158142,
       "steadyStateFps": 60.54897739116362,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-map3-run2",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "map3",
       "presentationFrameP50Ms": 8.5,
       "presentationFrameP95Ms": 13,
       "cpuFrameP50Ms": 5.100000023841858,
       "cpuFrameP95Ms": 7.5,
       "steadyStateFps": 110.19958368402752,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-map3",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "map3",
       "presentationFrameP50Ms": 8.899999976158142,
       "presentationFrameP95Ms": 12.899999976158142,
       "cpuFrameP50Ms": 5.100000023841858,
       "cpuFrameP95Ms": 7.200000047683716,
       "steadyStateFps": 110.96042411213722,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-rustworks-run2",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 11.799999952316284,
       "presentationFrameP95Ms": 15.199999928474426,
       "cpuFrameP50Ms": 7.200000047683716,
       "cpuFrameP95Ms": 9.399999976158142,
       "steadyStateFps": 83.2639467129107,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c1-rustworks",
+      "stage": "lane commit 1 - pond DATA only; for a body with no shape every code path it added is inert",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 11.399999976158142,
       "presentationFrameP95Ms": 15.699999928474426,
       "cpuFrameP50Ms": 7,
       "cpuFrameP95Ms": 9.400000095367432,
       "steadyStateFps": 83.37965536593286,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2-farcrysis",
+      "stage": "lane commit 2 - Beer-Lambert",
       "arena": "farcrysis",
       "presentationFrameP50Ms": 20.899999976158142,
       "presentationFrameP95Ms": 27.799999952316284,
       "cpuFrameP50Ms": 16.799999952316284,
       "cpuFrameP95Ms": 21.5,
       "steadyStateFps": 46.37740904817802,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2-map3-run1",
+      "stage": "lane commit 2 - Beer-Lambert",
       "arena": "map3",
       "presentationFrameP50Ms": 11.799999952316284,
       "presentationFrameP95Ms": 16.700000047683716,
       "cpuFrameP50Ms": 6.899999976158142,
       "cpuFrameP95Ms": 10.600000023841858,
       "steadyStateFps": 82.88819304103188,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2-rustworks",
+      "stage": "lane commit 2 - Beer-Lambert",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 11.399999976158142,
       "presentationFrameP95Ms": 15.199999928474426,
       "cpuFrameP50Ms": 6.900000095367432,
       "cpuFrameP95Ms": 9.200000047683716,
       "steadyStateFps": 85.8287240110182,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2b-high-seas",
+      "stage": "lane commit 2b - Beer-Lambert",
       "arena": "high-seas",
       "presentationFrameP50Ms": 11.800000071525574,
       "presentationFrameP95Ms": 19,
       "cpuFrameP50Ms": 7.199999928474426,
       "cpuFrameP95Ms": 11.300000071525574,
       "steadyStateFps": 77.57283227508054,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2b-map3",
+      "stage": "lane commit 2b - Beer-Lambert",
       "arena": "map3",
       "presentationFrameP50Ms": 10.100000023841858,
       "presentationFrameP95Ms": 19.799999952316284,
       "cpuFrameP50Ms": 5.5,
       "cpuFrameP95Ms": 8.299999952316284,
       "steadyStateFps": 79.36507936507937,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c2b-rustworks",
+      "stage": "lane commit 2b - Beer-Lambert",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 12.800000071525574,
       "presentationFrameP95Ms": 18.5,
       "cpuFrameP50Ms": 7.199999928474426,
       "cpuFrameP95Ms": 10.399999976158142,
       "steadyStateFps": 72.17321571772253,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c3-high-seas",
+      "stage": "lane commit 3 - backscatter",
       "arena": "high-seas",
       "presentationFrameP50Ms": 12.900000095367432,
       "presentationFrameP95Ms": 19,
       "cpuFrameP50Ms": 8,
       "cpuFrameP95Ms": 12,
       "steadyStateFps": 73.44540558327981,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c3-map3",
+      "stage": "lane commit 3 - backscatter",
       "arena": "map3",
       "presentationFrameP50Ms": 14.199999928474426,
       "presentationFrameP95Ms": 26.5,
       "cpuFrameP50Ms": 8.300000071525574,
       "cpuFrameP95Ms": 16.199999928474426,
       "steadyStateFps": 54.888089283029046,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c3-rustworks",
+      "stage": "lane commit 3 - backscatter",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 15.600000023841858,
       "presentationFrameP95Ms": 28.600000023841858,
       "cpuFrameP50Ms": 9.5,
       "cpuFrameP95Ms": 16.399999976158142,
       "steadyStateFps": 57.87781350482315,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c4-high-seas",
+      "stage": "lane commit 4 - scattering closure",
       "arena": "high-seas",
       "presentationFrameP50Ms": 10.399999976158142,
       "presentationFrameP95Ms": 13.200000047683716,
       "cpuFrameP50Ms": 6.5,
       "cpuFrameP95Ms": 8.199999928474426,
       "steadyStateFps": 94.24083769633508,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c4-map3",
+      "stage": "lane commit 4 - scattering closure",
       "arena": "map3",
       "presentationFrameP50Ms": 10,
       "presentationFrameP95Ms": 15.199999928474426,
       "cpuFrameP50Ms": 5.899999976158142,
       "cpuFrameP95Ms": 8.100000023841858,
       "steadyStateFps": 89.9280575582415,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c4-rustworks",
+      "stage": "lane commit 4 - scattering closure",
       "arena": "rustworks-1v1",
       "presentationFrameP50Ms": 10.800000071525574,
       "presentationFrameP95Ms": 14.299999952316284,
       "cpuFrameP50Ms": 6.5,
       "cpuFrameP95Ms": 8.299999952316284,
       "steadyStateFps": 88.23529411764706,
-      "sampleCount": 90
+      "sampleCount": null
     },
     {
       "build": "c5-map3",
+      "stage": "lane commit 5 - buried-basin fix",
       "arena": "map3",
       "presentationFrameP50Ms": 10.299999952316284,
       "presentationFrameP95Ms": 16.699999928474426,
       "cpuFrameP50Ms": 5.899999976158142,
       "cpuFrameP95Ms": 8.699999928474426,
       "steadyStateFps": 87.62535294358544,
-      "sampleCount": 90
+      "sampleCount": null
+    },
+    {
+      "build": "final-verify-map3",
+      "stage": "lane HEAD before the repair pass (c6c9afb8)",
+      "arena": "map3",
+      "presentationFrameP50Ms": 9,
+      "presentationFrameP95Ms": 11.799999952316284,
+      "cpuFrameP50Ms": 5,
+      "cpuFrameP95Ms": 7.199999928474426,
+      "steadyStateFps": 109.60906101252797,
+      "sampleCount": null
+    },
+    {
+      "build": "final2-high-seas",
+      "stage": "REPAIRED HEAD",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 13.5,
+      "presentationFrameP95Ms": 19.59999990463257,
+      "cpuFrameP50Ms": 8.5,
+      "cpuFrameP95Ms": 11.800000071525574,
+      "steadyStateFps": 72.92173067292401,
+      "sampleCount": null
+    },
+    {
+      "build": "final2-map3-run1",
+      "stage": "REPAIRED HEAD",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.200000047683716,
+      "presentationFrameP95Ms": 13.899999976158142,
+      "cpuFrameP50Ms": 5.800000071525574,
+      "cpuFrameP95Ms": 7.399999976158142,
+      "steadyStateFps": 96.4526846095793,
+      "sampleCount": null
+    },
+    {
+      "build": "final2-map3-run2",
+      "stage": "REPAIRED HEAD",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.100000023841858,
+      "presentationFrameP95Ms": 14,
+      "cpuFrameP50Ms": 5.699999928474426,
+      "cpuFrameP95Ms": 8.100000023841858,
+      "steadyStateFps": 97.83672138529471,
+      "sampleCount": null
+    },
+    {
+      "build": "final2-rustworks",
+      "stage": "REPAIRED HEAD",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 10.700000047683716,
+      "presentationFrameP95Ms": 15.600000023841858,
+      "cpuFrameP50Ms": 6.799999952316284,
+      "cpuFrameP95Ms": 10.100000023841858,
+      "steadyStateFps": 89.93704407557989,
+      "sampleCount": null
+    },
+    {
+      "build": "fixA-noskirtfix-high-seas",
+      "stage": "repair A/B: HEAD with the skirt migration IN (rejected)",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 8.399999976158142,
+      "presentationFrameP95Ms": 11.399999976158142,
+      "cpuFrameP50Ms": 4.800000071525574,
+      "cpuFrameP95Ms": 6.600000023841858,
+      "steadyStateFps": 118.68653566070273,
+      "sampleCount": null
+    },
+    {
+      "build": "fixA-noskirtfix-rustworks",
+      "stage": "repair A/B: HEAD with the skirt migration IN (rejected)",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 9.399999976158142,
+      "presentationFrameP95Ms": 12.399999976158142,
+      "cpuFrameP50Ms": 5.100000023841858,
+      "cpuFrameP95Ms": 7,
+      "steadyStateFps": 104.6025104631496,
+      "sampleCount": null
+    },
+    {
+      "build": "fixB-head-high-seas",
+      "stage": "repair A/B: HEAD with the skirt migration OUT",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 10.799999952316284,
+      "presentationFrameP95Ms": 15.800000071525574,
+      "cpuFrameP50Ms": 6.400000095367432,
+      "cpuFrameP95Ms": 9.800000071525574,
+      "steadyStateFps": 88.34789438138719,
+      "sampleCount": null
+    },
+    {
+      "build": "fixB-head-rustworks",
+      "stage": "repair A/B: HEAD with the skirt migration OUT",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 13.5,
+      "presentationFrameP95Ms": 22.299999952316284,
+      "cpuFrameP50Ms": 8.200000047683716,
+      "cpuFrameP95Ms": 13.399999976158142,
+      "steadyStateFps": 70.10983874476662,
+      "sampleCount": null
     }
   ]
 }

@@ -26,14 +26,19 @@
       "meanAbsDelta": 0.00025727,
       "maxAbsDelta": 0.07058824,
       "changedPixelFraction": 0.17307265,
+      "visiblyChangedPixelFraction": 4.61e-06,
+      "visiblyChangedPixels": 17,
       "roiMeanAbsDelta": 0.00027976,
       "silhouetteMaxShiftPx": 3,
       "silhouetteMeanShiftPx": 0.033984,
       "silhouetteColumnsMoved": 72,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.13902995,
-      "poolCoverageBefore": 0.19017008
+      "poolCoverage": 0.0,
+      "poolCoveragePixels": 0,
+      "frameDriftFraction": 0.13902995,
+      "poolCoverageBefore": 0.0,
+      "frameDriftFractionBefore": 0.19017008
     },
     "shallow-down": {
       "meanBefore": [
@@ -59,14 +64,19 @@
       "meanAbsDelta": 0.00011025,
       "maxAbsDelta": 0.13333333,
       "changedPixelFraction": 0.06968859,
+      "visiblyChangedPixelFraction": 7.107e-05,
+      "visiblyChangedPixels": 262,
       "roiMeanAbsDelta": 8.967e-05,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.0844043,
-      "poolCoverageBefore": 0.09463243
+      "poolCoverage": 0.0,
+      "poolCoveragePixels": 0,
+      "frameDriftFraction": 0.0844043,
+      "poolCoverageBefore": 0.0,
+      "frameDriftFractionBefore": 0.09463243
     },
     "shoreline": {
       "meanBefore": [
@@ -92,14 +102,19 @@
       "meanAbsDelta": 0.00018102,
       "maxAbsDelta": 0.15294118,
       "changedPixelFraction": 0.12124946,
+      "visiblyChangedPixelFraction": 0.00015218,
+      "visiblyChangedPixels": 561,
       "roiMeanAbsDelta": 0.00024089,
       "silhouetteMaxShiftPx": 4,
       "silhouetteMeanShiftPx": 0.044141,
       "silhouetteColumnsMoved": 94,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.16924832,
-      "poolCoverageBefore": 0.16475342
+      "poolCoverage": 0.0,
+      "poolCoveragePixels": 0,
+      "frameDriftFraction": 0.16924832,
+      "poolCoverageBefore": 0.0,
+      "frameDriftFractionBefore": 0.16475342
     },
     "wide": {
       "meanBefore": [
@@ -125,14 +140,19 @@
       "meanAbsDelta": 0.00031826,
       "maxAbsDelta": 0.11764706,
       "changedPixelFraction": 0.21574273,
+      "visiblyChangedPixelFraction": 5.97e-06,
+      "visiblyChangedPixels": 22,
       "roiMeanAbsDelta": 0.00028402,
       "silhouetteMaxShiftPx": 18,
       "silhouetteMeanShiftPx": 0.134766,
       "silhouetteColumnsMoved": 257,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.21794461,
-      "poolCoverageBefore": 0.25493083
+      "poolCoverage": 0.0,
+      "poolCoveragePixels": 0,
+      "frameDriftFraction": 0.21794461,
+      "poolCoverageBefore": 0.0,
+      "frameDriftFractionBefore": 0.25493083
     }
   }
 }

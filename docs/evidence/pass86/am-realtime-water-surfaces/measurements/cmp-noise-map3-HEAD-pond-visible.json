@@ -1,0 +1,158 @@
+{
+  "before": "artifacts\\hf420\\final2-map3-run1",
+  "after": "artifacts\\hf420\\final2-map3-run2",
+  "shots": {
+    "grazing": {
+      "meanBefore": [
+        0.198842,
+        0.21888,
+        0.259459
+      ],
+      "meanAfter": [
+        0.198827,
+        0.218863,
+        0.259437
+      ],
+      "roiMeanBefore": [
+        0.244441,
+        0.254789,
+        0.28559
+      ],
+      "roiMeanAfter": [
+        0.244423,
+        0.254766,
+        0.285571
+      ],
+      "meanAbsDelta": 0.0002753,
+      "maxAbsDelta": 0.20784314,
+      "changedPixelFraction": 0.18451497,
+      "visiblyChangedPixelFraction": 8.14e-06,
+      "visiblyChangedPixels": 30,
+      "roiMeanAbsDelta": 0.00030357,
+      "silhouetteMaxShiftPx": 3,
+      "silhouetteMeanShiftPx": 0.037891,
+      "silhouetteColumnsMoved": 74,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.00087484,
+      "poolCoveragePixels": 3225,
+      "frameDriftFraction": 0.26569255,
+      "poolCoverageBefore": 0.00087511,
+      "frameDriftFractionBefore": 0.19922607
+    },
+    "shallow-down": {
+      "meanBefore": [
+        0.023112,
+        0.0569,
+        0.055665
+      ],
+      "meanAfter": [
+        0.023117,
+        0.05691,
+        0.05567
+      ],
+      "roiMeanBefore": [
+        0.007484,
+        0.066253,
+        0.019286
+      ],
+      "roiMeanAfter": [
+        0.007486,
+        0.066269,
+        0.019286
+      ],
+      "meanAbsDelta": 0.00013247,
+      "maxAbsDelta": 0.02352941,
+      "changedPixelFraction": 0.09414469,
+      "visiblyChangedPixelFraction": 0.0,
+      "visiblyChangedPixels": 0,
+      "roiMeanAbsDelta": 0.00011532,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.36787788,
+      "poolCoveragePixels": 1356145,
+      "frameDriftFraction": 0.45800591,
+      "poolCoverageBefore": 0.36787896,
+      "frameDriftFractionBefore": 0.45921468
+    },
+    "shoreline": {
+      "meanBefore": [
+        0.073294,
+        0.108522,
+        0.101368
+      ],
+      "meanAfter": [
+        0.073285,
+        0.108497,
+        0.101351
+      ],
+      "roiMeanBefore": [
+        0.035649,
+        0.091193,
+        0.058861
+      ],
+      "roiMeanAfter": [
+        0.035638,
+        0.09115,
+        0.058826
+      ],
+      "meanAbsDelta": 0.00020253,
+      "maxAbsDelta": 0.24313725,
+      "changedPixelFraction": 0.13840522,
+      "visiblyChangedPixelFraction": 1.845e-05,
+      "visiblyChangedPixels": 68,
+      "roiMeanAbsDelta": 0.00024022,
+      "silhouetteMaxShiftPx": 2,
+      "silhouetteMeanShiftPx": 0.043359,
+      "silhouetteColumnsMoved": 99,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.35395101,
+      "poolCoveragePixels": 1304805,
+      "frameDriftFraction": 0.48218153,
+      "poolCoverageBefore": 0.35395128,
+      "frameDriftFractionBefore": 0.50232775
+    },
+    "wide": {
+      "meanBefore": [
+        0.351684,
+        0.357951,
+        0.364784
+      ],
+      "meanAfter": [
+        0.351725,
+        0.357994,
+        0.364833
+      ],
+      "roiMeanBefore": [
+        0.146272,
+        0.174989,
+        0.171589
+      ],
+      "roiMeanAfter": [
+        0.146292,
+        0.17502,
+        0.171623
+      ],
+      "meanAbsDelta": 0.00026799,
+      "maxAbsDelta": 0.11372549,
+      "changedPixelFraction": 0.17999674,
+      "visiblyChangedPixelFraction": 5.968e-05,
+      "visiblyChangedPixels": 220,
+      "roiMeanAbsDelta": 0.00023469,
+      "silhouetteMaxShiftPx": 11,
+      "silhouetteMeanShiftPx": 0.115625,
+      "silhouetteColumnsMoved": 241,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.05794569,
+      "poolCoveragePixels": 213611,
+      "frameDriftFraction": 0.25676107,
+      "poolCoverageBefore": 0.05794515,
+      "frameDriftFractionBefore": 0.22917508
+    }
+  }
+}

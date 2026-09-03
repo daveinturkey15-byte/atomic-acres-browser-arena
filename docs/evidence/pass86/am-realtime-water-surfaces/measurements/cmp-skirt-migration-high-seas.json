@@ -1,0 +1,129 @@
+{
+  "before": "artifacts\\hf420\\fixA-noskirtfix-high-seas",
+  "after": "artifacts\\hf420\\fixB-head-high-seas",
+  "shots": {
+    "sea-down": {
+      "meanBefore": [
+        0.009345,
+        0.1021,
+        0.397791
+      ],
+      "meanAfter": [
+        0.009343,
+        0.102126,
+        0.397818
+      ],
+      "roiMeanBefore": [
+        0.0,
+        0.089418,
+        0.397674
+      ],
+      "roiMeanAfter": [
+        0.0,
+        0.089446,
+        0.397702
+      ],
+      "meanAbsDelta": 0.00021745,
+      "maxAbsDelta": 0.37647059,
+      "changedPixelFraction": 0.15252903,
+      "visiblyChangedPixelFraction": 5.859e-05,
+      "visiblyChangedPixels": 216,
+      "roiMeanAbsDelta": 0.00020631,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.21411323,
+      "frameDriftFractionBefore": 0.12397108,
+      "skirtSeamBefore": {
+        "skirtPixels": 0
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    },
+    "sea-grazing": {
+      "meanBefore": [
+        0.309895,
+        0.489108,
+        0.646722
+      ],
+      "meanAfter": [
+        0.309883,
+        0.489089,
+        0.646704
+      ],
+      "roiMeanBefore": [
+        0.30127,
+        0.491689,
+        0.648836
+      ],
+      "roiMeanAfter": [
+        0.301255,
+        0.491666,
+        0.648815
+      ],
+      "meanAbsDelta": 0.00031437,
+      "maxAbsDelta": 0.24705882,
+      "changedPixelFraction": 0.21414551,
+      "visiblyChangedPixelFraction": 5.724e-05,
+      "visiblyChangedPixels": 211,
+      "roiMeanAbsDelta": 0.00031158,
+      "silhouetteMaxShiftPx": 1,
+      "silhouetteMeanShiftPx": 0.010156,
+      "silhouetteColumnsMoved": 26,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.23427165,
+      "frameDriftFractionBefore": 0.1748489,
+      "skirtSeamBefore": {
+        "skirtPixels": 0
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    },
+    "sea-wide": {
+      "meanBefore": [
+        0.281355,
+        0.43837,
+        0.608408
+      ],
+      "meanAfter": [
+        0.281343,
+        0.438345,
+        0.608386
+      ],
+      "roiMeanBefore": [
+        0.17969,
+        0.379956,
+        0.577227
+      ],
+      "roiMeanAfter": [
+        0.179673,
+        0.37992,
+        0.577197
+      ],
+      "meanAbsDelta": 0.00029037,
+      "maxAbsDelta": 0.37647059,
+      "changedPixelFraction": 0.19493462,
+      "visiblyChangedPixelFraction": 8.898e-05,
+      "visiblyChangedPixels": 328,
+      "roiMeanAbsDelta": 0.00027473,
+      "silhouetteMaxShiftPx": 3,
+      "silhouetteMeanShiftPx": 0.044531,
+      "silhouetteColumnsMoved": 108,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.15624864,
+      "frameDriftFractionBefore": 0.19342394,
+      "skirtSeamBefore": {
+        "skirtPixels": 0
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    }
+  }
+}

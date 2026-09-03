@@ -26,14 +26,16 @@
       "meanAbsDelta": 0.00020458,
       "maxAbsDelta": 0.21960784,
       "changedPixelFraction": 0.14169515,
+      "visiblyChangedPixelFraction": 3.201e-05,
+      "visiblyChangedPixels": 118,
       "roiMeanAbsDelta": 0.00014238,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.14589545,
-      "poolCoverageBefore": 0.11386122
+      "frameDriftFraction": 0.14589545,
+      "frameDriftFractionBefore": 0.11386122
     },
     "storm-grazing": {
       "meanBefore": [
@@ -59,14 +61,16 @@
       "meanAbsDelta": 0.00043515,
       "maxAbsDelta": 0.67843137,
       "changedPixelFraction": 0.26373535,
+      "visiblyChangedPixelFraction": 0.00047743,
+      "visiblyChangedPixels": 1760,
       "roiMeanAbsDelta": 0.0005695,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.20332031,
-      "poolCoverageBefore": 0.221065
+      "frameDriftFraction": 0.20332031,
+      "frameDriftFractionBefore": 0.221065
     },
     "storm-wide": {
       "meanBefore": [
@@ -92,14 +96,16 @@
       "meanAbsDelta": 0.0003736,
       "maxAbsDelta": 0.70980392,
       "changedPixelFraction": 0.14677056,
+      "visiblyChangedPixelFraction": 0.00544379,
+      "visiblyChangedPixels": 20068,
       "roiMeanAbsDelta": 0.00092369,
       "silhouetteMaxShiftPx": 0,
       "silhouetteMeanShiftPx": 0.0,
       "silhouetteColumnsMoved": 0,
       "width": 2560,
       "height": 1440,
-      "poolCoverage": 0.2061008,
-      "poolCoverageBefore": 0.18073595
+      "frameDriftFraction": 0.2061008,
+      "frameDriftFractionBefore": 0.18073595
     }
   }
 }

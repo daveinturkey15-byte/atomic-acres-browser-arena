@@ -1,0 +1,225 @@
+{
+  "before": "artifacts\\hf420\\fixA-noskirtfix-rustworks",
+  "after": "artifacts\\hf420\\fixB-head-rustworks",
+  "shots": {
+    "storm-down": {
+      "meanBefore": [
+        0.039468,
+        0.248548,
+        0.186988
+      ],
+      "meanAfter": [
+        0.039448,
+        0.248579,
+        0.187013
+      ],
+      "roiMeanBefore": [
+        3e-06,
+        0.233685,
+        0.178203
+      ],
+      "roiMeanAfter": [
+        1e-06,
+        0.233721,
+        0.178246
+      ],
+      "meanAbsDelta": 0.00024264,
+      "maxAbsDelta": 0.55686275,
+      "changedPixelFraction": 0.15700955,
+      "visiblyChangedPixelFraction": 0.0001378,
+      "visiblyChangedPixels": 508,
+      "roiMeanAbsDelta": 0.00020849,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.17647054,
+      "frameDriftFractionBefore": 0.12931071,
+      "skirtSeamBefore": {
+        "skirtPixels": 0
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 0
+      }
+    },
+    "storm-grazing": {
+      "meanBefore": [
+        0.108933,
+        0.238301,
+        0.277245
+      ],
+      "meanAfter": [
+        0.10892,
+        0.238376,
+        0.277253
+      ],
+      "roiMeanBefore": [
+        0.102735,
+        0.254987,
+        0.303832
+      ],
+      "roiMeanAfter": [
+        0.102728,
+        0.255374,
+        0.303948
+      ],
+      "meanAbsDelta": 0.00047061,
+      "maxAbsDelta": 0.54117647,
+      "changedPixelFraction": 0.27112929,
+      "visiblyChangedPixelFraction": 0.00069526,
+      "visiblyChangedPixels": 2563,
+      "roiMeanAbsDelta": 0.00065181,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.15282281,
+      "frameDriftFractionBefore": 0.21349691,
+      "skirtSeamBefore": {
+        "skirtPixels": 352,
+        "skirtCoverage": 9.549e-05,
+        "seamColumns": 67,
+        "skirtMeanRgb": [
+          0.142101,
+          0.170934,
+          0.240263
+        ],
+        "nearPlaneMeanRgb": [
+          0.089764,
+          0.272461,
+          0.257902
+        ],
+        "skirtChromaticity": [
+          0.256826,
+          0.308936,
+          0.434238
+        ],
+        "nearPlaneChromaticity": [
+          0.144752,
+          0.439363,
+          0.415885
+        ],
+        "seamHueDistance": 0.260855,
+        "seamLumaRatio": 0.730147
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 1511,
+        "skirtCoverage": 0.00040988,
+        "seamColumns": 247,
+        "skirtMeanRgb": [
+          0.111361,
+          0.417991,
+          0.321945
+        ],
+        "nearPlaneMeanRgb": [
+          0.046277,
+          0.275097,
+          0.243812
+        ],
+        "skirtChromaticity": [
+          0.130813,
+          0.491005,
+          0.378182
+        ],
+        "nearPlaneChromaticity": [
+          0.081879,
+          0.486737,
+          0.431384
+        ],
+        "seamHueDistance": 0.106404,
+        "seamLumaRatio": 1.542732
+      }
+    },
+    "storm-wide": {
+      "meanBefore": [
+        0.117225,
+        0.249195,
+        0.273449
+      ],
+      "meanAfter": [
+        0.117246,
+        0.253392,
+        0.274971
+      ],
+      "roiMeanBefore": [
+        0.118157,
+        0.259569,
+        0.273629
+      ],
+      "roiMeanAfter": [
+        0.116985,
+        0.271196,
+        0.277488
+      ],
+      "meanAbsDelta": 0.00252215,
+      "maxAbsDelta": 0.47843137,
+      "changedPixelFraction": 0.24112901,
+      "visiblyChangedPixelFraction": 0.01723741,
+      "visiblyChangedPixels": 63544,
+      "roiMeanAbsDelta": 0.00593234,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "frameDriftFraction": 0.24618978,
+      "frameDriftFractionBefore": 0.20468207,
+      "skirtSeamBefore": {
+        "skirtPixels": 47640,
+        "skirtCoverage": 0.01292318,
+        "seamColumns": 1974,
+        "skirtMeanRgb": [
+          0.147512,
+          0.166333,
+          0.238082
+        ],
+        "nearPlaneMeanRgb": [
+          0.254218,
+          0.301618,
+          0.387533
+        ],
+        "skirtChromaticity": [
+          0.267267,
+          0.301368,
+          0.431364
+        ],
+        "nearPlaneChromaticity": [
+          0.269479,
+          0.319725,
+          0.410796
+        ],
+        "seamHueDistance": 0.041136,
+        "seamLumaRatio": 0.562605
+      },
+      "skirtSeamAfter": {
+        "skirtPixels": 56742,
+        "skirtCoverage": 0.01539225,
+        "seamColumns": 2560,
+        "skirtMeanRgb": [
+          0.108582,
+          0.412584,
+          0.315234
+        ],
+        "nearPlaneMeanRgb": [
+          0.259645,
+          0.301056,
+          0.389297
+        ],
+        "skirtChromaticity": [
+          0.129821,
+          0.493285,
+          0.376894
+        ],
+        "nearPlaneChromaticity": [
+          0.273311,
+          0.316902,
+          0.409787
+        ],
+        "seamHueDistance": 0.352766,
+        "seamLumaRatio": 1.141655
+      }
+    }
+  }
+}
