@@ -196,6 +196,20 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('n2.mains-hum-swell', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
     event('n2.high-fence-bird', 'chirp', 2, [2_600, 3_100], 0.10, 0.019, 0, 47),
   ]),
+  // RAID2 (PREVIEW, HF-408): the same estate fiction as test2 but a measurably
+  // more OPEN one - 21.9% of its ground is roofed against test2's 36.7% - so the
+  // bed leans on open-air voices and on the pool, and the gap range is longer
+  // because there are fewer surfaces close enough to make a near sound.
+  'raid2': profile('raid2', 'open-terrace-estate-and-pool', [7, 15], [
+    event('r2.terrace-bird', 'chirp', 6, [2_500, 3_200], 0.10, 0.023, 0, 26),
+    event('r2.court-breeze', 'whoosh', 5, [320, 140], 1.85, 0.017, 0.9, 19),
+    event('r2.pool-lap', 'whoosh', 5, [370, 165], 0.98, 0.019, 1.1, 16),
+    event('r2.colonnade-draught', 'whoosh', 4, [280, 125], 1.60, 0.015, 1.0, 22),
+    event('r2.fountain-spill', 'clank', 3, [2_500, 2_000], 0.11, 0.013, 0, 12),
+    event('r2.planting-rustle', 'rustle', 4, [2_100, 1_350], 1.25, 0.014, 1.5, 13),
+    event('r2.shutter-knock', 'clank', 2, [1_500, 1_180], 0.13, 0.012, 0, 29),
+    event('r2.hillside-call', 'call', 2, [540, 415], 0.38, 0.016, 0, 54),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */

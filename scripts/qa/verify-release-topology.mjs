@@ -20,6 +20,25 @@ if (!rootIndex.includes('release-shell.js') || rootIndex.includes('type="module"
 const publicConfigSource = readFileSync(join(dist, 'release-channel-config.js'), 'utf8');
 const publicConfig = JSON.parse(publicConfigSource.slice(publicConfigSource.indexOf('=') + 1).replace(/;\s*$/, ''));
 const rollbackStaged = Boolean(config.rollback && existsSync(join(dist, config.rollback.path)));
+// LANE AD (PASS 87): every channel PATH below is read out of release-channels.json.
+// This verifier used to spell three of them as literals - `channels/the-big-one` for the
+// live channel path, the same name for the live channel id, and a six-name array for the
+// staged directory set - which were the pre-PASS-80 topology. From the pass80 cut onwards
+// the live channel is `channels/pass<N>`, so `npm run verify:release-topology` threw
+// `Root chooser is missing live PASS 86` on a correctly staged tree (measured on
+// d329628d, 2026-09-03). The production workflow runs this in the same step as staging,
+// so the release job could not reach its publish step at all.
+//
+// A literal is what goes stale; a derivation cannot. `channelDirectory` is also the only
+// place that knows how a channel path maps to a directory name.
+const channelDirectory = (key) => {
+  const path = config[key]?.path;
+  if (typeof path !== 'string' || !/^channels\/[a-z0-9-]+$/.test(path)) {
+    throw new Error(`release-channels.json ${key}.path must be one channels/<id> path`);
+  }
+  return path.slice('channels/'.length);
+};
+const liveChannelId = channelDirectory('experimental');
 const requiredChannelKeys = rollbackStaged
   ? ['experimental', 'previous', 'retained', 'historical', 'stable']
   : ['experimental', 'previous', 'retained', 'historical'];
@@ -75,7 +94,7 @@ if (liveChannelKeys) {
   }
 }
 if (publicConfig.experimental.pass !== config.experimental.pass || publicConfig.experimental.label !== config.experimental.label
-  || publicConfig.experimental.path !== 'channels/the-big-one') {
+  || publicConfig.experimental.path !== config.experimental.path) {
   throw new Error(`Root chooser is missing live ${config.experimental.pass}`);
 }
 if (publicConfig.previous.pass !== config.previous.pass
@@ -102,9 +121,13 @@ const stagedChannelDirectories = readdirSync(join(dist, 'channels'), { withFileT
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const expectedDirectories = rollbackStaged
-  ? ['pass63-rollback', 'pass69-retained', 'pass70-retained', 'pass72-retained', 'recent-stable', 'the-big-one']
-  : ['pass69-retained', 'pass70-retained', 'pass72-retained', 'recent-stable', 'the-big-one'];
+// Exactly as strict as the literal array it replaces - still a full-set equality, so an
+// extra staged tree and a missing one both fail - but every name now comes from the config
+// key that stage-release-topology.mjs stages under it.
+const stagedChannelConfigKeys = rollbackStaged
+  ? ['experimental', 'previous', 'retained', 'historical', 'stable', 'rollback']
+  : ['experimental', 'previous', 'retained', 'historical', 'stable'];
+const expectedDirectories = [...new Set(stagedChannelConfigKeys.map(channelDirectory))].sort();
 if (JSON.stringify(stagedChannelDirectories) !== JSON.stringify(expectedDirectories)) {
   throw new Error(`Unexpected staged channels: ${stagedChannelDirectories.join(', ')}`);
 }
@@ -250,7 +273,7 @@ if (!experimentalAssets.some((name) => readFileSync(join(experimentalRoot, 'asse
 }
 const experimentalProvenance = JSON.parse(readFileSync(join(experimentalRoot, 'channel-provenance.json'), 'utf8'));
 if (experimentalProvenance.schemaVersion !== 5
-  || experimentalProvenance.channel !== 'the-big-one'
+  || experimentalProvenance.channel !== liveChannelId
   || experimentalProvenance.releasePass !== config.experimental.pass
   || experimentalProvenance.path !== config.experimental.path
   || !/^[0-9a-f]{40}$/.test(experimentalProvenance.sourceSha ?? '')) {

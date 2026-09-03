@@ -121,6 +121,37 @@ const COVERAGE_FLOOR: Record<string, { meshes: number; footprintM2: number }> = 
   // spent later. A bleached noon test town is a MATTE map and is never going to
   // be a chrome one; "never zero anywhere" is the contract, and it is met.
   nuketown2: { meshes: 2, footprintM2: 16 },
+  // RAID2 (owner 2026-09-02, HF-408). RE-MEASURED 2026-09-03 in the lane's
+  // repair pass, and the previous pin has to be explained rather than quietly
+  // replaced, because it went DOWN.
+  //
+  // The old pin was 2 meshes / 631.6 m2 and its comment said the two were "the
+  // pool's presentation water sheet and the courtyard fountain's basin". That
+  // was wrong on both halves, and only measuring the extractor's own output
+  // showed it:
+  //
+  //  - The 609.3 m2 mesh was not the water sheet. It was
+  //    `raid2-presentation-presentation-batch-0`, the merged batch of every
+  //    presentation-only box in the arena. Merging the pool sheet (at z -29)
+  //    and the courtyard basin (at z -11) into one mesh gives that mesh a
+  //    BOUNDING BOX spanning 28 x 22 m of map, and the extractor measures
+  //    footprint from the bounding box. 609.3 m2 was a batching artefact, not
+  //    609.3 m2 of water.
+  //  - The second mesh was `raid2 wing glazing` (22.3 m2), a shots:true pane
+  //    standing 0.3 m proud of a solid wall INSIDE the pool wing. Eye-clearance
+  //    stage 2 found 13 violations on this arena and every one of them was that
+  //    pane; stage 3 confirmed the runtime camera could not resolve out of any
+  //    of them. It is removed, which is why this pin had to move at all.
+  //
+  // The new pin is the sum of two INDEPENDENTLY EXTRACTED real surfaces:
+  // `raid2 pool water` (195.8 m2) and `raid2 courtyard fountain basin`
+  // (11.6 m2), the latter enlarged to 3.4 x 3.4 m inside its own kerb and given
+  // its own shot surface so it stops being batched away. Deleting either one
+  // fails this gate, which the old pin could not do: under the old authoring
+  // both water surfaces were ONE mesh, so losing the pool sheet would still
+  // have left the count at 2 and only moved a number nobody could attribute.
+  // Pinned at 207, not a round number, for the same reason as before.
+  raid2: { meshes: 2, footprintM2: 207 },
 };
 
 type Coverage = {
@@ -184,6 +215,7 @@ beforeAll(async () => {
     { buildMap3 },
     // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins it too.
     { buildNuketown2 },
+    { buildRaid2 },
     { addNeighbourhoodLife, loadArenaArt },
     { ARENA_VISUAL_REGISTRY },
     { createPass64TslSceneSystems },
@@ -195,6 +227,7 @@ beforeAll(async () => {
     import('../../test-maps'),
     import('../../map3-arena'),
     import('../../nuketown2-arena'),
+    import('../../raid2-arena'),
     import('../../environment-assets'),
     import('../arena-visual-stream'),
     import('../pass64-tsl-scene'),
@@ -221,6 +254,8 @@ beforeAll(async () => {
     // TypeError at sweep time rather than a silently unswept arena - which is
     // the better failure, and the one that fired.
     nuketown2: buildNuketown2,
+    // RAID2 (owner 2026-09-02, HF-408).
+    raid2: buildRaid2,
   };
 
   for (const id of ALL_ARENA_IDS) {

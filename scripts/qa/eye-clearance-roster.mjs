@@ -32,16 +32,18 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * subtracted. Raise it when an arena is added; never lower it to get a run
  * green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, back to 7
  * while its card was withdrawn (HF-409), 8 again when the corridor showcase became
- * the arena, 9 the same day (HF-407) when the Nuke Town Rebuild shipped, and
- * 9 -> 10 at HF-423 when farcrysis was un-hidden as a PREVIEW card: the floor is
- * an alarm on the SCRAPE collapsing, so it has to equal the real roster.
+ * the arena, 9 the same day (HF-407) when the Nuke Town Rebuild shipped, 10 at
+ * HF-423 when farcrysis was un-hidden as a PREVIEW card, and 11 at HF-408 when
+ * the Raid Rebuild `raid2` shipped selectable: the floor is an alarm on the
+ * SCRAPE collapsing, so it has to equal the real roster.
  *
- * The merge of PASS 86 and Lane R is why this reads 10 and not 9: both sides
- * independently wrote the literal `9` from different arithmetic (nine of ten
- * with farcrysis hidden; nine ids before nuketown2 with it un-hidden), and git
- * merges identical text without conflict. The union of the two rosters is TEN.
+ * The merge of PASS 86, Lane R and Lane AQ is why this reads 11 and not 10:
+ * THREE sides independently wrote a literal from different arithmetic (nine of
+ * ten with farcrysis hidden; nine ids before nuketown2 with it un-hidden; ten
+ * with raid2 but farcrysis still hidden), and git merges identical text without
+ * conflict. The union of the three rosters is ELEVEN.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 10;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 11;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

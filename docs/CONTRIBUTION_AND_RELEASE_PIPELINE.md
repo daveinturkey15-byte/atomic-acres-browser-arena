@@ -90,7 +90,7 @@ One integrator owns the queue at a time.
 
 ## Release-owner flow
 
-Only the `release-production` GitHub Actions workflow may publish production.
+Only `scripts/orchestration/publish_pass<N>.py`, run from the canonical checkout, may publish production. The `release-production` workflow verifies a candidate and cannot publish.
 
 1. Wait for the merge commit's five required checks to succeed, including `requirements-acceptance`.
 2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. A publicly selectable fallback may never retain that sentinel: if its pinned historical Pages bytes predate timestamp injection, rebuild its exact approved source with the immutable timestamp of the pinned Pages publication, record `rebuiltFromSource: true`, and verify every live channel shows a real UK-local day/date/time. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
@@ -98,7 +98,7 @@ Only the `release-production` GitHub Actions workflow may publish production.
    ```ts
    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)
    ```
-3. Dispatch `release-production` with the exact full `main` SHA and release pass.
+3. Dispatch `release-production` with the exact full `main` SHA and release pass to produce the verification receipt, then publish with `python scripts/orchestration/publish_pass<N>.py` (dry-run first).
 4. The workflow refuses a non-tip SHA, requires successful checks, builds from a clean checkout, serializes Pages publication, preserves the historical review tree, and records source/Pages identities.
 5. The workflow revalidates the accepted manifest against the exact source SHA. Pass 62 and later cannot publish without approval parity; older rollback passes are marked legacy-exempt.
 6. Wait for the workflow receipt and exact Pages build to succeed.

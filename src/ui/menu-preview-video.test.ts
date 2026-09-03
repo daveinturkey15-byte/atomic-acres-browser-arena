@@ -45,6 +45,10 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   // key, and finalize-pass85-nuketown2-menu-preview.mjs proves that on the
   // installed bytes rather than asserting it.
   nuketown2: 'pass85-nuketown2-preview-v1',
+  // RAID2 (owner 2026-09-02, HF-408): its own additive family, the fifth. Same
+  // history as map3 - standby for one pass, then its own capture - and the same
+  // rule: new bytes never ship under an accepted family's key.
+  raid2: 'pass87-raid2-preview-v1',
 });
 
 /**
@@ -72,7 +76,12 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
 // pass85-nuketown2-preview-v1 family), so it came off in the same commit - which
 // is the rule this list is written to enforce. The list is empty again, and
 // should stay empty.
-const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([]);
+const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
+  // RAID2 (HF-408) sat here for one pass and has been REMOVED by capturing the
+  // flyover, exactly as map3 was before it. That is the mechanism working: a
+  // newly registered arena gets an honest place to stand, and it leaves by
+  // shipping its own bytes rather than by pointing at somebody else's.
+]);
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
 const ACCEPTED_COCKPIT_EVIDENCE_SHA256 = '8882a597f015d5e16a731b88c6167bd4eb93fe811992f8424754df5dbd753e8b';
@@ -127,7 +136,15 @@ describe('prerecorded map-selection previews', () => {
     // own flyover landed. This pin is RAISED, never lowered - it is the second,
     // hand-written half of the count above, and its whole job is to fail if a
     // new arena is quietly parked in MEDIA_PENDING_ARENAS instead of captured.
-    expect(assets).toHaveLength(30);
+    // HF-408 the same day: raid2 left standby by capturing its own flyover.
+    // At the PASS 87 integration merge this pin read 30 from BOTH sides for
+    // different reasons - ten arenas with farcrysis un-hidden (HF-423) and ten
+    // with raid2 registered (HF-408) - so git merged the literal without a
+    // conflict and it had to be re-counted by hand. The union is ELEVEN arenas
+    // shipping media, so 33. Pinned as a literal on purpose - deriving it from
+    // ARENA_SELECTIONS alone would silently accept a build where an arena
+    // quietly stopped shipping media.
+    expect(assets).toHaveLength(33);
   });
 
   // MAP3 (HF-405). Two obligations the allowlist above would otherwise leave

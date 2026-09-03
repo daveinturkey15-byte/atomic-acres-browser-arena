@@ -122,10 +122,11 @@ test('the sweep keeps a floor under the derived roster', () => {
   // printing success, so the script asserts a floor rather than assuming one.
   // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable, back to 7
   // while its card was withdrawn, 8 again when the showcase became the arena,
-  // 9 (HF-407) when the Nuke Town Rebuild shipped, and 10 (HF-423) when farcrysis
-  // was un-hidden as a PREVIEW card. The floor must equal the REAL roster, which
-  // the equality assertion below enforces in both directions.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*10/u, 'the roster floor must be pinned at 10');
+  // 9 (HF-407) when the Nuke Town Rebuild shipped, 10 (HF-423) when farcrysis
+  // was un-hidden as a PREVIEW card, and 11 (HF-408) when the Raid Rebuild
+  // shipped. The floor must equal the REAL roster, which the equality assertion
+  // below enforces in both directions.
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*11/u, 'the roster floor must be pinned at 11');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -428,15 +429,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*10/u,
-    'the shared roster floor must be pinned at 10',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*11/u,
+    'the shared roster floor must be pinned at 11',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 10, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 11, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so

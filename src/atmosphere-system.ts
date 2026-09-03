@@ -119,6 +119,18 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
       [-18, 14, 2.2, 3.8, 0.9], [18, -14, 2.2, 3.8, 3.2],
     ] as SmokeCard[]),
   }),
+  // RAID2 (PREVIEW, HF-408): cards sit on this arena's OWN zones, not test2's -
+  // the pool terrace at z -28, the courtyard at z -12, the drive at z +12 and
+  // the two spawn ends - because the rebuild's plan is a different plan.
+  'raid2': Object.freeze({
+    mist: Object.freeze([
+      [-27, -28, 13, 3.4], [8, -28, 13, 3.4], [0, -12, 11, 3.0],
+      [0, 12, 12, 3.2], [-42, -4, 10, 2.8], [42, -2, 10, 2.8],
+    ] as MistCard[]),
+    smoke: Object.freeze([
+      [-24, 20, 2.3, 3.9, 0.9], [24, 20, 2.3, 3.9, 3.2],
+    ] as SmokeCard[]),
+  }),
   // MAP3 (PREVIEW): mist sits in the outdoor wedges between the bays, which is
   // where the ground is open and the air is not walled in; the bays themselves
   // stay clear so a 54 m lane reads to its end.

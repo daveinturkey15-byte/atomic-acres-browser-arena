@@ -32,14 +32,17 @@ describe('opening arena selection', () => {
       // NUKETOWN2 (HF-407): the Nuke Town rejig, registered beside the shipped
       // Nuke Town rather than replacing it.
       'nuketown2',
+      // RAID2 (HF-408, 2026-09-02): the Raid layout rethink, beside the shipped Raid.
+      'raid2',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
     // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
     // 'Nuke Town' - the two arenas sit next to each other in the menu and the
     // owner has to be able to tell which one he is loading.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Nuke Town Rebuild']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(10);
-    expect(ARENA_SELECTIONS.length).toBe(10);
+    // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Nuke Town Rebuild', 'Raid Rebuild']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(11);
+    expect(ARENA_SELECTIONS.length).toBe(11);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -155,6 +158,7 @@ describe('opening arena selection', () => {
       // NUKETOWN2 (HF-407): the whole point of the rejig. The shipped Nuke Town
       // is the ONE imported arena in the game; its rebuild is code.
       nuketown2: 'code',
+      raid2: 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -185,7 +189,8 @@ describe('opening arena selection', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      // HF-408 (Lane AQ): raid2 is an eleventh entry on MATCH_DURATION_MS, like test2.
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -199,6 +204,8 @@ describe('opening arena selection', () => {
       'Map 3 explore arena',
       // NUKETOWN2 (HF-407).
       'Nuke Town Rebuild multiplayer arena',
+      // RAID2 (HF-408).
+      'Raid Rebuild multiplayer arena',
     ]);
   });
 
@@ -223,6 +230,11 @@ describe('opening arena selection', () => {
       // Town's hosted feature set deliberately - the thing under test is the
       // LAYOUT, so nothing else may differ between the two.
       'nuketown2': true,
+      // RAID2 (HF-408): field support is ON, matching test2. This is the same
+      // mode on the same netcode with a different arena id, and unlike Map 3 it
+      // registers `multiplayer: true` - so turning support OFF here would be
+      // inconsistent with the row it actually ships.
+      'raid2': true,
     });
   });
 
@@ -259,6 +271,8 @@ describe('opening arena selection', () => {
       'START EXPLORING',
       // NUKETOWN2 (HF-407): SOLO_BOT_COUNT, same as the shipped Nuke Town.
       '1 BOT SKIRMISH',
+      // RAID2 (HF-408): soloBotCount 2.
+      '2 BOTS SKIRMISH',
     ]);
   });
 

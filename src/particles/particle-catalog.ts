@@ -294,6 +294,15 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.42, kind: 'seed', colorWarm: 0xdfd2a4, colorCool: 0xaeae94, radiusM: 0.04, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.1 },
     0.55, 21, 12, 4,
   ),
+  // RAID2 (PREVIEW, HF-408): the same garden pollen family as test2, drifting a
+  // little harder because this rebuild has 21.9% roofed ground against test2's
+  // 36.7% and a 52 m open lane for the wind to run down.
+  'raid2': arena(
+    'raid2', 'terrace-pollen-and-pool-haze',
+    { density: 0.7, colorWarm: 0xffeec6, colorCool: 0xd6dcd8, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.17, windPull: 0.6, opacity: 0.09 },
+    { density: 0.5, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.044, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.11 },
+    0.7, 24, 14, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

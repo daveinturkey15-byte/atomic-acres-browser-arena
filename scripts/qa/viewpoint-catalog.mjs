@@ -120,6 +120,23 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'nuketown2-south-upper-window',
     'nuketown2-into-sun-street',
   ]),
+  // RAID2 (Lane AQ, HF-408): the Raid layout rethink. Ten cameras rather than
+  // the usual four because this arena's whole claim is about ten specific
+  // places, and the judgeset in docs/raid-rebuild/SPATIAL_PLAN.md section 5 is
+  // what the pass is reviewed through. Derived from
+  // src/rendering/arenas/raid2.ts, in authored order.
+  raid2: Object.freeze([
+    'raid2-estate-overview',
+    'raid2-west-apron',
+    'raid2-garage-fan',
+    'raid2-defining-lane',
+    'raid2-pool-deck-return',
+    'raid2-courtyard',
+    'raid2-house-spine',
+    'raid2-upper-bedroom',
+    'raid2-drive-balcony',
+    'raid2-drive-approach',
+  ]),
 });
 
 export const CATALOG_ARENAS = Object.keys(VIEWPOINT_CATALOG);

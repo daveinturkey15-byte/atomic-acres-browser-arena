@@ -10,7 +10,7 @@
 // of it), so this needs a python on PATH. It fails loudly when there is none: a contract
 // test that cannot run must not be mistaken for one that passed.
 //
-//   node --test scripts/orchestration/publish_pass84_plan.test.mjs
+//   node --test scripts/orchestration/publish_pass<N>_plan.test.mjs   (<N> = this pass)
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

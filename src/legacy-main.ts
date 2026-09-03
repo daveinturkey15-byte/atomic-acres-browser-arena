@@ -186,6 +186,8 @@ import {
 } from './arena-factory-registry';
 // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407.
 import { buildNuketown2 } from './nuketown2-arena';
+// RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
+import { buildRaid2 } from './raid2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -3385,6 +3387,11 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // layout for the Nuke Town flow, registered beside the shipped arena so the
   // main map is never broken mid-pass. See src/nuketown2-arena.ts.
   nuketown2: eagerArena(buildNuketown2),
+  // RAID2: Raid Rebuild (PREVIEW), HF-408 Lane AQ. Code-authored replacement
+  // layout for the Raid flow, registered beside the shipped arena so the
+  // original is never broken mid-pass. Eager: its builder is synchronous and
+  // needs no wasm prepare step. See src/raid2-arena.ts.
+  raid2: eagerArena(buildRaid2),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;

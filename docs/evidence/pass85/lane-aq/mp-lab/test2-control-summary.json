@@ -1,0 +1,130 @@
+{
+  "contract": "mp-lab-host-guest-summary-v1",
+  "label": "test2-baseline",
+  "measuredAt": "2026-09-03T00:23:30.298Z",
+  "mode": "host-guest",
+  "hostedBots": 0,
+  "sampleSeconds": 20,
+  "chromeFlags": "stock",
+  "stallFloorMs": 250,
+  "deadlockWindowMs": 5000,
+  "roster": [
+    "atomic-acres",
+    "skyline-terminal",
+    "rustworks-1v1",
+    "gun-range",
+    "high-seas",
+    "test1",
+    "test2",
+    "raid2"
+  ],
+  "joinFlowIdentical": true,
+  "joinFlowComparedCount": 1,
+  "joinFlowLongest": "boot>booted>host-click>room-code>guest-join-click>joined>host-selected-arena>arena-synced>guest-ready>host-start-click>deployed>sampling>sampled",
+  "joinFlowTruncatedArenas": [],
+  "joinFlowDivergent": [],
+  "arenas": [
+    {
+      "arenaId": "test2",
+      "pass": false,
+      "reasons": [
+        "host 3 stall(s) > 250 ms (worst 272.9 ms)",
+        "guest 5 stall(s) > 250 ms (worst 393.6 ms)"
+      ],
+      "join": {
+        "ok": true,
+        "roomMs": 966,
+        "joinMs": 1001
+      },
+      "arenaSync": {
+        "hostMs": 51676,
+        "guestMs": 49892
+      },
+      "deploy": {
+        "ok": true,
+        "hostOk": true,
+        "guestOk": true,
+        "hostMs": 21593,
+        "guestMs": 21544,
+        "hostedBotsSeen": 0,
+        "timeline": {
+          "host": [
+            {
+              "atMs": 595,
+              "lobbyPhase": "countdown",
+              "bootstrapStage": "finalizing",
+              "matchPhase": "warmup",
+              "gameStarted": false,
+              "menuHidden": true
+            },
+            {
+              "atMs": 15091,
+              "lobbyPhase": "countdown",
+              "bootstrapStage": "verifying-first-presentation",
+              "matchPhase": "warmup",
+              "gameStarted": false,
+              "menuHidden": true
+            }
+          ],
+          "guest": [
+            {
+              "atMs": 933,
+              "lobbyPhase": "countdown",
+              "bootstrapStage": "finalizing",
+              "matchPhase": "warmup",
+              "gameStarted": false,
+              "menuHidden": true
+            },
+            {
+              "atMs": 15177,
+              "lobbyPhase": "countdown",
+              "bootstrapStage": "verifying-first-presentation",
+              "matchPhase": "warmup",
+              "gameStarted": false,
+              "menuHidden": true
+            }
+          ]
+        }
+      },
+      "host": {
+        "fps": 19.9,
+        "worstStallMs": 272.9,
+        "stalls": 3,
+        "deadlocks": 0,
+        "frames": 396,
+        "source": "presented"
+      },
+      "guest": {
+        "fps": 18.4,
+        "worstStallMs": 393.6,
+        "stalls": 5,
+        "deadlocks": 0,
+        "frames": 369,
+        "firstMoveMs": 294,
+        "source": "presented"
+      },
+      "errors": {
+        "hostPage": 0,
+        "hostConsole": 0,
+        "guestPage": 0,
+        "guestConsole": 0
+      },
+      "flow": [
+        "boot",
+        "booted",
+        "host-click",
+        "room-code",
+        "guest-join-click",
+        "joined",
+        "host-selected-arena",
+        "arena-synced",
+        "guest-ready",
+        "host-start-click",
+        "deployed",
+        "sampling",
+        "sampled"
+      ]
+    }
+  ],
+  "pass": false
+}

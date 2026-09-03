@@ -803,3 +803,17 @@ PASS 86's arena additions). Owed next: the ART pass (flat untextured albedo; Lan
 L stays shelved at the owner's instruction but the rebuild needs its own first
 style pass), arena sync 45-63% slower than the shipped Raid (route to Lane H2),
 the warm-key art-direction quadrant being full, the weather sequencer latent bug.
+
+### 03:35 BST integration notes (Lanes AH, AE, AD merged; integrator edits)
+- AE (mobile): the PAUSE tap no longer falls through onto the menu it uncovers;
+  emulated sweep on three devices; phone checklist for the owner in Lane AE's
+  evidence. Integrator applied its collapsed-Advanced-Graphics CSS fix (the
+  closed disclosure laid ~2,815 px of catalog over the Options panel, on desktop
+  too). Left for Lane AR: the paused deck's covered join row, DEPLOY below the
+  fold on landscape phones, 24 px settings checkbox rows.
+- AD (release CI): the workflow verifies and cannot publish (`contents: read`);
+  `publish_pass<N>.py` is the only publisher. The three documentation patches
+  (README, AGENTS.md, pipeline doc) landed in the same integration commit.
+- Lane C's two zero-byte tsc log files under docs/evidence/pass84/farcrysis-load
+  were deleted (they made `qa:text-integrity` red on every branch); their
+  siblings carry the real `TSC EXIT 0` marker. No marker was fabricated.

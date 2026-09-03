@@ -1,0 +1,7 @@
+
+> atomic-acres-browser-arena@1.0.0 verify:release-topology
+> node scripts/qa/verify-release-topology.mjs
+
+{"releaseTopology":"verified","previousFiles":516,"retainedFiles":516,"historicalFiles":516,"stableFiles":509,"experimentalAssets":44}
+
+[exited with code 0]
