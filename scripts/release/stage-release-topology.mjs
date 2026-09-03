@@ -361,12 +361,23 @@ if (config.rollback) {
   }
 }
 
-// Every throwing step is above this line, so the candidate duplicates in the
-// dist root have done their job and the root becomes chooser-only.
-removeStagedOriginals();
-for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
-  copyFileSync(join(repositoryRoot, 'release-shell', file), join(distRoot, file));
-}
+// SKEPTIC FOLLOW-UP (PASS 87 Lane AR item 10). The first version of this fix
+// put removeStagedOriginals() here and left three copyFileSync calls and two
+// writeFileSync calls BELOW it, so the comment claiming every throwing step was
+// above the line was not true: a missing or unreadable release-shell/ file still
+// deleted dist/assets and dist/map3.html and reproduced the exact
+// "candidate dist is incomplete" failure on the next run.
+//
+// So every remaining input is READ and every output BUILT first, while the dist
+// root is still intact and re-runnable; only then is anything deleted or
+// written. Moving the delete to the very end would have been worse, not better:
+// the chooser index.html overwrites the candidate one, so a throw after that
+// copy would leave the next run staging the CHOOSER as the experimental
+// channel - silently wrong content instead of a loud failure.
+const releaseShellFiles = ['index.html', 'release-shell.css', 'release-shell.js'].map((file) => ({
+  file,
+  contents: readFileSync(join(repositoryRoot, 'release-shell', file)),
+}));
 const publicConfig = {
   experimental: {
     label: config.experimental.label,
@@ -404,7 +415,7 @@ const publicConfig = {
     },
   } : {}),
 };
-writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
+const releaseChannelConfigSource = `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`;
 
 mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
@@ -413,7 +424,15 @@ const topology = {
   channels: Object.fromEntries(Object.entries({ experimental, previous, retained, historical, stable, rollback })
     .filter(([, channel]) => channel)),
 };
-writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
+const topologyReceiptSource = `${JSON.stringify(topology, null, 2)}\n`;
+
+// Nothing above this line deletes or overwrites anything in the dist root, and
+// nothing below it can throw for a reason this script controls: the root goes
+// chooser-only in one uninterrupted sequence of writes.
+removeStagedOriginals();
+for (const { file, contents } of releaseShellFiles) writeFileSync(join(distRoot, file), contents);
+writeFileSync(join(distRoot, 'release-channel-config.js'), releaseChannelConfigSource);
+writeFileSync(topologyReceiptPath, topologyReceiptSource);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
   previous: { pass: previous.releasePass, pagesSha: previous.pagesSha, digest: previous.treeSha256 },

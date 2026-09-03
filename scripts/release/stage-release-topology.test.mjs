@@ -111,3 +111,38 @@ test('a run that never reaches staging does not touch the candidate either', (t)
   assert.ok(existsSync(join(dist, 'index.html')));
   assert.ok(existsSync(join(dist, 'assets')));
 });
+
+/**
+ * SKEPTIC FOLLOW-UP. The first version of the fix moved the completeness guard
+ * above the staging renames but left `removeStagedOriginals()` with three
+ * copyFileSync calls and two writeFileSync calls below it, so the in-code
+ * comment "every throwing step is above this line" was false: a missing or
+ * unreadable release-shell/ file still deleted dist/assets and dist/map3.html
+ * and reproduced `candidate dist is incomplete` on the next run.
+ *
+ * That window cannot be reached from a test without renaming a tracked
+ * directory out from under a shared machine's other builds, so it is closed by
+ * ORDER and asserted as order: after the destructive call, the script may only
+ * write. Any future edit that reads a file, copies a file, or shells out below
+ * that line re-opens the exact defect and fails here.
+ */
+test('nothing that can throw runs after the dist root is emptied', () => {
+  const source = readFileSync(join(ROOT, 'scripts', 'release', 'stage-release-topology.mjs'), 'utf8');
+  const destructive = source.indexOf('\nremoveStagedOriginals();');
+  assert.ok(destructive > 0, 'the destructive call must exist');
+  const tail = source.slice(destructive + '\nremoveStagedOriginals();'.length);
+
+  // The release-shell inputs are read while the dist root is still intact.
+  const read = source.indexOf("readFileSync(join(repositoryRoot, 'release-shell', file))");
+  assert.ok(read > 0 && read < destructive, 'release-shell/ must be READ before the dist root is emptied');
+
+  for (const forbidden of ['readFileSync(', 'copyFileSync(', 'cpSync(', 'rmSync(', 'execFileSync(', 'existsSync(', 'readdirSync(']) {
+    assert.ok(
+      !tail.includes(forbidden),
+      `${forbidden} runs after removeStagedOriginals(); a throw there leaves the dist root unre-runnable`,
+    );
+  }
+  // What is allowed after it: the writes that make the root chooser-only.
+  assert.match(tail, /writeFileSync\(join\(distRoot, file\), contents\)/u);
+  assert.match(tail, /writeFileSync\(topologyReceiptPath, topologyReceiptSource\)/u);
+});
