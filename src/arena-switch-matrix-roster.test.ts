@@ -30,7 +30,9 @@ describe('arena switch matrix roster', () => {
     expect([...derived].sort()).toEqual([...SELECTABLE_ARENAS.map((entry) => entry.id)].sort());
     // The hidden arena is hidden, not forgotten: it is in the registry and out
     // of the menu, and that difference is the whole point of the derivation.
-    expect(derived.length).toBeLessThan(ARENA_IDS.length);
+    // PASS 87: every registered arena is selectable (farcrysis un-hidden), so the roster may EQUAL the id list;
+    // it must never exceed it.
+    expect(derived.length).toBeLessThanOrEqual(ARENA_IDS.length);
     expect(derived).not.toContain('farcrysis');
   });
 

@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_479;
+const LINE_CEILING = 36_624;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -140,6 +140,13 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'Farcrysis and Raid Rebuild; measured on the merged head, not summed.',
   },
 
+  {
+    date: '2026-09-03',
+    lines: 36_624,
+    note:
+      'PASS 88 candidate: Lane H2 load-time second pass (admission attribution markers, cold-session precompile reach) '
+      + 'merged; measured on the merged head.',
+  },
 ];
 
 function legacyMainSource(): string {
