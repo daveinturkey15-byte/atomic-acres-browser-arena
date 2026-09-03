@@ -827,3 +827,11 @@ collapsed-graphics CSS (AE), release CI verifies-only (AD). Held: H2 (PASS 88
 candidate), AB, AL, AI, the four technique trials (merge audit pending), T.
 Boot smoke 13/13 on all eleven arenas; Farcrysis admission guard green (1.297x).
 Rollback: `python scripts/orchestration/publish_pass87.py --rollback`.
+
+## PASS 88 publish record — 04:59 BST 2026-09-03 (see docs/PASS88_CUT_REPORT_2026-09-03.md)
+Integration 255300e0 -> gh-pages {pass88 live, pass87 backup}; chooser generation
+b77c111be540. Shipped: Lane H2 (HF-417 switch-fence fix without the first-load
+regression; admission attributed). Boot smoke 13/13; Farcrysis admission guard
+1.368x. Rollback: `python scripts/orchestration/publish_pass88.py --rollback`.
+Not merged (branches pushed, for the morning cut): AI, AB, AL, the four
+technique trials, T.
