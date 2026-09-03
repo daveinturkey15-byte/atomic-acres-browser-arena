@@ -337,9 +337,15 @@ for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
 const publicConfig = {
   experimental: {
     label: config.experimental.label,
+    // LANE AD (PASS 87): both strings named "Pass 73" - the pass this file was last edited
+    // for - so every chooser card the staging step produced from the pass80 cut onwards
+    // described the live build as Pass 73 while the card beside it was stamped PASS 86. The
+    // live copy is the config's own description; the candidate sentence is derived from the
+    // stamped pass and keeps its exact publication-disabled wording.
     description: deploymentState === 'live'
-      ? 'The approved Pass 73 first-person, gameplay, world-integrity and renderer-correction build.'
-      : 'The local Pass 73 mechanically gated candidate. Publication remains disabled until exact preview binding.',
+      ? config.experimental.description
+      : `The local ${config.experimental.pass} mechanically gated candidate. `
+        + 'Publication remains disabled until exact preview binding.',
     pass: config.experimental.pass,
     path: config.experimental.path,
     deploymentState,
