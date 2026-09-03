@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass91ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass92ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 91. */
+const pass91ReleasedAt = '2026-09-03T15:47:27+01:00';
 /** gh-pages publish receipt for PASS 90. */
 const pass90ReleasedAt = '2026-09-03T09:30:35+01:00';
 /** gh-pages publish receipt for PASS 89. */
@@ -140,6 +142,23 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass92',
+    pass: 'PASS 92',
+    title: 'Pass 92 · Nuke Town Geometry From Owner Play & Profile Fold',
+    releasedAt: pass92ReleasedAt,
+    areas: Object.freeze(['nuketown2', 'graphics-profiles', 'map3', 'load-time', 'docs']),
+    summary: "Pass 92 fixes the Nuke Town Rebuild from the owner's play session: z-fighting removed with authored depth tiers, stairs walk both ways, upstairs windows are drop-out openings, ground-floor glass, the truck opens on three sides, wider kerb-side cover strips; RAY TRACED folded into Quality and Max; Map 3 street cell relocated; deploy-phase load attribution measured.",
+    highlights: Object.freeze([
+      'Nuke Town: z-fighting removed, stairs walk up and down, upstairs windows drop out, ground-floor glass, truck open on three sides, wider kerb cover',
+      'Graphics: RAY TRACED folded into Quality (light) and Max (more); RTX stays the separate-runtime explainer',
+      'Map 3 street cell relocated; deploy-phase load time attributed (two steps are 60-79% of it)',
+      'Pass 91 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -

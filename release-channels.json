@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 91",
-    "description": "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint."
+    "label": "PASS 92",
+    "description": "Nuke Town Rebuild fixed from the owner's play session: z-fighting removed with authored depth tiers, stairs walk both ways, upstairs windows are drop-out openings, ground-floor glass, the truck opens on three sides, wider kerb-side cover strips; RAY TRACED folded into Quality and Max; Map 3 street cell relocated; deploy-phase load attribution measured."
   },
   "experimental": {
-    "pass": "PASS 91",
-    "label": "PASS 91",
-    "description": "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint.",
-    "path": "channels/pass91"
+    "pass": "PASS 92",
+    "label": "PASS 92",
+    "description": "Nuke Town Rebuild fixed from the owner's play session: z-fighting removed with authored depth tiers, stairs walk both ways, upstairs windows are drop-out openings, ground-floor glass, the truck opens on three sides, wider kerb-side cover strips; RAY TRACED folded into Quality and Max; Map 3 street cell relocated; deploy-phase load attribution measured.",
+    "path": "channels/pass92"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass90Backup": {
-    "label": "PASS 90 · SAFE BACKUP",
+  "pass91Backup": {
+    "label": "PASS 91 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 90",
-    "path": "channels/pass90"
+    "pass": "PASS 91",
+    "path": "channels/pass91"
   }
 }

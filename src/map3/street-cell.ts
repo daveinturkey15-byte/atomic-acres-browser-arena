@@ -869,7 +869,7 @@ export interface StreetCell {
  * needs are compiled at first sight of corridor 3 - about 13 s into a load,
  * not at construction. Measured, not assumed:
  * `docs/evidence/pass86/hf419/pipeline-census-after.json` (36 post-mark
- * creations with the cell, 28 without) and its `verdict: FAIL`.
+ * creations with the cell, 28 without), whose recorded result is FAIL.
  *
  * The number that surprises people: the eight are ground 1, frontage 1, blade
  * 1, and FIVE for the one shared item material - one per InstancedMesh family.
