@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_654;
+const LINE_CEILING = 37_069;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -155,7 +155,32 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'per-mode copy panel and the RTX native-runtime explainer into the settings shell '
       + '(src/ui/pass64-shell.ts holds the markup; these are the legacy-main call sites). '
       + 'Measured at the merged head.',
-  },];
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_069,
+    note:
+      'PASS 89 integration, Lane AB (time of day). Authored as 36_830 on a branch based at '
+      + 'integration head 54c15b1e; re-measured here at the PASS 89 merged head, which also '
+      + 'carries Lane H2 and Lane AI. The lane text follows, unchanged: '
+      + 'the time-of-day uniform-write plumbing in the `// LIGHTING:` '
+      + 'region -- the per-arena baseline capture, the re-aim of the existing key light, '
+      + 'the one apply function and its writes-comparison gate, the lobby mirror and the '
+      + 'QA hooks (including the unforced weather override the gate falsifier needs). '
+      + 'The extraction the header asks for was already done: the whole model is pure and '
+      + 'lives in src/rendering/lighting-conditions.ts (~800 lines, zero THREE imports). '
+      + 'What is left here is exactly the code that must touch the light objects, and it '
+      + 'writes uniforms only -- no light is created, destroyed or toggled, which is the '
+      + 'PASS 82 constraint and is pinned against this source region by '
+      + 'src/rendering/lighting-conditions-light-set.test.ts. Measured on the tree merged '
+      + 'with integration head 54c15b1e (Lane AQ Raid Rebuild, AD, AE), not estimated. '
+      + 'The last 23 of these lines are the SOLO time-of-day row: the brief asks that a '
+      + 'solo player be able to fix the hour, and for one pass the only way to do it was '
+      + 'a URL parameter, and the last 8 suppress the display-refresh HUD advisory '
+      + 'in capture mode, which was laying an opaque strip across the bottom 8% of '
+      + 'the Terminal review frames.',
+  },
+];
 
 function legacyMainSource(): string {
   return readFileSync(resolve(__dirname, 'legacy-main.ts'), 'utf8');

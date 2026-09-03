@@ -3,6 +3,11 @@ import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
 import { ARENA_SELECTIONS, SELECTABLE_ARENAS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  LIGHTING_TIME_CHOICES,
+  LIGHTING_TIME_CHOICE_LABELS,
+} from '../rendering/lighting-conditions';
 import { DEFAULT_PRIVATE_MATCH_CONFIG, LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
@@ -150,6 +155,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           .filter((definition) => definition.availability === 'selectable')
           .map((definition) => `<option value="${definition.id}">${escapeAttribute(definition.displayName.toUpperCase())}</option>`)
           .join('')}</select></label>
+        <!-- Lane AB (PASS 87): the SOLO sky. The brief asks that solo "picks a random time within the arena's range unless the player fixes it"; the random default shipped first, but the only way to fix it was a URL parameter, which is not a player-facing control. This is the same replicated field as the lobby row below and writes the same privateMatchConfig.timeOfDay -- in solo there is no host to defer to, so it applies at once; when the player hosts, the lobby row takes over and this value seeds it. -->
+        <label>TIME OF DAY<select id="solo-time-of-day">${LIGHTING_TIME_CHOICES.map((choice) => `<option value="${choice}"${choice === DEFAULT_LIGHTING_TIME_CHOICE ? ' selected' : ''}>${LIGHTING_TIME_CHOICE_LABELS[choice]}</option>`).join('')}</select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <button id="field-kit-redeploy" type="button" hidden>REDEPLOY NOW WITH SELECTED FIELD KIT</button>
@@ -175,6 +182,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           <label>TIME LIMIT<select id="lobby-time-limit">${LOBBY_TIME_LIMITS_MS.map((ms) => `<option value="${ms}"${ms === DEFAULT_PRIVATE_MATCH_CONFIG.durationMs ? ' selected' : ''}>${Math.round(ms / 60_000)} MIN</option>`).join('')}</select></label>
           <!-- The initial DOM selection equals the contract default so a config change that fires before the first renderPrivateLobby mirror cannot silently publish a different clock. -->
           <label>KILL LIMIT<select id="lobby-kill-limit">${LOBBY_KILL_LIMITS.map((limit) => `<option value="${limit ?? ''}">${limit === null ? 'OFF · SCORE RACE' : `FIRST TO ${limit}`}</option>`).join('')}</select></label>
+          <!-- Lane AB (PASS 87): TIME OF DAY is host-authoritative, not a local graphics option. Friends must share a sky, so it joins the replicated match contract beside the time and kill limits and guests mirror the host's choice here. The labels are arena-relative on purpose: LATE is dusk on Nuke Town and night on RustRig. -->
+          <label>TIME OF DAY<select id="lobby-time-of-day">${LIGHTING_TIME_CHOICES.map((choice) => `<option value="${choice}"${choice === DEFAULT_LIGHTING_TIME_CHOICE ? ' selected' : ''}>${LIGHTING_TIME_CHOICE_LABELS[choice]}</option>`).join('')}</select></label>
           <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>
           <button id="lobby-balance" type="button">BALANCE TEAMS</button>
         </div>
