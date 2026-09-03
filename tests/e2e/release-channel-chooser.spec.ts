@@ -4,12 +4,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PASS66_RELEASE_IDENTITY } from '../../src/release-identity';
 
+type ConfiguredChannel = { label: string; pass: string; path: string };
+type ChooserKey = 'experimental' | 'previous' | 'retained' | 'historical';
 const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-channels.json'), 'utf8')) as {
   latest: { label: string };
-  experimental: { label: string; pass: string; path: string };
-  previous: { label: string; pass: string; path: string };
-  retained: { label: string; pass: string; path: string };
-  historical: { label: string; pass: string; path: string };
+  experimental: ConfiguredChannel;
+  previous: ConfiguredChannel;
+  retained: ConfiguredChannel;
+  historical: ConfiguredChannel;
+  rollback?: ConfiguredChannel;
 };
 
 // LANE AD (PASS 87): this file used to `import { CHANGELOG } from '../../src/changelog'`.
@@ -36,12 +39,36 @@ const currentEntry = {
  * so out loud rather than skipping quietly. Retained channels boot without an adapter, which
  * is why the routing tests below assert their runtime badges unconditionally.
  */
-async function hasWebGpuAdapter(page: import('@playwright/test').Page): Promise<boolean> {
-  return page.evaluate(async () => {
+async function hasWebGpuAdapter(
+  page: import('@playwright/test').Page,
+  testInfo: import('@playwright/test').TestInfo,
+  blocked: string,
+): Promise<boolean> {
+  const present = await page.evaluate(async () => {
     const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
     if (!gpu) return false;
     return Boolean(await gpu.requestAdapter());
   });
+  if (present) return true;
+  // REPAIR (skeptic, PASS 87): the first version only wrote a console.warn and returned, so
+  // the run was green at exit 0 with these assertions never executed and nothing in the
+  // report saying so - this repository's own "green gate that never looked" pattern. The
+  // absence is now (a) recorded as an annotation, so the HTML/JSON report carries it, and
+  // (b) FATAL wherever an adapter is supposed to exist: set REQUIRE_WEBGPU_ADAPTER=1 there
+  // and the missing adapter fails the test instead of quietly shrinking it.
+  const message = `no WebGPU adapter in this browser, so ${blocked} could NOT be checked. `
+    + 'This is BLOCKED, not passed.';
+  testInfo.annotations.push({ type: 'blocked', description: message });
+  // PASS73_NATIVE_WEBGPU=1 launches installed Chrome (headless) precisely because it acquires
+  // a real adapter there, so in that run a missing adapter is a defect, not an environment.
+  // REQUIRE_WEBGPU_ADAPTER=1 forces the same on any other runner that is supposed to have one.
+  if (process.env.REQUIRE_WEBGPU_ADAPTER === '1' || process.env.PASS73_NATIVE_WEBGPU === '1') {
+    throw new Error('[release-channel-chooser] an adapter was required '
+      + `(REQUIRE_WEBGPU_ADAPTER/PASS73_NATIVE_WEBGPU) and ${message}`);
+  }
+  console.warn(`[release-channel-chooser] ${message} Run this spec with `
+    + 'REQUIRE_WEBGPU_ADAPTER=1 where an adapter exists.');
+  return false;
 }
 
 /** The channel list the served chooser actually draws from, not a list written in this file. */
@@ -74,18 +101,29 @@ test('offers exactly the channels the deploy staged, stamped with the current pa
   // real chooser has drawn five cards since that channel returned - a literal count is the
   // same staleness class as the retired channel paths this lane removed. One card per served
   // channel, no card without a channel: that is the invariant, and it cannot go stale.
+  // REPAIR (skeptic, PASS 87): counting the cards against the served config alone could not
+  // fail unless rendering itself broke, and the retired-key loop neutered itself by skipping
+  // any key the config happened to serve. The expected key SET is now derived from
+  // release-channels.json and from what stage-release-topology.mjs stages under each key:
+  // the four mandatory chooser channels, plus `stable` exactly when the config carries the
+  // Pass 63 rollback (staging renames `rollback` -> `stable` in the public config, and
+  // stages it in every preview and in production). That is independent of the served bytes,
+  // so a dropped or an extra channel fails here, and it still names no channel path.
+  const expectedChooserKeys = ['experimental', 'previous', 'retained', 'historical',
+    ...(releaseChannels.rollback ? ['stable'] : [])].sort();
   const channels = await servedChannels(page);
   const servedKeys = Object.keys(channels);
-  expect(servedKeys).toContain('experimental');
-  await expect(page.locator('.release-channel-option')).toHaveCount(servedKeys.length);
+  expect([...servedKeys].sort()).toEqual(expectedChooserKeys);
+  await expect(page.locator('.release-channel-option')).toHaveCount(expectedChooserKeys.length);
   for (const [key, channel] of Object.entries(channels)) {
     const card = page.locator(`[data-release-choice="${key}"]`);
     await expect(card).toHaveCount(1);
     await expect(card).toContainText(channel.pass);
-  }
-  for (const retired of ['rollback', 'pass72', 'the-big-one']) {
-    if (servedKeys.includes(retired)) continue;
-    await expect(page.locator(`[data-release-choice="${retired}"]`)).toHaveCount(0);
+    // The served card must point at the path the config stages for that channel, under the
+    // config's own key name (`stable` is the rollback channel).
+    const configured = key === 'stable' ? releaseChannels.rollback : releaseChannels[key as ChooserKey];
+    expect(channel.path).toBe(configured?.path);
+    expect(channel.pass).toBe(configured?.pass);
   }
 
   await expect(page.locator('[data-release-choice="experimental"]')).toContainText(releaseChannels.experimental.label);
@@ -123,10 +161,9 @@ test('offers exactly the channels the deploy staged, stamped with the current pa
     return (await response.json()).releasePass as string;
   }, releaseChannels.experimental.path);
   expect(servedLivePass).toBe(releaseChannels.experimental.pass);
-  if (!await hasWebGpuAdapter(page)) {
-    console.warn('[release-channel-chooser] no WebGPU adapter in this browser, so the live '
-      + "channel's runtime badge and changelog head could NOT be checked. The chooser, the "
-      + 'card set, the route and the served provenance were. This is BLOCKED, not passed.');
+  if (!await hasWebGpuAdapter(page, testInfo,
+    "the live channel's runtime badge and changelog head (the chooser, the card set, the "
+    + 'route and the served provenance were checked)')) {
     return;
   }
   await expect(page.locator('#menu')).toBeVisible();
@@ -176,7 +213,7 @@ test('routes each retained choice to its own configured channel', async ({ page 
   }
 });
 
-test('keeps legacy latest, normal and room entries on the stamped current pass', async ({ page }) => {
+test('keeps legacy latest, normal and room entries on the stamped current pass', async ({ page }, testInfo) => {
   for (const query of ['?release=latest', '?release=normal', '?room=qa-room&autojoin=1']) {
     await page.goto(`/${query}&renderer=webgl2`);
     // The ROUTING property this test is named for is asserted unconditionally: every legacy
@@ -189,10 +226,8 @@ test('keeps legacy latest, normal and room entries on the stamped current pass',
     }, releaseChannels.experimental.path);
     expect(servedPass).toBe(releaseChannels.experimental.pass);
 
-    if (!await hasWebGpuAdapter(page)) {
-      console.warn(`[release-channel-chooser] ${query}: no WebGPU adapter in this browser, so the `
-        + 'runtime release badge could NOT be checked. Routing and served provenance were. '
-        + 'This is BLOCKED, not passed - run this spec where an adapter exists.');
+    if (!await hasWebGpuAdapter(page, testInfo,
+      `${query}: the runtime release badge (routing and served provenance were checked)`)) {
       continue;
     }
     await expect(page.locator('#menu')).toBeVisible();
