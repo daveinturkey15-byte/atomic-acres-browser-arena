@@ -817,3 +817,13 @@ the warm-key art-direction quadrant being full, the weather sequencer latent bug
 - Lane C's two zero-byte tsc log files under docs/evidence/pass84/farcrysis-load
   were deleted (they made `qa:text-integrity` red on every branch); their
   siblings carry the real `TSC EXIT 0` marker. No marker was fabricated.
+
+## PASS 87 publish record — 04:35 BST 2026-09-03 (see docs/PASS87_CUT_REPORT_2026-09-03.md)
+Integration 63e69108 -> gh-pages {pass87 live, pass86 backup}; chooser generation
+97618442dcec. Shipped: RAID REBUILD · PREVIEW (HF-408), FARCRYSIS · PREVIEW
+(HF-423), residuals (menu overflow, minimap 30 Hz, bot stance, 2x core line of
+sight, nacelle collider, gamepad CI, staging + stage-3 fixes), mobile PAUSE fix +
+collapsed-graphics CSS (AE), release CI verifies-only (AD). Held: H2 (PASS 88
+candidate), AB, AL, AI, the four technique trials (merge audit pending), T.
+Boot smoke 13/13 on all eleven arenas; Farcrysis admission guard green (1.297x).
+Rollback: `python scripts/orchestration/publish_pass87.py --rollback`.
