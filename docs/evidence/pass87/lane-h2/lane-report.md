@@ -586,7 +586,8 @@ makes that row evidence rather than an anecdote.
 | `8a82ff95`, `1c80b083` | this report |
 | `2a72720d` | both surviving cases take the whole scene — no arena gets a narrower relief than it ships with |
 | `e89492af` | probe floors: no no-op first load, and the live match must be on the arena that was asked for |
-| `5d5517ab`, `6f263a2d` | report and switch-matrix receipts |
+| `5d5517ab`, `6f263a2d`, `0635ff04` | report, switch-matrix receipts, exit-gate table |
+| `bbf2b6f5` | drop the comment for the attachment check `2a72720d` removed |
 
 ## 11. Verification
 
