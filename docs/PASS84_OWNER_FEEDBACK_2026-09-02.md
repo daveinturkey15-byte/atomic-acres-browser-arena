@@ -835,3 +835,12 @@ regression; admission attributed). Boot smoke 13/13; Farcrysis admission guard
 1.368x. Rollback: `python scripts/orchestration/publish_pass88.py --rollback`.
 Not merged (branches pushed, for the morning cut): AI, AB, AL, the four
 technique trials, T.
+
+## HF-424 — owner 2026-09-03 06:15: today's pacing and plan
+**Statement:** "we are at 80% of usage so maybe need to take it a bit more careful
+today on volume" then "i will be away for 9 hours, so we can slowly but surely
+work on things but using alot of compute, thoughts?" Plan: `docs/DAY_2026-09-03_PLAN.md`
+(four blocks, at most two Opus chains at a time, a cut per block: PASS 89 now,
+Farcrysis real arena + animation, Raid art + water everywhere, PASS 90 + hill-climb
+receipts). Also 06:12: the source push had been blocked since 03:35 by the
+`workflow` scope; fixed 06:18 after the owner re-authorised (pushed 2c08d0b8..00db4c07).
