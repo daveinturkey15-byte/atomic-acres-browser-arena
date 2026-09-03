@@ -122,6 +122,7 @@ import {
   createNuketown2GarageFloorMaterial,
   createNuketown2GarageWallMaterial,
   createNuketown2GlassMaterial,
+  createNuketown2PoolWaterMaterial,
   createNuketown2TileFloorMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
@@ -667,6 +668,7 @@ type Nuketown2Materials = Readonly<{
   taillight: THREE.Material;
   sign: THREE.Material;
   planter: THREE.Material;
+  poolWater: THREE.Material;
 }>;
 
 /**
@@ -748,6 +750,7 @@ function nuketown2Materials(): Nuketown2Materials {
   const rubber = createNuketown2TireMaterial();
   const chrome = createNuketown2ChromeMaterial();
   const headlight = createNuketown2HeadlightMaterial();
+  const poolWater = createNuketown2PoolWaterMaterial();
   const taillight = createNuketown2TaillightMaterial();
   // decal: the pane is a collider and a ballistic surface.
   const windowGlass = createNuketown2GlassMaterial();
@@ -830,6 +833,7 @@ function nuketown2Materials(): Nuketown2Materials {
     rubber,
     chrome,
     headlight,
+    poolWater,
     taillight,
     sign: standard(0xdbd1ba, 0.78, 0.06),
     // Hedges, the yard crate, the patio table and the alley planter are one
@@ -1765,6 +1769,30 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // that far forward in the yard because the registry gate requires 5.5 m of
   // clearance from every spawn and the spawn line is at |z| = 30-32.
   pair(builder, 'yard butt', [-8.5, LOW_COVER, -26], [1.2, LOW_COVER * 2, 1.2], m.block);
+  // --- HF-440 Cycle 2: Backyard swimming pool, patio decks & contact skirts --
+  // Backyard swimming pool:
+  pair(builder, 'yard pool coping', [4.8, 0.18, -29.5], [4.4, 0.36, 3.2], m.drive,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard pool water nuketown2-yard-pool-water', [4.8, 0.24, -29.5], [3.8, 0.04, 2.6], m.poolWater,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'yard pool ladder', [4.8 - 1.6, 0.45, -29.5], [0.12, 0.55, 0.48], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard pool deck chair 0', [4.8 + 0.6, 0.28, -27.3], [0.70, 0.25, 1.60], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard pool deck chair 1', [4.8 - 0.6, 0.28, -27.3], [0.70, 0.25, 1.60], m.trim,
+    { solid: false, shots: false, cast: true });
+
+  // Foundation pads & contact skirts under yard obstacles (prevents grass blade clipping):
+  pair(builder, 'yard cover crate pad', [-8.5, 0.04, HOUSE_BACK_Z - 4.5], [2.70, 0.08, 2.30], m.drive,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'yard far crate pad', [11.5, 0.04, -28.0], [2.90, 0.08, 2.50], m.drive,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'yard cover wall footing', [5.5, 0.04, HOUSE_BACK_Z - 5.5], [7.30, 0.08, 0.55], m.drive,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'yard butt pad', [-8.5, 0.04, -26], [1.40, 0.08, 1.40], m.drive,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'yard patio table slab', [-14.5, 0.04, -31.5], [2.60, 0.08, 2.60], m.drive,
+    { solid: false, shots: false, cast: false });
 }
 
 /** The perimeter: a 3.2 m wall on all four sides, just inside the bounds. */
