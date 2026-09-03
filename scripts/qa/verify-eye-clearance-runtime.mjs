@@ -13,6 +13,7 @@ import {
   unverifiedCeilingFor,
 } from './eye-clearance-roster.mjs';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { readCameraNearPlaneM } from './lib/camera-near-plane.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
@@ -42,23 +43,15 @@ console.log(`[eye-clearance] runtime verifier roster (${ARENAS.length}): ${ARENA
  * claim, at the one threshold that is not a matter of taste: below the near
  * plane the player literally sees through the surface.
  *
- * Scraped rather than hardcoded, and it throws instead of guessing, because a
- * frozen copy of a value that lives somewhere else is how every other stale
- * roster in this pipeline started. This is a floor for judging, never a new
- * budget: the 0.15 m probe radius the sweep and the runtime resolve share is
- * still the target, and rows between 0.08 and 0.15 stay visible in the log.
+ * PASS 87 Lane AR item 9: the scrape moved to scripts/qa/lib/camera-near-plane.mjs
+ * so it can be unit-tested (this file launches a browser at module scope, so
+ * nothing could import the function and nothing did), and it now follows a
+ * NAMED constant. It had matched a numeric literal only, and HF-410 replaced
+ * that literal with FIRST_PERSON_CAMERA_NEAR_METERS in PASS 85 - so this threw
+ * on every call for two passes and `--check` never ran.
  */
 function cameraNearPlaneM() {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const source = readFileSync(resolvePath(here, '../../src/legacy-main.ts'), 'utf8');
-  const match = /const camera = new THREE\.PerspectiveCamera\(\s*[\d.]+,\s*[\d.]+,\s*([\d.]+),/u.exec(source);
-  if (!match) {
-    throw new Error(
-      'eye-clearance stage 3: could not read the player camera near plane from src/legacy-main.ts. '
-      + 'Refusing to judge runtime clearance against a guessed threshold.',
-    );
-  }
-  return Number(match[1]);
+  return readCameraNearPlaneM();
 }
 
 const browser = await chromium.launch({
