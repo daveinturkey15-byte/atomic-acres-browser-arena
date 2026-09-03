@@ -10,6 +10,9 @@ export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   // HF-359 (Pass 74): farcrysis ships without authored sheds (jungle island).
   Object.freeze({ arenaId: 'farcrysis' as const, zone: null, minimumSheds: 0 }),
   Object.freeze({ arenaId: 'high-seas' as const, zone: null, minimumSheds: 0 }),
+  // NUKETOWN2 (owner 2026-09-02, HF-407): "still keeping things like ... the
+  // sheds". Two, one per back yard, exactly as the shipped Nuke Town has two.
+  Object.freeze({ arenaId: 'nuketown2' as const, zone: 'whole-arena' as const, minimumSheds: 2 }),
 ]);
 
 /**
@@ -41,6 +44,21 @@ export const PASS65_SHED_PLACEMENTS: readonly ShedPlacement[] = Object.freeze([
   Object.freeze({
     id: 'terminal-shed-east', definitionId: FIELD_SHED_DEFINITION.id,
     arenaId: 'skyline-terminal', zone: 'terminal-apron', position: { x: 29, y: 0, z: 4 }, yaw: -Math.PI / 2,
+  }),
+  // NUKETOWN2 (owner 2026-09-02, HF-407): one shed in each back yard, on the
+  // outboard side away from the spawn line, so the shed is cover you fight
+  // AROUND on the way out of your own yard rather than a wall across the
+  // spawn. The pair is a 180-degree rotation of each other - position negated
+  // in x and z, yaw turned by pi - which is the same involution every solid in
+  // src/nuketown2-arena.ts is emitted through, so the sheds cannot be the one
+  // asymmetric thing on a map whose whole fairness argument is that rotation.
+  Object.freeze({
+    id: 'nuketown2-shed-north-yard', definitionId: FIELD_SHED_DEFINITION.id,
+    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: -24, y: 0, z: -18.5 }, yaw: Math.PI / 2,
+  }),
+  Object.freeze({
+    id: 'nuketown2-shed-south-yard', definitionId: FIELD_SHED_DEFINITION.id,
+    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: 24, y: 0, z: 18.5 }, yaw: -Math.PI / 2,
   }),
 ]);
 

@@ -1,0 +1,10 @@
+{
+ "url": "http://127.0.0.1:4298/channels/pass84/map3.html",
+ "booted": true,
+ "ms": 783,
+ "body": "click to look around · WASD to walk · WebGPU · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D",
+ "failed": [],
+ "errors": [
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+ ]
+}

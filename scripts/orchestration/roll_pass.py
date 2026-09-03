@@ -83,8 +83,11 @@ def main() -> None:
     src_py = os.path.join(orch, f"publish_pass{a}.py")
     dst_py = os.path.join(orch, f"publish_pass{n}.py")
     py = roll_numbers(read(src_py), n)
-    py = re.sub(r'"dist-pass\d{2}", "dist-pass\d{2}",',
-                f'"dist-pass{b}", "dist-pass{a}", "dist-pass{n}",', py, count=1)
+    # the freshness-guard exclusion list names every dist-pass copy from 83 to this pass, once each
+    pat = re.compile('(?:"dist-pass' + chr(92) + 'd{2}", )+')
+    if not pat.search(py):
+        raise SystemExit("publish script: dist-pass exclusion list not found")
+    py = pat.sub("".join(f'"dist-pass{k}", ' for k in range(83, n + 1)), py, count=1)
     m = re.search(r'\nDESCRIPTION = \(\n(?:    "[^\n]*\n)+\)', py)
     if not m:
         raise SystemExit("publish script: DESCRIPTION block not found")
@@ -180,6 +183,21 @@ def main() -> None:
     if f"+const stableFallback = releaseChannels.pass{a}Backup" not in d:
         raise SystemExit("outside-ownership patch: bootstrap diff missing the new backup key")
     write(os.path.join(ROOT, "docs", f"pass{n}-outside-ownership.patch"), d)
+    # 10. changelog.test.ts: the previous pass's highlight pin on `latest` moves onto its own entry,
+    #     and `latest` gets one pin from this pass's first highlight.
+    p = os.path.join(ROOT, "src", "changelog.test.ts")
+    s = read(p)
+    nl = chr(92) + "n"
+    marker = "    expect(latest.highlights.join('" + nl + "')).toContain("
+    first = s.find(marker)
+    if first < 0:
+        raise SystemExit("changelog.test.ts: no latest.highlights pin to move")
+    head_pin = args.highlight[0][:40].replace("'", chr(92) + "'")
+    s = s.replace(marker, f"    expect(pass{a}Highlights).toContain(")
+    s = s[:first] + (marker + f"'{head_pin}');" + chr(10)
+                     + f"    const pass{a}Highlights = CHANGELOG.find((entry) => entry.id === 'pass{a}')?.highlights.join('" + nl + "') ?? '';" + chr(10)) + s[first:]
+    write(p, s)
+
     print(f"rolled to PASS {n}: publish_pass{n}.py, its contract test, identity, channels, fallback key pass{a}Backup, topology/handshake/project-map/changelog tests, changelog entry, docs/pass{n}-outside-ownership.patch")
 
 

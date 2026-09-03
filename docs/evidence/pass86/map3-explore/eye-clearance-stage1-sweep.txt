@@ -1,0 +1,18 @@
+exit=0
+atomic-acres: 237 colliders (0 floor) -> 3511 legal hug spots (8 colliders with no legal adjacent stance)
+skyline-terminal: thinned to every 3th spot
+skyline-terminal: 176 colliders (0 floor) -> 3770 legal hug spots (4 colliders with no legal adjacent stance)
+rustworks-1v1: thinned to every 2th spot
+rustworks-1v1: 85 colliders (0 floor) -> 2048 legal hug spots (12 colliders with no legal adjacent stance)
+gun-range: thinned to every 2th spot
+gun-range: 36 colliders (2 floor) -> 2944 legal hug spots (0 colliders with no legal adjacent stance)
+high-seas: thinned to every 4th spot
+high-seas: 213 colliders (1 floor) -> 3896 legal hug spots (0 colliders with no legal adjacent stance)
+test1: thinned to every 2th spot
+test1: 120 colliders (1 floor) -> 3688 legal hug spots (0 colliders with no legal adjacent stance)
+test2: thinned to every 5th spot
+test2: 307 colliders (31 floor) -> 3467 legal hug spots (9 colliders with no legal adjacent stance)
+map3: thinned to every 3th spot
+map3: 225 colliders (2 floor) -> 3013 legal hug spots (3 colliders with no legal adjacent stance)
+
+[exited with code 0]

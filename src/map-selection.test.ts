@@ -29,11 +29,17 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
+      // NUKETOWN2 (HF-407): the Nuke Town rejig, registered beside the shipped
+      // Nuke Town rather than replacing it.
+      'nuketown2',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(9);
-    expect(ARENA_SELECTIONS.length).toBe(9);
+    // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
+    // 'Nuke Town' - the two arenas sit next to each other in the menu and the
+    // owner has to be able to tell which one he is loading.
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Nuke Town Rebuild']);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(10);
+    expect(ARENA_SELECTIONS.length).toBe(10);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -76,17 +82,21 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
-    // HF-359: 2-bot solo combat map with fieldSupport disabled
+    // HF-359: 2-bot solo combat map with fieldSupport disabled.
+    // HF-423 (2026-09-02): shipped as a PREVIEW card - selectable, but solo
+    // only, so the hosted-lobby roster and the MP lab sweep do not pick it up
+    // before anyone has played it. The bot counts are unchanged.
     expect(arenaSelection('farcrysis')).toMatchObject({
       id: 'farcrysis',
       selectorLabel: 'FARCrySIS',
       displayName: 'Farcrysis',
-      multiplayer: true,
+      prototype: true,
+      multiplayer: false,
       fieldSupport: false,
       overdrive: false,
       soloBotCount: 2,
       maximumSoloBots: 2,
-      rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+      rulesLabel: 'PREVIEW · 5 MIN · SOLO · 2 BOTS',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
     expect(arenaSelection('high-seas')).toMatchObject({
@@ -142,6 +152,9 @@ describe('opening arena selection', () => {
       test1: 'code',
       test2: 'code',
       map3: 'code',
+      // NUKETOWN2 (HF-407): the whole point of the rejig. The shipped Nuke Town
+      // is the ONE imported arena in the game; its rebuild is code.
+      nuketown2: 'code',
     });
     // Exactly one imported arena today; a second one appearing without this
     // gate being revisited is the drift worth catching.
@@ -172,7 +185,7 @@ describe('opening arena selection', () => {
     // HF-359: includes farcrysis round clock and canvas label
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
@@ -182,7 +195,10 @@ describe('opening arena selection', () => {
       'High Seas multiplayer arena',
       'Firing Range multiplayer arena',
       'Raid multiplayer arena',
-      'Map 3 multiplayer arena',
+      // MAP3: an explore arena is not a multiplayer arena.
+      'Map 3 explore arena',
+      // NUKETOWN2 (HF-407).
+      'Nuke Town Rebuild multiplayer arena',
     ]);
   });
 
@@ -202,6 +218,11 @@ describe('opening arena selection', () => {
       // Support rewards are hosted-authoritative and this arena has had no
       // two-client lane run against it.
       'map3': false,
+      // NUKETOWN2 (HF-407): field support is ON, unlike Map 3. The owner said
+      // he will host this preview with friends, and it carries the shipped Nuke
+      // Town's hosted feature set deliberately - the thing under test is the
+      // LAYOUT, so nothing else may differ between the two.
+      'nuketown2': true,
     });
   });
 
@@ -231,30 +252,108 @@ describe('opening arena selection', () => {
       // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
-      // MAP3 (HF-405).
-      '2 BOTS SKIRMISH',
+      // MAP3 (HF-405, then HF-409): Map 3 fields no bots at all and is not a
+      // firing range - it explores. "START RANGE" was the right words while
+      // the Gun Range was the only bot-less arena and the wrong words for the
+      // second one.
+      'START EXPLORING',
+      // NUKETOWN2 (HF-407): SOLO_BOT_COUNT, same as the shipped Nuke Town.
+      '1 BOT SKIRMISH',
     ]);
   });
 
-  // MAP3 (owner 2026-09-02, HF-405). Map 3 ships selectable and SOLO. The
-  // failure this pins is the one the repo has already had twice: an arena that
-  // is registered but not offered ("published but unselectable"), or one that
-  // advertises hosted lobbies nobody has run a two-client lane against.
-  it('offers Map 3 as a selectable solo preview and never as a hosted lobby', () => {
+  // MAP3 (owner 2026-09-02, HF-405 then HF-409; card restored PASS 86). Map 3
+  // shipped selectable and SOLO at 15:14, was withdrawn at 16:25 the same day
+  // because the card launched the authored stone gallery rather than the
+  // corridor showcase, and is offered again now that the showcase IS the arena.
+  // It comes back as an EXPLORE arena, which is a declared registry kind.
+  it('offers Map 3 as an explore arena, with no lobby, no bots and no clock pressure', () => {
     const map3 = arenaSelection('map3');
     expect(map3.id).toBe('map3');
     expect(map3.selectable).toBe(true);
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    // The kind is the thing every gate reads; it is not a list of ids.
+    expect(map3.kind).toBe('explore');
+    // ...and it is the ONLY explore arena, so a team arena silently acquiring
+    // the kind (and dropping out of the team-spawn rule) fails here.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'explore').map((entry) => entry.id)).toEqual(['map3']);
+    expect(ARENA_SELECTIONS.filter((entry) => entry.kind === 'team').length).toBe(ARENA_SELECTIONS.length - 1);
+    // Still registered: audio, spawn safety, replay and the compatibility
+    // decoder all read the FULL registry, and a saved match or a shared link
+    // naming map3 has to keep resolving.
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('map3');
     expect(map3.multiplayer).toBe(false);
     expect(map3.fieldSupport).toBe(false);
     expect(map3.overdrive).toBe(false);
     // The card has to SAY preview, or "solo only" is a surprise at the lobby.
     expect(map3.selectorLabel).toContain('PREVIEW');
-    expect(map3.rulesLabel).toContain('SOLO PREVIEW');
+    // HF-409, owner 16:55: "it's not about combat, it's a mode you can
+    // explore". The card says EXPLORE and the arena fields no bots at all -
+    // not two, not one. A preview that quietly kept a bot ladder would be the
+    // old claim wearing the new label.
+    expect(map3.rulesLabel).toContain('EXPLORE');
+    expect(map3.soloBotCount).toBe(0);
+    expect(map3.maximumSoloBots).toBe(0);
+
+    // MAP3 (HF-409 finisher 3): the card links to the standalone showcase page,
+    // and the href is RELATIVE. The published game document is at
+    // `channels/<pass>/index.html`, so a rooted '/map3.html' 404s on every
+    // channel - which is the whole reason the page looked destroyed.
+    expect(map3.showcasePath).toBe('map3.html');
+    expect(map3.showcasePath?.startsWith('/')).toBe(false);
+    expect(map3.showcasePath).not.toContain('://');
+    // No other arena claims a second page, so a copy-paste into a team arena
+    // (which has no such page built) fails here rather than shipping a 404.
+    expect(ARENA_SELECTIONS.filter((entry) => entry.showcasePath).map((entry) => entry.id)).toEqual(['map3']);
+
+    // The lede counts the corridors, and there are EIGHT since the Rapier
+    // playground landed as a real lane in `MAP3_LANES`. An undercounting lede
+    // is the same class of untruth as the matchbar that called this a
+    // deathmatch, and is the kind of copy that silently rots as content lands.
+    expect(map3.menuLede).toContain('eight corridors');
+    expect(map3.menuLede).not.toContain('seven corridors');
+    // An explore arena must not carry a match clock into its HUD. The registry
+    // keeps `matchRules.durationMs` because the id is also the replay/storage
+    // boundary and a saved match naming map3 must still decode - so the HUD
+    // reads the KIND, not the clock. See `src/ui/hud-mode-banner.ts`.
+    expect(map3.fieldSupport).toBe(false);
     // Stable id is the network/storage boundary from the first commit.
     expect(decodeArenaId('map3')).toBe('map3');
     expect(isArenaId('map3')).toBe(true);
     expect(ARENA_IDS).toContain('map3');
+  });
+
+  // NUKETOWN2 (owner 2026-09-02, HF-407). The rebuild ships selectable, hosted
+  // and with the 2x core, because the owner asked to host it with friends and
+  // asked for the 2x damage to be kept. What this pins is the pair of failures
+  // that would make the A/B meaningless: the rebuild being registered but not
+  // offered ("published but unselectable"), and the two Nuke Towns being
+  // indistinguishable in the menu.
+  it('offers the Nuke Town Rebuild as a selectable hosted preview beside the shipped map', () => {
+    const rebuild = arenaSelection('nuketown2');
+    expect(rebuild.id).toBe('nuketown2');
+    expect(rebuild.selectable).toBe(true);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('nuketown2');
+    // The owner's three kept features, as far as the registry can carry them.
+    expect(rebuild.multiplayer).toBe(true);
+    expect(rebuild.fieldSupport).toBe(true);
+    expect(rebuild.overdrive).toBe(true);
+    // The card must say preview, and must not read as the shipped map.
+    expect(rebuild.selectorLabel).toContain('PREVIEW');
+    expect(rebuild.rulesLabel).toContain('PREVIEW');
+    expect(rebuild.displayName).not.toBe(arenaSelection('atomic-acres').displayName);
+    expect(rebuild.routeId).not.toBe(arenaSelection('atomic-acres').routeId);
+    // The shipped Nuke Town is untouched by this lane: still there, still the
+    // imported build, still the default the decoder falls back to.
+    expect(arenaSelection('atomic-acres').authoring).toBe('import');
+    expect(decodeArenaId('nuke-town')).toBe('atomic-acres');
+    expect(decodeArenaId('nuketown')).toBe('atomic-acres');
+    // Stable id is the network/storage boundary from the first commit, so the
+    // promotion the owner will ask for later is one field and not a migration.
+    expect(decodeArenaId('nuketown2')).toBe('nuketown2');
+    expect(decodeArenaId('nuke-town-rebuild')).toBe('nuketown2');
+    expect(isArenaId('nuketown2')).toBe(true);
+    expect(ARENA_IDS).toContain('nuketown2');
   });
 
   it('decodes current route labels and preserves stable URL/storage/protocol ids', () => {

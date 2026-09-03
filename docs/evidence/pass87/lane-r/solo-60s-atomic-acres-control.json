@@ -1,0 +1,33 @@
+{
+ "contract": "farcrysis-solo-60s-v1",
+ "measuredAt": "2026-09-02T23:45:25.335Z",
+ "arena": "atomic-acres",
+ "url": "http://127.0.0.1:4180",
+ "seconds": 60,
+ "path": "real menu: callsign field, .map-card, #solo - no debug API is used to enter the match",
+ "ok": true,
+ "stoppedAt": null,
+ "admittedMs": 81694,
+ "pageErrorsBeforeHold": 0,
+ "consoleErrorsBeforeHold": 0,
+ "hold": {
+  "frames": 3400,
+  "meanFps": 56.7,
+  "p50FrameMs": 17.5,
+  "p95FrameMs": 22.4,
+  "p99FrameMs": 26,
+  "worstFrameMs": 76.6,
+  "gapsOver1000ms": 0,
+  "longFramesOver33ms": 8
+ },
+ "snapshotAfterHold": {
+  "matchPhase": "active",
+  "gameStarted": true,
+  "arena": null
+ },
+ "pageErrorsDuringHold": [],
+ "consoleErrorsDuringHold": [],
+ "stillActive": true,
+ "pageErrorsAll": [],
+ "consoleErrorsAll": []
+}

@@ -182,6 +182,20 @@ export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfil
     event('m3.scrub-bird', 'chirp', 3, [2_200, 2_900], 0.12, 0.020, 0, 44),
     event('m3.distant-hail', 'call', 2, [560, 430], 0.36, 0.016, 0, 58),
   ]),
+  // NUKETOWN2 (PREVIEW, HF-407): the same test-town nobody lives in, heard
+  // from the road. Suburb ambience with the wildlife thinned right out and the
+  // hard bodies left in - a bus shell ticking as it cools, a garage door
+  // rattling in its channel, a fence board knocking - because the whole read of
+  // this map is that the houses are props and the street is the fight.
+  'nuketown2': profile('nuketown2', 'test-town-street-and-empty-houses', [8, 17], [
+    event('n2.bus-shell-tick', 'clank', 5, [780, 610], 0.20, 0.017, 0, 22),
+    event('n2.garage-door-rattle', 'clank', 4, [300, 210], 0.55, 0.016, 0, 26),
+    event('n2.fence-board-knock', 'creak', 4, [220, 140], 0.85, 0.014, 0, 19),
+    event('n2.street-gust', 'whoosh', 6, [330, 160], 1.60, 0.018, 0.8, 15),
+    event('n2.dry-lawn-rustle', 'rustle', 4, [2_300, 1_450], 0.50, 0.013, 1.3, 12),
+    event('n2.mains-hum-swell', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
+    event('n2.high-fence-bird', 'chirp', 2, [2_600, 3_100], 0.10, 0.019, 0, 47),
+  ]),
 });
 
 /** Total weight of an arena's events; 0 when the arena has none. */

@@ -171,8 +171,19 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
-// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
-import { buildMap3 } from './map3-arena';
+// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
+// imported here: Map 3 is the one lazily loaded arena (HF-409, see
+// `arenaFactories` below and `src/arena-factory-registry.ts`).
+// MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
+import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
+// MAP3 (HF-409): eager/lazy arena builders behind one registry.
+import {
+  createArenaFactoryRegistry,
+  eagerArena,
+  lazyArena,
+} from './arena-factory-registry';
+// NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407.
+import { buildNuketown2 } from './nuketown2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -257,6 +268,9 @@ import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/kill
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+// MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
+// current arena's mode IS. See src/ui/hud-mode-banner.ts.
+import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
@@ -1057,7 +1071,7 @@ import {
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
-  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  railgunSpawnSitesForArena,
   admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
@@ -3327,19 +3341,48 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
-const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
-  'atomic-acres': buildArena,
-  'rustworks-1v1': buildRustworks1v1,
-  'gun-range': buildGunRange,
-  'skyline-terminal': buildSkylineTerminal,
-  farcrysis: buildFarcrysis,
-  'high-seas': buildHighSeas,
+/**
+ * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
+ *
+ * Every arena but Map 3 is `eagerArena(...)`: the same static function
+ * reference this map has always held, resolved with no await and no behaviour
+ * change of any kind. Map 3 alone is `lazyArena(...)`, because its builder
+ * reaches the showcase corridors (~10k lines of TSL) and a static entry here
+ * would park all of it in the boot graph of a player who picked Nuke Town -
+ * directly against the live owner priority, "faster map loads".
+ *
+ * The fetch happens in `performArenaSelection`'s asynchronous preparation
+ * phase, BEFORE construction, so `constructArena` stays synchronous inside the
+ * fenced transaction between the WebGPU fence and the authority commit.
+ * `resolved()` throws rather than returning undefined if that ordering is ever
+ * broken, which is the failure mode worth being loud about.
+ */
+const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'atomic-acres': eagerArena(buildArena),
+  'rustworks-1v1': eagerArena(buildRustworks1v1),
+  'gun-range': eagerArena(buildGunRange),
+  'skyline-terminal': eagerArena(buildSkylineTerminal),
+  farcrysis: eagerArena(buildFarcrysis),
+  'high-seas': eagerArena(buildHighSeas),
   // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
-  test1: buildTest1,
-  test2: buildTest2,
-  // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
-  // architecture rather than the src/map3 showcase corridors.
-  map3: buildMap3,
+  test1: eagerArena(buildTest1),
+  test2: eagerArena(buildTest2),
+  // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
+  //
+  // The loader RESOLVES AND PREPARES. `prepareMap3()` initialises the Rapier
+  // wasm the eighth corridor is built from, and doing it here means
+  // `isResolved(id)` keeps its one meaning for every caller - "the builder can
+  // be called right now" - instead of a lazy arena having a second, invisible
+  // readiness step that only the arena transition knew about.
+  map3: lazyArena(async () => {
+    const module = await import('./map3-arena');
+    await module.prepareMap3();
+    return module.buildMap3;
+  }),
+  // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407. Code-authored replacement
+  // layout for the Nuke Town flow, registered beside the shipped arena so the
+  // main map is never broken mid-pass. See src/nuketown2-arena.ts.
+  nuketown2: eagerArena(buildNuketown2),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -3369,7 +3412,7 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
   const stagingScene = new THREE.Scene();
   let candidate: ArenaMap | null = null;
   try {
-    candidate = arenaFactories[arenaId](stagingScene);
+    candidate = arenaFactories.resolved(arenaId)(stagingScene);
     candidate.root.removeFromParent();
     prepareArenaPresentation(candidate);
     if (recordConstruction) arenaConstructionHistory.push(arenaId);
@@ -3553,6 +3596,15 @@ function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
 // The menu owns prerecorded media. Do not construct, stream, compile, upload,
 // or submit any gameplay arena until the player explicitly deploys.
 let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+/**
+ * MAP3 (HF-409): drives `ArenaMap.update` for the ACTIVE arena only.
+ *
+ * There is exactly one of these and exactly one call site (search `// MAP3:`
+ * in `frame()`). Arenas that do not set `update` - every arena but Map 3 -
+ * pay one property read per frame and nothing else; the context below is
+ * built by a callback the animator only invokes when a hook exists.
+ */
+const arenaFrameAnimator = createArenaFrameAnimator();
 let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
@@ -7144,6 +7196,14 @@ function selectLobbyCodeForManualCopy(code: string): void {
 }
 
 function currentMatchRules() {
+  // MAP3 (HF-409 finisher 2): an EXPLORE arena has no clock and no score
+  // limit, so nothing can run out and nobody can win. The registry row keeps
+  // `matchRules.durationMs` because the arena id is also the replay/storage
+  // boundary and a saved match naming map3 must still decode - the RUNTIME
+  // rules are what the match state machine reads, and they follow the KIND.
+  // Without this, walking the showcase ends in a VICTORY/DEFEAT card at five
+  // minutes, which is the same lie as the TEAM DEATHMATCH banner.
+  if (selectedArena.kind === 'explore') return EXPLORE_MATCH_RULES;
   if (gameMode === 'solo') return selectedArena.matchRules;
   // HF-377: the lobby config is the replicated match contract; its kill limit
   // applies identically to TDM (squad score) and FFA (leader kills) because
@@ -17538,10 +17598,22 @@ async function startGame(
   respawnTimer = null;
   respawnEndsAt = 0;
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+  // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
+  // This runs once, before the first frame, so an explore arena never shows a
+  // single frame of TEAM DEATHMATCH / 05:00 / AQUA-CORAL before the per-frame
+  // writer below corrects it.
+  const startBanner = hudModeBanner({
+    arena: selectedArena, site: 'match-start',
+    domination: dominationModeActive(), freeForAll: false, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  element<HTMLElement>('#timer').hidden = !startBanner.clock;
+  element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
+  element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
+  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
   element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -27135,7 +27207,38 @@ function updateMatchState(now: number): void {
   updateDominationHud();
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
     .filter((score) => !score.id.startsWith('host-bot-')));
-  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
+  // MAP3 (HF-409 finisher 3): THE EXPLORE WARMUP DEADLOCK.
+  //
+  // `preserveSoloCountdownCue` exists so a long solo render stall cannot
+  // consume an unseen 3-2-1 edge: while the next cue has not been presented it
+  // pushes warmup's endsAt back to now + N seconds, EVERY FRAME, until that cue
+  // is shown. `lastMatchCountdownCue` starts null, so the cue it waits for is
+  // '3'.
+  //
+  // An explore arena presents no countdown at all - that is the point, there is
+  // no match to count in - so '3' is never presented, `lastMatchCountdownCue`
+  // stays null, and warmup is extended forever. `advanceMatch` only leaves
+  // warmup when `now >= state.endsAt`, which by construction never happens.
+  //
+  // Measured on this tree before this fix: Map 3 sat in `warmup` for the full
+  // 120 s of a boot probe and never reached `active`. That is not cosmetic -
+  // `gameplayInputEnabled()` requires `phase === 'active'`, so the arena the
+  // owner asked to be able to WALK rendered at 53 fps with a correct explore
+  // HUD and would not accept a single movement input, permanently. The
+  // pass74 arena boot smoke fails on map3 for exactly this reason.
+  //
+  // So the hold is gated on there being a cue to hold FOR. This is the same
+  // declared decision the HUD uses, not a second opinion about explore arenas.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  matchState = preserveSoloCountdownCue(
+    matchState,
+    now,
+    lastMatchCountdownCue,
+    gameMode === 'solo' && countdownCueAllowed,
+  );
   const preAdvanceState = matchState;
   const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
@@ -27165,7 +27268,11 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  if (matchState.phase === 'warmup') {
+  // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
+  // match to start, so the 3-2-1 cue and its audio would be announcing one.
+  // `countdownCueAllowed` is computed once, above, because the warmup hold and
+  // the cue presentation must agree - when they disagreed, warmup never ended.
+  if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
       const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
@@ -27176,9 +27283,14 @@ function updateMatchState(now: number): void {
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
   if (matchState.phase === 'active') {
-    const engageSequence = presentMatchCountdownCue('engage');
-    audio.matchCountdown('engage');
-    lastMatchCountdownCue = 'engage';
+    // MAP3 (HF-409 finisher 2): "ENGAGE" is a combat word and the big centre
+    // cue is a match-start cue. An explore arena gets neither - it is opened,
+    // not started - so it is welcomed in instead and nothing counts down.
+    const engageSequence = countdownCueAllowed ? presentMatchCountdownCue('engage') : null;
+    if (countdownCueAllowed) {
+      audio.matchCountdown('engage');
+      lastMatchCountdownCue = 'engage';
+    }
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
@@ -27186,12 +27298,13 @@ function updateMatchState(now: number): void {
     // announcement that took over or queued behind it.
     presentBanner(
       'match-flow',
-      'ENGAGE',
+      countdownCueAllowed ? 'ENGAGE' : 'EXPLORE',
       privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
       900,
     );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
+      if (engageSequence === null) return;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -27896,7 +28009,15 @@ function updateHud(now: number): void {
     ? [rangeScore, targetHits]
     : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
       : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+  // MAP3 (HF-409 finisher 2): see src/ui/hud-mode-banner.ts. Reproduces this
+  // site's previous conditional exactly for every team arena.
+  const banner = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  element<HTMLElement>('#timer').hidden = !banner.clock;
+  element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
@@ -27909,11 +28030,11 @@ function updateHud(now: number): void {
   });
   previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective;
+      : presentation.objective);
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
@@ -29235,6 +29356,19 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  // MAP3 (HF-409): the standalone showcase link. Present only for an arena that
+  // declares a second page, and relative to THIS document, so it resolves
+  // inside whatever release channel the player loaded the game from.
+  const showcaseLink = element<HTMLAnchorElement>('#arena-showcase-link');
+  const showcasePath = selectedArena.showcasePath;
+  if (showcasePath) {
+    showcaseLink.setAttribute('href', showcasePath);
+    showcaseLink.title = `Open the ${selectedArena.displayName} showcase fly-through in a new tab`;
+    showcaseLink.hidden = false;
+  } else {
+    showcaseLink.removeAttribute('href');
+    showcaseLink.hidden = true;
+  }
   canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
@@ -29468,6 +29602,15 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    // MAP3 (HF-409): fetch a lazily loaded arena's builder chunk HERE, in the
+    // preparation phase, so the construction below stays synchronous inside the
+    // fence. The guard matters: an eager arena must not gain even a microtask
+    // boundary it did not have before, so it never touches this await at all.
+    if (!arenaFactories.isResolved(nextSelection.id)) {
+      profileArenaTransition('arena-factory-load');
+      await arenaFactories.resolve(nextSelection.id);
+      assertAdmission();
+    }
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
@@ -30776,6 +30919,15 @@ function frame(now: number, scheduleNext = true): void {
     updateTargets(selectedArena.id === 'gun-range'
       ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
       : visualNow);
+    // MAP3 (HF-409): advance arena-authored animation for the active arena.
+    // `arena` is the admitted arena; staged and cached arenas are never passed
+    // here, so a not-yet-admitted world cannot advance its clock behind the
+    // loading transition. The context factory allocates only when a hook exists.
+    arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
+      arenaId: arena.id,
+      cameraPosition: camera.position,
+      playerVelocity: player.velocity,
+    }));
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
@@ -31966,6 +32118,7 @@ const debugWindow = window as Window & {
     /** HF-412: cheap third-person stance-blend read; see sampleBodyStancePose. */
     sampleBodyStancePose: (kind?: 'bot' | 'remote') => ReturnType<typeof sampleBodyStancePose>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
+    prepareArena: (arenaId: ArenaId) => Promise<void>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -34439,6 +34592,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  /**
+   * MAP3 (HF-409 finisher 2): make a NON-ACTIVE arena buildable.
+   *
+   * `traceBallistics(..., arenaId)` builds an arena it is not standing in, on
+   * the spot and synchronously, and that is how the eye-clearance stage-2
+   * sweep probes every arena from one page. A lazily loaded arena (map3) has a
+   * chunk to fetch and a wasm module to initialise before its builder exists,
+   * and neither can happen inside a synchronous call. So the wait is a
+   * separate, awaitable step: call this first and the probe below works.
+   * Resolving an eager arena is a no-op that costs one microtask.
+   */
+  prepareArena: async (arenaId) => { await arenaFactories.resolve(arenaId); },
   traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;
@@ -35951,9 +36116,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     broadcastOverdriveState(now);
   },
   stageRailgunSpawn: (siteIndex = 0) => {
-    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
-    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
-    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
+    // HF-407: the staging path is arena-scoped, not Nuke-Town-scoped. Hard-coding
+    // 'atomic-acres' here while the player stood in another railgun arena would have
+    // staged the pickup at the SHIPPED map's coordinates - a debug backdoor telling a
+    // QA run the weapon works where a real match would put it somewhere else.
+    const stagedSites = gameStarted ? railgunSpawnSitesForArena(selectedArena.id) : null;
+    if (!stagedSites) return railgunState;
+    const boundedIndex = Math.max(0, Math.min(stagedSites.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState(selectedArena.id, 0, (boundedIndex + 0.01) / stagedSites.length, railgunState.generation + 1);
     const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();

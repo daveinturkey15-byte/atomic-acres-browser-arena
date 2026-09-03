@@ -1,0 +1,359 @@
+{
+ "capturedAt": "2026-09-02T18:44:07.734Z",
+ "stage": "2 (live sweep) AFTER Lane J, with --check",
+ "probeM": 0.15,
+ "machine": "dave-gaming-pc",
+ "note": "ComfyUI queue empty; launched behind a 3000 MiB free-VRAM guard; headless Chrome native WebGPU",
+ "arenas": {
+  "atomic-acres": {
+   "spots": 3511,
+   "dynamicAuthorityColliders": 0,
+   "traces": 24528,
+   "violations": 15,
+   "unannotated": 15,
+   "annotated": {},
+   "ceiling": 15,
+   "byStance": {
+    "stand": 6,
+    "prone": 7,
+    "crouch": 2
+   },
+   "bySurface": {
+    "exterior-access-ramp": 12,
+    "interior-access-ramp": 3
+   },
+   "rows": [
+    {
+     "x": -29.71,
+     "z": -16.26,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      0.8,
+      0.6,
+      0
+     ],
+     "distance": 0.071,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": -29.71,
+     "z": -15.5,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.078,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": -29.71,
+     "z": -16.3,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      0.8,
+      0.6,
+      0
+     ],
+     "distance": 0.099,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": -29.71,
+     "z": -15.54,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.053,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": -11.48,
+     "z": -11.68,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "distance": 0.081,
+     "surface": "interior-access-ramp"
+    },
+    {
+     "x": -10.65,
+     "z": -11.68,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "distance": 0.081,
+     "surface": "interior-access-ramp"
+    },
+    {
+     "x": -9.82,
+     "z": -11.68,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "distance": 0.081,
+     "surface": "interior-access-ramp"
+    },
+    {
+     "x": -29.78,
+     "z": -13.33,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      0.8,
+      0.6,
+      0
+     ],
+     "distance": 0.084,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": -29.78,
+     "z": -12.6,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.052,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.69,
+     "z": 12.45,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      -0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.14,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.69,
+     "z": 13.21,
+     "eyeY": 0.61,
+     "stance": "prone",
+     "kind": "face",
+     "dir": [
+      -0.83,
+      0,
+      -0.56
+     ],
+     "distance": 0.028,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.71,
+     "z": 15.54,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      -0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.053,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.71,
+     "z": 16.3,
+     "eyeY": 1.7,
+     "stance": "stand",
+     "kind": "face",
+     "dir": [
+      -0.8,
+      0.6,
+      0
+     ],
+     "distance": 0.099,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.78,
+     "z": 14.07,
+     "eyeY": 1.16,
+     "stance": "crouch",
+     "kind": "face",
+     "dir": [
+      -0.8,
+      -0.6,
+      0
+     ],
+     "distance": 0.057,
+     "surface": "exterior-access-ramp"
+    },
+    {
+     "x": 29.78,
+     "z": 14.81,
+     "eyeY": 1.16,
+     "stance": "crouch",
+     "kind": "face",
+     "dir": [
+      -0.8,
+      0.6,
+      0
+     ],
+     "distance": 0.079,
+     "surface": "exterior-access-ramp"
+    }
+   ]
+  },
+  "skyline-terminal": {
+   "spots": 3770,
+   "dynamicAuthorityColliders": 0,
+   "traces": 26390,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 0,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  },
+  "rustworks-1v1": {
+   "spots": 2048,
+   "dynamicAuthorityColliders": 0,
+   "traces": 14336,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 0,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  },
+  "gun-range": {
+   "spots": 2904,
+   "dynamicAuthorityColliders": 1,
+   "traces": 20317,
+   "violations": 2,
+   "unannotated": 0,
+   "annotated": {
+    "gun-range-wallbang-walkthrough-panels": 2
+   },
+   "ceiling": 0,
+   "byStance": {
+    "crouch": 2
+   },
+   "bySurface": {
+    "gun-range-wallbang-panel-glass": 1,
+    "gun-range-wallbang-panel-brick": 1
+   },
+   "rows": [
+    {
+     "x": -17.98,
+     "z": -7.67,
+     "eyeY": 1.16,
+     "stance": "crouch",
+     "kind": "face",
+     "dir": [
+      -0.83,
+      0,
+      0.56
+     ],
+     "distance": 0.052,
+     "surface": "gun-range-wallbang-panel-glass"
+    },
+    {
+     "x": -9.02,
+     "z": -7.67,
+     "eyeY": 1.16,
+     "stance": "crouch",
+     "kind": "face",
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "distance": 0,
+     "surface": "gun-range-wallbang-panel-brick"
+    }
+   ]
+  },
+  "high-seas": {
+   "spots": 3896,
+   "dynamicAuthorityColliders": 0,
+   "traces": 27272,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 2,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  },
+  "test1": {
+   "spots": 3688,
+   "dynamicAuthorityColliders": 0,
+   "traces": 25816,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 0,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  },
+  "test2": {
+   "spots": 3467,
+   "dynamicAuthorityColliders": 0,
+   "traces": 24269,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 0,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  },
+  "map3": {
+   "spots": 3516,
+   "dynamicAuthorityColliders": 0,
+   "traces": 24612,
+   "violations": 0,
+   "unannotated": 0,
+   "annotated": {},
+   "ceiling": 0,
+   "byStance": {},
+   "bySurface": {},
+   "rows": []
+  }
+ }
+}

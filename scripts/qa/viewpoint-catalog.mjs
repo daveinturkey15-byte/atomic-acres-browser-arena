@@ -106,6 +106,20 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'test2-garden-occlusion',
     'test2-into-sun-terrace',
   ]),
+  // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild's seven
+  // authored cameras, landed in the SAME commit as the arena module, because
+  // the note at the top of this file records what happens otherwise - Test1 and
+  // Test2 had authored review cameras for a day and a half that no stage of
+  // this instrument had ever seen.
+  nuketown2: Object.freeze([
+    'nuketown2-overhead',
+    'nuketown2-north-yard',
+    'nuketown2-south-yard',
+    'nuketown2-street-centre',
+    'nuketown2-north-upper-window',
+    'nuketown2-south-upper-window',
+    'nuketown2-into-sun-street',
+  ]),
 });
 
 export const CATALOG_ARENAS = Object.keys(VIEWPOINT_CATALOG);

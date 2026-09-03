@@ -296,6 +296,14 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-40, 12, 2.4, 4.2], [40, -12, 2.4, 4.2]],
     { count: 56, minX: -46, maxX: 46, minZ: -46, maxZ: 46 },
   ),
+  // NUKETOWN2 (PREVIEW, HF-407): the review layout mirrors ATMOSPHERE_LAYOUTS
+  // in atmosphere-system.ts - yards and cul-de-sacs, never the road. The dust
+  // box is the playable rectangle, which is where the players are.
+  'nuketown2': atmosphereLayout(
+    [[-14, -19, 11, 3.4], [14, 19, 11, 3.4], [-24, -2, 9, 3.0], [24, 2, 9, 3.0]],
+    [[-20, -21, 2.2, 3.8], [20, 21, 2.2, 3.8]],
+    { count: 56, minX: -29, maxX: 29, minZ: -26, maxZ: 26 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

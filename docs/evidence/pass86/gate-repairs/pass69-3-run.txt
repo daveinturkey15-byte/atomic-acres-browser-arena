@@ -1,0 +1,60 @@
+
+Running 1 test using 1 worker
+
+
+(node:39612) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/1] [chromium] › tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:987:5 › proves canonical authored first-person weapons satisfy the scoped maximum-contact hip, settled-ADS, fire-kick, and reload presentation contracts
+
+(node:17904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[2/1] (retries) [chromium] › tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:987:5 › proves canonical authored first-person weapons satisfy the scoped maximum-contact hip, settled-ADS, fire-kick, and reload presentation contracts (retry #1)
+  1) [chromium] › tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:987:5 › proves canonical authored first-person weapons satisfy the scoped maximum-contact hip, settled-ADS, fire-kick, and reload presentation contracts 
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      647 |     api.setMovement(false);
+      648 |   });
+    > 649 |   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+          |              ^
+      650 |   return stageStableContactFixture(page, 'initial-deploy');
+      651 | }
+      652 |
+        at deploy (C:\Users\david\projects\aa-claude-gatefix\tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:649:14)
+        at C:\Users\david\projects\aa-claude-gatefix\tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:1002:37
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    TimeoutError: page.waitForFunction: Timeout 60000ms exceeded.
+
+      647 |     api.setMovement(false);
+      648 |   });
+    > 649 |   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+          |              ^
+      650 |   return stageStableContactFixture(page, 'initial-deploy');
+      651 | }
+      652 |
+        at deploy (C:\Users\david\projects\aa-claude-gatefix\tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:649:14)
+        at C:\Users\david\projects\aa-claude-gatefix\tests\e2e\pass69-3-authored-near-plane-catalog.spec.ts:1002:37
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium-retry1\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass69-3-authored-near-pla-0772c-load-presentation-contracts-chromium-retry1\error-context.md

@@ -38,6 +38,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -49,8 +50,11 @@ const BASE = arg('--url', 'http://127.0.0.1:41911');
 const AUDIT_PATH = resolve(arg('--audit', 'artifacts/qa/collider-parity-audit.json'));
 const ARENA_BOOT_TIMEOUT_MS = Number(arg('--boot-timeout-ms', '300000'));
 const CAPTURES_PER_ARENA = Number(arg('--max-captures', '3'));
-const ALL_ARENAS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas'];
-const selected = arg('--arenas', ALL_ARENAS.join(','))
+// PASS 85 Lane N repair: this default was a hardcoded six-arena literal, so the
+// live collider-parity sweep never opened Test1, Test2 or Map 3 even though the
+// offline audit it compares against (scripts/qa/collider-visual-parity-core.ts)
+// already covered all nine. Derived now; `--arenas` still overrides it.
+const selected = arg('--arenas', defaultBootRoster())
   .split(',').map((value) => value.trim()).filter(Boolean);
 
 const OUT_DIR = resolve('artifacts/qa/collider-parity-live');

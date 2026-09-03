@@ -12,6 +12,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -24,7 +25,11 @@ const RENDERER = arg('--renderer', 'webgpu');
 const PER_ARENA_MS = Number(arg('--per-arena', '150000'));
 const SETTLE_MS = Number(arg('--settle', '6000'));
 const OUT_DIR = arg('--out', 'artifacts/qa/pass79-graphics');
-const ARENAS = arg('--arenas', 'atomic-acres,farcrysis,high-seas,skyline-terminal,rustworks-1v1,gun-range')
+// PASS 85 Lane N: this default was a hardcoded arena literal, so Test1, Test2
+// and Map 3 were never swept by it and nothing said so. It is now derived from
+// the registry (scripts/qa/arena-roster.mjs) and is a strict superset of what
+// it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 
 mkdirSync(resolve(OUT_DIR), { recursive: true });

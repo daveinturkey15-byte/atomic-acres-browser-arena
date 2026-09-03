@@ -14,6 +14,11 @@ import testArenaChoreographyJson from '../../source-assets/menu/pass79-test-aren
 // ARENA_SELECTIONS but not this merge makes the roster assertion reject EVERY
 // capture, which is how test1/test2 came to ship byte-copied placeholder media.
 import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
+// NUKETOWN2 (owner 2026-09-02, HF-407): the sixth extension recipe, merged for
+// the same reason - the rebuild reached ARENA_SELECTIONS as the tenth arena on
+// the day it was authored, and an arena in that list but not in this merge makes
+// the roster assertion reject EVERY capture.
+import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
 import { menuPreviewDefinition, menuPreviewPose } from '../../src/ui/menu-preview-camera';
 import type { ArenaId } from '../../src/map-selection';
 import { canonicalPass65PreviewArenaDependencies } from './pass65-menu-preview-arena-dependencies';
@@ -77,6 +82,9 @@ const choreography = {
     // ninth here too and the roster assertion in runtimeInputReceipt() compares
     // equal.
     ...map3ChoreographyJson.arenas,
+    // NUKETOWN2 is tenth in ARENA_SELECTIONS and is spread last, so its key
+    // lands tenth here too and the roster assertion compares equal.
+    ...nuketown2ChoreographyJson.arenas,
   },
 } as unknown as typeof choreographyJson;
 const generatedAt = choreography.generatedAt;

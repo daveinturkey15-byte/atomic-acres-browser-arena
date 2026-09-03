@@ -32,15 +32,32 @@ describe('Pass 66 command shell', () => {
       'terminal',
       'rustrig',
       'gun-range',
+      // farcrysis (HF-423, 2026-09-02): un-hidden as a PREVIEW card, solo only.
+      // It was hidden by the owner on 2026-08-28 because it took 279 s to load
+      // and then killed the tab; it re-enters the menu behind measured cold
+      // admission evidence (docs/evidence/pass87/lane-r/farcrysis-admission.json),
+      // and it sits HERE rather than at the end because ARENA_SELECTIONS is what
+      // decides the order and the assertion above holds this list to it.
+      'farcrysis',
       'high-seas',
       // owner 2026-08-30: Test1/Test2 arenas added.
       'test1',
       'test2',
-      // MAP3 (owner 2026-09-02, HF-405): shipped selectable, labelled PREVIEW.
+      // MAP3 (owner 2026-09-02, HF-409, card restored in PASS 86): the corridor
+      // showcase is offered as an EXPLORE arena, last in registry order.
       'map3',
+      // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town rebuild, last in the
+      // offered order, labelled PREVIEW. Pinned here as well as against
+      // SELECTABLE_ARENAS because the order is what a player sees.
+      'nuke-town-rebuild',
     ]);
-    // Farcrysis is hidden (owner, 2026-08-28) but must remain a real arena elsewhere.
-    expect(markup).not.toContain('data-arena-route="farcrysis"');
+    // The negative pin that used to read "farcrysis is not offered" is not
+    // dropped, it is inverted: the arena must now BE in the menu, and it must be
+    // labelled PREVIEW there, which is a stronger statement than its absence was.
+    expect(markup).toContain('data-arena-route="farcrysis"');
+    // Bounded so it cannot reach the NEXT card and pass on someone else's
+    // PREVIEW label: the match may not cross another data-arena-route.
+    expect(markup).toMatch(/data-arena-route="farcrysis"(?:(?!data-arena-route=)[\s\S])*?PREVIEW/);
     expect(markup).toContain(`${SELECTABLE_ARENAS.length} deployable spaces · choose before launch`);
   });
 
@@ -149,5 +166,26 @@ describe('Pass 66 command shell', () => {
     expect(markup).not.toContain('<canvas id="match-pause-backdrop"');
     expect(markup).not.toContain('class="preview-helicopter"');
     expect(markup).not.toContain('class="preview-cat"');
+  });
+
+  // MAP3 (HF-409): the menu is the only place a player can learn the standalone
+  // showcase page exists.
+  it('ships the showcase link hidden and with no href, for the selection code to fill in', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="arena-showcase-link"');
+    expect(markup).toContain('class="arena-showcase-link"');
+
+    const link = /<a class="arena-showcase-link"[^>]*>/.exec(markup)?.[0] ?? '';
+    expect(link).not.toBe('');
+    // Hidden until an arena that HAS a second page is selected: the shell is
+    // rendered once, for every arena.
+    expect(link).toContain('hidden');
+    // No href in the static markup. A rooted or baked href is exactly the bug
+    // this link has to avoid - it is resolved per channel at selection time.
+    expect(link).not.toMatch(/href=/);
+    // The showcase captures pointer lock and the movement keys, so it must not
+    // replace the menu that launched it.
+    expect(link).toContain('target="_blank"');
+    expect(link).toContain('rel="noopener noreferrer"');
   });
 });

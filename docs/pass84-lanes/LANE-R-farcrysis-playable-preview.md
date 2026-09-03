@@ -68,3 +68,22 @@ Branch: `contrib/dave-gaming-pc/claude/farcrysis-load-fix` (base e046c130)
 Frame-time before/after vs atomic-acres, spawn table evidence, collision
 fixes, vegetation frames compared, gate results for the unhide, publish-guard
 patch if needed, commits. Claim-state every line.
+
+## ADDENDUM (orchestrator, 22:30 BST 2026-09-02, HF-423) — unshelved; ship as PREVIEW in PASS 87
+The owner: "get farcrysis sorted overnight too after nuke town and raid". Base is
+the current integration head (PASS 85 live + Lane W + the FARCRYSIS-LOAD pattern
+from Lane C, evidence under docs/evidence/pass84/farcrysis-load/). Read Lane C's
+report first; its admission fix is on the line, so start by MEASURING cold
+admission on Quality headless at this head (three runs, quiet machine), then
+close whatever still fails the fence by compiling LESS (shared materials, fewer
+permutations, prewarm scoped to the arena) - never by widening the fence. Then
+the Lane P/U registration trail (spawn table from the solver, spawn-quality gate,
+eye-clearance stages 1-3 measured, collider/visual parity, menu preview through
+the sanctioned generator, art-direction row above the floor), the art gaps to a
+clean first pass (memory atomic-acres-art-lighting-direction records why it was
+hidden), and the flip to `selectable: true` labelled PREVIEW. The publish guard
+change is NOT yours: put the exact patch to scripts/orchestration/publish_pass87.py
+(farcrysis-unselectable guard -> admission-evidence guard reading your receipts)
+in the report. Full `npx vitest run` once at the end (publish candidate). Target
+merge-ready by 04:30; say honestly if not.
+

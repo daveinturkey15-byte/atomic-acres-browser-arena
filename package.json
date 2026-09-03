@@ -58,7 +58,10 @@
     "qa:pass70:firefox-geckodriver": "npm run qa:pass70:firefox-geckodriver:contract && node scripts/qa/run-pass70-firefox-geckodriver.mjs",
     "qa:pass70:iphone15-webkit": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs iphone15",
     "qa:pass70:opera": "npm run qa:pass70:cross-browser:contract && node scripts/qa/run-pass70-cross-browser.mjs opera",
+    "measure:ibl:load-parity": "npm run build && node scripts/qa/probe-ibl-load-parity.mjs --serve-dist dist",
+    "measure:ibl:environment-contribution": "npm run build && node scripts/qa/probe-ibl-environment-contribution.mjs --serve-dist dist",
     "qa:cross-browser:contract": "node --test scripts/qa/cross-browser-gate-contract.test.mjs",
+    "qa:arena-roster:contract": "node --test scripts/qa/arena-roster-contract.test.mjs",
     "qa:cross-browser": "npm run qa:cross-browser:contract && node scripts/qa/run-with-dev-server.mjs node scripts/qa/run-cross-browser-gate.mjs",
     "qa:cross-browser:matrix": "node scripts/qa/run-with-dev-server.mjs node scripts/qa/verify-cross-browser-matrix.mjs",
     "qa:cross-browser:ceiling": "node scripts/qa/measure-refresh-ceiling.mjs",
@@ -166,6 +169,7 @@
     "qa:pass65:operator-assets": "node scripts/qa/verify-pass65-operator-production.mjs",
     "qa:pass64:renderer": "playwright test tests/e2e/pass64-renderer-foundation.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:pass74:arena-boot-smoke": "playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0",
+    "qa:pass84:gamepad": "playwright test tests/e2e/pass84-gamepad.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:environment": "node scripts/qa/capture-pass25a-environment.mjs",
     "qa:pass29:capture": "node scripts/qa/capture-pass29-environment.mjs",
     "qa:pass29:luminance": "python3 scripts/qa/measure-pass29-luminance.py",
@@ -197,8 +201,8 @@
     "deploy": "npm run build && gh-pages -d dist --add",
     "deploy:ci": "gh-pages -d dist",
     "qa:eye-clearance:contract": "node --test scripts/qa/eye-clearance-sweep-contract.test.mjs",
-    "qa:eye-clearance": "npm run qa:eye-clearance:contract && npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/run-with-preview-server.mjs node scripts/qa/sweep-eye-clearance-live.mjs --check",
-    "qa:eye-clearance:runtime": "node scripts/qa/verify-eye-clearance-runtime.mjs"
+    "qa:eye-clearance": "npm run qa:eye-clearance:contract && npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/run-with-preview-server.mjs node scripts/qa/sweep-eye-clearance-live.mjs --check && npm run qa:eye-clearance:runtime",
+    "qa:eye-clearance:runtime": "node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-eye-clearance-runtime.mjs --check"
   },
   "overrides": {
     "postcss": "8.5.23",

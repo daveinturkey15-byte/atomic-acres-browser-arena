@@ -11,6 +11,11 @@ export const MATCH_DIAGNOSTIC_ARENAS = [
   // 0007_add_map3_arena.sql: this list and that CHECK constraint are the two
   // halves of the same boundary and must never drift apart.
   'map3',
+  // NUKETOWN2 (owner 2026-09-02, HF-407). Paired with worker/migrations/
+  // 0008_add_nuketown2_arena.sql, which was written when the arena landed while
+  // THIS list was not - the full suite caught the drift the comment above warns
+  // about, because the focused runs never loaded this file.
+  'nuketown2',
 ] as const;
 // Owner 2026-08-30: Domination ships with the Test2 arena.
 export const MATCH_DIAGNOSTIC_MODES = ['solo', 'tdm', 'ffa', 'domination'] as const;

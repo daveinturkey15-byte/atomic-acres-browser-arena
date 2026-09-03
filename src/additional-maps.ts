@@ -3597,8 +3597,33 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   };
   addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
   addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  /**
+   * Engine nacelle seat height. Lane J, 2026-09-02 (eye-clearance triage).
+   *
+   * The nacelles used to sit at y = 1.6, so their 1.9 m body spanned
+   * 0.65 .. 2.55 m. Two consequences, both measured:
+   *  - the wing above them is authored at 2.68 .. 2.96 (visual AND authority,
+   *    `addWingAuthority`), so the engines hung 0.13 m clear of the wing they
+   *    are bolted to - floating geometry under the forging review;
+   *  - the 0.65 m belly left a prone crawl space over a 0.61 m prone eye. The
+   *    eye-clearance sweep flagged all six of skyline-terminal's red rows there
+   *    (d = 0.067 m, prone, both nacelles), and stage 3 was worse than the
+   *    analytic number: `resolveEyeClearance` had nowhere lateral to go, pushed
+   *    the camera UP into the nacelle to its 0.34 m cap (seat y 1.66, i.e.
+   *    inside the engine) and still measured 0.035 m - a metre above the
+   *    player's real eye, looking through the engine's interior.
+   *
+   * Seating the nacelle against the wing underside fixes both at once: the top
+   * lands exactly on 2.68 and the belly rises to 0.78 m, which clears the prone
+   * eye by 0.17 m - past the sweep's 0.15 m probe radius (= the camera's 0.08 m
+   * near plane plus bob margin), so the runtime resolve never engages here at
+   * all. It is a translation only: no size, footprint or material changes, and
+   * the instanced Quality visual below moves with it so authority and mesh stay
+   * coincident.
+   */
+  const NACELLE_CENTRE_Y = 1.73;
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, NACELLE_CENTRE_Y, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, NACELLE_CENTRE_Y, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -3634,7 +3659,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
   for (const [index, z] of [12, -8].entries()) {
-    nacelleMatrix.compose(new THREE.Vector3(0, 1.6, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
+    // Same seat height as the collision authority above - see NACELLE_CENTRE_Y.
+    nacelleMatrix.compose(new THREE.Vector3(0, NACELLE_CENTRE_Y, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
     engineNacelles.setMatrixAt(index, nacelleMatrix);
   }
   engineNacelles.instanceMatrix.needsUpdate = true;

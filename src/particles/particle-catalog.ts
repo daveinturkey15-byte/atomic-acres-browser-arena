@@ -284,6 +284,16 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     { density: 0.4, kind: 'seed', colorWarm: 0xe0d6b0, colorCool: 0xb4b09c, radiusM: 0.042, fallMps: 0.28, windPull: 0.8, flutterMps: 0.58, spinRadiansPerSecond: 1.5, opacity: 0.1 },
     0.8, 22, 13, 4,
   ),
+  // NUKETOWN2 (PREVIEW, HF-407): road grit off warm asphalt and dry lawn seed
+  // out of the two back yards. Deliberately close to the shipped Nuke Town's
+  // suburban air rather than a new idea - this lane is a LAYOUT rejig, and the
+  // air being familiar is what lets the owner read the layout change on its own.
+  'nuketown2': arena(
+    'nuketown2', 'road-grit-and-dry-lawn-seed',
+    { density: 0.72, colorWarm: 0xe6d8b8, colorCool: 0xc0bfb4, radiusM: 0.014, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.09 },
+    { density: 0.42, kind: 'seed', colorWarm: 0xdfd2a4, colorCool: 0xaeae94, radiusM: 0.04, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.1 },
+    0.55, 21, 12, 4,
+  ),
 });
 
 export function arenaParticleProfile(arenaId: ArenaId): ArenaParticleProfile {

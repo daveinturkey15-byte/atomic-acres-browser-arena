@@ -67,6 +67,7 @@ const {
 } = TSL as unknown as Record<string, any>;
 
 import type { Corridor } from './corridors';
+import type { CorridorSolid } from './corridor-solids';
 import { rgb } from './foliage-material';
 import { hash11 } from './leaf-geometry';
 import { retryLoad } from '../retry-load';
@@ -283,31 +284,143 @@ export interface PhysicsCorridor extends Corridor {
 /* The corridor                                                        */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* PREPARE, then BUILD (HF-409 finish)                                  */
+/* ------------------------------------------------------------------ */
+
 /**
- * Async because RAPIER.init() streams and instantiates a wasm module, and
- * nothing here can be built before RAPIER exists. main.ts must AWAIT this.
+ * MAP3 (HF-409 finisher 2): why this corridor is split in two.
+ *
+ * Building this corridor needs a wasm module, and fetching a wasm module is
+ * asynchronous. That was fine while the corridor only ever appeared on
+ * `/map3.html`, whose `main.ts` is free to await. It stops being fine the
+ * moment the corridor is part of the ARENA, because three callers build an
+ * arena SYNCHRONOUSLY and cannot be made async where they stand:
+ *
+ *   * `constructArena` in legacy-main sits inside the fenced transaction
+ *     between the WebGPU fence and the authority commit - an await there opens
+ *     the fence;
+ *   * `__ATOMIC_ACRES_DEBUG__.traceBallistics(..., arenaId)` builds a
+ *     NON-ACTIVE arena on the spot to trace against it, which is how the eye
+ *     clearance stage-2 sweep works at all;
+ *   * the collider/visual parity audit and the spawn-layout solver hold a
+ *     plain `Record<ArenaId, (scene) => ArenaMap>` builder table.
+ *
+ * So the asynchrony is moved OUT of the build and in front of it.
+ * `loadMap3Rapier()` is the whole async part: it resolves the chunk, runs
+ * `RAPIER.init()` once, and caches the module. After it has resolved,
+ * `createPhysicsCorridorSync()` is an ordinary synchronous constructor and
+ * `buildMap3` is an ordinary synchronous builder.
+ *
+ * IT THROWS RATHER THAN OMITTING. An unprepared build does NOT quietly return
+ * seven corridors instead of eight: an arena that is silently missing an
+ * eighth of its content, its colliders and its shot surfaces would sail
+ * through every gate that counts things it can see and would be measured,
+ * ledgered and published as complete. The error names the fix instead.
+ *
+ * A FAILED LOAD IS NOT CACHED, for the same reason the arena factory registry
+ * does not cache one: a flaky wasm fetch must not retire the corridor for the
+ * rest of the session.
  */
-export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
-  /* ---- Rapier boot, matching src/physics.ts exactly ------------------ */
-  const { default: RAPIER } = await retryLoad(
-    'rapier3d chunk (map3 physics corridor)',
-    () => import('@dimforge/rapier3d-compat'),
-  );
-  // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
-  // the legacy positional form and warns even though the public init() takes no
-  // arguments. Suppress only that upstream message; restore immediately. Left in
-  // because map3's error surface promotes warnings to the screen.
-  const originalWarn = console.warn;
-  console.warn = (...args: unknown[]) => {
-    if (args.length === 1
-      && args[0] === 'using deprecated parameters for the initialization function; pass a single object instead') return;
-    originalWarn(...args);
-  };
-  try {
-    await RAPIER.init();
-  } finally {
-    console.warn = originalWarn;
+let rapierModule: typeof RapierTypes | null = null;
+let rapierLoad: Promise<typeof RapierTypes> | null = null;
+
+/** True once `createPhysicsCorridorSync()` will not throw. */
+export function isMap3RapierReady(): boolean {
+  return rapierModule !== null;
+}
+
+/**
+ * Resolve the Rapier chunk and initialise its wasm. Idempotent; concurrent
+ * callers share one load. This is the ONLY asynchronous step Map 3 has.
+ */
+export async function loadMap3Rapier(): Promise<typeof RapierTypes> {
+  if (rapierModule) return rapierModule;
+  if (rapierLoad) return rapierLoad;
+  rapierLoad = (async () => {
+    /* ---- Rapier boot, matching src/physics.ts exactly ------------------ */
+    const { default: RAPIER } = await retryLoad(
+      'rapier3d chunk (map3 physics corridor)',
+      () => import('@dimforge/rapier3d-compat'),
+    );
+    // Rapier 0.19.3's compatibility bundle calls its own wasm-bindgen loader with
+    // the legacy positional form and warns even though the public init() takes no
+    // arguments. Suppress only that upstream message; restore immediately. Left in
+    // because map3's error surface promotes warnings to the screen.
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      if (args.length === 1
+        && args[0] === 'using deprecated parameters for the initialization function; pass a single object instead') return;
+      originalWarn(...args);
+    };
+    try {
+      await RAPIER.init();
+    } finally {
+      console.warn = originalWarn;
+    }
+    rapierModule = RAPIER as unknown as typeof RapierTypes;
+    rapierLoad = null;
+    return rapierModule;
+  })().catch((error: unknown) => {
+    rapierLoad = null;
+    throw error;
+  });
+  return rapierLoad;
+}
+
+function requireRapier(): typeof RapierTypes {
+  if (!rapierModule) {
+    throw new Error(
+      'map3 physics corridor: Rapier has not been prepared. createPhysicsCorridorSync() and '
+      + 'buildMap3() are SYNCHRONOUS by contract, so the wasm module must already be resolved '
+      + 'when they run. Await loadMap3Rapier() (or prepareMap3(), which wraps it) first. '
+      + 'KNOWN CALLERS (HF-409): __ATOMIC_ACRES_DEBUG__.prepareArena(map3) before '
+      + "traceBallistics against a non-active map3; the arena transition's preparation phase "
+      + 'before constructArena; scripts/qa builder tables before they call buildMap3.',
+    );
   }
+  return rapierModule;
+}
+
+export type PhysicsCorridorOptions = Readonly<{
+  /**
+   * Install this corridor's own `keydown` listener for B (rebuild wall) and F
+   * (reset everything). TRUE on `/map3.html`, which owns the whole window;
+   * FALSE inside the game arena, which does not.
+   *
+   * WHY THE ARENA MUST PASS FALSE. `KeyB` is the game's `emote` binding and
+   * `KeyF` is `interact` (src/key-bindings.ts). A window-level listener here
+   * fires ALONGSIDE the game's own handler, so pressing F to use something
+   * would silently also reset a 131-body playground three corridors away, and
+   * emoting would rebuild a brick wall. The corridor still exposes
+   * `rebuildWall()` and `resetAll()`; the arena simply has nothing bound to
+   * them yet, which is the honest state - a new in-game keybinding belongs to
+   * whoever owns the input map, not to a corridor.
+   */
+  bindKeys?: boolean;
+}>;
+
+/**
+ * The async form kept for `/map3.html`, whose `main.ts` awaits its corridors
+ * anyway. Exactly `prepare` then `build`, so the page and the arena run the
+ * same constructor.
+ */
+export async function createPhysicsCorridor(
+  options: PhysicsCorridorOptions = {},
+): Promise<PhysicsCorridor> {
+  await loadMap3Rapier();
+  return createPhysicsCorridorSync(options);
+}
+
+/**
+ * Build the playground. Synchronous; throws if `loadMap3Rapier()` has not
+ * resolved. See the prepare-then-build note above.
+ */
+export function createPhysicsCorridorSync(
+  options: PhysicsCorridorOptions = {},
+): PhysicsCorridor {
+  const RAPIER = requireRapier();
+  const bindKeys = options.bindKeys ?? true;
 
   const world = new RAPIER.World({ x: 0, y: GRAVITY_Y, z: 0 });
   world.timestep = FIXED_DT;
@@ -525,6 +638,12 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, FLOOR_Y, -LEN / 2 + 0.5);
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  // MAP3 (HF-409 finisher 2): every mesh here is NAMED, because the parity
+  // audit and its triage ledger identify geometry by name and this corridor
+  // was authored for a page where nothing ever asked. Names deliberately dodge
+  // the audit's own exclusion patterns: "seesaw" matches /sea/ and would have
+  // quietly excused the tilt plank as water presentation.
+  floor.name = 'map3-physics-bay-floor';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo);
@@ -556,16 +675,50 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
 
   const kerbParts: THREE.BufferGeometry[] = [];
   const KERB_H = 0.44;
+  /**
+   * MAP3 (HF-409 finisher 2): what the ARENA collides in this corridor.
+   *
+   * Two collider sets exist here and they are not the same set, on purpose.
+   * `staticBox()` above writes into this corridor's PRIVATE Rapier world - the
+   * one the bricks and balls live in - and those boxes are sized for a rolling
+   * 23 kg lead shot (the mouth threshold's Rapier box stands 0.64 m so nothing
+   * escapes into the hub). `solids` below is what the GAME's movement and shot
+   * authority gets, and it must describe what a PLAYER meets: the same kerb at
+   * its true visible 0.34 m, which is under the 0.45 m autostep, so you walk
+   * into the bay instead of bouncing off an invisible wall a third of a metre
+   * taller than the thing you can see.
+   *
+   * Only the STATIC mass is here. Every jenga block, brick, ball, gear, paddle
+   * and see-saw plank is a dynamic body that moves every frame, and a Box2
+   * collider is a static world rectangle: pinning one where a brick stood at
+   * t = 0 leaves an invisible brick in the aisle and the real one intangible.
+   * That is the rovers' argument in the parity ledger, and it is the same
+   * argument.
+   */
+  const solids: CorridorSolid[] = [];
   for (const side of [-1, 1]) {
     kerbParts.push(standing(0.30, KERB_H, LEN + 1, side * HALF_W, -LEN / 2 + 0.5));
     staticBox(0.15, KERB_H / 2 + 0.4, (LEN + 1) / 2, side * HALF_W, FLOOR_Y + KERB_H / 2 - 0.4, -LEN / 2 + 0.5);
+    solids.push({
+      name: `kerb-${side < 0 ? 'west' : 'east'}`,
+      x: side * HALF_W, y: FLOOR_Y + KERB_H / 2, z: -LEN / 2 + 0.5,
+      sx: 0.30, sy: KERB_H, sz: LEN + 1, material: 'metal',
+    });
   }
   // Threshold at the mouth and a back wall at the far end so nothing escapes
   // into the hub or off the end of the world.
   kerbParts.push(standing(HALF_W * 2, 0.34, 0.3, 0, 0.35));
   staticBox(HALF_W, 0.5, 0.15, 0, FLOOR_Y + 0.1, 0.35);
+  solids.push({
+    name: 'mouth-threshold', x: 0, y: FLOOR_Y + 0.17, z: 0.35,
+    sx: HALF_W * 2, sy: 0.34, sz: 0.3, material: 'metal',
+  });
   kerbParts.push(standing(HALF_W * 2, 1.2, 0.34, 0, -LEN + 0.3));
   staticBox(HALF_W, 0.6, 0.17, 0, FLOOR_Y + 0.6, -LEN + 0.3);
+  solids.push({
+    name: 'back-wall', x: 0, y: FLOOR_Y + 0.6, z: -LEN + 0.3,
+    sx: HALF_W * 2, sy: 1.2, sz: 0.34, material: 'metal',
+  });
 
   /* ================================================================== */
   /* Bay 1 — the Jenga tower                                             */
@@ -912,6 +1065,11 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     wedge.rotateY(Math.PI / 4);
     wedge.translate(PLANK_POS.x, FLOOR_Y - 0.15 + wedgeH / 2, PLANK_POS.z);
     frameParts.push(wedge);
+    // Static steel, and tall enough to stop a body: the arena collides it.
+    solids.push({
+      name: 'seesaw-fulcrum', x: PLANK_POS.x, y: FLOOR_Y - 0.15 + wedgeH / 2, z: PLANK_POS.z,
+      sx: 0.60, sy: wedgeH, sz: 0.60, material: 'metal',
+    });
   }
   // Two guide rails that funnel a kicked ball into the paddles instead of past
   // them. Angled inward, so they steer rather than block.
@@ -921,12 +1079,22 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     rail.rotateY(a);
     rail.translate(s * 1.95, FLOOR_Y + 0.25, MACH_Z + 2.1);
     frameParts.push(rail);
+    // The rails are yawed by +/-0.42 rad. `clusterSolid`'s rule applies: a yaw
+    // that is not a quarter turn is DROPPED rather than inflated into an AABB,
+    // so the collider stays the rail's true footprint, square to the corridor
+    // and always inside the visible steel.
+    solids.push({
+      name: `machine-guide-rail-${s < 0 ? 'west' : 'east'}`,
+      x: s * 1.95, y: FLOOR_Y + 0.25, z: MACH_Z + 2.1,
+      sx: 0.10, sy: 0.65, sz: 3.2, material: 'metal',
+    });
     staticBox(0.05, 0.25, 1.6, s * 1.95, FLOOR_Y + 0.25, MACH_Z + 2.1,
       { x: 0, y: Math.sin(a / 2), z: 0, w: Math.cos(a / 2) });
   }
 
   const frameGeo = consume(frameParts);
   const frameMesh = new THREE.Mesh(frameGeo, steelMat);
+  frameMesh.name = 'map3-physics-machine-frame';
   frameMesh.castShadow = true;
   frameMesh.receiveShadow = true;
   group.add(frameMesh);
@@ -934,6 +1102,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
 
   const kerbGeo = consume(kerbParts);
   const kerbMesh = new THREE.Mesh(kerbGeo, steelMat);
+  kerbMesh.name = 'map3-physics-kerb';
   kerbMesh.castShadow = true;
   kerbMesh.receiveShadow = true;
   group.add(kerbMesh);
@@ -999,6 +1168,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     { name: 'aTone', data: new Float32Array(jengaTone), size: 1 },
     { name: 'aGrain', data: new Float32Array(jengaGrain), size: 1 },
   ]);
+  jengaMesh.name = "map3-physics-jenga-block";
   group.add(jengaMesh);
   disposables.push(jengaGeo, jengaMesh);
 
@@ -1008,6 +1178,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     { name: 'aTone', data: new Float32Array(brickTone), size: 1 },
     { name: 'aWear', data: new Float32Array(brickWear), size: 1 },
   ]);
+  brickMesh.name = "map3-physics-wall-brick";
   group.add(brickMesh);
   disposables.push(brickGeo, brickMesh);
 
@@ -1032,12 +1203,14 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     { name: 'aColB', data: ballColB, size: 3 },
     { name: 'aParam', data: ballParam, size: 4 },
   ]);
+  ballMesh.name = "map3-physics-ball";
   group.add(ballMesh);
   disposables.push(ballGeo, ballMesh);
 
   // --- machine meshes --------------------------------------------------
   const wheelGeo = makeWheel(HUB_R, BLADES, BLADE_HALF_LEN, BLADE_HALF_WIDE, BLADE_HALF_THICK);
   const wheelMesh = new THREE.Mesh(wheelGeo, metalMat);
+  wheelMesh.name = 'map3-physics-paddle-wheel';
   wheelMesh.castShadow = true;
   group.add(wheelMesh);
   disposables.push(wheelGeo);
@@ -1047,18 +1220,21 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
   const lipB = box(PLANK_HALF.x * 2, 0.14, 0.06, 0, 0.10, -(PLANK_HALF.z - 0.04));
   const plankFullGeo = consume([plankGeo, lipA, lipB]);
   const plankMesh = new THREE.Mesh(plankFullGeo, plankMat);
+  plankMesh.name = 'map3-physics-tilt-plank';
   plankMesh.castShadow = true;
   group.add(plankMesh);
   disposables.push(plankFullGeo);
 
   const bigGearGeo = makeGear(GEAR_BIG_R, 22, 0.10);
   const bigGear = new THREE.Mesh(bigGearGeo, metalMat);
+  bigGear.name = 'map3-physics-gear-large';
   bigGear.position.set(GEAR_BIG.x, GEAR_BIG.y, GEAR_BIG.z);
   group.add(bigGear);
   disposables.push(bigGearGeo);
 
   const smallGearGeo = makeGear(GEAR_SMALL_R, 10, 0.10);
   const smallGear = new THREE.Mesh(smallGearGeo, metalMat);
+  smallGear.name = 'map3-physics-gear-small';
   smallGear.position.set(GEAR_SMALL.x, GEAR_SMALL.y, GEAR_SMALL.z);
   group.add(smallGear);
   disposables.push(smallGearGeo);
@@ -1071,23 +1247,27 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
   axleGeo.rotateZ(Math.PI / 2);
   axleGeo.translate((AXLE_FROM + GEAR_X) / 2, WHEEL_POS.y, MACH_Z);
   const axleMesh = new THREE.Mesh(axleGeo, metalMat);
+  axleMesh.name = 'map3-physics-axle';
   group.add(axleMesh);
   disposables.push(axleGeo);
 
   // Con-rod: a unit-length box along +Z, scaled and aimed each frame.
   const rodGeo = box(0.055, 0.055, 1, 0, 0, 0);
   const rodMesh = new THREE.Mesh(rodGeo, metalMat);
+  rodMesh.name = 'map3-physics-crank-rod';
   group.add(rodMesh);
   disposables.push(rodGeo);
 
   const pistonGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.30, 14);
   pistonGeo.rotateX(Math.PI / 2);
   const pistonMesh = new THREE.Mesh(pistonGeo, metalMat);
+  pistonMesh.name = 'map3-physics-piston';
   group.add(pistonMesh);
   disposables.push(pistonGeo);
 
   const needleGeo = box(0.026, 0.30, 0.026, 0, 0.13, 0);
   const needleMesh = new THREE.Mesh(needleGeo, metalMat);
+  needleMesh.name = 'map3-physics-tacho-needle';
   needleMesh.position.set(DIAL.x, DIAL.y, DIAL.z + 0.13);
   group.add(needleMesh);
   disposables.push(needleGeo);
@@ -1140,6 +1320,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
   trailGeo.setAttribute('aTint', new THREE.BufferAttribute(trailTint, 3));
   trailGeo.setIndex(trailIndex);
   const trailMesh = new THREE.Mesh(trailGeo, trailMat);
+  trailMesh.name = 'map3-physics-motion-trail';
   trailMesh.frustumCulled = false;
   trailMesh.renderOrder = 6;
   group.add(trailMesh);
@@ -1276,7 +1457,14 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     if (e.code === 'KeyB') rebuildWall();
     else if (e.code === 'KeyF') resetAll();
   };
-  if (typeof window !== 'undefined') window.addEventListener('keydown', onKeyDown);
+  // `typeof window.addEventListener === 'function'` and not just `typeof
+  // window !== 'undefined'`: the collider/visual parity audit builds every
+  // arena under a minimal window stub that has no listener API, and the old
+  // guard threw there the moment this corridor joined the arena.
+  const keysBound = bindKeys
+    && typeof window !== 'undefined'
+    && typeof window.addEventListener === 'function';
+  if (keysBound) window.addEventListener('keydown', onKeyDown);
 
   /* ================================================================== */
   /* Frame                                                               */
@@ -1440,6 +1628,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     length: LEN,
     title: 'Rapier playground — B rebuilds the wall, F resets everything',
     skill: 'threejs-game-development',
+    solids,
 
     update(elapsed: number, dt: number): void {
       lastElapsed = elapsed;
@@ -1478,7 +1667,7 @@ export async function createPhysicsCorridor(): Promise<PhysicsCorridor> {
     resetAll,
 
     dispose(): void {
-      if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown);
+      if (keysBound) window.removeEventListener('keydown', onKeyDown);
       disposables.forEach((d) => d.dispose());
       group.clear();
       // Frees every body, collider and joint in one call — Rapier owns them.

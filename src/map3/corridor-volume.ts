@@ -35,6 +35,8 @@ const {
 } = TSL as unknown as Record<string, any>;
 
 import type { Corridor } from './corridors';
+// MAP3 (HF-409): the solids this corridor publishes for an arena to collide.
+import { uprightSolid, type CorridorSolid } from './corridor-solids';
 import { rgb } from './foliage-material';
 import { hash11 } from './leaf-geometry';
 
@@ -182,6 +184,8 @@ export function createVolumeCorridor(): Corridor {
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0.04, -LEN / 2);
   const floor = new THREE.Mesh(floorGeo, stoneMat);
+  // MAP3 (HF-409): named at creation - the parity rules read these names.
+  floor.name = 'map3-godrays-hall-floor';
   floor.receiveShadow = true;
   group.add(floor);
   disposables.push(floorGeo);
@@ -197,11 +201,24 @@ export function createVolumeCorridor(): Corridor {
 
   const parts: THREE.BufferGeometry[] = [];
   const lastColumnZ = FIRST_COLUMN_Z - (NUM_COLUMNS - 1) * BAY_SPACING;
+  /**
+   * MAP3 (HF-409): the hall's mass, declared as it is built.
+   *
+   * The whole colonnade is merged into ONE mesh so it draws once, which means
+   * its bounding box is the hall's interior VOLUME - the corridor you walk
+   * down. Colliding that box would seal the corridor shut. The columns, the
+   * pierced sun wall and the end wall are the actual solids, and they are
+   * known here and nowhere else. The roof slab and architraves are overhead
+   * and out of a standing body's way, so they are not movement solids; the
+   * slit and the clerestory slot are holes and stay holes.
+   */
+  const solids: CorridorSolid[] = [];
 
   for (let i = 0; i < NUM_COLUMNS; i++) {
     const z = FIRST_COLUMN_Z - i * BAY_SPACING;
     for (const side of [-1, 1]) {
       const x = side * COLUMN_X;
+      solids.push(uprightSolid(`column-${i}${side > 0 ? 'e' : 'w'}`, x, z, 0.38, ROOF_Y, 'stone'));
       const col = new THREE.CylinderGeometry(0.32, 0.38, ROOF_Y, 10);
       col.translate(x, ROOF_Y / 2, z);
       parts.push(col);
@@ -228,16 +245,33 @@ export function createVolumeCorridor(): Corridor {
       const wallH = ROOF_Y + ROOF_T;
       parts.push(box(WALL_T, wallH, segLen, WALL_X, wallH / 2, z - segLen / 2));
       parts.push(box(WALL_T, wallH, segLen, WALL_X, wallH / 2, zFar + segLen / 2));
+      solids.push({ name: `sunwall-${i}a`, x: WALL_X, y: wallH / 2, z: z - segLen / 2, sx: WALL_T, sy: wallH, sz: segLen, material: 'stone' });
+      solids.push({ name: `sunwall-${i}b`, x: WALL_X, y: wallH / 2, z: zFar + segLen / 2, sx: WALL_T, sy: wallH, sz: segLen, material: 'stone' });
+      // The slit's sill is knee-high and the lintel above it starts at 5.6 m;
+      // only the sill is in a body's way, and it is the reason you cannot walk
+      // out through a shaft of light.
+      solids.push({ name: `sunwall-${i}-sill`, x: WALL_X, y: SLIT_Y0 / 2, z: zc, sx: WALL_T, sy: SLIT_Y0, sz: SLIT_W, material: 'stone' });
       parts.push(box(WALL_T, SLIT_Y0, SLIT_W, WALL_X, SLIT_Y0 / 2, zc));
       parts.push(box(WALL_T, wallH - SLIT_Y1, SLIT_W, WALL_X, (wallH + SLIT_Y1) / 2, zc));
     }
   }
   // End wall at the far column line closes the hall so the last bay is dark too.
   parts.push(box(W + 0.4, ROOF_Y + ROOF_T, WALL_T, 0, (ROOF_Y + ROOF_T) / 2, lastColumnZ - 0.3));
+  solids.push({
+    name: 'end-wall',
+    x: 0,
+    y: (ROOF_Y + ROOF_T) / 2,
+    z: lastColumnZ - 0.3,
+    sx: W + 0.4,
+    sy: ROOF_Y + ROOF_T,
+    sz: WALL_T,
+    material: 'stone',
+  });
 
   const merged = mergeSimple(parts);
   parts.forEach((g) => g.dispose());
   const hall = new THREE.Mesh(merged, colMat);
+  hall.name = 'map3-godrays-colonnade';
   hall.castShadow = true;
   hall.receiveShadow = true;
   group.add(hall);
@@ -259,6 +293,7 @@ export function createVolumeCorridor(): Corridor {
 
   const sphereGeo0 = new THREE.SphereGeometry(0.65, 20, 16);
   const sphereMesh0 = new THREE.Mesh(sphereGeo0, sphereMat);
+  sphereMesh0.name = 'map3-godrays-rolling-body';
   sphereMesh0.castShadow = true;
   sphereMesh0.receiveShadow = true;
   group.add(sphereMesh0);
@@ -266,6 +301,7 @@ export function createVolumeCorridor(): Corridor {
 
   const sphereGeo1 = new THREE.SphereGeometry(0.5, 18, 14);
   const sphereMesh1 = new THREE.Mesh(sphereGeo1, sphereMat);
+  sphereMesh1.name = 'map3-godrays-rolling-body';
   sphereMesh1.castShadow = true;
   sphereMesh1.receiveShadow = true;
   group.add(sphereMesh1);
@@ -346,6 +382,7 @@ export function createVolumeCorridor(): Corridor {
   const volGeo = new THREE.BoxGeometry(W + 0.4, ROOF_Y + 1.2, LEN + 0.8);
   volGeo.translate(0, (ROOF_Y + 1.2) / 2, -LEN / 2);
   const vol = new THREE.Mesh(volGeo, volMat);
+  vol.name = 'map3-godrays-light-shaft-volume';
   vol.frustumCulled = false;
   vol.renderOrder = 5;
   group.add(vol);
@@ -417,6 +454,7 @@ export function createVolumeCorridor(): Corridor {
   }
 
   const motes = new THREE.Mesh(moteGeo, moteMat);
+  motes.name = 'map3-godrays-dust-mote-particles';
   motes.frustumCulled = false;
   motes.renderOrder = 6;
   group.add(motes);
@@ -428,6 +466,7 @@ export function createVolumeCorridor(): Corridor {
   return {
     group,
     length: LEN,
+    solids,
     title: 'Volumetric god rays through slit walls, cut by rolling bodies',
     skill: 'webgpu-tsl-arena-forging',
     update(elapsed, dt, playerPos, playerVel) {
