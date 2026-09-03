@@ -29425,9 +29425,38 @@ async function performArenaSelection(
       // already built. THE FENCE IS UNTOUCHED at 12 s, and
       // src/presentation-prewarm-contract.test.ts pins that this region now
       // contains no arena-id branch at all.
+      //
+      // LOAD-CUT (pass 85, lane H2, 2026-09-03): the generalisation above was
+      // measured to cost a FIRST LOAD 8.6 s it never gets back. Interleaved A/B
+      // on gun-range, baseline dist and candidate dist back to back on the same
+      // machine minutes apart (docs/evidence/pass87/lane-h2/): the
+      // `visual-definition` phase went 4398 -> 12981 ms (x2.95) against an
+      // internal control of x1.35, and `coverage-submit-fence` did NOT fall to
+      // pay for it. The reason is in the ROOT, not the gate: on an in-session
+      // switch the whole scene's vocabulary is the thing at risk, because the
+      // renderer's cache holds the PREVIOUS arena's permutations; on a cold
+      // session nothing in the scene has been realised yet, the retained
+      // gameplay roots are suppressed and are prewarmed by their own passes
+      // downstream, and the only vocabulary the fenced warm frame can be
+      // surprised by is THE ARENA'S OWN - which is exactly what farcrysis's
+      // 134-217 cold pipelines were (submission 1 of a cold session).
+      //
+      // So the root is chosen by whether an arena was already prepared in this
+      // session. Both cases keep protection, neither reads an arena id, and the
+      // in-session-switch case - the one that took the 56-pair matrix from
+      // 55/56 to 56/56 - is byte-for-byte what it was.
+      //
+      // The attachment check is not defensive noise: precompileExactScenePass
+      // REQUIRES its root to be attached to the submitted scene and throws if it
+      // is not, and an arena factory that parents its root elsewhere would turn
+      // a load-time cut into a failed transition. Falling back to the whole
+      // scene is the safe direction (more compiled, never less).
       if (pass64TslSystems) {
         const scenePassPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+        let arenaRootAncestor: THREE.Object3D = arena.root;
+        while (arenaRootAncestor.parent) arenaRootAncestor = arenaRootAncestor.parent;
+        const precompileRoot = hadPreparedArena || arenaRootAncestor !== scene ? scene : arena.root;
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(precompileRoot));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);
