@@ -33,8 +33,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import {
-  eyeClearanceArenaIds, MINIMUM_EYE_CLEARANCE_ARENAS, UNMEASURED_CEILING,
-  partitionAnnotatedViolations,
+  arenaSideCeiling, countArenaSideViolations, eyeClearanceArenaIds,
+  MINIMUM_EYE_CLEARANCE_ARENAS, UNMEASURED_CEILING, partitionAnnotatedViolations,
 } from './eye-clearance-roster.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -89,18 +89,16 @@ test('the selectable roster this test measures against is the real one', () => {
   // MAP3 (owner 2026-09-02, HF-409, PASS 86): ratcheted BACK UP 7 -> 8 with the
   // card. The 8 -> 7 drop lasted exactly as long as the withdrawal did.
   assert.ok(
-    selectable.length >= 8,
+    selectable.length >= 10,
     `expected the real selectable roster, got ${JSON.stringify(selectable)}`,
   );
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3', 'farcrysis']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be swept`);
   }
-  for (const hidden of ['farcrysis']) {
-    assert.ok(
-      !selectable.includes(hidden),
-      `${hidden} is selectable:false and must stay out of the required set`,
-    );
-  }
+  // The negative pin that used to stand here - "farcrysis is selectable:false
+  // and must stay out of the required set" - is retired by HF-423, which ships
+  // it as a PREVIEW card. It is not dropped: farcrysis moved into the REQUIRED
+  // list above, which is the same fact asserted in the stronger direction.
 });
 
 test('the sweep derives its roster instead of hardcoding one', () => {
@@ -123,10 +121,11 @@ test('the sweep keeps a floor under the derived roster', () => {
   // but a truncated roster would still sweep less than the game ships while
   // printing success, so the script asserts a floor rather than assuming one.
   // Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped selectable, back to 7
-  // while its card was withdrawn, 8 again when the showcase became the arena, and
-  // 9 (HF-407) when the Nuke Town Rebuild shipped. The floor must equal the REAL
-  // roster, which the equality assertion below enforces in both directions.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*9/u, 'the roster floor must be pinned at 9');
+  // while its card was withdrawn, 8 again when the showcase became the arena,
+  // 9 (HF-407) when the Nuke Town Rebuild shipped, and 10 (HF-423) when farcrysis
+  // was un-hidden as a PREVIEW card. The floor must equal the REAL roster, which
+  // the equality assertion below enforces in both directions.
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*10/u, 'the roster floor must be pinned at 10');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -410,7 +409,8 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   // to nothing. An empty roster tests nothing while reporting success - the trap
   // the cross-browser gate hit, and the reason stage 1 asserts a floor too.
   // Raised 7 -> 8 on 2026-09-02 (HF-405) with Map 3, and back to 7 the same day
-  // (HF-409) when Map 3's card was withdrawn.
+  // (HF-409) when Map 3's card was withdrawn. 9 with the Nuke Town Rebuild
+  // (HF-407), 10 with farcrysis un-hidden (HF-423).
   //
   // MAP3: "this pin only moves UP" was the wrong rule, and lowering the literal
   // is not what makes this honest - so the literal is no longer the pin. The
@@ -428,15 +428,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*9/u,
-    'the shared roster floor must be pinned at 9',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*10/u,
+    'the shared roster floor must be pinned at 10',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 9, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 10, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so
@@ -801,4 +801,75 @@ test('the runtime-resolve record covers the roster too', () => {
   const extra = recorded.filter((id) => !roster.includes(id));
   assert.deepEqual(missing, [], `selectable arenas with no runtime-resolve record: ${missing.join(', ')}`);
   assert.deepEqual(extra, [], `runtime-resolve records for non-selectable arenas: ${extra.join(', ')}`);
+});
+
+// ---------------------------------------------------------------------------
+// The arena-side sub-ceiling (HF-423).
+//
+// A raw ceiling stops being a ratchet once most of what it counts is the
+// instrument. farcrysis entered at 441, and 373 of those rows name the ground
+// proxy because stage 1 seats eye heights on a hardcoded y = 0 plane. Left at
+// that, the arena's own 68 rows could grow more than fivefold and the ratchet
+// would stay green. The sub-ceiling is the second gate; these pins stop it
+// being added and then quietly ignored, widened, or emptied.
+// ---------------------------------------------------------------------------
+
+test('the arena-side sub-ceiling is enforced by the ratchet, not just recorded', () => {
+  const live = STAGE_SOURCES['sweep-eye-clearance-live.mjs'];
+  assert.match(live, /countArenaSideViolations\(/u, 'the live sweep must classify violations by surface class');
+  assert.match(live, /arenaSideCeiling\(/u, 'the live sweep must read the sub-ceiling from the ledger');
+  assert.match(
+    live,
+    /ARENA-SIDE violations > sub-ceiling/u,
+    'the ratchet must fail when the arena-side count exceeds its sub-ceiling',
+  );
+  // A committed sub-ceiling with no measurement behind it must REFUSE, not pass.
+  assert.match(
+    live,
+    /produced no arena-side count/u,
+    'a run that committed a sub-ceiling but produced no arena-side count must fail',
+  );
+});
+
+test('every committed sub-ceiling is real: an integer, a non-empty exclusion list, a dated note', () => {
+  const subs = LEDGER.arenaSideCeilings ?? {};
+  const roster = selectableArenaIdsFromSource();
+  assert.ok(
+    String(LEDGER.arenaSideCeilingsNote ?? '').length > 40,
+    'the ledger must say what arenaSideCeilings means and how it is enforced',
+  );
+  for (const [arena, entry] of Object.entries(subs)) {
+    assert.ok(roster.includes(arena), `${arena} has a sub-ceiling but is not selectable`);
+    // Runs the real reader, so a shape that reads fine to the eye but throws in
+    // the ratchet fails here instead of at 2 a.m. on cut night.
+    const resolved = arenaSideCeiling(arena, LEDGER);
+    assert.ok(resolved, `${arena}: arenaSideCeiling() must resolve a committed entry`);
+    assert.ok(Number.isInteger(resolved.ceiling) && resolved.ceiling >= 0,
+      `${arena}: sub-ceiling must be a non-negative integer`);
+    assert.ok(resolved.excludeSurfacePrefixes.length > 0,
+      `${arena}: a sub-ceiling that excludes nothing is the raw ceiling wearing a hat`);
+    assert.ok(resolved.ceiling <= LEDGER.ceilings[arena],
+      `${arena}: the arena-side sub-ceiling (${resolved.ceiling}) cannot exceed the raw ceiling `
+      + `(${LEDGER.ceilings[arena]}) - it counts a strict subset of the same rows`);
+    assert.ok(String(entry.note ?? '').length > 80, `${arena}: a sub-ceiling needs the measurement behind it`);
+    assert.match(String(entry.measuredAt), /^\d{4}-\d{2}-\d{2}$/u, `${arena}: a sub-ceiling needs a date`);
+  }
+});
+
+test('farcrysis keeps its arena-side sub-ceiling, and it matches the committed evidence', () => {
+  // Recomputed from the stage-2 artifact rather than trusted: 441 rows, 373
+  // naming the ground proxy, 68 the arena's own colliders. If the number in the
+  // ledger and the number in the evidence ever disagree, one of them is a guess.
+  const resolved = arenaSideCeiling('farcrysis', LEDGER);
+  assert.ok(resolved, 'farcrysis must keep an arena-side sub-ceiling while stage 1 seats eyes on a flat plane');
+  const evidence = JSON.parse(readFileSync(
+    resolve(REPO_ROOT, 'docs/evidence/pass87/lane-r/eye-clearance-stage2-violations.json'), 'utf8',
+  ));
+  assert.equal(evidence.violations.length, LEDGER.ceilings.farcrysis,
+    'the raw ceiling must be the row count in the committed stage-2 evidence');
+  const arenaSide = countArenaSideViolations('farcrysis', evidence.violations, LEDGER);
+  assert.equal(arenaSide, resolved.ceiling,
+    `the sub-ceiling must BE the measured arena-side count (evidence ${arenaSide}, ledger ${resolved.ceiling})`);
+  assert.ok(arenaSide < evidence.violations.length,
+    'the exclusion must actually exclude something, or the sub-ceiling proves nothing');
 });

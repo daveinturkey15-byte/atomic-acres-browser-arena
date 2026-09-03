@@ -41,7 +41,16 @@ export const definition = createProceduralArenaVisualDefinition({
   reviewCameras: [
     camera('farcrysis-beach-golden', [-54, 3.2, -54], [0, 1.2, 0], 'overview', 1.08),
     camera('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion', 1.08),
-    camera('farcrysis-core-interior', [0, 2.6, 0], [0, 1.7, 4], 'geometry', 1.08),
+    // HF-423: this camera sat at [0, 2.6, 0] - INSIDE farcrysis-core-catwalk,
+    // whose slab spans x -3.5..3.5, z -1.2..1.2 at y 2.41..2.59. MEASURED by
+    // casting the frame's own rays through the built arena: the nearest opaque
+    // surface was 0.01 m away and the catwalk filled 64.3 % of the frame, so
+    // the arena's only 'geometry' review camera was reviewing a plank pressed
+    // against the lens. Moved to the west wall at eye height looking across to
+    // the stair run: nearest surface 1.24 m, 32 distinct surfaces (was 23),
+    // and the frame is catwalk 24 % / terrain 20 % / desk 9 % / east wall 6 %
+    // - the interior it is named for.
+    camera('farcrysis-core-interior', [-4.3, 1.65, 0], [3.4, 1.9, 2.4], 'geometry', 1.08),
     camera('farcrysis-seaplane-throwback', [48, 2.4, -48], [40, 1.2, -40], 'overview', 1.08),
     // Shore-band audit cameras (HF-395/396 round 4): the top-down frame proves
     // every vegetation band hugs the square shoreline instead of a legacy

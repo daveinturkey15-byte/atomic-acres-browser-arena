@@ -184,9 +184,9 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   'skyline-terminal': buildSkylineTerminal,
   'rustworks-1v1': buildRustworks1v1,
   'gun-range': buildGunRange,
-  // farcrysis is `selectable: false` in map-selection.ts, so it is not swept -
-  // but its builder stays wired up, so un-hiding it restores its coverage in
-  // the same edit that un-hides it, with no second place to remember.
+  // farcrysis became selectable (PREVIEW) on 2026-09-02, HF-423. The builder
+  // was already wired up while it was hidden, exactly so that un-hiding it
+  // restored its coverage in the same edit - which is what happened.
   farcrysis: buildFarcrysis,
   'high-seas': buildHighSeas,
   test1: buildTest1,
@@ -201,11 +201,13 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * Floor on the derived roster. The derivation cannot silently collapse to an
  * empty list the way a regex-scraped one can, but an empty or truncated roster
  * would sweep nothing while printing success, so it is asserted rather than
- * assumed. 9 = the ten ids in arena-identity.ts minus hidden farcrysis. map3
- * left the roster for one day (2026-09-02, HF-409) and rejoined it when the
- * corridor showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9.
+ * assumed. 10 = every id in arena-identity.ts, nothing subtracted. map3 left
+ * the roster for one day (2026-09-02, HF-409) and rejoined it when the corridor
+ * showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9; farcrysis
+ * being un-hidden as a PREVIEW card (2026-09-02, HF-423) made it 10. Raise it
+ * when an arena is added; never lower it to get a run green.
  */
-export const MINIMUM_SWEPT_ARENAS = 9;
+export const MINIMUM_SWEPT_ARENAS = 10;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

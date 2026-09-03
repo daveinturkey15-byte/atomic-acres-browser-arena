@@ -198,11 +198,29 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     routeId: 'farcrysis' as const,
     kind: 'team' as const,
     // HIDDEN 2026-08-28, owner request: "remove farcrysis for now its not ready".
-    // Measured against the LIVE build through the real player path the same day: the only
-    // arena of six that never reaches an active match - 279 s, then the tab crashes. The
-    // other five reach playable in 49-69 s. Restore by deleting this one line once the
-    // farcrysis lanes land and verify-player-path-cdp.mjs passes it.
-    selectable: false,
+    // Measured against the LIVE build through the real player path that day: the only
+    // arena of six that never reached an active match - 279 s, then the tab crashed. The
+    // other five reached playable in 49-69 s.
+    //
+    // UN-HIDDEN 2026-09-02 as a PREVIEW card (HF-423, owner: "get farcrysis sorted
+    // overnight too"). What changed, all measured, none of it a relaxed threshold:
+    //   - the load path (PASS 84 Lane C): every fenced WebGPU submission now completes
+    //     and the arena transition COMMITS, where before it failed the first 12 s fence,
+    //     rolled back, and poisoned the next arena's fence behind the same stuck
+    //     submission. Cold admission MEASURED at the shipped bundle on a quiet machine,
+    //     three paired runs against a same-window atomic-acres control
+    //     (docs/evidence/pass87/lane-r/farcrysis-admission.json): farcrysis 30.5/34.4/31.1 s
+    //     (mean 32.0), atomic-acres 25.2/26.8/24.9 s (mean 25.7), worst pair ratio 1.283
+    //     over twelve pairs. Comparable to the shipped control, NOT inside the written
+    //     12 s falsifier - no arena on this machine meets that - and stated as such.
+    //   - the ground became real to the shared rules (HF-423): a terrain collision proxy
+    //     in `raycastMeshes` took the HF-402 spawn floor rule from 6.44 % to 100 %
+    //     coverage, and made the island stop bullets.
+    //   - the spawn table is solved rather than authored on the beach corners, and the
+    //     eye-clearance, walkable-parity and cross-browser rosters all derive from this
+    //     registry, so un-hiding it here is what puts it into those gates.
+    // It ships `multiplayer: false`: solo only until the owner has played it.
+    selectable: true,
     legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
     prototype: true,
     selectorLabel: 'FARCrySIS',
@@ -211,10 +229,14 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'SIS',
     menuLede: 'Fight through a flooded jungle research station — an original beach-and-jungle homage with dense collision cover, a ruined core, and golden-hour beach light.',
     summary: 'Jungle island research station · dense cover · golden-hour beach',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    rulesLabel: 'PREVIEW · 5 MIN · SOLO · 2 BOTS',
     soloBotCount: 2,
     maximumSoloBots: 2,
-    multiplayer: true,
+    // PREVIEW ships solo-only. The MP lab roster is computed as
+    // `multiplayer && selectable` (tests/e2e/mp-lab-registry-contract.test.mjs),
+    // so this is also what keeps farcrysis out of a multiplayer sweep nobody
+    // has run against it yet. Flipping it true is a gated change, not a typo.
+    multiplayer: false,
     fieldSupport: false,
     overdrive: false,
     authoring: 'code' as const,

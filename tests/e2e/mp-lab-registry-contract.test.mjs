@@ -25,10 +25,21 @@ const harnessSource = readFileSync(HARNESS, 'utf8');
 const rosterSource = readFileSync(ROSTER, 'utf8');
 const registrySource = readFileSync(REGISTRY, 'utf8');
 
-/** Every arena the registry declares, with the two flags the harness cares about. */
-function registryArenas() {
+/**
+ * Every arena the registry declares, with the two flags the harness cares about.
+ *
+ * `source` is a parameter so the parser can be exercised against a fixture as
+ * well as against the shipping registry. Before HF-423 the parser's own
+ * `selectable: false` branch was proved only by farcrysis being hidden; when
+ * farcrysis shipped as a PREVIEW card no registry entry carried that flag any
+ * more, and a parser branch nothing exercises is one that can rot silently -
+ * which is exactly how a roster ends up quietly including a hidden arena. The
+ * branch is now proved against a fixture, so it stays proved whether or not
+ * the shipping registry happens to hide anything.
+ */
+function registryArenas(source = registrySource) {
   const rows = [];
-  for (const block of registrySource.split(/Object\.freeze\(\{\s*\n\s*id:\s*'/).slice(1)) {
+  for (const block of source.split(/Object\.freeze\(\{\s*\n\s*id:\s*'/).slice(1)) {
     const id = block.match(/^([a-z0-9-]+)'/)?.[1];
     if (!id) continue;
     const body = block.slice(0, block.indexOf('\n  }),') >= 0 ? block.indexOf('\n  }),') : undefined);
@@ -41,7 +52,27 @@ test('the registry declares arenas and the parser sees them', () => {
   const arenas = registryArenas();
   assert.ok(arenas.length >= 5, `expected at least five registry arenas, parsed ${arenas.length}`);
   assert.ok(arenas.some((arena) => arena.id === 'atomic-acres'), 'atomic-acres must be in the registry');
-  assert.ok(arenas.some((arena) => !arena.selectable), 'the parser must recognise a hidden arena (selectable: false)');
+  // Both branches of the `selectable` read, against a fixture shaped exactly
+  // like a registry entry. This is not weaker than the assertion it replaces:
+  // it still fails if the parser stops seeing `selectable: false`, and it now
+  // ALSO fails if the parser stops seeing a selectable entry, which the old
+  // form could not check.
+  const fixture = [
+    'Object.freeze({',
+    "    id: 'fixture-hidden' as const,",
+    '    selectable: false,',
+    '    multiplayer: true,',
+    '  }),',
+    'Object.freeze({',
+    "    id: 'fixture-shown' as const,",
+    '    multiplayer: true,',
+    '  }),',
+  ].join('\n');
+  assert.deepEqual(
+    registryArenas(fixture).map((arena) => [arena.id, arena.selectable, arena.multiplayer]),
+    [['fixture-hidden', false, true], ['fixture-shown', true, true]],
+    'the parser must recognise both selectable: false and a selectable entry',
+  );
 });
 
 test('arena-roster.mts derives from src/map-selection.ts and filters on multiplayer', () => {
@@ -68,7 +99,12 @@ test('the computed roster equals the registry multiplayer + selectable set in re
   const expected = registryArenas().filter((arena) => arena.multiplayer && arena.selectable).map((arena) => arena.id);
   assert.deepEqual(computed, expected);
   assert.ok(computed.length >= 5, `expected at least five multiplayer arenas, got ${computed.length}`);
-  assert.ok(!computed.includes('farcrysis'), 'a hidden arena must not be swept');
+  // HF-423 un-hid farcrysis as a PREVIEW card, but shipped it `multiplayer:
+  // false` - solo only until it has been played. So it must STILL be absent
+  // here, and now for the reason the roster actually computes rather than
+  // because it was hidden. If someone flips multiplayer on, this fires and the
+  // MP lab has to be run against it before it can ship.
+  assert.ok(!computed.includes('farcrysis'), 'farcrysis ships multiplayer:false (PREVIEW) and must not be swept');
 });
 
 test('the falsifier floors are the ledger values', async () => {

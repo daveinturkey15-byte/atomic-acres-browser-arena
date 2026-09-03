@@ -29,7 +29,7 @@ import {
   radialCluster,
   type Vec2,
 } from './farcrysis-midmap-landmarks';
-import { buildVegetation, animateVegetationWind, setVegetationLOD, lumpify } from './farcrysis-vegetation';
+import { buildVegetation, animateVegetationWind, setVegetationLOD, lumpify, applyFarcrysisShadeLift } from './farcrysis-vegetation';
 // terrain.ts ShaderMaterial effects disabled for TSL review compatibility.
 // Terrain + water provided inline; lighting simplified to standard lights.
 import { applyFarcrysisTextures } from './farcrysis-textures';
@@ -1203,6 +1203,17 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
       detailLitter.material = mat;
     }
   }
+
+  // HF-423 art first pass, second and final shade-lift sweep.
+  //
+  // The lift inside buildVegetation can only reach what exists when it runs.
+  // The canopy trunk/crown visuals (farcrysis.ts) and the detail vine tubes
+  // (buildDetail, above) are authored later, so both stayed at emissive 0 and
+  // rendered as black silhouettes on their shaded side - the same defect the
+  // lift exists to remove. Re-running it here covers them; it recomputes each
+  // emissive from the material's own colour, so the layers already lifted get
+  // exactly the same values back.
+  applyFarcrysisShadeLift(root);
 
   // Per-frame animation driver (wind sway, water/foam, god-rays, vegetation LOD).
   //

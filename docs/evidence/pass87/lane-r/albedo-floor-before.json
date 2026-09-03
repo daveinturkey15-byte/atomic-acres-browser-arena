@@ -1,0 +1,108 @@
+{
+  "contract": "farcrysis-albedo-floor-v1",
+  "measuredAt": "2026-09-02T21:46:34.482Z",
+  "ambient": 0.19601,
+  "crushLuma": 0.02,
+  "meshes": 540,
+  "totalMass": 795244,
+  "crushedMass": 38118,
+  "crushedMassShare": 0.04793,
+  "worst": [
+    {
+      "mesh": "farcrysis-interactable-drum-hoops",
+      "instances": 50,
+      "triangles": 120,
+      "mass": 6000,
+      "colorLuma": 0.08488,
+      "mapMean": 1,
+      "albedo": 0.08488,
+      "emissive": 0,
+      "floor": 0.01664,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-interactable-drum-rims",
+      "instances": 50,
+      "triangles": 120,
+      "mass": 6000,
+      "colorLuma": 0.08488,
+      "mapMean": 1,
+      "albedo": 0.08488,
+      "emissive": 0,
+      "floor": 0.01664,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-water-inline",
+      "instances": 1,
+      "triangles": 4608,
+      "mass": 4608,
+      "colorLuma": 0.09605,
+      "mapMean": 1,
+      "albedo": 0.09605,
+      "emissive": 0,
+      "floor": 0.01883,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-vege-undergrowth-cards",
+      "instances": 330,
+      "triangles": 12,
+      "mass": 3960,
+      "colorLuma": 0.09872,
+      "mapMean": 1,
+      "albedo": 0.09872,
+      "emissive": 0,
+      "floor": 0.01935,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-vege-emergent-trunks",
+      "instances": 76,
+      "triangles": 32,
+      "mass": 2432,
+      "colorLuma": 0.05719,
+      "mapMean": 1,
+      "albedo": 0.05719,
+      "emissive": 0.00686,
+      "floor": 0.01807,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-vege-mangrove-trunks",
+      "instances": 18,
+      "triangles": 84,
+      "mass": 1512,
+      "colorLuma": 0.063,
+      "mapMean": 1,
+      "albedo": 0.063,
+      "emissive": 0.00756,
+      "floor": 0.01991,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-vege-leaf-litter",
+      "instances": 120,
+      "triangles": 12,
+      "mass": 1440,
+      "colorLuma": 0.09374,
+      "mapMean": 1,
+      "albedo": 0.09374,
+      "emissive": 0,
+      "floor": 0.01837,
+      "crushed": true
+    },
+    {
+      "mesh": "farcrysis-vege-twigs",
+      "instances": 90,
+      "triangles": 16,
+      "mass": 1440,
+      "colorLuma": 0.09374,
+      "mapMean": 1,
+      "albedo": 0.09374,
+      "emissive": 0,
+      "floor": 0.01837,
+      "crushed": true
+    }
+  ]
+}
