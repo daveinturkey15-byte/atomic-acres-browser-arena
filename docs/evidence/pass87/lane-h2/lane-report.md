@@ -676,8 +676,33 @@ makes that row evidence rather than an anecdote.
 | `e89492af` | probe floors: no no-op first load, and the live match must be on the arena that was asked for |
 | `5d5517ab`, `6f263a2d`, `0635ff04` | report, switch-matrix receipts, exit-gate table |
 | `bbf2b6f5` | drop the comment for the attachment check `2a72720d` removed |
+| `a196a3ae` | complete the commit table |
+| **repair pass, after the skeptic** | |
+| `b6178399` | probe: `rivalPlaywrightBrowsersMaxDuringRun` is `null` when the room was sampled <= once; `--max-edges` for a bounded PAIRED sweep |
+| `2ccd58ad` | the "nuketown2 8/8 outgoing" correction, the re-totalled coverage (33/34 of 72), and three claim-state downgrades |
+| `9ec78a60` | **the paired switch sweep: 10/10 pairs slower, median +7 857 ms, async pipelines 13-40 -> 56-76** |
+| `56c41644` | boot smoke 12/12 on this branch, farcrysis and nuketown2 included |
 
 ## 11. Verification
+
+**Repair pass (2026-09-03), re-run after the skeptic's findings:**
+- `npx tsc --noEmit` -> **exit 0**.
+- `npx vitest run src/rendering/cold-session-precompile-reach.test.ts
+  src/presentation-prewarm-contract.test.ts src/arena-special-weapon-reach.test.ts
+  src/arena-switch-matrix-roster.test.ts src/rendering/art-direction.test.ts
+  src/rendering/arena-coverage-prewarm.test.ts` -> **6 files / 53 tests passed**.
+- `node --check` on all four touched `scripts/qa/*.mjs` -> clean.
+- Line endings by byte count: `src/legacy-main.ts` **0 CRLF / 36 553 LF**; every
+  other edited file 0 CRLF, this report included.
+- `git diff aa9befca..HEAD -- src/ | grep -cE
+  'ShaderMaterial|RawShaderMaterial|onBeforeCompile'` -> **0**;
+  `grep -c 'flushWebGpuFrames(12_000)' src/legacy-main.ts` -> **4**.
+- `git ls-files artifacts` -> **empty**. The repair pass changed **no source
+  file**: its diff is `scripts/qa/probe-arena-switch-matrix.mjs`, this report and
+  evidence under `docs/evidence/pass87/lane-h2/`.
+- Boot smoke **12/12** (section 13b); paired switch sweep 10/10 + 6/10 edges
+  committed, 0 failed (section 13a).
+
 
 - **`npx tsc --noEmit`: exit 0** at both source commits that changed behaviour,
   `89d760ba` and `2a72720d`. (It was
