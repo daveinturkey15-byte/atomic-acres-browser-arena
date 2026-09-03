@@ -46,6 +46,24 @@ It does not solve foot contact. Foot sliding is MEASURED and reported by
 scripts/animation/measure-retarget-quality.mjs; the fix, when needed, is an
 explicit IK pass, not a silent adjustment here.
 
+SOURCE SKELETONS
+----------------
+`--source-skeleton soma30` (the default) is unchanged in every respect. A second
+source, `--source-skeleton g1-34`, retargets MotionBricks' Unitree G1 skeleton
+using exactly the same three-step global-delta method, because the property that
+makes step 3 legal - identity rest rotations - holds for G1 too (verified: FK
+from `neutral_joints` and the parent chain reproduces the published
+`global_joint_positions` to 5.005e-7).
+
+G1 differs from SOMA-30 in two ways that the table below has to state rather
+than paper over. It has NO head and NO neck link, so those operator joints stay
+at rest and are named deficiencies. And every ball joint is a serial chain of
+single-axis links, so a destination bone takes its ORIENTATION from the deepest
+link of its chain (whose global matrix composes all axes) and its POSITION from
+the shallowest (the anatomical joint). That is why a G1 row carries two source
+joints. `src/animation/motionbricks-g1-retarget.ts` is the reviewable statement
+of this table and its test asserts the alignment; this is its mirror.
+
 WHY IT IMPORTS THE SOURCE GLTF RATHER THAN THE SAVED .blend
 -----------------------------------------------------------
 The archetype .blend files hold the same 24 clips and their action data is
@@ -155,6 +173,83 @@ FINGER_PREFIXES = ("Index", "Middle", "Ring", "Pinky", "Thumb")
 # fixed by its bone offsets; that is the only thing a scale factor may come from.
 SOMA_REST_HIP_HEIGHT_M = 0.0843453 + 0.4322175 + 0.4215510 + 0.0505947
 
+# MotionBricks G1-34 -> canonical operator rig. Mirrors
+# src/animation/motionbricks-g1-retarget.ts's G1_TO_OPERATOR; the value is
+# (destination bone or None, joint whose GLOBAL rotation orients it). The joint
+# NAMES and PARENTS are deliberately not written here - they are read from
+# skeleton.json, which parse-mbstyle.mjs derives from the published support.gguf
+# metadata, so there is exactly one transcription of them in the tree.
+G1_TO_OPERATOR = {
+    "pelvis_skel": ("Hips", "pelvis_skel"),
+    "left_hip_pitch_skel": ("UpperLeg.L", "left_hip_yaw_skel"),
+    "left_hip_roll_skel": (None, "left_hip_roll_skel"),
+    "left_hip_yaw_skel": (None, "left_hip_yaw_skel"),
+    "left_knee_skel": ("LowerLeg.L", "left_knee_skel"),
+    "left_ankle_pitch_skel": ("Foot.L", "left_ankle_roll_skel"),
+    "left_ankle_roll_skel": (None, "left_ankle_roll_skel"),
+    "left_toe_base": ("PT.L", "left_toe_base"),
+    "right_hip_pitch_skel": ("UpperLeg.R", "right_hip_yaw_skel"),
+    "right_hip_roll_skel": (None, "right_hip_roll_skel"),
+    "right_hip_yaw_skel": (None, "right_hip_yaw_skel"),
+    "right_knee_skel": ("LowerLeg.R", "right_knee_skel"),
+    "right_ankle_pitch_skel": ("Foot.R", "right_ankle_roll_skel"),
+    "right_ankle_roll_skel": (None, "right_ankle_roll_skel"),
+    "right_toe_base": ("PT.R", "right_toe_base"),
+    "waist_yaw_skel": ("Abdomen", "waist_yaw_skel"),
+    "waist_roll_skel": ("Torso", "waist_roll_skel"),
+    "waist_pitch_skel": ("Chest", "waist_pitch_skel"),
+    "left_shoulder_pitch_skel": ("Shoulder.L", "left_shoulder_pitch_skel"),
+    "left_shoulder_roll_skel": ("UpperArm.L", "left_shoulder_yaw_skel"),
+    "left_shoulder_yaw_skel": (None, "left_shoulder_yaw_skel"),
+    "left_elbow_skel": ("LowerArm.L", "left_elbow_skel"),
+    "left_wrist_roll_skel": ("Wrist.L", "left_wrist_yaw_skel"),
+    "left_wrist_pitch_skel": (None, "left_wrist_pitch_skel"),
+    "left_wrist_yaw_skel": (None, "left_wrist_yaw_skel"),
+    "left_hand_roll_skel": (None, "left_hand_roll_skel"),
+    "right_shoulder_pitch_skel": ("Shoulder.R", "right_shoulder_pitch_skel"),
+    "right_shoulder_roll_skel": ("UpperArm.R", "right_shoulder_yaw_skel"),
+    "right_shoulder_yaw_skel": (None, "right_shoulder_yaw_skel"),
+    "right_elbow_skel": ("LowerArm.R", "right_elbow_skel"),
+    "right_wrist_roll_skel": ("Wrist.R", "right_wrist_yaw_skel"),
+    "right_wrist_pitch_skel": (None, "right_wrist_pitch_skel"),
+    "right_wrist_yaw_skel": (None, "right_wrist_yaw_skel"),
+    "right_hand_roll_skel": (None, "right_hand_roll_skel"),
+}
+
+# Operator joints G1 cannot reach at all, because g1skel34 ends at the waist.
+# Named here so a capture never has to discover them.
+OPERATOR_JOINTS_G1_CANNOT_DRIVE = ("Neck", "Head")
+
+
+def load_g1_skeleton(directory: Path) -> dict:
+    """Names, parents and parent-relative rest offsets, from skeleton.json.
+
+    parse-mbstyle.mjs writes this beside the .f32 pair, derived from the
+    published `motionbricks.joint_names` key and the `joint_parents` /
+    `neutral_joints` tensors of support.gguf. Nothing here is guessed; if the
+    file is absent the run STOPS rather than assuming a joint order, because a
+    guessed order shifts every channel and still renders.
+    """
+    meta_path = directory / "skeleton.json"
+    if not meta_path.exists():
+        raise RuntimeError(
+            str(meta_path) + " missing. Run: node scripts/animation/parse-mbstyle.mjs "
+            "--emit-motion <style> --motion-out <dir>.")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if meta.get("skeleton") != "g1skel34":
+        raise RuntimeError("expected skeleton g1skel34, got " + repr(meta.get("skeleton")))
+    if len(meta["names"]) != 34 or len(meta["parents"]) != 34:
+        raise RuntimeError("g1skel34 must carry exactly 34 names and 34 parents")
+    missing = sorted(set(meta["names"]) - set(G1_TO_OPERATOR))
+    if missing:
+        raise RuntimeError("correspondence table is missing G1 joints: " + repr(missing))
+    if not isinstance(meta.get("fps"), (int, float)) or meta["fps"] <= 0:
+        raise RuntimeError(
+            "skeleton.json carries no usable fps. The scene frame rate must come from "
+            "the source, not from Blender's default, or the clip bakes out at the wrong speed.")
+    return meta
+
+
 
 def cli(flag: str, default=None):
     tokens = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -172,7 +267,7 @@ def read_f32(path: Path) -> list[float]:
     return list(struct.unpack(f"<{len(data)//4}f", data))
 
 
-def load_motion(directory: Path) -> dict:
+def load_motion(directory: Path, expected_joints: int | None = None) -> dict:
     root = read_f32(directory / "root_positions.f32")
     rot = read_f32(directory / "local_rotations_xyzw.f32")
     if len(root) % 3:
@@ -181,16 +276,18 @@ def load_motion(directory: Path) -> dict:
     if len(rot) % (frames * 4):
         raise RuntimeError("rotation buffer does not divide by frames*4")
     joints = len(rot) // (frames * 4)
-    if joints != len(SOMA30_NAMES):
+    expected = len(SOMA30_NAMES) if expected_joints is None else expected_joints
+    if joints != expected:
         raise RuntimeError(
-            f"expected {len(SOMA30_NAMES)} SOMA-30 joints, got {joints}. "
-            "This script only retargets soma30; identify the skeleton before retargeting.")
+            f"expected {expected} source joints, got {joints}. Identify the "
+            "skeleton before retargeting; a joint-count mismatch shifts every channel.")
     return {"frames": frames, "joints": joints, "root": root, "rot": rot}
 
 
-def source_global_rotations(motion: dict) -> list[list[Quaternion]]:
-    """Compose parent-local rotations up the SOMA chain into global rotations."""
+def source_global_rotations(motion: dict, parents=None) -> list[list[Quaternion]]:
+    """Compose parent-local rotations up the source chain into global rotations."""
     frames, joints, rot = motion["frames"], motion["joints"], motion["rot"]
+    parents = SOMA30_PARENTS if parents is None else parents
     out: list[list[Quaternion]] = []
     for t in range(frames):
         globals_: list[Quaternion] = []
@@ -198,14 +295,15 @@ def source_global_rotations(motion: dict) -> list[list[Quaternion]]:
             base = (t * joints + j) * 4
             # Kimodo writes xyzw; mathutils.Quaternion takes wxyz.
             local = Quaternion((rot[base + 3], rot[base + 0], rot[base + 1], rot[base + 2]))
-            parent = SOMA30_PARENTS[j]
+            parent = parents[j]
             globals_.append(local if parent < 0 else globals_[parent] @ local)
         out.append(globals_)
     return out
 
 
 def source_world_positions(
-    src_global: list[list[Quaternion]], root_positions: list[float]
+    src_global: list[list[Quaternion]], root_positions: list[float],
+    offsets=None, parents=None,
 ) -> list[list[Vector]]:
     """Forward-kinematic joint positions on the SOMA skeleton, per frame.
 
@@ -216,11 +314,13 @@ def source_world_positions(
 
     position[j] = position[parent] + R_global[parent] * rest_offset[j]
     """
+    offsets = SOMA30_OFFSETS if offsets is None else offsets
+    parents = SOMA30_PARENTS if parents is None else parents
     out: list[list[Vector]] = []
     for t, frame_rotations in enumerate(src_global):
         positions: list[Vector] = []
-        for j, offset in enumerate(SOMA30_OFFSETS):
-            parent = SOMA30_PARENTS[j]
+        for j, offset in enumerate(offsets):
+            parent = parents[j]
             if parent < 0:
                 positions.append(Vector(root_positions[t * 3: t * 3 + 3]))
             else:
@@ -243,6 +343,10 @@ def main() -> None:
     clip_name = cli("--clip", "Kimodo_Clip")
     out_path = ROOT / cli("--out", "artifacts/motion/retargeted/clip.glb")
     report_path = out_path.with_suffix(".report.json")
+    source_skeleton = cli("--source-skeleton", "soma30")
+    if source_skeleton not in ("soma30", "g1-34"):
+        raise RuntimeError(
+            "unknown --source-skeleton " + repr(source_skeleton) + "; expected soma30 or g1-34")
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(source_gltf))
@@ -250,9 +354,35 @@ def main() -> None:
     bpy.context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode="POSE")
 
-    motion = load_motion(motion_dir)
+    if source_skeleton == "g1-34":
+        g1 = load_g1_skeleton(motion_dir)
+        source_names = g1["names"]
+        source_parents = g1["parents"]
+        source_offsets = [tuple(o) for o in g1["restOffsets"]]
+        source_rest_hip = g1["restHipHeightM"]
+        source_fps = g1["fps"]
+    else:
+        source_names = SOMA30_NAMES
+        source_parents = SOMA30_PARENTS
+        source_offsets = SOMA30_OFFSETS
+        source_rest_hip = SOMA_REST_HIP_HEIGHT_M
+        # Kimodo/SOMA-30 clips are natively 24 fps, which is also Blender's
+        # factory default, so this path is unchanged by being made explicit.
+        source_fps = 24
+
+    # THE SCENE FRAME RATE IS PART OF THE RETARGET, NOT A DISPLAY SETTING.
+    # One key is inserted per source frame, and the glTF exporter converts key
+    # indices to SECONDS using scene.render.fps. Leaving it at Blender's default
+    # 24 while baking a 30 fps source exported the first trial clip at
+    # 76/24 = 3.1667 s instead of 76/30 = 2.5333 s - a walk running 25% slow,
+    # with every per-second figure measured off it wrong by the same factor,
+    # and nothing in the file to say so.
+    bpy.context.scene.render.fps = int(round(source_fps))
+    bpy.context.scene.render.fps_base = bpy.context.scene.render.fps / float(source_fps)
+
+    motion = load_motion(motion_dir, len(source_names))
     frames = motion["frames"]
-    src_global = source_global_rotations(motion)
+    src_global = source_global_rotations(motion, source_parents)
 
     # Destination rest orientations, in armature space.
     rest_global: dict[str, Matrix] = {}
@@ -265,21 +395,32 @@ def main() -> None:
     if hips_bone is None:
         raise RuntimeError("canonical rig is missing the Hips joint")
     dest_hip_height = (armature.matrix_world @ hips_bone.head_local).z
-    scale = dest_hip_height / SOMA_REST_HIP_HEIGHT_M
+    scale = dest_hip_height / source_rest_hip
     root_bone_name = "Body" if armature.pose.bones.get("Body") else "Hips"
 
-    driven: list[tuple[int, str]] = []
+    # (rotation source index, position source index, destination bone). The two
+    # indices differ only for g1-34, where a 3-DoF ball joint is a serial chain:
+    # the composed orientation lives on the chain's deepest link and the
+    # anatomical position on its shallowest.
+    driven: list[tuple[int, int, str]] = []
     skipped_missing: list[str] = []
-    for j, name in enumerate(SOMA30_NAMES):
-        dest = SOMA30_TO_OPERATOR.get(name)
+    for j, name in enumerate(source_names):
+        if source_skeleton == "g1-34":
+            dest, rotation_source = G1_TO_OPERATOR[name]
+            rotation_index = source_names.index(rotation_source)
+        else:
+            dest = SOMA30_TO_OPERATOR.get(name)
+            rotation_index = j
         if dest is None:
             continue
         if dest.startswith(FINGER_PREFIXES):
             raise RuntimeError(f"refusing to drive weapon-grip chain {dest}")
+        if dest in OPERATOR_JOINTS_G1_CANNOT_DRIVE and source_skeleton == "g1-34":
+            raise RuntimeError(f"g1skel34 has no source for {dest}; it must stay unmapped")
         if armature.pose.bones.get(dest) is None:
             skipped_missing.append(dest)
             continue
-        driven.append((j, dest))
+        driven.append((rotation_index, j, dest))
     if skipped_missing:
         raise RuntimeError(f"rig is missing mapped joints: {sorted(skipped_missing)}")
 
@@ -307,7 +448,7 @@ def main() -> None:
         depth[name] = 0 if bone.parent is None else bone_depth(bone.parent.name) + 1
         return depth[name]
 
-    driven_ordered = sorted(driven, key=lambda pair: bone_depth(pair[1]))
+    driven_ordered = sorted(driven, key=lambda row: bone_depth(row[2]))
 
     # THIS RIG CANNOT INHERIT POSITION THROUGH PARENTING.
     # Foot.R's parent is Root, not LowerLeg.R, and UpperLeg.R's parent is Body,
@@ -316,7 +457,8 @@ def main() -> None:
     # whose legs swung 57 degrees while the feet measured 0.0000 m of travel.
     # The authored clips animate foot TRANSLATION directly for the same reason.
     # Every mapped bone is therefore placed explicitly from source FK.
-    src_positions = source_world_positions(src_global, motion["root"])
+    src_positions = source_world_positions(
+        src_global, motion["root"], source_offsets, source_parents)
     # SOMA is Y-up / +Z forward; Blender is Z-up. Swap and scale to our stature.
     def to_blender(p: Vector) -> Vector:
         return Vector((p.x * scale, p.z * scale, p.y * scale))
@@ -324,17 +466,17 @@ def main() -> None:
     for t in range(frames):
         frame = t + 1
         bpy.context.scene.frame_set(frame)
-        for j, dest in driven_ordered:
+        for j_rot, j_pos, dest in driven_ordered:
             pose_bone = armature.pose.bones[dest]
             # SOMA rest rotations are identity, so the source global rotation
             # at time t IS the global delta from rest. Apply it to the
             # DESTINATION bone's rest orientation to get where that bone should
             # point in armature space.
-            target = src_global[t][j].to_matrix().to_4x4() @ rest_global[dest]
+            target = src_global[t][j_rot].to_matrix().to_4x4() @ rest_global[dest]
             # Assign rotation only: keep the head where the (already-posed)
             # parent chain has just put it, so no bone is translated off its
             # joint. Blender converts this to the correct local delta itself.
-            target.translation = to_blender(src_positions[t][j])
+            target.translation = to_blender(src_positions[t][j_pos])
             pose_bone.matrix = target
             bpy.context.view_layer.update()
             # Location is keyed as well as rotation, and that is not optional.
@@ -382,13 +524,20 @@ def main() -> None:
     report = {
         "clip": clip_name,
         "frames": frames,
-        "sourceSkeleton": "soma30",
-        "drivenJoints": sorted(dest for _, dest in driven),
+        "sourceSkeleton": source_skeleton,
+        "sourceFps": source_fps,
+        "sceneFps": bpy.context.scene.render.fps / bpy.context.scene.render.fps_base,
+        "clipDurationS": round(frames / float(source_fps), 4),
+        "drivenJoints": sorted(dest for _, _, dest in driven),
         "drivenCount": len(driven),
-        "unmappedSourceJoints": sorted(n for n in SOMA30_NAMES if SOMA30_TO_OPERATOR.get(n) is None),
+        "unmappedSourceJoints": sorted(
+            n for n in source_names
+            if (G1_TO_OPERATOR[n][0] if source_skeleton == "g1-34" else SOMA30_TO_OPERATOR.get(n)) is None),
+        "operatorJointsSourceCannotDrive": (
+            list(OPERATOR_JOINTS_G1_CANNOT_DRIVE) if source_skeleton == "g1-34" else []),
         "hipHeightScale": round(scale, 5),
         "destinationHipHeightM": round(dest_hip_height, 4),
-        "sourceRestHipHeightM": round(SOMA_REST_HIP_HEIGHT_M, 4),
+        "sourceRestHipHeightM": round(source_rest_hip, 4),
         "rootBone": root_bone_name,
         "sourceGltf": str(source_gltf.relative_to(ROOT)),
         "motion": str(motion_dir.relative_to(ROOT)),

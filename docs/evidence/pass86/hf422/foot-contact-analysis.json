@@ -1,0 +1,836 @@
+{
+  "lane": "HF-422",
+  "generatedAt": "2026-09-03T01:17:45.527Z",
+  "tool": "scripts/animation/hf422-foot-contact-analysis.mjs",
+  "why": "Contiguity-aware and frame-rate-explicit re-measurement, written after a skeptic review refuted the first draft of this evidence. It replaces the withdrawn \"5.3x the authored walk\" foot-slide claim.",
+  "withdrawn": {
+    "fiveTimesSlide": "WITHDRAWN. The gate tool sums horizontal distance between CONSECUTIVE SURVIVING samples after an Array.filter that discards contiguity, so it also sums the swing-phase jump between separate stance phases. Zero over-count on a one-stance clip, 53% on this six-stance one. Combined with a fixed 3 cm band that swallows 79% of a low-lifting clip against 33% of the authored walk, and a 2.3x clip-length difference, that manufactured the whole ratio.",
+    "toeSlide": "WITHDRAWN. PT.L/PT.R are not toes. In Swat.gltf they are Root-parented, childless, NOT mirrored (rest 0.568,0.627,0.227 and -0.018,0.423,0.659) and sit 0.42-0.63 m off the floor. No authored clip animates them.",
+    "groundPenetration": "WITHDRAWN. The -0.0168 m belongs to PT.R. The trial clip actual FEET bottom out at +0.0442 and +0.0492 - HIGHER off the ground than every authored clip +0.0224.",
+    "travelFalsifier": "WITHDRAWN. The \"in-place and travelling differ by only 0.04 m\" falsifier was the same non-contiguity artifact. On contiguous stance they differ by 1.55x (Foot.L 2.1617 vs 1.3959 m) and 2.43x (Foot.R 1.5916 vs 0.6561 m).",
+    "g4FootSlideFailure": "WITHDRAWN. On the repo OWN pass-77 metric the trial clip stance foot is broadly consistent with the ground speed the clip carries. See authoredGroundSpeedGateSweep."
+  },
+  "frameRateFix": {
+    "defect": "scripts/blender/retarget-kimodo-motion.py never set scene.render.fps, so a 30 fps MotionBricks source baked out at Blender default 24: 76 frames became 3.1667 s instead of 2.5333 s and the clip ran 25% slow, with nothing in the file to say so.",
+    "fixedThisPass": "The scene frame rate is now read from skeleton.json (soma30 keeps 24, which is both its native rate and Blender default, so that path is unchanged) and both trial GLBs were re-baked. sourceFps, sceneFps and clipDurationS are now in the retarget report.",
+    "sideEffect": "One Blender scene exports every action at ONE scene fps, so in these re-baked files the 24 authored actions carry 30 fps sampler times. Every frame-based figure here is unaffected; every per-second figure states the clip native rate explicitly via nativeFpsUsed."
+  },
+  "scaleChainCheck": {
+    "claim": "The position scale chain is correct end to end.",
+    "evidence": "Source walk_gun path travel 2.80193 m x hipHeightScale 1.1358 predicts 3.1824 m at operator scale; the Hips path measured in the travelling bake is 3.1817 m. 0.7 mm apart."
+  },
+  "authoredGroundSpeedGateSweep": {
+    "method": "Recovered ground speed by the pass-77 method (median backward ankle velocity relative to hips over the contact phase), swept over the contact-height gate. pass-77 own constant is 0.10.",
+    "validation": "This implementation reproduces the repo frozen constants: Walk 1.3559 vs 1.3416 (1.07%), Run 3.0803 vs 3.0832 (0.09%). The residual is the Blender bake round trip; pass-77 reads the original Swat.gltf.",
+    "reading": "The authored clips are gate-STABLE. The trial clip is not: at the canonical 0.10 gate only 66 of 1920 samples survive and it reports a spurious 0.2683 m/s, while at 0.15-0.30 it recovers 1.07-1.21 m/s against an operator-scale target of 1.273 m/s. So the stance foot is broadly right and NO foot-slide failure can be claimed - but the instability is itself the finding: the trial clip feet lift so little, and so asymmetrically, that the repo own contact detector nearly fails on it.",
+    "gates": {
+      "MB_Walk_Gun_Debug (in place)": {
+        "0.1": {
+          "groundSpeedMps": 0.2683,
+          "contactSamples": 66
+        },
+        "0.15": {
+          "groundSpeedMps": 1.1214,
+          "contactSamples": 239
+        },
+        "0.2": {
+          "groundSpeedMps": 1.2137,
+          "contactSamples": 568
+        },
+        "0.25": {
+          "groundSpeedMps": 1.1386,
+          "contactSamples": 1059
+        },
+        "0.3": {
+          "groundSpeedMps": 1.0753,
+          "contactSamples": 1222
+        }
+      },
+      "MB_Walk_Gun_Debug (travelling)": {
+        "0.1": {
+          "groundSpeedMps": 0.6593,
+          "contactSamples": 66
+        },
+        "0.15": {
+          "groundSpeedMps": 1.2094,
+          "contactSamples": 239
+        },
+        "0.2": {
+          "groundSpeedMps": 1.2519,
+          "contactSamples": 568
+        },
+        "0.25": {
+          "groundSpeedMps": 1.1639,
+          "contactSamples": 1059
+        },
+        "0.3": {
+          "groundSpeedMps": 1.0895,
+          "contactSamples": 1222
+        }
+      },
+      "Walk (authored)": {
+        "0.1": {
+          "groundSpeedMps": 1.3559,
+          "contactSamples": 616
+        },
+        "0.15": {
+          "groundSpeedMps": 1.3558,
+          "contactSamples": 680
+        },
+        "0.2": {
+          "groundSpeedMps": 1.3558,
+          "contactSamples": 739
+        },
+        "0.25": {
+          "groundSpeedMps": 1.2474,
+          "contactSamples": 1028
+        },
+        "0.3": {
+          "groundSpeedMps": 1.2474,
+          "contactSamples": 1069
+        }
+      },
+      "Run (authored)": {
+        "0.1": {
+          "groundSpeedMps": 3.0803,
+          "contactSamples": 543
+        },
+        "0.15": {
+          "groundSpeedMps": 3.0803,
+          "contactSamples": 643
+        },
+        "0.2": {
+          "groundSpeedMps": 3.019,
+          "contactSamples": 785
+        },
+        "0.25": {
+          "groundSpeedMps": 2.6553,
+          "contactSamples": 910
+        },
+        "0.3": {
+          "groundSpeedMps": 2.6553,
+          "contactSamples": 990
+        }
+      },
+      "Run_Back (authored)": {
+        "0.1": {
+          "groundSpeedMps": 3.0803,
+          "contactSamples": 519
+        },
+        "0.15": {
+          "groundSpeedMps": 3.0803,
+          "contactSamples": 587
+        },
+        "0.2": {
+          "groundSpeedMps": 3.0803,
+          "contactSamples": 668
+        },
+        "0.25": {
+          "groundSpeedMps": 3.019,
+          "contactSamples": 791
+        },
+        "0.3": {
+          "groundSpeedMps": 2.7645,
+          "contactSamples": 887
+        }
+      },
+      "Idle_Gun (authored)": {
+        "0.1": {
+          "groundSpeedMps": 0,
+          "contactSamples": 960
+        },
+        "0.15": {
+          "groundSpeedMps": 0,
+          "contactSamples": 960
+        },
+        "0.2": {
+          "groundSpeedMps": 0,
+          "contactSamples": 960
+        },
+        "0.25": {
+          "groundSpeedMps": 0,
+          "contactSamples": 960
+        },
+        "0.3": {
+          "groundSpeedMps": 0,
+          "contactSamples": 960
+        }
+      }
+    }
+  },
+  "bandM": 0.03,
+  "clips": {
+    "MB_Walk_Gun_Debug (in place)": {
+      "clip": "MB_Walk_Gun_Debug",
+      "samples": 76,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 2.533333,
+      "exportedDurationS": 2.5,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 30,
+      "durationSUsed": 2.5,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 66,
+        "authoredForwardMps": 0.2683,
+        "authoredLateralMps": -0.0013,
+        "authoredGroundSpeedMps": 0.2683
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.0442,
+          "maxY": 0.1377,
+          "liftM": 0.0935,
+          "bandFrames": 60,
+          "bandFraction": 0.7895,
+          "segments": 6,
+          "slideContiguousM": 2.1617,
+          "slideNaiveM": 3.2981,
+          "naiveOvercountPct": 52.6,
+          "slidePerStanceFrameM": 0.04,
+          "pathTotalM": 3.4809,
+          "pathPerSecondMS": 1.3924,
+          "bandValid": false
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0492,
+          "maxY": 0.1162,
+          "liftM": 0.0669,
+          "bandFrames": 51,
+          "bandFraction": 0.6711,
+          "segments": 6,
+          "slideContiguousM": 1.5916,
+          "slideNaiveM": 2.9638,
+          "naiveOvercountPct": 86.2,
+          "slidePerStanceFrameM": 0.0354,
+          "pathTotalM": 3.2386,
+          "pathPerSecondMS": 1.2954,
+          "bandValid": false
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": -0.0135,
+          "maxY": 0.0168,
+          "liftM": 0.0304,
+          "bandFrames": 75,
+          "bandFraction": 0.9868,
+          "segments": 2,
+          "slideContiguousM": 3.6405,
+          "slideNaiveM": 3.8126,
+          "naiveOvercountPct": 4.7,
+          "slidePerStanceFrameM": 0.0499,
+          "pathTotalM": 3.8128,
+          "pathPerSecondMS": 1.5251,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": -0.0168,
+          "maxY": 0.1274,
+          "liftM": 0.1442,
+          "bandFrames": 47,
+          "bandFraction": 0.6184,
+          "segments": 6,
+          "slideContiguousM": 1.713,
+          "slideNaiveM": 2.6876,
+          "naiveOvercountPct": 56.9,
+          "slidePerStanceFrameM": 0.0418,
+          "pathTotalM": 3.8663,
+          "pathPerSecondMS": 1.5465,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.7545,
+          "maxY": 0.8274,
+          "liftM": 0.0728,
+          "bandFrames": 35,
+          "bandFraction": 0.4605,
+          "segments": 6,
+          "slideContiguousM": 0.0024,
+          "slideNaiveM": 0.0027,
+          "naiveOvercountPct": 13.1,
+          "slidePerStanceFrameM": 0.0001,
+          "pathTotalM": 0.0072,
+          "pathPerSecondMS": 0.0029,
+          "bandValid": true
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb"
+    },
+    "MB_Walk_Gun_Debug (travelling)": {
+      "clip": "MB_Walk_Gun_Debug",
+      "samples": 76,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 2.533333,
+      "exportedDurationS": 2.5,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 30,
+      "durationSUsed": 2.5,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 66,
+        "authoredForwardMps": 0.052,
+        "authoredLateralMps": -0.6572,
+        "authoredGroundSpeedMps": 0.6593
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.0442,
+          "maxY": 0.1377,
+          "liftM": 0.0935,
+          "bandFrames": 60,
+          "bandFraction": 0.7895,
+          "segments": 6,
+          "slideContiguousM": 1.3959,
+          "slideNaiveM": 3.3382,
+          "naiveOvercountPct": 139.1,
+          "slidePerStanceFrameM": 0.0259,
+          "pathTotalM": 3.3459,
+          "pathPerSecondMS": 1.3384,
+          "bandValid": false
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0492,
+          "maxY": 0.1162,
+          "liftM": 0.0669,
+          "bandFrames": 51,
+          "bandFraction": 0.6711,
+          "segments": 6,
+          "slideContiguousM": 0.6561,
+          "slideNaiveM": 3.1563,
+          "naiveOvercountPct": 381.1,
+          "slidePerStanceFrameM": 0.0146,
+          "pathTotalM": 3.2055,
+          "pathPerSecondMS": 1.2822,
+          "bandValid": false
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": -0.0135,
+          "maxY": 0.0168,
+          "liftM": 0.0304,
+          "bandFrames": 75,
+          "bandFraction": 0.9868,
+          "segments": 2,
+          "slideContiguousM": 3.1153,
+          "slideNaiveM": 3.3562,
+          "naiveOvercountPct": 7.7,
+          "slidePerStanceFrameM": 0.0427,
+          "pathTotalM": 3.3563,
+          "pathPerSecondMS": 1.3425,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": -0.0168,
+          "maxY": 0.1274,
+          "liftM": 0.1442,
+          "bandFrames": 47,
+          "bandFraction": 0.6184,
+          "segments": 6,
+          "slideContiguousM": 0.6928,
+          "slideNaiveM": 3.146,
+          "naiveOvercountPct": 354.1,
+          "slidePerStanceFrameM": 0.0169,
+          "pathTotalM": 3.2051,
+          "pathPerSecondMS": 1.282,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.7622,
+          "maxY": 0.8754,
+          "liftM": 0.1132,
+          "bandFrames": 16,
+          "bandFraction": 0.2105,
+          "segments": 3,
+          "slideContiguousM": 0.6319,
+          "slideNaiveM": 1.2108,
+          "naiveOvercountPct": 91.6,
+          "slidePerStanceFrameM": 0.0486,
+          "pathTotalM": 3.1817,
+          "pathPerSecondMS": 1.2727,
+          "bandValid": true
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun.glb"
+    },
+    "Walk (authored)": {
+      "clip": "Walk",
+      "samples": 33,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 1.1,
+      "exportedDurationS": 1.0667,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 24,
+      "durationSUsed": 1.3333,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 616,
+        "authoredForwardMps": 1.3558,
+        "authoredLateralMps": -0.0111,
+        "authoredGroundSpeedMps": 1.3559
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.0224,
+          "maxY": 0.2184,
+          "liftM": 0.196,
+          "bandFrames": 11,
+          "bandFraction": 0.3333,
+          "segments": 1,
+          "slideContiguousM": 0.5738,
+          "slideNaiveM": 0.5738,
+          "naiveOvercountPct": 0,
+          "slidePerStanceFrameM": 0.0574,
+          "pathTotalM": 1.7634,
+          "pathPerSecondMS": 1.3225,
+          "bandValid": true
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0224,
+          "maxY": 0.2184,
+          "liftM": 0.1961,
+          "bandFrames": 12,
+          "bandFraction": 0.3636,
+          "segments": 1,
+          "slideContiguousM": 0.6219,
+          "slideNaiveM": 0.6219,
+          "naiveOvercountPct": 0,
+          "slidePerStanceFrameM": 0.0565,
+          "pathTotalM": 1.7547,
+          "pathPerSecondMS": 1.316,
+          "bandValid": true
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": 0.4669,
+          "maxY": 0.4669,
+          "liftM": 0,
+          "bandFrames": 33,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": 0.4669,
+          "maxY": 0.4669,
+          "liftM": 0,
+          "bandFrames": 33,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.8201,
+          "maxY": 0.8899,
+          "liftM": 0.0698,
+          "bandFrames": 17,
+          "bandFraction": 0.5152,
+          "segments": 3,
+          "slideContiguousM": 0.0431,
+          "slideNaiveM": 0.0862,
+          "naiveOvercountPct": 100,
+          "slidePerStanceFrameM": 0.0031,
+          "pathTotalM": 0.0862,
+          "pathPerSecondMS": 0.0646,
+          "bandValid": false
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb"
+    },
+    "Run (authored)": {
+      "clip": "Run",
+      "samples": 20,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 0.666667,
+      "exportedDurationS": 0.6333,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 24,
+      "durationSUsed": 0.7917,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 543,
+        "authoredForwardMps": 3.0803,
+        "authoredLateralMps": 0,
+        "authoredGroundSpeedMps": 3.0803
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.022,
+          "maxY": 0.5596,
+          "liftM": 0.5376,
+          "bandFrames": 5,
+          "bandFraction": 0.25,
+          "segments": 1,
+          "slideContiguousM": 0.5058,
+          "slideNaiveM": 0.5058,
+          "naiveOvercountPct": 0,
+          "slidePerStanceFrameM": 0.1264,
+          "pathTotalM": 2.0177,
+          "pathPerSecondMS": 2.5487,
+          "bandValid": true
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0222,
+          "maxY": 0.558,
+          "liftM": 0.5357,
+          "bandFrames": 5,
+          "bandFraction": 0.25,
+          "segments": 2,
+          "slideContiguousM": 0.3651,
+          "slideNaiveM": 0.8278,
+          "naiveOvercountPct": 126.7,
+          "slidePerStanceFrameM": 0.1217,
+          "pathTotalM": 1.9276,
+          "pathPerSecondMS": 2.4349,
+          "bandValid": true
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": 0.4206,
+          "maxY": 0.4206,
+          "liftM": 0,
+          "bandFrames": 20,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": 0.4233,
+          "maxY": 0.4233,
+          "liftM": 0,
+          "bandFrames": 20,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.7964,
+          "maxY": 0.8782,
+          "liftM": 0.0818,
+          "bandFrames": 7,
+          "bandFraction": 0.35,
+          "segments": 2,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": 16.3,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": true
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb"
+    },
+    "Run_Back (authored)": {
+      "clip": "Run_Back",
+      "samples": 21,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 0.7,
+      "exportedDurationS": 0.6667,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 24,
+      "durationSUsed": 0.8333,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 519,
+        "authoredForwardMps": -3.0803,
+        "authoredLateralMps": 0,
+        "authoredGroundSpeedMps": 3.0803
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.022,
+          "maxY": 0.4546,
+          "liftM": 0.4326,
+          "bandFrames": 5,
+          "bandFraction": 0.2381,
+          "segments": 1,
+          "slideContiguousM": 0.5078,
+          "slideNaiveM": 0.5078,
+          "naiveOvercountPct": 0,
+          "slidePerStanceFrameM": 0.127,
+          "pathTotalM": 1.969,
+          "pathPerSecondMS": 2.3628,
+          "bandValid": true
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0222,
+          "maxY": 0.4505,
+          "liftM": 0.4282,
+          "bandFrames": 6,
+          "bandFraction": 0.2857,
+          "segments": 2,
+          "slideContiguousM": 0.474,
+          "slideNaiveM": 0.9467,
+          "naiveOvercountPct": 99.7,
+          "slidePerStanceFrameM": 0.1185,
+          "pathTotalM": 1.9267,
+          "pathPerSecondMS": 2.312,
+          "bandValid": true
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": 0.4206,
+          "maxY": 0.4206,
+          "liftM": 0,
+          "bandFrames": 21,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": 0.4233,
+          "maxY": 0.4233,
+          "liftM": 0,
+          "bandFrames": 21,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.7964,
+          "maxY": 0.8782,
+          "liftM": 0.0818,
+          "bandFrames": 7,
+          "bandFraction": 0.3333,
+          "segments": 2,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": 0.6,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": true
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb"
+    },
+    "Idle_Gun (authored)": {
+      "clip": "Idle_Gun",
+      "samples": 41,
+      "firstKeyS": 0.033333,
+      "lastKeyS": 1.366667,
+      "exportedDurationS": 1.3333,
+      "sampleStepS": 0.033333,
+      "exportFps": 30,
+      "nativeFpsUsed": 24,
+      "durationSUsed": 1.6667,
+      "authoredSpeed": {
+        "method": "median-contact-phase-ankle-velocity-relative-to-hips (scripts/blender/measure-pass77-operator-locomotion.py)",
+        "contactHeightFraction": 0.1,
+        "contactSamples": 960,
+        "authoredForwardMps": 0,
+        "authoredLateralMps": 0,
+        "authoredGroundSpeedMps": 0
+      },
+      "bones": [
+        {
+          "name": "Foot.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.L",
+          "minY": 0.0228,
+          "maxY": 0.0228,
+          "liftM": 0,
+          "bandFrames": 41,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "Foot.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > Foot.R",
+          "minY": 0.0228,
+          "maxY": 0.0228,
+          "liftM": 0,
+          "bandFrames": 41,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "PT.L",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.L",
+          "minY": 0.6265,
+          "maxY": 0.6265,
+          "liftM": 0,
+          "bandFrames": 41,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "PT.R",
+          "parent": "Root",
+          "chain": "CharacterArmature > Root > PT.R",
+          "minY": 0.4233,
+          "maxY": 0.4233,
+          "liftM": 0,
+          "bandFrames": 41,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": null,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        },
+        {
+          "name": "Hips",
+          "parent": "Body",
+          "chain": "CharacterArmature > Root > Body > Hips",
+          "minY": 0.8576,
+          "maxY": 0.8657,
+          "liftM": 0.0081,
+          "bandFrames": 41,
+          "bandFraction": 1,
+          "segments": 1,
+          "slideContiguousM": 0,
+          "slideNaiveM": 0,
+          "naiveOvercountPct": 0,
+          "slidePerStanceFrameM": 0,
+          "pathTotalM": 0,
+          "pathPerSecondMS": 0,
+          "bandValid": false
+        }
+      ],
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb"
+    }
+  }
+}
