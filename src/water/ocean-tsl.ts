@@ -24,11 +24,14 @@ import {
 } from 'three/webgpu';
 import {
   abs,
+  cameraPosition,
   color,
   cos,
+  exp,
   dot,
   float,
   max,
+  min,
   mix,
   positionLocal,
   positionWorld,
@@ -49,7 +52,7 @@ import {
   oceanSpectrumFingerprint,
 } from './ocean-spectrum';
 import { minimumSurfaceSegments } from './water-quality';
-import { waterBodyId, type WaterBodyDefinition } from './water-authoring';
+import { WATER_TYPES, waterBodyId, type WaterBodyDefinition, type WaterOptics } from './water-authoring';
 
 export type OceanTslWater = Readonly<{
   mesh: THREE.Mesh;
@@ -92,6 +95,65 @@ export const OCEAN_EMISSIVE_SCALE = 0.38;
 export function oceanRoughnessFromSlope(slopeMagnitude: number): number {
   const t = Math.min(1, Math.max(0, slopeMagnitude / OCEAN_SLOPE_FULL_ROUGHNESS));
   return OCEAN_ROUGHNESS_FLAT + (OCEAN_ROUGHNESS_ROUGH - OCEAN_ROUGHNESS_FLAT) * t;
+}
+
+/**
+ * HF-420 physical water colour.
+ *
+ * A palette lerp between a "deep" and a "shallow" colour is not a water colour
+ * model; it is a painted approximation of one, and it is why browser water
+ * reads as plastic. Water colour is TRANSMISSION: light travels a path through
+ * the medium, the medium removes wavelengths at different rates, and what is
+ * left comes back to the eye. Beer-Lambert:
+ *
+ *   transmitted = incoming * exp(-sigma * pathLength)
+ *
+ * with sigma a per-channel extinction vector (see WATER_TYPES) and pathLength a
+ * real distance through the water column, not a constant.
+ *
+ * WHERE OUR pathLength COMES FROM, stated plainly because it is a deviation.
+ * The canonical form derives pathLength from scene depth behind the surface.
+ * This surface is OPAQUE (depthWrite, no refraction), so there is no depth
+ * texture to read without adding a pass, and the trial's budget is zero new
+ * passes. Instead the column is derived from the body's own AUTHORED
+ * bathymetry - the shore ramp for an ocean, the rectangle's shore band for a
+ * pond - and then slanted by the view angle. It is a real per-pixel,
+ * view-dependent path length, and it is what makes water at a shore read as
+ * shallow; it is NOT a depth-buffer read, and nothing here should be quoted as
+ * one. Refraction (which brings the depth read with it) is deliberately out of
+ * scope for this pass.
+ */
+/** Minimum cosine used when slanting the path, so a grazing view stays finite. */
+export const OCEAN_MIN_VIEW_COSINE = 0.18;
+
+/** Optical path through the column: down to the floor and back out to the eye. */
+export function oceanPathLength(columnDepth: number, viewCosine: number): number {
+  const cosine = Math.max(OCEAN_MIN_VIEW_COSINE, Math.min(1, viewCosine));
+  return columnDepth * (1 / cosine + 1);
+}
+
+/** Beer-Lambert transmission per channel over an optical path. */
+export function oceanTransmission(
+  optics: WaterOptics,
+  pathLength: number,
+): Readonly<{ r: number; g: number; b: number }> {
+  return Object.freeze({
+    r: Math.exp(-optics.extinction.r * pathLength),
+    g: Math.exp(-optics.extinction.g * pathLength),
+    b: Math.exp(-optics.extinction.b * pathLength),
+  });
+}
+
+/** The optics a body renders with, or null when it keeps the palette lerp. */
+export function oceanOpticsForBody(body: WaterBodyDefinition): WaterOptics | null {
+  return body.waterType ? WATER_TYPES[body.waterType] : null;
+}
+
+/** Authored column depth (m) at open water for a body with optics. */
+export function oceanColumnDepth(body: WaterBodyDefinition): number {
+  const optics = oceanOpticsForBody(body);
+  if (!optics) return 0;
+  return body.opticalDepth ?? optics.defaultDepth;
 }
 
 /**
@@ -186,7 +248,52 @@ export function createOceanTslWater(
     .add(animationTime.mul(0.45))).mul(0.5).add(0.5);
   const foamBreakup = smoothstep(float(0.58), float(0.92), shimmer);
   const authoredFoam = crestFoam.mul(foamBreakup);
-  const darkWater = mix(color(body.palette.deep), color(body.palette.shallow), shimmer.mul(0.22).add(slope.mul(1.35)).min(1));
+  const paletteWater = mix(color(body.palette.deep), color(body.palette.shallow), shimmer.mul(0.22).add(slope.mul(1.35)).min(1));
+
+  // --- HF-420 Beer-Lambert colour -----------------------------------------
+  // One graph for every body. A body with no authored waterType sets
+  // useExtinction to 0 and comes out byte-identical to the palette lerp above,
+  // so the physical model reverts per body by deleting one authored field and
+  // the pipeline count is unchanged (uniforms, never a new graph shape).
+  const optics = oceanOpticsForBody(body);
+  const useExtinction = uniform(optics ? 1 : 0);
+  const extinction = uniform(new THREE.Vector3(
+    optics?.extinction.r ?? 0,
+    optics?.extinction.g ?? 0,
+    optics?.extinction.b ?? 0,
+  ));
+  const columnDepth = uniform(oceanColumnDepth(body));
+  // Authored bathymetry, two shapes, selected by a uniform so the graph is one
+  // shape: an ocean ramps from its shoreline out to open water in Chebyshev
+  // distance from the arena origin; a pond ramps inward from its own rectangle
+  // edge over its shore band.
+  const shapedMask = uniform(shape ? 1 : 0);
+  const shoreInner = uniform(body.shore.innerRadius);
+  const shoreOuter = uniform(Math.max(body.shore.outerRadius, body.shore.innerRadius + 0.001));
+  const shapeCenter = uniform(new THREE.Vector2(shape?.centerX ?? 0, shape?.centerZ ?? 0));
+  const shapeHalf = uniform(new THREE.Vector2(sizeX / 2, sizeZ / 2));
+  const shoreBand = uniform(Math.max(shape?.shoreBand ?? 1, 0.001));
+  const chebyshev = max(abs(positionWorld.x), abs(positionWorld.z));
+  const openDepthFactor = smoothstep(shoreInner, shoreOuter, chebyshev);
+  const edgeDistance = min(
+    shapeHalf.x.sub(abs(positionWorld.x.sub(shapeCenter.x))),
+    shapeHalf.y.sub(abs(positionWorld.z.sub(shapeCenter.y))),
+  );
+  const shapedDepthFactor = smoothstep(float(0), shoreBand, edgeDistance);
+  const waterDepth = columnDepth.mul(mix(openDepthFactor, shapedDepthFactor, shapedMask));
+  // Slant the column by the view angle: light goes down to the floor and back
+  // out to the eye, so a grazing look crosses far more water than a look
+  // straight down. Clamped so a horizon-grazing ray stays finite.
+  const viewDirection = cameraPosition.sub(positionWorld).normalize();
+  const viewCosine = dot(oceanNormalLocal, viewDirection).max(float(OCEAN_MIN_VIEW_COSINE));
+  const pathLength = waterDepth.mul(float(1).div(viewCosine).add(1));
+  const transmission = exp(extinction.mul(pathLength).negate());
+  // The authored `shallow` colour is reused as the water-leaving reference
+  // radiance (bottom plus in-water scattering) that the column then absorbs;
+  // it is <= 1 per channel and transmission is <= 1, so the bloom-threshold
+  // contract above is preserved by construction.
+  const physicalWater = color(body.palette.shallow).mul(transmission);
+  const darkWater = mix(paletteWater, physicalWater, useExtinction);
   const keyLight = body.night
     ? vec3(0.25, 0.85, 0.35).normalize()
     : vec3(0.45, 0.72, -0.22).normalize();
@@ -250,6 +357,9 @@ export function createOceanTslWater(
   water.userData.surfaceSegmentsZ = segmentsZ;
   water.userData.waterBodyId = waterBodyId(body);
   water.userData.waterShape = shape;
+  water.userData.waterType = body.waterType ?? null;
+  water.userData.waterExtinction = optics ? [optics.extinction.r, optics.extinction.g, optics.extinction.b] : null;
+  water.userData.waterColumnDepth = oceanColumnDepth(body);
   water.userData.totalSteepness = OCEAN_TOTAL_STEEPNESS;
   water.userData.waterBody = body;
   water.userData.swimmable = body.swimmable;
