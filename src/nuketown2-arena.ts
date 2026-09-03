@@ -339,11 +339,23 @@ function pair(
   name: string,
   position: [number, number, number],
   size: [number, number, number],
-  material: THREE.Material,
+  /**
+   * One material for both halves, or `[north, south]` for the two that differ
+   * by COLOUR ALONE. HF-426 Job 3: the reference's playable houses are blue,
+   * yellow and orange - not one repeated shell - and the two houses here are
+   * the map's primary landmark, so a player who breaks into an upper room can
+   * tell whose room it is from the siding. Geometry stays identical, which is
+   * what the fidelity gate's 180-degree partner test measures (size + position,
+   * never material), so this cannot make the two halves unequal to play.
+   */
+  material: THREE.Material | readonly [THREE.Material, THREE.Material],
   options: BoxOptions = {},
 ): void {
-  box(builder, `nuketown2 north ${name}`, position, size, material, options);
-  box(builder, `nuketown2 south ${name}`, [-position[0], position[1], -position[2]], size, material, options);
+  const single = (material as { isMaterial?: boolean }).isMaterial === true;
+  const north = single ? material as THREE.Material : (material as readonly THREE.Material[])[0]!;
+  const south = single ? material as THREE.Material : (material as readonly THREE.Material[])[1]!;
+  box(builder, `nuketown2 north ${name}`, position, size, north, options);
+  box(builder, `nuketown2 south ${name}`, [-position[0], position[1], -position[2]], size, south, options);
 }
 
 /** A body already centred on the origin axis it would be rotated about. */
@@ -387,8 +399,14 @@ type Nuketown2Materials = Readonly<{
   asphalt: THREE.MeshStandardMaterial;
   kerb: THREE.MeshStandardMaterial;
   drive: THREE.MeshStandardMaterial;
+  /** North house board siding - the reference's BLUE house. */
   sidingA: THREE.MeshStandardMaterial;
+  /** South house board siding - the reference's YELLOW house. */
   sidingB: THREE.MeshStandardMaterial;
+  /** Both garage wings - the reference's ORANGE. */
+  garageSiding: THREE.MeshStandardMaterial;
+  /** The up-and-over garage door leaf parked in its head. */
+  garageDoor: THREE.MeshStandardMaterial;
   trim: THREE.MeshStandardMaterial;
   roof: THREE.MeshStandardMaterial;
   interior: THREE.MeshStandardMaterial;
@@ -406,36 +424,93 @@ type Nuketown2Materials = Readonly<{
 }>;
 
 /**
- * Our own palette, not the reference's. The owner's words: "we can then make our
- * own artstyle". A test-town built for one purpose and never lived in: bleached
- * board siding in two values so the two houses read apart at a glance while
- * staying the same building, a cool grey road, and exactly two saturated bodies
- * on the whole map — the coach and the truck box — so the eye goes to the
- * turning head, which is where the fight is.
+ * HF-426 JOB 3 - THE APPROVED LOOK, PORTED. Owner 2026-09-03: "then layer in
+ * all the visual styles we had aimed for and approved in our older layout".
+ * The approved look is the SHIPPED Nuke Town's (`atomic-acres`), so every
+ * albedo below is the shipped map's OWN, MEASURED - not eyeballed and not
+ * invented. The shipped map dresses itself with PBR texture sets it streams
+ * from `public/assets/original/textures/`; this arena imports nothing (see the
+ * file header), so each entry here carries that texture set's mean albedo at
+ * the same authored roughness/metalness, sampled 2026-09-03 on a 4-px stride:
  *
- * NOTE FOR JOB 3 (the visual pass). This palette is the PREVIEW palette. The
- * owner's approved look is the shipped Nuke Town's, and porting it is Job 3's
- * whole job; nothing in this file constrains it beyond the material NAMES the
- * geometry asks for.
+ *   siding-aqua      0x448684    plaster-warm   0xdbd1ba    grass-turf   0x496438
+ *   siding-coral     0xac5644    brick-warm     0x9b5c43    wood-deck    0x673b24
+ *   roof-shingles    0x444c4d    asphalt-aged   0x252a2c    concrete     0xa9a697
+ *
+ * ...plus the shipped map's own flat-authored materials, taken verbatim:
+ * `white` 0xf0e4c9/0.68, `mustard` 0xd9a43b, `chrome` 0xaebdc1/0.18/0.76,
+ * and art-kit's `MAT.rubber` 0x202628/0.9 and `MAT.cream` 0xe7dbc1/0.68.
+ *
+ * WHERE THE REFERENCE OVERRIDES THE SHIPPED MAP, AND WHY. Three places, all
+ * recorded in `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md`:
+ *
+ *   1. HOUSE COLOUR (5.3). The reference's playable-area houses are BLUE,
+ *      YELLOW and ORANGE - the previous cut's green+yellow are the ORIGINAL
+ *      Nuketown's colours, which is the same mistake as the yellow school bus.
+ *      So the trio is the shipped map's own three house/accent hues
+ *      re-pointed: its `siding-aqua` value and roughness rotated to blue for
+ *      the north house, its `mustard` for the south house, its `siding-coral`
+ *      for both garage wings. Same family, the reference's trio.
+ *   2. THE COACH IS CREAM AND RED (5.2), not the shipped coach's amber. It
+ *      keeps the shipped coach's PAINT SPEC (roughness 0.48, metalness 0.25 -
+ *      `buildRetroCoach` in art-kit.ts) so it reads as the same class of
+ *      object under the same key.
+ *   3. THE TRUCK IS A PLAIN BOX VAN (2), so it carries no saturated panel at
+ *      all. That leaves the coach's red waistline as the ONE saturated body on
+ *      the map, standing in the turning head, which is where the fight is.
+ *
+ * ONE THING IS DELIBERATELY NOT PORTED: `carA`'s roughness stays at 0.20.
+ * The ray-traced preset admits a reflective proxy at roughness <= 0.22 over
+ * 6 m2, and the parked cars are the only surfaces on this map that clear both;
+ * the shipped map's own `chrome` comment records the same rule being broken by
+ * one hundredth and costing the flagship map its reflections. `garageDoor`
+ * (0.18) is that same shipped chrome and adds two more.
  */
 function nuketown2Materials(): Nuketown2Materials {
   return Object.freeze({
-    ground: standard(0x6d6a52, 1, 0),
-    lawn: standard(0x5f6b41, 0.98, 0),
-    asphalt: standard(0x3c3d40, 0.95, 0.02),
-    kerb: standard(0x8d8a80, 0.9, 0.02),
-    drive: standard(0x6f6d66, 0.93, 0.02),
-    sidingA: standard(0xc8bda2, 0.88, 0.02),
-    sidingB: standard(0x9fae9c, 0.88, 0.02),
-    trim: standard(0xe4ded0, 0.8, 0.03),
-    roof: standard(0x54514c, 0.92, 0.03),
-    interior: standard(0xb0a894, 0.9, 0.01),
-    fence: standard(0x8a7a62, 0.9, 0.02),
-    block: standard(0x9a958a, 0.94, 0.01),
-    busShell: standard(0xd8a52b, 0.62, 0.16),
-    busTrim: standard(0x2f2f31, 0.7, 0.2),
-    truckCab: standard(0xa33327, 0.55, 0.24),
-    truckBox: standard(0xcfc7b4, 0.72, 0.1),
+    // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
+    // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
+    // so the 220 m slab reads as the same scrubland the forest ring stands on
+    // rather than as a different planet starting at the fence.
+    ground: standard(0x3f4a30, 1, 0),
+    // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
+    // this, and that field's blade green (0x5e9e41) was keyed against it.
+    lawn: standard(0x496438, 1, 0),
+    asphalt: standard(0x252a2c, 0.98, 0.02),
+    // concrete-poured, fresh at the kerb and weathered on the apron - the
+    // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
+    kerb: standard(0xa9a697, 0.94, 0.02),
+    drive: standard(0x8b8879, 0.94, 0.02),
+    // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
+    // with the hue carried to the reference's blue (measured 117.9).
+    sidingA: standard(0x46809f, 0.76, 0),
+    // The YELLOW house: the shipped map's `mustard` hex, at siding roughness
+    // rather than its painted-metal 0.58/0.18 - this is board, not panel.
+    sidingB: standard(0xd9a43b, 0.76, 0),
+    // The ORANGE wing: siding-coral, unchanged.
+    garageSiding: standard(0xac5644, 0.76, 0),
+    // The shipped map's `chrome`, verbatim - it is what dresses BOTH garage
+    // doors there. The opening itself stays a hole (it is a route); this is the
+    // door leaf parked in its head, which is what you see from the street.
+    garageDoor: standard(0xaebdc1, 0.18, 0.76),
+    // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
+    trim: standard(0xf0e4c9, 0.68, 0.03),
+    roof: standard(0x444c4d, 0.86, 0.03),
+    // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
+    interior: standard(0xdbd1ba, 0.92, 0.01),
+    // wood-deck: the plank fence, the same timber the shipped map decks with.
+    fence: standard(0x673b24, 0.92, 0.02),
+    block: standard(0x9d9a8c, 0.94, 0.01),
+    // THE COACH. Cream body (art-kit `MAT.cream`) at the shipped coach's own
+    // paint spec, with a red waistline - the reference's cream/red streamlined
+    // body - as the one saturated thing on the map.
+    busShell: standard(0xe7dbc1, 0.48, 0.25),
+    busTrim: standard(0xa8382c, 0.48, 0.25),
+    // THE MOVING TRUCK: a plain box van. Painted cab, matte panel box, no
+    // livery, because the reference's is a hire truck and because the eye is
+    // meant to go to the coach beside it.
+    truckCab: standard(0xdedac9, 0.55, 0.24),
+    truckBox: standard(0xd3cdbb, 0.78, 0.06),
     // The two parked cars are the only POLISHED surfaces on the map, and that
     // is deliberate rather than decorative: the ray-traced preset's proxy
     // extraction admits a surface at roughness <= 0.22 with a footprint over
@@ -445,11 +520,17 @@ function nuketown2Materials(): Nuketown2Materials {
     // ~0.2 rough and genuinely metallic, and a 4.4 x 1.9 m body clears the
     // footprint floor where the 2.2 x 1.7 m glass house does not, so the honest
     // fix was to author the paint correctly rather than to gloss a road.
-    carA: standard(0x3f6f86, 0.2, 0.62),
-    carGlass: standard(0x24333c, 0.14, 0.5),
-    rubber: standard(0x191a1c, 0.96, 0.02),
-    sign: standard(0xd9d2bd, 0.78, 0.06),
-    planter: standard(0x4a4034, 0.96, 0.01),
+    // Job 3 re-keys the HUE into the shipped map's own aqua family and leaves
+    // the two numbers the preset classifies on exactly where they were.
+    carA: standard(0x3d6f80, 0.2, 0.62),
+    carGlass: standard(0x2b3d47, 0.14, 0.5),
+    // art-kit `MAT.rubber`, verbatim.
+    rubber: standard(0x202628, 0.9, 0.02),
+    sign: standard(0xdbd1ba, 0.78, 0.06),
+    // Hedges, the yard crate, the patio table and the alley planter are one
+    // material and four of the five uses are garden mass, so it is keyed as
+    // clipped hedge against the shipped map's `grassDark` (effective 0x243917).
+    planter: standard(0x415a33, 0.96, 0.01),
   });
 }
 
@@ -470,7 +551,9 @@ function nuketown2Materials(): Nuketown2Materials {
  * are that if you can actually shoot through them.
  */
 function house(builder: Builder, m: Nuketown2Materials): void {
-  const siding = m.sidingA;
+  // HF-426 Job 3: blue north, yellow south. Same wall in the same place; only
+  // the paint differs, so the 180-degree partner gate is untouched.
+  const siding = [m.sidingA, m.sidingB] as const;
   const zFront = HOUSE_FRONT_Z - WALL_T / 2;      // wall centre, front face on the front line
   const zBack = HOUSE_BACK_Z + WALL_T / 2;
   const zMid = (HOUSE_FRONT_Z + HOUSE_BACK_Z) / 2;   // -16.5
@@ -638,7 +721,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 
   pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.drive, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, GARAGE_DEPTH], m.roof);
-  pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.sidingB);
+  pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
 
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box. Matches the hole cut in
@@ -646,22 +729,24 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   const LINK_DOOR: [number, number] = [-19.5, -17.9];
   [[GARAGE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], GARAGE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `garage link pier ${index}`,
-      [GARAGE_X0 + WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.sidingB);
+      [GARAGE_X0 + WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.garageSiding);
   });
 
   // Garage door: a 3.5 m opening onto the driveway apron, headed at 3.0 m.
   const DOOR: [number, number] = [5.0, 8.5];
   [[GARAGE_X0, DOOR[0]], [DOOR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
-      [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.sidingB);
+      [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
   });
-  pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.trim);
+  // The door LEAF, parked in its head: the shipped map's chrome, and the piece
+  // that makes a 3.5 m hole read as a garage rather than as a missing wall.
+  pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.garageDoor);
 
   // Rear door into the back yard.
   const REAR: [number, number] = [5.4, 7.0];
   [[GARAGE_X0, REAR[0]], [REAR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
-      [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.sidingB);
+      [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
   });
   pair(builder, 'garage back head', [(REAR[0] + REAR[1]) / 2, H - 0.4, zBack], [REAR[1] - REAR[0], 0.8, WALL_T], m.trim);
 
@@ -722,8 +807,22 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   const bodyH = c.height - 0.2;
   streetVehicle(builder, 'coach body', [c.x, bodyH / 2, c.z], [c.length, bodyH, c.width], m.busShell);
   streetVehicle(builder, 'coach roof cap', [c.x, c.height - 0.1, c.z], [c.length - 0.4, 0.2, c.width - 0.2], m.busShell);
-  streetVehicle(builder, 'coach window band', [c.x, 2.1, c.z + c.width / 2],
-    [c.length - 1.6, 0.9, 0.08], m.busTrim, { solid: false, shots: false, cast: false });
+  // HF-426 Job 3 - THE COACH IS THE MAP'S LANDMARK, so it is dressed on both
+  // flanks rather than one. A cream box with a single band down one side reads
+  // as a crate from the half of the map that cannot see that side; the
+  // reference's coach is a cream body with a RED WAISTLINE and a continuous
+  // window band, and it is the only saturated body left on this map now the
+  // truck is a plain van. Four decals replace the one previous band; all four
+  // are named `nuketown2 street-vehicle ...` and all four are added to the
+  // enumerated asymmetric list in nuketown2-fidelity.test.ts with this reason.
+  // Presentation only: no collider, no shot surface, no shadow - the coach's
+  // solid body underneath is unchanged, so cover and ballistics do not move.
+  for (const [index, side] of [-1, 1].entries()) {
+    streetVehicle(builder, `coach waist stripe ${index}`, [c.x, 1.35, c.z + side * c.width / 2],
+      [c.length - 0.6, 0.5, 0.08], m.busTrim, { solid: false, shots: false, cast: false });
+    streetVehicle(builder, `coach window band ${index}`, [c.x, 2.25, c.z + side * c.width / 2],
+      [c.length - 1.6, 0.8, 0.08], m.carGlass, { solid: false, shots: false, cast: false });
+  }
   for (const [index, x] of [-2.9, 2.9].entries()) {
     streetVehicle(builder, `coach wheel ${index}`, [c.x + x, 0.42, c.z], [1.0, 0.84, c.width + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });

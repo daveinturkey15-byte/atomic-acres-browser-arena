@@ -532,7 +532,22 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle coach roof cap',
       'nuketown2 street-vehicle coach wheel 0',
       'nuketown2 street-vehicle coach wheel 1',
-      'nuketown2 street-vehicle coach window band',
+      // HF-426 JOB 3, 2026-09-03 - DELIBERATE ADDITION, with the reason.
+      // The one-flank `coach window band` became four flank decals: a red
+      // WAIST STRIPE and a glazing BAND on each side. Why the list grows: the
+      // coach is now cream (the reference's cream/red streamlined body,
+      // schematic 5.2) and is the only saturated body left on the map now the
+      // truck is a plain box van, so it has to read as a coach from BOTH
+      // halves - a cream box banded down one side only reads as a crate to
+      // whichever team cannot see that side. All four are presentation decals
+      // (solid: false, shots: false, cast: false) on the coach's own solid
+      // body, so no cover, collider or ballistic surface moved; the exception's
+      // plan-area cap and the per-half cover floors below both still measure
+      // the same solids they did before.
+      'nuketown2 street-vehicle coach waist stripe 0',
+      'nuketown2 street-vehicle coach waist stripe 1',
+      'nuketown2 street-vehicle coach window band 0',
+      'nuketown2 street-vehicle coach window band 1',
       'nuketown2 street-vehicle head car body',
       'nuketown2 street-vehicle head car cabin',
       'nuketown2 street-vehicle head car wheel 00',
