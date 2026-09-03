@@ -86,6 +86,20 @@ WARN [REG-2] row 8 "Fully procedural jungle (same author, earlier)" (line 108) r
 WARN [REG-5] row 31 "Rigged first-person arms, CC0 (para / OpenGameArt)" (line 758) has no **Canonical:** field; record `Canonical: none - <why>` explicitly so 'unresolved' is distinguishable from 'never looked'
 ```
 
+### CORRECTION (2026-09-03) — the session-1 AFTER count is **13**, not 14
+
+The AFTER block above is the guard's own stdout and it reads `problems=13`, with thirteen bullets
+under it. The lane report and commit `80a17e11`'s subject both said **14**. The guard is the
+authority and it was already in this file; the report miscounted its own artefact. The corrected
+series is:
+
+| | s1 start | s1 end | s2 start | s2 end | s3 end (this pass) |
+|---|---|---|---|---|---|
+| `technique_register_guard` problems | 47 | **13** | 9 | 8 | **6** |
+
+The pushed commit subject is left as it is: a commit message is not rewritten to fix a number the
+evidence file beside it already states correctly. See `CORRECTIONS.md` §C3.
+
 ## What changed, and who owns it
 
 | Finding class | Before | After | Cause |
@@ -142,3 +156,63 @@ other owners' skills; `open-world-city-art-loop@Qoder` (REG-8) is HF-419's mirro
 weights are **still absent** from `models/diffusion_models/` and `models/vae/`, so the brief's
 step 5 bounded test remains blocked on a ~9.95 GB download into the owner's install — his call,
 not a lane's. His ComfyUI was not updated, restarted or queued in this session either.
+
+
+## SESSION 3 (2026-09-03, skeptic repair) — 6 problems, none Lane AH's
+
+Same command, same machine, AKP root. The skeptic independently measured **6** before this pass
+began; between session 2 and now, other owners closed the `threejs-webgpu-water` REG-4 rows.
+
+```
+FAIL technique-register-guard machine=dave-gaming-pc rows=49 skills=17 problems=6 warnings=3
+- [REG-5] row 24 "TAKEN - browser survival horror ... (VOIDMODE)" (line 488) names a canonical repository but pins no 40-hex commit
+- [REG-5] row 32 "WAN 2.2 - local text-to-video and image-to-video, Apache 2.0" (line 785) names a canonical repository but pins no 40-hex commit
+- [REG-4] carrying skill 'local-video-generation' is absent from the frozen skill baseline
+- [REG-4] carrying skill 'local-video-generation' has drifted since its evaluation was written (record 052cde0f4bd6, disk b43d4b3e5a88)
+- [REG-8] carrying skill 'open-world-city-art-loop' is not mirrored to Qoder
+- [REG-7] 'threejs-webgpu-water' mirror for Qoder disagrees with canonical (b535720fc6ba canonical vs 1adc553a3dc3 mirror)
+WARN [REG-5] row 5 ... | WARN [REG-2] row 8 ... | WARN [REG-5] row 31 ...   (3 warnings, unchanged all session)
+```
+
+Rows 24 and 32 are older commit-pin gaps; `local-video-generation` is pre-existing;
+`open-world-city-art-loop@Qoder` is HF-419's; the `threejs-webgpu-water` Qoder mirror is HF-420's.
+**None names a Lane AH skill or row.** Reported, not swept — no exemption entry was written and no
+blanket accept was run.
+
+### The transient 7th problem was this lane's own, and it was fixed properly
+
+Editing `comfyui-3d-native-pipeline/SKILL.md` moved canonical to `61202ad0e934` while the Qoder
+copy still held `b95258caf3cc`, so the guard raised **REG-7 against this lane** (6 → 7). Repaired
+by hand-copying that one file **from** canonical to `~\.qoder\skills\comfyui-3d-native-pipeline\`,
+then re-running: 7 → 6.
+
+`sync_skill_mirrors.py --apply` was **not** run. It resolves through two junctions into the vault
+store and is newest-wins-by-mtime with write-through, so a stale mirror can overwrite canonical —
+the failure mode recorded in AKP gotcha `8dc73d0`. Qoder gaps are hand-copied per skill or not at
+all.
+
+### The scoped accept, and what was deliberately not touched
+
+```
+$ python scripts/skill_regression_guard.py accept --skill comfyui-3d-native-pipeline \
+    --policy skill-regression-policy.json --skill-root C:\Users\david\AppData\Local\hermes\skills \
+    --baseline skill-baseline.json --evaluations skill-evaluations
+PASS skill-regression-guard skills=162 drift=1 warnings=10
+PASS accepted skills=comfyui-3d-native-pipeline
+```
+
+- `--skill <name>`, never a blanket accept; `--force` was never used.
+- `skill-regression-policy.json` untouched — the 360-char ceiling is still at its original commit.
+  The ten `WARN ... long resident description` lines are other owners' skills between 271 and 341
+  chars, i.e. under the ceiling and over the 220-char warn threshold. They are warnings by design
+  and were left as warnings.
+- `description_sha256` for this skill is **unchanged** (`0dd63a13…`) because the frontmatter was not
+  edited; only the body moved, `b95258caf3cc` → `61202ad0e934`, with a rewritten paired evaluation
+  record (`change_type: update`, sixth paired scenario, regression budget still 0) and a fresh
+  SkillScan v1.1.5 verdict of **SAFE**.
+
+### Discovery re-verified
+
+`_Scripts\link_skills.ps1 -VerifyOnly`: **162 active skills, OK 162/162** on all seven roots
+(Claude Code, OMP, Codex, dsh, Continue, Antigravity, Hermes); read-through probe OK. The
+machine-wide 0/159 outage this lane found in session 1 has not regressed.
