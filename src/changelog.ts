@@ -147,6 +147,16 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       // stays the entry the release card renders. No pass number is invented
       // here - this extends the entry the release stamp already names, which
       // is the pattern this file documents for lanes.
+      //
+      // INTEGRATOR, READ THIS BEFORE MERGING. It was written on a branch based
+      // at 714d4121, where `pass85` was the PENDING top entry. PASS 86
+      // published at 00:50 BST 2026-09-03 and froze pass85's timestamp, so on
+      // the integration line this string is sitting inside an ALREADY-PUBLISHED
+      // release and git will merge it there without a conflict. MOVE IT to the
+      // new pending top entry and add 'GRAPHICS' to that entry's `areas`.
+      // `src/graphics-profile-contract.test.ts` -> "registers the
+      // graphics-ladder highlight only in the unreleased top entry"
+      // fails until you do; that red is the reminder, not a bug.
       'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
       'Pass 84 stays published as the single safe backup; every older channel is retired',
     ]),

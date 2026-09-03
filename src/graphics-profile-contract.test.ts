@@ -19,6 +19,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { CHANGELOG, PENDING_PRODUCTION_RELEASE } from './changelog';
 import { GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import { normalizePass65Settings } from './pass65-settings';
 import {
@@ -280,5 +281,46 @@ describe('HF-418 RTX explainer', () => {
     expect(stageAt).toBeGreaterThan(openAt);
     // And the branch has to return, or the explainer would stage a preset too.
     expect(body.slice(openAt, stageAt)).toContain('return;');
+  });
+});
+
+describe('HF-418 release-note registration', () => {
+  it('registers the graphics-ladder highlight only in the unreleased top entry', () => {
+    // THE MERGE HAZARD THIS EXISTS FOR, AND WHY IT IS A TEST RATHER THAN A NOTE.
+    //
+    // This lane branched at 714d4121, where `pass85` was the PENDING top entry,
+    // and registered HF-418's highlight there - correctly, at the time. PASS 86
+    // then published at 00:50 BST 2026-09-03 from integration e1361b0f, which
+    // froze pass85's releasedAt to a real receipt and put `pass86` above it.
+    // `git merge-tree --write-tree HEAD e1361b0f` merges CLEANLY: git has no
+    // opinion about which array a string lands in. Without this assertion the
+    // BALANCED mode, the per-mode copy and the RTX explainer would be advertised
+    // to players inside an ALREADY-PUBLISHED release entry, and no gate on the
+    // integration line would notice (changelog.test.ts pins latest.id and never
+    // inspects a past entry's highlights).
+    //
+    // So the rule is stated mechanically: the highlight lives in CHANGELOG[0],
+    // and CHANGELOG[0] is still on the pending sentinel. On the integration line
+    // this goes RED and tells the integrator to move one string into the new
+    // pending entry (and 'GRAPHICS' into that entry's `areas`). A red test that
+    // names the fix beats a clean merge that ships a lie.
+    const marker = 'A new BALANCED graphics mode sits between Performance and Quality';
+    const carrying = CHANGELOG.filter((entry) => entry.highlights.some((line) => line.includes(marker)));
+    expect(carrying, 'the HF-418 highlight must be registered exactly once').toHaveLength(1);
+    expect(carrying[0], 'the HF-418 highlight must sit in the entry the release stamp names')
+      .toBe(CHANGELOG[0]);
+    expect(
+      carrying[0].releasedAt,
+      'MOVE THE HF-418 HIGHLIGHT: CHANGELOG[0] carries a published release timestamp, '
+        + 'so this build would advertise PASS 87 graphics work inside an already-shipped '
+        + 'release entry. Move the string into the new pending top entry and add GRAPHICS '
+        + 'to its areas.',
+    ).toBe(PENDING_PRODUCTION_RELEASE);
+    expect(carrying[0].areas).toContain('GRAPHICS');
+    // The three things the highlight promises the player must all be in it.
+    const highlight = carrying[0].highlights.find((line) => line.includes(marker)) ?? '';
+    expect(highlight).toMatch(/RTX entry opens an explainer/);
+    expect(highlight).toMatch(/RAY TRACED/);
+    expect(highlight).toMatch(/any WebGPU graphics card/);
   });
 });
