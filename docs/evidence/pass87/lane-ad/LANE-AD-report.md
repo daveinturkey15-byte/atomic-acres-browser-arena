@@ -350,3 +350,104 @@ No headed browser was launched. The only browser run is Playwright chromium **he
 confirmed empty (`http://127.0.0.1:8188/queue` → `{"queue_running": [], "queue_pending": []}`).
 No process I did not start was killed. No server was left running. gh-pages was read via
 `git archive` only — no worktree, no branch write, nothing published.
+
+---
+
+# REPAIR PASS (skeptic verdict ACCEPT_WITH_FIXES), 2026-09-03 03:05–03:30 BST
+
+Four commits: `b1d7e3d8`, `dae229f2`, `224d4b69`, `c43981f7`.
+
+## MAJOR 1 — the channel-path detector had a hole in its own defect class. FIXED.
+
+`allowed` was every `channels/<id>` string anywhere in `release-channels.json`, and that file
+also records where channels USED to live. Measured before the repair (the skeptic's two
+probes, reproduced): a stale live literal one pass after the stamp moves returned `[]`
+(the outgoing path is parked in `pass<N>Backup.path`), and `channels/the-big-one` against
+today's config returned `[]` (it survives three times as a historical `pagesPath`).
+
+`allowed` is now built by SUBTRACTION: the `path` of every channel that is neither
+`experimental` nor a `pass<N>Backup` — measured as
+`[channels/pass72-retained, channels/pass70-retained, channels/pass69-retained,
+channels/recent-stable, channels/pass63-rollback]`. Literals are extracted by a scanner over
+real string literals (comments and regex literals no longer count; a path inside a longer
+route literal now does). One contextual exemption: a literal compared against a recorded
+`.pagesPath` field, which pins an immutable historical Pages location and can never be a
+route — the same value against `.path` is still flagged, asserted red.
+
+Mutation-proven against the real sources: reintroducing `'channels/the-big-one'` or
+`'channels/pass86'` into `scripts/qa/verify-release-topology.mjs` is flagged; the five owned
+sources (now including `tests/e2e/release-channel-chooser.spec.ts`) return `[]`.
+`node --test scripts/release/release-policy-contract.test.mjs` → 6/6.
+
+## MAJOR 2 — three repository documents still say the workflow publishes. NOT FIXED HERE.
+
+Outside this lane's ownership. `AGENTS.md:84`, `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md:93`
+and `README.md:118`+`:122`. The exact patches for all three are in the lane report's
+`outsideOwnershipPatches` (the README one is new in this repair). The workflow change must
+not merge without them.
+
+## MAJOR 3 — the WebGPU guard was green-with-nothing-checked. FIXED, AND THE GAP CLOSED.
+
+Every block now pushes a `blocked` annotation into `testInfo.annotations`, and the absence
+THROWS under `REQUIRE_WEBGPU_ADAPTER=1` or `PASS73_NATIVE_WEBGPU=1` (that run launches
+installed Chrome headless precisely because it acquires a real adapter).
+
+Then the assertions were actually measured. `PASS73_NATIVE_WEBGPU=1
+npm run qa:playwright-topology -- tests/e2e/release-channel-chooser.spec.ts
+--project=chromium --workers=1 --retries=0` → **5 passed, exit 0, 9.0 s, ZERO BLOCKED lines**
+(`docs/evidence/pass87/lane-ad/after4-e2e-chooser-native-webgpu.log.txt`). The live channel's
+runtime badge, the changelog head and the three legacy-alias badges are therefore measured on
+this machine, not assumed. Headless, no window, GPU 12.3 GiB free, ComfyUI queue empty.
+
+## MINORS
+
+- **YAML never parsed → PARSED.** `yaml@2.9.0` (read-only `require` of a copy already installed
+  elsewhere on this machine; none exists in this checkout, and python has no `yaml`):
+  0 errors, 0 warnings, 5 top-level keys, `name: release-verification`, `permissions` all
+  read, one job `verify`, 18 steps. `docs/evidence/pass87/lane-ad/yaml-parse.log.txt`.
+- **HF-400 guard degraded to green when git failed → FAILS.** In a checkout without
+  `origin/gh-pages` the CLI now exits 1 saying the live half did not run;
+  `TWO_CHANNEL_POLICY_SKIP_GIT=1` still exits 0 (skipping is opt-in). Unchanged where the
+  ref exists.
+- **Self-referential card count → pinned to the config.** The expected key set is derived from
+  `release-channels.json` and from what `stage-release-topology.mjs` stages under each key
+  (`experimental, previous, retained, historical`, plus `stable` exactly when the config
+  carries the Pass 63 rollback), asserted as set equality, and each card's `path`/`pass` is
+  pinned to that channel's configured values.
+- **`write-production-receipt.mjs` uncallable → documented dormant**, with why it is kept
+  (it is the schema-3 PUBLISHED receipt) and what would call it.
+- **Brief item 3 — still OPEN**, unchanged, for the reasons the skeptic verified.
+
+## NEW FINDING — the sibling-drift contract would have failed the PASS 87 cut. FIXED.
+
+Not in the verdict; found while checking the merge. The integration head `87924955` carries
+Lane R's HF-423 change to `publish_pass86.py` (the farcrysis flag check replaced by a
+receipt-backed admission guard). Measured on the merged tree: the shipped contract reported
+**1066 drifting lines**, of which 239 were real — the rest an offset cascade from an
+index-by-index comparison. The release workflow runs this test, so the merge would have gone
+red with a thousand lines of noise on the night of a cut.
+
+The diff is a real LCS diff now (an insertion reports once), and the invariant is the failure
+mode rather than whole-file equality — which is not an invariant of this repository, because
+`roll_pass.py` builds the next sibling by copying the live script, so the live script is also
+the template and a guard that must change at the next cut has nowhere else to live. Three
+checks, each red-tested, that survive a deliberate template edit:
+the freshness guard's skip set may only GAIN `dist-pass<N>`; no named guard may vanish without
+a declared, present successor (`DECLARED_GUARD_REPLACEMENTS`: farcrysis-unselectable →
+farcrysis-admission), with a commented-out `run_guard` reading as removed; and the refusal
+count may not fall (85: 22, 86: 22, merged: 30). The full diff is still printed, and >400
+lines still fails.
+
+Measured on the merged tree (`git merge-tree` HEAD × `87924955`):
+`publish-sibling-drift.test.mjs` 7/7 and `release-policy-contract.test.mjs` 6/6, with the
+192-line declared-work diff printed for the cut operator.
+
+## Repair-pass test results
+
+`npx tsc --noEmit` exit 0 · focused vitest 10 files 135/135 · `node --test` on both contract
+suites 13/13 · `publish_pass86_plan.test.mjs` 9/9 · HF-400 guard against the live branch
+`{"twoChannelPolicy":"ok","live":"pass86","backup":"pass85","livePagesChannels":["pass85","pass86"]}`
+· chooser spec 5/5 headless (BLOCKED lines) and 5/5 with a real adapter (no BLOCKED lines).
+Machine: no headed browser at any point, GPU checked before each run, ComfyUI queue empty
+both times, no process killed, nothing left listening on 4173/4174, no Playwright temp tree
+left behind, gh-pages read-only.
