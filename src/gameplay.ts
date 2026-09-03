@@ -55,12 +55,55 @@ export type MovementProfile = {
   jumpVelocity: number;
 };
 
+/**
+ * The authored stance speeds, in m/s. Pulled out of `movementProfile`'s ternary
+ * under HF-433 so the ONE number the owner reports on - how fast a crouched
+ * player moves - is a named, greppable, gated value rather than a literal in
+ * the middle of an expression. The values are the shipped ones, unchanged.
+ */
+export const MOVEMENT_SPEED_M_S = Object.freeze({
+  walk: 6.15,
+  sprint: 8.7,
+  ads: 4.05,
+  crouch: 3.15,
+  prone: 1.55,
+});
+
+/**
+ * HF-433, owner after PASS 90: "when I go prone now it dropshots nicely but
+ * going crouched I still move fast, sort it out in the same way?"
+ *
+ * CROUCHED MOVEMENT ALREADY HAD ITS OWN SPEED, AND IT WAS ALREADY SLOWER THAN
+ * THE REFERENCE'S. Measured from this table: 3.15 / 6.15 = 0.512 of the walk,
+ * against the roughly 0.6 Black Ops 2 uses. Raising it toward 0.6 would make a
+ * crouched player FASTER, which is the opposite of what was reported, so the
+ * number is kept and recorded rather than retuned.
+ *
+ * What was actually wrong was in `src/legacy-main.ts`: holding sprint while
+ * crouched STOOD THE PLAYER UP and sprinted. The crouch profile below was
+ * applied for exactly one frame and then the stance was gone. That is the "I
+ * still move fast" the owner felt, and it is fixed where it lives - in
+ * `stepSprintLatch` (src/prone-transition.ts), by the same rule HF-431 already
+ * applies to prone.
+ */
+export const CROUCH_SPEED_FACTOR = MOVEMENT_SPEED_M_S.crouch / MOVEMENT_SPEED_M_S.walk;
+
 export function movementProfile(context: MovementContext): MovementProfile {
   const prone = context.prone === true;
   const authoredMultiplier = Number.isFinite(context.equippedMovementMultiplier)
     ? Math.max(0.1, Math.min(1.5, context.equippedMovementMultiplier!))
     : 1;
-  const maxSpeed = (prone ? 1.55 : context.crouched ? 3.15 : context.ads ? 4.05 : context.sprinting ? 8.7 : 6.15)
+  // Stance beats intent: a crouched player is crouch-speed whatever the sprint
+  // input says, which is why this ternary tests `crouched` before `sprinting`.
+  const maxSpeed = (prone
+    ? MOVEMENT_SPEED_M_S.prone
+    : context.crouched
+      ? MOVEMENT_SPEED_M_S.crouch
+      : context.ads
+        ? MOVEMENT_SPEED_M_S.ads
+        : context.sprinting
+          ? MOVEMENT_SPEED_M_S.sprint
+          : MOVEMENT_SPEED_M_S.walk)
     * authoredMultiplier;
   const groundAcceleration = prone ? 17 : context.crouched ? 36 : context.sprinting ? 54 : context.ads ? 40 : 48;
   return {

@@ -29,6 +29,7 @@ import {
   stepSprintLatch,
 } from './prone-transition';
 import { stanceEyeHeight } from './legacy-pure-helpers-2';
+import { CROUCH_SPEED_FACTOR, MOVEMENT_SPEED_M_S, movementProfile, sprintEligible } from './gameplay';
 
 const LEGACY_MAIN = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const PRONE_TRANSITION_SOURCE = readFileSync(new URL('./prone-transition.ts', import.meta.url), 'utf8');
@@ -377,3 +378,103 @@ describe('HF-431 drop shot from sprint (Lane AX)', () => {
   });
 });
 
+describe('HF-433 crouch speed and the crouch sprint latch (Lane AU2)', () => {
+  // Owner after PASS 90: "when I go prone now it dropshots nicely but going
+  // crouched I still move fast, sort it out in the same way?"
+
+  it('gives crouched movement its own speed, and records the number', () => {
+    // The factor, measured from the authored table rather than asserted from
+    // memory: 3.15 / 6.15 = 0.512 of the walk, against the roughly 0.6 Black
+    // Ops 2 uses. It is kept at 0.512 rather than raised toward 0.6 BECAUSE
+    // the complaint was that crouched movement is too FAST - moving it to 0.6
+    // would have made it faster still.
+    expect(CROUCH_SPEED_FACTOR).toBeCloseTo(0.512, 3);
+    expect(CROUCH_SPEED_FACTOR).toBeLessThan(0.6);
+    expect(MOVEMENT_SPEED_M_S.crouch).toBe(3.15);
+    expect(MOVEMENT_SPEED_M_S.walk).toBe(6.15);
+
+    const base = { prone: false, ads: false, sprinting: false, grounded: true };
+    const walk = movementProfile({ ...base, crouched: false });
+    const crouch = movementProfile({ ...base, crouched: true });
+    expect(crouch.maxSpeed).toBeCloseTo(walk.maxSpeed * CROUCH_SPEED_FACTOR, 10);
+    expect(crouch.maxSpeed).toBeLessThan(walk.maxSpeed);
+    // ...and the equipped-weapon multiplier scales it like any other stance,
+    // so a fast weapon cannot crouch-run at walking pace.
+    const heavy = movementProfile({ ...base, crouched: true, equippedMovementMultiplier: 1.5 });
+    expect(heavy.maxSpeed).toBeCloseTo(MOVEMENT_SPEED_M_S.crouch * 1.5, 10);
+  });
+
+  it('never returns a sprint speed for a crouched player, whatever the input says', () => {
+    // Stance beats intent. If this ever inverts, a crouched player asking to
+    // sprint gets 8.7 m/s while still reading as crouched to every other
+    // system - the exact shape of the owner's report.
+    const crouchSprint = movementProfile({ crouched: true, prone: false, ads: false, sprinting: true, grounded: true });
+    expect(crouchSprint.maxSpeed).toBe(MOVEMENT_SPEED_M_S.crouch);
+    expect(crouchSprint.eyeHeight).toBe(1.16);
+    // And the eligibility rule agrees: a crouched player is not sprint-eligible.
+    expect(sprintEligible(1, 0, false, true, false)).toBe(false);
+    expect(sprintEligible(1, 0, false, false, false)).toBe(true);
+  });
+
+  it('refuses to latch sprint if shift is pressed while CROUCHED, exactly as for prone', () => {
+    const fromCrouch = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'crouch');
+    expect(fromCrouch.latched).toBe(false);
+    expect(fromCrouch.requiresFreshPress).toBe(true);
+    // Holding that same press into stand still does not sprint.
+    const stoodUp = stepSprintLatch(fromCrouch, true, 'stand');
+    expect(stoodUp.latched).toBe(false);
+    expect(stoodUp.requiresFreshPress).toBe(true);
+  });
+
+  it('drops sprint the moment the player crouches, and needs a fresh press after standing', () => {
+    // Sprinting, standing.
+    let state = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'stand');
+    expect(state.latched).toBe(true);
+
+    // Crouch is taken (requestStance clears the latch, same call HF-431 makes
+    // for prone) and shift is STILL held.
+    state = clearSprintLatchOnDropShot(state);
+    state = stepSprintLatch(state, true, 'crouch');
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(true);
+
+    // Stand back up with shift still down: still no sprint.
+    state = stepSprintLatch(state, true, 'stand');
+    expect(state.latched).toBe(false);
+
+    // Release, then press again while standing: sprint.
+    state = stepSprintLatch(state, false, 'stand');
+    state = stepSprintLatch(state, true, 'stand');
+    expect(state.latched).toBe(true);
+    expect(state.requiresFreshPress).toBe(false);
+  });
+
+  it('wires the crouch clear into legacy-main.ts, and removes the auto-stand that caused it', () => {
+    // The clear, beside the prone one it copies.
+    expect(LEGACY_MAIN).toMatch(/if\s*\(target\s*===\s*'crouch'\)\s*sprintLatchState\s*=\s*clearSprintLatchOnDropShot\(sprintLatchState\);/);
+    // THE DEFECT ITSELF. `updatePhysics` used to stand a crouched player up the
+    // moment they held sprint:
+    //   const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
+    //   if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
+    // so the crouch speed applied for exactly one frame. Both lines are gone,
+    // and this is what stops them coming back.
+    expect(LEGACY_MAIN).not.toContain("requestStance('stand')\n");
+    expect(LEGACY_MAIN).not.toMatch(/wantsSprint\s*&&\s*validSprintDirection/);
+    expect(LEGACY_MAIN).not.toContain('const validSprintDirection');
+    // ...and the stance passed to the eligibility check on the sprint decision
+    // is still the REAL one, not a hard-coded `false` as that deleted line used.
+    expect(LEGACY_MAIN).toMatch(/sprintEligible\(forwardInput,\s*strafeInput,\s*adsHeld,\s*crouched,\s*prone\)/);
+  });
+
+  it('leaves the drop-shot timing constants exactly where HF-412 put them', () => {
+    // HF-433 is a stance/sprint change. If it moved the drop-shot feel, the
+    // owner's "it dropshots nicely" would have been spent paying for it.
+    expect(DROP_SHOT_TIMING.standToProneMs).toBe(300);
+    expect(DROP_SHOT_TIMING.proneToStandMs).toBe(380);
+    expect(DROP_SHOT_TIMING.crouchStepMs).toBe(170);
+    expect(DROP_SHOT_TIMING.holdCrouchToProneMs).toBe(320);
+    expect(stanceTransitionDurationMs('stand', 'prone')).toBe(DROP_SHOT_TIMING.standToProneMs);
+    expect(stanceTransitionDurationMs('prone', 'stand')).toBe(DROP_SHOT_TIMING.proneToStandMs);
+    expect(stanceTransitionDurationMs('stand', 'crouch')).toBe(DROP_SHOT_TIMING.crouchStepMs);
+  });
+});

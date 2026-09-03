@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_095;
+const LINE_CEILING = 37_100;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -217,6 +217,19 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'is the seat passed at match start, the seat carried on an accepted client state '
       + 'message, and the seat the debug harness stages. The SHIPPED map resolves to the '
       + 'same {0, 3.75, 0} it always had.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_100,
+    note:
+      'PASS 91 Lane AU2 (HF-433): +5 lines net on the crouch sprint rule. The owner reported '
+      + 'that going crouched still moved fast; the cause was in updatePhysics, where holding '
+      + 'sprint while crouched STOOD THE PLAYER UP and sprinted, so the authored crouch speed '
+      + 'applied for one frame. The rule lives in src/prone-transition.ts (stepSprintLatch now '
+      + 'requires the standing stance, exactly as HF-431 already did for prone); what lands '
+      + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
+      + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
+      + 'the auto-stand it fed - so the net is comment, not code.',
   },
 ];
 

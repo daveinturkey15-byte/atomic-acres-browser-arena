@@ -17121,8 +17121,10 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   // continuous across the drop. `src/prone-transition.test.ts` pins that both
   // prone arms of the old expression stay gone.
   if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
-  // HF-431: clear sprint latch when dropping to prone
+  // HF-431 (prone) and HF-433 (crouch): leaving the standing stance clears the
+  // sprint latch, so a still-held Shift never resumes sprinting on standing.
   if (target === 'prone') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
+  if (target === 'crouch') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
   currentSprinting = false;
   return true;
 }
@@ -26714,8 +26716,11 @@ function updatePhysics(dt: number): void {
   );
   sprintLatchState = stepSprintLatch(sprintLatchState, rawSprintInput, player.stance);
   const wantsSprint = sprintLatchState.latched && input.lengthSq() > 0 && playerGrounded;
-  const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
-  if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
+  // HF-433: the auto-stand that used to sit here - hold sprint while crouched
+  // or prone and the player was stood up and sprinted - is gone. `wantsSprint`
+  // cannot be true off the standing stance any more (stepSprintLatch), so it
+  // was also unreachable; leaving it would have re-opened the defect the first
+  // time that latch rule was relaxed.
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);

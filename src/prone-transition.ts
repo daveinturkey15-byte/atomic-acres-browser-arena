@@ -300,13 +300,23 @@ export const IDLE_SPRINT_LATCH: SprintLatchState = Object.freeze({
 /**
  * Steps the sprint latch state.
  *
- * Rules (HF-431):
+ * Rules (HF-431, extended by HF-433):
  * - If the sprint input is not held, reset to idle (arms a future fresh press).
- * - If a fresh press is required (set on drop shot), sprint cannot engage while
- *   the input remains held, even across standing up.
- * - If the player is prone, pressing sprint does not engage sprint and sets
- *   `requiresFreshPress` so simply standing up does not immediately sprint.
- * - Otherwise (standing/crouched and fresh press available), sprint latches.
+ * - If a fresh press is required (set on a stance drop), sprint cannot engage
+ *   while the input remains held, even across standing up.
+ * - If the player is NOT STANDING - prone or crouched - pressing sprint does
+ *   not engage sprint and sets `requiresFreshPress`, so simply standing up does
+ *   not immediately sprint.
+ * - Otherwise (standing, and a fresh press available), sprint latches.
+ *
+ * HF-433 is the crouch half, and it is the owner's own words: "when I go prone
+ * now it dropshots nicely but going crouched I still move fast, sort it out in
+ * the same way?". Before it, a crouched player who held sprint was STOOD UP by
+ * `src/legacy-main.ts` and sprinted, so the crouch speed the movement profile
+ * authors (0.512 of the walk - `CROUCH_SPEED_FACTOR`) applied for one frame.
+ * With `stand` required here, sprint simply cannot engage from a crouch: the
+ * player has to stand first, and if they were holding sprint through the
+ * crouch they have to release and press it again. Exactly the prone rule.
  */
 export function stepSprintLatch(
   state: SprintLatchState,
@@ -319,15 +329,18 @@ export function stepSprintLatch(
   if (state.requiresFreshPress) {
     return Object.freeze({ latched: false, requiresFreshPress: true });
   }
-  if (currentStance === 'prone') {
+  if (currentStance !== 'stand') {
     return Object.freeze({ latched: false, requiresFreshPress: true });
   }
   return Object.freeze({ latched: true, requiresFreshPress: false });
 }
 
 /**
- * Called when a drop shot occurs (transitioning to prone) while sprinting.
- * Clears the latch and requires a fresh press after the player stands.
+ * Called when the player leaves the standing stance while sprinting - the drop
+ * shot (HF-431) and, since HF-433, an ordinary crouch. Clears the latch and
+ * requires a fresh press after the player stands. The name is HF-431's and is
+ * kept because `src/prone-transition.test.ts` pins the exact call site text in
+ * `src/legacy-main.ts` against it.
  */
 export function clearSprintLatchOnDropShot(
   _state: SprintLatchState,
