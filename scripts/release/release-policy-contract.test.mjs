@@ -25,36 +25,143 @@ const repositoryRoot = resolve(import.meta.dirname, '..', '..');
 const read = (relative) => readFileSync(join(repositoryRoot, relative), 'utf8');
 const config = JSON.parse(read('release-channels.json'));
 
-/** Every `channels/<id>` string anywhere in release-channels.json. */
-export function configuredChannelPaths(channelConfig) {
-  const found = new Set();
-  const visit = (value) => {
-    if (typeof value === 'string') {
-      if (/^channels\/[a-z0-9.-]+$/u.test(value)) found.add(value);
-      return;
-    }
-    if (value && typeof value === 'object') for (const entry of Object.values(value)) visit(entry);
-  };
-  visit(channelConfig);
-  return found;
+const BACKUP_KEY = /^pass\d+Backup$/u;
+const CHANNEL_PATH = /channels\/[a-z0-9.-]+/gu;
+
+/**
+ * The channel paths an owned release source is allowed to spell out, built by SUBTRACTION
+ * rather than by union - which is the whole point of this detector.
+ *
+ * REPAIR (skeptic, PASS 87): the first version of this function allowed every `channels/<id>`
+ * string anywhere in release-channels.json. That let through exactly the defect class the lane
+ * exists for, because the config also records where channels USED to live:
+ *   - `channels/the-big-one` appears three times as a historical `pagesPath`, so the retired
+ *     live path this lane removed from two verifiers could have been written straight back in;
+ *   - after every cut the outgoing live path is parked in `pass<N>Backup.path`, so a
+ *     one-pass-stale live literal - the precise failure that made `verify:release-topology`
+ *     throw `Root chooser is missing live PASS 86` - was allowed the moment the stamp moved.
+ * Measured before this repair: hardcodedChannelPaths("... !== 'channels/pass86'", a config
+ * whose live path is channels/pass87 and whose pass86Backup.path is channels/pass86) -> [],
+ * and hardcodedChannelPaths("const live='channels/the-big-one'", today's config) -> [].
+ * Both are asserted below and both now return the literal.
+ *
+ * So: allowed = the `path` of every channel that is NEITHER the experimental (live) channel
+ * NOR a `pass<N>Backup` - i.e. the frozen retained trees whose path cannot move. A path that
+ * only ever appears as a historical `pagesPath` is not stageable and is therefore not allowed.
+ */
+export function stageableChannelPaths(channelConfig) {
+  const stageable = new Set();
+  for (const [key, value] of Object.entries(channelConfig)) {
+    if (key === 'experimental' || BACKUP_KEY.test(key)) continue;
+    if (value && typeof value === 'object' && typeof value.path === 'string'
+      && /^channels\/[a-z0-9.-]+$/u.test(value.path)) stageable.add(value.path);
+  }
+  return stageable;
 }
 
 /**
- * A channel path spelled as a literal is a defect when it is EITHER unknown to the config
- * (a retired tree the script still believes in) OR the live channel path (which moves every
- * pass and must always be read from `experimental.path`).
+ * The string literals of a JS/TS source, each with the code that immediately precedes it.
+ * Comments and regex literals are skipped, so a `channels/<id>` written in prose or inside a
+ * shape-validating regex such as /^channels\/[a-z0-9-]+$/ is not read as a destination -
+ * unlike the previous quote-matching regex, which counted a backticked path in a comment.
+ * Template substitutions are skipped by brace counting; a backtick inside `${...}` would
+ * confuse this, and none of the owned sources has one.
  */
-export function hardcodedChannelPaths(source, channelConfig, { requireQuotes = true } = {}) {
-  const allowed = configuredChannelPaths(channelConfig);
-  const live = channelConfig.experimental.path;
-  // In JS/TS sources only QUOTED occurrences count: a `channels/<id>` in prose or inside a
-  // validation regex such as /^channels\/[a-z0-9-]+$/ is a description, not a destination.
-  // YAML has no regex literals, so every occurrence there is read.
-  const pattern = requireQuotes ? /['"`](channels\/[a-z0-9.-]+)['"`]/gu : /(channels\/[a-z0-9.-]+)/gu;
-  const literals = new Set([...source.matchAll(pattern)].map((match) => match[1]));
-  return [...literals]
-    .filter((literal) => literal === live || !allowed.has(literal))
-    .sort();
+export function stringLiterals(source) {
+  const literals = [];
+  let index = 0;
+  let code = '';
+  const regexMayStart = () => {
+    const previous = code.replace(/\s+$/u, '').at(-1);
+    return previous === undefined || '=(,:[!&|?{};+*%<>~^'.includes(previous);
+  };
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index);
+      index = end === -1 ? source.length : end;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2);
+      index = end === -1 ? source.length : end + 2;
+      code += ' ';
+      continue;
+    }
+    if (char === '/' && regexMayStart()) {
+      index += 1;
+      let inClass = false;
+      while (index < source.length) {
+        const inner = source[index];
+        if (inner === '\\') { index += 2; continue; }
+        if (inner === '\n') break;
+        if (inner === '[') inClass = true;
+        else if (inner === ']') inClass = false;
+        else if (inner === '/' && !inClass) { index += 1; break; }
+        index += 1;
+      }
+      code += ' ';
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      const quote = char;
+      index += 1;
+      let value = '';
+      while (index < source.length) {
+        const inner = source[index];
+        if (inner === '\\') { value += source.slice(index, index + 2); index += 2; continue; }
+        if (inner === quote) { index += 1; break; }
+        if (inner === '\n' && quote !== '`') break;
+        if (quote === '`' && inner === '$' && source[index + 1] === '{') {
+          let depth = 1;
+          index += 2;
+          while (index < source.length && depth > 0) {
+            if (source[index] === '{') depth += 1;
+            else if (source[index] === '}') depth -= 1;
+            index += 1;
+          }
+          value += '${}';
+          continue;
+        }
+        value += inner;
+        index += 1;
+      }
+      literals.push({ value, precedingCode: code.slice(-80) });
+      code += ' ';
+      continue;
+    }
+    code += char;
+    index += 1;
+  }
+  return literals;
+}
+
+/**
+ * A channel path spelled as a literal is a defect unless it is a frozen retained tree
+ * (`stageableChannelPaths`). The live path, any pinned-backup path, any retired Pages
+ * location and any tree unknown to the config are all defects.
+ *
+ * ONE exemption, and it is contextual rather than value-based: a literal compared directly
+ * against a recorded `.pagesPath` field pins an immutable historical fact (where a frozen
+ * channel was once served on Pages) and can never be used as a route. `.path !== '...'`
+ * with the same value is still flagged - asserted in the red test below.
+ */
+export function hardcodedChannelPaths(source, channelConfig, { language = 'js' } = {}) {
+  const allowed = stageableChannelPaths(channelConfig);
+  const found = new Set();
+  if (language === 'yaml') {
+    // YAML has neither regex nor string-literal syntax to reason about, so every occurrence
+    // outside a `#` comment is read as a destination.
+    const withoutComments = source.split('\n').map((line) => line.replace(/(^|\s)#.*$/u, '$1')).join('\n');
+    for (const match of withoutComments.matchAll(CHANNEL_PATH)) found.add(match[0]);
+  } else {
+    for (const { value, precedingCode } of stringLiterals(source)) {
+      if (/\.pagesPath\s*[!=]==?\s*$/u.test(precedingCode)) continue;
+      for (const match of value.matchAll(CHANNEL_PATH)) found.add(match[0]);
+    }
+  }
+  return [...found].filter((literal) => !allowed.has(literal)).sort();
 }
 
 // ---------------------------------------------------------------------------------- red
@@ -63,21 +170,47 @@ test('the hardcoded-channel-path detector fails on the exact defect it was writt
   const synthetic = { experimental: { pass: 'PASS 86', path: 'channels/pass86' },
     previous: { pass: 'PASS 72', pagesPath: 'channels/the-big-one', path: 'channels/pass72-retained' } };
 
-  // The retired live channel, still believed in: flagged because the config no longer
-  // stages it as anything but a historical pagesPath... which it IS here, so it is allowed.
-  assert.deepEqual(hardcodedChannelPaths("stagePinned('previous', 'channels/the-big-one')", synthetic), []);
+  // The retired live channel, still believed in. It survives in the config only as a
+  // historical pagesPath, so it is NOT stageable and spelling it is a defect.
+  assert.deepEqual(hardcodedChannelPaths("stagePinned('previous', 'channels/the-big-one')", synthetic),
+    ['channels/the-big-one']);
+  // ... including against today's real config, where it appears three times as a pagesPath.
+  // This probe returned [] before the repair.
+  assert.deepEqual(hardcodedChannelPaths("const live = 'channels/the-big-one';", config),
+    ['channels/the-big-one']);
   // A tree the config knows nothing about at all.
   assert.deepEqual(hardcodedChannelPaths("expect(path).toBe('channels/pass63-rollback')", synthetic),
     ['channels/pass63-rollback']);
   // The live channel path, spelled out - the failure that broke verify:release-topology.
   assert.deepEqual(hardcodedChannelPaths("if (publicConfig.experimental.path !== 'channels/pass86')", synthetic),
     ['channels/pass86']);
-  // And a derived read is clean, as is a validation regex that merely describes the shape.
+  // And the same literal ONE PASS LATER, when the stamp has moved and the outgoing live path
+  // is parked in pass86Backup. This probe also returned [] before the repair: a stale live
+  // literal became invisible on the very day it went stale.
+  assert.deepEqual(hardcodedChannelPaths("if (publicConfig.experimental.path !== 'channels/pass86')", {
+    experimental: { pass: 'PASS 87', path: 'channels/pass87' },
+    pass86Backup: { pass: 'PASS 86', path: 'channels/pass86' },
+    previous: { pass: 'PASS 72', path: 'channels/pass72-retained' },
+  }), ['channels/pass86']);
+  // A path inside a longer literal - a fetch route, say - is still a spelled destination.
+  assert.deepEqual(hardcodedChannelPaths("await fetch('/channels/pass86/channel-provenance.json')", synthetic),
+    ['channels/pass86']);
+  // A frozen retained tree, whose path cannot move, stays legal.
+  assert.deepEqual(hardcodedChannelPaths("config.previous.path !== 'channels/pass72-retained'", synthetic), []);
+  // A derived read is clean, as is a validation regex or a comment that describes the shape.
   assert.deepEqual(hardcodedChannelPaths('publicConfig.experimental.path !== config.experimental.path', synthetic), []);
   assert.deepEqual(hardcodedChannelPaths(String.raw`/^channels\/[a-z0-9-]+$/u.test(path)`, synthetic), []);
-  // In YAML there are no regex literals, so an unquoted path is still a hardcoded path.
+  assert.deepEqual(hardcodedChannelPaths('// this used to spell `channels/the-big-one` here\n', synthetic), []);
+  // The one contextual exemption: pinning a recorded historical Pages location. The same
+  // value compared against `.path` - which IS a route - is still flagged.
+  assert.deepEqual(hardcodedChannelPaths("config.previous.pagesPath !== 'channels/the-big-one'", synthetic), []);
+  assert.deepEqual(hardcodedChannelPaths("config.previous.path !== 'channels/the-big-one'", synthetic),
+    ['channels/the-big-one']);
+  // In YAML there are no regex or string literals, so a bare path is still a hardcoded path.
   assert.deepEqual(hardcodedChannelPaths('  run: cp -r dist channels/pass63-rollback\n', synthetic,
-    { requireQuotes: false }), ['channels/pass63-rollback']);
+    { language: 'yaml' }), ['channels/pass63-rollback']);
+  assert.deepEqual(hardcodedChannelPaths('  # channels/pass63-rollback was staged here\n', synthetic,
+    { language: 'yaml' }), []);
 });
 
 test('the two-channel policy detector fails on every way HF-400 can be broken', () => {
@@ -137,11 +270,16 @@ const OWNED_RELEASE_SOURCES = Object.freeze([
   'scripts/qa/verify-release-topology.mjs',
   'scripts/qa/verify-release-topology-browser.mjs',
   '.github/workflows/release-production.yml',
+  // The spec that expected `/channels/the-big-one/` at integration head, and which this lane
+  // rewrote to derive every route from the config. It is the same defect class, so it is
+  // held to the same contract.
+  'tests/e2e/release-channel-chooser.spec.ts',
 ]);
 
 test('no release or topology script hardcodes a channel path', () => {
   for (const relative of OWNED_RELEASE_SOURCES) {
-    assert.deepEqual(hardcodedChannelPaths(read(relative), config, { requireQuotes: !relative.endsWith('.yml') }), [],
+    assert.deepEqual(hardcodedChannelPaths(read(relative), config,
+      { language: relative.endsWith('.yml') ? 'yaml' : 'js' }), [],
       `${relative} spells a channel path that release-channels.json does not stage, `
       + 'or spells the live channel path instead of reading experimental.path');
   }
