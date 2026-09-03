@@ -1,4 +1,8 @@
-#advanced-graphics .advanced-graphics-catalog {
+/* Only when the disclosure is OPEN. An author `display` declaration on a direct
+   child of a closed <details> outranks the user-agent rule that hides the
+   contents, so the collapsed catalog was laying out ~2,815 px over every
+   section below it (measured, Lane AE, PASS 87 window). */
+#advanced-graphics[open] .advanced-graphics-catalog {
   display: grid;
   gap: 12px;
   padding: 12px;
@@ -275,3 +279,5 @@
     min-height: 60px;
   }
 }
+
+#advanced-graphics:not([open]) .advanced-graphics-catalog { display: none; }
