@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 86",
-    "description": "Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body."
+    "label": "PASS 87",
+    "description": "Pass 87 adds the Raid Rebuild and Farcrysis preview arenas, fixes the crowded menu and the mobile pause tap, gives bots a stance, and moves the 2x core behind a real line of sight."
   },
   "experimental": {
-    "pass": "PASS 86",
-    "label": "PASS 86",
-    "description": "Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body.",
-    "path": "channels/pass86"
+    "pass": "PASS 87",
+    "label": "PASS 87",
+    "description": "Pass 87 adds the Raid Rebuild and Farcrysis preview arenas, fixes the crowded menu and the mobile pause tap, gives bots a stance, and moves the 2x core behind a real line of sight.",
+    "path": "channels/pass87"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass85Backup": {
-    "label": "PASS 85 · SAFE BACKUP",
+  "pass86Backup": {
+    "label": "PASS 86 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 85",
-    "path": "channels/pass85"
+    "pass": "PASS 86",
+    "path": "channels/pass86"
   }
 }

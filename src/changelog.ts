@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass86ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass87ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 86. */
+const pass86ReleasedAt = '2026-09-03T00:48:11+01:00';
 /** gh-pages publish receipt for PASS 85. */
 const pass85ReleasedAt = '2026-09-02T20:16:44+01:00';
 /** gh-pages publish receipt for PASS 84. */
@@ -130,6 +132,25 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass87',
+    pass: 'PASS 87',
+    title: 'Pass 87 · Raid Rebuild, Farcrysis Preview, Residuals & Mobile',
+    releasedAt: pass87ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'MOBILE', 'HUD', 'RELEASE']),
+    summary: 'Pass 87 adds the Raid Rebuild and Farcrysis preview arenas, fixes the crowded menu and the mobile pause tap, gives bots a stance, and moves the 2x core behind a real line of sight.',
+    highlights: Object.freeze([
+      'RAID REBUILD · PREVIEW: a code-authored Raid built to the Black Ops 2 flow - longer sightlines, fewer and bigger cover masses, less roofed ground, all four upper rooms reachable, and real cover you can see',
+      'FARCRYSIS · PREVIEW is back on the menu: solved spawns on the terrain, a ground you can shoot over, and admission measured against Nuke Town',
+      'The menu no longer overflows with eleven arena cards; bots crouch under fire and go prone when hurt, replicated like players; the 2x Damage Core needs a line of sight instead of a height window',
+      'Mobile: the PAUSE tap no longer opens the project map under it; touch controls verified on three emulated devices; the collapsed Advanced Graphics panel no longer lays out over the Options below it',
+      'The minimap redraws at 30 Hz, the review cameras track the real near plane, eye-clearance stage 3 reports again, and the release workflow verifies without publishing',
+      'Pass 86 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
