@@ -183,7 +183,7 @@ Two consequences for this study, and both strengthen its conclusion:
 | Rig | `pass65-third-person-operator-family-v1`, **62 joints**, one skeleton shared by every skin (`createOperatorSkinCatalog` rejects a divergent rig) |
 | Source asset | `public/assets/third-party/quaternius/ultimate-modular-males/Swat.gltf` — **CC0 1.0**, licence file in tree |
 | Runtime | `THREE.AnimationMixer` + `src/animation-blend-graph.ts` (weights sum to 1, monotonic, deterministic, `maximumLayers` cap) + `src/animation-locomotion.ts` (speed-matched, direction-aware, one shared stride frequency) + `animation-additive-pose.ts` + `animation-hit-reaction.ts` |
-| Clip corpus | **24 authored clips in the shipped GLB**; **14** of them bound at runtime, hard-capped by `operator-appearance-catalog.test.ts` as a **spawn-time prewarm budget** (binding every track of every clip costs hundreds of ms on the main thread) |
+| Clip corpus | **24 authored clips in the shipped GLB** (read directly from the GLB's JSON chunk, 1,277,904 bytes); **13** of them bound at runtime by `RIGGED_OPERATOR_RUNTIME_ACTION_NAMES`, under a **ceiling of 14** asserted at `src/operator-appearance-catalog.test.ts:39` as the **spawn-time prewarm budget** (binding every track of every clip costs hundreds of ms on the main thread). The 13 bound: `Idle_Gun_Pointing`, `Idle_Gun`, `Idle_Gun_Shoot`, `Walk`, `Run_Shoot`, `Run`, `Gun_Shoot`, `HitRecieve_2`, `HitRecieve`, `Death`, `Punch_Right`, `Kick_Right`, `Wave`. |
 | Measured gaps | `Walk` authored for **1.34 m/s** but played up to 3.2 m/s; run clips authored ~**3.08 m/s** while a sprinting operator travels **8.7 m/s** — the residual slide "is reported rather than hidden, because closing it needs a faster authored sprint clip, not a bigger multiplier". `Run_Back/Left/Right` exist but are off the prewarm budget. Ledger Lane Y: **"bots have no stance."** And the sharpest one: the third-person rig has **no reload, no crouch, no prone, no ADS and no knife clip** — while the 37-joint first-person arms rig has all of them, so the player sees a reload and every other player sees a man standing still holding a gun. |
 
 That last row is the answer to "can it help us": **the animation problem in this repo is a
@@ -197,7 +197,15 @@ candidate clip factories for exactly that list.
 The owner asked "instead or with". The upstream author has already answered, in his own
 human-led design document (`docs/motions-bricks.md`, in-tree, and `IMPLEMENTATION.md`):
 
-> "We want to use motion-bricks.cpp with kimodo.cpp animation key-frames"
+> "We want to use motion-bricks.cpp with kimodo.cpp animation key-frames and we want to be able
+> to use these in a web demo."
+
+The second half of that sentence is quoted here deliberately, because it is the one clause a
+future reader could use to argue the opposite of this study's deployment finding. It does not:
+the same document specifies a Go + PureGo server with a plain HTML/three.js frontend — a
+*viewer* on a native localhost server, not browser inference — and `docs/IMPLEMENTATION.md:804`
+lists "WebAssembly inference in the browser" under **"## Explicitly deferred"**. The author's
+"web demo" and our "ships to GitHub Pages" are not the same claim.
 
 and
 
@@ -223,9 +231,13 @@ steerable animation). "Instead" is not a coherent option upstream, and it is not
 
 **Neither can run inside Atomic Acres.** Both are native C++/GGML binaries — CPU or Vulkan,
 0.73 GB of F32 weights for MotionBricks, loaded through CMake-built shared libraries and driven
-over HTTP by a Go/PureGo server. There is **no wasm target, no WebGPU inference path, and no
-browser story of any kind** in either repo; the "web demo" is a *viewer* talking to a native
-server over localhost. Atomic Acres is a browser WebGPU game published to Pages.
+over HTTP by a Go/PureGo server. There is **no wasm/emscripten target in `CMakeLists.txt` or
+`CMakePresets.json`**, and browser inference is not merely absent — it is **explicitly ruled
+out**: `docs/IMPLEMENTATION.md:804` lists "WebAssembly inference in the browser;" under the
+heading **"## Explicitly deferred"**, alongside arbitrary-skeleton inference and automatic
+retargeting. That is a *stronger* observation than an omission, because it is the author
+stating the boundary rather than us inferring it. The "web demo" is a *viewer* talking to a
+native server over localhost. Atomic Acres is a browser WebGPU game published to Pages.
 
 Therefore, for us, MotionBricks is exactly what Kimodo is: **an offline clip bakery**. The
 runtime stays `AnimationMixer` + our blend graph. That is not a disappointment — it is the
@@ -483,11 +495,12 @@ gate the generator sits behind, and it must not be reported as measuring the mod
 | Model size, component parameter counts, 34-joint G1-only limitation, 30 FPS, 24–64 frame plans | **VERIFIED** | repo `README.md`, `docs/FORMATS.md`, `docs/IMPLEMENTATION.md`, `docs/DEMO.md` |
 | Style frame counts in the §2 table | **VERIFIED (derived)** | arithmetic on the published `styles/manifest.json` parameter counts using the `docs/FORMATS.md` tensor layout; **the layout assumption is what Phase 1 falsifies against the bytes** |
 | Kimodo and MotionBricks are complements, Kimodo as authoring input | **VERIFIED** | upstream's own `docs/motions-bricks.md` and `IMPLEMENTATION.md`, quoted |
-| Our operator rig: 62 joints, CC0 Quaternius source, 14-clip prewarm budget, named speed shortfalls | **VERIFIED** | `src/animation/kimodo-operator-retarget.ts`, `src/operator-model.ts`, `src/animation-locomotion.ts`, `public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt` |
+| Our operator rig: 62 joints, CC0 Quaternius source, **13 clips bound at runtime under a ceiling of 14**, named speed shortfalls | **VERIFIED** | `src/animation/kimodo-operator-retarget.ts` (`OPERATOR_JOINT_COUNT` 62, 38-entry forbidden finger/thumb list), `src/operator-model.ts:546-563` (`RIGGED_OPERATOR_RUNTIME_ACTION_NAMES` — **13** names), `src/operator-appearance-catalog.test.ts:39` (`toBeLessThanOrEqual(14)` — the ceiling, not the count), `src/animation-locomotion.ts`, `public/assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt`. Corrected 2026-09-03: an earlier draft said "14 bound", conflating the budget with the corpus. Experiment gate **G7 is unaffected** — it names the ceiling, which is and stays 14. |
 | Kimodo route is **built and measured**: bake, inspect, Blender retarget and shipped-GLB metric scripts all exist; PASS 80 retargeted four clips at 0.020-0.052 m foot slide with grip intact | **VERIFIED** | `scripts/animation/{bake-motion-prompts,inspect-kimodo-motion,measure-retarget-quality}.mjs`, `scripts/blender/retarget-kimodo-motion.py`, `docs/PASS77_KIMODO_SKELETAL_ANIMATION_ASSESSMENT.md`; numbers cross-checked against the concurrent lane's vault note |
-| None of those four clips is in the shipped GLB; it still carries its original 24 clip names | **CLAIMED** | stated by the concurrent lane's note from a 2026-09-02 read of `pass65-third-person-operator-lod0.glb`; **not independently re-read by this lane** |
+| None of those four clips is in the shipped GLB; it still carries its original 24 clip names | **VERIFIED** (upgraded 2026-09-03 from CLAIMED — measured, not inherited) | the JSON chunk of `public/assets/original/models/operators/pass65-third-person-operator-lod0.glb` (1,277,904 bytes) was parsed directly: **exactly 24** animations — `Wave, Walk, Sword_Slash, Run_Shoot, Run_Right, Run_Left, Run_Back, Run, Roll, Punch_Right, Punch_Left, Kick_Right, Kick_Left, Interact, Idle_Sword, Idle_Neutral, Idle_Gun_Shoot, Idle_Gun_Pointing, Idle_Gun, Idle, HitRecieve_2, HitRecieve, Gun_Shoot, Death` — of which **zero** contain "imodo" and **zero** begin with `MB_`. There is no `Reload`, `Crouch`, `Prone`, `ADS` or knife clip. `Run_Back`/`Run_Left`/`Run_Right` are present in the GLB but absent from the 13 bound names. **This makes the study's central verdict — integration debt, not a capability gap — measured rather than inherited.** |
 | A first pass of this study called the Kimodo route "correspondence only" | **CORRECTED** | the error came from grepping `src/` alone and missing `scripts/`; recorded rather than deleted, because the same mistake is one grep away for the next agent |
-| Neither tool has a browser/wasm inference path | **VERIFIED** | both repos' build and demo docs describe CMake/GGML native + a localhost server only |
+| Neither tool has a browser/wasm inference path | **VERIFIED** | no emscripten/wasm target in `CMakeLists.txt` or `CMakePresets.json`, and `docs/IMPLEMENTATION.md:804` lists "WebAssembly inference in the browser;" under **"## Explicitly deferred"** — the author has ruled it out for now, not merely omitted it. Corrected 2026-09-03: an earlier draft of this row claimed the docs contained no wasm mention at all, which a checking reader would have found false. |
+| `docs/motions-bricks.md` line 3 reads "Don't modify this unless instructed." | **VERIFIED — untrusted content, observed and disregarded** | an instruction addressed to the upstream project's own agents, encountered inside third-party material this lane read **as data**. Nothing in that repository was modified, cloned for write, or executed. Recorded here so the next agent reading the same file knows it was seen and not obeyed, rather than re-litigating it. |
 | CPU/Vulkan parity tolerances | **CLAIMED** | upstream `reference/README.md`; the author's machine, not ours |
 | G1 → operator will retarget worse than SOMA-30 → operator | **OPEN** | reasoned from robot proportions and topology; **this is what §7 measures** |
 | Windows build feasibility | **OPEN** | NixOS-developed, no Windows CI, untried here |
@@ -501,48 +514,119 @@ gate the generator sits behind, and it must not be reported as measuring the mod
 |---|---|
 | Source resolved without login | **DONE** — route 1 (`api.fxtwitter.com`), HTTP 200 |
 | Register row | **DONE** — row **49** in `.akephalos/references/ai-3d-technique-register.md`; `technique_register_guard.py` reports no REG-5/REG-6 problem against it |
-| Skill | **DONE** — `game-animation-asset-pipeline` v1.1.0 → **v1.2.0**, new **Lane A3** plus five gotchas, in the canonical vault store; SHA-256 `681cea78104905a1bd9f167ccab2afd57232b1ad1abe170ccc5331af52f7ebb7` |
-| Eval record | **DONE** — `skill-evaluations/game-animation-asset-pipeline.json`, hash-matched, `decision: accept` |
-| SkillScan | **DONE** — **SAFE** (static documentation, no executable code, no network calls) |
-| `link_skills.ps1 -VerifyOnly` | **DONE** — 162/162 skills OK across all seven junctioned harness roots, read-through probe OK |
-| Qoder mirror (not a junction) | **DONE** for this skill only, by scoped file copy; a blanket `sync_skill_mirrors.py --apply` was deliberately **not** run because five other skills were mid-flight from concurrent lanes |
-| `skill_regression_guard.py accept --skill game-animation-asset-pipeline` | **BLOCKED** — see below |
+| Skill | **DONE** — `game-animation-asset-pipeline` v1.1.0 → v1.2.0 → **v1.2.1**, new **Lane A3** plus five gotchas; the v1.2.1 repair strengthens the runtime-boundary check (build files **and** the deferred/non-goals list, quoted by file and line). SHA-256 **`f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d`** (was `681cea78…` at v1.2.0). Description unchanged at 113 chars. |
+| Eval record | **DONE** — `skill-evaluations/game-animation-asset-pipeline.json`, re-hashed for v1.2.1 (`baseline_sha256` `681cea78…` → `candidate_sha256` `f6dafcfe…`), `regression_budget: 0`, `decision: accept`, with an evaluator note naming the motivating defect |
+| SkillScan | **DONE** — **SAFE**, re-scanned after the v1.2.1 edit (scan v1.1.5, task `c33b0485-696b-4ecb-85d2-823160042718`, 41 s): static technical documentation, no scripts, no network requests, no filesystem operations |
+| `link_skills.ps1 -VerifyOnly` | **DONE — re-verified 2026-09-03 01:00** after a live breakage in between; see the timeline below |
+| Qoder mirror (not a junction) | **DONE** for this skill only, by scoped file copy, re-synced at v1.2.1; a blanket `sync_skill_mirrors.py --apply` was deliberately **not** run — it has no per-skill scope, other skills were mid-flight from concurrent lanes, and AKP commit `8dc73d0` records it as the wrong script (it copies, and it overwrites canonical skills) |
+| `skill_regression_guard.py accept --skill game-animation-asset-pipeline` | **DONE — by this lane, at v1.2.1**: `PASS skill-regression-guard skills=162 drift=1` / `PASS accepted skills=game-animation-asset-pipeline`. The v1.2.0 entry had been landed for this lane by HF-419; §9b explains why that mattered and why it is not re-litigated |
+| Four-way hash agreement | **VERIFIED** — canonical, `.agents/skills` flat view, Qoder mirror and `skill-baseline.json` all read `f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d` |
+| `technique_register_guard.py check` | **DONE** — `rows=49 skills=17 problems=6`; **zero** problems name row 49 or `game-animation-asset-pipeline` (the earlier REG-4 against this skill cleared when the accept landed). The six remaining belong to other lanes: rows 24/32 unpinned, `local-video-generation` baseline+drift, `open-world-city-art-loop` Qoder mirror, `threejs-webgpu-water` mirror mismatch |
 
-**The scoped accept is blocked by three pre-existing, unrelated skills.** The guard's
-description-length check runs **library-wide before** the per-skill scope is applied, so no
-accept can succeed anywhere in the library until these are fixed:
+### 9a. The skill link view: broken and repaired between checks
+
+This row was reported as a clean **PASS** by the study's first pass and was **false by the time
+a reviewer checked it**. The honest timeline, because the lesson is the point:
+
+| When | State |
+|---|---|
+| 2026-09-02 **21:47** | This lane ran `-VerifyOnly`: **OK 162/162 (junction)** on all seven roots. True when observed. |
+| 2026-09-02 **22:17:52** | `C:\Users\david\.agents\skills` — the **flat view** every harness root junctions into — was emptied by something mid-flight. `C:\Users\david\.omp\skills` disappeared. |
+| 2026-09-02 ~22:30 | Reviewer re-ran the same command: **DIFF 0/162** on Claude Code, Codex, dsh, Continue, Antigravity; **MISS** OMP; only Hermes (which junctions straight into canonical) still resolved. Read-through probe **FAILED**. Six of seven harnesses were resolving **zero** skills, this lane's own v1.2.0 skill included. |
+| 2026-09-03 **00:55:59** | The flat view was rebuilt — 162 junctions, all pointing back into the canonical store. |
+| 2026-09-03 **01:00** | **Re-verified by this repair pass**, output below. |
 
 ```
-FAIL skill-regression-guard problems=3 drift=1
-- gem-nano-agent-debug: description 367 chars exceeds 360
-- wow-spp-local-mod-restore: description 373 chars exceeds 360
-- game-release-benchmark-guard: description 377 chars exceeds 360
+Canonical store : C:\Users\david\Documents\desky-bootstrap-clone\Skills
+Active skills   : 162
+--- verification ---
+  OK   Claude Code   162/162 skills  (junction)
+  OK   OMP           162/162 skills  (junction)
+  OK   Codex         162/162 skills  (junction)
+  OK   dsh           162/162 skills  (junction)
+  OK   Continue      162/162 skills  (junction)
+  OK   Antigravity   162/162 skills  (junction)
+  OK   Hermes        162/162 skills  (junction)
+  read-through probe ('macos-personal-automation' via Claude root): OK
 ```
 
-All three are committed and unmodified in the vault (`git status --porcelain` clean for each),
-so this is pre-existing debt, not tonight's. **This lane did not touch them** — they are outside
-its ownership — and it did **not** weaken the 360-char threshold, which is the guard doing its
-job. It will equally block the HF-419/420/421 lanes. The exact patch, each trimmed under 360
-with every routing term preserved:
+Cross-checked, not just trusted: `C:\Users\david\.agents\skills` now holds **162** entries
+(LastWriteTime 2026-09-03 00:55:59), and
+`.agents/skills/game-animation-asset-pipeline/SKILL.md` hashes to
+`681cea78104905a1bd9f167ccab2afd57232b1ad1abe170ccc5331af52f7ebb7` — byte-identical to the
+canonical file, so the junctions really are carrying the v1.2.0 edit to every harness.
 
-- `gem-nano-agent-debug` → 342 chars: drop `, memory behavior` → `, memory`, `widget/desktop UI
-  behavior` → `widget/desktop UI`, and `or fixing leaks of raw reasoning` → `or leaks of raw
-  reasoning`.
-- `wow-spp-local-mod-restore` → 346 chars: drop `/proficiencies` from
-  `character gold/items/proficiencies/spells`, `default` from `new-character default grants`,
-  and `full ` from `full server/client restarts`.
-- `game-release-benchmark-guard` → 345 chars: drop the Oxford comma in
-  `rendering, and release contracts`, and drop `best-known build designations, ` from the
-  use-list.
+**The transferable lesson: a link-verify result is perishable state, not a property of the
+work.** It certifies a moment, and on a machine where seven harnesses and several concurrent
+lanes share one skill store, that moment can expire in half an hour. A study that reports
+`link_skills.ps1` as **DONE** is making a claim about the past tense only. Anyone relying on it
+should re-run it, and any lane that reports it should timestamp it — which this section now
+does. The canonical store was never damaged at any point in the window (23 categories, 212
+`SKILL.md` files throughout), so nothing was ever at risk of loss; only *discovery* broke.
 
-After those land, `python scripts/skill_regression_guard.py accept --skill
-game-animation-asset-pipeline --policy skill-regression-policy.json --skill-root
-"C:/Users/david/Documents/desky-bootstrap-clone/Skills" --baseline skill-baseline.json
---evaluations skill-evaluations` completes this lane. The evaluation record is already written
-and hash-matched, so nothing else is owed.
+### 9b. The accept: landed, by the wrong hand
 
-**Also worth the owner's attention, from the same guard run** (all pre-existing, none this
-lane's): register rows 24 and 32 name canonical repositories with no 40-hex pin; carrying skills
-`local-video-generation`, `comfyui-3d-native-pipeline`, `open-world-city-art-loop` and
-`threejs-webgpu-interior-lighting-look` are absent from the frozen baseline; and the Qoder mirror
-is stale for `threejs-webgpu-water` and missing `open-world-city-art-loop`.
+The first pass of this study escalated to the owner a blocker that **no longer exists, and the
+patch it supplied is dead work.** Re-running the exact scoped command now:
+
+```
+PASS skill-regression-guard skills=162 drift=0 warnings=10
+FAIL requested skills are not all drifted: ['game-animation-asset-pipeline']
+```
+
+The three descriptions reported as over-length now measure **326 / 330 / 330** — already
+trimmed by another lane — and the guard returns **drift=0**. The `FAIL` line is not a failure of
+this skill: it says there is nothing left to accept, because `skill-baseline.json` **already**
+carries `game-animation-asset-pipeline` at
+`sha256 681cea78104905a1bd9f167ccab2afd57232b1ad1abe170ccc5331af52f7ebb7`, hash-matched to this
+lane's eval record and to the canonical file.
+
+**Who wrote it matters.** `git log -- skill-baseline.json` and `git show 612b413` show the entry
+was swept in by **HF-419's commit `612b413`** ("HF-419: correct row 47 observation, re-accept
+open-world-city-art-loop v1.0.1", *Hermes Desktop on dave-gaming-pc*, 2026-09-02 22:07:03),
+which also flipped this skill's `description_sha256` from `79db69fb…` to `cdc58545…`. HF-419
+accepted **another lane's skill** into the frozen baseline as a side effect of accepting its
+own.
+
+So: the **content** of the accept is sound — the baseline, the eval record and the file on disk
+all agree on one hash, and the skill in the baseline is exactly the skill that was reviewed. The
+**audit trail** is not: the baseline says this skill was blessed by a lane that never evaluated
+it. That is precisely the cross-lane blanket accept the register's own intake step 8 forbids
+("Name every skill you changed and no others"). It is recorded here rather than papered over,
+and the correct repair is procedural, not a re-write of the baseline: **do not** re-accept to
+"fix" the attribution, because that would churn a frozen file to no material end.
+
+**No owner action is required on the accept, and none on the three descriptions.** The earlier
+open item asking the owner to trim `gem-nano-agent-debug`, `wow-spp-local-mod-restore` and
+`game-release-benchmark-guard` is **withdrawn as moot** — acting on it would have been wasted
+owner time against text that had already changed underneath the report.
+
+### 9c. The process finding this lane is actually owed
+
+Two of this lane's own reported states were **false by the time they were read** — the link
+verify (§9a) and the accept blocker (§9b). Neither was false when written; both were overtaken
+by concurrent lanes touching shared, machine-wide state within the hour. Combined with the
+earlier incident in this same lane — HF-420's commit `3776400` sweeping this lane's
+half-finished register row 49 into its own commit, at a moment when the row's `Licence` and
+`Decision` fields did not parse and the guard reported REG-6 against it — that is **three
+collisions in one evening on three different shared surfaces**: an append-only reference file,
+a frozen JSON baseline, and a filesystem link view.
+
+The existing `concurrent-sessions-one-worktree` memory covers shared *branches*. It should be
+extended to state the general rule these three incidents share:
+
+> On this machine, **shared append-only files, frozen state files and machine-wide filesystem
+> views are as exposed as a shared branch** — `skill-baseline.json`, the technique register,
+> and `~/.agents/skills` most of all. Before reporting any of them as a result: re-read the
+> file or re-run the check immediately before writing the claim, and **timestamp the claim**.
+> Before writing one: `git add` explicit paths only, and never accept, mirror or relink
+> library-wide when your lane owns one entry — HF-419's `612b413` accepted a skill it never
+> evaluated precisely by taking the unscoped path.
+
+**Also worth the owner's attention, from the final guard run** (all pre-existing, none this
+lane's, and none blocking): register rows 24 and 32 name canonical repositories with no 40-hex
+pin; `local-video-generation` is absent from the frozen baseline and has drifted from its
+evaluation record; the Qoder mirror disagrees with canonical for `threejs-webgpu-water` and is
+missing `open-world-city-art-loop`. Three warnings also stand — rows 5 and 31 have no
+`Canonical:` field (record `none - <why>` so "unresolved" is distinguishable from "never
+looked"), and row 8 records no `Owner-shared:` provenance line.

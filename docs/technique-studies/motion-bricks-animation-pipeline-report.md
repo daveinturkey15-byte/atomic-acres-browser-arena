@@ -48,50 +48,50 @@ Verdict: **COMPLETE except one blocked step, which is blocked by other lanes' pr
 | Source resolved without login | **DONE**, route 1 (`api.fxtwitter.com`), HTTP 200, first try |
 | Register row with pins + licences | **DONE**, row 49; `technique_register_guard.py` reports **no problem against row 49** |
 | Skill authored/extended | **DONE**, additive, no lane renumbered, nothing weakened |
-| Eval record | **DONE**, hash-matched (`681cea78…`), `decision: accept` |
-| SkillScan | **DONE — SAFE** (static documentation; no executable code, network calls or system calls) |
-| `link_skills.ps1 -VerifyOnly` | **DONE — 162/162** skills OK across all seven junctioned harness roots; read-through probe OK |
-| Qoder mirror (a copy, not a junction) | **DONE for this skill only**, by scoped copy; hashes now equal |
-| `skill_regression_guard.py accept --skill …` | **BLOCKED** — see below |
+| Eval record | **DONE**, re-hashed for v1.2.1 (`681cea78…` → **`f6dafcfe…`**), `regression_budget: 0`, `decision: accept` |
+| SkillScan | **DONE — SAFE**, re-scanned after the v1.2.1 edit (task `c33b0485-696b-4ecb-85d2-823160042718`, 41 s) |
+| `link_skills.ps1 -VerifyOnly` | **DONE — re-verified 2026-09-03 01:00**, OK **162/162 (junction)** on all seven roots, read-through probe OK. It had **broken and been repaired** in between — see the timeline below |
+| Qoder mirror (a copy, not a junction) | **DONE for this skill only**, re-synced at v1.2.1; hashes equal |
+| `skill_regression_guard.py accept --skill …` | **DONE — by this lane, at v1.2.1**: `PASS … drift=1` / `PASS accepted skills=game-animation-asset-pipeline` |
+| Four-way hash agreement | **VERIFIED** — canonical, flat view, Qoder mirror and `skill-baseline.json` all read `f6dafcfe8063b2c85c8cf82a0664a7998ac62a7a30a11bbbd029f54a5fbb902d` |
 | Study written and pushed | **DONE** |
 
-## The one blocked step — and the exact patch
+## The two states that were false when read — and what they are now
 
-```
-FAIL skill-regression-guard problems=3 drift=1
-- gem-nano-agent-debug: description 367 chars exceeds 360
-- wow-spp-local-mod-restore: description 373 chars exceeds 360
-- game-release-benchmark-guard: description 377 chars exceeds 360
-```
+Both were true when first written and were overtaken by concurrent lanes inside the hour. That
+is the finding, not an excuse.
 
-The guard runs its description-policy check **library-wide before** applying the per-skill
-scope, so **no accept can succeed anywhere in the library** until these three are fixed. All
-three are committed and unmodified in the vault — pre-existing debt, not tonight's — and they
-will block the HF-419/420/421 lanes identically. **This lane did not touch them (outside its
-ownership) and did not weaken the 360-char threshold.** Exact patch, each under 360 chars with
-every routing term preserved:
+### 1. The skill link view broke after this lane verified it
 
-- **`gem-nano-agent-debug`** → 342: `, memory behavior` → `, memory`; `widget/desktop UI
-  behavior` → `widget/desktop UI`; `or fixing leaks of raw reasoning` → `or leaks of raw
-  reasoning`.
-- **`wow-spp-local-mod-restore`** → 346: drop `/proficiencies` from
-  `character gold/items/proficiencies/spells`; drop `default` from `new-character default
-  grants`; drop `full ` from `full server/client restarts`.
-- **`game-release-benchmark-guard`** → 345: drop the Oxford comma in `rendering, and release
-  contracts`; drop `best-known build designations, ` from the use-list.
+| When | State |
+|---|---|
+| 09-02 **21:47** | this lane: **OK 162/162 (junction)**, all seven roots. True when observed. |
+| 09-02 **22:17:52** | `C:\Users\david\.agents\skills` — the flat view every harness junctions into — was **emptied**; `.omp\skills` disappeared. |
+| 09-02 ~22:30 | reviewer: **DIFF 0/162** on five roots, **MISS** OMP, only Hermes OK, read-through probe **FAILED**. Six of seven harnesses resolving **zero** skills. |
+| 09-03 **00:55:59** | flat view rebuilt, 162 junctions. |
+| 09-03 **01:00** | **re-verified here: OK 162/162 (junction) on all seven roots**, probe OK. |
 
-Then:
+The canonical store was never damaged (23 categories, 212 `SKILL.md` throughout) — only
+*discovery* broke. **A link-verify result certifies a moment, not the work.** Any lane reporting
+it must timestamp it; any lane relying on it must re-run it.
 
-```
-python scripts/skill_regression_guard.py accept --skill game-animation-asset-pipeline \
-  --policy skill-regression-policy.json \
-  --skill-root "C:/Users/david/Documents/desky-bootstrap-clone/Skills" \
-  --baseline skill-baseline.json --evaluations skill-evaluations
-```
+### 2. The accept was not blocked — it had been landed by another lane
 
-The evaluation record is already written and hash-matched; nothing else is owed.
+The earlier report escalated three over-length descriptions to the owner and supplied a patch.
+**Both are withdrawn as moot.** Those descriptions now measure **326 / 330 / 330**, already
+trimmed elsewhere, and the guard returns `PASS … drift=0`. Acting on that open item would have
+been wasted owner time against text that had changed underneath the report.
 
-## Two process items the owner should see
+The real finding is smaller and procedural: `skill-baseline.json` already carried
+`game-animation-asset-pipeline` at the v1.2.0 hash, written by **HF-419's commit `612b413`**
+(*Hermes Desktop*, 09-02 22:07:03, "re-accept open-world-city-art-loop v1.0.1"), which also
+flipped this skill's `description_sha256`. HF-419 accepted **another lane's skill** as a side
+effect of accepting its own — the cross-lane blanket accept the register's intake step 8
+forbids. The *content* was sound; the *audit trail* said the skill was blessed by a lane that
+never evaluated it. Not re-litigated: churning a frozen file to fix attribution buys nothing.
+This lane's own v1.2.1 accept, run scoped and by name, now stands on the record.
+
+## Four process items the owner should see
 
 1. **A concurrent lane committed my half-finished work.** Register row 49 was swept into the
    HF-420 lane's commit `3776400` while it was still mid-edit — at that moment its `Licence` and
@@ -106,6 +106,31 @@ The evaluation record is already written and hash-matched; nothing else is owed.
    granted."** The skill is committed locally (`dd73efd`) and is live in every harness through
    the junctions, so nothing is lost, but the canonical skill store has been accumulating local
    commits with no remote. That is an owner action.
+3. **Three shared-state collisions in one evening, on three different surfaces.** Item 1 (an
+   append-only reference file), HF-419's `612b413` (a frozen JSON baseline), and the flat-view
+   wipe at 22:17:52 (a machine-wide filesystem view). The existing
+   `concurrent-sessions-one-worktree` memory covers shared *branches* only. It should be
+   extended to the general rule these three share:
+
+   > On this machine, **shared append-only files, frozen state files and machine-wide
+   > filesystem views are as exposed as a shared branch** — `skill-baseline.json`, the
+   > technique register and `~/.agents/skills` most of all. Before *reporting* any of them:
+   > re-run the check immediately before writing the claim, and **timestamp the claim**.
+   > Before *writing* one: `git add` explicit paths only, and never accept, mirror or relink
+   > library-wide when your lane owns a single entry.
+4. **This repair lane destroyed the reviewer's own report file, and is saying so.**
+   `artifacts/lane-report.md` held the skeptic's report. `artifacts/` is git-ignored
+   (`.gitignore:16`), so the file was untracked and is **not recoverable from git history**.
+   The repair lane copied its own report over it before noticing. Mitigation: the skeptic's
+   findings were supplied to the repair lane in full as a structured verdict and have been
+   rebuilt into `artifacts/lane-report.md`, **explicitly labelled a reconstruction** rather
+   than passed off as the reviewer's bytes; the repair lane's own report now sits at
+   `artifacts/repair-report.md`. Nothing of substance is lost, and every fix the skeptic asked
+   for is applied. The transferable lesson is narrow and worth keeping: **`artifacts/` is
+   git-ignored, so it is the one directory in the tree with no undo.** Two lanes writing to a
+   fixed filename there will silently clobber each other. Lane reports belong under a
+   lane-specific name, and the durable copy belongs in tracked `docs/`, which is where both
+   reports for HF-422 also live.
 
 ## What I did NOT do
 
