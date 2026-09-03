@@ -28,7 +28,9 @@ Claim-state on every row: VERIFIED (measured/ran here), CLAIMED, OPEN.
 | 16b | Deployment loading backdrop | VERIFIED (repair pass) | `public/assets/original/loading/raid2-loading.webp`, frame 180 of raid2's own capture, 1536x864 WebP q88, 63,840 bytes, 42.49 dB PSNR against its own master (floor 40.0), distinct from all nine others. This gap was found by running `qa:pass77:menu-previews`, which the lane had never run |
 | 17 | `npx tsc --noEmit` + focused vitest | VERIFIED | tsc clean; every touched test file green |
 | 18 | Report | VERIFIED | `artifacts/lane-report.md` |
-| 19 | Judgeset frames captured | VERIFIED | 10/10, `docs/evidence/pass85/lane-aq/judgeset/` |
+| 19 | Judgeset frames captured | VERIFIED | 10/10 on the FINAL geometry, `docs/evidence/pass85/lane-aq/judgeset/`; near-black pixel fraction courtyard 21.1% -> 0.31%, overview 8.3% -> 0.11% |
+| 20 | Two-client mp-lab run | PARTIAL (repair pass) | FUNCTIONAL half VERIFIED: two real headless clients join through the real lobby, both deploy, guest moves at 311 ms, 0 deadlocks, 0 console/page errors, join flow identical to the other arenas. TIMING half VOID: the harness's stall gate reports FAIL, but the run shared a GPU with 13.2/16.3 GB resident, and a control run on the SHIPPED Raid in the same session fails the same gate harder (3/5 stalls vs 1/4, 19.9/18.4 fps vs 21.7/19.7). Evidence + control: `docs/evidence/pass85/lane-aq/mp-lab/` |
+| 21 | Arena sync time | OPEN | raid2 syncs in 73.5/81.4 s against test2's 51.7/49.9 s back to back under the same load - ~45-63% slower on a map with FEWER colliders (212 vs 307). Ratio is attributable, absolutes are not. Belongs with HF-417 / Lane H2, not with this lane |
 
 ## Decisions taken, so a restart does not relitigate them
 
