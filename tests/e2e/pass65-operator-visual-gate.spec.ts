@@ -34,7 +34,12 @@ type OperatorDebug = {
 };
 
 async function stageOperator(page: Page, profile: 'blender' | 'performance') {
-  await page.goto(`/?release=latest&renderer=webgl2&render=${profile}&signal=on&grass=off&mist=off&clouds=off&rays=off&map=skyline-terminal&seed=650021`);
+  // PASS 87 Lane AR, item 8. `?renderer=webgl2` was removed, not replaced: the
+  // owner retired the WebGL2 fallback on 2026-08-30 and
+  // resolveRenderRuntimeRequest has voided its `search` argument ever since, so
+  // the parameter did nothing here and reading this line suggested the gate
+  // covered a route that no longer exists.
+  await page.goto(`/?release=latest&render=${profile}&signal=on&grass=off&mist=off&clouds=off&rays=off&map=skyline-terminal&seed=650021`);
   await page.waitForFunction(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     return debug?.snapshot().weaponReady === true;
@@ -44,6 +49,26 @@ async function stageOperator(page: Page, profile: 'blender' | 'performance') {
     debug.startSolo();
     debug.setBotsFrozen(true);
   });
+  /**
+   * PASS 87 Lane AR, item 8. This gate has been red since 2026-07-27 and
+   * unreachable from any runner, so nobody had seen WHERE it failed. Measured
+   * headless on installed Chrome: it fails here, on `expect.poll`'s DEFAULT
+   * 10 s, waiting for a bot operator that cannot exist yet - solo match
+   * admission on skyline-terminal takes 14-20 s (the ledger's own figure, Lane
+   * H2). So the gate reported "no operator model" when what it had actually
+   * measured was "the match had not started".
+   *
+   * The wait is now explicit and named: admission first, at the same 60 s the
+   * rest of this suite gives it (tests/e2e/pass64-hud-menu.spec.ts), then the
+   * operator poll. NOTHING about the operator contract below is relaxed - the
+   * material, LOD, clip and mesh assertions are byte-identical. A failure now
+   * says which of the two things went wrong.
+   */
+  await page.waitForFunction(
+    () => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active',
+    undefined,
+    { timeout: 60_000 },
+  );
   await expect.poll(async () => page.evaluate(() => Boolean((
     window.__ATOMIC_ACRES_DEBUG__ as unknown as OperatorDebug
   ).snapshot().bots[0]?.operatorModel))).toBe(true);
@@ -100,7 +125,8 @@ async function stageOperator(page: Page, profile: 'blender' | 'performance') {
 }
 
 test('renders the canonical opaque PBR operator in Quality and authored Performance LODs', async ({ page }) => {
-  test.setTimeout(150_000);
+  // Two full stagings, each of which now waits for a real match admission.
+  test.setTimeout(300_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await mkdir('artifacts/pass65/operator-visual-gate', { recursive: true });
