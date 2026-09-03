@@ -269,33 +269,47 @@ describe('bakeIrradianceVolume', () => {
     // steps, and the per-ray stepper still spent 31 ms in one step until the
     // deadline moved to `performance.now()`.
     //
-    // Quiet-machine distribution over 400 steps, from the committed instrument
-    // `scripts/qa/measure-bake-step-budget.mjs`: mean 3.03 ms, p95 3.10 (LOW) /
-    // 3.07 (HIGH), worst 5.13 / 3.89, ZERO steps over twice the budget. The
-    // bounds below are looser than that because this suite runs eleven files in
-    // parallel on the owner's shared workstation and wall clock there measures
-    // the machine too; they are still far tighter than the old stepper, which
-    // fails both of them on this fixture.
+    // BEST OF THREE ATTEMPTS, AND WHY THAT IS NOT A WEAKENING. The quantity is
+    // deterministic; contention can only inflate it, never deflate it. This
+    // suite runs twenty-one files in parallel on the owner's shared workstation,
+    // where a descheduled thread has read 44 ms on code whose quiet-machine
+    // worst step is 5.13 ms. Taking the smallest of three attempts measures the
+    // code rather than the machine. It does not let the OLD stepper through:
+    // its overshoot is intrinsic, ~20 ms at LOW on this fixture on a QUIET
+    // machine, so every attempt fails.
+    //
+    // Quiet-machine distribution from the committed instrument
+    // `scripts/qa/measure-bake-step-budget.mjs`, 150 steps, three runs each,
+    // which is what the bounds below are set from:
+    //   FIXED  LOW  p95 3.03-3.10  worst 3.37-3.53
+    //   FIXED  HIGH p95 3.03-3.06  worst 3.16-3.20
+    //   BEFORE LOW  p95 5.65-5.95  worst 6.62-9.47
+    //   BEFORE HIGH p95 14.2-17.3  worst 16.9-19.9
     const scene = twentyFourOccluderProxy();
     expect(scene.shapes.length).toBe(24);
     for (const tier of ['low', 'high'] as const) {
-      const session = beginIrradianceBake(scene, DAYLIGHT, {
-        arenaId: `budget-${tier}`,
-        tuning: resolveBakedIndirectTuning(tier),
-        fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
-      });
-      const durations: number[] = [];
-      // A slice of the bake, not the whole thing: the property is a property of
-      // every step, and a full HIGH bake of this volume is ~20 s.
-      while (durations.length < 200 && !session.done()) {
-        const before = performance.now();
-        session.step(3);
-        durations.push(performance.now() - before);
+      let best: number[] | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const session = beginIrradianceBake(scene, DAYLIGHT, {
+          arenaId: `budget-${tier}-${attempt}`,
+          tuning: resolveBakedIndirectTuning(tier),
+          fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
+        });
+        const durations: number[] = [];
+        // A slice of the bake, not the whole thing: the property is a property
+        // of every step, and a full HIGH bake of this volume is ~20 s.
+        while (durations.length < 150 && !session.done()) {
+          const before = performance.now();
+          session.step(3);
+          durations.push(performance.now() - before);
+        }
+        expect(durations.length, `${tier} steps`).toBe(150);
+        const sorted = [...durations].sort((a, b) => a - b);
+        if (best === null || sorted[sorted.length - 1] < best[best.length - 1]) best = sorted;
       }
-      expect(durations.length, `${tier} steps`).toBe(200);
-      const sorted = [...durations].sort((a, b) => a - b);
-      expect(sorted[Math.floor(sorted.length * 0.95)], `${tier} p95 step ms`).toBeLessThanOrEqual(6);
-      expect(sorted[sorted.length - 1], `${tier} worst step ms`).toBeLessThanOrEqual(20);
+      const sorted = best as number[];
+      expect(sorted[Math.floor(sorted.length * 0.95)], `${tier} p95 step ms`).toBeLessThanOrEqual(4.5);
+      expect(sorted[sorted.length - 1], `${tier} worst step ms`).toBeLessThanOrEqual(6);
     }
   });
 
