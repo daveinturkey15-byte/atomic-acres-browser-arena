@@ -26,7 +26,8 @@
  * Usage:
  *   node scripts/bake/bake-arena-indirect.mjs --proxy artifacts/proxy/atomic-acres.json \
  *     --arena atomic-acres --tier low --out src/rendering/lighting/baked
- *   node scripts/bake/bake-arena-indirect.mjs --self-test
+ *   node scripts/bake/bake-arena-indirect.mjs --self-test \
+ *     --proxy artifacts/proxy/atomic-acres.json --tier low --repeats 3
  */
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -42,15 +43,30 @@ if (!tsx) {
   console.error('[bake] needs `tsx` to import the TypeScript bake module. Run through `npx tsx`.');
 }
 
+// A flag parser that understands VALUELESS flags. The previous one advanced two
+// at a time unconditionally, so `--self-test --tier high` set `self-test` to
+// "--tier" and then read `high` as a key: the tier was silently dropped unless
+// it happened to be written before `--self-test`. A CLI that quietly ignores the
+// argument that selects what you are measuring is how a table of numbers comes
+// to describe something other than what its caller asked for.
 const args = new Map();
-for (let index = 2; index < process.argv.length; index += 2) {
-  args.set(process.argv[index].replace(/^--/, ''), process.argv[index + 1]);
+for (let index = 2; index < process.argv.length; index += 1) {
+  const token = process.argv[index];
+  if (!token.startsWith('--')) continue;
+  const next = process.argv[index + 1];
+  if (next === undefined || next.startsWith('--')) {
+    args.set(token.replace(/^--/, ''), true);
+  } else {
+    args.set(token.replace(/^--/, ''), next);
+    index += 1;
+  }
 }
 
 const {
   BAKED_INDIRECT_RUNTIME_GRID,
   beginIrradianceBake,
   computeBakeDigest,
+  deserialiseIrradianceVolume,
   resolveBakedIndirectTuning,
   serialiseIrradianceVolume,
 } = await import(pathToFileURL(join(process.cwd(), 'src/rendering/lighting/baked-indirect.ts')).href);
@@ -60,27 +76,67 @@ const OUT = args.get('out') ?? 'src/rendering/lighting/baked';
 const tuning = resolveBakedIndirectTuning(TIER);
 
 if (args.has('self-test')) {
-  // A bake of a known scene, twice, to prove the cache key and the output are
+  // A bake of a known scene, repeated, to prove the cache key and the output are
   // both reproducible on this machine before anyone trusts a committed volume.
-  const scene = syntheticScene();
-  const lighting = syntheticLighting();
-  const first = runBake(scene, lighting, 'self-test');
-  const second = runBake(scene, lighting, 'self-test');
-  const identical = first.volume.coefficients.every((value, index) => value === second.volume.coefficients[index]);
+  //
+  // WHAT THIS BAKES MATTERS AS MUCH AS WHETHER IT REPEATS. The default scene is
+  // `syntheticScene()`, which has SIX occluders. Every shipped arena's runtime
+  // receipt reports TWENTY-FOUR, and bake cost is dominated by shape count -
+  // every ray intersects every shape. The first version of the lighting document
+  // quoted this synthetic run as the arena bake cost and was several times too
+  // low as a result. Pass `--proxy <file from scripts/qa/extract-arena-proxy.mjs>`
+  // to self-test against a real arena, which is what the published table now is.
+  const selfTestProxyPath = args.get('proxy');
+  let scene = syntheticScene();
+  let lighting = syntheticLighting();
+  let sceneName = 'synthetic-6-occluders';
+  if (selfTestProxyPath) {
+    const loaded = JSON.parse(await readFile(selfTestProxyPath, 'utf8'));
+    if (!loaded.lighting) {
+      console.error('[bake] the proxy file carries no `lighting` block; the digest would be a lie.');
+      process.exit(2);
+    }
+    scene = loaded.scene;
+    lighting = loaded.lighting;
+    sceneName = `${loaded.arenaId ?? 'arena'} (extracted)`;
+  }
+  const repeats = Math.max(2, Number(args.get('repeats') ?? '2'));
+  const runs = [];
+  for (let index = 0; index < repeats; index += 1) runs.push(runBake(scene, lighting, 'self-test'));
+  const first = runs[0];
+  const identical = runs.every((run) => run.volume.coefficients
+    .every((value, index) => value === first.volume.coefficients[index]));
+  const digestStable = runs.every((run) => run.volume.digest === first.volume.digest);
+  const times = runs.map((run) => Math.round(run.elapsedMs));
+  // The cached path, measured rather than asserted: serialise and deserialise
+  // the volume the way a committed build-time bake is consumed. The old table
+  // published a "cached 0 ms" row with no measurement behind it anywhere.
+  const cacheStart = performance.now();
+  const roundTripped = deserialiseIrradianceVolume(serialiseIrradianceVolume(first.volume));
+  const cacheMs = performance.now() - cacheStart;
+  const serialised = JSON.stringify(serialiseIrradianceVolume(first.volume));
   console.log(JSON.stringify({
     tier: TIER,
+    scene: sceneName,
+    proxy: selfTestProxyPath ?? null,
     digest: first.volume.digest,
-    digestStable: first.volume.digest === second.volume.digest,
+    digestStable,
     coefficientsIdentical: identical,
     probes: first.volume.dimensions.reduce((a, b) => a * b, 1),
     grid: first.volume.dimensions.join('x'),
-    firstBakeMs: first.elapsedMs,
-    secondBakeMs: second.elapsedMs,
+    repeats,
+    bakeMs: times,
+    bakeMsMedian: [...times].sort((a, b) => a - b)[Math.floor(times.length / 2)],
+    bakeMsMin: Math.min(...times),
+    bakeMsMax: Math.max(...times),
+    cacheDecodeMs: Number(cacheMs.toFixed(2)),
+    cacheDecodeMatches: roundTripped.digest === first.volume.digest,
     occluderShapes: first.volume.bake.occluderShapes,
     filledProbes: first.volume.bake.filledProbes,
-    serialisedBytes: JSON.stringify(serialiseIrradianceVolume(first.volume)).length,
+    serialisedBytes: serialised.length,
+    at: new Date().toISOString(),
   }, null, 2));
-  process.exit(identical && first.volume.digest === second.volume.digest ? 0 : 1);
+  process.exit(identical && digestStable ? 0 : 1);
 }
 
 const proxyPath = args.get('proxy');
