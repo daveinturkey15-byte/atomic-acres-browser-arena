@@ -20007,15 +20007,10 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
-    // Lane AR item 3: replicated like a peer's. The host sends the stance it
-    // simulated; the guest poses from it, so both ends play the same body
-    // transition instead of the guest inventing a permanent stand.
-    // A host that predates the field sends no stance; hostedBotSnapshotStance
-    // reads that as the 'stand' those builds actually simulated, so a PASS 87
-    // guest on a PASS 86 host poses bots instead of refusing their snapshots.
-    const replicatedStance = hostedBotSnapshotStance(snapshot);
-    bot.stance = replicatedStance;
-    poseOperator(bot.root, replicatedStance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
+    // Lane AR item 3: replicated like a peer's. A pre-PASS-87 host sends none;
+    // hostedBotSnapshotStance reads that as 'stand'. See src/hosted-bots.ts.
+    bot.stance = hostedBotSnapshotStance(snapshot);
+    poseOperator(bot.root, bot.stance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,

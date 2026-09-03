@@ -171,8 +171,8 @@ describe('the shipped bot paths read the stance field (Lane AR item 3)', () => {
     // separate call in a 36,000-line module and a regression in any one of them
     // is invisible: the body just stands up again.
     expect(LEGACY).toContain("poseOperator(bot.root, debugBotStanceOverride ?? bot.stance,");
-    expect(LEGACY).toContain('const replicatedStance = hostedBotSnapshotStance(snapshot);');
-    expect(LEGACY).toContain('poseOperator(bot.root, replicatedStance,');
+    expect(LEGACY).toContain('bot.stance = hostedBotSnapshotStance(snapshot);');
+    expect(LEGACY).toContain('poseOperator(bot.root, bot.stance,');
     expect(LEGACY).toContain('yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,');
     expect(LEGACY).toContain('bot.position.y + botStanceEyeHeightM(bot.stance)');
     expect(LEGACY).not.toContain("stance: 'stand', continuity: bot.continuity");
