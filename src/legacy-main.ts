@@ -69,6 +69,7 @@ import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -980,6 +981,7 @@ import {
   type TimedMapWeaponAuthorityState,
   type TimedMapWeaponId,
 } from './timed-map-weapon-authority';
+import { arenaCanAcquireFlamethrower, arenaCanAcquireFlareGun } from './arena-special-weapon-reach';
 import {
   TIMED_MAP_WEAPON_SCHEMA_VERSION,
   type TimedMapWeaponClaimRequestMessage,
@@ -16975,6 +16977,8 @@ async function startGame(
   matchStartPreparing = true;
   matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration = token.generation;
+  beginMatchAdmissionProfile();
+  markMatchAdmission('admission-open');
   lastGameplayPresentedFrame = 0;
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
@@ -17240,6 +17244,7 @@ async function startGame(
     endsAt: Number.POSITIVE_INFINITY,
     winner: null,
   };
+  markMatchAdmission('bot-spawn');
   if (mode === 'solo') {
     await spawnBots();
     assertMatchAdmissionCurrent(token);
@@ -17247,8 +17252,10 @@ async function startGame(
     await spawnBots(privateMatchConfig.hostedBotCount);
     assertMatchAdmissionCurrent(token);
   }
+  markMatchAdmission('corpse-pool');
   await ensureCorpsePresentationPool();
   assertMatchAdmissionCurrent(token);
+  markMatchAdmission('bot-presentations');
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   try {
     await prewarmBotPresentations();
@@ -17285,12 +17292,16 @@ async function startGame(
       // deployments to the menu. Compile the exact rest composition once here,
       // behind compileAndRender's own 12s cold-generation fence, so every
       // guarded admission flush below only ever measures warm frames.
+      markMatchAdmission('rest-composition-compile');
       await renderRuntime.compileAndRender(scene, camera, scene);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('weapon-switch-rehearsal');
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('initial-match-settle');
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -17299,22 +17310,27 @@ async function startGame(
       // surface in control until the browser has delivered a full hitch-free
       // second; deferred driver work or a major collection must never spill
       // into the first controllable frame.
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       // Restore and compile the ordinary rest frame after the staged fire
       // compositions so the first controllable frame starts from exact state.
+      markMatchAdmission('webgl-rest-composition');
       await prewarmExactWebGlMatchComposition();
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     }
   } finally {
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
+    finalizeMatchAdmissionProfile(mode);
   }
   // Admission can legitimately span several seconds of cold renderer work.
   // None of that scheduler time may enter the first live simulation delta.
@@ -29453,11 +29469,70 @@ async function performArenaSelection(
       // createRenderPipelineAsync, which Dawn compiles on worker threads and
       // outside any fence - with frustum culling disabled so the coverage set
       // is complete; the warm frame and the committing coverage draw then
-      // find every pipeline already built. The fence itself is untouched and
-      // every other arena takes exactly the sequence it took before.
-      if (selectedArena.id === 'farcrysis' && pass64TslSystems) {
-        const farcrysisPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));
+      // find every pipeline already built. The fence itself is untouched.
+      //
+      // LOAD-CUT (pass 85, lane H, HF-417): the arena-id gate this used to
+      // carry was the bug. Lane I found gun-range UNREACHABLE by an in-match
+      // map switch on the shipped PASS 84 build - "[Gun Range map selection
+      // failed] WebGPU queue completion exceeded 12000 ms for submission 614
+      // ... fenced draws 770" - while its FIRST load was fine, so every
+      // instrument that only ever boots straight into an arena stayed green
+      // while the map could not be entered. Measured on the shipped build
+      // (docs/evidence/pass85/lane-h/): an in-session switch into gun-range
+      // creates 234-302 render pipelines, and the switch-matrix phase
+      // attribution reports how many of them are built inside THIS
+      // warm-frame-and-fence window. Whichever arena is entered second carries
+      // that cost, so nothing about it is farcrysis-specific - farcrysis was
+      // simply the first arena heavy enough to lose the race outright. The
+      // off-fence realisation therefore runs for EVERY arena. compileAsync
+      // uses createRenderPipelineAsync, which Dawn compiles on worker threads
+      // outside any submission, so this MOVES work off the fence rather than
+      // adding it: the coverage precompile below then finds the pipelines
+      // already built. THE FENCE IS UNTOUCHED at 12 s, and
+      // src/presentation-prewarm-contract.test.ts pins that this region now
+      // contains no arena-id branch at all.
+      //
+      // LOAD-CUT (pass 85, lane H2, 2026-09-03): the generalisation above was
+      // measured to cost a FIRST LOAD 8.6 s it never gets back. Interleaved A/B
+      // on gun-range, baseline dist and candidate dist back to back on the same
+      // machine minutes apart (docs/evidence/pass87/lane-h2/): the
+      // `visual-definition` phase went 4398 -> 12981 ms (x2.95) against an
+      // internal control of x1.35, and `coverage-submit-fence` did NOT fall to
+      // pay for it. The reason is in the ROOT, not the gate: on an in-session
+      // switch the whole scene's vocabulary is the thing at risk, because the
+      // renderer's cache holds the PREVIOUS arena's permutations; on a cold
+      // session nothing in the scene has been realised yet, the retained
+      // gameplay roots are suppressed and are prewarmed by their own passes
+      // downstream, and the only vocabulary the fenced warm frame can be
+      // surprised by is THE ARENA'S OWN - which is exactly what farcrysis's
+      // 134-217 cold pipelines were (submission 1 of a cold session).
+      //
+      // The in-session-switch case - the one that took the 56-pair matrix from
+      // 55/56 to 56/56 - is byte-for-byte what it was, and neither case reads an
+      // arena id.
+      //
+      // MEASURED AGAIN (lane H2, 2026-09-03): scoping the cold-session root to
+      // the arena recovered only a third of the cost - gun-range's
+      // `visual-definition` went 12981 -> 10049 ms against a 4404 ms baseline,
+      // internal control x0.99 - and `coverage-submit-fence` stayed flat at
+      // x1.00, so the remaining 5.6 s is ADDED work, not moved work. On a cold
+      // session the coverage precompile downstream realises the same set off the
+      // fence anyway and the warm frame in between clears 12 s on every arena
+      // except the one `cold-session-precompile-reach.ts` names with its
+      // evidence. So the cold-session relief is asked of that authority, and
+      // this region still contains no arena id (pinned twice).
+      //
+      // The intermediate step of this lane scoped the COLD-SESSION root to
+      // `arena.root` and measured it: it recovered 2 932 ms of the 8 583 and left
+      // 5 645 ms, so the cold session stopped running the relief at all except
+      // where it is needed. That left the narrowed root reachable ONLY for the
+      // arena the authority names - which would have shipped farcrysis a
+      // NARROWER relief than PASS 86 gives it today, on no evidence. Both
+      // surviving cases therefore take the whole scene, exactly as PASS 86 does.
+      const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
+      if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
+        const scenePassPrecompile = pass64TslSystems;
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);
@@ -33185,6 +33260,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+      matchAdmissionProfile: lastMatchAdmissionProfile,
       botWeaponVocabulary: botWeaponGpuVocabulary.telemetry(),
     },
     gameStarted,
@@ -36287,6 +36363,59 @@ let lastArenaEffectPrewarmProfile: Readonly<{
   groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
 }> | null = null;
 
+// LOAD-CUT (pass 85, lane H2): MATCH ADMISSION IS THE LARGEST UNMEASURED BLOCK.
+// The arena transition has had a phase profiler since pass 79 and every cut this
+// repo has made to load time was aimed by it. Admission - everything between
+// `startSolo()` and the first live frame - has only ever produced ONE number,
+// and it is 14.4-20.4 s per arena, roughly 30-40% of the wall time between
+// pressing deploy and playing (lane H first-load rows, 2026-09-02). "Attribute
+// it" cannot be done from one number, so this records the same shape the
+// transition profiler records.
+//
+// It is MARKERS ONLY. Every call in the admission block is pinned by exact
+// source string in `src/presentation-prewarm-contract.test.ts`, so nothing here
+// wraps, reorders, adds or removes a step: `markMatchAdmission` stamps
+// performance.now() BETWEEN the existing statements, exactly as
+// `profileArenaTransition` does inside the transition. A mark costs one array
+// push; the block it measures costs seconds.
+let matchAdmissionMarks: { name: string; at: number }[] = [];
+let lastMatchAdmissionProfile: Readonly<{
+  arenaId: string;
+  mode: string;
+  durationMs: number;
+  steps: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+function beginMatchAdmissionProfile(): void {
+  matchAdmissionMarks = [];
+}
+
+function markMatchAdmission(name: string): void {
+  matchAdmissionMarks.push({ name, at: performance.now() });
+}
+
+/**
+ * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ * the LAST mark's duration runs to this call - which is why `finalize` is stamped
+ * at the end of both backend branches rather than inferred.
+ */
+function finalizeMatchAdmissionProfile(mode: string): void {
+  const marks = matchAdmissionMarks;
+  matchAdmissionMarks = [];
+  if (marks.length === 0) return;
+  const completedAt = performance.now();
+  const steps = marks.map((mark, index) => Object.freeze({
+    name: mark.name,
+    durationMs: Number(((index + 1 < marks.length ? marks[index + 1].at : completedAt) - mark.at).toFixed(3)),
+  }));
+  lastMatchAdmissionProfile = Object.freeze({
+    arenaId: selectedArena.id,
+    mode,
+    durationMs: Number((completedAt - marks[0].at).toFixed(3)),
+    steps: Object.freeze(steps),
+  });
+}
+
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
   await yieldBrowserPreparationFrame();
 }
@@ -36343,8 +36472,24 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
+    // LOAD-CUT (pass 85, lane H): these two rehearsals are SERIALIZED after the
+    // concurrent families above - they stage a transient world PointLight and
+    // three r185 folds the visible light graph into every render object's cache
+    // key, so they cannot overlap - and they ran on every arena. Measured over
+    // 56 in-session map switches on the shipped PASS 84 build:
+    // `flare-first-shot` 2560.6 ms median, `flamethrower-first-shot` 415.4 ms,
+    // out of a 21.3 s median switch. Neither weapon is a loadout weapon; each
+    // has one authored route onto a map, and `arena-special-weapon-reach.ts`
+    // asks those authorities (TIMED_MAP_WEAPON_DEFINITIONS, and the
+    // field-support rule for the care package's crimson flamethrower) instead
+    // of restating an arena list. Nothing leaves the ADMITTED vocabulary: the
+    // full weapon catalogue is still prewarmed above, and
+    // prewarmMatchBoundFirstShotPresentations still rehearses both exact fire
+    // compositions against the complete match scene on every arena before
+    // admission. This only drops the duplicate arena-side rehearsal on arenas
+    // whose own authority can never produce the weapon.
     groups.push(await runGroup('flare-first-shot', () => (
-      flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlareGun(selectedArena) ? Promise.resolve() : flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -36352,7 +36497,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ))
     )));
     groups.push(await runGroup('flamethrower-first-shot', () => (
-      flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlamethrower(selectedArena) ? Promise.resolve() : flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
           () => renderRuntime.compileAndRender(scene, camera, scene),
