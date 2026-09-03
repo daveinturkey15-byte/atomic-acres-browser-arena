@@ -985,3 +985,23 @@ skeptic, then PASS 91.
   evidence capture); research, reference truth, gates and licences stay on Opus;
   every Gemini branch is Opus-verified before it ships. The running Raid lane's
   research (Job 1) will be treated as unverified until the Opus pass re-derives it.
+
+## HF-432 / HF-433 — owner 2026-09-03 13:05 after playing PASS 90
+**Statement (verbatim):** "new nuketown starting to shape up, still some issues with
+wher stairs are,a the cover and size/shape of the side areas of the map and spawns,
+needs refinement. Doors are too small shoudnt have to crouch, vechiles in mid
+street need more accurate layout to original. Also when I go prone now it
+dropsshots nicely but going crounced i still move fast, sort it out in the same
+way?"
+- **HF-432 Nuke Town Rebuild refinement (Lane AU2, Opus):** stair positions per
+  the reference (which wall, which direction, landing), the side areas (yards /
+  flanks: their size, shape and cover pieces), spawn placement, door openings a
+  standing player walks through (>= 2.1 m clear, no crouch), and the mid-street
+  vehicles placed as the reference has them (the truck off the road centre-line
+  as measured - the 2x core position becomes per-arena, weapons-code change
+  authorised by the orchestrator). Evidence: overhead beside the schematic, a
+  door-height probe, a stair traversal probe, spawn gate.
+- **HF-433 crouch speed (same worker):** crouched movement is slower (a crouch
+  speed factor like the prone one; BO2-style ~0.6 of walk), no sprint while
+  crouched, and the sprint latch clears on crouch the way HF-431 did for prone;
+  unit tests on the movement state machine + the drop-shot e2e spec extended.
