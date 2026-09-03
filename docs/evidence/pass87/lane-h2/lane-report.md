@@ -111,6 +111,28 @@ process, its own port and its own receipt, and each stamps its own rival count
 and free VRAM. This does not make the room quiet; it makes the two arms share
 the same room.
 
+**SKEPTIC CORRECTION (2026-09-03, accepted).** "Contention is common-mode" was
+claim-stated VERIFIED. It is not: it is a DESIGN INTENT that the receipts only
+approximate, and the claim is hereby downgraded to **CLAIMED**. The rival counts
+differ per arm in the final pairs (gun-range base 31 vs candidate 35; high-seas
+base 27 vs candidate 38), and `playwrightChromeProcessSamples` is **1** on every
+first-load receipt — one sample, taken at launch — so the
+`rivalPlaywrightBrowsersMaxDuringRun: 0` those receipts publish means "never
+sampled again", not "no rivals". A reader would take it for the opposite of what
+this lane's own gotcha (section 7) warns about.
+
+Two consequences, both acted on:
+- The probe no longer publishes that field as a number when the room was sampled
+  at most once; it publishes `null`. Landed this repair pass in
+  `scripts/qa/probe-arena-switch-matrix.mjs` ("not sampled" must not be
+  publishable as "zero").
+- What actually carries the first-load A/B rows is therefore **the internal
+  control** (the mean of seven untouched prewarm families, reported per row) and
+  **build equivalence** (after `2a72720d` a cold session executes PASS 86's exact
+  precompile behaviour on every arena) — NOT common-mode contention. The
+  conclusion in section 3a is unchanged; its support is narrower than was
+  written, and n=1 per arm.
+
 ## 3. Job 1 — the held regression REPRODUCES, and it is one phase
 
 > **Claim-state note.** "The 56-pair matrix went 55/56 -> 56/56" is a FIRST-PASS
@@ -561,8 +583,27 @@ makes that row evidence rather than an anecdote.
   constants, `src/rendering/arenas/farcrysis.ts` (Lane C's). The farcrysis
   cold-session relief is expressed in a NEW module rather than by editing Lane
   C's arena file, so this pass creates no conflict with Lane C.
+- **`src/arena-special-weapon-reach.ts` and its test sit at `src/` root, not
+  under `src/rendering/`, and they gate WEAPON prewarm reach — a word the
+  brief's boundary list excludes.** They are carried under an **explicit
+  orchestrator exception**: the 22:18 cut instruction said to keep the flare-gun
+  reach fix when the rest of lane H was held. Recorded here so no future lane
+  reads it as precedent for a lane touching `weapons` on its own authority.
+- **PROPOSED PATCH, OUTSIDE THIS LANE'S OWNERSHIP — not applied.**
+  `scripts/qa/probe-pipeline-compile-stalls-cdp.mjs` writes receipts that cannot
+  name the build they measured. Port the `distBundle` stamp from `b4ee52d9`
+  into it — line 116, the `report` initialiser:
+  ```js
+  // add alongside `dist: DIST,`
+  distBundle: (readdirSync(join(DIST, 'assets')).find((f) => /^legacy-main-.*\.js$/u.test(f)) ?? null),
+  gitSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  gitDirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0,
+  ```
+  (`readdirSync` is already imported at line 61; `execFileSync` is not — add it
+  to the `node:child_process` import.) Purely additive: no behaviour, no
+  threshold, no timeout changes. The owner of that instrument applies it.
 - **No gate, threshold, timeout or test was weakened.** `flushWebGpuFrames(12_000)`
-  is untouched (0 occurrences in the diff, all call sites intact). The one pin
+  is untouched (4 call sites intact; 0 hits in the source diff). The one pin
   this pass edited is this lane's own, and every edit ADDED assertions:
   the exact precompile guard, the exact root expression, the ancestor walk, the
   attachment fallback, exactly-one-precompile-call, plus the pre-existing
@@ -605,8 +646,11 @@ makes that row evidence rather than an anecdote.
   `src/rendering/` — **28 files / 367 tests pass, 0 fail**, which includes the
   art-direction bounds and cross-arena distinctiveness floor. Full suite NOT run,
   per brief.
-- **`flushWebGpuFrames(12_000)` untouched**: 0 occurrences in this pass's diff
-  against the merge commit; 4 call sites intact in `src/legacy-main.ts`.
+- **`flushWebGpuFrames(12_000)` untouched**: **4 call sites intact** in
+  `src/legacy-main.ts`, and **0 hits in the SOURCE diff**. (Correction: the first
+  version said "0 occurrences in this pass's diff". `git diff a2efa280..HEAD |
+  grep -c flushWebGpuFrames` is **3**, not 0 — all three are prose inside this
+  report. Cosmetically wrong, substantively right; the fence is not touched.)
 - **No ShaderMaterial / RawShaderMaterial / onBeforeCompile** introduced: 0
   occurrences in the diff.
 - **`src/legacy-main.ts` is pure LF** (0 CRLF) after every edit.
@@ -652,19 +696,53 @@ makes that row evidence rather than an anecdote.
 
 ### In-combat pipeline tripwire (PASS 82 invariant), 75 s each
 
+**Which build these three receipts measured — corrected.** The first version said
+"the final build". They were taken 00:50-00:57 and committed at `b32116f6`,
+*before* the final source commit `2a72720d`, and
+`probe-pipeline-compile-stalls-cdp.mjs` records **no `distBundle` and no
+`gitSha`** — only `dist: <path>`. So the receipt **cannot name the build it
+measured**, which is precisely the defect commit `b4ee52d9` fixed for the
+switch-matrix probe and did not fix here. The argument that it does not matter is
+sound and independently checkable — `git diff 89d760ba..2a72720d` touches only
+the `precompileRoot` expression, reachable only on a **cold load of farcrysis**,
+which is `selectable: false` and is not one of these three arenas — but that is
+an argument, not the receipt. **CLAIM-STATE: counts VERIFIED; build attribution
+CLAIMED.** The one-line patch that would close it is in section 9 (it lives in a
+file outside this lane's ownership, so it is proposed, not applied).
+
 | arena | pipelines before window | **in window** | in a stall | shader modules in window |
 |---|---|---|---|---|
 | gun-range | 264 | **0** | 0 | 0 |
 | high-seas | 251 | **1** | 0 | 0 |
 | atomic-acres | 374 | **0** | 0 | 0 |
 
-VERIFIED, and the `1` is identified rather than excused: the probe's
-`samplePipelineLabels` names it `renderPipeline_MeshBasicMaterial_774`, which is
-**the same single creation Lane A recorded on the SHIPPED build** (baseline 374
-before / 1 during / 0 in a stall). This lane did not introduce it. Two of the
-three arenas read **0**, including atomic-acres at the identical 374-before count
-where Lane A's shipped baseline read 1 — so on this build the invariant is met on
-gun-range and atomic-acres and missed by one on high-seas. The brief states the invariant as "in-combat creations MUST stay 0";
+The counts are VERIFIED. The **provenance** of the `1` was mis-stated in the
+first version of this report and is corrected here.
+
+- **VERIFIED:** the probe's `samplePipelineLabels` names the in-window creation
+  `renderPipeline_MeshBasicMaterial_774`, with its creation stack.
+- **VERIFIED:** the same pipeline label appears, one creation in window, on
+  builds this lane did not touch — `docs/evidence/pass85/hf410/pipeline-compile-repair-run1.json`
+  and `run2.json` (**HF-410's receipts, arena atomic-acres, 374 before / 1
+  during**) and `docs/evidence/pass85/lane-h/qa/pipeline-tripwire-after-atomic-acres.json`
+  (**lane H's own PASS 85 after-build, atomic-acres, 398 / 1**).
+- **CORRECTED:** the first version credited those to "Lane A on the SHIPPED
+  build" and to **high-seas**. Neither is right. They are HF-410's and lane H's
+  own, and all three are **atomic-acres**. **No shipped-build tripwire receipt
+  for high-seas exists anywhere in this repository** (`find docs/evidence -name
+  '*tripwire*'` returns five files: the three above plus this lane's four, and
+  none of the prior ones is high-seas).
+- **CLAIM-STATE: CLAIMED, not VERIFIED** — "this lane did not introduce the
+  high-seas creation" rests on (a) the label being pre-existing elsewhere and (b)
+  this lane's diff containing no material, geometry or light change that could
+  create a `MeshBasicMaterial`, not on a high-seas before/after. The honest
+  falsifier is one 75 s tripwire run on the baseline dist against high-seas; it
+  was not taken.
+
+Two of the three arenas read **0**, including atomic-acres at 374 before where
+HF-410's atomic-acres receipt at the same 374 read **1** — so on this build the
+invariant is met on gun-range and atomic-acres and missed by one on high-seas.
+The brief states the invariant as "in-combat creations MUST stay 0";
 that is not the shipped state either, and it is a standing item for whoever owns
 that invariant — not something to be silently reported as green.
 
@@ -727,12 +805,61 @@ arena-loading gate in this repository boots straight into an arena, which is
 precisely how Gun Range shipped unreachable-by-switch in PASS 84 with every gate
 green. Result below.
 
-**Result — nuketown2, VERIFIED with one honest subtraction:**
+**Result — nuketown2. THE FIRST VERSION OF THIS TABLE WAS FALSE; here is the
+corrected one.**
 
-| direction | pairs walked | committed | note |
+| direction | rows recorded | GENUINE nuketown2 edges | note |
 |---|---|---|---|
-| `nuketown2 -> *` (8) | 8 | **8** | one chunk, chained correctly, 167-372 pipelines per edge, 21.7-56.0 s |
-| `* -> nuketown2` (8) | 8 | 4 real + **4 VOID** | see below |
+| `nuketown2 -> *` (8) | 8 | **1** (+1 re-run = **2**) | 7 rows are MISLABELLED — they departed the previous target, not nuketown2 |
+| `* -> nuketown2` (8) | 8 | **4** | the other 4 rows are `nuketown2 -> nuketown2`, VOID, disclosed in the first version |
+
+### CORRECTION (repair pass, 2026-09-03) — "8/8 outgoing" was false, and the lane's own receipt proves it
+
+The first version of this report claimed `nuketown2 -> *` was **8 of 8 committed,
+one chunk, chained correctly**. That is **FALSE**, by the exact defect this lane
+diagnosed for the INCOMING sweep and then failed to apply to the OUTGOING one.
+An independent skeptic found it; it is re-derived here from the committed
+receipt rather than taken on trust.
+
+`h2-after-nuketown-out.json` was taken at `5d5517ab` — **before** this lane's own
+probe fix `e89492af`. It ran `--sources nuketown2` over one page, so after edge 1
+the live match was on `skyline-terminal` and the walker had to re-establish
+`nuketown2` as the source before every later edge. The pre-fix walker had neither
+the return-to-menu nor the `matchArenaId !== source` assertion, so every
+re-establishment was a **no-op**. Its own `firstLoads` array says so:
+
+| # | arena asked for | first-load ms | deployMs | verdict |
+|---|---|---|---|---|
+| 1 | nuketown2 | **41 648** | **21 189** | genuine |
+| 2-8 | nuketown2 | 399 / 428 / 564 / 593 / 711 / 763 / 1 147 | 146-371 | **no-op** |
+
+`switchEdge()` DOES return to the menu before selecting its TARGET, which is why
+each target selection still did real work — from whatever arena was actually
+live, i.e. the PREVIOUS target. So rows 2-8 measured, in order:
+
+`skyline-terminal->rustworks-1v1`, `rustworks-1v1->gun-range`,
+`gun-range->high-seas`, `high-seas->test1`, `test1->test2`, `test2->map3`,
+`map3->atomic-acres` — every one of them labelled `nuketown2->*`.
+
+**The measurement that settles it (VERIFIED).** Two genuine outgoing edges were
+re-run through the FIXED probe (`e89492af`) on the same candidate bundle
+(`legacy-main-BZjJAeqa.js`): `nuketown2->skyline-terminal` 23 713 ms / 284
+pipelines and `nuketown2->rustworks-1v1` 25 189 ms / 275 pipelines, 2/2
+committed — and the **second nuketown2 source re-establishment took 28 980 ms
+(deploy 17 615 ms)** where the pre-fix receipt recorded 399-1 147 ms. Receipt:
+`docs/evidence/pass87/lane-h2/qa/skeptic-nuketown-out-recheck.json`.
+
+**Rows 2-8 of `h2-after-nuketown-out.json` are therefore VOID AS LABELLED.**
+They are not void as measurements: each is a real, committed switch of the true
+pair named above, and they are counted below under that true pair — never under
+`nuketown2`. Commit `e89492af`'s message says "as do all eight outgoing edges
+from nuketown2, which chained correctly in one chunk". **That sentence is wrong
+and this section supersedes it.**
+
+**nuketown2 in-session switch coverage is 2 of 8 outgoing (1 in the sweep + 1 new
+from the re-run) and 4 of 8 incoming — not 8/8.** It remains the least
+switch-tested arena in the game and the remaining 10 nuketown2 edges are the
+highest-value pairs in the unwalked set.
 
 **The four void rows are a defect in this lane's own probe, found by reading its
 output rather than its exit code.** With `--targets nuketown2 --session-edges 2`
@@ -753,21 +880,42 @@ window's last measurement, so it is CLAIMED, not verified.
 The four REAL incoming edges all committed: `atomic-acres`, `rustworks-1v1`,
 `high-seas` and `test2` into nuketown2, 157-241 pipelines each, 11.2-19.4 s.
 
-### Switch-matrix coverage, totalled honestly
+### Switch-matrix coverage, RE-TOTALLED after the correction
+
+The first version of this table said **37 of 72**. That was wrong three ways: it
+counted seven mislabelled rows as nuketown2 departures, it double-counted two
+pairs walked in two different receipts, and it presented row count as pair count.
+Recomputed mechanically from the three receipts (replay the chunk walker, mark a
+source re-establishment under 2 000 ms as a no-op, re-derive the true source,
+then de-duplicate):
 
 | | pairs |
 |---|---|
 | ordered pairs in the 9-arena matrix | 72 |
-| walked and committed, real | **37** (25 from the aborted full run + 8 + 4) |
-| walked but VOID (probe defect) | 4 |
-| **not walked** | **31** |
-| failed | **0** |
+| edge ROWS recorded across the three receipts | 41 |
+| rows whose source label is wrong (pre-fix no-op re-establishment) | 11 |
+| — of those, rows that measured a real DISTINCT pair under another name | 7 |
+| — of those, rows that were `nuketown2 -> nuketown2` (no switch at all) | 4 |
+| duplicate pairs walked twice (`nuketown2->skyline-terminal`, `atomic-acres->nuketown2`) | 2 |
+| **GENUINE distinct ordered pairs walked and committed** | **33** |
+| **+ the fixed-probe re-run** (`nuketown2->rustworks-1v1`, new) | **34** |
+| **not walked** | **38** |
+| failed / fence-exceeded | **0** |
+
+Reproduce the count:
+
+```
+node -e "…replay each receipt's chunk walker, treat firstLoads[i].ms < 2000 as a
+no-op re-establishment, set trueSource = previous committed arena, drop
+self-pairs, de-duplicate…"   ->  total rows 41, mislabelled 11, self-pairs 4,
+unique as-labelled 39, unique TRUE distinct ordered pairs 33
+```
 
 **CLAIM-STATE: the 72-pair gate did NOT complete and this lane does not claim
-it.** What is VERIFIED is 37 real ordered pairs committed with zero
-fence-exceeded errors on the candidate build, including every outgoing edge from
-the arena that shipped hours ago and had never been switch-tested. The remaining
-31 pairs are OPEN and the run is cheap to repeat on a quiet machine.
+it.** VERIFIED: **34 genuine ordered pairs committed, 0 failed, 0
+fence-exceeded** on the candidate build. Of the 38 unwalked, **10 involve
+nuketown2** — the arena the first version of this report believed was fully
+covered. That is the run to buy first with the next quiet window.
 
 
 
