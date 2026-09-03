@@ -123,7 +123,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Ray-traced refractions: the transmitted-ray tier stays a Custom-only opt-in.',
       'Screen-space global illumination, depth of field and motion blur — the expensive gather and the two effects that replace pixels. Those belong to a profile you pick on purpose.',
     ]),
-    referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.1 ms median frame, with zero pipelines compiled during play on any arena measured. Its distance from BALANCED on that card is inside the noise and is not claimed. A slower card gives up frame rate here before it gives up looks.',
+    referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, atomic-acres, post-fold ladder: 12.3 ms median frame and 26.8 ms at the 95th percentile, 375 pipelines compiled at admission and zero during play. Its distance from BALANCED on that card is inside the noise and is not claimed. A slower card gives up frame rate here before it gives up looks.',
   }),
   Object.freeze({
     id: 'max',
@@ -154,7 +154,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Ray-traced refractions: the transmitted-ray tier stays a Custom-only opt-in until it carries a measured cold-compile figure on every arena.',
       'Spatial upscaling, which renders below native and would contradict the supersample.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080 at device pixel ratio 1 — the machine this profile is aimed at, and one where the 115% supersample is clamped away, so these figures are the effect tiers alone. Averaged over three arenas: 21.0 ms median frame and 42.8 ms at the 95th percentile, against 12-14 ms and 27-30 ms for every rung below it. That gap reproduces on all three arenas separately, which is why it is the one ordering in the ladder this build states as measured rather than as designed. Anything less than a top-end card should expect to choose QUALITY.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080 at device pixel ratio 1, atomic-acres, post-fold ladder: 29.0 ms median frame and 60.2 ms at the 95th percentile, 478 pipelines compiled at admission and zero during play — the most expensive thing this build can ask a GPU to do, now with the full ray-traced tier on top. The gap to every rung below is the one ordering in the ladder this build states as measured rather than as designed. Anything less than a top-end card should expect to choose QUALITY.',
   }),
 ]);
 

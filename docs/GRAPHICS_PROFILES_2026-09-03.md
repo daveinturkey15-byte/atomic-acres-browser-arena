@@ -505,6 +505,44 @@ arriving through a completely independent channel.
 
 ---
 
+### §3-R. The re-measured post-fold ladder (HF-438, 2026-09-03)
+
+`scripts/qa/audit-graphics-profiles.mjs`, one fresh headless Chrome per row,
+2560x1440, real WebGPU backend confirmed per row, atomic-acres, 10 s sample,
+an otherwise quiet GPU (ComfyUI queue empty before and after every row; the
+pre-browser gate — queue empty AND ≥ 3000 MiB free — polled to open). Raw
+rows: `docs/evidence/pass92/graphics-fold/*.json`; write-up with claim-states
+in the README beside them.
+
+| Preset | Cold admission (s) | Pipelines @admission | Pipelines in combat | Median ms | p95 ms | p99 ms | Rate Hz | Draws | Tris |
+|---|---|---|---|---|---|---|---|---|---|
+| PERFORMANCE | 24.1 | 297 | 0 | 14.6 | 36.4 | 45.7 | 53.7 | 152 | 289k |
+| BALANCED | 31.1 | 375 | 0 | 10.2 | 26.3 | 35.0 | 79.0 | 186 | 540k |
+| QUALITY (light trace) | 34.5 | 375 | 0 | 12.3 | 26.8 | 29.0 | 71.8 | 190 | 536k |
+| MAX (full trace) | 40.2 | 478 | 0 | 29.0 | 60.2 | 63.9 | 31.6 | 373 | 688k |
+
+Every row: `backend: webgpu`, `admissionOutcome: admitted`, `errors: 0`,
+`pipelinesInCombat: 0`, peak completion latency 87-425.5 ms against the
+12,000 ms fence. **VERIFIED.**
+
+**The pipeline-count delta the fold was required to record (MEASURED).**
+QUALITY on atomic-acres: 374 → 375 (+1). MAX on atomic-acres: 478 → 478 (the
+count is unchanged; the trace's stage rides the existing composite-pass
+pipeline structure rather than adding a pipeline variant here). The
+cold-compile admission fence was NOT widened: no pipeline is compiled during
+combat on any row, and refractions — the one tier that might — remain a
+Custom opt-in.
+
+**What this table does NOT establish.** It is n=1, one 10 s window, one
+arena, one session. The frame-time cells are NOT comparable against §3's
+historical rows as a measure of the fold's cost (different session, different
+load, §3's own under-15%-per-cell rule). The fold's per-frame cost on
+QUALITY/MAX frame time is **OPEN** and needs the repeats protocol from item 4
+of §3. The pipeline deltas and the clean tripwire are direct, load-insensitive
+measurements and are the evidence the fold needed.
+
+---
+
 ## 4. Honesty column: what "verified" means for each control
 
 `ADVANCED_GRAPHICS_RUNTIME_EVIDENCE` carries two different strengths of claim
