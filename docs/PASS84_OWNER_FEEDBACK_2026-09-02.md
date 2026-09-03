@@ -786,3 +786,20 @@ measured on a quiet machine: farcrysis 32.0 s mean vs the atomic-acres control
   ridged-FBM backdrop), the core building's interior floor/walls and a practical
   light, the 25 runtime eye rows, and stage 1's flat-ground eye seat (an
   instrument fix that also affects every heightfield arena).
+
+### HF-408 Raid layout rethink — lane result 02:20 BST and the orchestrator's decision
+Lane AQ (branch raid-rejig, 13 commits; skeptic REJECT on one geometric blocker,
+repaired): the complaint was measured as wall SHAPE, not wall quantity (shipped
+Raid: 59 eye-blocking masses averaging 11 m2, mean open sightline 9.97 m, 36.7%
+roofed ground); the rebuild carries 34 masses averaging 22.6 m2, mean open line
+13.62 m, long-axis median 25.65 m, 21.9% roofed, wall footprint per floor area
+UP (13.0 -> 15.5), 84 mountable cover pieces, all four upper rooms reachable
+(the skeptic found three sealed by full-height walls emitted from grade; fixed and
+measured by flood fill), 12/12 legal spawns with zero spawn-to-spawn sightlines,
+parity 0/0, real menu preview, eye clearance measured (13 -> 0), readability of
+the cover family gated. **Decision:** ships in PASS 87 as RAID REBUILD · PREVIEW
+if the integration worker lands it green by 04:20 (35-file conflict surface with
+PASS 86's arena additions). Owed next: the ART pass (flat untextured albedo; Lane
+L stays shelved at the owner's instruction but the rebuild needs its own first
+style pass), arena sync 45-63% slower than the shipped Raid (route to Lane H2),
+the warm-key art-direction quadrant being full, the weather sequencer latent bug.
