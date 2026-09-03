@@ -1168,3 +1168,17 @@ assets and textures and lighting need to be tip top, raid can come next"
 - **Owner 18:58:** "glm usage is at 80% of 5hr window, gemini looks better
   though" → Lane BA rebalanced: Gemini builds cycles 1–2, GLM cycle 3 + final;
   automatic fallback between the two; critics stay Gemini.
+
+## HF-444 — owner 2026-09-03 19:25: use the local Qwen model overnight
+
+- "some more resource for you, can you use my qwen local model, i think its 27b
+  iq3xxs with mtp ... 64 or 80k context? ... it can work all night, find some
+  jobs its good at?" → Local Qwen3.8-27B UD-IQ3_XXS (llama-server :8080, ctx
+  65536, native MTP, idle-sleep 180 s) becomes a third cheap worker. Task fit:
+  small-context, mechanical, self-verifying jobs with a gate each — stale
+  comment audit, script usage headers, an unreferenced-export finder
+  (report-only), gotcha drafts from the day's findings, the morning report
+  skeleton. Worktree `aa-claude-qwen`, branch `qwen-tidy-overnight`. GPU rule:
+  Qwen jobs wait while the Lane BA chain holds `ba-running.lock`, so the
+  Nuke Town captures never fight a 13 GiB model for VRAM; Opus verifies every
+  Qwen commit in the morning before anything merges.
