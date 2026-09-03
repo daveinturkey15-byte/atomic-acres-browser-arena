@@ -107,7 +107,11 @@ test('every selectable arena is covered by the derived roster', () => {
   // is a collapsed-derivation alarm and must equal the REAL roster in both
   // directions - which is why the equality assertion below, not this literal,
   // is the thing that actually holds it.
-  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  // HF-423 (PASS 87): 8 -> 10. Both PASS 86 and Lane R independently wrote the
+  // literal `9` from different arithmetic (nine of ten with farcrysis hidden;
+  // nine ids before nuketown2 with it un-hidden). Git merges identical text
+  // without conflict, so the union of the two is TEN, not nine.
+  assert.ok(selectable.length >= 10, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
   // MAP3 (HF-409 repair, 2026-09-02): a bare floor only guards DOWNWARD, so a
   // silently lowered literal would still pass while covering fewer arenas. The
   // sibling eye-clearance contract was given a floor-equals-derived-roster
@@ -124,11 +128,13 @@ test('every selectable arena is covered by the derived roster', () => {
     'this file and the shared roster derivation must name the SAME arenas, not merely the same count',
   );
   // MAP3 joins the required set with its card: an offered arena that no browser
-  // ever loads is exactly the hole this required set exists to catch.
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  // ever loads is exactly the hole this required set exists to catch. FARCRYSIS
+  // joins it at HF-423 for the same reason.
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3', 'farcrysis']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
-  for (const hidden of ['farcrysis']) {
-    assert.ok(!selectable.includes(hidden), `${hidden} is selectable:false and must stay out of the required set`);
-  }
+  // The negative pin that used to stand here - "farcrysis is selectable:false
+  // and must stay out of the required set" - is retired by HF-423. It is not
+  // dropped: farcrysis is now in the REQUIRED list above, the same fact in the
+  // stronger direction. A PREVIEW card is browser-tested like any other.
 });

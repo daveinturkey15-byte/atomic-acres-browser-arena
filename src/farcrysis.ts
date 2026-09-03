@@ -20,11 +20,18 @@ import { bakeFarcrysisWaterDepth, createFarcrysisSeaSurfaceMaterial } from './fa
 import {
   farcrysisTerrainHeight,
   farcrysisTerrainPhysicsTiles,
+  farcrysisTerrainProxyChunks,
   farcrysisBotGroundPlatforms,
   FARCRYSIS_SAFETY_FLOOR_Y,
   FARCRYSIS_WATER_LEVEL,
 } from './farcrysis-terrain-authority';
-import { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE } from './farcrysis-constants';
+import {
+  FARCRYSIS_BOUNDS,
+  FARCRYSIS_COVER_MIN,
+  FARCRYSIS_MAX_SIGHTLINE,
+  FARCRYSIS_PATROL_XZ,
+  FARCRYSIS_SPAWNS_XZ,
+} from './farcrysis-constants';
 
 // HF-395 relational mid-map composition: every mid-map prop derives its world
 // position from one of four quadrant landmark frames (see the module header).
@@ -82,14 +89,26 @@ function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   };
 }
 
+/**
+ * Authored spawns, seated on the terrain authority.
+ *
+ * The shared `spawnRecord` helper every flat-floored arena uses pins y at the
+ * 1.7 m eye height, i.e. FEET AT y = 0. farcrysis has no floor at y = 0: its
+ * ground is the analytic field `farcrysisTerrainHeight(x, z)`, and the runtime
+ * uses the authored y verbatim (`player.position.copy(spawnPoint())` then
+ * `characterPhysics.teleportEye(...)` in legacy-main). The pre-PASS-85 table
+ * sat entirely on the beach corners, where the surface runs 0.08-0.50 m, so
+ * the flat pin buried the feet by up to half a metre; anywhere on the island
+ * interior it would have buried them by up to 7.3 m. Resolving y here is what
+ * lets the table move off the beach at all.
+ */
 function spawnRecord(
   team0: readonly (readonly [number, number])[],
   team1: readonly (readonly [number, number])[],
 ): Record<Team, THREE.Vector3[]> {
-  return {
-    0: team0.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-    1: team1.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
-  };
+  const seat = ([x, z]: readonly [number, number]): THREE.Vector3 =>
+    new THREE.Vector3(x, farcrysisTerrainHeight(x, z) + 1.7, z);
+  return { 0: team0.map(seat), 1: team1.map(seat) };
 }
 
 type Builder = {
@@ -511,15 +530,35 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     for (const crate of landmarkCratePlacements(frame)) {
       const [cx, cz] = crate.pos;
       if (crate.tier === 1) {
-        // Upper tier rides INSIDE the base crate's cover footprint — visual
-        // only, so one collider covers both boxes of the stack.
-        const top = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.85, 1.55), crateMat);
-        top.name = `farcrysis-crate-${frame.tag}-stack-top`;
-        top.position.set(cx + Math.sin(crate.yaw) * 0.06, groundY(cx, cz) + 1.33, cz + Math.cos(crate.yaw) * 0.06);
-        top.rotation.y = crate.yaw;
-        top.castShadow = true;
+        // HF-423 collider/visual parity. The comment that stood here claimed
+        // "one collider covers both boxes of the stack". It did not: the base
+        // crate's cover box tops out at groundY + 0.90 and this lid's visual
+        // top face is at groundY + 1.755, so a player who climbed the stack
+        // stood 0.855 m INSIDE a solid-looking crate. That is the exact
+        // authored-mass-versus-movement-authority defect the arena forging
+        // review in AGENTS.md forbids, and it was carried as an accepted
+        // "hidden arena" row in src/walkable-surface-parity-gate.test.ts -
+        // an excuse that expires the moment the arena ships.
+        //
+        // The upper tier now carries its own cover box, sized and seated on
+        // its own visual. The stack becomes a full-height blocker rather than
+        // vaultable waist cover, which is what a two-tier crate stack has
+        // looked like all along.
+        const topSize: [number, number, number] = [1.55, 0.85, 1.55];
+        const topPos: [number, number, number] = [
+          cx + Math.sin(crate.yaw) * 0.06,
+          groundY(cx, cz) + 1.33,
+          cz + Math.cos(crate.yaw) * 0.06,
+        ];
+        const top = cover(
+          builder,
+          `farcrysis-crate-${frame.tag}-stack-top`,
+          topPos,
+          topSize,
+          crateMat,
+          [0, crate.yaw, 0],
+        );
         top.receiveShadow = true;
-        root.add(top);
         continue;
       }
       cover(
@@ -817,18 +856,39 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // Research tower legs (art tower at [-8.5, -8.5], legs at ±1.3 offsets in
   // farcrysis-art.ts addResearchTower) and cave arch pillars (art cave group
   // at [52, 32], yaw 1.2). World positions are derived from the same authored
-  // constants; the arch top stays open so players can walk through the arch.
+  // constants; the arch OPENING stays clear so players can walk through it.
   for (const [lx, lz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]] as const) {
     const x = -8.5 + lx;
     const z = -8.5 + lz;
     colliderProxy(`farcrysis-art-tower-leg-collider-${lx}-${lz}`, [x, groundY(x, z) + 2.4, z], [0.26, 4.8, 0.26], 'structural-metal');
   }
+  // HF-423: the tower's lookout platform (3.0 x 3.0 steel deck at local
+  // y 4.86) and its dish (0.1 m disc at local y 6.2) carried NO authority at
+  // all while the arena was hidden, and neither did the cave arch crown. That
+  // is the "authored visible mass matches movement and projectile authority"
+  // rule in AGENTS.md, and it was excused in
+  // src/walkable-surface-parity-gate.test.ts by the words "hidden arena" -
+  // an excuse that expires the moment the arena becomes selectable. Bullets
+  // passed straight through a steel deck, and a player put on top of it by any
+  // future route (or by the eye-clearance stage-3 teleporter) fell 4.95 m
+  // through it. All three now block movement and stop shots on their own
+  // visual footprint. The tower group sits at [-8.5, terrainHeight, -8.5], so
+  // the deck's world height is that ground plus its authored local offset -
+  // derived here rather than re-typed, so the collider tracks the art.
+  const towerGroundY = groundY(-8.5, -8.5);
+  colliderProxy('farcrysis-art-tower-platform-collider', [-8.5, towerGroundY + 4.86, -8.5], [3.0, 0.12, 3.0], 'structural-metal');
+  colliderProxy('farcrysis-art-tower-dish-collider', [-8.5, towerGroundY + 6.2, -8.5], [1.6, 0.1, 1.6], 'thin-metal');
   const caveYaw = 1.2;
   for (const side of [-1, 1] as const) {
     const x = 52 + side * 1.5 * Math.cos(caveYaw);
     const z = 32 - side * 1.5 * Math.sin(caveYaw);
     colliderProxy(`farcrysis-art-cave-pillar-collider-${side > 0 ? 'r' : 'l'}`, [x, groundY(x, z) + 1.3, z], [0.7, 2.6, 1.6], 'concrete', [0, caveYaw, 0]);
   }
+  // The arch CROWN, not the opening: the slab spans local y 2.4-3.0, so the
+  // 0-2.4 m gap a player walks through stays clear. The comment above used to
+  // say "the arch top stays open so players can walk through the arch", which
+  // conflated the crown with the opening.
+  colliderProxy('farcrysis-art-cave-arch-top-collider', [52, groundY(52, 32) + 2.7, 32], [3.8, 0.6, 1.4], 'concrete', [0, caveYaw, 0]);
 
   // Representative large palm trunks from the enhanced-palm art layer. The
   // placements are seeded-deterministic, so colliders and instances always
@@ -915,21 +975,36 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     wall.visible = false;
   }
 
-  // Spawns — rotationally symmetric across the core (NW vs SE), off colliders,
-  // no opposing spawn line-of-sight.
-  const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(
-    [
-      [-52, -52], [-44, -48], [-48, -40], [-36, -52],
-    ],
-    [
-      [52, 52], [44, 48], [48, 40], [36, 52],
-    ],
-  );
+  // Spawns — PASS 85 Lane R. Solved, not authored by eye:
+  // `npx tsx scripts/qa/solve-farcrysis-spawns.ts`, which searches this
+  // arena's own geometry under the HF-402 constraint set
+  // (src/spawn-layout-constraints.ts: floor beneath, autostep route to the
+  // enemy, cover in reach, no enemy spawn in sight, wall standoff, open arc,
+  // team separation) with each candidate carrying its own terrain-resolved
+  // height. Evidence: docs/evidence/pass85/lane-r/spawn-solve.json (committed;
+  // the solver also writes an untracked copy under artifacts/, which is
+  // git-ignored on purpose - cite the committed path).
+  //
+  // What it replaces, measured: four points per team inside a 16 x 12 m
+  // beach corner of a 128 x 128 m island - the exact layout
+  // src/spawn-layout-quality.test.ts names in its own preamble - spanning
+  // 0.125 of the longer axis against that gate's 0.18 floor, with the whole
+  // interior, the ruined core and the ridge unused by either team.
+  //
+  // Measured after: 6 + 6 points, 100% in envelope (floor, route, cover,
+  // standoff, arc all pass), team spreads 0.219 and 0.344 of the longer axis,
+  // cross-team minimum 48.8 m = 0.381 of it (gate floor 0.33), nearest
+  // enemy spawn with a sightline 48.8 m away (gate floor 30 m).
+  //
+  // The NW/SE diagonal split of the old table is kept: team 0 owns
+  // (x + z) / 2 <= -17, team 1 owns >= +17.
+  //
+  // The coordinates themselves live in farcrysis-constants.ts, the arena's leaf
+  // module, because farcrysis-vegetation.ts needs them too and used to keep a
+  // hand-copied second table (see FARCRYSIS_SPAWNS_XZ).
+  const spawns: Record<Team, THREE.Vector3[]> = spawnRecord(FARCRYSIS_SPAWNS_XZ[0], FARCRYSIS_SPAWNS_XZ[1]);
 
-  const patrolPoints = [
-    [-52, -52], [-36, -40], [-24, -32], [-8, -24], [0, 0], [24, 32], [36, 40], [52, 52],
-    [-40, 36], [40, -36], [-16, -48], [16, 48],
-  ].map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const patrolPoints = FARCRYSIS_PATROL_XZ.map(([x, z]) => new THREE.Vector3(x, 0, z));
 
   // --- Pass 69 art/feel lane (presentation only — no colliders, spawns, or gameplay authority) ---
   applyFarcrysisArtwork(root);
@@ -943,6 +1018,55 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // walls. This is the established split map.ts already uses for ramps.
   const terrainPlates = farcrysisTerrainPhysicsTiles();
   for (const plate of terrainPlates) builder.physicsColliders.push(plate.box);
+
+  // ---- HF-423: the ground is now a RAYCAST surface too ---------------------
+  //
+  // Those plates are rotated, and both consumers of a downward probe skip
+  // rotated boxes: the shared HF-402 `floorBeneath` (spawn quality) and the
+  // hitscan path, which only ever sees `raycastMeshes`. So this arena had no
+  // floor under the spawn rule (MEASURED: 202 of 3,136 dry cells, 6.44 %, all
+  // prop tops) and no ground under gunfire. Every other shipped arena pushes
+  // its ground mesh into `raycastMeshes`; farcrysis simply never did.
+  //
+  // 256 invisible chunk meshes (16 x 16 over the 128 m island, 8 m each, 288
+  // triangles apiece = 73,728 in total) carry the collision-only triangulation,
+  // so a ray's per-mesh bounding-box rejection leaves ~288 triangles to walk
+  // instead of all 73,728. MEASURED at this head with
+  // `farcrysisTerrainProxyChunks()`: 256 chunks / 73,728 triangles, matching
+  // `docs/evidence/pass87/lane-r/floor-coverage-after-shotbox.json`
+  // (terrainProxyMeshes 256, terrainProxyTriangles 73728). An earlier revision
+  // of this comment described an abandoned 4 x 4 x 32 layout and was wrong.
+  // They stay OUT of `colliders` for the same reason the
+  // plates do — LOS, bot avoidance and spawn validation must not read the
+  // ground as walls.
+  const terrainProxyGroup = new THREE.Group();
+  terrainProxyGroup.name = 'farcrysis-terrain-collision-proxy';
+  for (const chunk of farcrysisTerrainProxyChunks()) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(chunk.positions, 3));
+    geometry.setIndex(new THREE.BufferAttribute(chunk.indices, 1));
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    // The mud material is reused rather than authored: the mesh never renders,
+    // and a fresh material here would be a fresh node graph and a fresh render
+    // pipeline on an arena whose admission cost is the thing under repair.
+    const mesh = new THREE.Mesh(geometry, mudMat);
+    mesh.name = chunk.id;
+    mesh.visible = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.matrixAutoUpdate = false;
+    mesh.userData.collisionProxy = true;
+    mesh.userData.farcrysisTerrainProxy = true;
+    mesh.userData.impactSurface = classifyImpactSurface({ name: chunk.id });
+    terrainProxyGroup.add(mesh);
+    builder.raycastMeshes.push(mesh);
+    const surface = createBallisticSurface(chunk.id, chunk.id, chunk.bounds, { material: 'earth' });
+    builder.shotSurfaces.push(surface);
+    mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
+  }
+  root.add(terrainProxyGroup);
 
   // Bot feet track the same surface through the generic verticalNavigation
   // channel (authoredElevationAt in legacy-main) — platforms for the ground

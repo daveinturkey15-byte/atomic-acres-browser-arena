@@ -39,7 +39,7 @@
  * on every peer. No Math.random anywhere.
  */
 
-import type { Box2 } from './collision';
+import { segmentBoxHitTime, type Box2, type Point3 } from './collision';
 import { FARCRYSIS_BOUNDS } from './farcrysis-constants';
 import { FARCRYSIS_WATER } from './water/water-authoring';
 import { SWIM_TUNING, feetDepthFromEyeDepth } from './water/swim-state';
@@ -402,4 +402,230 @@ export function farcrysisBotGroundPlatforms(): readonly BotGroundPlatform[] {
   }
   platformCache = Object.freeze(out);
   return platformCache;
+}
+
+// ---------------------------------------------------------------------------
+// Floor probe — what HF-402's `floorBeneath` cannot see on this arena
+// ---------------------------------------------------------------------------
+
+/**
+ * The gap between a standing player's FEET and the terrain plate beneath them,
+ * or null when no plate is within reach. Positive = the surface is below the
+ * feet; negative = the feet are inside it, up to autostep.
+ *
+ * PASS 85 Lane R. `floorBeneath` in src/spawn-layout-constraints.ts finds a
+ * floor from a downward ray against `raycastMeshes`, an axis-aligned collider
+ * top, or the physics fail-safe floor — and skips any box carrying a
+ * `rotation`. farcrysis has none of the three under the player: the visual
+ * terrain is presentation-only and deliberately absent from `raycastMeshes`,
+ * the fail-safe floor is 4.5 m down, and the ground IS 5,474 rotated
+ * tangent-plane slabs from `farcrysisTerrainPhysicsTiles`. Measured with the
+ * shipped rule: 7 of 1,244 dry 2 m cells on this island report a floor, all of
+ * them prop tops. This probe answers the same question against the plates,
+ * with the same segment and the same tolerances, so farcrysis instruments do
+ * not have to wait on a change to a shared module.
+ */
+export function farcrysisFloorGapBeneath(
+  eye: Point3,
+  physicsColliders: readonly Box2[],
+  eyeHeightM = 1.7,
+  autostepM = 0.45,
+  dropToleranceM = 0.6,
+): number | null {
+  const far = eyeHeightM + dropToleranceM + 0.01;
+  const feetY = eye.y - eyeHeightM;
+  const start = { x: eye.x, y: eye.y, z: eye.z };
+  const end = { x: eye.x, y: eye.y - far, z: eye.z };
+  let best: number | null = null;
+  for (const box of physicsColliders) {
+    if (box.maxY === undefined) continue;
+    let surfaceY: number;
+    if (box.rotation) {
+      const time = segmentBoxHitTime(start, end, box, 0);
+      if (time === null) continue;
+      surfaceY = eye.y - time * far;
+    } else {
+      if (eye.x < box.minX || eye.x > box.maxX || eye.z < box.minZ || eye.z > box.maxZ) continue;
+      surfaceY = box.maxY;
+    }
+    const gap = feetY - surfaceY;
+    if (gap < -autostepM || gap > dropToleranceM) continue;
+    if (best === null || Math.abs(gap) < Math.abs(best)) best = gap;
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// Terrain collision proxy — the ground this arena never registered for raycasts
+// ---------------------------------------------------------------------------
+
+/**
+ * Chunks per axis. The proxy is split so THREE's per-mesh bounding-box test
+ * rejects all but the one or two chunks a ray actually crosses; a single
+ * 32k-triangle ground mesh would be walked in full on every hitscan.
+ */
+export const TERRAIN_PROXY_CHUNKS_PER_AXIS = 16;
+
+/** Grid steps per chunk edge. 16 chunks x 12 steps over 128 m = a 0.667 m lattice. */
+export const TERRAIN_PROXY_SEGMENTS_PER_CHUNK = 12;
+
+export type TerrainProxyChunk = Readonly<{
+  id: string;
+  /** World-space triangle soup; the mesh sits at the origin untransformed. */
+  positions: Float32Array;
+  indices: Uint32Array;
+  /**
+   * The chunk's BallisticSurface box.
+   *
+   * NOT the tight bounds of the triangles. `surfaceInterval` in
+   * src/ballistics.ts models every shot surface as a SOLID BOX, and a box that
+   * spans a chunk's minimum-to-maximum ground contains the eye of any player
+   * standing lower than that chunk's high point - so their shot begins inside
+   * 'earth' and dies at the muzzle. MEASURED with the tight box over 2,000
+   * level-ish shots fired from a standing eye seated on the arena's own ground:
+   * 56.5 % began inside the box and only 172 of 2,000 travelled 60 m. The
+   * ceiling is therefore the chunk's MINIMUM ground height: everything below
+   * the whole chunk's surface is solid, and no standing player can be inside
+   * it. See TERRAIN_SHOT_BOX_CEILING below for the measured trade.
+   */
+  bounds: Box2;
+  /** The tight triangle bounds, kept for tests and instruments that want them. */
+  visualBounds: Box2;
+}>;
+
+let proxyCache: readonly TerrainProxyChunk[] | null = null;
+
+/**
+ * A collision-only triangulation of `farcrysisTerrainHeight` over the arena.
+ *
+ * WHY THIS EXISTS. `floorBeneath` in src/spawn-layout-constraints.ts — the
+ * shared HF-402 spawn-quality rule — accepts a floor from a downward ray
+ * against `raycastMeshes`, from the top face of an AXIS-ALIGNED collider box,
+ * or from the fail-safe floor. Every other shipped arena satisfies it the first
+ * way: additional-maps.ts pushes its `ground` / `floor` / `tarmac` mesh into
+ * `raycastMeshes`. farcrysis satisfied none of them — its ground is 5,474
+ * ROTATED tangent-plane plates in `physicsColliders`, which that rule skips by
+ * construction, and its sculpted terrain was presentation-only and absent from
+ * `raycastMeshes`. MEASURED before this proxy existed, over the 3,136 dry 2 m
+ * cells of the island (`scripts/qa/measure-farcrysis-floor-coverage.ts`): 202
+ * cells reported a floor — 6.44 %, every one of them a prop top. So the arena
+ * was the outlier, not the shared rule, and this closes it from the arena side
+ * rather than by loosening a shared threshold.
+ *
+ * The same registration also makes the ground a shot blocker. It was not one:
+ * the plates carry no `BallisticSurface`, so bullets passed through hillsides.
+ *
+ * RESOLUTION. 16 x 16 chunks of 12 steps is a 0.667 m lattice. MEASURED off-
+ * lattice (mid-cell samples, where linear interpolation is worst) against the
+ * analytic field: maximum 0.1086 m, mean 0.0028 m. That is inside the 0.12 m
+ * `PLATE_FIT_TOLERANCE_M` the physics plates themselves are fitted to, and far
+ * inside `floorBeneath`'s 0.45 m autostep and 0.6 m drop tolerances, so proxy
+ * error cannot push the probe off a real floor. That is 256 chunks of 288
+ * triangles = 73,728 triangles in total. The coarser 4 x 4 chunks of 32 steps
+ * (32,768 triangles on a 1 m lattice) was measured first and rejected: same
+ * per-ray cost, 0.3296 m maximum error.
+ *
+ * COST. MEASURED over 2,000 hitscan-shaped rays across the arena's full
+ * `raycastMeshes` set: 0.024 ms/ray without the proxy, 0.293 ms/ray with it at
+ * the original 8 x 8 chunk layout (16 m chunks, 1,152 triangles each). The chunking is what keeps that bounded - one
+ * 73,728-triangle ground mesh would be walked in full on every shot.
+ *
+ * TERRAIN_SHOT_BOX_CEILING. The BALLISTIC box is a separate question from the
+ * triangles, because `surfaceInterval` models a shot surface as a solid box.
+ * MEASURED over 2,000 level-ish shots fired from a standing eye seated on the
+ * arena's own ground, against the triangulated surface itself as ground truth
+ * (798 / 2,000 = 39.9 % of those shots really do meet the island within 60 m):
+ *
+ *   model                                   muzzle inside earth   ground stops
+ *   16 m chunk, tight minY..maxY  (DEFECTIVE, fixed)     56.5 %          1,543
+ *   no ballistic surface at all   (pre-lane)             0.0 %              0
+ *   16 m chunk, ceiling = chunk min ground               0.0 %            194
+ *   8 m chunk,  ceiling = chunk min ground  (SHIPPED)    0.0 %            445
+ *   4 m cells,  ceiling = cell min ground                0.0 %            570
+ *   2 m cells,  ceiling = cell min ground                0.0 %            628
+ *
+ * The tight box does not merely over-block, it blocks 193 % of the true rate
+ * while eating more than half of all shots at the muzzle. Finer cells converge
+ * on the truth from BELOW - under-blocking is a bullet that flies through a
+ * hillside, over-blocking is a player who cannot shoot - but src/ballistics.test.ts
+ * pins one shot surface per raycast mesh across every arena, so the cell size
+ * and the chunk size are the same number. 8 m chunks with a min-ground ceiling
+ * is what this arena ships: 0 % muzzle, 56 % of the true blocking, and a shot
+ * cost of 0.120 ms against 0.083 ms for the broken model and 0.067 ms for no
+ * ground surface at all. 4 m would reach 71 % of the truth at 0.277 ms/shot;
+ * that trade is left to a pass with frame time to spare, and the real answer is
+ * a heightfield shot-surface kind that src/ballistics.ts does not have.
+ */
+export function farcrysisTerrainProxyChunks(): readonly TerrainProxyChunk[] {
+  if (proxyCache) return proxyCache;
+  const chunks: TerrainProxyChunk[] = [];
+  const spanX = (FARCRYSIS_BOUNDS.maxX - FARCRYSIS_BOUNDS.minX) / TERRAIN_PROXY_CHUNKS_PER_AXIS;
+  const spanZ = (FARCRYSIS_BOUNDS.maxZ - FARCRYSIS_BOUNDS.minZ) / TERRAIN_PROXY_CHUNKS_PER_AXIS;
+  const steps = TERRAIN_PROXY_SEGMENTS_PER_CHUNK;
+  const stepX = spanX / steps;
+  const stepZ = spanZ / steps;
+
+  for (let cx = 0; cx < TERRAIN_PROXY_CHUNKS_PER_AXIS; cx += 1) {
+    for (let cz = 0; cz < TERRAIN_PROXY_CHUNKS_PER_AXIS; cz += 1) {
+      const originX = FARCRYSIS_BOUNDS.minX + cx * spanX;
+      const originZ = FARCRYSIS_BOUNDS.minZ + cz * spanZ;
+      const positions = new Float32Array((steps + 1) * (steps + 1) * 3);
+      let minY = Number.POSITIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i <= steps; i += 1) {
+        for (let j = 0; j <= steps; j += 1) {
+          // Sample on the shared lattice, not on a chunk-local offset, so the
+          // seam vertices of neighbouring chunks are bit-identical and no ray
+          // can slip between them.
+          const x = originX + i * stepX;
+          const z = originZ + j * stepZ;
+          const y = farcrysisTerrainHeight(x, z);
+          const base = (i * (steps + 1) + j) * 3;
+          positions[base] = x;
+          positions[base + 1] = y;
+          positions[base + 2] = z;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      const indices = new Uint32Array(steps * steps * 6);
+      let cursor = 0;
+      for (let i = 0; i < steps; i += 1) {
+        for (let j = 0; j < steps; j += 1) {
+          const a = i * (steps + 1) + j;
+          const b = a + 1;
+          const c = a + (steps + 1);
+          const d = c + 1;
+          // Counter-clockwise seen from +Y, so the face normals point UP and a
+          // downward probe hits the FRONT face. The mirrored winding compiles
+          // and renders identically (the mesh never renders) but every
+          // `floorBeneath` ray passes straight through a FrontSide material.
+          indices[cursor] = a;
+          indices[cursor + 1] = b;
+          indices[cursor + 2] = c;
+          indices[cursor + 3] = b;
+          indices[cursor + 4] = d;
+          indices[cursor + 5] = c;
+          cursor += 6;
+        }
+      }
+      const footprint = {
+        minX: originX,
+        maxX: originX + spanX,
+        minZ: originZ,
+        maxZ: originZ + spanZ,
+      };
+      chunks.push(Object.freeze({
+        id: `farcrysis-terrain-proxy-${cx}-${cz}`,
+        positions,
+        indices,
+        // The ballistic box stops at the chunk's LOWEST ground, so no player
+        // standing anywhere on this chunk can be inside it. See the header.
+        bounds: Object.freeze({ ...footprint, minY: FARCRYSIS_SAFETY_FLOOR_Y, maxY: minY }) as Box2,
+        visualBounds: Object.freeze({ ...footprint, minY, maxY }) as Box2,
+      }));
+    }
+  }
+  proxyCache = Object.freeze(chunks);
+  return proxyCache;
 }

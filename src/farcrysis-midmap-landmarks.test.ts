@@ -162,7 +162,13 @@ describe('farcrysis mid-map landmarks (HF-395)', () => {
         const wallTag = entry.id.match(/^farcrysis-ruined-wall-(nw|ne|sw|se)-/)?.[1];
         const otherIsOwnWall = crateTag !== undefined && other.id.startsWith(`farcrysis-ruined-wall-${crateTag}-`);
         const otherIsOwnCrate = wallTag !== undefined && other.id.startsWith(`farcrysis-crate-${wallTag}`);
-        if (otherIsOwnWall || otherIsOwnCrate) continue;
+        // HF-423 designed contact: `farcrysis-crate-<tag>-stack-top` is the LID
+        // of that stack, given real authority in this pass because it was
+        // authored mass a player can stand on. A lid that did not touch the
+        // crates under it would be the defect. Only ITS OWN stack is exempt -
+        // a lid overlapping any other collider still fails here.
+        const otherIsOwnStackTop = crateTag !== undefined && other.id === `farcrysis-crate-${crateTag}-stack-top`;
+        if (otherIsOwnWall || otherIsOwnCrate || otherIsOwnStackTop) continue;
         const clash = boxesIntersect(entry.bounds, other.bounds)
           ? `${entry.id} intersects ${other.id}`
           : null;
@@ -175,14 +181,30 @@ describe('farcrysis mid-map landmarks (HF-395)', () => {
     const scene = new THREE.Scene();
     const arena = buildFarcrysis(scene);
     const audit = arena.root.userData.farcrysisColliderAudit as ReadonlyArray<{ id: string; bounds: Box2ish & { minY?: number; maxY?: number } }>;
+    let stackTops = 0;
     for (const entry of audit) {
       if (!/^farcrysis-(ruined-wall-(nw|ne|sw|se)|crate-(nw|ne|sw|se))/.test(entry.id)) continue;
       const cx = (entry.bounds.minX + entry.bounds.maxX) / 2;
       const cz = (entry.bounds.minZ + entry.bounds.maxZ) / 2;
       const seat = entry.bounds.minY ?? Number.NaN;
+      // HF-423: a stack LID does not seat on the terrain, it seats on the crates.
+      // Asserting the ground rule against it would be asserting the wrong thing,
+      // so it gets the RIGHT one instead: its base must meet the top of its own
+      // stack within the same 0.06 m, which is a tighter claim than "somewhere
+      // above the ground" and fails if the lid ever floats off its crates.
+      const stackTag = entry.id.match(/^farcrysis-crate-(nw|ne|sw|se)-stack-top$/)?.[1];
+      if (stackTag !== undefined) {
+        stackTops += 1;
+        const stack = audit.find((candidate) => candidate.id === `farcrysis-crate-${stackTag}`);
+        expect(stack, `expected the stack under ${entry.id}`).toBeTruthy();
+        expect(Math.abs(seat - (stack!.bounds.maxY ?? Number.NaN)), `${entry.id} seats on its stack`)
+          .toBeLessThanOrEqual(0.06);
+        continue;
+      }
       expect(Math.abs(seat - farcrysisTerrainHeight(cx, cz)), `${entry.id} seating`)
         .toBeLessThanOrEqual(0.06);
     }
+    expect(stackTops, 'expected one lid per landmark crate stack').toBe(4);
   });
 
   it('anchors each wordmark plaque on its landmark crate cover in the built arena', () => {
