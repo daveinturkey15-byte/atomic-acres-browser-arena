@@ -29463,13 +29463,17 @@ async function performArenaSelection(
       // except the one `cold-session-precompile-reach.ts` names with its
       // evidence. So the cold-session relief is asked of that authority, and
       // this region still contains no arena id (pinned twice).
+      // The intermediate step of this lane scoped the COLD-SESSION root to
+      // `arena.root` and measured it: it recovered 2 932 ms of the 8 583 and left
+      // 5 645 ms, so the cold session stopped running the relief at all except
+      // where it is needed. That left the narrowed root reachable ONLY for the
+      // arena the authority names - which would have shipped farcrysis a
+      // NARROWER relief than PASS 86 gives it today, on no evidence. Both
+      // surviving cases therefore take the whole scene, exactly as PASS 86 does.
       const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
       if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
         const scenePassPrecompile = pass64TslSystems;
-        let arenaRootAncestor: THREE.Object3D = arena.root;
-        while (arenaRootAncestor.parent) arenaRootAncestor = arenaRootAncestor.parent;
-        const precompileRoot = hadPreparedArena || arenaRootAncestor !== scene ? scene : arena.root;
-        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(precompileRoot));
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);

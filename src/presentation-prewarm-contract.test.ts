@@ -660,24 +660,19 @@ describe('presentation prewarm startup contract', () => {
     expect(coldWebGpuWarmFrame)
       .toContain('const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);');
     expect(coldWebGpuWarmFrame)
-      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(precompileRoot));');
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));');
     expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(0);
     // LANE H2. The relief stays unconditional - every arena, both paths - but
     // its ROOT is now chosen, because measuring it showed a cold session paying
     // 8.6 s to realise a scene whose non-arena content the fenced warm frame
     // cannot be surprised by. Pinned strictly tighter than before, not looser:
-    //  * the whole scene on an in-session switch (`hadPreparedArena`), which is
+    //  * unconditionally on an in-session switch (`hadPreparedArena`), which is
     //    byte-for-byte the sequence that took the 56-pair switch matrix to 56/56,
-    //  * the arena's own root on a cold session, which is exactly the vocabulary
-    //    farcrysis's "submission 1 ... fenced draws 1017" was made of,
-    //  * the whole scene as the FALLBACK when the arena root is not attached to
-    //    the submitted scene, because precompileExactScenePass throws on a
-    //    detached root and the safe direction is more compiled, never less.
-    // A future edit that drops the branch, inverts it, or removes the
-    // attachment fallback fails here.
-    expect(coldWebGpuWarmFrame)
-      .toContain('const precompileRoot = hadPreparedArena || arenaRootAncestor !== scene ? scene : arena.root;');
-    expect(coldWebGpuWarmFrame).toContain('while (arenaRootAncestor.parent) arenaRootAncestor = arenaRootAncestor.parent;');
+    //  * on a cold session only where a cold session has been MEASURED to lose
+    //    the 12 s fence, answered by cold-session-precompile-reach.ts.
+    // Both surviving cases take the WHOLE SCENE, exactly as PASS 86 does, so no
+    // arena's relief is narrower than the one it ships with today. A future edit
+    // that drops the guard, inverts it, or narrows the root fails here.
     expect(coldWebGpuWarmFrame.match(/precompileExactScenePass\(/g) ?? []).toHaveLength(1);
     for (const fencedStep of [
       'requestStaticShadowRefresh(true);',
@@ -686,7 +681,7 @@ describe('presentation prewarm startup contract', () => {
     ]) {
       expect(coldWebGpuWarmFrame).toContain(fencedStep);
       expect(
-        coldWebGpuWarmFrame.indexOf('scenePassPrecompile.precompileExactScenePass(precompileRoot)'),
+        coldWebGpuWarmFrame.indexOf('scenePassPrecompile.precompileExactScenePass(scene)'),
         `the ScenePass precompile must precede ${fencedStep}, otherwise it compiles inside the fence it exists to relieve`,
       ).toBeLessThan(coldWebGpuWarmFrame.indexOf(fencedStep));
     }
