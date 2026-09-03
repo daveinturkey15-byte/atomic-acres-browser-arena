@@ -157,13 +157,19 @@ gotcha, Qoder is genuinely the one root that needs **copies**, must never be the
 must never be bulk-synced. Decide deliberately: add Qoder to `link_skills.ps1` as a copy-mode
 root, or record a `mirror_exemptions` entry.
 
-**B5 — pre-existing register-guard debt, untouched — 9 problems after the B0 repair (not the 13
-first reported, and not the 60 seen while the flat view was broken).** None names this lane's
-skill; REG-4 and REG-8 are both clear for it. The nine: rows 24 and 32 pin no commit (REG-5 ×2);
-`threejs-webgpu-water` drifted and unaccepted, drifted since its evaluation, and its Qoder mirror
-disagrees (REG-4 ×2, REG-7); `local-video-generation` absent from the baseline and drifted since
-its evaluation (REG-4 ×2); `open-world-city-art-loop` not mirrored to Qoder (REG-8) and missing
-from the vault note (REG-9, HF-419's to close). No guard was weakened and nothing was forced.
+**B5 — pre-existing register-guard debt, untouched, and falling as other lanes land.** The
+count is a moving target and none of it names this lane's skill (REG-4 and REG-8 are both clear
+for `threejs-webgpu-interior-lighting-look`, confirmed by a grep of the guard output returning
+zero hits). Measured this pass: **60 problems while the flat view was broken → 9 immediately
+after the B0 repair → 6 an hour later**, as concurrent lanes accepted `threejs-webgpu-water` and
+closed the HF-419 vault-note gap. The 13 quoted in the first draft matched no state at any point.
+
+The six that remain, all other lanes' or older debt: rows 24 and 32 pin no commit (REG-5 ×2);
+`local-video-generation` is absent from the baseline and drifted since its evaluation (REG-4 ×2);
+`open-world-city-art-loop` is not mirrored to Qoder (REG-8); the `threejs-webgpu-water` Qoder
+mirror disagrees with canonical (REG-7). The last two are both B4's Qoder gap, and per the B0
+gotcha the fix is a **named, one-directional copy** canonical → Qoder, never a bulk sync. No
+guard was weakened and nothing was forced.
 
 ---
 
