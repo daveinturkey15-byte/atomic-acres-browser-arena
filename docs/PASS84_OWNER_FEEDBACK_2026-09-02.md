@@ -858,3 +858,44 @@ involved, or create a similar skill that is slightly adapted? bit of both maybe.
   SAM component), for weapon-involved motion; register row + eval record + guard
   accept per the technique-register procedure. Owner of the skill: the animation
   lane (AT) or a follow-up skill lane; not before block 2.
+
+## HF-426..HF-429 — owner 2026-09-03 ~06:50 after playing PASS 88 (priority order: 426, 427; compute-careful)
+**Statement (verbatim):** "the nuketown rebuild is not right, its based on an old
+layout we had here, not the actual layout of black ops 2 nuketown, you need to do
+some proper research and adjust the layout of the map and assets, then layer in
+all the visual styles we had aimed for and approved in our older layout,
+prioritise that ahead of other things and be careful with compute. I hope it wont
+take long? Raid layout feels better but is missing all the nice detail you had in
+the old version, get the same level of detail to the new layout and then enhance
+it to be closer to the original map in lighthing texture and asset style too,
+ideally with just code and our new skills techniques. There are also some issues
+with the raid map layout not being true and accurate so you need to do better
+research there too. i also coulndt see balanced gfx profile. Farcrysis needs a
+total re work its assets and texures are still a mess and it hasnt used the new
+techniques from threejs etc for its nature and water, that would need to be
+sorted, so remove that map and park that for later, focus on sorting out
+nuketown preview first then raid, and like i said be careful with compute"
+- **HF-426 Nuke Town Rebuild accuracy (priority 1):** the rebuild reproduced our
+  own older layout, not Black Ops 2 Nuketown. Lane AU: proper reference research
+  from public overhead/callout maps and gameplay stills (view them, extract a
+  schematic, reconcile sources, record proportions - describe and measure, copy
+  nothing), rebuild `nuketown2`'s layout and props to it, THEN layer the approved
+  visual style of the shipped Nuke Town (its materials, lawn, forest surround,
+  mountain ring, lighting) onto the new layout in code. Falsifier: an overhead
+  render of the rebuild beside the reference schematic with every structure,
+  vehicle and fence in the reference's relative position within stated
+  tolerances, judged by a skeptic who reads the reference sources independently.
+- **HF-427 Raid Rebuild detail + accuracy (priority 2):** the same level of
+  detail as the shipped Raid on the new layout, then lighting/texture/asset style
+  closer to the original, code-only with the new skills; and better layout
+  research (the current layout is not true to the original in places). Lane AV,
+  after AU.
+- **HF-428 Balanced profile not visible:** it exists on Lane AI's branch (Balanced
+  profile + RTX explainer), which missed the overnight cuts; it is in the PASS 89
+  integration now.
+- **HF-429 Farcrysis parked:** hidden again (`selectable: false`) in PASS 89; the
+  block-2 Farcrysis lane is cancelled; a future rework must use the new
+  vegetation/water/interior-lighting skills. The admission guard keeps working
+  for a parked build.
+- Compute: one Opus chain per lane, serial (AU then AV), plus the PASS 89
+  integration already running; no waves.
