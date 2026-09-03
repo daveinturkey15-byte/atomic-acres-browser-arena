@@ -3622,8 +3622,27 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
    * coincident.
    */
   const NACELLE_CENTRE_Y = 1.73;
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, NACELLE_CENTRE_Y, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, NACELLE_CENTRE_Y, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  /**
+   * Nacelle collision authority. Lane J found this transposed against its own
+   * visual and PASS 87 Lane AR (item 12) landed the repair.
+   *
+   * The visual is `engineNacelles` below: a CylinderGeometry of length 4.1 and
+   * radius 0.95, rotated +90 degrees about Z, so its axis lies along X and its
+   * world extent is 4.1 x 1.9 x 1.9 (x, y, z). The authority box was authored
+   * 1.9 x 1.9 x 4.1 - the same three numbers with x and z swapped, i.e. the
+   * engine turned across the aircraft instead of along it. Consequences,
+   * measured from the built arena: 1.10 m of solid stuck out fore and aft of a
+   * pod that visibly ends there (an invisible wall), and 1.10 m of visible pod
+   * on each side had no collision or shot authority at all (shooting through a
+   * jet engine). Both profiles, since the pod was authored.
+   *
+   * Derived-not-copied is asserted in src/additional-maps.test.ts: the size pin
+   * that used to hardcode 1.9/1.9/4.1 now reads the instanced visual's own
+   * world bounds, so the next person to re-orient the pod cannot re-transpose
+   * the collider silently.
+   */
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, NACELLE_CENTRE_Y, 12.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, NACELLE_CENTRE_Y, -8.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -3768,7 +3787,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
 
   const physicalCover: ArenaMap['physicalCover'] = [
-    { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },
+    // Lane AR item 12: these two follow the repaired nacelle authority above
+    // (4.1 along x, 1.9 across z, plus the same 0.2 m cover margin the other
+    // rows carry). The south row was the transposed footprint; the north
+    // engine at z = -8 had no physicalCover row at all, so half the aircraft's
+    // hard cover was missing from bot cover selection and the minimap.
+    { id: 'jetliner-engine-south', bounds: { minX: -2.25, maxX: 2.25, minZ: 10.85, maxZ: 13.15 }, blocksMovement: true, blocksShots: true },
+    { id: 'jetliner-engine-north', bounds: { minX: -2.25, maxX: 2.25, minZ: -9.15, maxZ: -6.85 }, blocksMovement: true, blocksShots: true },
     { id: 'terminal-backwall', bounds: { minX: -31, maxX: 31, minZ: -34.3, maxZ: -33.9 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-west', bounds: { minX: -12.6, maxX: -7.4, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-east', bounds: { minX: 7.4, maxX: 12.6, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },

@@ -1190,7 +1190,18 @@ describe('additional authored maps', () => {
 
     const engine = map.root.getObjectByName('skyline-jetliner-engine-1') as THREE.Mesh<THREE.BoxGeometry>;
     const fuel = map.root.getObjectByName('skyline-fuel-trailer') as THREE.Mesh<THREE.BoxGeometry>;
-    expect(engine.geometry.parameters).toMatchObject({ width: 1.9, height: 1.9, depth: 4.1 });
+    // PASS 87 Lane AR item 12: was `toMatchObject({ width: 1.9, height: 1.9,
+    // depth: 4.1 })`. Those three literals pinned the authority box to a
+    // footprint TRANSPOSED against the pod it is supposed to be - and pinned it
+    // hard enough that the defect survived every gate for as long as it existed.
+    // A literal cannot notice that. The pin now comes from the visual itself,
+    // which is asserted separately in "the nacelle collider matches the pod it
+    // is drawn as"; here it just has to be non-degenerate and box-shaped, which
+    // is all this HF-188 block was ever about.
+    expect(engine.geometry.type).toBe('BoxGeometry');
+    for (const axis of ['width', 'height', 'depth'] as const) {
+      expect(engine.geometry.parameters[axis], `engine ${axis}`).toBeGreaterThan(0);
+    }
     expect(fuel.geometry.parameters).toMatchObject({ width: 5.2, height: 2.2, depth: 2.2 });
     expect(audit.entries.filter((entry) => entry.placeholder.includes('skyline-tarmac-cargo-'))).toHaveLength(10);
 
@@ -1264,6 +1275,91 @@ describe('additional authored maps', () => {
       // the clearance above is measured at a seat nobody occupies.
       expect(bounds.min.y, `${name}: prone capsule top ${proneCapsuleTopY} must fit under the belly`)
         .toBeGreaterThanOrEqual(proneCapsuleTopY);
+    }
+  });
+
+  /**
+   * PASS 87 Lane AR, item 12 (Lane J's withheld F1 patch).
+   *
+   * The nacelle has two bodies authored 50 lines apart: `qualityPlaceholderBox`
+   * makes the collision authority, `engineNacelles` makes what the player sees.
+   * They disagreed on which way the engine points. The visual is a cylinder of
+   * length 4.1 rotated about Z so its axis lies along X (fore-aft, along the
+   * fuselage); the authority box was 1.9 x 1.9 x 4.1, i.e. 4.1 across Z, so the
+   * solid ran ACROSS the aircraft. Measured on the built arena before the fix:
+   * 1.10 m of invisible solid fore and aft of a pod that visibly ends, and
+   * 1.10 m of visible pod each side carrying no movement or shot authority.
+   *
+   * This is the forging review's "authored visible mass matches movement and
+   * projectile authority" rule, so it is asserted from the two real bodies
+   * rather than from either one's numbers.
+   */
+  it('the nacelle collider matches the pod it is drawn as, on both engines', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const visual = map.root.getObjectByName('skyline-aircraft-engine-nacelles') as THREE.InstancedMesh;
+    expect(visual, 'the instanced nacelle visual must exist').toBeTruthy();
+    expect(visual.count).toBe(2);
+    visual.updateMatrixWorld(true);
+    visual.geometry.computeBoundingBox();
+
+    const authorities = ['skyline-jetliner-engine-1', 'skyline-jetliner-engine-2']
+      .map((name) => {
+        const mesh = map.root.getObjectByName(name);
+        expect(mesh, name).toBeTruthy();
+        return { name, bounds: new THREE.Box3().setFromObject(mesh!) };
+      });
+
+    const instanceMatrix = new THREE.Matrix4();
+    for (let index = 0; index < visual.count; index += 1) {
+      visual.getMatrixAt(index, instanceMatrix);
+      const podBounds = visual.geometry.boundingBox!.clone()
+        .applyMatrix4(instanceMatrix.premultiply(visual.matrixWorld));
+      const podCentre = podBounds.getCenter(new THREE.Vector3());
+      const match = authorities
+        .map((entry) => ({ entry, distance: entry.bounds.getCenter(new THREE.Vector3()).distanceTo(podCentre) }))
+        .sort((a, b) => a.distance - b.distance)[0]!;
+      expect(match.distance, `pod ${index} must be co-sited with a collision authority`).toBeLessThan(0.5);
+
+      const podSize = podBounds.getSize(new THREE.Vector3());
+      const authoritySize = match.entry.bounds.getSize(new THREE.Vector3());
+      for (const axis of ['x', 'y', 'z'] as const) {
+        expect(
+          Math.abs(podSize[axis] - authoritySize[axis]),
+          `${match.entry.name}: authority is ${authoritySize[axis].toFixed(2)} m on ${axis} `
+            + `while the pod drawn there is ${podSize[axis].toFixed(2)} m. A collider transposed `
+            + 'against its visual is an invisible wall on one axis and a shoot-through on another.',
+        ).toBeLessThanOrEqual(0.06);
+      }
+    }
+  });
+
+  /**
+   * The nacelles are hard cover; `physicalCover` is what bot cover selection
+   * and the minimap read. Lane AR item 12: the one row that existed described
+   * the transposed footprint, and the north engine had no row at all.
+   */
+  it('gives both nacelles a physicalCover row that follows the repaired authority', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const [name, coverId] of [
+      ['skyline-jetliner-engine-1', 'jetliner-engine-south'],
+      ['skyline-jetliner-engine-2', 'jetliner-engine-north'],
+    ] as const) {
+      const authority = new THREE.Box3().setFromObject(map.root.getObjectByName(name)!);
+      const cover = map.physicalCover.find((entry) => entry.id === coverId);
+      expect(cover, `${coverId} must exist`).toBeTruthy();
+      expect(cover!.blocksMovement).toBe(true);
+      expect(cover!.blocksShots).toBe(true);
+      // Same margin the other cover rows carry, checked as a band rather than a
+      // literal so the row cannot drift back to a transposed footprint.
+      for (const [lo, hi, min, max, axis] of [
+        [cover!.bounds.minX, cover!.bounds.maxX, authority.min.x, authority.max.x, 'x'],
+        [cover!.bounds.minZ, cover!.bounds.maxZ, authority.min.z, authority.max.z, 'z'],
+      ] as const) {
+        expect(lo, `${coverId} ${axis} min`).toBeLessThanOrEqual(min + 0.01);
+        expect(hi, `${coverId} ${axis} max`).toBeGreaterThanOrEqual(max - 0.01);
+        expect(lo, `${coverId} ${axis} min margin`).toBeGreaterThanOrEqual(min - 0.3);
+        expect(hi, `${coverId} ${axis} max margin`).toBeLessThanOrEqual(max + 0.3);
+      }
     }
   });
 
