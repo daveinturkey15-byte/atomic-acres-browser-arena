@@ -100,7 +100,7 @@ const BUILDING_X = ROAD_HALF + KERB_W + PAVE_W;   // 7.10
 const PAVE_Y = ROAD_Y + KERB_H;                    // 0.17
 /** Cell extent along the corridor axis, in corridor-local z. */
 const Z_START = -52;
-const Z_END = -74;
+const Z_END = -62;
 /** The cell's far extent, so the corridor that owns it can report its true length. */
 export const STREET_CELL_Z_END = Z_END;
 const CELL_LEN = Z_START - Z_END;                  // 22
@@ -916,7 +916,9 @@ export function createStreetCell(seed = 419): StreetCell {
   for (const side of [-1, 1] as const) {
     let z = Z_START - 1.2;
     while (z > Z_END + 3.0) {
-      const width = 5.6 + rnd() * 4.4;
+      const maxW = z - Z_END - 0.6;
+      const width = Math.min(5.6 + rnd() * 4.4, maxW);
+      if (width < 3.0) break;
       const bays = Math.max(2, Math.round(width / 3.1));
       const storeys = 2 + Math.floor(rnd() * 3);
       const block = buildStreetFrontage(rnd, bays, storeys, width);
@@ -983,6 +985,7 @@ export function createStreetCell(seed = 419): StreetCell {
   for (let i = 0; i < 6; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const z = Z_START - 2.6 - i * 3.5 - rnd() * 0.7;
+    if (z - 0.2 < Z_END) break;
     lamps.push({ x: side * poleX, y: PAVE_Y, z, ry: side < 0 ? 0 : Math.PI, s: 0.96 + rnd() * 0.08 });
   }
   family(lampPrototype(), lamps);
@@ -997,6 +1000,7 @@ export function createStreetCell(seed = 419): StreetCell {
   for (let i = 0; i < 14; i++) {
     const side = i < 7 ? -1 : 1;
     const z = Z_START - 3.4 - (i % 7) * 2.55 - rnd() * 0.35;
+    if (z - 0.1 < Z_END) continue;
     bollards.push({
       x: side * (ROAD_HALF + KERB_W + 0.24), y: PAVE_Y, z,
       ry: rnd() * 0.5 - 0.25, s: 0.94 + rnd() * 0.12,
@@ -1007,8 +1011,10 @@ export function createStreetCell(seed = 419): StreetCell {
   const bins: Array<{ x: number; y: number; z: number; ry: number; tint?: [number, number, number] }> = [];
   for (let i = 0; i < 5; i++) {
     const side = i % 2 === 0 ? 1 : -1;
+    const z = Z_START - 5.1 - i * 4.3 - rnd() * 0.9;
+    if (z - 0.3 < Z_END) continue;
     bins.push({
-      x: side * (poleX + 0.22), y: PAVE_Y, z: Z_START - 5.1 - i * 4.3 - rnd() * 0.9,
+      x: side * (poleX + 0.22), y: PAVE_Y, z,
       ry: rnd() * Math.PI, tint: [0.045, 0.075, 0.062],
     });
   }
@@ -1026,6 +1032,7 @@ export function createStreetCell(seed = 419): StreetCell {
   for (let i = 0; i < 8; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const z = Z_START - 3.2 - Math.floor(i / 2) * 5.6 - rnd() * 0.5;
+    if (z - 2.2 < Z_END) continue;
     cars.push({
       // Sill 0.17 m clear of the kerb face: parked, not embedded, and close
       // enough to be cover rather than an obstacle in the lane.
