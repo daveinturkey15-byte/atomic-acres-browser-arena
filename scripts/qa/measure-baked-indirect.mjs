@@ -46,6 +46,23 @@ const AO = args.get('ao') ?? null;
 const OUT = args.get('out') ?? 'artifacts/baked-indirect';
 const TIMEOUT = Number(args.get('timeout') ?? '240000');
 const SAMPLE_MS = Number(args.get('sample') ?? '14000');
+/**
+ * How long to wait after admission before the sample window opens.
+ *
+ * THE DEFAULT USED TO BE 6 SECONDS AND THAT WAS TOO SHORT FOR EITHER TIER. The
+ * bake is spread at 3 ms per presented frame, so its wall-clock convergence is
+ * (bake CPU ms / 3) frames. Measured on the real extracted proxies: LOW is 773 ms
+ * of CPU (~258 frames, ~7 s at 36 Hz) and HIGH is 3007 ms (~1000 frames, ~28 s).
+ * A 6 s window therefore sampled BOTH tiers mid-bake, and the resulting "HIGH
+ * costs +5.8 ms" row was a measurement of the loading transient rather than of
+ * the steady state - which the lane then explained, correctly but without
+ * measuring it. 45 s clears both.
+ */
+const SETTLE_MS = Number(args.get('settle') ?? '45000');
+/** Optional second arena, selected in the SAME page load. See below. */
+const SECOND_ARENA = args.get('secondArena') ?? null;
+/** Appended to the output filename so repeats of one cell do not overwrite. */
+const LABEL = args.get('label') ?? null;
 const SETTINGS_KEY = 'atomic-acres-pass65-settings-v1';
 
 async function comfyQueue() {
@@ -173,8 +190,13 @@ try {
 
   // Let the bake converge and the frame settle before the window opens. The
   // bake is deliberately spread over frames, so measuring during it would
-  // measure the loading screen rather than the game.
-  await page.waitForTimeout(6000);
+  // measure the loading screen rather than the game. See SETTLE_MS.
+  row.settleMs = SETTLE_MS;
+  await page.waitForTimeout(SETTLE_MS);
+  row.bakeConverged = await page.evaluate(() => {
+    const receipt = document.documentElement.dataset.bakedIndirect ?? null;
+    return receipt;
+  });
   row.receiptDuringSettle = await page.evaluate(() => document.documentElement.dataset.bakedIndirect ?? null);
   const pipelinesBeforeCombat = await page.evaluate(() => window.__pipelineCount);
 
@@ -226,6 +248,42 @@ try {
     if (!(Number(gain) > 0)) problems.push(`live gain ${gain}`);
     row.receiptVerdict = problems.length === 0 ? 'OK' : problems.join('; ');
   }
+  // THE B1 CHECK, LIVE. Switching arena inside ONE page load is the condition
+  // under which "the runtime never re-derives the digest" is visible: the post
+  // graph is built once per session, so before the fix the second arena kept the
+  // first arena's probe volume, at the first arena's origin, forever. Every row
+  // this lane originally took was a cold single-arena load, which is exactly the
+  // condition that hides it.
+  if (SECOND_ARENA) {
+    row.secondArena = SECOND_ARENA;
+    row.receiptBeforeArenaSwap = row.receipt;
+    // BACK TO THE MENU FIRST. `performArenaSelection` returns immediately if
+    // `gameStarted` is true, so calling selectArena mid-match is a silent no-op
+    // - the first version of this check "measured" a stale digest that was
+    // really just the same arena, twice. The transition a player performs is
+    // menu, select, deploy, and that is what this drives.
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu(); });
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === false,
+      undefined, { timeout: TIMEOUT });
+    await page.waitForTimeout(1500);
+    await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, SECOND_ARENA);
+    row.arenaIdAfterSelect = await page.evaluate(() => document.documentElement.dataset.arenaId ?? null);
+    await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
+    await page.waitForFunction(() => {
+      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+      return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
+    }, undefined, { timeout: TIMEOUT });
+    await page.waitForTimeout(SETTLE_MS);
+    row.receiptAfterArenaSwap = await page.evaluate(() => document.documentElement.dataset.bakedIndirect ?? null);
+    const before = (row.receiptBeforeArenaSwap ?? '').split(':')[1] ?? null;
+    const after = (row.receiptAfterArenaSwap ?? '').split(':')[1] ?? null;
+    row.arenaSwapVerdict = row.arenaIdAfterSelect !== SECOND_ARENA
+      ? `INCONCLUSIVE: the arena never changed (dataset.arenaId ${row.arenaIdAfterSelect})`
+      : (before && after && before !== after)
+        ? `OK: digest ${before} -> ${after} inside one page load`
+        : `STALE VOLUME: digest ${before} -> ${after}`;
+    row.errorsAfterSwap = errors.length;
+  }
 } catch (error) {
   row.failure = String(error).slice(0, 400);
 } finally {
@@ -236,7 +294,7 @@ if (row.comfyQueueAfter !== null && row.comfyQueueAfter > 0) {
   row.void = 'ComfyUI had work queued by the end of this run; the numbers are void.';
 }
 await mkdir(OUT, { recursive: true });
-const name = `${TIER}-${AO ? `ao-${AO}-` : ''}${ARENA}.json`;
+const name = `${TIER}-${AO ? `ao-${AO}-` : ''}${ARENA}${LABEL ? `-${LABEL}` : ''}.json`;
 await writeFile(join(OUT, name), `${JSON.stringify(row, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(row, null, 2));
 process.exit(row.failure || row.void ? 1 : 0);
