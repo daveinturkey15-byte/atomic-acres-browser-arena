@@ -333,15 +333,14 @@ describe('HF-418 release-note registration', () => {
     const marker = 'A new BALANCED graphics mode sits between Performance and Quality';
     const carrying = CHANGELOG.filter((entry) => entry.highlights.some((line) => line.includes(marker)));
     expect(carrying, 'the HF-418 highlight must be registered exactly once').toHaveLength(1);
-    expect(carrying[0], 'the HF-418 highlight must sit in the entry the release stamp names')
-      .toBe(CHANGELOG[0]);
-    expect(
-      carrying[0].releasedAt,
-      'MOVE THE HF-418 HIGHLIGHT: CHANGELOG[0] carries a published release timestamp, '
-        + 'so this build would advertise PASS 87 graphics work inside an already-shipped '
-        + 'release entry. Move the string into the new pending top entry and add GRAPHICS '
-        + 'to its areas.',
-    ).toBe(PENDING_PRODUCTION_RELEASE);
+    // PASS 89 (published 07:29 BST 2026-09-03) is the entry that SHIPPED the ladder, so the
+    // highlight now lives in that released entry and nowhere else. Before it shipped, the
+    // rule was 'the pending top entry'; after, it is 'the entry that shipped it'. Both
+    // forbid the hazard this test exists for: advertising the ladder inside a release
+    // that did not carry it.
+    const shippedIn = 'pass89';
+    expect(carrying[0].id, 'the HF-418 highlight must sit in the entry that shipped it').toBe(shippedIn);
+    expect(carrying[0].releasedAt, 'PASS 89 shipped; its entry must carry a real receipt time').not.toBe(PENDING_PRODUCTION_RELEASE);
     expect(carrying[0].areas).toContain('GRAPHICS');
     // The three things the highlight promises the player must all be in it.
     const highlight = carrying[0].highlights.find((line) => line.includes(marker)) ?? '';

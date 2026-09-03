@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_080;
+const LINE_CEILING = 37_087;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -197,6 +197,12 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'Post-PASS 89 integration: chiptune rotation + drop shot from sprint (HF-430/431) merged; measured on the merged head.',
   },
 
+  {
+    date: '2026-09-03',
+    lines: 37_087,
+    note:
+      'PASS 90 candidate: Nuke Town Rebuild accuracy (Lane AU, HF-426) merged on top of the chiptune rotation; measured on the merged head.',
+  },
 ];
 
 function legacyMainSource(): string {

@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 89",
-    "description": "Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework."
+    "label": "PASS 90",
+    "description": "Pass 90 rebuilds the Nuke Town Rebuild preview to the real Black Ops 2 Nuketown layout with the shipped map's approved look, rotates ten chiptune tracks at half volume, and stops a drop shot from sprinting on."
   },
   "experimental": {
-    "pass": "PASS 89",
-    "label": "PASS 89",
-    "description": "Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework.",
-    "path": "channels/pass89"
+    "pass": "PASS 90",
+    "label": "PASS 90",
+    "description": "Pass 90 rebuilds the Nuke Town Rebuild preview to the real Black Ops 2 Nuketown layout with the shipped map's approved look, rotates ten chiptune tracks at half volume, and stops a drop shot from sprinting on.",
+    "path": "channels/pass90"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass88Backup": {
-    "label": "PASS 88 · SAFE BACKUP",
+  "pass89Backup": {
+    "label": "PASS 89 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 88",
-    "path": "channels/pass88"
+    "pass": "PASS 89",
+    "path": "channels/pass89"
   }
 }

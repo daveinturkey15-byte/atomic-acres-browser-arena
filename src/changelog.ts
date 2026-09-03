@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass89ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass90ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 89. */
+const pass89ReleasedAt = '2026-09-03T07:25:14+01:00';
 /** gh-pages publish receipt for PASS 88. */
 const pass88ReleasedAt = '2026-09-03T04:57:44+01:00';
 /** gh-pages publish receipt for PASS 87. */
@@ -136,6 +138,24 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass90',
+    pass: 'PASS 90',
+    title: 'Pass 90 · Nuke Town Rebuild Made Accurate, Chiptune Rotation & Drop-Shot Sprint',
+    releasedAt: pass90ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'AUDIO', 'MOVEMENT']),
+    summary: "Pass 90 rebuilds the Nuke Town Rebuild preview to the real Black Ops 2 Nuketown layout with the shipped map's approved look, rotates ten chiptune tracks at half volume, and stops a drop shot from sprinting on.",
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW now follows Black Ops 2 Nuketown measured from its own minimaps: the long axis runs across the street, the road ends in a cul-de-sac, the moving truck is the open cover with the 2x core on its roof, the coach is closed, the houses nearly face each other with set-back garages, the fence gaps are back',
+      "The rebuild wears the shipped Nuke Town's approved look: blue, yellow and orange houses, the cream-and-red coach, the lawn field, the forest ring and the mountains re-fitted to the new footprint, with a re-captured menu preview",
+      'Chiptune music plays at half its old volume and rotates ten distinct ninety-second tracks in a shuffled order with no repeats until all ten have played, swapping on the bar',
+      'A drop shot from a sprint no longer resumes sprinting while Shift is held; sprint needs a fresh press after you stand',
+      'Pass 89 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
