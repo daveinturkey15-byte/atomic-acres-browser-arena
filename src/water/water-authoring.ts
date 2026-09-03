@@ -335,11 +335,17 @@ const MAP3_BASIN_SHARED = Object.freeze({
   arenaId: 'map3' as const,
   presentationOwner: 'shared-ocean' as const,
   dryFootprintMask: 'none' as const,
-  // The Water bay's basins are solid boxes whose visible top face is at
-  // y = -0.05 (src/map3-arena.ts, `map3 water basin`). The surface sits 30 mm
-  // above that face, under the 0.3 m kerb, so the walkway stays the contested
-  // line and nothing about the bay's collision changes.
-  level: -0.02,
+  // MEASURED, not assumed. The Water bay's basin boxes top out at y = -0.05,
+  // but the bay FLOOR SLAB above them spans y -0.27 .. +0.03 across the full
+  // bay width (`map3 <bay> floor`, src/map3-arena.ts) - so the "sunken basin"
+  // is entirely buried under the arena's own paving and nothing at basin level
+  // is ever drawn. The first pond authored here at y = -0.02 rendered exactly
+  // ZERO pixels, which the capture harness's pool-hidden probe caught. The
+  // surface therefore sits 5 mm ABOVE the floor slab, inside the 0.27 m kerb
+  // that borders the basin: a shallow kerbed pool on the bay floor. No
+  // collider, no step a player can feel, no gameplay change - and the buried
+  // basin is handed back to Map 3's owner as a defect, not patched from here.
+  level: 0.035,
   swimmable: false,
   // Near-still: at this amplitude the summed Gerstner slope is ~0.005, far
   // below the 0.06 foam/backscatter gate, so a Map 3 basin is EXACTLY zero
