@@ -146,13 +146,29 @@ if (provenance) {
    *    checkout, red on an LF one, regardless of Map 3.
    *
    * A capture record is history and is never rewritten. What this gate needs is
-   * accountability, and it comes in two halves, both stricter than the old
-   * equality check because neither can be satisfied by a stale number:
+   * accountability, and it comes in two halves:
    *   - the LIVE generator must be the version the shared lineage says is
    *     current, graded on LF-normalised bytes so the verdict does not depend
    *     on anyone's git config;
    *   - the digest THIS family recorded must be a generator version that
    *     really existed, matched against the lineage in either line ending.
+   *
+   * WHAT THIS GATE NO LONGER COVERS, stated plainly rather than sold as a
+   * strengthening. The old equality check compared the live generator's bytes
+   * with the bytes this family actually captured with, so it detected MEDIA
+   * THAT HAD GONE STALE relative to the generator. The pair above does not:
+   * both conditions are satisfied by running
+   * `node scripts/assets/write-capture-generator-lineage.mjs` after any
+   * generator edit, with the captured media untouched. It is stricter on
+   * provenance (a recorded digest can no longer be a number nothing ever
+   * hashed to, which is what the CRLF defect was) and weaker on staleness.
+   *
+   * The brief's other option - pin only the byte-affecting parts of the
+   * generator, so a pixel-relevant edit still reds the families that captured
+   * with the old one - would restore the staleness property. It needs a
+   * defensible split of that file into capture parameters and everything else,
+   * which is a separate piece of work; the pass77 family's own re-capture
+   * cadence is what covers staleness until then.
    */
   const live = liveGeneratorDigests();
   const lineage = await readJson(path.join(root, LINEAGE_PATH), 'shared capture generator lineage');

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 import {
   GENERATOR_PATH,
   LINEAGE_PATH,
@@ -15,6 +16,7 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LINEAGE = JSON.parse(readFileSync(resolve(ROOT, LINEAGE_PATH), 'utf8'));
 const VERSIONS = [LINEAGE.current, ...LINEAGE.retired];
+const git = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 /**
  * PASS 87 Lane AR, item 11 - the shared menu-preview capture generator.
@@ -25,7 +27,28 @@ const VERSIONS = [LINEAGE.current, ...LINEAGE.retired];
  * into a red gate whose only "fixes" were falsifying a historical digest or
  * living with the red. It lived with the red.
  */
-test('the committed lineage is what git says it is', () => {
+/**
+ * SKEPTIC FOLLOW-UP. This test used to be a bare
+ * `assert.deepEqual(buildLineage(), LINEAGE)`. buildLineage() shells out to
+ * `git log -- <generator>` and embeds short hashes and author dates, so on a
+ * shallow clone (actions/checkout defaults to fetch-depth: 1), or after any
+ * rebase or squash of that file's history, it reconstructs a SHORTER lineage
+ * and reds - turning a provenance gate into a checkout-shape gate. The lane
+ * had just made this script the front door of `npm run qa:pass77:menu-previews`,
+ * so that would have been the pass77 gate failing for the shape of the clone.
+ *
+ * The invariants hold on any checkout and are what the gate actually needs.
+ * The full reconstruction is still run, because it is the strongest check
+ * available - but only where the repository can answer it.
+ */
+test('the committed lineage is what git says it is, where git can say it', () => {
+  const shallow = git(['rev-parse', '--is-shallow-repository']).trim() === 'true';
+  const reachable = git(['log', '--format=%H', '--', GENERATOR_PATH]).trim().split('\n').filter(Boolean).length;
+  if (shallow || reachable < VERSIONS.length) {
+    // Not a pass and not a failure: the repository cannot answer the question.
+    console.log(`lineage reconstruction skipped: shallow=${shallow} reachableCommits=${reachable} recordedVersions=${VERSIONS.length}`);
+    return;
+  }
   const rebuilt = buildLineage();
   assert.deepEqual(rebuilt, LINEAGE, 'run node scripts/assets/write-capture-generator-lineage.mjs');
 });
@@ -77,11 +100,14 @@ test('the two digests are computed the way they claim to be', () => {
 });
 
 test('the lineage is append-only in shape: newest first, no duplicates', () => {
+  assert.equal(LINEAGE.schemaVersion, 1);
+  assert.ok(VERSIONS.length >= 1, 'a lineage must have at least the current version');
   const digests = VERSIONS.map((version) => version.sha256);
   assert.equal(new Set(digests).size, digests.length, 'a digest may appear once');
   for (const version of VERSIONS) {
     assert.match(version.sha256, /^[0-9a-f]{64}$/u);
     assert.match(version.crlfSha256, /^[0-9a-f]{64}$/u);
+    assert.match(version.commit, /^[0-9a-f]{7,40}$/u);
     assert.match(version.date, /^\d{4}-\d{2}-\d{2}$/u);
     assert.ok(version.subject.length > 0, 'every version says what changed');
   }
