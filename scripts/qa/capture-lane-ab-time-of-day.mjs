@@ -49,6 +49,42 @@
 // frame delta is paired and each verdict carries `frameWithinNoise`. A delta
 // inside `frameNoiseMs` is reported as unresolvable rather than as a number.
 //
+// THE SANDWICH (v5), AND THE THREE ARENAS THAT FORCED IT
+// v2 paired each excursion with an identity taken ~1 s BEFORE it, which fixed
+// the thirty-second drift v1 measured. It does not fix a one-off scene EVENT
+// that lands between the two shots of a pair, and three arenas turned out to
+// have exactly that. Measured by the band scan, on identity frames where
+// nothing whatever was written:
+//
+//   farcrysis   shadow mass steps 24.86 -> 28.44 once, ~45 s after deploy, and
+//               stays there (visible in the scan's own identity column);
+//   raid2       0.11 -> 4.07 once, and stays (and raid2 is PINNED, so it CANNOT
+//               be lighting - every choice on it resolves to the identity);
+//   high-seas   4.87 -> 9.1 and back to 4.87 later in the same record, i.e. it
+//               oscillates rather than settles.
+//
+// Each of those is 3.5-4.3 points against a 3-point safety threshold, and each
+// produced a "finding" in the v3 run that thirteen paired scan samples then
+// refuted. So v5 sandwiches every excursion: identity, excursion, identity. If
+// the two identities disagree by more than the null tolerance the scene moved
+// underneath the pair and the verdict is VOID - reported as an instrument
+// finding, never as a safety verdict. When they agree, the delta is taken
+// against their mean, which also halves the identity's own sampling error.
+//
+// WHAT THIS HARNESS IS FOR, AND WHAT IT IS NOT FOR (v4)
+// It is a SCREEN over the whole matrix, not the decision instrument. Three
+// samples per arena cannot tell a lighting change from a one-off scene event
+// that lands between a pair, and this run has now been wrong in both
+// directions on that: it refuted a Raid finding (+3.82 here, +0.01 on a
+// re-run) and it raised a farcrysis/clear/early finding of +3.96 that
+// `scan-lane-ab-band-readability.mjs` then refuted with thirteen paired
+// samples across the same band (worst +0.38). So the protocol is: a finding
+// here is a QUESTION, and the band scan answers it. `identityDriftPoints` --
+// the spread of a record's three interleaved identity frames -- is the number
+// that says how busy an arena's review frame was, and any record above the
+// null tolerance now carries an advisory note saying its single findings must
+// be confirmed by the scan before they are believed.
+//
 // Runs INSTALLED CHROME HEADLESS over CDP. A run that asked for WebGPU and got
 // anything else, or got the Microsoft software adapter, is INVALIDATED rather
 // than written as evidence.
@@ -373,7 +409,15 @@ try {
             true,
           );
           const state = await captureChoice(tod, resolve(OUT, arena, `${arena}--${weather}--${tod}.png`), true);
-          record.states.push({ tod, ...state, before });
+          // THE CLOSING SLICE. Identity again, immediately after the excursion.
+          // Not frame-sampled: it exists to bound the SCENE, and the frame-time
+          // pair is already `before` vs `state`.
+          const after = await captureChoice(
+            'authored',
+            resolve(OUT, arena, `${arena}--${weather}--authored-after-${tod}.png`),
+            false,
+          );
+          record.states.push({ tod, ...state, before, after });
           const telemetry = state.telemetry;
           console.error(`[lane-ab] ${arena.padEnd(17)} ${weather.padEnd(11)} ${tod.padEnd(9)}`
             + ` hour=${telemetry?.hour ?? '?'} sun=${telemetry?.sunIntensityScale ?? '?'}`
@@ -410,10 +454,28 @@ for (const record of runs) {
     // The paired identity frame, taken ~1 s before this one on the same deploy.
     const before = state.before;
     if (!before) continue;
+    const after = state.after ?? null;
     const frameTimeBaselineMs = before.frame ? before.frame.p50 : null;
-    const shadowGrowth = Number((state.stats.shadowMassPercent - before.stats.shadowMassPercent).toFixed(2));
-    const floorDrop = before.stats.lumaP05 - state.stats.lumaP05;
-    const highlightGrowth = Number((state.stats.highlightMassPercent - before.stats.highlightMassPercent).toFixed(2));
+    // THE SANDWICH TEST. Two identity frames, one either side of the excursion,
+    // on the same deploy. If they disagree the scene moved underneath the pair
+    // and no number taken across it is a measurement of the lighting.
+    const sandwichSpreadPoints = after === null ? null : Number(
+      Math.abs(after.stats.shadowMassPercent - before.stats.shadowMassPercent).toFixed(2));
+    const sandwichHeld = sandwichSpreadPoints === null || sandwichSpreadPoints <= PINNED_NULL_TOLERANCE_POINTS;
+    // Comparing against the MEAN of two agreeing identities rather than one of
+    // them also halves the identity's own sampling error.
+    const identityMass = after === null || !sandwichHeld
+      ? before.stats.shadowMassPercent
+      : (before.stats.shadowMassPercent + after.stats.shadowMassPercent) / 2;
+    const identityFloor = after === null || !sandwichHeld
+      ? before.stats.lumaP05
+      : (before.stats.lumaP05 + after.stats.lumaP05) / 2;
+    const identityHighlight = after === null || !sandwichHeld
+      ? before.stats.highlightMassPercent
+      : (before.stats.highlightMassPercent + after.stats.highlightMassPercent) / 2;
+    const shadowGrowth = Number((state.stats.shadowMassPercent - identityMass).toFixed(2));
+    const floorDrop = Number((identityFloor - state.stats.lumaP05).toFixed(2));
+    const highlightGrowth = Number((state.stats.highlightMassPercent - identityHighlight).toFixed(2));
     const drawDelta = state.budget.drawCalls - before.budget.drawCalls;
     state.verdict = {
       shadowMassGrowthPoints: shadowGrowth,
@@ -438,12 +500,22 @@ for (const record of runs) {
       // difference between evidence and a decimal place.
       withinInstrumentNoise: record.pairNoisePoints !== null
         && Math.abs(shadowGrowth) <= record.pairNoisePoints,
+      sandwichSpreadPoints,
+      sandwichHeld,
       pass:
         shadowGrowth <= SAFETY.maximumShadowMassGrowthPoints
         && floorDrop <= SAFETY.maximumShadowFloorDropSteps
         && highlightGrowth <= SAFETY.maximumHighlightMassGrowthPoints
         && Math.abs(drawDelta) <= SAFETY.maximumDrawCallDelta,
     };
+    // A verdict taken across a scene that moved is not a verdict. It is
+    // reported as an INSTRUMENT finding — which still stops the run being clean
+    // — rather than laundered into a safety pass or a safety failure.
+    if (!sandwichHeld) {
+      instrumentFindings.push(`${record.arena}/${record.weather}/${state.tod}: VOID — the identity frames `
+        + `either side of this excursion disagree by ${sandwichSpreadPoints}pt, so the scene moved under the pair`);
+      continue;
+    }
     if (!state.verdict.pass) {
       findings.push(`${record.arena}/${record.weather}/${state.tod}: `
         + `shadowMass +${shadowGrowth}pt, floor -${floorDrop} steps, `
@@ -472,6 +544,20 @@ for (const record of runs) {
       + 'claims, so its verdicts are not finer than its own noise');
   }
 }
+// ADVISORY, not a gate: which records had a review frame busy enough that a
+// single verdict from them needs the band scan to confirm it. This does not
+// change the exit code and must not - it is information the reader of the JSON
+// would otherwise have to compute, and computing it is exactly what nobody did
+// before the farcrysis false positive.
+const instrumentNotes = [];
+for (const record of runs) {
+  if (!record.states?.length || record.identityDriftPoints === null) continue;
+  if (record.identityDriftPoints > PINNED_NULL_TOLERANCE_POINTS) {
+    instrumentNotes.push(`${record.arena}/${record.weather}: the three interleaved identity frames `
+      + `spread ${record.identityDriftPoints}pt across this record, so the review frame is not static; `
+      + 'a single finding here is a question for scan-lane-ab-band-readability.mjs, not an answer');
+  }
+}
 if (instrumentFindings.length) exitCode = 3;
 
 const report = {
@@ -482,7 +568,7 @@ const report = {
   frameSamples: FRAME_SAMPLES,
   safety: SAFETY,
   instrument: {
-    version: 'interleaved-identity-baseline-v3-paired-frame-time',
+    version: 'sandwiched-identity-v5-paired-frame-time',
     pinnedNullTolerancePoints: PINNED_NULL_TOLERANCE_POINTS,
     pinnedArenas: [...PINNED_ARENAS],
   },
@@ -490,11 +576,13 @@ const report = {
   runs,
   findings,
   instrumentFindings,
+  instrumentNotes,
 };
 writeFileSync(resolve(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.error(`[lane-ab] wrote ${resolve(OUT, 'report.json')}; findings=${findings.length}`);
 for (const finding of findings) console.error(`[lane-ab] FAIL ${finding}`);
 for (const finding of instrumentFindings) console.error(`[lane-ab] INSTRUMENT ${finding}`);
+for (const note of instrumentNotes) console.error(`[lane-ab] NOTE ${note}`);
 if (instrumentFindings.length) {
   console.error('[lane-ab] NULL EXPERIMENT FAILED: a pinned arena moved on an identity write, '
     + 'so no verdict in this run is evidence about any arena');

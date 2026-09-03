@@ -73,19 +73,35 @@ const STEPS = Math.max(3, Number(arg('--steps', '9')));
 const OUT = resolve(process.cwd(), arg('--out', 'artifacts/lane-ab-scan'));
 const VIEWPORT = { width: 1280, height: 720 };
 
-/** The capture harness's bound, imported by value so the two cannot drift. */
+/** The capture harness's bounds, copied by value so the two cannot drift. A
+ *  band end is only usable if it satisfies BOTH: the fraction of the frame in
+ *  shadow may not grow, and the shadow-DETAIL floor (the 5th-percentile luma,
+ *  where an enemy standing in shade lives) may not collapse. v1 of this scan
+ *  measured only the first, which is why the merged-head sweep could still
+ *  fail a band end this scan had blessed -- skyline-terminal/heavy-rain at
+ *  06:48 grew shadow mass by only 0.2 points and dropped P05 by 3 steps. */
 const MAX_SHADOW_MASS_GROWTH_POINTS = 3;
+const MAX_SHADOW_FLOOR_DROP_STEPS = 2;
 
-async function shadowMassPercent(file) {
+async function frameStats(file) {
   const image = sharp(file);
   const { width, height } = await image.metadata();
   const raw = await image.clone().removeAlpha().raw().toBuffer();
+  const pixels = width * height;
+  const histogram = new Uint32Array(256);
   let shadow = 0;
   for (let index = 0; index < raw.length; index += 3) {
     const luma = 0.2126 * raw[index] + 0.7152 * raw[index + 1] + 0.0722 * raw[index + 2];
+    histogram[Math.min(255, Math.round(luma))] += 1;
     if (luma < 24) shadow += 1;
   }
-  return Number(((shadow / (width * height)) * 100).toFixed(2));
+  let seen = 0;
+  let lumaP05 = 255;
+  for (let level = 0; level < 256; level += 1) {
+    seen += histogram[level];
+    if (seen >= pixels * 0.05) { lumaP05 = level; break; }
+  }
+  return { shadowMassPercent: Number(((shadow / pixels) * 100).toFixed(2)), lumaP05 };
 }
 
 let SERVE_CHILD = null;
@@ -170,7 +186,7 @@ try {
           await page.waitForTimeout(1_100);
           const file = resolve(OUT, arena, `${arena}--${weather}--${tag}.png`);
           await page.screenshot({ path: file });
-          return shadowMassPercent(file);
+          return frameStats(file);
         };
 
         // Warm-up, then the identity. The authored hour IS the identity, so it
@@ -184,21 +200,28 @@ try {
         for (let step = 0; step <= STEPS; step += 1) {
           const hour = low + ((high - low) * step) / STEPS;
           const before = await at(profile.authoredHour, `identity-${step}`);
-          const mass = await at(hour, `h${hour.toFixed(2)}`);
+          const sample = await at(hour, `h${hour.toFixed(2)}`);
           const writes = resolveLightingConditions({ arenaId: arena, fixedHour: hour });
-          const growth = Number((mass - before).toFixed(2));
+          const growth = Number((sample.shadowMassPercent - before.shadowMassPercent).toFixed(2));
+          const floorDrop = before.lumaP05 - sample.lumaP05;
+          const safe = growth <= MAX_SHADOW_MASS_GROWTH_POINTS && floorDrop <= MAX_SHADOW_FLOOR_DROP_STEPS;
           scan.samples.push({
             hour: Number(hour.toFixed(3)),
-            identityShadowMassPercent: before,
-            shadowMassPercent: mass,
+            identityShadowMassPercent: before.shadowMassPercent,
+            shadowMassPercent: sample.shadowMassPercent,
             shadowMassGrowthPoints: growth,
+            identityLumaP05: before.lumaP05,
+            lumaP05: sample.lumaP05,
+            shadowFloorDropSteps: floorDrop,
             sunIntensityScale: Number(writes.sunIntensityScale.toFixed(4)),
             shadowFloorScale: Number(writes.shadowFloorScale.toFixed(4)),
-            safe: growth <= MAX_SHADOW_MASS_GROWTH_POINTS,
+            safe,
           });
           console.error(`[lane-ab-scan] ${arena.padEnd(17)} ${weather.padEnd(11)} h=${hour.toFixed(2)}`
-            + ` sun=${writes.sunIntensityScale.toFixed(3)} shadow ${before}->${mass} (${growth >= 0 ? '+' : ''}${growth})`
-            + ` ${growth <= MAX_SHADOW_MASS_GROWTH_POINTS ? 'safe' : 'UNSAFE'}`);
+            + ` sun=${writes.sunIntensityScale.toFixed(3)}`
+            + ` shadow ${before.shadowMassPercent}->${sample.shadowMassPercent} (${growth >= 0 ? '+' : ''}${growth})`
+            + ` P05 ${before.lumaP05}->${sample.lumaP05} (-${floorDrop})`
+            + ` ${safe ? 'safe' : 'UNSAFE'}`);
         }
 
         // The widest CONTIGUOUS run of safe hours containing the authored hour.
@@ -234,11 +257,12 @@ try {
 
 writeFileSync(resolve(OUT, 'scan.json'), `${JSON.stringify({
   lane: 'AB',
-  contract: 'band-readability-scan-v1',
+  contract: 'band-readability-scan-v2-with-shadow-floor',
   generatedAt: new Date().toISOString(),
   gitSha,
   viewport: VIEWPORT,
   maxShadowMassGrowthPoints: MAX_SHADOW_MASS_GROWTH_POINTS,
+  maxShadowFloorDropSteps: MAX_SHADOW_FLOOR_DROP_STEPS,
   environmentInvalid: environmentInvalid || null,
   scans,
 }, null, 2)}\n`);
