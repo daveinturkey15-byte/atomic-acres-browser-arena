@@ -249,6 +249,49 @@ export function oceanDeepScatterColor(optics: WaterOptics): Readonly<{ r: number
 }
 
 /**
+ * The colour the horizon skirt paints.
+ *
+ * HF-420 REGRESSION FIX. The skirt is the cheap unlit ring that carries the sea
+ * from the edge of the displaced near plane out to the horizon. It has always
+ * painted the body's DEEP ENDPOINT flat: `palette.deep` back when the near
+ * plane's deep endpoint was also `palette.deep`. The extinction commit moved
+ * the near plane's deep endpoint to the water type's scattering colour and left
+ * the skirt behind, so the two surfaces stopped agreeing on what deep water is
+ * and a hard full-width HUE break appeared where they meet - olive-green near
+ * plane against a navy skirt on RustRig, saturated blue against a pale skirt on
+ * High Seas. That is a visual regression on two shipped arenas and it was not a
+ * judgement call: the skirt simply was not migrated.
+ *
+ * The correct endpoint is not a hand-picked colour, it is the LIMIT of the
+ * model the near plane now runs. The skirt is only ever seen at a grazing
+ * angle, and there the slanted column is optically deep:
+ *
+ *   pathLength = depth * (1/cos + 1),  cos floors at OCEAN_MIN_VIEW_COSINE 0.18
+ *
+ * so for High Seas 12 m * 6.56 = 79 m of water (transmission in its
+ * SLOWEST channel, blue: e^-4.33 = 1.3%) and for RustRig 14 m * 6.56 = 92 m
+ * (its slowest channel is e^-23.9, i.e. nothing at all). With
+ * transmission at zero the closure L = L_floor*T + L_scatter*(1-T) collapses to
+ * L_scatter exactly. So the skirt paints `optics.scatter`, which IS the near
+ * plane's own colour where the two meet - it is not an approximation of it.
+ *
+ * What deliberately does NOT change: the skirt is still unlit and still paints
+ * that endpoint flat, exactly as it painted `palette.deep` flat before this
+ * lane. The near plane is a lit MeshStandardNodeMaterial, so a residual
+ * BRIGHTNESS step across the seam remains, and it is the same step, from the
+ * same cause, that the accepted pre-change build had. Only the hue disagreement
+ * this lane introduced is removed. Making the skirt lit would mean a second
+ * material graph and a second pipeline, which the pass budget forbids.
+ *
+ * A body with no `waterType` keeps `palette.deep`, so the one-line revert path
+ * reverts the skirt with it.
+ */
+export function oceanHorizonColor(body: WaterBodyDefinition): number {
+  const optics = oceanOpticsForBody(body);
+  return optics ? optics.scatter : body.palette.deep;
+}
+
+/**
  * Builds the WebGPU water mesh for one authored body. The caller owns
  * visibility scheduling; the mesh starts visible (bodies only exist where
  * water is authored).
@@ -527,7 +570,10 @@ export function createOceanTslWater(
   horizonPositions.needsUpdate = true;
   horizonGeometry.computeVertexNormals();
   const horizonMaterial = new THREE.MeshBasicMaterial({
-    color: body.palette.deep,
+    // The optically-deep limit of THIS body's optics, not a second palette
+    // entry - see oceanHorizonColor(). Falls back to palette.deep for any body
+    // that authors no water type.
+    color: oceanHorizonColor(body),
     side: THREE.DoubleSide,
     depthWrite: true,
     fog: false,
@@ -544,6 +590,7 @@ export function createOceanTslWater(
   horizon.userData.horizonRadius = horizonRadius;
   horizon.userData.radialSegments = 24;
   horizon.userData.curvatureDrop = curvatureDrop;
+  horizon.userData.horizonColor = oceanHorizonColor(body);
   water.add(horizon);
   return Object.freeze({
     mesh: water,
