@@ -66,40 +66,59 @@ function materialNameOf(mesh: THREE.Mesh): string {
   return material.name || material.type;
 }
 
-function collectBoxes(): { boxes: Box[]; skipped: number } {
+function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[] } {
   const scene = new THREE.Scene();
   const map = buildNuketown2(scene);
   const boxes: Box[] = [];
   let skipped = 0;
-  for (const node of map.root.children) {
+  const skippedNames: string[] = [];
+  // REVIEW FIX (Opus, PASS 92): TRAVERSE, do not iterate the direct children.
+  // The arena root also carries three art GROUPS - the instanced lawn field,
+  // the forest ring and the mountain backdrop - and iterating `children` walked
+  // straight past all sixteen of their meshes WITHOUT COUNTING THEM, so the
+  // report's own "skipped: 0" line claimed a complete audit it had not done.
+  // They are still not auditable here (instanced or non-parametric geometry
+  // rather than authored axis-aligned boxes), but they are now COUNTED and
+  // NAMED, so "0 FINDINGS" is a scoped claim and the unaudited classes are
+  // visible to whoever reads the evidence.
+  map.root.updateMatrixWorld(true);
+  const world = new THREE.Vector3();
+  map.root.traverse((node) => {
     const mesh = node as THREE.Mesh;
-    if (mesh.isMesh !== true) continue;
+    if (mesh.isMesh !== true) return;
     // Batch meshes are skipped: their members are audited through the hidden
     // source nodes, which carry the names and the exact same material objects.
-    if (mesh.userData.presentationOnly === true) continue;
-    if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; continue; }
+    // The test is `sourceMeshes`, the marker `batchPresentationOnlyBoxes` puts
+    // on a MERGED mesh - NOT `presentationOnly`, which the lawn field, the
+    // forest ring and the mountain backdrop also set, and which therefore
+    // dropped all sixteen of their meshes out of the audit with no trace.
+    if (mesh.userData.sourceMeshes !== undefined) return;
+    const label = mesh.name || mesh.type;
+    if ((mesh as THREE.InstancedMesh).isInstancedMesh === true) { skipped += 1; skippedNames.push(`${label} (instanced)`); return; }
+    if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; skippedNames.push(`${label} (rotated)`); return; }
     const geometry = mesh.geometry as THREE.BoxGeometry;
-    if (geometry.parameters === undefined) { skipped += 1; continue; }
+    if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
     const p = geometry.parameters;
+    mesh.getWorldPosition(world);
     boxes.push({
       name: mesh.name,
       materialId: materialIdOf(mesh),
       materialName: materialNameOf(mesh),
       polygonOffsetFactor: offsetFactorOf(mesh),
-      x0: mesh.position.x - p.width / 2,
-      x1: mesh.position.x + p.width / 2,
-      z0: mesh.position.z - p.depth / 2,
-      z1: mesh.position.z + p.depth / 2,
-      top: mesh.position.y + p.height / 2,
+      x0: world.x - p.width / 2,
+      x1: world.x + p.width / 2,
+      z0: world.z - p.depth / 2,
+      z1: world.z + p.depth / 2,
+      top: world.y + p.height / 2,
     });
-  }
-  return { boxes, skipped };
+  });
+  return { boxes, skipped, skippedNames };
 }
 
 function main(): void {
   const outIndex = process.argv.indexOf('--out');
   const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
-  const { boxes, skipped } = collectBoxes();
+  const { boxes, skipped, skippedNames } = collectBoxes();
 
   const rows: string[] = [];
   let findings = 0;
@@ -133,10 +152,12 @@ function main(): void {
   const header = [
     `# nuketown2 coplanar top-face pairs (HF-434 instrument)`,
     `# head ${sha} · generated ${new Date().toISOString()}`,
-    `# boxes=${boxes.length} (skipped non-box/rotated: ${skipped}) · pairs<=${NEAR_METERS}m: ${rows.length}`
+    `# boxes=${boxes.length} · pairs<=${NEAR_METERS}m: ${rows.length}`
       + ` · FINDINGS (different materials, no offset): ${findings}`
       + ` · FENCED (material offset): ${fenced}`
       + ` · SAME-MATERIAL (benign): ${benign}`,
+    `# UNAUDITED meshes (instanced / rotated / non-parametric geometry, not covered by`
+      + ` the top-face test above): ${skipped}${skippedNames.length > 0 ? ` - ${skippedNames.join(', ')}` : ''}`,
     '',
   ];
   const report = [...header, ...rows, ''].join('\n');
