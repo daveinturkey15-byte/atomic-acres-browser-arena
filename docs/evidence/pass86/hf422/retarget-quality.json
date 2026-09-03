@@ -1,0 +1,505 @@
+{
+  "lane": "HF-422",
+  "generatedAt": "2026-09-03T00:38:01.221Z",
+  "glbNote": "Blender NLA export carrying the 24 authored clips plus the trial clip. Uncompressed float accessors, so every row below is produced by the SAME tool on the SAME file - the only like-for-like comparison available (see the shipped-GLB finding in the lane report).",
+  "tool": "scripts/animation/measure-retarget-quality.mjs",
+  "clips": {
+    "MB_Walk_Gun_Debug": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "MB_Walk_Gun_Debug",
+      "sampledTimes": 76,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [],
+      "movingJointCount": 18,
+      "topMovingJoints": [
+        {
+          "joint": "Foot.L",
+          "degrees": 50.52
+        },
+        {
+          "joint": "Foot.R",
+          "degrees": 41.52
+        },
+        {
+          "joint": "LowerLeg.L",
+          "degrees": 40.14
+        },
+        {
+          "joint": "UpperLeg.L",
+          "degrees": 37.96
+        },
+        {
+          "joint": "UpperLeg.R",
+          "degrees": 36.73
+        },
+        {
+          "joint": "LowerLeg.R",
+          "degrees": 28.41
+        },
+        {
+          "joint": "Hips",
+          "degrees": 16.63
+        },
+        {
+          "joint": "UpperArm.R",
+          "degrees": 14.7
+        }
+      ],
+      "lowestFootY": -0.0168,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 60,
+          "slideM": 3.2981
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 51,
+          "slideM": 2.9638
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 75,
+          "slideM": 3.8126
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 47,
+          "slideM": 2.6876
+        }
+      ]
+    },
+    "Walk": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "Walk",
+      "sampledTimes": 33,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [
+        {
+          "joint": "Middle2.L",
+          "degrees": 6.86
+        },
+        {
+          "joint": "Middle2.R",
+          "degrees": 6.86
+        },
+        {
+          "joint": "Ring2.L",
+          "degrees": 3.8
+        },
+        {
+          "joint": "Ring2.R",
+          "degrees": 3.8
+        }
+      ],
+      "movingJointCount": 20,
+      "topMovingJoints": [
+        {
+          "joint": "Foot.L",
+          "degrees": 91.66
+        },
+        {
+          "joint": "Foot.R",
+          "degrees": 59.91
+        },
+        {
+          "joint": "UpperArm.L",
+          "degrees": 59.21
+        },
+        {
+          "joint": "UpperArm.R",
+          "degrees": 59.21
+        },
+        {
+          "joint": "UpperLeg.L",
+          "degrees": 51.51
+        },
+        {
+          "joint": "LowerLeg.L",
+          "degrees": 47.12
+        },
+        {
+          "joint": "UpperLeg.R",
+          "degrees": 46.81
+        },
+        {
+          "joint": "LowerLeg.R",
+          "degrees": 36.98
+        }
+      ],
+      "lowestFootY": 0.0224,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 11,
+          "slideM": 0.5738
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 12,
+          "slideM": 0.6219
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 33,
+          "slideM": 0
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 33,
+          "slideM": 0
+        }
+      ]
+    },
+    "Run": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "Run",
+      "sampledTimes": 20,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [],
+      "movingJointCount": 17,
+      "topMovingJoints": [
+        {
+          "joint": "Foot.L",
+          "degrees": 158.53
+        },
+        {
+          "joint": "Foot.R",
+          "degrees": 131.48
+        },
+        {
+          "joint": "LowerLeg.R",
+          "degrees": 91.19
+        },
+        {
+          "joint": "LowerLeg.L",
+          "degrees": 78.63
+        },
+        {
+          "joint": "UpperArm.L",
+          "degrees": 70.47
+        },
+        {
+          "joint": "UpperLeg.L",
+          "degrees": 65.09
+        },
+        {
+          "joint": "UpperLeg.R",
+          "degrees": 51.64
+        },
+        {
+          "joint": "Head",
+          "degrees": 42.49
+        }
+      ],
+      "lowestFootY": 0.022,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 5,
+          "slideM": 0.5058
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 5,
+          "slideM": 0.8278
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 20,
+          "slideM": 0
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 20,
+          "slideM": 0
+        }
+      ]
+    },
+    "Run_Back": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "Run_Back",
+      "sampledTimes": 21,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [],
+      "movingJointCount": 17,
+      "topMovingJoints": [
+        {
+          "joint": "Foot.L",
+          "degrees": 111.16
+        },
+        {
+          "joint": "LowerLeg.R",
+          "degrees": 91.26
+        },
+        {
+          "joint": "Foot.R",
+          "degrees": 86.63
+        },
+        {
+          "joint": "UpperLeg.L",
+          "degrees": 71.67
+        },
+        {
+          "joint": "LowerLeg.L",
+          "degrees": 59.7
+        },
+        {
+          "joint": "UpperLeg.R",
+          "degrees": 48.38
+        },
+        {
+          "joint": "Head",
+          "degrees": 42.49
+        },
+        {
+          "joint": "Torso",
+          "degrees": 41.28
+        }
+      ],
+      "lowestFootY": 0.022,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 5,
+          "slideM": 0.5078
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 6,
+          "slideM": 0.9467
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 21,
+          "slideM": 0
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 21,
+          "slideM": 0
+        }
+      ]
+    },
+    "Idle_Gun": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "Idle_Gun",
+      "sampledTimes": 41,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [
+        {
+          "joint": "Thumb2.R",
+          "degrees": 35.03
+        },
+        {
+          "joint": "Thumb3.R",
+          "degrees": 15.12
+        },
+        {
+          "joint": "Thumb3.L",
+          "degrees": 11.68
+        },
+        {
+          "joint": "Thumb2.L",
+          "degrees": 9.5
+        },
+        {
+          "joint": "Ring2.L",
+          "degrees": 4.7
+        },
+        {
+          "joint": "Middle3.L",
+          "degrees": 4.42
+        },
+        {
+          "joint": "Ring3.L",
+          "degrees": 3.41
+        },
+        {
+          "joint": "Middle2.L",
+          "degrees": 2.8
+        },
+        {
+          "joint": "Index2.L",
+          "degrees": 2.35
+        },
+        {
+          "joint": "Index3.L",
+          "degrees": 1.89
+        }
+      ],
+      "movingJointCount": 21,
+      "topMovingJoints": [
+        {
+          "joint": "Thumb2.R",
+          "degrees": 35.03
+        },
+        {
+          "joint": "UpperArm.R",
+          "degrees": 16.49
+        },
+        {
+          "joint": "Thumb3.R",
+          "degrees": 15.12
+        },
+        {
+          "joint": "LowerArm.R",
+          "degrees": 12.23
+        },
+        {
+          "joint": "Thumb3.L",
+          "degrees": 11.68
+        },
+        {
+          "joint": "Thumb2.L",
+          "degrees": 9.5
+        },
+        {
+          "joint": "Shoulder.R",
+          "degrees": 9.44
+        },
+        {
+          "joint": "Ring2.L",
+          "degrees": 4.7
+        }
+      ],
+      "lowestFootY": 0.0228,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 41,
+          "slideM": 0
+        }
+      ]
+    },
+    "Idle_Gun_Pointing": {
+      "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",
+      "clip": "Idle_Gun_Pointing",
+      "sampledTimes": 41,
+      "animatedJointCount": 62,
+      "gripChannelsVarying": [
+        {
+          "joint": "Thumb3.L",
+          "degrees": 11.68
+        },
+        {
+          "joint": "Ring4.R",
+          "degrees": 9.7
+        },
+        {
+          "joint": "Thumb2.L",
+          "degrees": 9.5
+        },
+        {
+          "joint": "Pinky4.R",
+          "degrees": 8.21
+        },
+        {
+          "joint": "Ring3.R",
+          "degrees": 5.59
+        },
+        {
+          "joint": "Ring2.L",
+          "degrees": 4.7
+        },
+        {
+          "joint": "Middle3.R",
+          "degrees": 4.61
+        },
+        {
+          "joint": "Middle3.L",
+          "degrees": 4.42
+        },
+        {
+          "joint": "Ring3.L",
+          "degrees": 3.41
+        },
+        {
+          "joint": "Middle2.L",
+          "degrees": 2.8
+        },
+        {
+          "joint": "Index2.L",
+          "degrees": 2.35
+        },
+        {
+          "joint": "Index3.L",
+          "degrees": 1.89
+        }
+      ],
+      "movingJointCount": 22,
+      "topMovingJoints": [
+        {
+          "joint": "Thumb3.L",
+          "degrees": 11.68
+        },
+        {
+          "joint": "Ring4.R",
+          "degrees": 9.7
+        },
+        {
+          "joint": "Thumb2.L",
+          "degrees": 9.5
+        },
+        {
+          "joint": "Shoulder.R",
+          "degrees": 9.44
+        },
+        {
+          "joint": "Pinky4.R",
+          "degrees": 8.21
+        },
+        {
+          "joint": "UpperArm.R",
+          "degrees": 7.63
+        },
+        {
+          "joint": "Ring3.R",
+          "degrees": 5.59
+        },
+        {
+          "joint": "Ring2.L",
+          "degrees": 4.7
+        }
+      ],
+      "lowestFootY": 0.0228,
+      "footSlide": [
+        {
+          "name": "Foot.L",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "Foot.R",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "PT.L",
+          "plantedFrames": 41,
+          "slideM": 0
+        },
+        {
+          "name": "PT.R",
+          "plantedFrames": 41,
+          "slideM": 0
+        }
+      ]
+    }
+  }
+}
