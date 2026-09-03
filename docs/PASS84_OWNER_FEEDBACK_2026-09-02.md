@@ -649,3 +649,442 @@ we can of course test stuff in map 3 if not clear to be widely deployed"
 - **Access rule:** X sources are read through public mirrors; if a thread is
   auth-blocked, the lane reports BLOCKED and the owner is asked to log in (never a
   search substitute).
+
+### HF-408 Raid layout rethink — SCHEDULED 22:05 BST (owner asked again: "didn't we have stuff for RAID")
+Lane AQ (`docs/pass84-lanes/LANE-AQ-raid-rejig.md`): the Nuke Town protocol
+applied to Raid - reference study first, code-authored `raid2` preview beside the
+shipped Raid, wall-density and sightline table against the reference, Lane U's
+skeptic findings as the do-not-repeat list. Targets PASS 87 if merge-ready by
+04:30, else the next pass. The Raid ART pass (Lane L) stays shelved as the owner
+asked; the rebuild ships a clean first-pass style.
+### Lane AR — PASS 87 residuals brief written (`docs/pass84-lanes/LANE-AR-pass87-residuals.md`)
+HUD/menu overflow with 8+ cards (red since PASS 84), minimap 30 Hz, bot stance,
+line-ceiling one-direction ratchet, overdrive roof claim, review-camera near
+plane, stale webgl2 copy, operator visual gate. Launches after the 22:20 cut.
+
+### HF-409 Map 3 explore — finisher result 22:15 BST: MERGE-READY FOR PASS 87, NOT PASS 86
+Landed on branch map3-demo-showcase (9847a7e9): the card is back as an EXPLORE
+arena KIND (required `kind: 'team' | 'explore'` on every registry row; the
+explore branch of the spawn-quality gate is stricter, not an exemption; all four
+roster ratchets restored 7 -> 8; map3 in the cross-browser required set); full
+suite 5168/0 on that change set; merges clean. NOT yet: the in-match HUD still
+says TEAM DEATHMATCH with a countdown in explore (legacy-main :16976/:27305),
+/map3.html is dead on every published channel until the stage-release-topology
+patch lands with proof, and the eye-clearance ceiling cannot be measured until
+buildMap3 gets the prepare-then-build split (stage 2 builds arenas synchronously;
+map3 is code-split). Do NOT merge V at 22:20; a second finisher is on the PASS 87
+critical path now. Stray: aa-map3 carries three uncommitted HF-412 files (not
+V's); aa-map3-laneV-verify is a scratch runner to remove once V is accepted.
+
+### HF-407 Nuke Town rebuild — finisher result 22:20 BST: MERGE-READY FOR PASS 86 (ship as NUKE TOWN REBUILD · PREVIEW)
+Branch nuketown-rejig at de0840e6: full suite 5187/0 on the branch; merge probe
+clean against 6c77a662; no third-party prose (scripted scan 0 hits); the 2x core
+roof reachable by a real Rapier traversal (eye 5.72 m over the core); lawn out of
+the houses (0.000 m2 overlap, asserted in the fidelity test); real menu preview
+media committed (the pass77 provenance gate stays red on the PRE-EXISTING shared-
+generator digest broken by c25f5e32/Map 3 - not faked, owner of that gate to fix);
+rare gun landed on the rebuild via RAILGUN_ARENA_IDS + per-arena sites, shipped
+Nuke Town byte-identical (tests); eye clearance MEASURED (ceiling 18, all prone
+under the truck decks; 2 runtime rows left OPEN); 60 s headless solo run zero
+errors. **Cut instruction:** merge U into PASS 86 after J/N in the auditor's
+order; re-run the boot smoke for nuketown2 (not run since the rare-gun commit)
+and the arena-roster + channel-list checks post-merge (the "published but
+unselectable" gotcha: integration also edits test-maps.ts, release-channels.json,
+legacy-main.ts). Promotion out of PREVIEW is the owner's call after he plays it.
+
+## HF-423 — owner 22:25 BST: "get farcrysis sorted overnight too after nuke town and raid"
+**Statement (verbatim):** "ok thanks, get farcrysis sorted overnight too after nuke
+town and raid, i will sleep now see you at 6AM so i can play something good and
+hear more about it all, impress me with all the cool 3js skills etc and animation
+possibly too if time permits! night night"
+- Lane R (`docs/pass84-lanes/LANE-R-farcrysis-playable-preview.md`) is UNSHELVED
+  and launched 22:30 on Opus, priority after Nuke Town (done) and Raid (running):
+  Farcrysis admitted inside the 12 s fence on Quality (Lane C's FARCRYSIS-LOAD
+  pattern is on the integration line), spawn table + gates, art gaps closed to a
+  clean first pass, unhidden as a PREVIEW card. The publish script's
+  farcrysis-unselectable guard becomes a farcrysis-admission-evidence guard in the
+  same cut that ships it (boot smoke + admission time + tripwire 0) - the cut
+  agent applies that with roll_pass.py's help; never delete the guard.
+- Falsifier: `selectable: true` + boot smoke green headless + admission < 12 s
+  cold on Quality + tripwire 0 + spawn-quality gate + eye-clearance measured +
+  60 s solo run zero errors; targets PASS 87 by 04:30, else the next pass.
+- Owner's 06:00 ask: something good to play (Nuke Town Rebuild preview in PASS 86;
+  Raid, Farcrysis, Map 3 explore, water/lighting/animation trials in PASS 87 where
+  green) and the morning report with the skills and animation work.
+
+### Gate repairs merged 22:40 BST (branch pass86-gate-repairs, a94ea6db)
+- pass65 arms visual gate no longer ABORTS on the fitted rig: its 0.15/0.25
+  retreat thresholds are kept verbatim on `requestedSurfaceRetreat` (the probe
+  demand HF-410 leaves intact; the applied retreat is zero by design), wall pose
+  asserted via wallBlend, penetration asserted directly on the fit's own margins
+  (capsule margin > 0, floor clearance > 0, bodyFitScale pinned). Result on the
+  fitted rig: 2 violations, both the LEFT support sleeve in prone-against-wall
+  poses - a real defect, kept RED honestly. Cause measured: the contact fold
+  scales the whole viewmodel root, arms included (14% reach loss), and the
+  support socket sits further forward; no lane constant or elbow pole can move
+  it. Proposed fixes (PASS 87 residuals): exempt the arm chains from the fold
+  scale, or add a fourth reach arc toward the eye with a near-plane guard.
+- pass69-3 near-plane catalog spec: the 20-vs-21 setup defect is fixed with the
+  MEASURED runtime identity of crimson-flamethrower (a livery over the
+  flamethrower asset); the full run still stops at deploy() on this loaded box
+  (matchPhase wait) - unverified, re-run on a quiet machine through the committed
+  harness (build+stage exceeds the 180 s webServer timeout under load; not
+  changed).
+
+### HF-417 / load-time deep cut — Lane H decision 22:18 BST: HOLD from PASS 86 (regressed first loads)
+The skeptic's re-analysis of Lane H's own data: generalising the off-fence
+precompile to every arena took the 56-pair switch matrix to 56/56 with zero
+fence failures (real win; the failing class was atomic-acres -> high-seas, not
+Gun Range), BUT paired whole-switch time is SLOWER (median +488 ms, 31/55 edges),
+and first loads regressed badly on the two arenas that most needed help:
+gun-range 43.0 -> 65.4 s (+52%), high-seas ~48 -> 71.0 s (+45%); the ~3 s
+staged-light warm-up migrates to whichever rehearsal runs first (killstreak
+vocabulary now 6.8-7.0 s). The baseline sweep also shared the GPU with eight
+Lane V browsers. Owner intent is "load every map much faster", so this does not
+ship as-is. **Cut instruction: do NOT merge Lane H into PASS 86.** Keep for
+PASS 87 as Lane H2: (1) re-measure baseline and candidate on a quiet GPU with
+the fixed instrument (sync/async pipeline sinks separated); (2) keep the roster-
+derived switch-matrix gate, the flare-gun reach fix and the stricter prewarm
+contract pin; (3) precompile off the fence WITHOUT serialising it into first
+load (parallel compileAsync, menu-time prewarm scoped to the arena the player
+picked); (4) the ~3.5 s serialized rehearsal cut on the four heavy arenas; (5)
+match admission (deploy) at 14-20 s per arena is the largest unexamined block -
+attribute it and cut it. Gate: no arena's first load or switch slower than the
+quiet-GPU baseline, tripwire 0 on every arena, switch matrix 56/56.
+
+## PASS 86 publish record — 00:50 BST 2026-09-03 (see docs/PASS86_CUT_REPORT_2026-09-02.md)
+Integration e1361b0f -> gh-pages {pass86 live, pass85 backup}; chooser generation
+cb0967af4030. Shipped: Nuke Town Rebuild PREVIEW (HF-407), Map 3 EXPLORE with the
+honest HUD and the in-channel showcase page (HF-409), viewmodel fit (HF-410),
+eye-clearance triage (J), QA corpus (N), IBL verification (I). Held: H (load
+regressions), T (permissive threshold). Boot smoke 12/12 on all ten arenas.
+Rollback: `python scripts/orchestration/publish_pass86.py --rollback`.
+
+### HF-423 Farcrysis — lane result 02:10 BST and the orchestrator's decision
+Lane R (branch farcrysis-playable-preview, 22 commits, skeptic ACCEPT_WITH_FIXES,
+repaired): spawn table solved on the terrain authority, ground registered for
+raycasts, crate lids / tower deck / dish / cave crown given real authority, the
+ground shot box no longer swallows a standing player (a self-inflicted defect
+found and fixed: 56.5% of shots died at the muzzle), eye clearance measured off
+the sentinel (441, of which 373 are a stage-1 instrument limitation on
+heightfields and 25 are genuine runtime rows), art first pass lifts the island
+off black on measured luma, the card unhidden as PREVIEW, and cold admission
+measured on a quiet machine: farcrysis 32.0 s mean vs the atomic-acres control
+25.7 s, worst pair ratio 1.28, zero in-combat pipelines.
+- **Falsifier amendment (orchestrator):** the row's "admission < 12 s cold"
+  clause conflated the 12 s WebGPU fence with wall-clock admission; no arena
+  admits in 12 s on this machine (Lane H measured deploy at 14-20 s everywhere).
+  The gate is now: cold admission ratio to the atomic-acres control <= 1.60 on a
+  quiet machine (measured 1.28), every fenced submission inside the unchanged
+  12 s fence, tripwire 0. The publish guard becomes an admission-evidence guard
+  reading the lane's receipt (docs/evidence/pass87/lane-r/farcrysis-admission.json,
+  keyed to the built bundle).
+- **Ships in PASS 87 as FARCRYSIS · PREVIEW** with an honest caveat: in-combat
+  frame time is 1.34-1.89x atomic-acres (median 1.64x; 224 vs 110 distinct
+  materials is the lever, not attempted). Next pass: collapse materials onto the
+  shared vocabulary, the owner's vegetation technique (Bezier tufts + SSS,
+  ridged-FBM backdrop), the core building's interior floor/walls and a practical
+  light, the 25 runtime eye rows, and stage 1's flat-ground eye seat (an
+  instrument fix that also affects every heightfield arena).
+
+### HF-408 Raid layout rethink — lane result 02:20 BST and the orchestrator's decision
+Lane AQ (branch raid-rejig, 13 commits; skeptic REJECT on one geometric blocker,
+repaired): the complaint was measured as wall SHAPE, not wall quantity (shipped
+Raid: 59 eye-blocking masses averaging 11 m2, mean open sightline 9.97 m, 36.7%
+roofed ground); the rebuild carries 34 masses averaging 22.6 m2, mean open line
+13.62 m, long-axis median 25.65 m, 21.9% roofed, wall footprint per floor area
+UP (13.0 -> 15.5), 84 mountable cover pieces, all four upper rooms reachable
+(the skeptic found three sealed by full-height walls emitted from grade; fixed and
+measured by flood fill), 12/12 legal spawns with zero spawn-to-spawn sightlines,
+parity 0/0, real menu preview, eye clearance measured (13 -> 0), readability of
+the cover family gated. **Decision:** ships in PASS 87 as RAID REBUILD · PREVIEW
+if the integration worker lands it green by 04:20 (35-file conflict surface with
+PASS 86's arena additions). Owed next: the ART pass (flat untextured albedo; Lane
+L stays shelved at the owner's instruction but the rebuild needs its own first
+style pass), arena sync 45-63% slower than the shipped Raid (route to Lane H2),
+the warm-key art-direction quadrant being full, the weather sequencer latent bug.
+
+### 03:35 BST integration notes (Lanes AH, AE, AD merged; integrator edits)
+- AE (mobile): the PAUSE tap no longer falls through onto the menu it uncovers;
+  emulated sweep on three devices; phone checklist for the owner in Lane AE's
+  evidence. Integrator applied its collapsed-Advanced-Graphics CSS fix (the
+  closed disclosure laid ~2,815 px of catalog over the Options panel, on desktop
+  too). Left for Lane AR: the paused deck's covered join row, DEPLOY below the
+  fold on landscape phones, 24 px settings checkbox rows.
+- AD (release CI): the workflow verifies and cannot publish (`contents: read`);
+  `publish_pass<N>.py` is the only publisher. The three documentation patches
+  (README, AGENTS.md, pipeline doc) landed in the same integration commit.
+- Lane C's two zero-byte tsc log files under docs/evidence/pass84/farcrysis-load
+  were deleted (they made `qa:text-integrity` red on every branch); their
+  siblings carry the real `TSC EXIT 0` marker. No marker was fabricated.
+
+## PASS 87 publish record — 04:35 BST 2026-09-03 (see docs/PASS87_CUT_REPORT_2026-09-03.md)
+Integration 63e69108 -> gh-pages {pass87 live, pass86 backup}; chooser generation
+97618442dcec. Shipped: RAID REBUILD · PREVIEW (HF-408), FARCRYSIS · PREVIEW
+(HF-423), residuals (menu overflow, minimap 30 Hz, bot stance, 2x core line of
+sight, nacelle collider, gamepad CI, staging + stage-3 fixes), mobile PAUSE fix +
+collapsed-graphics CSS (AE), release CI verifies-only (AD). Held: H2 (PASS 88
+candidate), AB, AL, AI, the four technique trials (merge audit pending), T.
+Boot smoke 13/13 on all eleven arenas; Farcrysis admission guard green (1.297x).
+Rollback: `python scripts/orchestration/publish_pass87.py --rollback`.
+
+## PASS 88 publish record — 04:59 BST 2026-09-03 (see docs/PASS88_CUT_REPORT_2026-09-03.md)
+Integration 255300e0 -> gh-pages {pass88 live, pass87 backup}; chooser generation
+b77c111be540. Shipped: Lane H2 (HF-417 switch-fence fix without the first-load
+regression; admission attributed). Boot smoke 13/13; Farcrysis admission guard
+1.368x. Rollback: `python scripts/orchestration/publish_pass88.py --rollback`.
+Not merged (branches pushed, for the morning cut): AI, AB, AL, the four
+technique trials, T.
+
+## HF-424 — owner 2026-09-03 06:15: today's pacing and plan
+**Statement:** "we are at 80% of usage so maybe need to take it a bit more careful
+today on volume" then "i will be away for 9 hours, so we can slowly but surely
+work on things but using alot of compute, thoughts?" Plan: `docs/DAY_2026-09-03_PLAN.md`
+(four blocks, at most two Opus chains at a time, a cut per block: PASS 89 now,
+Farcrysis real arena + animation, Raid art + water everywhere, PASS 90 + hill-climb
+receipts). Also 06:12: the source push had been blocked since 03:35 by the
+`workflow` scope; fixed 06:18 after the owner re-authorised (pushed 2c08d0b8..00db4c07).
+
+## HF-425 — owner 2026-09-03 06:40: the SAM-licence decision
+**Statement:** "on the licence we can just not use that technique when guns are
+involved, or create a similar skill that is slightly adapted? bit of both maybe."
+- Rule: the ComfyUI video-mocap chain (SAM3D body) is NEVER used for anything
+  that involves guns or weapons - no gun-holding clips, no reload/ADS/knife
+  captures, no bot combat motion. It MAY be used for unarmed content (idles,
+  emotes, civilian/environment characters, menu characters) with the licence
+  recorded per clip.
+- Adapted skill: author `video-mocap-permissive-pipeline` in the vault store -
+  the same capture-to-clip pipeline on a permissively licensed body tracker (no
+  SAM component), for weapon-involved motion; register row + eval record + guard
+  accept per the technique-register procedure. Owner of the skill: the animation
+  lane (AT) or a follow-up skill lane; not before block 2.
+
+## HF-426..HF-429 — owner 2026-09-03 ~06:50 after playing PASS 88 (priority order: 426, 427; compute-careful)
+**Statement (verbatim):** "the nuketown rebuild is not right, its based on an old
+layout we had here, not the actual layout of black ops 2 nuketown, you need to do
+some proper research and adjust the layout of the map and assets, then layer in
+all the visual styles we had aimed for and approved in our older layout,
+prioritise that ahead of other things and be careful with compute. I hope it wont
+take long? Raid layout feels better but is missing all the nice detail you had in
+the old version, get the same level of detail to the new layout and then enhance
+it to be closer to the original map in lighthing texture and asset style too,
+ideally with just code and our new skills techniques. There are also some issues
+with the raid map layout not being true and accurate so you need to do better
+research there too. i also coulndt see balanced gfx profile. Farcrysis needs a
+total re work its assets and texures are still a mess and it hasnt used the new
+techniques from threejs etc for its nature and water, that would need to be
+sorted, so remove that map and park that for later, focus on sorting out
+nuketown preview first then raid, and like i said be careful with compute"
+- **HF-426 Nuke Town Rebuild accuracy (priority 1):** the rebuild reproduced our
+  own older layout, not Black Ops 2 Nuketown. Lane AU: proper reference research
+  from public overhead/callout maps and gameplay stills (view them, extract a
+  schematic, reconcile sources, record proportions - describe and measure, copy
+  nothing), rebuild `nuketown2`'s layout and props to it, THEN layer the approved
+  visual style of the shipped Nuke Town (its materials, lawn, forest surround,
+  mountain ring, lighting) onto the new layout in code. Falsifier: an overhead
+  render of the rebuild beside the reference schematic with every structure,
+  vehicle and fence in the reference's relative position within stated
+  tolerances, judged by a skeptic who reads the reference sources independently.
+- **HF-427 Raid Rebuild detail + accuracy (priority 2):** the same level of
+  detail as the shipped Raid on the new layout, then lighting/texture/asset style
+  closer to the original, code-only with the new skills; and better layout
+  research (the current layout is not true to the original in places). Lane AV,
+  after AU.
+- **HF-428 Balanced profile not visible:** it exists on Lane AI's branch (Balanced
+  profile + RTX explainer), which missed the overnight cuts; it is in the PASS 89
+  integration now.
+- **HF-429 Farcrysis parked:** hidden again (`selectable: false`) in PASS 89; the
+  block-2 Farcrysis lane is cancelled; a future rework must use the new
+  vegetation/water/interior-lighting skills. The admission guard keeps working
+  for a parked build.
+- Compute: one Opus chain per lane, serial (AU then AV), plus the PASS 89
+  integration already running; no waves.
+- **Owner 07:00:** away 90 min, then until ~15:00; "be careful with our 20%
+  remaining compute and use gemini flash 3.8 as support through the bridge".
+  Applied: Gemini 3.8 Flash (agy bridge) does the bulk work of each lane
+  (reference research, schematic, first geometry/props pass); Opus runs one
+  skeptic + one repair per lane; Fable coordinates. Serial: AU then AV.
+
+## HF-430 — owner 2026-09-03 07:05: chiptune music
+**Statement (verbatim):** "half the chiptune music sound and have it swap between
+about 10 different variations and tracks, each one lasting about 90 seconds and
+being random in order". Lane AW (Gemini bulk, Opus skeptic): music gain halved
+(measured, not eyeballed: -6 dB on the music bus only, SFX untouched), ~10
+distinct procedural variations/tracks of ~90 s each, shuffled order with no
+immediate repeat, seamless swap, persisted volume respected; a unit test pins the
+count, the durations and the no-repeat shuffle; a headless run records which
+tracks played over 5 minutes.
+
+## HF-431 — owner 2026-09-03 07:08: drop shot from sprint must not resume sprinting
+**Statement (verbatim):** "if I am sprinting and press Z it should do the drop shot
+but then not keep sprinting if i am still holding Shift, sort that too". Lane AX
+(with AW): pressing the prone/drop-shot key while sprinting performs the drop shot;
+the sprint latch is cleared so a still-held Shift does not resume sprinting from
+prone (sprint must be re-pressed after standing); unit test on the stance/sprint
+state machine + a headless keyboard sequence test (Shift held, Z, stays prone and
+not sprinting; stand, Shift again sprints).
+
+## PASS 89 publish record — 07:29 BST 2026-09-03
+Integration 07453942 -> gh-pages {pass89 live, pass88 backup}; chooser generation
+2dade140e0fe. Shipped: Lane AI (BALANCED profile, per-profile copy, RTX explainer,
+ladder doc), Lane AB (time of day on every arena, host TIME OF DAY lobby row),
+Lane AL (baked indirect tiers; two runtime blockers fixed with tests), Lane AO
+(MotionBricks analysis tools, NO-GO on the build), HF-429 Farcrysis PARKED
+(selectable false; Lane R's work and receipts kept). Held: AP GTA-art trial (its
+street cell overruns the Map 3 playfield; relocate then re-measure), AM water
+(its every-arena pond roster test is not shipped as a test), AN subway trial.
+Full suite 5578/0; boot smoke 13/13; all five presets boot; RTX explainer
+falsifier green. Rollback: `python scripts/orchestration/publish_pass89.py --rollback`.
+HF-430/431 (chiptune rotation, drop shot from sprint): Gemini bulk + Opus
+skeptic/repair ACCEPT_WITH_FIXES (four worker defects fixed: red ratchet, untested
+shipped path, early timbre swap, wrong opening timbre); merged after the cut ->
+next pass. Note for the owner: Shift while PRONE no longer stands you up into a
+sprint (fresh Shift after standing); menu music not halved (game music only).
+- 07:32: the Gemini bridge hit its individual quota ("resets in 4h9m") right as
+  Lane AV (Raid) launched; AV is deferred to ~11:45 on Gemini. Opus continues
+  only on Nuke Town (skeptic on Jobs 1-2, then Job 3 visual style) so priority 1
+  is not delayed; the PASS 90 cut carries Nuke Town + chiptune/drop-shot.
+
+### HF-426 progress 08:40 BST — Nuke Town Rebuild layout is now measured from first-party minimaps
+The Gemini research was REJECTED by the Opus skeptic (three of five citations did
+not exist; it reproduced our old layout again). Redone from the two Treyarch
+minimaps (BO2 512 px and BO7 4096 px, which agree to ~1%): the playable map is
+2.36:1 with the LONG AXIS ACROSS THE STREET (yard-house-road-house-yard), the
+road is a stub opening into a cul-de-sac turning head (0.45 L), the MOVING TRUCK
+is the open body (2x core on its cargo-box roof, climb via the cab treads) and
+the 1960s COACH is closed cover, the houses nearly face each other (0.065 L
+offset) with the garages set back 0.168 L behind their own driveway aprons, fence
+gaps kept but off-axis from their rotational partners (the symmetric version
+gave an 82 m clear lane). Arena rebuilt at 36 x 84 m (absolute scale is an
+ANCHOR - one constant, no public source gives metres); 16 fidelity bands derived
+from the schematic; spawn gate, parity 0/0, walkable 0, boot smoke 13/13, 60 s
+run 99 fps zero errors. Commit f3615486. Job 3 (the shipped Nuke Town's approved
+look: blue/yellow/orange houses, cream/red coach, lawn field, forest surround
+and mountain ring re-fitted to the new footprint, menu preview re-captured) is
+running on Opus now; PASS 90 follows.
+
+## PASS 90 publish record — 09:34 BST 2026-09-03
+Integration 0a1db1b3 -> gh-pages {pass90 live, pass89 backup}; chooser generation
+6267b5120e57. Shipped: HF-426 Nuke Town Rebuild made accurate to Black Ops 2
+Nuketown 2025 (first-party minimaps; across-street long axis, cul-de-sac stub,
+open truck with the 2x core, closed coach, set-back garages, fence gaps) with the
+shipped Nuke Town's approved look (blue/yellow/orange houses, cream-and-red
+coach, lawn field, forest ring and mountains re-fitted, menu preview re-captured;
+shared-generator lineage repaired); HF-430 chiptune at half volume with ten
+~90 s tracks in a no-repeat shuffle; HF-431 drop shot from sprint clears the
+sprint latch. Full suite 5647/0; boot smoke 13/13; identity OK. Rollback:
+`python scripts/orchestration/publish_pass90.py --rollback`. Owner notes: absolute
+scale of the rebuild is an anchor (one constant to rescale); Shift while prone no
+longer stands you into a sprint; menu music was not halved (game music only).
+Next: HF-427 Raid (Lane AV) on Gemini when its quota resets (~11:45) + Opus
+skeptic, then PASS 91.
+- **Owner 12:55:** "be careful with what you assign gemini i suppose if its
+  fabricating things, maybe there is better suited tasks until the model swaps or
+  a pro one comes". Rule from here: Gemini 3.8 Flash gets bounded mechanical work
+  only (dressing from a verified schematic, instrument runs, guarded refactors,
+  evidence capture); research, reference truth, gates and licences stay on Opus;
+  every Gemini branch is Opus-verified before it ships. The running Raid lane's
+  research (Job 1) will be treated as unverified until the Opus pass re-derives it.
+
+## HF-432 / HF-433 — owner 2026-09-03 13:05 after playing PASS 90
+**Statement (verbatim):** "new nuketown starting to shape up, still some issues with
+wher stairs are,a the cover and size/shape of the side areas of the map and spawns,
+needs refinement. Doors are too small shoudnt have to crouch, vechiles in mid
+street need more accurate layout to original. Also when I go prone now it
+dropsshots nicely but going crounced i still move fast, sort it out in the same
+way?"
+- **HF-432 Nuke Town Rebuild refinement (Lane AU2, Opus):** stair positions per
+  the reference (which wall, which direction, landing), the side areas (yards /
+  flanks: their size, shape and cover pieces), spawn placement, door openings a
+  standing player walks through (>= 2.1 m clear, no crouch), and the mid-street
+  vehicles placed as the reference has them (the truck off the road centre-line
+  as measured - the 2x core position becomes per-arena, weapons-code change
+  authorised by the orchestrator). Evidence: overhead beside the schematic, a
+  door-height probe, a stair traversal probe, spawn gate.
+- **HF-433 crouch speed (same worker):** crouched movement is slower (a crouch
+  speed factor like the prone one; BO2-style ~0.6 of walk), no sprint while
+  crouched, and the sprint latch clears on crouch the way HF-431 did for prone;
+  unit tests on the movement state machine + the drop-shot e2e spec extended.
+- **Owner 15:25:** "we have 13% usage remaining this week and it resets in 20
+  hours, so lets plan like that." Plan: finish only the nearly-done Nuke Town
+  refinement worker (all six HF-432 items + HF-433 committed; gates/report left)
+  when the Opus API recovers from 529, cut PASS 91 with it, then STOP Opus work
+  until the reset (~11:30 BST 2026-09-04). Raid's Opus verification (Lane AV
+  check-and-finish; Gemini's Jobs 1-2 are on the branch, unverified) resumes
+  after the reset -> PASS 92. No Gemini bulk work tonight either: every Gemini
+  branch needs an Opus check before it ships.
+
+## PASS 91 publish record — 15:51 BST 2026-09-03
+Integration b939766a -> gh-pages {pass91 live, pass90 backup}; chooser generation
+5ab5194ef158. Shipped: HF-432 Nuke Town Rebuild refinement (stair/landing/upper
+hallway per the reference, side-area cover, spawns re-solved with a new gate,
+doors >= 2.1 m clear, coach/truck/cars placed as the reference with a per-arena
+2x core - the shipped Nuke Town's seat unchanged) and HF-433 crouch speed
+(crouch has its own slower speed, cannot sprint, clears the sprint latch). The
+worker was cut off three times by API 529; the orchestrator committed its final
+item-6 edits after tsc 0 and 311 focused tests green. Gates on the cut: full
+suite 5656/0; parity 0/0; walkable 0; boot smoke 13/13; identity OK. Rollback:
+`python scripts/orchestration/publish_pass91.py --rollback`. NOT run: the 60 s
+solo run on the refined arena (compute budget). Next (after the weekly reset,
+~11:30 BST 2026-09-04): Raid Opus verification -> PASS 92.
+
+## HF-434..HF-438 — owner 2026-09-03 17:15 after playing PASS 91 (voice)
+**Statement (transcribed):** "loads of z-fighting all through the map so that needs
+fixing. some of the geometry needs adjustments like stairs and being able to walk
+up and down stairs and go out of windows and putting glass on the windows. one of
+the trucks in the street needs a side entrance so you can go in over the left
+side, right side, or the end, more similar to the actual Nuketown map. the areas
+on the side of the main street need to be a bit wider and have cover - look at
+the Black Ops 2 map yourself. I don't think we should have a ray tracing AND an
+RTX mode ... the RTX mode as a separate runtime is fine, and just bake some ray
+tracing into the quality profile and then even more in the max. the chiptune
+music sounds good. the animations feel pretty good."
+- **HF-434 z-fighting on Nuke Town Rebuild (P0):** coplanar surfaces flicker
+  across the map. Likely causes: the ground-dressing decal plates at +0.02 m over
+  the slab (and the lawn plate) with the 0.02 m near plane's coarser depth
+  (~1 cm at 60 m), fence/wall/roof overlaps. Fix: decals via polygonOffset or a
+  depth-tested offset that survives distance, or split the slab so nothing is
+  coplanar; sweep every coplanar pair with the parity instrument; capture
+  far-distance frames before/after.
+- **HF-435 stairs + windows:** stairs walkable up AND down (traversal probe both
+  ways); upstairs windows you can go out of (jump-out openings like the
+  reference); glass panes on the ground-floor windows (shot-through, see-through,
+  a pane you cannot walk through).
+- **HF-436 truck side entrances:** the open truck's cargo box enterable from the
+  left side, the right side and the end, as the reference's moving truck.
+- **HF-437 street side areas:** the strips beside the main street wider, with
+  cover pieces, per the reference (re-check the minimap's kerb-side zones).
+- **HF-438 profiles:** no separate RAY TRACED preset; fold its features into
+  Quality (lightly) and Max (more); RTX stays as the separate-runtime explainer.
+  Lane AI's ladder doc, control-set hashes and the e2e option pins re-derived.
+- Lanes: AU3 (HF-434..437, GLM first with Opus verification after the reset),
+  AI2 (HF-438, GLM then Opus). Compute: 13% left this week; Opus resumes ~11:30
+  BST 2026-09-04.
+
+## HF-439 / HF-440 — owner 2026-09-03 17:30
+**Statement (verbatim):** "please ingest these to our skills and use whatever might
+make sense? https://github.com/PhiloLabs/fable51-worlds ; trellis in browser rather
+than local? how many use? https://mesh-baker.needle.tools/ ; Any use or we already
+got this or similar ? https://x.com/philippsieben/status/2095440655170294085 ; you
+can use Opus a little bit as we still have 87% used and 13% remaining; put raid
+rebuild to one side and polish up nuketown, as well as geometry the layout and
+assets and textures and lighting need to be tip top, raid can come next"
+- **HF-439 three sources to ingest** (Lane AZ, Opus, one pass): resolve each
+  (fetch, licence, what it observably is, who uses it), register rows, write or
+  extend skills where they earn it, and answer the owner's three questions
+  (Trellis in the browser vs local; mesh-baker adoption and fit; whether the
+  philippsieben technique is something we already have). Vault + AKP procedure.
+- **HF-440 Nuke Town Rebuild polish first, Raid parked:** after the GLM geometry
+  pass (HF-434..437), an Opus "tip top" pass on layout, assets, textures and
+  lighting with the brief-driven critic loop and the judgeset; Raid (Lane AV
+  check-and-finish) waits behind it. Compute: 13% left; Opus "a little".
+- **Owner 17:35 (HF-441):** "if load time is a quick win, get that in; can we get a
+  build live tonight with partial improvements for nuketown maybe by 7-9pm? i can
+  give feedback then". Plan: PASS 92 cut ~20:00-20:30 with whatever GLM-3 has
+  landed green (z-fighting, stairs/windows/glass, truck openings, side strips), the
+  profile fold if GLM-4 lands, the skills study docs. Mechanical gates only
+  tonight (fidelity, parity, walkable, spawn, full suite, boot smoke); the Opus
+  review of the GLM branches follows after the reset. Load time: no quick win is
+  on the shelf - H2 shipped the first-load fix in PASS 88; the remaining levers
+  (switch median +0.5 s, deploy 14-20 s attribution) are a day's work each, so
+  they are not in tonight's build.

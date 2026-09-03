@@ -10,6 +10,10 @@ import { AMBIENT_LIFE_RANGE } from './particles/ambient-life-settings';
 // tracer's own numbers and bounds so a tier can never exist here that the
 // resolver does not know how to clamp.
 import type { RayTracingTier } from './rendering/raytracing/raytracing-profile';
+// HF-418 - the baked irradiance-probe tier. Same argument as the line above:
+// the type lives with the bake's own numbers and bounds, so a tier can never
+// exist here that the resolver does not know how to clamp.
+import type { BakedIndirectTier } from './rendering/lighting/baked-indirect';
 
 export type AntiAliasingMode = 'off' | 'msaa-2x' | 'msaa-4x' | 'fxaa' | 'smaa';
 export type ShadowResolution = 'medium' | 'high';
@@ -54,6 +58,12 @@ export type AdvancedGraphicsValues = Readonly<{
   shadowUpdateMode: ShadowUpdateMode;
   shadowFilter: ShadowFilterMode;
   indirectLighting: LightingTier;
+  /**
+   * HF-418 - offline path-traced irradiance probes, sampled per pixel. The one
+   * lighting control whose per-frame cost is the same at every tier: the tier
+   * decides how long the OFFLINE trace ran, not what the frame does.
+   */
+  bakedIndirect: BakedIndirectTier;
   ambientOcclusion: AmbientOcclusionQuality;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
@@ -111,6 +121,7 @@ export type GraphicsRuntimeConsumer =
   | 'shadow-runtime'
   | 'arena-lighting'
   | 'ambient-occlusion'
+  | 'baked-indirect'
   | 'material-refinement'
   | 'atmosphere-runtime'
   | 'presentation-budget'
@@ -270,6 +281,23 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Scales arena hemisphere and ambient bounce approximations without inventing path tracing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'live', runtimeConsumer: 'arena-lighting',
+  }),
+  // HF-418 / Lane AL. THE ONE CONTROL IN THIS CATEGORY THAT IS ALMOST FREE.
+  // Everything else here is a per-frame march whose tier is a cost; this is a
+  // 3D texture fetch whose tier decided how long an OFFLINE path trace ran.
+  // That asymmetry is why the profile defaults turn it on where they turn the
+  // marches off, and the description says so without saying "free", because
+  // the bake is real work - it is just work the frame does not do.
+  //
+  // It is also the answer to the one thing RAY TRACED structurally cannot do.
+  // Classic recursive ray tracing computes no indirect bounce at all; the
+  // documented failure is raising a flat ambient constant until the scene is
+  // milk. This is what gets raised instead.
+  control({
+    key: 'bakedIndirect', id: 'graphics-baked-indirect', category: 'lighting', label: 'Baked indirect light',
+    description: 'Light that has bounced off the world once or twice, traced before you got here: shaded sides pick up the colour of what is next to them instead of going flat grey. Costs the frame almost nothing.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'baked-indirect',
   }),
   control({
     key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
@@ -556,6 +584,17 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadowFilter: runtimeEvidence('src/legacy-main.ts', 'shadowMapTypeForFilter', 'settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
+  // The stronger claim, and it is earned: `publishBakedIndirectReceipt` writes
+  // the BOUND volume's grid, digest, occluder count and LIVE gain onto
+  // documentElement from the code that actually bound it, so a headless check
+  // can tell "bound and correctly invisible" from "never bound" without a debug
+  // hook. That is the distinction the 2026-08-31 IBL bug existed inside of.
+  bakedIndirect: runtimeEvidence(
+    'src/rendering/lighting/baked-indirect-runtime.ts',
+    'buildBakedIndirectRuntime',
+    'render.atomicSignal.advancedGraphics.screenSpace.bakedIndirect',
+    'documentElement.dataset.bakedIndirect (publishBakedIndirectReceipt)',
+  ),
   screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
   screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
   // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
@@ -692,13 +731,13 @@ export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = 
  * The exact shipped matrix is pinned in graphics-settings-registry.test.ts;
  * changing a value here without changing that table fails the suite.
  */
-export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
+export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   // PERFORMANCE — deliberately untouched. This is the compatibility-forced and
   // low-spec preset; nothing in the screen-space stack runs here at all.
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
@@ -715,6 +754,108 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // because ambient instances are per-frame fill rate.
     wetSurfaces: true, ambientLife: 0.6,
   }),
+  // ===================================================================
+  // BALANCED — HF-418. The rung between Performance and Quality.
+  // ===================================================================
+  //
+  // Owner, 2026-09-02 19:10, verbatim: "maybe make a new balanced profile that
+  // doesnt look shit like performance but will run nice and look good?"
+  //
+  // HOW IT WAS DERIVED, AND WHY THESE CONTROLS AND NOT OTHERS. The HF-414
+  // audit measured Performance, Quality, Ray Traced and Max cold and in a
+  // settled match at 2560x1440 on the owner's RTX 5080
+  // (docs/GRAPHICS_PROFILES_2026-09-03.md, evidence under
+  // docs/evidence/pass87/graphics-profiles/). Balanced takes the controls that
+  // carry most of what a player reads as "it looks good" for the least frame
+  // cost, and refuses the ones whose cost is a new render target, a new MRT
+  // attachment or a new raymarch:
+  //
+  //   TAKEN FROM QUALITY (cheap, and the whole reason Performance looks poor)
+  //     renderScale 1.00   Performance renders at 0.75 and upsamples. That is
+  //                        the single largest reason it "looks shit": every
+  //                        edge in the frame is reconstructed. Native
+  //                        resolution costs fill rate and nothing else - no
+  //                        new pass, no new target, no new pipeline.
+  //     geometryDetail full  Restores the authored representation. This is a
+  //                        streaming/vertex cost, not a per-pixel one.
+  //     shadows HIGH       A shadowed scene reads as lit; an unshadowed one
+  //                        reads as flat. This is the biggest single look win
+  //                        in the ladder.
+  //     indirectLighting HIGH  A scalar on the environment contribution
+  //                        (lightingScale in pass65-settings.ts). It changes a
+  //                        uniform, not the graph.
+  //     reflectionQuality HIGH  The baked PMREM probe tier. Load-time cost,
+  //                        zero per-frame cost.
+  //     bloomQuality CINEMATIC  Already-built stage, different uniforms.
+  //     anisotropy 8       Sampler state. Free at this resolution.
+  //     particle/decal/smoke HIGH  Capacity ceilings the arenas were authored
+  //                        against. Smoke in particular is gameplay-visible
+  //                        and must not read differently from Quality.
+  //
+  //   DELIBERATELY NOT TAKEN (each one buys a new per-frame structure)
+  //     MSAA 4x -> SMAA    A 4-sample principal HDR target multiplies pipeline
+  //                        variants and bandwidth across every material in the
+  //                        arena. The RAY TRACED preset's own notes call this
+  //                        trade "the single biggest saving" in the ladder, and
+  //                        the same argument applies here with nothing bought
+  //                        in exchange. SMAA is one display-side post stage.
+  //     SSR OFF            Quality's screen-space reflections add the normal
+  //                        and material MRT attachments; the registry's own
+  //                        Quality note names that as its main new cost.
+  //     Sun shafts OFF     A 24-step raymarch of the sun shadow map per pixel.
+  //     shadowResolution MEDIUM  1024 rather than 2048 (see resolveGraphicsRuntime).
+  //                        Quarter the shadow-map fill for a softness
+  //                        difference that is invisible at engagement range on
+  //                        the static update mode both profiles use.
+  //     AO / SSGI / DoF / motion blur / ray tracing  all off, as on Quality or
+  //                        below it. Nothing here replaces or gathers pixels.
+  //
+  //   BETWEEN THE TWO
+  //     Rain at 0.75 of the authored density with the ceiling left open, and
+  //     the air at 0.8. Rain is pure fill rate and it is the one family a
+  //     mid-range machine feels immediately; the CEILING is not the cost, the
+  //     instance count is, so Balanced thins the count rather than hiding the
+  //     storm state Performance caps away.
+  //     Grain and vignette sit between the two profiles' authored values.
+  //
+  // TODO(HF-418 item 4, Lane AL): the lighting-feature controls Lane AL is
+  // building - baked indirect, SSR tiers, AO tiers, contact shadows, each with
+  // a measured cost and a per-profile default - had not landed when this
+  // profile was authored. When they do, BALANCED is the profile whose defaults
+  // have to be argued first: it is the rung where "beautiful lighting that
+  // wont murder FPS" (owner, 19:10) is actually decided, and its current
+  // lighting position is deliberately conservative (indirect HIGH, everything
+  // screen-space OFF) precisely so that adding a cheap baked tier is a clear
+  // improvement rather than a swap. The control-set hash in
+  // graphics-profile-contract.test.ts will fail the moment that edit lands,
+  // which is the intended tripwire: the audit doc must be re-measured with it.
+  // PASS 89 INTEGRATION. Lane AI authored BALANCED before Lane AL's
+  // `bakedIndirect` control existed, and left a TODO above saying BALANCED is
+  // the rung whose baked-indirect default has to be argued first. Argued here:
+  // LOW, the same tier QUALITY takes.
+  //   * It is not a per-frame cost. Lane AL pins that LOW and HIGH differ only
+  //     in BAKE cost, never in per-frame cost
+  //     (src/rendering/lighting/baked-indirect.test.ts, "LOW and HIGH differ
+  //     only in BAKE cost"), and the bake itself is chunked under a 3 ms
+  //     per-frame wall-clock bound that is now enforced per RAY.
+  //   * BALANCED's whole argument is "QUALITY's look without the passes that
+  //     cost the most per frame". A baked volume is exactly that: an offline
+  //     cost that buys bounce light. Taking OFF here would have made the rung
+  //     darker than the one below it once QUALITY got the volume.
+  //   * HIGH is not taken: it is the RAY TRACED / MAX bake, and its extra cost
+  //     is bake time on a machine that by definition has less of it to spare.
+  balanced: Object.freeze({
+    renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
+    antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
+    environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
+    particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.24, vignette: 0.14,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+    weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
+    wetSurfaces: true, ambientLife: 0.8,
+  }),
   // QUALITY — the auto-selected default on 8-core/8 GB machines, so it takes
   // only the two cheapest additive effects and both at their LOW tier:
   //   Sun shafts LOW  — 24 raymarch steps at 0.35 scale, gain 0.14 of a ceiling
@@ -730,7 +871,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
     screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -800,7 +941,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
   raytraced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'high',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 16, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -844,7 +985,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // 1.15x supersample, and it is the one control with no enforced bound.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
     screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'off', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',

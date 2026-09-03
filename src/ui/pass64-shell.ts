@@ -3,6 +3,11 @@ import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
 import { ARENA_SELECTIONS, SELECTABLE_ARENAS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  LIGHTING_TIME_CHOICES,
+  LIGHTING_TIME_CHOICE_LABELS,
+} from '../rendering/lighting-conditions';
 import { DEFAULT_PRIVATE_MATCH_CONFIG, LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
@@ -14,6 +19,8 @@ import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-di
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
+import { GRAPHICS_PROFILE_DESCRIPTIONS } from './graphics-profile-descriptions'; // HF-414/HF-418
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, rtxNativeRuntimeExplainerMarkup, RTX_NATIVE_RUNTIME_OPTION_LABEL } from './rtx-native-runtime-explainer'; // HF-418
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog'; // HF-360
@@ -115,6 +122,19 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="eyebrow">SELECTED THEATRE // 01</div>
         <h1 id="arena-title">NUKE <span>TOWN</span></h1>
         <p class="lede" id="arena-lede">Fight through an authored living neighbourhood with physical transit cover, tactical viewmodels, atmospheric dust and a contested 2× Damage Core.</p>
+        <!--
+          MAP3 (HF-409): the only route a player has to the standalone showcase
+          page. Hidden here and given its href at selection time from the
+          selected arena's showcasePath, so an arena without a second page
+          renders no link rather than an empty one. The href is RELATIVE on
+          purpose - the game document lives at channels/PASS/index.html on the
+          published site, so a rooted href would 404 on every channel.
+          target=_blank because the showcase owns the whole window (it captures
+          pointer lock and W/A/S/D), and losing the menu you launched it from
+          would be a one-way trip; rel per the usual opener hygiene.
+          NOTE: no backticks in this comment - it is inside a template literal.
+        -->
+        <a class="arena-showcase-link" id="arena-showcase-link" hidden target="_blank" rel="noopener noreferrer">OPEN THE STANDALONE SHOWCASE ↗</a>
       </header>
       <aside id="menu-showcase" aria-hidden="true">
         <canvas id="match-pause-frame-fallback" aria-hidden="true" hidden width="1" height="1"></canvas>
@@ -135,6 +155,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           .filter((definition) => definition.availability === 'selectable')
           .map((definition) => `<option value="${definition.id}">${escapeAttribute(definition.displayName.toUpperCase())}</option>`)
           .join('')}</select></label>
+        <!-- Lane AB (PASS 87): the SOLO sky. The brief asks that solo "picks a random time within the arena's range unless the player fixes it"; the random default shipped first, but the only way to fix it was a URL parameter, which is not a player-facing control. This is the same replicated field as the lobby row below and writes the same privateMatchConfig.timeOfDay -- in solo there is no host to defer to, so it applies at once; when the player hosts, the lobby row takes over and this value seeds it. -->
+        <label>TIME OF DAY<select id="solo-time-of-day">${LIGHTING_TIME_CHOICES.map((choice) => `<option value="${choice}"${choice === DEFAULT_LIGHTING_TIME_CHOICE ? ' selected' : ''}>${LIGHTING_TIME_CHOICE_LABELS[choice]}</option>`).join('')}</select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <button id="field-kit-redeploy" type="button" hidden>REDEPLOY NOW WITH SELECTED FIELD KIT</button>
@@ -160,6 +182,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           <label>TIME LIMIT<select id="lobby-time-limit">${LOBBY_TIME_LIMITS_MS.map((ms) => `<option value="${ms}"${ms === DEFAULT_PRIVATE_MATCH_CONFIG.durationMs ? ' selected' : ''}>${Math.round(ms / 60_000)} MIN</option>`).join('')}</select></label>
           <!-- The initial DOM selection equals the contract default so a config change that fires before the first renderPrivateLobby mirror cannot silently publish a different clock. -->
           <label>KILL LIMIT<select id="lobby-kill-limit">${LOBBY_KILL_LIMITS.map((limit) => `<option value="${limit ?? ''}">${limit === null ? 'OFF · SCORE RACE' : `FIRST TO ${limit}`}</option>`).join('')}</select></label>
+          <!-- Lane AB (PASS 87): TIME OF DAY is host-authoritative, not a local graphics option. Friends must share a sky, so it joins the replicated match contract beside the time and kill limits and guests mirror the host's choice here. The labels are arena-relative on purpose: LATE is dusk on Nuke Town and night on RustRig. -->
+          <label>TIME OF DAY<select id="lobby-time-of-day">${LIGHTING_TIME_CHOICES.map((choice) => `<option value="${choice}"${choice === DEFAULT_LIGHTING_TIME_CHOICE ? ' selected' : ''}>${LIGHTING_TIME_CHOICE_LABELS[choice]}</option>`).join('')}</select></label>
           <label class="lobby-check"><input id="lobby-auto-balance" type="checkbox" checked> AUTO BALANCE</label>
           <button id="lobby-balance" type="button">BALANCE TEAMS</button>
         </div>
@@ -213,6 +237,65 @@ function fieldKitPanelMarkup(): string {
   </div>`;
 }
 
+/**
+ * HF-418 — the graphics ladder, its truthful per-profile copy, and the RTX
+ * explainer entry.
+ *
+ * THREE THINGS CHANGED HERE AND EACH ONE WAS ASKED FOR.
+ *
+ * 1. ORDER. The list now climbs: PERFORMANCE, BALANCED, QUALITY, RAY TRACED,
+ *    MAX. It used to lead with QUALITY because that is the default, which made
+ *    PERFORMANCE below it read as a step up.
+ * 2. COPY. One paragraph for all five modes is replaced by one honest line per
+ *    mode plus an expandable detail block, both generated from
+ *    GRAPHICS_PROFILE_DESCRIPTIONS, which is itself pinned to the measured
+ *    audit by graphics-profile-contract.test.ts. Every block is rendered and
+ *    all but the active one are `hidden`, so this stays a pure string function
+ *    and legacy-main only toggles visibility.
+ * 3. RTX. The last entry is NOT a preset. Its value is not a member of
+ *    `GraphicsPreset`, and legacy-main puts the select straight back before
+ *    opening the explainer dialog, so selecting it cannot change the renderer.
+ *    That is the whole point: the owner asked what RTX is and where it sits,
+ *    and the answer is that it is a native runtime that does not exist yet,
+ *    not a rung on this ladder.
+ */
+function graphicsPresetRowMarkup(): string {
+  const options = GRAPHICS_PROFILE_DESCRIPTIONS
+    .map(({ id, label }) => `<option value="${id}">${label}</option>`)
+    .join('');
+  const detail = GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => `
+        <div class="graphics-profile-detail" data-graphics-profile="${profile.id}" hidden>
+          <p class="graphics-profile-intended">${profile.intendedFor}</p>
+          <h5>TURNS ON</h5><ul>${profile.turnsOn.map((line) => `<li>${line}</li>`).join('')}</ul>
+          <h5>LEAVES OFF</h5><ul>${profile.leavesOff.map((line) => `<li>${line}</li>`).join('')}</ul>
+          <p class="graphics-profile-reference"><small>${profile.referenceFrameNote}</small></p>
+        </div>`).join('');
+  const summaries = GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => `
+        <p class="graphics-profile-summary" data-graphics-profile="${profile.id}" title="${profile.intendedFor}" hidden>${profile.summary}</p>`).join('');
+  // CUSTOM has no audit row because it has no fixed control set, but it is a
+  // selectable option and the detail panel is keyed by the selected value: with
+  // no `custom` block the panel opened onto nothing at all, under a heading
+  // promising what the mode turns on. It gets a block that says why it is empty
+  // and where the real answer is. `graphics-profile-contract.test.ts` now
+  // asserts a detail block for EVERY selectable option, so a future rung cannot
+  // repeat this.
+  const customDetail = `
+        <div class="graphics-profile-detail" data-graphics-profile="custom" hidden>
+          <p class="graphics-profile-intended">For players who want to set individual controls themselves.</p>
+          <h5>TURNS ON</h5><ul><li>Whatever you set. CUSTOM has no fixed control set of its own: it starts from the last named mode you had selected and keeps every change you make in Advanced Graphics.</li></ul>
+          <h5>LEAVES OFF</h5><ul><li>Whatever you leave off. Because the set is yours, no measured cost line can be quoted for it.</li></ul>
+          <p class="graphics-profile-reference"><small>Open ADVANCED GRAPHICS below to see and change the individual controls. Every named mode above lists its own measured cost at 2560x1440 on an RTX 5080; CUSTOM cannot, because its control set is not fixed.</small></p>
+        </div>`;
+  return `<div class="graphics-preset-row">
+        <label>GRAPHICS MODE<select id="graphics-profile">${options}<option value="custom">CUSTOM</option><option value="${RTX_NATIVE_RUNTIME_OPTION_VALUE}">${RTX_NATIVE_RUNTIME_OPTION_LABEL}</option></select></label>
+        <div id="graphics-profile-copy">${summaries}
+        <p class="graphics-profile-summary" data-graphics-profile="custom" hidden>Your own values, started from the last named mode you had selected. Editing any advanced control saves the mode as Custom.</p>
+        </div>
+        <details id="graphics-profile-detail-panel"><summary>WHAT THIS MODE TURNS ON, AND WHAT IT COSTS</summary>${detail}${customDetail}</details>
+      </div>
+      ${rtxNativeRuntimeExplainerMarkup()}`;
+}
+
 function optionsPanelMarkup(): string {
   const audioBusLabels: Record<typeof AUDIO_BUS_IDS[number], string> = {
     master: 'MASTER', sfx: 'SFX', movement: 'MOVEMENT', ui: 'UI', announcements: 'ANNOUNCEMENTS',
@@ -228,10 +311,7 @@ function optionsPanelMarkup(): string {
     </div>
     <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
       <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span><button id="graphics-save" type="button">SAVE GRAPHICS</button></header>
-      <div class="graphics-preset-row">
-        <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="raytraced">RAY TRACED</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
-        <p>Quality is the balanced default. Performance reduces presentation cost. Max cranks every setting. Editing any advanced control saves the mode as Custom.</p>
-      </div>
+      ${graphicsPresetRowMarkup()}
       <details id="advanced-graphics" class="advanced-settings">
         <summary><span>ADVANCED GRAPHICS</span><small>REAL WEBGPU / PRESENTATION CONTROLS + CAPABILITY LIMITS</small></summary>
         ${advancedGraphicsMarkup()}

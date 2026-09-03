@@ -906,8 +906,11 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
   const add = (
     geo: THREE.BufferGeometry, mat: THREE.Material,
     order: number, cast: boolean, receive: boolean,
+    // MAP3 (HF-409): named at creation - the arena's parity audit reads these.
+    name = 'map3-colosseum-part',
   ): THREE.Mesh => {
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = name;
     mesh.castShadow = cast;
     mesh.receiveShadow = receive;
     mesh.renderOrder = order;
@@ -941,7 +944,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     eraserMat.side = THREE.FrontSide;
     eraserMat.fog = false;
     disposables.push(eraserMat);
-    const mesh = add(s.build(), eraserMat, 1, false, false);
+    const mesh = add(s.build(), eraserMat, 1, false, false, 'map3-colosseum-cavity-depth-eraser');
     mesh.frustumCulled = false;
   }
 
@@ -949,7 +952,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
   {
     const s = new Strip();
     buildCavea(s);
-    add(s.build(), caveaMat, 2, false, true);
+    add(s.build(), caveaMat, 2, false, true, 'map3-colosseum-cavea-terrain');
   }
   {
     // Arena floor (the cellar floor) plus the surviving sand deck over the far
@@ -963,13 +966,13 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     s.cap(64, DA, DB, DECK_Y, DZ);
     // Low ring first so the broken edge of the deck faces OUT, at the player.
     s.ring(64, DA, DB, DECK_Y - 0.55, DA, DB, DECK_Y, DZ);
-    add(s.build(), sandMat, 2, false, true);
+    add(s.build(), sandMat, 2, false, true, 'map3-colosseum-arena-sand-terrain');
   }
   {
     const parts = buildHypogeum(seed);
     const geo = mergeSimple(parts);
     parts.forEach((g) => g.dispose());
-    add(geo, cellarMat, 2, true, true);
+    add(geo, cellarMat, 2, true, true, 'map3-colosseum-hypogeum');
   }
 
   /* --- 3. the apron ---------------------------------------------------- */
@@ -995,7 +998,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     const geo = new THREE.ShapeGeometry(shape, 80);
     geo.rotateX(-Math.PI / 2);
     geo.translate(0, 0.06, 0);
-    add(geo, apronMat, 3, false, true);
+    add(geo, apronMat, 3, false, true, 'map3-colosseum-apron-ground');
   }
 
   /* --- 4. the structure ------------------------------------------------ */
@@ -1007,12 +1010,12 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     ];
     const geo = mergeSimple(parts);
     parts.forEach((g) => g.dispose());
-    add(geo, stoneMat, 3, true, true);
+    add(geo, stoneMat, 3, true, true, 'map3-colosseum-arcade');
   }
   {
     const s = new Strip();
     buildTerraceDeck(s);
-    add(s.build(), stoneMat, 3, false, true);
+    add(s.build(), stoneMat, 3, false, true, 'map3-colosseum-overlook-terrace-ground');
   }
 
   /* --- 5. the pyramids -------------------------------------------------- */
@@ -1032,7 +1035,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     }
     const geo = mergeSimple(parts);
     parts.forEach((g) => g.dispose());
-    add(geo, pyramidMat, 3, false, false);
+    add(geo, pyramidMat, 3, false, false, 'map3-colosseum-distant-skyline-backdrop');
   }
 
   /* --- 6. the horizon glow --------------------------------------------- */
@@ -1066,7 +1069,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     // main.ts's 400 m far plane even from the far end of another corridor.
     const geo = new THREE.PlaneGeometry(430, 210);
     geo.translate(0, 52, -240);
-    const mesh = add(geo, hazeMat, -700, false, false);
+    const mesh = add(geo, hazeMat, -700, false, false, 'map3-colosseum-atmosphere-haze');
     mesh.frustumCulled = false;
   }
 
@@ -1085,7 +1088,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     const geo = new THREE.CylinderGeometry(1, 0.55, H, 48, 1, false);
     geo.scale(60, 1, 52);
     geo.translate(0, (24 + ARENA_Y + 0.6) / 2, CZ);
-    const mesh = add(geo, shaftMat, 6, false, false);
+    const mesh = add(geo, shaftMat, 6, false, false, 'map3-colosseum-light-shaft-volume');
     mesh.frustumCulled = false;
   }
 

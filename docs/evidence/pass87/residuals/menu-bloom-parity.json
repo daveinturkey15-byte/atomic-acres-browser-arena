@@ -1,0 +1,94 @@
+{
+  "probe": "menu bloom parity + overflow, PASS 87 Lane AR item 1",
+  "base": "http://127.0.0.1:4183/",
+  "worstParityMaxChannelDelta": 0,
+  "worstNoiseMaxChannelDelta": 0,
+  "bloomPaintsVisiblePixels": true,
+  "verdict": "the shipped bloom paints what the pre-PASS-87 bloom painted, and it is visible",
+  "rows": [
+    {
+      "viewport": "desktop",
+      "width": 1920,
+      "height": 1080,
+      "phase": "from",
+      "menuOverflowX": 0,
+      "pageOverflowX": 0,
+      "shotPixels": 1943536,
+      "noise": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "parity": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "visibility": {
+        "differingChannelSamples": 1149087,
+        "maxChannelDelta": 250
+      }
+    },
+    {
+      "viewport": "desktop",
+      "width": 1920,
+      "height": 1080,
+      "phase": "to",
+      "menuOverflowX": 0,
+      "pageOverflowX": 0,
+      "shotPixels": 1943536,
+      "noise": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "parity": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "visibility": {
+        "differingChannelSamples": 1027375,
+        "maxChannelDelta": 133
+      }
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "phase": "from",
+      "menuOverflowX": 0,
+      "pageOverflowX": 0,
+      "shotPixels": 329160,
+      "noise": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "parity": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "visibility": {
+        "differingChannelSamples": 167445,
+        "maxChannelDelta": 144
+      }
+    },
+    {
+      "viewport": "narrow",
+      "width": 390,
+      "height": 844,
+      "phase": "to",
+      "menuOverflowX": 0,
+      "pageOverflowX": 0,
+      "shotPixels": 329160,
+      "noise": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "parity": {
+        "differingChannelSamples": 0,
+        "maxChannelDelta": 0
+      },
+      "visibility": {
+        "differingChannelSamples": 167445,
+        "maxChannelDelta": 144
+      }
+    }
+  ]
+}

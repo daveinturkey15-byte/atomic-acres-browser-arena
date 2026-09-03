@@ -289,8 +289,14 @@ describe('Pass 65 sound-event inventory', () => {
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
     // owner 2026-08-30: Test1/Test2 arenas added — digest recomputed over the
     // eight-arena variant rows. owner 2026-09-02 (HF-405): recomputed again
-    // over Map 3's bed, event and music variant rows.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('c8ddadbac7e5f5f5fa21a40c68c3277271e76e673630307650ee77cc4972dc8a');
+    // over Map 3's bed, event and music variant rows. owner 2026-09-02
+    // (HF-407): recomputed again over the Nuke Town Rebuild's bed, event and
+    // music variant rows.
+    // (HF-408, 2026-09-03): recomputed once more at integration over the MERGED
+    // inventory - the Raid rebuild's two bed sources, its one event source and
+    // its music variant row now sit alongside the Nuke Town Rebuild's, so
+    // neither branch's pin was correct on its own.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass87-raid2-menu-preview-v1",
+  "generatedAt": "2026-09-02",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "RAID2 (owner 2026-09-02, HF-408). Additive family, same reason as pass77, pass79 and pass84: the Pass 66 masters choreography is digest-pinned by the retained production gate, so a new arena rides beside it rather than rewriting accepted history. This is the AUTHORING recipe. The orbit is fitted to RAID2_BOUNDS (100 x 76 m, the same box the shipped Raid uses) rather than copied from another arena: radius 48 x 38 is the half-extent of that box, and the 30 m altitude clears the map's tallest authored mass (the 5.3 m upper wall) by the same margin Map 3's 34 m clears its 5.2 m gantries. The phase is set so the pass opens over the pool terrace - the map's one 52 m lane and the whole point of the rebuild - rather than over a spawn apron.",
+  "arenas": {
+    "raid2": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // RAID REBUILD · PREVIEW",
+      "presentationId": "menu-video-runtime-helo-raid2-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 87014081,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [
+        0,
+        2.6,
+        0
+      ],
+      "radius": [
+        48,
+        38
+      ],
+      "altitudeM": 30,
+      "lookAt": [
+        0,
+        2.0,
+        -6
+      ],
+      "phaseRadians": 4.35,
+      "safeVolume": {
+        "x": [
+          -49.5,
+          49.5
+        ],
+        "y": [
+          29,
+          31
+        ],
+        "z": [
+          -37.5,
+          37.5
+        ]
+      },
+      "reviewLabel": "Raid Rebuild hillside estate cockpit flyover"
+    }
+  }
+}

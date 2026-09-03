@@ -29,6 +29,62 @@ export const FOREST_MAX_RADIAL_M = 62;
 
 const SEED = 0x7d31_44b9;
 
+/**
+ * HF-426 Job 3 - the ring is FITTED to a footprint, like the mountain envelope
+ * beside it. Everything the band needs is here rather than read off module
+ * constants, because the Nuke Town Rebuild is 36 x 84 m: the shipped inner
+ * radius of 36.5 m falls INSIDE that map along z, so every candidate on the
+ * long axis would be rejected by the rectangle test and the whole forest would
+ * pile onto the two short flanks.
+ *
+ * `groundY` / `groundNormal` are injected for the same reason. The shipped map
+ * plants against the mountain backdrop's rolling skirt; the rebuild authors its
+ * own flat 270 m ground slab and takes no skirt, so it plants against that.
+ */
+export type NuketownForestEnvelope = Readonly<{
+  bounds: Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;
+  /** Rectangle inflation - nothing is planted inside the arena plus this. */
+  rectMarginM: number;
+  /** Inner edge of the ring band. */
+  ringInnerM: number;
+  /** Outer edge - must stay inside the mountain envelope's foothill feet. */
+  maxRadialM: number;
+  seed: number;
+  groundY: (x: number, z: number) => number;
+  groundNormal: (x: number, z: number, target: THREE.Vector3) => THREE.Vector3;
+}>;
+
+/** The shipped map's band: exactly the radii it has always been planted on. */
+export const NUKETOWN_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
+  bounds: ARENA_BOUNDS,
+  rectMarginM: FOREST_RECT_MARGIN_M,
+  ringInnerM: 36.5,
+  maxRadialM: FOREST_MAX_RADIAL_M,
+  seed: SEED,
+  groundY: nuketownBackdropGroundY,
+  groundNormal: nuketownBackdropGroundNormal,
+});
+
+/** The top face of the rebuild's own ground slab: it plants on flat ground. */
+export const NUKETOWN2_FOREST_GROUND_Y = 0;
+
+/**
+ * The rebuild's band: 44.5 m in (the map corner is 45.7, so the inner edge is
+ * just clear of it on every bearing) to 70 m out, which leaves the same 2 m gap
+ * to its foothill feet at 72 m that the shipped map has at 62 / 64.
+ */
+export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
+  bounds: Object.freeze({ minX: -18, maxX: 18, minZ: -42, maxZ: 42 }),
+  rectMarginM: FOREST_RECT_MARGIN_M,
+  ringInnerM: 44.5,
+  maxRadialM: 70,
+  // A different stream, so the two maps do not carry the same tree in the same
+  // world position.
+  seed: SEED ^ 0x0002_6426,
+  groundY: () => NUKETOWN2_FOREST_GROUND_Y,
+  groundNormal: (_x: number, _z: number, target: THREE.Vector3) => target.set(0, 1, 0),
+});
+
 export interface NuketownForestStats {
   conifers: number;
   broadleafs: number;
@@ -101,19 +157,26 @@ function contactSkirt(radius: number, segments: number, seed: number): THREE.Buf
   return geometry;
 }
 
-function insideForestBand(x: number, z: number): boolean {
-  const inflatedMinX = ARENA_BOUNDS.minX - FOREST_RECT_MARGIN_M;
-  const inflatedMaxX = ARENA_BOUNDS.maxX + FOREST_RECT_MARGIN_M;
-  const inflatedMinZ = ARENA_BOUNDS.minZ - FOREST_RECT_MARGIN_M;
-  const inflatedMaxZ = ARENA_BOUNDS.maxZ + FOREST_RECT_MARGIN_M;
+function insideForestBand(x: number, z: number, envelope: NuketownForestEnvelope): boolean {
+  const inflatedMinX = envelope.bounds.minX - envelope.rectMarginM;
+  const inflatedMaxX = envelope.bounds.maxX + envelope.rectMarginM;
+  const inflatedMinZ = envelope.bounds.minZ - envelope.rectMarginM;
+  const inflatedMaxZ = envelope.bounds.maxZ + envelope.rectMarginM;
   const insideRect = x > inflatedMinX && x < inflatedMaxX && z > inflatedMinZ && z < inflatedMaxZ;
   if (insideRect) return false;
-  return Math.hypot(x, z) < FOREST_MAX_RADIAL_M;
+  return Math.hypot(x, z) < envelope.maxRadialM;
 }
 
 type TreeSlot = { x: number; z: number; yaw: number; scale: number; tone: number };
 
-function ringSlots(count: number, innerRadius: number, outerRadius: number, seed: number, minSeparation: number): TreeSlot[] {
+function ringSlots(
+  envelope: NuketownForestEnvelope,
+  count: number,
+  innerRadius: number,
+  outerRadius: number,
+  seed: number,
+  minSeparation: number,
+): TreeSlot[] {
   const rng = mulberry32(seed);
   const slots: TreeSlot[] = [];
   let attempts = 0;
@@ -127,7 +190,7 @@ function ringSlots(count: number, innerRadius: number, outerRadius: number, seed
     const theta = index * GOLDEN_ANGLE + rng() * 0.5;
     const x = Math.cos(theta) * radius;
     const z = Math.sin(theta) * radius;
-    if (!insideForestBand(x, z)) continue;
+    if (!insideForestBand(x, z, envelope)) continue;
     let tooClose = false;
     for (const other of slots) {
       if (Math.hypot(x - other.x, z - other.z) < minSeparation) { tooClose = true; break; }
@@ -164,7 +227,17 @@ function triCount(geometry: THREE.BufferGeometry): number {
   return position ? position.count / 3 : 0;
 }
 
-export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownForestSurround {
+export function buildNuketownForestSurround(
+  parent: THREE.Object3D,
+  envelope: NuketownForestEnvelope = NUKETOWN_FOREST_ENVELOPE,
+): NuketownForestSurround {
+  // Tier radii as OFFSETS from the band's inner edge, so the shipped map's
+  // authored 38 / 62, 37 / 56 and 36.5 / 58 fall out of ringInner = 36.5 and
+  // maxRadial = 62 unchanged, and any other footprint gets the same three
+  // interleaved tiers, fitted.
+  const coniferBand = [envelope.ringInnerM + 1.5, envelope.maxRadialM] as const;
+  const broadleafBand = [envelope.ringInnerM + 0.5, envelope.maxRadialM - 6] as const;
+  const understoryBand = [envelope.ringInnerM, envelope.maxRadialM - 4] as const;
   const group = new THREE.Group();
   group.name = 'nuketown-forest-surround';
   group.userData.presentationOnly = true;
@@ -189,11 +262,11 @@ export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownFor
   // fallback only fires if the height field ever returns a non-finite value,
   // which would be a bug in the field, not a placement case.
   const groundY = (x: number, z: number): number => {
-    const y = nuketownBackdropGroundY(x, z);
+    const y = envelope.groundY(x, z);
     return Number.isFinite(y) ? y : FOREST_FLOOR_FALLBACK_Y;
   };
   const scratchNormal = new THREE.Vector3();
-  const groundNormal = (x: number, z: number): THREE.Vector3 => nuketownBackdropGroundNormal(x, z, scratchNormal);
+  const groundNormal = (x: number, z: number): THREE.Vector3 => envelope.groundNormal(x, z, scratchNormal);
 
   const register = (mesh: THREE.InstancedMesh): void => {
     mesh.instanceMatrix.needsUpdate = true;
@@ -221,7 +294,7 @@ export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownFor
   const coniferMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94, metalness: 0, flatShading: true });
   disposables.push(coniferGeometry, coniferMaterial);
 
-  const coniferSlots = ringSlots(340, 38, FOREST_MAX_RADIAL_M, SEED, 3.4);
+  const coniferSlots = ringSlots(envelope, 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
   const conifers = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, coniferSlots.length);
   conifers.name = 'forest-conifers';
   const coniferTones = [0x2e4a30, 0x39573a, 0x27412b, 0x435f41];
@@ -247,7 +320,7 @@ export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownFor
   const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, flatShading: true });
   disposables.push(broadTrunkGeometry, canopyGeometry, trunkMaterial, canopyMaterial);
 
-  const broadleafSlots = ringSlots(180, 37, 56, SEED ^ 0x00ff_1234, 4.2);
+  const broadleafSlots = ringSlots(envelope, 180, broadleafBand[0], broadleafBand[1], envelope.seed ^ 0x00ff_1234, 4.2);
   const broadTrunks = new THREE.InstancedMesh(broadTrunkGeometry, trunkMaterial, broadleafSlots.length);
   const canopies = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, broadleafSlots.length);
   broadTrunks.name = 'forest-broadleaf-trunks';
@@ -274,7 +347,7 @@ export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownFor
   const scrubGeometry = new THREE.IcosahedronGeometry(0.9, 0);
   const scrubMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, metalness: 0, flatShading: true });
   disposables.push(scrubGeometry, scrubMaterial);
-  const scrubSlots = ringSlots(260, 36.5, 58, SEED ^ 0x5a5a_9c9c, 1.9);
+  const scrubSlots = ringSlots(envelope, 260, understoryBand[0], understoryBand[1], envelope.seed ^ 0x5a5a_9c9c, 1.9);
   const scrub = new THREE.InstancedMesh(scrubGeometry, scrubMaterial, scrubSlots.length);
   scrub.name = 'forest-understory';
   const scrubTones = [0x55663d, 0x64744a, 0x707c52, 0x4a5c38];
@@ -298,7 +371,7 @@ export function buildNuketownForestSurround(parent: THREE.Object3D): NuketownFor
   // The kit emits these under every near-tier woody plant for exactly the
   // reason the owner's frames show: a trunk that meets the ground on a hard
   // silhouette edge reads as a sticker, and 769 of them read as a plate.
-  const skirtGeometry = contactSkirt(1.15, 9, SEED ^ 0x00c0_ffee);
+  const skirtGeometry = contactSkirt(1.15, 9, envelope.seed ^ 0x00c0_ffee);
   const skirtMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.99, metalness: 0, flatShading: true });
   disposables.push(skirtGeometry, skirtMaterial);
   const skirtSlots = [...coniferSlots, ...broadleafSlots];

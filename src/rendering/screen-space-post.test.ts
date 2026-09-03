@@ -27,6 +27,7 @@ const POST_DEFAULTS = Object.freeze({
 } as const);
 
 const EVERYTHING_ON = resolveScreenSpacePostRuntime({
+  bakedIndirect: 'high',
   volumetricLightShafts: 'high',
   screenSpaceReflections: 'high',
   screenSpaceGi: 'high',
@@ -53,6 +54,7 @@ describe('HF-364 screen-space MRT requirements', () => {
     expect(screenSpaceMrtRequirement(EVERYTHING_ON))
       .toEqual({ normal: true, material: true, velocity: true });
     const onlyBlur = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0.5, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
@@ -60,6 +62,7 @@ describe('HF-364 screen-space MRT requirements', () => {
     // so neither may drag an extra attachment along with it.
     expect(screenSpaceMrtRequirement(onlyBlur)).toEqual({ normal: false, material: false, velocity: true });
     const onlyShafts = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: true, depthOfFieldStrength: 1, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
@@ -107,9 +110,17 @@ describe('HF-364 scene-pass assembly', () => {
     expect(systems.linearSourceStages).toEqual([
       'scene-pass-linear-hdr',
       'motion-blur-velocity-smear',
+      // HF-418 / Lane AL. Two stages were BEING BUILT and not being reported:
+      // the ray-traced layer's, missing since HF-398 landed, and the baked
+      // probe layer's, new here. `pass64LinearSourceStages` is a hand-written
+      // enumeration and neither had ever been added to it, so the published
+      // receipt described a chain the installed pipeline did not have. This
+      // pin now asserts the complete chain.
+      'baked-indirect-probe-add',
       'ssgi-screen-space-bounce-add',
       'contact-occlusion-multiply',
       'ssr-screen-space-reflection-add',
+      'raytraced-reflection-refraction-add',
       'depth-guarded-bloom-add',
       'godrays-volumetric-shaft-add',
       'depth-of-field-bokeh',
@@ -148,6 +159,7 @@ describe('HF-364 scene-pass assembly', () => {
     const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
     const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
     const shaftsWithoutShadows = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: false });
@@ -211,6 +223,7 @@ describe('HF-398 ray-traced layer wiring', () => {
     // no reflection ray to build. Both are therefore a hard requirement of the
     // tier and not a nice-to-have it can degrade past.
     const onlyRayTracing = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'reflections',
@@ -227,6 +240,7 @@ describe('HF-398 ray-traced layer wiring', () => {
     // sun there is nothing for one to resolve against, so the tier reports why
     // instead of quietly shipping a reflection with no shadow in it.
     const noSun = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'refractions',
@@ -264,6 +278,7 @@ describe('HF-398 ray-traced layer wiring', () => {
     // occlusion multiply, because a reflection is not occluded by the surface
     // reflecting it, and before bloom, so a wet highlight can bloom.
     const both = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'high', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'reflections',
@@ -310,6 +325,7 @@ describe('HF-401 shaft stage follows the arena sun that actually casts shadows',
     screenSpace,
   });
   const SHAFTS_ONLY = resolveScreenSpacePostRuntime({
+    bakedIndirect: 'off',
     volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
     depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
   }, { shadowsEnabled: true });
@@ -449,6 +465,7 @@ describe('HF-401 the shaft rebuild settles instead of recomposing on every apply
     const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
     const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
     const shaftsOnly = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });

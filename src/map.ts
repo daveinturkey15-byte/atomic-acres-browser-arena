@@ -36,6 +36,7 @@ import { Team } from './protocol';
 import type { GlassState } from './glass-authority';
 import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
 import type { ArenaId } from './map-selection';
+import type { ArenaFrameUpdate } from './arena-frame-animation';
 
 export type PracticeTarget = {
   id: string;
@@ -79,6 +80,16 @@ export type ArenaMap = {
     performanceVisualMeshes?: number;
   }>;
   bounds: Box2;
+  /**
+   * MAP3 (HF-409): optional per-frame animation for arena-authored content.
+   *
+   * Absent on every arena but Map 3, and absent is the zero-cost path: the frame
+   * loop reads this property, finds nothing, and does not even build the context
+   * (`src/arena-frame-animation.ts`, proven in its test). An arena that sets it
+   * is ticked once per frame while it is the ACTIVE arena and never while it is
+   * merely built, cached or staged behind a loading transition.
+   */
+  update?: ArenaFrameUpdate;
   /** Optional physics-only fail-safe floor. Defaults to y=0 for legacy arenas. */
   physicsSafetyFloorY?: number;
   houseTelemetry: {

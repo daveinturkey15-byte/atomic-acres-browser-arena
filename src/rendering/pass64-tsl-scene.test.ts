@@ -354,6 +354,14 @@ describe('Pass 64 authored TSL pipeline set', () => {
         // raymarch. With the whole stack off it must be exactly zero — one
         // more pinned field than this expectation carried before, not one
         // fewer.
+        // HF-418 / Lane AL: baked indirect, and HF-398's trace, were both
+        // absent from this projection while being present in the resolved
+        // runtime - the same hand-written-list defect that kept the trace out
+        // of `pass64LinearSourceStages`. Pinned here in their zero state for
+        // the reason the comment above gives: telemetry proves the zero, it
+        // does not leave it to be inferred from an absent field.
+        bakedIndirect: SCREEN_SPACE_POST_DISABLED.bakedIndirect,
+        rayTracing: SCREEN_SPACE_POST_DISABLED.rayTracing,
         godrays: { ...SCREEN_SPACE_POST_DISABLED.godrays, effectiveAdditiveGain: 0 },
         reflections: SCREEN_SPACE_POST_DISABLED.reflections,
         globalIllumination: SCREEN_SPACE_POST_DISABLED.globalIllumination,

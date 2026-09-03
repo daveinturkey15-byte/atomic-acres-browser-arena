@@ -514,6 +514,19 @@ plus 14 detached ones. Two need naming:
 - `C:\Users\david\projects\atomic-acres-gauntlet` (+ its `.gauntlet-tmp\wt-head`)
   — frozen; leave.
 
+**One worktree has a corrupt index and reads as clean (new, VERIFIED).**
+`C:\Users\david\Documents\Codex\2026-08-09\i-ve\work\pass71-chopper-ci-257b-fix2`
+(branch `contrib/dave-gaming-pc/codex/pass71-chopper-ci-257b-fix2`) answers
+`git status` with `error: bad signature 0x00000000 / fatal: index file corrupt`.
+Its index file is dated **Aug 14 10:35**, three weeks before this lane, so the
+damage is pre-existing and was not caused by these scans. Two consequences, both
+now fixed in the plan: the error goes to stderr, so a `$(git status --porcelain)`
+test sees an empty string and classes the worktree **clean and deletable**; and
+under `set -euo pipefail` the non-zero exit **kills the whole run** — it did, on
+the first execution of the fixed script. Per AGENTS.md ("Do not clean, reset,
+stash, move, or delete another task's worktree") this lane did not repair it.
+State of the underlying work: **OPEN**, one worktree, nobody's active lane.
+
 **HAZARD (new, VERIFIED) — `--force` destroys git-ignored evidence, and
 `git status --porcelain` cannot see it.** `--porcelain` alone does not report
 ignored files, and it is the only "is there work here?" test the original plan
@@ -664,11 +677,14 @@ safe_remove_worktree() {
   # (ii) git-IGNORED evidence: --porcelain alone cannot see this. 319 of 379
   #      clean worktrees hold 58,069 such files (VERIFIED, see section 4).
   local n
-  # `|| n=0`: find exits non-zero for every path that does not exist, and with
-  # pipefail that would kill the run on the first worktree without an
-  # artifacts/ tree (VERIFIED: it did, on the second branch of the dry run)
-  n=$(find "$p/artifacts" "$p/docs/evidence" "$p/test-results" \
-           "$p/playwright-report" -type f 2>/dev/null | wc -l) || n=0
+  # `|| true` INSIDE the group, not after the pipeline: find exits non-zero for
+  # every path that does not exist, and with pipefail that kills the run
+  # (VERIFIED: it did, on the second branch of the first dry run). Putting the
+  # `||` after `| wc -l` instead is worse than the crash — it silently
+  # overwrites a correct non-zero count with 0 and disarms this whole guard
+  # (VERIFIED: that version reported 0 skips where 319 are due).
+  n=$( { find "$p/artifacts" "$p/docs/evidence" "$p/test-results" \
+              "$p/playwright-report" -type f 2>/dev/null || true; } | wc -l )
   if [ "$n" -gt 0 ]; then
     echo "SKIP ($n ignored evidence files): $p" | tee -a "$SKIPPED"; return 0; fi
   # (iii) node_modules is a JUNCTION in 173 worktrees. Drop the link first so
@@ -709,15 +725,17 @@ git for-each-ref --format='%(refname:short)' refs/heads | sort |
       awk -v want="refs/heads/$b" '/^worktree /{p=substr($0,10)} $0=="branch "want{print p}' |
       while read -r p; do safe_remove_worktree "$p"; done
     # if the worktree survived the guard, the branch is still checked out:
-    # leave it alone rather than fighting git for it
-    if git worktree list --porcelain | grep -qx "branch refs/heads/$b"; then
+    # leave it alone rather than fighting git for it. Only meaningful under
+    # --apply; in DRY mode nothing was actually removed, so testing it there
+    # would report every branch as skipped and hide the real plan.
+    if [ "$APPLY" = 1 ] && git worktree list --porcelain | grep -qx "branch refs/heads/$b"; then
       echo "SKIP branch (still checked out): $b"; continue
     fi
     if git merge-base --is-ancestor "$b" "$SHIP" 2>/dev/null; then
       run "git branch -D '$b'"          # see the design note below: -D, not -d
     else
       git rev-parse -q --verify "refs/tags/archive/$b" >/dev/null \
-        || { echo "REFUSING $b: no archive tag"; continue; }
+        || { echo "REFUSING $b: no archive tag (expected for every unmerged branch in DRY mode - a1 only echoed its tags)"; continue; }
       run "git branch -D '$b'"
     fi
   done
@@ -807,6 +825,39 @@ echo "--- worktrees deliberately kept ---"; cat "$SKIPPED"
 
 Order matters: branches first (Step 2 removes the worktrees that block a
 delete), then this sweep catches detached and now-branchless trees.
+
+### Step 3b — the dry run was executed, and that is how three more defects were found
+
+**VERIFIED, 2026-09-02 21:15–21:55 BST.** Steps 1–3 were extracted from this
+document verbatim, `bash -n`-checked, and **run to completion in DRY mode** from
+`aa-gemini-audit`. The first draft of this plan had never been executed. It does
+not survive its own first run:
+
+| # | Defect found by running it | Fix |
+|---|---|---|
+| 1 | The protect-list loop ends on `[ -n "$st" ] && echo …`. When the last worktree is clean that test is false, so the `while` is false, so with `pipefail` the whole group is false and **`set -e` kills the run before `$PROTECT` is ever written** — silently, zero output, exit 1. | end the loop body with `:` |
+| 2 | `n=$(find "$p/artifacts" … \| wc -l)` — `find` exits non-zero for every path that does not exist, and `pipefail` propagates it, killing the run on the second branch. | `{ find … \|\| true; } \| wc -l` |
+| 3 | The obvious repair for #2, `… \| wc -l) \|\| n=0`, is **worse than the crash**: it overwrites a correct non-zero count with 0 and silently disarms the ignored-evidence guard. That version ran to completion and reported **0 skips where 270 are due**. | put the `\|\| true` inside the group, not after the pipe |
+
+Defect 3 is the one worth remembering: a guard that fails open looks exactly
+like a guard that passed. Final DRY run, exit 0, no `fatal:`, no `error:`:
+
+```
+protected branches                  80     (live lanes kept committing during the run)
+DRY: git tag archive/*             254
+DRY: git branch -D                  69     == the 69 merged deletable, exactly
+REFUSING (no archive tag)          254     expected in DRY: a1 only echoed its tags
+DRY: git worktree remove            54     unique paths
+DRY: cmd //c rmdir <junction>       19
+SKIP (ignored evidence)            270     unique paths
+SKIP (dirty)                        15     unique paths
+SKIP (protected path)                4     browser-arena + 3 gauntlet trees
+```
+
+`SKIP (protected path): C:/Users/david/projects/atomic-acres-browser-arena` is
+B1 fixed and demonstrated: the main working tree is refused by the guard rather
+than removed. The corrupt-index worktree never reaches a removal call, because
+the protect-list now treats an unreadable worktree as dirty.
 
 **Expect this step to skip far more than it removes, and that is correct.**
 319 of the 379 clean worktrees hold git-ignored evidence (§4). The skip list is
@@ -1001,6 +1052,9 @@ Everything below was re-measured by this repair pass, not accepted on report.
 | — | "`git worktree prune --dry-run -v` printed nothing for the 3 missing directories, so `prune` does NOT catch them." | refuted | **WITHDRAWN.** Not reproducible: 0 missing directories at re-scan, all three already unregistered with no remove step run. §4 and Step 3 restated; mechanism OPEN. |
 | — | "4 orphan `gh-pages` lineage + 2 with no merge-base." | corrected | All **six** have no merge-base (VERIFIED per branch). |
 | — | "370 carrying `node_modules` — retire, this is the disk." | corrected | 173 of 371 are junctions costing ~0 bytes; disk is `dist-*` copies. New hazard section in §4. |
+| B3 | **Found by this repair, not by the skeptic: the plan script had never been executed and dies on its own first run**, twice, silently — `set -e` + `pipefail` on a false loop tail and on `find` over non-existent paths. | blocker | FIXED and demonstrated: §5 Step 3b. The whole of Steps 1–3 now runs to completion in DRY mode, exit 0, and its output is quoted. |
+| B4 | Found by this repair: one worktree (`…\pass71-chopper-ci-257b-fix2`) has a **corrupt index** dated 3 weeks before this lane. `git status` errors to stderr, so a `$(…)` test reads it as **clean and deletable**, and the non-zero exit kills the run under `set -e`. | blocker | FIXED — both call sites now check git's exit status and treat an unreadable worktree as dirty. The index itself was NOT repaired (AGENTS.md forbids touching another task's worktree); recorded OPEN in §4. |
+| B5 | Found by this repair: the natural fix for B3 (`… \| wc -l) \|\| n=0`) makes the ignored-evidence guard **fail open** — it ran clean and reported 0 skips where 270 are due. | blocker | FIXED — `\|\| true` moved inside the group; the re-run reports the 270. This is why the dry run had to be executed rather than read. |
 
 Nothing in §3 changed. S1 — `ccfeec86`, an ancestor of the shipping head,
 deleting four verifiers and the 2,125-line `src/feel/**` subsystem under a

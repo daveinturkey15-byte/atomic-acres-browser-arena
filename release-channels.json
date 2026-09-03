@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 85",
-    "description": "Pass 85 lands the first of the 2026-09-02 evening list: Black Ops 2 style drop shots, the Firing Range roof netting that swallowed players, and first-person arms and knife that stay in frame."
+    "label": "PASS 91",
+    "description": "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint."
   },
   "experimental": {
-    "pass": "PASS 85",
-    "label": "PASS 85",
-    "description": "Pass 85 lands the first of the 2026-09-02 evening list: Black Ops 2 style drop shots, the Firing Range roof netting that swallowed players, and first-person arms and knife that stay in frame.",
-    "path": "channels/pass85"
+    "pass": "PASS 91",
+    "label": "PASS 91",
+    "description": "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint.",
+    "path": "channels/pass91"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass84Backup": {
-    "label": "PASS 84 · SAFE BACKUP",
+  "pass90Backup": {
+    "label": "PASS 90 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 84",
-    "path": "channels/pass84"
+    "pass": "PASS 90",
+    "path": "channels/pass90"
   }
 }

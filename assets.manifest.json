@@ -1129,6 +1129,114 @@
       "placeholderStatus": "production",
       "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 43.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass84-map3-loading/",
       "modifications": "Captured offline at native 1440p from the actual authoritative Map 3 production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.mp4",
+          "sha256": "88ab344dad32add5c015a630e1b90e7166931679a11f2553c47804c01fdae42e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webm",
+          "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webp",
+          "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass85-menu-previews/nuketown2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
+      "sourceScriptSha256": "e58b41dfb042db6b0961ab82a57e7d7bdde166fcc92225cc72add56bd66c7f8d",
+      "sourceProvenance": "source-assets/menu/pass85-nuketown2-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Nuke Town Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Nuke Town Rebuild authoritative runtime arena",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass85-nuketown2-loading/provenance.json",
+      "sourceProvenanceSha256": "1a26299ebd6c7654db7d0bb0dbeda16f2fb88a5a06ef5238bf38a76675d39a06",
+      "sourceScript": "scripts/assets/finalize_pass85_nuketown2_loading_backdrop.py",
+      "sourceScriptSha256": "028b11e1c1100c315523a739ae5e4cd3eb50a90d86153cb6426d2f615d561b11",
+      "files": [
+        {
+          "path": "public/assets/original/loading/nuketown2-loading.webp",
+          "sha256": "131d939356bd66592e0e2d4f47786628034d57a5bad0238bb198acb3dceedf6c"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the nine shipped backdrops in format, resampler, output size and payload budget. Measured 40.36 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass85-nuketown2-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Nuke Town Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-pass87-raid2-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/raid2.mp4",
+          "sha256": "70078fbf29f557327ce8bfc56c121d9c679c704322d32e5e46fab0abed2fe228"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webm",
+          "sha256": "8a5735c8546af5423f47bf1679359c8ea6f27b42a9a8e208731ae017355aed36"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webp",
+          "sha256": "3054a0219a35bc6d316c0d0efbcbc898e65999974b548718c5b16db5528e29de"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass87-menu-previews/raid2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass87-raid2-menu-preview.mjs",
+      "sourceScriptSha256": "2759775cc61100cc435e8b81dda411ebb068ba37378ca0082821562dc496b87b",
+      "sourceProvenance": "source-assets/menu/pass87-raid2-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Raid Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass87-raid2-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Raid Rebuild authoritative runtime arena",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass87-raid2-loading/provenance.json",
+      "sourceProvenanceSha256": "2b0e67dc4ec4ce04392302c63302c77d0560fe015012cec0351acb9b1c94b997",
+      "sourceScript": "scripts/assets/finalize_pass87_raid2_loading_backdrop.py",
+      "sourceScriptSha256": "57f87f9966f44b6c0c5c4a1f2ac60fab5689d1f98a16cecad5128892dcc2a074",
+      "files": [
+        {
+          "path": "public/assets/original/loading/raid2-loading.webp",
+          "sha256": "94ff72c5c530fc9b7a4ec1b72d01c6aa84c7f1237a073bc2dc7e82ada60e84ff"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 42.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass87-raid2-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Raid Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
     }
   ],
   "rejectedCandidates": [

@@ -629,24 +629,51 @@ describe('presentation prewarm startup contract', () => {
     // cold session and it is fenced at 12 s. farcrysis realised 134-217 cold
     // pipelines inside that one submission, missed the fence, rolled back and
     // left the queue stuck for the next arena's 4 s fence too. The fix realises
-    // that arena's exact ScenePass vocabulary through compileAsync first, which
-    // Dawn compiles off-fence. That is an ARENA-ID SPECIAL CASE in a shared
-    // engine path, which is this repo's documented drift shape (hardcoded
-    // rosters that silently stop matching the real arena set), so it is pinned
-    // here: the branch must exist, it must be gated on farcrysis, it must run
-    // strictly BEFORE the shadow refresh and the fenced warm frame, and it must
-    // stay the ONLY arena-id branch in this region. A second arena taking a
-    // divergent prewarm sequence is a deliberate decision and fails this test
-    // until it is made one.
+    // the exact ScenePass vocabulary through compileAsync first, which Dawn
+    // compiles off-fence.
+    //
+    // PASS 85 lane H (HF-417) re-pinned this STRICTER, not looser. Lane C
+    // gated the relief on `selectedArena.id === 'farcrysis'` and this test
+    // pinned that gate while warning that an arena-id branch in a shared
+    // engine path is this repo's documented drift shape. The warning was
+    // right: on the shipped PASS 84 build gun-range was UNREACHABLE by an
+    // in-match map switch — "[Gun Range map selection failed] WebGPU queue
+    // completion exceeded 12000 ms for submission 614 ... fenced draws 770" —
+    // because it took the un-relieved sequence and compiled its vocabulary
+    // inside this fence. The relief is now unconditional, so the pin is
+    // inverted: this region must contain NO arena-id branch at all (0, where
+    // it used to allow exactly 1), the precompile must still run strictly
+    // before the shadow refresh and the fenced warm frame, and the fence
+    // itself must still be 12 s. Re-introducing any per-arena special case
+    // here fails this test.
     const coldWebGpuWarmFrame = arenaDeployment.slice(
       arenaDeployment.indexOf("if (renderRuntime.backend === 'webgpu') {"),
       arenaDeployment.indexOf("profileArenaTransition('quality-presentation');"),
     );
     expect(coldWebGpuWarmFrame).not.toHaveLength(0);
-    expect(coldWebGpuWarmFrame).toContain("if (selectedArena.id === 'farcrysis' && pass64TslSystems) {");
+    // LANE H2: the guard now also asks whether a COLD session needs the relief.
+    // The switch case (`hadPreparedArena`) is unconditional and unchanged; the
+    // cold-session case is answered by an evidenced authority module, never by
+    // an id in this region - which the zero-arena-id assertion below still pins.
     expect(coldWebGpuWarmFrame)
-      .toContain('await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));');
-    expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(1);
+      .toContain('if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {');
+    expect(coldWebGpuWarmFrame)
+      .toContain('const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);');
+    expect(coldWebGpuWarmFrame)
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));');
+    expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(0);
+    // LANE H2. The relief stays unconditional - every arena, both paths - but
+    // its ROOT is now chosen, because measuring it showed a cold session paying
+    // 8.6 s to realise a scene whose non-arena content the fenced warm frame
+    // cannot be surprised by. Pinned strictly tighter than before, not looser:
+    //  * unconditionally on an in-session switch (`hadPreparedArena`), which is
+    //    byte-for-byte the sequence that took the 56-pair switch matrix to 56/56,
+    //  * on a cold session only where a cold session has been MEASURED to lose
+    //    the 12 s fence, answered by cold-session-precompile-reach.ts.
+    // Both surviving cases take the WHOLE SCENE, exactly as PASS 86 does, so no
+    // arena's relief is narrower than the one it ships with today. A future edit
+    // that drops the guard, inverts it, or narrows the root fails here.
+    expect(coldWebGpuWarmFrame.match(/precompileExactScenePass\(/g) ?? []).toHaveLength(1);
     for (const fencedStep of [
       'requestStaticShadowRefresh(true);',
       'await submitForegroundWebGpuFrame(true);',
@@ -654,8 +681,8 @@ describe('presentation prewarm startup contract', () => {
     ]) {
       expect(coldWebGpuWarmFrame).toContain(fencedStep);
       expect(
-        coldWebGpuWarmFrame.indexOf('farcrysisPrecompile.precompileExactScenePass(scene)'),
-        `the farcrysis precompile must precede ${fencedStep}, otherwise it compiles inside the fence it exists to relieve`,
+        coldWebGpuWarmFrame.indexOf('scenePassPrecompile.precompileExactScenePass(scene)'),
+        `the ScenePass precompile must precede ${fencedStep}, otherwise it compiles inside the fence it exists to relieve`,
       ).toBeLessThan(coldWebGpuWarmFrame.indexOf(fencedStep));
     }
     // The relief must never become a fence change: the arena still has to pass

@@ -1,0 +1,673 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-03T00:50:39.710Z",
+  "label": "h2-tripwire-gun-range",
+  "arena": "gun-range",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-loadcut\\dist",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.306,
+    "rafCallbacks": 2408,
+    "stallCount": 120,
+    "stallsPerMinute": 95.61,
+    "frozenFractionPercent": 17.48,
+    "medianStallMs": 105.5,
+    "maxStallMs": 516.7
+  },
+  "pipelines": {
+    "beforeWindow": 264,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 17.48,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 300,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 17.48,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 102331,
+      "alive": true,
+      "weapon": "pistol"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 102043,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": [
+    {
+      "startMs": 102249,
+      "endMs": 102349,
+      "durationMs": 100
+    },
+    {
+      "startMs": 104987.4,
+      "endMs": 105093,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 106498.4,
+      "endMs": 106604,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 106998.6,
+      "endMs": 107104,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 107259.5,
+      "endMs": 107365,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 107737.4,
+      "endMs": 107843,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 107843.4,
+      "endMs": 107949,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 108238,
+      "endMs": 108338,
+      "durationMs": 100
+    },
+    {
+      "startMs": 109509.9,
+      "endMs": 109621,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 110238,
+      "endMs": 110338,
+      "durationMs": 100
+    },
+    {
+      "startMs": 110748.9,
+      "endMs": 110849,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 111232.5,
+      "endMs": 111338,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 111993.2,
+      "endMs": 112099,
+      "durationMs": 105.8
+    },
+    {
+      "startMs": 112248.5,
+      "endMs": 112354,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 112492.8,
+      "endMs": 112593,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 114293.4,
+      "endMs": 114399,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 114493,
+      "endMs": 114593,
+      "durationMs": 100
+    },
+    {
+      "startMs": 114732.4,
+      "endMs": 114838,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 116742.9,
+      "endMs": 116843,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 116987.6,
+      "endMs": 117110,
+      "durationMs": 122.4
+    },
+    {
+      "startMs": 118987.8,
+      "endMs": 119099,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 119232,
+      "endMs": 119332,
+      "durationMs": 100
+    },
+    {
+      "startMs": 119499,
+      "endMs": 119599,
+      "durationMs": 100
+    },
+    {
+      "startMs": 119738,
+      "endMs": 119849,
+      "durationMs": 111
+    },
+    {
+      "startMs": 119987.5,
+      "endMs": 120093,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 120237.6,
+      "endMs": 120343,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 120343.4,
+      "endMs": 120449,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 120504,
+      "endMs": 120604,
+      "durationMs": 100
+    },
+    {
+      "startMs": 120715.1,
+      "endMs": 120826,
+      "durationMs": 110.9
+    },
+    {
+      "startMs": 120982,
+      "endMs": 121082,
+      "durationMs": 100
+    },
+    {
+      "startMs": 121232.5,
+      "endMs": 121338,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 121499,
+      "endMs": 121599,
+      "durationMs": 100
+    },
+    {
+      "startMs": 121738,
+      "endMs": 121838,
+      "durationMs": 100
+    },
+    {
+      "startMs": 121971,
+      "endMs": 122071,
+      "durationMs": 100
+    },
+    {
+      "startMs": 122232,
+      "endMs": 122343,
+      "durationMs": 111
+    },
+    {
+      "startMs": 122743,
+      "endMs": 122843,
+      "durationMs": 100
+    },
+    {
+      "startMs": 123570.9,
+      "endMs": 123671,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 123998.7,
+      "endMs": 124121,
+      "durationMs": 122.3
+    },
+    {
+      "startMs": 124232,
+      "endMs": 124332,
+      "durationMs": 100
+    },
+    {
+      "startMs": 125498.6,
+      "endMs": 125604,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 125771,
+      "endMs": 125871,
+      "durationMs": 100
+    },
+    {
+      "startMs": 126570.9,
+      "endMs": 126671,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 126765,
+      "endMs": 126865,
+      "durationMs": 100
+    },
+    {
+      "startMs": 127232.4,
+      "endMs": 127338,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 128226.4,
+      "endMs": 128343,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 129459.4,
+      "endMs": 129565,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 129565.9,
+      "endMs": 129688,
+      "durationMs": 122.1
+    },
+    {
+      "startMs": 130243.1,
+      "endMs": 130371,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 130459.8,
+      "endMs": 130582,
+      "durationMs": 122.2
+    },
+    {
+      "startMs": 130610,
+      "endMs": 130710,
+      "durationMs": 100
+    },
+    {
+      "startMs": 130992.9,
+      "endMs": 131104,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 131232.5,
+      "endMs": 131338,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 131988,
+      "endMs": 132088,
+      "durationMs": 100
+    },
+    {
+      "startMs": 133004,
+      "endMs": 133104,
+      "durationMs": 100
+    },
+    {
+      "startMs": 133993.6,
+      "endMs": 134099,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 135737.5,
+      "endMs": 135843,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 136982,
+      "endMs": 137082,
+      "durationMs": 100
+    },
+    {
+      "startMs": 138492.9,
+      "endMs": 138654,
+      "durationMs": 161.1
+    },
+    {
+      "startMs": 140748.3,
+      "endMs": 140865,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 142243,
+      "endMs": 142343,
+      "durationMs": 100
+    },
+    {
+      "startMs": 142548.4,
+      "endMs": 142654,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 142987.8,
+      "endMs": 143088,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 143221,
+      "endMs": 143321,
+      "durationMs": 100
+    },
+    {
+      "startMs": 144215.5,
+      "endMs": 144321,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 144487.4,
+      "endMs": 144593,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 144771.3,
+      "endMs": 144888,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 145737.9,
+      "endMs": 145838,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 147226.9,
+      "endMs": 147327,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 147992.9,
+      "endMs": 148104,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 149993,
+      "endMs": 150093,
+      "durationMs": 100
+    },
+    {
+      "startMs": 150465.5,
+      "endMs": 150571,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 150571,
+      "endMs": 150671,
+      "durationMs": 100
+    },
+    {
+      "startMs": 151248.5,
+      "endMs": 151354,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 151492.9,
+      "endMs": 151604,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 151998.4,
+      "endMs": 152104,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 152248.4,
+      "endMs": 152354,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 152487.9,
+      "endMs": 152588,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 152748.4,
+      "endMs": 152854,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 152998.9,
+      "endMs": 153099,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 153254,
+      "endMs": 153354,
+      "durationMs": 100
+    },
+    {
+      "startMs": 153471.3,
+      "endMs": 153588,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 153704.3,
+      "endMs": 153810,
+      "durationMs": 105.7
+    },
+    {
+      "startMs": 154481.9,
+      "endMs": 154582,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 154731.9,
+      "endMs": 154832,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 154988,
+      "endMs": 155088,
+      "durationMs": 100
+    },
+    {
+      "startMs": 156482,
+      "endMs": 156582,
+      "durationMs": 100
+    },
+    {
+      "startMs": 156703.9,
+      "endMs": 156804,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 157242.8,
+      "endMs": 157343,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 157981.9,
+      "endMs": 158082,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 158115.2,
+      "endMs": 158243,
+      "durationMs": 127.8
+    },
+    {
+      "startMs": 158270.9,
+      "endMs": 158393,
+      "durationMs": 122.1
+    },
+    {
+      "startMs": 158487.4,
+      "endMs": 158604,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 158737.4,
+      "endMs": 158854,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 158998.4,
+      "endMs": 159104,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 159943,
+      "endMs": 160043,
+      "durationMs": 100
+    },
+    {
+      "startMs": 163481.9,
+      "endMs": 163593,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 164221.4,
+      "endMs": 164327,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 164487.4,
+      "endMs": 164593,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 164982,
+      "endMs": 165082,
+      "durationMs": 100
+    },
+    {
+      "startMs": 165554.3,
+      "endMs": 165671,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 165965.5,
+      "endMs": 166071,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 168488,
+      "endMs": 168588,
+      "durationMs": 100
+    },
+    {
+      "startMs": 169304.7,
+      "endMs": 169410,
+      "durationMs": 105.3
+    },
+    {
+      "startMs": 169499,
+      "endMs": 169599,
+      "durationMs": 100
+    },
+    {
+      "startMs": 169998.8,
+      "endMs": 170110,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 170260,
+      "endMs": 170382,
+      "durationMs": 122
+    },
+    {
+      "startMs": 170488,
+      "endMs": 170588,
+      "durationMs": 100
+    },
+    {
+      "startMs": 170732,
+      "endMs": 170832,
+      "durationMs": 100
+    },
+    {
+      "startMs": 170999.2,
+      "endMs": 171116,
+      "durationMs": 116.8
+    },
+    {
+      "startMs": 171492.9,
+      "endMs": 171593,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 172754,
+      "endMs": 172854,
+      "durationMs": 100
+    },
+    {
+      "startMs": 172998.8,
+      "endMs": 173110,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 173982.5,
+      "endMs": 174088,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 174992.9,
+      "endMs": 175093,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 175248.9,
+      "endMs": 175349,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 175509.9,
+      "endMs": 175621,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 175726.3,
+      "endMs": 175843,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 176248.4,
+      "endMs": 176354,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 176504.6,
+      "endMs": 176610,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 176754.3,
+      "endMs": 177271,
+      "durationMs": 516.7
+    }
+  ]
+}

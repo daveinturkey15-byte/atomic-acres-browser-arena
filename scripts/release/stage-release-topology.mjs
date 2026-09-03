@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync,
+  copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -113,12 +113,65 @@ const channelRoot = (path) => {
 
 rmSync(join(distRoot, 'channels'), { recursive: true, force: true });
 const experimentalRoot = channelRoot(config.experimental.path);
-mkdirSync(experimentalRoot, { recursive: true });
-renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
-renameSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'));
-const experimentalJs = walkFiles(join(experimentalRoot, 'assets')).filter((path) => path.endsWith('.js'));
-if (!experimentalJs.some((path) => readFileSync(path).includes(Buffer.from(config.experimental.pass)))) {
+
+// VALIDATE BEFORE MOVING. The pass-identity check below used to run AFTER the
+// two renames, and `renameSync` is a move, not a copy: once index.html and
+// assets/ had left the dist root, a throw here returned a tree that no longer
+// satisfied the `candidate dist is incomplete` guard at the top of this script.
+// The staging step was therefore not idempotent on failure - the second run
+// failed for a different and more confusing reason than the first, and the only
+// recovery was a full rebuild. The check reads the same bytes either side of a
+// rename, so hoisting it costs nothing and makes the failure non-destructive.
+const candidateJs = walkFiles(join(distRoot, 'assets')).filter((path) => path.endsWith('.js'));
+if (!candidateJs.some((path) => readFileSync(path).includes(Buffer.from(config.experimental.pass)))) {
   throw new Error(`Experimental candidate does not contain ${config.experimental.pass}`);
+}
+
+// ---------------------------------------------------------------------------
+// PASS 87 Lane AR, item 10: STAGE NON-DESTRUCTIVELY.
+//
+// These three used to be `renameSync`, i.e. moves. Every check between here and
+// the release-shell copy below - the stable channel's env vars and dist
+// completeness, four pinned Pages channels, the rollback rebuild's timestamp
+// and dist - runs AFTER the move and can throw. When one did, index.html and
+// assets/ had already left the dist root, so the run that failed for
+// "RELEASE_STABLE_DIST must be an absolute path" left a dist whose ROOT was
+// empty. The preview then served a 404, and the next run failed at the guard
+// near the top of this script with the unrelated and misleading message
+// `candidate dist is incomplete` - a message about the build, printed because
+// of a staging failure. The only recovery anybody found was a full rebuild.
+//
+// Copying instead of moving makes the whole step idempotent on failure at the
+// cost of one temporary duplicate of the candidate. `removeStagedOriginals()`
+// deletes that duplicate below, AFTER the last thing that can throw, so the
+// successful end state is byte-identical to the move: a chooser-only dist root.
+// (index.html is overwritten by the release shell either way; assets/ and
+// map3.html are the two that had to be removed explicitly.)
+mkdirSync(experimentalRoot, { recursive: true });
+cpSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
+cpSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'), { recursive: true });
+// MAP3 (HF-409): the Map 3 showcase page is a second build input, so vite emits
+// it beside index.html at the dist root with `./assets/...` links. Those links
+// only resolve inside the candidate channel, which is where index.html and the
+// assets directory just went - without this move /map3.html is served with a
+// 200 and every one of its chunks 404s, and the page never leaves its
+// "Starting Map 3..." banner. Measured: 9 x 404, banner still up after 180 s.
+//
+// `existsSync` rather than an unconditional move: the pinned historical
+// channels this script also stages were built before map3.html was an input,
+// and a rebuild of one of those must not fail for want of a page it never had.
+if (existsSync(join(distRoot, 'map3.html'))) {
+  cpSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'));
+}
+
+/**
+ * Deletes the candidate copies left in the dist root by the staging above.
+ * Called once, after every step that can throw, so a failure anywhere in
+ * staging leaves a re-runnable dist instead of an empty one.
+ */
+function removeStagedOriginals() {
+  rmSync(join(distRoot, 'assets'), { recursive: true, force: true });
+  rmSync(join(distRoot, 'map3.html'), { force: true });
 }
 
 function stagePinned(channelName, channel) {
@@ -308,15 +361,35 @@ if (config.rollback) {
   }
 }
 
-for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
-  copyFileSync(join(repositoryRoot, 'release-shell', file), join(distRoot, file));
-}
+// SKEPTIC FOLLOW-UP (PASS 87 Lane AR item 10). The first version of this fix
+// put removeStagedOriginals() here and left three copyFileSync calls and two
+// writeFileSync calls BELOW it, so the comment claiming every throwing step was
+// above the line was not true: a missing or unreadable release-shell/ file still
+// deleted dist/assets and dist/map3.html and reproduced the exact
+// "candidate dist is incomplete" failure on the next run.
+//
+// So every remaining input is READ and every output BUILT first, while the dist
+// root is still intact and re-runnable; only then is anything deleted or
+// written. Moving the delete to the very end would have been worse, not better:
+// the chooser index.html overwrites the candidate one, so a throw after that
+// copy would leave the next run staging the CHOOSER as the experimental
+// channel - silently wrong content instead of a loud failure.
+const releaseShellFiles = ['index.html', 'release-shell.css', 'release-shell.js'].map((file) => ({
+  file,
+  contents: readFileSync(join(repositoryRoot, 'release-shell', file)),
+}));
 const publicConfig = {
   experimental: {
     label: config.experimental.label,
+    // LANE AD (PASS 87): both strings named "Pass 73" - the pass this file was last edited
+    // for - so every chooser card the staging step produced from the pass80 cut onwards
+    // described the live build as Pass 73 while the card beside it was stamped PASS 86. The
+    // live copy is the config's own description; the candidate sentence is derived from the
+    // stamped pass and keeps its exact publication-disabled wording.
     description: deploymentState === 'live'
-      ? 'The approved Pass 73 first-person, gameplay, world-integrity and renderer-correction build.'
-      : 'The local Pass 73 mechanically gated candidate. Publication remains disabled until exact preview binding.',
+      ? config.experimental.description
+      : `The local ${config.experimental.pass} mechanically gated candidate. `
+        + 'Publication remains disabled until exact preview binding.',
     pass: config.experimental.pass,
     path: config.experimental.path,
     deploymentState,
@@ -348,7 +421,7 @@ const publicConfig = {
     },
   } : {}),
 };
-writeFileSync(join(distRoot, 'release-channel-config.js'), `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`);
+const releaseChannelConfigSource = `window.__ATOMIC_ACRES_RELEASE_CHANNELS__=${JSON.stringify(publicConfig)};\n`;
 
 mkdirSync(dirname(topologyReceiptPath), { recursive: true });
 const topology = {
@@ -357,7 +430,15 @@ const topology = {
   channels: Object.fromEntries(Object.entries({ experimental, previous, retained, historical, stable, rollback })
     .filter(([, channel]) => channel)),
 };
-writeFileSync(topologyReceiptPath, `${JSON.stringify(topology, null, 2)}\n`);
+const topologyReceiptSource = `${JSON.stringify(topology, null, 2)}\n`;
+
+// Nothing above this line deletes or overwrites anything in the dist root, and
+// nothing below it can throw for a reason this script controls: the root goes
+// chooser-only in one uninterrupted sequence of writes.
+removeStagedOriginals();
+for (const { file, contents } of releaseShellFiles) writeFileSync(join(distRoot, file), contents);
+writeFileSync(join(distRoot, 'release-channel-config.js'), releaseChannelConfigSource);
+writeFileSync(topologyReceiptPath, topologyReceiptSource);
 console.log(JSON.stringify({ releaseTopology: 'ok', sourceSha, channels: {
   experimental: { pass: experimental.releasePass, sourceSha, digest: experimental.treeSha256 },
   previous: { pass: previous.releasePass, pagesSha: previous.pagesSha, digest: previous.treeSha256 },

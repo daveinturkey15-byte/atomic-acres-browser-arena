@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+  "note": "Every version of the shared menu-preview capture generator, newest first. `sha256` is the LF-normalised digest (checkout-independent); `crlfSha256` is what the same content hashes to on a CRLF checkout, because two family provenance records were written that way. Regenerate with `node scripts/assets/write-capture-generator-lineage.mjs`. Never edit a recorded digest in place: a family provenance record is history.",
+  "current": {
+    "sha256": "dd7714cae50184f859b1eb24a8429bfaf02c105b09a928b65fd9305b79e730f9",
+    "crlfSha256": "eee50679b5b1ac34c28bb28d567af71659f6ba74cbecc65cdd9ba11fc83c13ee",
+    "commit": "a617fdf8",
+    "date": "2026-09-03",
+    "subject": "merge: PASS 87 raid integration - Lane AQ Raid Rebuild onto the PASS 86 head"
+  },
+  "retired": [
+    {
+      "sha256": "169ad102d3b656f29054fcc7a2a668b159350ae528fb0ce2ee32c8dc01813cf9",
+      "crlfSha256": "fabec21db8a3ea520ddb386ed599cd2cd058767af561b1c5fc7462621b782773",
+      "commit": "c1e31bb8",
+      "date": "2026-09-03",
+      "subject": "feat(raid2): a REAL menu preview and loading backdrop - PREVIEW STANDBY is gone"
+    },
+    {
+      "sha256": "317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b",
+      "crlfSha256": "0ee1002642f51a55bcf20b2dab70d9938edf5391a1272ec788809fedc2b995dd",
+      "commit": "a4b56ec7",
+      "date": "2026-09-02",
+      "subject": "feat(nuketown2): the rebuild's own captured menu flyover and loading backdrop, so no selectable arena ships a blank card (HF-407)"
+    },
+    {
+      "sha256": "89fffa1c039894029619367042227b4165038ed1ece308d62852b180bddf4509",
+      "crlfSha256": "e89fb93409891d3c2830b42997bf56c63402c57a6381c3fc991b1c70142b1c83",
+      "commit": "c25f5e32",
+      "date": "2026-09-02",
+      "subject": "feat(map3): Map 3's own captured menu flyover and loading backdrop"
+    },
+    {
+      "sha256": "840c8a1c25d7136149f6808ad30fc8565c2a8595cb4c914a2738f9d387951907",
+      "crlfSha256": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15",
+      "commit": "5ac48931",
+      "date": "2026-08-30",
+      "subject": "fix(menu): capture real Test1/Test2 previews and stop a map shipping another map's footage"
+    },
+    {
+      "sha256": "c450443ae83cc604dbebc12ce5bd65b72f079c7621b6ecbe6514f1a53c26baa6",
+      "crlfSha256": "8e886a62d93b68699542135cc2a22d9851189d738ef20c629e59701ef1688cfe",
+      "commit": "3b79d9a2",
+      "date": "2026-08-23",
+      "subject": "fix(HF-374): farcrysis boots on WebGPU - two real causes, neither visible to headless QA"
+    },
+    {
+      "sha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
+      "crlfSha256": "396f80f1d2aeb654eacfb3530e0376d7106618aa5260fa7e60a9ae052ff114ca",
+      "commit": "04886489",
+      "date": "2026-08-11",
+      "subject": "chore(pass70): open immutable menu preview v15 family"
+    },
+    {
+      "sha256": "0cf83fd5e94434951bc6949d90a6aa5db3625707e3cf0298d0a8d59dcc47ef88",
+      "crlfSha256": "4b72a9c28ab4b22202ac4b747dc24905e1239f17d4957bb88528b25d815b3dd4",
+      "commit": "7aa73dab",
+      "date": "2026-08-11",
+      "subject": "chore(pass70): open immutable menu preview v14 family"
+    },
+    {
+      "sha256": "73c9b7ca78b73b5a7e1a24323afbddca4a176594367c5fe1d95a56e5c04cafb9",
+      "crlfSha256": "14b1bf972b8d5e28ee07598fc41055ee3c08013f2d509be1e808dd9811742554",
+      "commit": "62e8cea5",
+      "date": "2026-08-09",
+      "subject": "reconcile Pass 69.3 mobile weapons and support"
+    },
+    {
+      "sha256": "cf9fb254538c9cc36715c5a7155876394f8a7b972268a0850def74e71c698e3e",
+      "crlfSha256": "29967661e8fee59137206955bbf0fabd7e908258b58d94d90cf4f531886cedfa",
+      "commit": "a5b77a02",
+      "date": "2026-08-02",
+      "subject": "fix(media): isolate long WebGPU arena captures"
+    },
+    {
+      "sha256": "066f60406f1350c1ec73154d612c0555ef261a36e1e91660691dbb0240fa0097",
+      "crlfSha256": "fcc4b3ee70ae5bf0caf589cd57a199a95d2567c104be0cdf3ae9105d98c337e4",
+      "commit": "3e2d5655",
+      "date": "2026-08-02",
+      "subject": "fix(media): measure scaled preview stage before pose"
+    },
+    {
+      "sha256": "b7df78d3b665516f95894bb38ecca764d7769f94fce0b6e969298072848c97e7",
+      "crlfSha256": "9d86c094334b6f4f412d41d4bbd71eff5c3050d3c7fe1c5e0e9ecaedfb9a2b6f",
+      "commit": "4b43704e",
+      "date": "2026-08-02",
+      "subject": "feat(pass66): freeze final-adjustments HITL candidate"
+    },
+    {
+      "sha256": "cfe96df62efa7a5785030b1e5d9ab0cce8e28648eefa1ada5522189ed5229154",
+      "crlfSha256": "617c81f1d81103098a46533ba4c4e7043b752f9eaff115e9087de3c312e2a1ed",
+      "commit": "f8663c55",
+      "date": "2026-07-30",
+      "subject": "Bind preview v4 capture date"
+    },
+    {
+      "sha256": "44123c993085db075a92fb4421d895a5884f0ab5dcb3417b6ad0ae7f1e7b7b1e",
+      "crlfSha256": "29b12407e2d51122f525e49f0ab858d9407f2e44f04263aa97c7ea8eefaa2afc",
+      "commit": "f6eb50db",
+      "date": "2026-07-29",
+      "subject": "feat(media): forge deterministic Pass 66 map previews"
+    },
+    {
+      "sha256": "6638fc1561f540e3176116800aa99541feb970d43f8c6f1043dff5ddf406a0d8",
+      "crlfSha256": "115137256e5a6abf1588dea86ef4d7611ee79e8a346398d14b50f40298a15bef",
+      "commit": "ead245bc",
+      "date": "2026-07-29",
+      "subject": "fix(pass65): harden prerecorded rotor preview pipeline"
+    },
+    {
+      "sha256": "d46072d9b80f5204a2302e5fc838999f9d7bab34583948507f2cedc56e19608e",
+      "crlfSha256": "08169dd35523e3ab9d84ae764b2d076f4fab0a94a4ed6e1b1943cd6510516c48",
+      "commit": "02bba2fa",
+      "date": "2026-07-29",
+      "subject": "fix(menu): refine helicopter rotor projection"
+    },
+    {
+      "sha256": "065dfe0202b2c0497caa8d2fa144231eee576304983a1884853ca4766c23c623",
+      "crlfSha256": "0088b354febeb60ad9d0d348e8478fd828a8f4361d63dd0a37b1893f3fd2a208",
+      "commit": "88ed6266",
+      "date": "2026-07-29",
+      "subject": "feat(pass65): complete chopper presentation"
+    },
+    {
+      "sha256": "b8236a4a0f9a793af38a807b9690cfa53c1de3ab655b79be5e5f784338c6e5e2",
+      "crlfSha256": "fb2bc9a344acba12a1444feac2ba139ce592204bc221569001c049520458aefe",
+      "commit": "d9fe0421",
+      "date": "2026-07-28",
+      "subject": "test(menu): pin authored gun-range preview inputs"
+    },
+    {
+      "sha256": "834451ea16073bfde0e4c0ca13eab358f8eedd75988c631dc0e6c6c2a8bc65f4",
+      "crlfSha256": "d43cebc0d0ba2fb5b072e299ef9636f5f8b8d891d6864e578749723d97b143ec",
+      "commit": "0385074b",
+      "date": "2026-07-28",
+      "subject": "assets(pass65): author polished WebGPU menu previews"
+    },
+    {
+      "sha256": "66d6071904340dc46e2690309bba5cb917f26e1123ef08cc31f4fce9f6ac5592",
+      "crlfSha256": "e357e30eef7ee3bb8d1b813f7de8fbd2e05c6184614549d0c275ca90f8690747",
+      "commit": "87226d72",
+      "date": "2026-07-28",
+      "subject": "feat(pass65): prepare audited The Big One HITL candidate"
+    }
+  ]
+}

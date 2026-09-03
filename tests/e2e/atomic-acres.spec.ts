@@ -3,6 +3,18 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { BOT_GRENADE_POOL, BOT_STARTING_WEAPON_POOL } from '../../src/bot-ai';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
+import { GRAPHICS_PROFILE_DESCRIPTIONS } from '../../src/ui/graphics-profile-descriptions';
+import { RTX_NATIVE_RUNTIME_OPTION_LABEL } from '../../src/ui/rtx-native-runtime-explainer';
+
+// The GRAPHICS MODE select, as shipped: every rung in the description registry
+// in ladder order, then CUSTOM (no fixed control set, so it has no registry
+// row), then the RTX native-runtime explainer, which is not a preset at all.
+const EXPECTED_GRAPHICS_OPTION_LABELS = [
+  ...GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => profile.label),
+  'CUSTOM',
+  RTX_NATIVE_RUNTIME_OPTION_LABEL,
+];
+
 
 const releaseChannels = JSON.parse(readFileSync('release-channels.json', 'utf8')) as {
   experimental: { pass: string };
@@ -1089,8 +1101,23 @@ test.describe('boot and authored presentation', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveCount(5);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder,
+    // and it is the same mistake a second time - the unit pin in
+    // src/ui/pass64-shell.test.ts moved and these browser assertions did not.
+    // BALANCED joined the ladder, the list now CLIMBS instead of leading with
+    // the default, and the seventh entry is the RTX native-runtime EXPLAINER,
+    // which is NOT a preset (its value is outside GraphicsPreset) and changes
+    // no renderer setting. Three sites must move together: this one,
+    // atomic-acres.spec.ts 'legacy Quality alias', and
+    // tests/e2e/pass64-hud-menu.spec.ts.
+    // PASS 89: DERIVED, not re-typed. This list has now gone stale twice for
+    // the same reason - a rung moved in the shipped ladder and three browser
+    // assertions kept naming the old one. The ladder's order and labels stay
+    // pinned literally, ONCE, in src/graphics-profile-contract.test.ts; here
+    // we assert the rendered DOM equals that shipped ladder.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(EXPECTED_GRAPHICS_OPTION_LABELS.length);
+    await expect(page.locator('#graphics-profile option')).toHaveText(EXPECTED_GRAPHICS_OPTION_LABELS);
     await expect(page.locator('#audio-settings')).toBeVisible();
     await expect(page.locator('#accessibility-settings')).toBeVisible();
     expect((await debug(page)).audio.ambience.continuousSources).toBe(2);
@@ -3120,8 +3147,23 @@ test.describe('performance and stability', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveCount(5);
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder,
+    // and it is the same mistake a second time - the unit pin in
+    // src/ui/pass64-shell.test.ts moved and these browser assertions did not.
+    // BALANCED joined the ladder, the list now CLIMBS instead of leading with
+    // the default, and the seventh entry is the RTX native-runtime EXPLAINER,
+    // which is NOT a preset (its value is outside GraphicsPreset) and changes
+    // no renderer setting. Three sites must move together: this one,
+    // atomic-acres.spec.ts 'legacy Quality alias', and
+    // tests/e2e/pass64-hud-menu.spec.ts.
+    // PASS 89: DERIVED, not re-typed. This list has now gone stale twice for
+    // the same reason - a rung moved in the shipped ladder and three browser
+    // assertions kept naming the old one. The ladder's order and labels stay
+    // pinned literally, ONCE, in src/graphics-profile-contract.test.ts; here
+    // we assert the rendered DOM equals that shipped ladder.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(EXPECTED_GRAPHICS_OPTION_LABELS.length);
+    await expect(page.locator('#graphics-profile option')).toHaveText(EXPECTED_GRAPHICS_OPTION_LABELS);
     await startSolo(page);
     await page.waitForTimeout(1_000);
     const state = await debug(page);

@@ -11,6 +11,14 @@ import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
 import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
 import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
+// Lane AB (PASS 87): the replicated time-of-day mode. Type-only for the choice
+// plus two pure helpers; the lighting module imports no netcode, so there is no
+// cycle and this file stays free of THREE.
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  isLightingTimeChoice,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
@@ -28,6 +36,23 @@ export type PrivateMatchConfig = Readonly<{
   /** HF-377: host-settable kill limit replicated as part of the match
    * contract. `null` keeps the historical uncapped score race. */
   scoreLimit: number | null;
+  /**
+   * Lane AB (PASS 87): the host's TIME OF DAY choice for the match.
+   *
+   * It lives in the replicated match contract rather than in a player's own
+   * graphics options for the same reason `weatherIntensity` does NOT: a local
+   * weather setting is a presentation clamp that can only show LESS of a sky
+   * every peer already agrees on, whereas the hour is the sky itself. Two peers
+   * on different hours are arguing about a different match.
+   *
+   * Optional and tolerant exactly like `skinId` and `stanceId`, so pre-PASS-87
+   * checkpoints, rejoin envelopes and saved lobbies still validate; absent means
+   * `DEFAULT_LIGHTING_TIME_CHOICE`. The VALUE is a mode, not an hour: the hour
+   * itself is derived from the mode plus the match seed both peers already hold,
+   * so this field costs one short string per lobby snapshot and nothing per
+   * frame.
+   */
+  timeOfDay?: LightingTimeChoice;
 }>;
 
 export type LobbyMember = Readonly<{
@@ -106,6 +131,7 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   autoBalance: true,
   durationMs: 300_000,
   scoreLimit: null,
+  timeOfDay: DEFAULT_LIGHTING_TIME_CHOICE,
 });
 
 /** Owner 2026-08-30: replicated Domination zone truth (host-authoritative). */
@@ -194,6 +220,7 @@ export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfi
     && typeof config.autoBalance === 'boolean'
     && isLobbyTimeLimitMs(config.durationMs)
     && isLobbyKillLimit(config.scoreLimit)
+    && (config.timeOfDay === undefined || isLightingTimeChoice(config.timeOfDay))
     && (config.arenaId !== 'gun-range'
       || config.mode === 'ffa'
         && config.hostedBotCount === 0

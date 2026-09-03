@@ -13,13 +13,13 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 85 candidate first and freezes every published timestamp behind it', () => {
+  it('keeps the pending Pass 91 candidate first and freezes every published timestamp behind it', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass85');
+    expect(latest.id).toBe('pass91');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 85');
-    expect(latest.summary).toContain('Pass 85');
+    expect(latest.title).toContain('Pass 91');
+    expect(latest.summary).toContain('Pass 91');
     // HF-406: Pass 73 stopped being the current entry on 2026-09-02. Its Pages
     // publication receipt is e138853f ("PASS 73 from 506d6142", 2026-08-21T20:27:27Z),
     // so it is history with a real timestamp, not a candidate that never shipped.
@@ -41,8 +41,20 @@ describe('changelog', () => {
     // HF-406: the badge leads with the pass number the build is stamped with. The old
     // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
     // the owner read as "pass 73 HITL".
-    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 85 · RELEASE CANDIDATE');
-    expect(latest.highlights.join('\n')).toContain('Drop shots work the Black Ops 2 way');
+    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 91 · RELEASE CANDIDATE');
+    expect(latest.highlights.join('\n')).toContain('NUKE TOWN REBUILD · PREVIEW refined: the');
+    const pass90Highlights = CHANGELOG.find((entry) => entry.id === 'pass90')?.highlights.join('\n') ?? '';
+    expect(pass90Highlights).toContain('NUKE TOWN REBUILD · PREVIEW now follows ');
+    const pass89Highlights = CHANGELOG.find((entry) => entry.id === 'pass89')?.highlights.join('\n') ?? '';
+    expect(pass89Highlights).toContain('A new BALANCED graphics mode sits between Performance and Quality');
+    const pass88Highlights = CHANGELOG.find((entry) => entry.id === 'pass88')?.highlights.join('\n') ?? '';
+    expect(pass88Highlights).toContain('Switching arenas mid-session no longer f');
+    const pass87Highlights = CHANGELOG.find((entry) => entry.id === 'pass87')?.highlights.join('\n') ?? '';
+    expect(pass87Highlights).toContain('RAID REBUILD · PREVIEW: a code-authored ');
+    const pass86Highlights = CHANGELOG.find((entry) => entry.id === 'pass86')?.highlights.join('\n') ?? '';
+    expect(pass86Highlights).toContain('NUKE TOWN REBUILD · PREVIEW');
+    const pass85Highlights = CHANGELOG.find((entry) => entry.id === 'pass85')?.highlights.join('\n') ?? '';
+    expect(pass85Highlights).toContain('Drop shots work the Black Ops 2 way');
     const pass84Highlights = CHANGELOG.find((entry) => entry.id === 'pass84')?.highlights.join('\n') ?? '';
     expect(pass84Highlights).toContain('pulls back half as far when you brush a wall');
     expect(pass84Highlights).toContain('M14 EBR hits 40 percent harder');

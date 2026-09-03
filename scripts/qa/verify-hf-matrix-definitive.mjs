@@ -46,6 +46,7 @@ import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -69,7 +70,12 @@ const SHOT_DIR = arg('--shots', 'artifacts/hf-matrix');
 // Every production arena x TDM and FFA. Gun-range forces its own special-case
 // mode (FFA + zero bots + armory rules); one lane covers it and the mode is
 // recorded as forced rather than pretending we selected something else.
-const ARENAS = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas'];
+//
+// PASS 85 Lane N repair: "every production arena" was a six-id literal written
+// before Test1, Test2 and Map 3 shipped, so the matrix asserted totality over a
+// roster three arenas short. It is derived now; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
+  .split(',').map((entry) => entry.trim()).filter(Boolean);
 const LANES = [];
 for (const arena of ARENAS) {
   if (arena === 'gun-range') {

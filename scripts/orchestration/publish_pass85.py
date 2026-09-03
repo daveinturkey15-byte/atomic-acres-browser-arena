@@ -30,7 +30,10 @@ must resolve to the PASS 84 backup, not merely to something that exists.
 would be inlined, the fallback the in-build chooser would draw, and every guard's verdict)
 and touches nothing. Pass `--gh-pages-dir <path>` to plan against a local clone or worktree
 of gh-pages without running git at all; `--plan-json <path>` writes the plan as JSON for
-the contract test (scripts/orchestration/publish_pass84_plan.test.mjs).
+the contract test (scripts/orchestration/publish_pass<N>_plan.test.mjs, where <N> is
+this script's own pass; roll_pass.py's number roll cannot reach a name with an underscore
+after the digits, so a literal here goes stale silently - it pointed two passes back until
+the Lane AD release-CI fix).
 """
 from __future__ import annotations
 

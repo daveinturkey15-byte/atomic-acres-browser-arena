@@ -62,7 +62,54 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   test2: [],
   // MAP3 (owner 2026-09-02, HF-405): same rule - a new arena starts with an
   // EMPTY accepted ledger. Anything the audit finds is a bug in the arena.
-  map3: [],
+  map3: [
+    // MAP3 (HF-409, 2026-09-02): Map 3 became the corridor SHOWCASE, and every
+    // row below is a body that MOVES. A BallisticSurface is a static world
+    // rectangle; rating a thing that drives, rolls or bobs would put its shot
+    // authority where the object stood at t=0 and nowhere near where it is,
+    // which is worse than no rating - a bullet would stop in open air and pass
+    // through the object itself. Every STATIC solid in these corridors is
+    // rated: 209 surfaces, authored from `src/map3/corridor-solids.ts`.
+    // Only the FRAME is listed for the forest rover: its body panels sit
+    // inside the frame's footprint and the census already explains them there.
+    { name: 'map3-forest-rover-frame', count: 1, reason: 'self-driving rover: an autonomous vehicle whose pose changes every frame; a static surface would rate empty ground' },
+    { name: 'map3-shoreline-rover-body', count: 1, reason: 'self-driving rover fording the shallows; pose changes every frame' },
+    { name: 'map3-godrays-rolling-body', count: 2, reason: 'the two marched bodies that roll through the light shafts; their whole purpose is to move, and they are the volumetric exhibit, not cover' },
+    { name: 'map3-shoreline-floating-barrel', count: 3, reason: 'floats on the Gerstner surface: heaves and drifts with the waves every frame' },
+    { name: 'map3-shoreline-floating-buoy', count: 2, reason: 'moored buoy riding the swell; bobs every frame' },
+    // MAP3 (HF-409 finisher 2, 2026-09-02): the Rapier playground is the
+    // arena's eighth corridor now. Four of these five rows are the same class
+    // as every row above - a body that MOVES, so a static shot rectangle would
+    // rate the ground it left.
+    { name: 'map3-physics-jenga-block', count: 1, reason: 'the jenga tower: 45 dynamic bodies in one instanced mesh, authored to be knocked down' },
+    { name: 'map3-physics-wall-brick', count: 1, reason: 'the running-bond wall: 76 dynamic bricks in one instanced mesh, authored to be knocked down' },
+    { name: 'map3-physics-paddle-wheel', count: 1, reason: 'paddle wheel on a revolute joint; it spins every frame the balls hit it' },
+    { name: 'map3-physics-gear-large', count: 1, reason: 'gear driven by the wheel rotation it measures; turns every frame' },
+    // The fifth is NOT a moving body and is the one that needs its own reason.
+    // `map3-physics-machine-frame` is a MERGED BATCH of the machine bay's
+    // separated static fixtures - two wheel bearings, a gear stanchion, a
+    // tachometer dial on a post, the see-saw fulcrum and two guide rails. Its
+    // AABB (6.11 x 2.34 x 4.28 m) is therefore mostly the walkable bay floor
+    // BETWEEN those fixtures, and it is 2.34 m tall only because the dial sits
+    // at 1.85 m on a 10 cm post. Every part of it over the audit's own 0.35 m
+    // substantiality floor - the fulcrum and both guide rails - carries a
+    // movement collider AND a shot surface authored from
+    // `src/map3/corridor-solids.ts`; the rest are 0.10-0.14 m posts. A round
+    // crossing the air between them is the correct behaviour, and rating the
+    // batch's AABB would put a 26 m2 steel plate across an empty bay.
+    { name: 'map3-physics-machine-frame', count: 1, reason: 'merged batch of separated static machine fixtures; the fulcrum and both guide rails are individually collided and rated, the rest are sub-0.35 m posts, and the AABB is the walkable bay between them' },
+  ],
+  // NUKETOWN2 (owner 2026-09-02, HF-407): same rule, and it held on the first
+  // run - the audit reports 0 invisible colliders and 0 walk-through meshes
+  // over 187 colliders and 192 visible meshes, so there is nothing to accept.
+  // (Re-measured in the 2026-09-02 repair pass after the bus roof-access treads
+  // were added and the front lawn was clipped out of the houses; the earlier
+  // 186/188 in this comment predated the ground-dressing demotion to decals and
+  // never matched a run.)
+  nuketown2: [],
+  // RAID2 (owner 2026-09-02, HF-408): same rule. The audit measured 0 ghost
+  // shot surfaces on this arena, so an empty ledger is the measurement.
+  raid2: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -94,6 +141,12 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   // MAP3 (HF-405): enters at the strictest possible ceiling, not at whatever
   // it happens to measure.
   map3: 0,
+  // NUKETOWN2 (HF-407): same rule, same floor. Every ghost shot surface the
+  // rebuild has is a failure, from its first commit.
+  nuketown2: 0,
+  // RAID2 (HF-408): enters at the strictest possible ceiling, not at whatever
+  // it happens to measure.
+  raid2: 0,
   'gun-range': 0,
   farcrysis: 0,
 });

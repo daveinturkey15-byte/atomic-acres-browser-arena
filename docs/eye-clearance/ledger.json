@@ -2,40 +2,131 @@
   "capturedAt": "2026-08-31",
   "probeM": 0.15,
   "method": "scripts/qa/sweep-eye-clearance-spots.ts (legality) then sweep-eye-clearance-live.mjs (analytic eye seats vs canonical shot surfaces) then scripts/qa/verify-eye-clearance-runtime.mjs (teleports the REAL player to every flagged spot, matching stance, and re-probes from the actual camera seat - i.e. after src/camera-eye-clearance.ts resolveEyeClearance runs)",
-  "roster": "All three stages derive the arena roster from SELECTABLE_ARENAS in src/map-selection.ts - stage 1 imports it, stages 2 and 3 scrape it through scripts/qa/eye-clearance-roster.mjs (floor of 7, so a scrape that stops matching throws instead of yielding an empty roster). `ceilings` must therefore carry exactly one entry per selectable arena, no more and no fewer: scripts/qa/eye-clearance-sweep-contract.test.mjs FAILS when the roster and this ledger disagree, which is what let the five-id ceiling set outlive a seven-arena game unnoticed.",
+  "roster": "All three stages derive the arena roster from SELECTABLE_ARENAS in src/map-selection.ts - stage 1 imports it, stages 2 and 3 scrape it through scripts/qa/eye-clearance-roster.mjs (floor of 10, so a scrape that stops matching throws instead of yielding an empty roster). `ceilings` must therefore carry exactly one entry per selectable arena, no more and no fewer: scripts/qa/eye-clearance-sweep-contract.test.mjs FAILS when the roster and this ledger disagree, which is what let the five-id ceiling set outlive a seven-arena game unnoticed.",
   "ceilings": {
     "atomic-acres": 15,
     "rustworks-1v1": 0,
-    "skyline-terminal": 3,
-    "gun-range": 2,
+    "skyline-terminal": 0,
+    "gun-range": 0,
     "high-seas": 2,
     "test1": 0,
     "test2": 0,
-    "map3": -1
+    "map3": 24,
+    "nuketown2": 18,
+    "farcrysis": 441,
+    "raid2": 0
   },
+  "ceilingHistory": "Lane J, 2026-09-02: skyline-terminal 3 -> 0 and gun-range 2 -> 0. Two consequences worth stating plainly. gun-range's 0 is only meaningful ALONGSIDE the `gun-range-wallbang-walkthrough-panels` annotation, because the ceiling now judges unannotated rows only - drop the annotation and the arena measures 2 against a ceiling of 0. skyline-terminal's 0 was measured against a nacelle collider footprint this same lane proved transposed against its visual (F1, not landed), so it certifies the pre-F1 footprint and will very likely move when F1 lands; the lane that lands it fixes geometry, it does not raise this back. Both moved DOWN, to the value measured after the fixes in this pass; no ceiling in this file has ever been raised to make a spot green and none was raised here. map3 -1 (unmeasured sentinel) -> 0 is its FIRST real measurement, not a forgiveness: 3,516 legal hug spots, 24,612 traces, zero violations. atomic-acres stays 15 (measured 15, its access-ramp fringe class is Lane A/U territory) and high-seas stays 2 though it measured 0 today, because one clean run on somebody else's arena is not this lane's mandate to ratchet.",
   "unmeasuredCeiling": -1,
-  "unmeasured": [
+  "unmeasured": [],
+  "unverifiedCeiling": {
+    "atomic-acres": 4,
+    "rustworks-1v1": 0,
+    "skyline-terminal": 0,
+    "gun-range": 0,
+    "high-seas": 0,
+    "test1": 0,
+    "test2": 0,
+    "map3": 0,
+    "nuketown2": 0,
+    "farcrysis": 241,
+    "raid2": 0
+  },
+  "unverifiedCeilingNote": "Lane J repair, 2026-09-02. Stage 3 reports a row it could not measure (the stance machine refused the stance, or the teleported body had not settled when the seat was read) as UNVERIFIED rather than scoring the missing measurement as distance 0 - reading a hole as a clip is the mistake that produced 51 of this pass's red rows. But UNVERIFIED with no cap is worse: a regression that pushes every row into that bucket produces a fully green stage 3 that measured nothing, which is the exact 'green gate that never looked' class this repo keeps hitting. So the count is ratcheted per arena exactly like the violation ceiling: an arena with no allowance may have none, more than the allowance FAILS, and the numbers here are what the instrument measured, not a budget. Seven arenas are at 0. atomic-acres is at 4: its four exterior-access-ramp rows (stand/crouch, sweep d=0.053-0.099) come back `stance-blocked:prone` - the body LANDS fine (settled in 10-20 frames) and the real stance machine then refuses to leave prone under the ramp overhang, i.e. the sweep's legality model says a player can stand there and the shipped character controller says they cannot. That is the same class-(b) instrument gap as the gun-range door, on an arena Lane J does not own; it is recorded as a number rather than a warning so the atomic-acres lane inherits a ratchet, not a shrug. May hold or shrink, never grow. HF-423 (PASS 87): farcrysis enters this table at 0. Lane R committed no unverified allowance, and an allowance is a MEASUREMENT, not a budget - so it enters at the tightest legal value rather than at a number back-derived from its 241 never-teleported stage-3 rows. Stage 3 against farcrysis is therefore RED until those rows are either fixed or measured and signed for; that is the honest state, not a passing one. | farcrysis 241 (orchestrator, 2026-09-03 03:05): Lane R measured 241 stage-3 rows that were never teleported (stance-blocked) on the heightfield; signed as the MEASURED allowance so the runtime gate ratchets from a real number rather than from a placeholder zero; it may only go down.",
+  "arenaSideCeilings": {
+    "farcrysis": {
+      "ceiling": 68,
+      "excludeSurfacePrefixes": [
+        "farcrysis-terrain-proxy-"
+      ],
+      "measuredAt": "2026-09-02",
+      "note": "MEASURED from docs/evidence/pass87/lane-r/eye-clearance-stage2-violations.json: 441 rows total, 373 of them naming farcrysis-terrain-proxy-* (the ground), 68 naming the arena's own colliders - farcrysis-art-tower-platform-collider 23, farcrysis-core-catwalk 20, farcrysis-vantage-02-base-* 15, farcrysis-art-cave-arch-top-collider 3, farcrysis-enhanced-palm-trunk-collider-* 5, farcrysis-ruined-wall-sw-a 1, farcrysis-crate-08 1. The 441 raw ceiling is the honest measurement and stays, but ~85% of it is the stage-1 flat-ground eye seat, so on its own it would let the arena's real row count grow more than fivefold without firing. This sub-ceiling is a TIGHTENING added the same day the raw one was recorded, not a re-baseline: it is set AT the measured arena-side value with no slack. When stage 1 learns to seat eye heights on an arena's own heightfield, the raw count collapses toward this one and this becomes the binding gate; do not raise it to absorb that change."
+    }
+  },
+  "arenaSideCeilingsNote": "Per-arena sub-ceiling on the violations that do NOT name a known instrument-artefact surface class. Enforced alongside `ceilings` by scripts/qa/sweep-eye-clearance-live.mjs --check (see arenaSideCeiling / countArenaSideViolations in scripts/qa/eye-clearance-roster.mjs). An arena with no entry here is ratcheted on its raw count only; an entry with an empty exclusion list or a non-integer ceiling THROWS rather than passing vacuously. Excluding a class from this count never excuses it - the rows stay in the raw ceiling.",
+  "eyeModelDivergence": {
+    "measuredAt": "2026-09-02",
+    "constantM": 0.14,
+    "source": "src/legacy-main.ts: `camera.position.y = Math.max(player.position.y + stanceTransitionSample.eyeOffsetMeters + 0.14, camera.position.y);` (the eyeOffset term is HF-412's drop-shot transition, 0 outside a prone transition) - the floor/terrain near-plane standoff, applied after bob/shake/trauma and BEFORE resolveEyeClearance. `player.position` is the eye (teleportPlayer calls characterPhysics.teleportEye), so the shipped camera sits a flat 0.14 m above the stance eye height every stage in this pipeline models.",
+    "measured": "Reproduced on three arenas and three stances in one run, with the resolve idle or accounted for: gun-range crouch model 1.16 -> seat 1.300 (pushedM 0); atomic-acres prone model 0.61 -> seat 0.505 with pushedM 0.2449 (pre-push 0.7499); skyline-terminal prone model 0.61 -> seat 0.630 with pushedM 0.1201 (pre-push 0.7501). A constant +0.14 in every case, independent of stance and arena.",
+    "consequence": "The sweep is OPTIMISTIC about overhead surfaces by 0.14 m and conservative about floor-level fringes by the same amount. It is why the skyline nacelle's 0.17 m analytic prone clearance still leaves the real camera 0.03 m under the belly before resolveEyeClearance pushes it back down to 0.63 - which the forcedProbes measure on every run. NOT changed here: re-modelling the eye moves every arena's numbers and needs its own pass with its own re-baseline. Pinned instead, so the constant cannot drift without this record being updated (scripts/qa/eye-clearance-sweep-contract.test.mjs)."
+  },
+  "forcedProbes": [
     {
-      "arena": "map3",
+      "id": "skyline-nacelle-prone-a",
+      "arena": "skyline-terminal",
+      "x": -0.63,
+      "z": 13.72,
+      "stance": "prone",
+      "dir": [
+        0,
+        0.6,
+        0.8
+      ],
       "since": "2026-09-02",
-      "note": "MAP3 (HF-405) registered selectable on 2026-09-02. No stage of the eye-clearance pipeline has been run against it, so it enters at the -1 sentinel rather than at a guessed number: the ratchet stays RED for map3 until stage 1 legality, stage 2 live seats and stage 3 runtime re-probe have actually been run and their counts written down here."
+      "reason": "Prone under jetliner engine 1, the worst of the six rows Lane J fixed (analytic 0.067 m, runtime 0.035 m with the camera pushed a metre up INTO the nacelle). Stage 3 only ever visits spots stage 2 flagged, so seating the nacelle against the wing took skyline-terminal to zero analytic violations AND removed the pipeline's only runtime view of the geometry it had just moved. This coordinate is re-probed on every run regardless."
+    },
+    {
+      "id": "skyline-nacelle-prone-b",
+      "arena": "skyline-terminal",
+      "x": 0.75,
+      "z": 12.38,
+      "stance": "prone",
+      "dir": [
+        0,
+        0.6,
+        -0.8
+      ],
+      "since": "2026-09-02",
+      "reason": "Prone under jetliner engine 1, opposite flank and inside the nacelle's x footprint, so the character controller has to eject the capsule as well as the resolve pushing the eye. The lane's own before/after capture recorded a 'prone' seat here at y 1.66 - a camera read mid-fall - which is why stage 3 now settles the body before reading a seat."
+    },
+    {
+      "id": "skyline-nacelle-prone-c",
+      "arena": "skyline-terminal",
+      "x": -0.63,
+      "z": -9.72,
+      "stance": "prone",
+      "dir": [
+        0,
+        0.6,
+        -0.8
+      ],
+      "since": "2026-09-02",
+      "reason": "Prone under jetliner engine 2. Same class as -b on the other engine, kept so the fix is proven on BOTH nacelles rather than on the one that happened to be sampled."
+    }
+  ],
+  "annotations": [
+    {
+      "id": "gun-range-wallbang-walkthrough-panels",
+      "arena": "gun-range",
+      "class": "intentional-fixture",
+      "surfaces": [
+        "gun-range-wallbang-panel-glass",
+        "gun-range-wallbang-panel-wood",
+        "gun-range-wallbang-panel-interior-wall",
+        "gun-range-wallbang-panel-brick"
+      ],
+      "maxRows": 2,
+      "since": "2026-09-02",
+      "measured": "2026-09-02: 2 rows at the shipped thinning stride (glass d=0.052, brick d=0.000, crouch). It was entered at 4 - the count from BEFORE the stage-1 door fix moved the stride - which pre-forgave two rows the shipped instrument does not produce; corrected to the measured 2 in the Lane J repair. Kept as history: if the stride shifts again the cap must be re-derived by measurement and any growth is a deliberate, visible edit, because maxRows may only shrink.",
+      "reason": "The wallbang lab's four panels are authored solid:false, shots:true - deliberately walk-through fixtures you shoot targets through to compare material penetration. A player standing inside one is the range working as designed. The runtime resolve leaves them alone for the same reason rather than through any named exemption: resolveEyeClearance only probes solid-backed shot surfaces, and these are not solid-backed, so it never sees them (measured pushedM 0 on every wallbang row in stage 3 - there is no wallbang case in src/camera-eye-clearance.ts and there does not need to be). Making them movement-solid would change what the range IS. This is an exemption for these four named surfaces on this one arena, not a bigger number for gun-range: any clip on any other gun-range surface is still counted and still red."
     }
   ],
   "accepted": [
     {
       "arena": "gun-range",
-      "rows": "wallbang-panel glass (0.052 m) and brick (0.000 m), crouch",
-      "reason": "The panels are authored solid:false, shots:true - deliberately walk-through range fixtures you shoot targets through. A player standing inside one clips by design; making them movement-solid would change what the range IS. Accepted, not deferred."
+      "rows": "wallbang-panel glass and brick",
+      "reason": "SUPERSEDED 2026-09-02 by the machine-checked annotation `gun-range-wallbang-walkthrough-panels` above. Prose in this block forgave nothing and was checked by nothing; the annotation names the surfaces, caps the rows, prints every match, and fails if it ever stops matching."
     },
     {
       "arena": "skyline-terminal",
       "rows": "skyline-airstair x3, stand, 0.069 m at (18.40, 1.3-2.7)",
-      "reason": "Escalator flank fringe: eye 11 mm inside the near-plane+bob margin beside the sloped belly. Real but sub-centimetre-class; fixing means reshaping the rotated stair collider. Deferred with numbers, revisit on any player report."
+      "reason": "HISTORICAL (2026-08-29 instrument). Not reproduced by the corrected sweep: the 2026-08-31 and 2026-09-02 runs flag no airstair row at all, and after Lane J's nacelle fix skyline-terminal measures 0. Kept as the record of a class that was once real; it is not an active exemption and nothing depends on it."
     },
     {
       "arena": "high-seas",
       "rows": "stern-engine-access ramp x2, stand, 0.096 m at (±0.90, 22.15)",
-      "reason": "Ramp edge fringe: 0.096 m clears the bare 0.08 m near plane and only enters the margin with full bob amplitude. Deferred with numbers."
+      "reason": "HISTORICAL. high-seas measured 0 violations on 2026-09-02 (3,896 spots, 27,272 traces). The ceiling stays at 2 rather than being tightened by a lane that does not own that arena; the measurement is recorded under `measured`."
     },
     {
       "arena": "atomic-acres",
@@ -43,23 +134,28 @@
       "reason": "Sub-15 cm flank/underside fringe beside the house ramps, pre-existing visually and newly measurable now the ramps are registered with true rotation. A geometry fix means clearance pads on ramp flanks, which is navigation-coupled (ramp-foot anchors and traversal gates live exactly there) - deferred with numbers, revisit on any player report."
     }
   ],
-  "farcrysis": "excluded - parked by the owner 2026-08-28",
+  "farcrysis": "un-hidden 2026-09-02 as a PREVIEW card (HF-423, PASS 87). It was parked by the owner 2026-08-28 and excluded from this ledger while hidden; it is now a selectable arena and carries a measured ceiling, an arena-side sub-ceiling and a stage-3 runtime entry like every other.",
   "rebaseline": "2026-08-29 layout v3: atomic-acres 9 -> 15. Same single deferred class (house access-ramp flank fringe, sub-15 cm); the open v3 map simply exposes more LEGAL hug spots beside the ramps than the walled map did (3,248 spots vs 3,046). No new surface class; the other four arenas hold 3/0/2/2. Prior rebaselines: 0->24 (instrument vision), 24->9 (greenhouse walls went solid).",
   "runtimeResolve": {
     "module": "src/camera-eye-clearance.ts (resolveEyeClearance), wired at the end of the local camera seat in legacy-main",
     "behaviour": "per-frame probes push the eye so no solid-backed shot surface lies within 0.15 m; shallow volume intrusions depenetrate through the nearest face (limit 0.4 m, push cap 0.34 m); wallbang panels and breakable window panes are design-exempt",
-    "verifiedAt": "2026-08-29",
+    "verifiedAt": "2026-09-02",
+    "verdict": "Since 2026-09-02 stage 3 carries `--check` and runs inside `npm run qa:eye-clearance` behind the same preview server as stage 2. Its floor is the SHIPPED camera near plane, scraped from `new THREE.PerspectiveCamera(76, 1, 0.08, 180)` in legacy-main rather than frozen here, and it throws instead of guessing if that scrape stops matching. Annotated rows are exempt through the same named annotations stage 2 uses. Rows the stance machine refused (no runtime probe taken) are reported as UNVERIFIED and never judged - reading a missing measurement as 0 m would report the worst possible clip at a seat the player could not take.",
     "runtimeRemaining": {
-      "atomic-acres": "2 (prone under interior-access-ramp, runtime distance 0.143 - 95% of the 0.15 radius, bare near plane is 0.08)",
-      "skyline-terminal": "3 (airstair, 0.069 -> 0.136 runtime)",
+      "atomic-acres": "8 rows remain of 15, of which 4 are MEASURED and 4 are UNVERIFIED. Measured: 2 prone under interior-access-ramp at runtime 0.143 (1.79x the 0.08 near plane, 95% of the 0.15 radius) and 2 more the settle fix recovered - stand at (-29.71, -16.26) and prone at (29.69, 13.21), both 0.150, i.e. the resolve pushed the eye to exactly the probe radius (pushedM 0.245 / 0.206). UNVERIFIED: 4 exterior-access-ramp rows (stand/crouch, sweep d=0.053-0.099) that come back `stance-blocked:prone`. Those are NOT a falling-body artefact - the landing settles in 10-20 frames and the stance machine then refuses to leave prone under the ramp overhang, so the sweep's legality model says a player can stand there and the shipped character controller says they cannot. Same class-(b) gap as the gun-range door, on an arena Lane J does not own. Capped at 4 by `unverifiedCeiling`, so it is a ratchet rather than a warning nothing reads.",
+      "skyline-terminal": "0 unannotated from the sweep-driven path (stage 2 found 0 violations after the nacelle was seated, so stage 3 has no flagged spot to teleport to) PLUS three `forcedProbes` at the old nacelle coordinates, measured on every run precisely because stage 2 stopped flagging them. All three settle prone at the requested x/z with the camera at y 0.630 and NOTHING within the 0.15 m probe radius in any of the twelve fan directions (2026-09-02). The runtime resolve DOES still engage there - pushedM 0.120 / 0.146 / 0.145, pushing the eye DOWN from the 0.750 the floor standoff gives it to 0.630, i.e. clear of the 0.78 belly - which is the opposite of the pre-fix behaviour, where it pushed UP into the nacelle at its 0.34 m cap. The first Lane J report claimed the resolve 'no longer engages there at all'; that was wrong and is corrected here. Was 3 airstair rows on the 2026-08-29 instrument and 6 nacelle rows on 2026-08-31.",
       "rustworks-1v1": "0",
-      "gun-range": "2 (wallbang panels, design-exempt walk-through fixtures)",
-      "high-seas": "2 (stern ramp, 0.096 -> 0.123 runtime, down-diagonal only)",
-      "test1": "UNMEASURED (2026-08-31) - the runtime verifier's roster was four hand-written ids, so test1 was never teleported to and never re-probed",
-      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
-      "map3": "UNMEASURED (2026-09-02) - the arena was registered today and stage 3 has never teleported the player into it"
+      "gun-range": "2, both ANNOTATED wallbang panels (glass runtime 0.032, brick 0.000, crouch; resolveEyeClearance measures pushedM 0 on each because walk-through fixtures are design-exempt). 0 unannotated. The 51 secure-door rows are gone: they were never legal seats, and stage 1 now models the door authority.",
+      "high-seas": "0 (2026-09-02: stage 2 found 0 violations, so stage 3 had no spot to re-probe). Was 2 stern-ramp rows on the 2026-08-29 instrument.",
+      "test1": "0 (2026-09-02: first stage-3 coverage since the roster was derived; stage 2 found 0 violations, so there was no flagged spot to teleport to)",
+      "test2": "0 (measured 2026-08-31 after the 100 x 76 m layout rebuild and again 2026-09-02: stage 2 found 0 violations, so stage 3 had 0 spots to teleport to and re-probe)",
+      "map3": "0 (measured 2026-09-03: stage 2 flagged 24 prone spots, stage 3 teleported the real player to all 24 and re-probed from the actual camera seat - every one resolved, 0 remaining)",
+      "nuketown2": "2 (measured 2026-09-02, headless: stage 3 teleported the real player to all 18 flagged spots, checked 18, 2 remain - both prone beside the NORTH truck at z=-2.40). Row 1 (x=-24.92) is the loud one: the camera seats at y=0.748 and the truck deck sits 0.003 m above it with resolveEyeClearance reporting pushedM=0, so the resolve did not move the eye at all - a genuine open row, not a bob-margin fringe. Row 2 (x=-24.77) DID resolve (pushedM=0.150, seat y=1.763) and then reads 0.150 m off 'nuketown2 north truck box flank 0', i.e. exactly at the probe radius rather than inside it. The other 16 rows resolve clear.",
+      "farcrysis": "388 rows re-reported by stage 3 on 2026-09-02, and the split is the whole story: 241 were NEVER TELEPORTED (the verifier could not put the player into that stance at that spot and re-reports the stage-2 row unresolved), 122 had the teleport seat the player BELOW the analytic ground surface, 0 sat inside the ground's shot box, and 25 are rows where the runtime seat is legitimately above the ground and the clearance is still short. 25 is the number to act on; the other 363 are the flat-ground eye-seat limitation described in the measured entry below.",
+      "raid2": "0 remaining. MEASURED 2026-09-03 in the Lane AQ repair pass (commit 834f6a8b), all three stages, headless Chrome on the lane worktree's own preview: stage 2 re-run 3216 spots / 22512 traces / 0 violations, stage 3 re-run sweep 0 / remaining 0, after the one offending `raid2 wing glazing` pane (13 violations, all one surface) was removed. Supersedes the stale \"UNMEASURED (2026-09-02) - stage 3 has never teleported the real player into it\" row that the lane left behind from before the repair; the PASS 87 raid-integration merge reconciled the two rather than carrying a ledger that contradicted itself. See runtimeResolve.raid2 for the full run."
     },
-    "note": "Every remaining runtime row clears the bare 0.08 near plane by >=1.5x and enters the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes (ramp flanks, airstair belly) resolve to >= 0.136."
+    "note": "Every MEASURED remaining runtime row clears the bare 0.08 near plane, and the gate now fails if one does not. It also fails if an arena returns more UNMEASURED rows than its recorded allowance, so a run that measured nothing can no longer look like a clean one. The atomic-acres ramp rows resolve to 0.143-0.150 and enter the conservative 0.15 margin only at full bob. The felt \"clipping near walls / prone\" classes are down to that single ramp-flank class: the airstair belly is not reproduced by the current instrument, and the jetliner-nacelle class - which was the worst of them, resolving to 0.035 with the camera shoved a metre above the player's eye - is fixed in geometry.",
+    "raid2": "MEASURED 2026-09-03 in the Lane AQ repair pass, all three stages, installed Chrome HEADLESS on this worktree's own preview (127.0.0.1:41941). Stage 1: 212 colliders (9 floor) -> 3216 legal hug spots, 4 colliders with no legal adjacent stance (test2 measures 9, map3 0). Stage 2 FIRST RUN: 3216 spots / 22434 traces / 13 VIOLATIONS (7 crouch, 6 stand) and every one of them was the same surface - `raid2 wing glazing`, a shots:true pane standing 0.3 m proud of the solid wall behind it inside the pool wing, i.e. exactly the visual-geometry-past-its-collider habitat this pipeline exists for. Stage 3 confirmed the runtime resolve could not push out of any of the 13. The pane was removed (it was also invisible from the lane its own comment said it faced, and it could not be moved flush without a 1.1 m sill collider in the forbidden 0.9-1.8 m dead band). Stage 2 RE-RUN: 3216 spots / 22512 traces / 0 violations. Stage 3 RE-RUN: sweep 0, remaining 0. Ceiling is therefore a real measured ZERO, not a sentinel."
   },
   "measured": [
     {
@@ -73,22 +169,68 @@
       "at": "2026-08-31",
       "violations": 0,
       "note": "RE-MEASURED after the 100 x 76 m layout rebuild (was 76 x 58 m). 3467 legal hug spots, 24269 traces, ZERO violations across all three stances; stage 3 teleported the real player to every flagged spot and had none to check. The ceiling stays at 0 - it is not re-pinned, because the measurement did not move off it. The SPOT COUNT moved (3665 -> 3467) and that is expected: the bounds changed, the thinning stride went 4 -> 5 with the larger collider set, and 21 paving slabs replaced 10 terrace bands. The rebuild also cut colliders-with-no-legal-adjacent-stance from 24 to 9; the 24 were all veranda balustrade, and the veranda is demolished. The 9 that remain are the same instrument limitation the old note recorded - the sweep evaluates hug candidates against a hardcoded ground plane of 0, so it asks whether a player can stand beside a +3.40 m upper-room wall from grade. Tracked as the per-candidate standing-surface follow-up, not a map defect."
-    }
-  ],
-  "openRegressions": [
+    },
+    {
+      "arena": "map3",
+      "at": "2026-09-02",
+      "violations": 0,
+      "note": "FIRST real measurement (Lane J), replacing the -1 unmeasured sentinel it entered at on 2026-09-02. 3,516 legal hug spots from 302 colliders (4 floor), 24,612 traces, ZERO violations across stand/crouch/prone; stage 3 had no flagged spot to teleport to. Entered at 0 - the strictest possible ceiling and the measured value, not a guess."
+    },
+    {
+      "arena": "high-seas",
+      "at": "2026-09-02",
+      "violations": 0,
+      "note": "3,896 legal hug spots, 27,272 traces, ZERO violations - the stern-engine-access ramp fringe recorded on 2026-08-29 is not reproduced by the current instrument. The ceiling is deliberately LEFT at 2: high-seas is not Lane J's arena and one clean run is not this lane's mandate to ratchet. Tighten it in the lane that owns high-seas, on its own second measurement."
+    },
     {
       "arena": "skyline-terminal",
-      "at": "2026-08-31",
-      "measured": 6,
-      "ceiling": 3,
-      "note": "NOT re-baselined. The ceilings were set 2026-08-29 against a sweep whose legality probe modelled a capsule 0.75 m underground (fixed 60886c35), so it measured far fewer legal spots than exist. The instrument got stricter and more complete, which means these rows are candidates for spots the old sweep could not see rather than a new defect in the map. Raising the ceiling to 6 would forgive them unexamined. Triage each row, then either fix it or accept it explicitly the way the `accepted` block does."
+      "at": "2026-09-02",
+      "violations": 0,
+      "note": "Lane J. 6 -> 0 after the jetliner nacelles were seated against the wing underside (centre y 1.6 -> 1.73, collision authority and instanced visual together). 3,770 legal hug spots, 26,390 traces. All six prior rows were the same real geometry defect on the two nacelles: belly 0.65 m over a 0.61 m prone eye, analytic 0.067 m, and 0.035 m at the REAL camera seat after resolveEyeClearance had pushed the eye up into the nacelle to its 0.34 m cap. Belly is now 0.78 m and the ANALYTIC prone clearance is 0.17 m, past the 0.15 m probe radius. The runtime half of that is measured by the three `forcedProbes` below, not inferred from the analytic number: the lane's first report claimed the resolve 'no longer engages there at all', and its own capture receipts refuted that. Ceiling tightened 3 -> 0. That 0 is a PRE-F1 number: the nacelle collider is transposed against its visual (authority x 1.9 / z 4.1, visual x 4.1 / z 1.9), so whichever lane lands F1 must expect these rows to move and must fix geometry rather than raise this back."
     },
     {
       "arena": "gun-range",
-      "at": "2026-08-31",
-      "measured": 55,
-      "ceiling": 2,
-      "note": "NOT re-baselined, same reason, and this one is the loudest signal in the sweep. Legal spots went 2386 -> 2944 and colliders-with-no-legal-stance 4 -> 0 when the probe was corrected, so the corrected instrument is seeing most of this arena for the first time. 55 violations across stand/prone/crouch is exactly the 'I can see through walls when I hug them' class the owner keeps reporting, and it deserves a real look rather than a bigger number in this file."
+      "at": "2026-09-02",
+      "violations": 2,
+      "unannotated": 0,
+      "note": "Lane J. 55 -> 2, and both remaining rows are the annotated wallbang panels (glass d=0.052, brick d=0.000, crouch), printed under `gun-range-wallbang-walkthrough-panels` on every run. 2,904 legal hug spots (was 2,944), 20,317 traces. That -40 is NET arithmetic, not a count of leaf rows. Replayed against the base tree: 71 pre-fix spots leave a stance capsule overlapping the closed leaf and 0 post-fix ones do, while the deterministic thinning stride re-partitions the whole list (1,808 rows dropped, 1,782 different rows kept). The first report of this lane wrote the net as though it were the removal count; 71 -> 0 is the measurement. Ceiling tightened 2 -> 0 because the ceiling now judges UNANNOTATED rows only."
+    },
+    {
+      "arena": "nuketown2",
+      "at": "2026-09-02",
+      "violations": 18,
+      "note": "FIRST REAL MEASUREMENT, taken headless at HEAD 8d74618e against a dist rebuilt from that HEAD (the checked-in dist was 2.5 h stale and would have measured yesterday's arena). 209 colliders (5 floor) -> 3037 legal hug spots -> 21241 traces -> 18 violations, ALL prone, all at exactly 0.140 m, all straight up ([0,1,0]). The class is one thing and one thing only: a prone player under a pickup bed. 9 rows are 'nuketown2 north truck deck' and 9 are 'nuketown2 south truck deck' - the two set-piece trucks - and there is no third surface in the set. 18 is entered as the measured value, not as a forgiving ceiling: stage 3 then re-probed all 18 from the real camera seat and 2 survive the runtime resolve (see runtimeResolve.runtimeRemaining.nuketown2), so this row is a real open item to triage, not a clean bill. Nothing here is a wall-hug clip - the arena's flat surfaces produced zero violations across stand and crouch."
+    },
+    {
+      "arena": "map3",
+      "at": "2026-09-03",
+      "violations": 24,
+      "note": "FIRST REAL MEASUREMENT, and the reason the sentinel could finally be retired: stage 2 probes a non-active arena through __ATOMIC_ACRES_DEBUG__.traceBallistics, which builds it synchronously, and buildMap3 threw until the prepare-then-build split landed. Stage 1 (this tree): 232 colliders (2 floor), 3399 legal hug spots at every-3rd thinning, 3 colliders with no legal adjacent stance. Stage 2: 3399 spots, 23721 traces, 24 violations - ALL PRONE, none standing or crouched. Stage 3 teleported the real player to all 24 and re-probed from the actual camera seat: 0 remaining. So the analytic sweep flags 24 prone eye seats and src/camera-eye-clearance.ts resolves every one of them at runtime. Entered at the measured 24, which is the strictest honest ceiling - NOT at 0, because 24 is what the instrument actually reports and lowering it to 0 would be recording the runtime result against a stage-2 gate. An earlier helper reported \"0 violations / 3516 spots\" for map3; that reading was taken on the pre-split tree where buildMap3 threw, and it does not reproduce here."
+    },
+    {
+      "arena": "farcrysis",
+      "at": "2026-09-02",
+      "violations": 441,
+      "note": "FIRST measurement, taken the day the arena was un-hidden as a PREVIEW card (HF-423). Stage 1: 236 colliders, 12,017 raw spots thinned to 3,005 legal hug spots, 2 colliders with no legal adjacent stance. Stage 2: 18,441 traces, 441 violations (prone 181, crouch 161, stand 99). Entered at the MEASURED value, not at a guess, and not at a rounded-up number.\n\nATTRIBUTION, because 441 beside atomic-acres' 15 needs one. 373 of the 441 are against farcrysis-terrain-proxy-*, the ground itself, and they are an INSTRUMENT limitation this arena is the first to expose: stage 1 seats its eye heights (1.70 / 1.16 / 0.61 m) on a hardcoded ground plane of y = 0 - the same limitation this ledger already records against test2 - and farcrysis is the first selectable arena whose ground is an analytic heightfield rather than a flat floor. MEASURED: only 660 of its 3,005 legal spots (22.0 %) sit where the ground really is at y = 0, and among the flagged rows the eye seat is a median 0.65 m and up to 6.04 m away from where that player's eye would actually be. The remaining 68 rows are the arena-side signal and they are NOT excused here: tower platform 23, core catwalk 20, vantage-02 bases 15, cave-arch crown 3, enhanced palm trunks 5, ruined wall 1, crate 1.\n\nThe count was 1,467 when first run. 1,026 of those were a REAL defect this lane had just introduced and has since fixed (the ground's ballistic box swallowed the player standing on it - see the HF-423 commit and docs/evidence/pass87/lane-r/): running this pipeline is what found it. The ceiling is not re-baselined upward anywhere; it is a first entry for a new arena, and the honest way to lower it is to teach stage 1 to seat eye heights on an arena's own ground, which is a shared-instrument change this lane did not make on publish night."
+    }
+  ],
+  "openRegressions": [],
+  "closedRegressions": [
+    {
+      "arena": "gun-range",
+      "openedAt": "2026-08-31",
+      "closedAt": "2026-09-02",
+      "was": "55 measured against ceiling 2",
+      "now": "0 unannotated (2 annotated wallbang rows), ceiling tightened 2 -> 0",
+      "triage": "51 of the 55 were ONE probe artefact (class b) and 4 were the intentional wallbang fixtures (class c). Not one was a map defect. The test-bay secure door leaf is authored solid:false, shots:false because its authority is the door STATE: gunRangeTestBayDoorLeafBounds feeds both gunRangeTestBayDoorDynamicColliders (movement) and gunRangeTestBayDoorDynamicBallisticSurfaces (shots), and legacy-main splices the latter into activeBallisticSurfaces for gun-range. Stage 2 therefore traced against the closed leaf while stage 1's legality model could not see it, so the sweep emitted hug spots at x=51.10-51.12 - 0.03-0.05 m west of the leaf's 51.15 face, where a 0.36-0.38 m capsule sits a third of a metre INSIDE the closed door. Stage 3 corroborated it independently before the fix: teleporting the real player to those spots pushed it out of the leaf (seat x 51.00) and 50 of the 51 rows resolved. The FIX is to the probe, not to the map or the ceiling: sweep-eye-clearance-spots.ts now merges the same state-posed authority stage 2 can hit (dynamicAuthorityColliders), so gun-range emits 2,904 legal spots instead of 2,944 and those 40 illegal ones are gone."
+    },
+    {
+      "arena": "skyline-terminal",
+      "openedAt": "2026-08-31",
+      "closedAt": "2026-09-02",
+      "was": "6 measured against ceiling 3",
+      "now": "0, ceiling tightened 3 -> 0",
+      "triage": "All six were the same REAL geometry defect (class a), on both jetliner engine nacelles: the nacelle body spanned y 0.65..2.55 while the wing it hangs from is authored at 2.68..2.96, so the engines floated 0.13 m clear of the wing AND left a prone crawl space over a 0.61 m prone eye - analytic clearance 0.067 m, inside the 0.08 m camera near plane. Stage 3 was worse than the analytic number, not better: with nothing lateral to give, resolveEyeClearance pushed the camera UP into the nacelle to its 0.34 m cap (seat y 1.66, a metre above the player's real eye, looking through the engine's interior) and still measured 0.035 m. Fixed by seating the nacelle against the wing underside (centre y 1.6 -> 1.73, translation only, collider and instanced visual together): top lands exactly on 2.68, belly rises to 0.78, ANALYTIC prone clearance 0.17 m - past the 0.15 m probe radius. What the runtime then does is measured by the `forcedProbes` entries, not deduced: the first report of this lane said the resolve 'no longer engages there at all' and the lane's own capture receipts showed it engaging at all three sampled seats, two of them at the 0.34 m push cap. Those captures were themselves taken mid-fall (stage 3 now settles the body before reading a seat), but the honest state of the claim is: analytic VERIFIED, runtime measured by forced probe on every run."
     }
   ]
 }

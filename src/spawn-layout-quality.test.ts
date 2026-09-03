@@ -11,6 +11,17 @@ import {
   arenaRunsTeamModes,
   measureSpawnLayout,
 } from './spawn-layout-constraints';
+import { prepareMap3 } from './map3-arena';
+
+/**
+ * MAP3 (HF-409 finisher 2): PREPARE, then BUILD.
+ *
+ * `buildMap3` is synchronous like every other arena builder, but its eighth
+ * corridor (the Rapier playground) needs a wasm module first, so it THROWS
+ * rather than quietly returning seven corridors. One top-level await here
+ * resolves it for every build below. Idempotent; ~70 ms once per process.
+ */
+await prepareMap3();
 
 type SpawnPoint = { x: number; z: number };
 // HF-402: the builder table is `Record<ArenaId, ...>` in
@@ -249,10 +260,41 @@ describe('HF-402: the free-for-all exemption matches what the runtime does', () 
     expect(legacyMain).toContain('modeInput.disabled = !hostControls || rangeLobby;');
   });
 
-  it('exempts nothing else: every other selectable arena is held to team separation', () => {
+  it('exempts nothing else: every selectable TEAM arena is held to team separation', () => {
     for (const selection of PLAYABLE) {
+      // MAP3 (HF-409, owner 2026-09-02 16:55: "it's not about combat, it's a
+      // mode you can explore"): an EXPLORE arena has no opposing side, so there
+      // is no second table for its spawns to be separated FROM and the rule is
+      // vacuous rather than skipped.
+      //
+      // This reads the registry's declared `kind`, NOT a list of ids, and it is
+      // a check the file did not have before: declaring `'explore'` obliges the
+      // arena to actually carry no lobby, no bots and no field support, so the
+      // kind cannot be used to duck this gate while shipping combat. An explore
+      // arena that later gains a lobby or a single bot fails HERE, immediately,
+      // rather than quietly leaving the rule.
+      if (selection.kind === 'explore') {
+        expect(selection.multiplayer, `${selection.id} is declared explore but hosts a lobby`).toBe(false);
+        expect(selection.maximumSoloBots, `${selection.id} is declared explore but fields bots`).toBe(0);
+        expect(selection.soloBotCount, `${selection.id} is declared explore but fields bots`).toBe(0);
+        expect(selection.fieldSupport, `${selection.id} is declared explore but carries field support`).toBe(false);
+        expect(arenaFieldsBots(selection.id), `${selection.id} is declared explore but the runtime fields bots`).toBe(false);
+        expect(arenaRunsTeamModes(selection.id), `${selection.id} is declared explore but runs team modes`).toBe(false);
+        continue;
+      }
       if (FREE_FOR_ALL_ONLY_ARENA_IDS.includes(selection.id)) continue;
       expect(arenaRunsTeamModes(selection.id), `${selection.id} escapes the team-separation rule`).toBe(true);
     }
+  });
+
+  it('holds every selectable arena to a declared kind, and keeps exactly one explore arena', () => {
+    // The kind is a required field, so tsc already forces a new arena to answer
+    // the question. This pins the ANSWER SET so that flipping an existing team
+    // arena to explore - which would silently drop it out of the rule above -
+    // is a deliberate edit to this line.
+    for (const selection of PLAYABLE) {
+      expect(['team', 'explore'], `${selection.id} has no declared kind`).toContain(selection.kind);
+    }
+    expect(PLAYABLE.filter((selection) => selection.kind === 'explore').map((selection) => selection.id)).toEqual(['map3']);
   });
 });

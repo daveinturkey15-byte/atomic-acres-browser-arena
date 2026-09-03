@@ -86,6 +86,23 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
   'map3': definition('map3', 58, [
     { id: 'map3-hub-overflight', xQ: 0, zQ: 0, altitudeM: 24 },
   ]),
+  // NUKETOWN2 (PREVIEW, HF-407): the same ceiling as the shipped Nuke Town,
+  // because it is the same kind of place at the same scale - nothing on it is
+  // taller than a 6.5 m roof deck. Three portals matching the shipped map's
+  // shape: the road either side of the bus, and one overflight of the centre.
+  // The bus roof carries the 2x core, so the centre portal sits well above it.
+  'nuketown2': definition('nuketown2', 42, [
+    { id: 'nuketown2-west-street-air-gap', xQ: -0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'nuketown2-east-street-air-gap', xQ: 0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'nuketown2-central-overflight', xQ: 0, zQ: 0, altitudeM: 18 },
+  ]),
+  // RAID2 (PREVIEW, HF-408): the tallest authored mass is the 5.3 m upper wall,
+  // so the ceiling is set by sightline like test2's. The courtyard is the one
+  // portal because it is the only place on the map that is open to the sky with
+  // no roof, slab or upper room over it.
+  'raid2': definition('raid2', 63, [
+    { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

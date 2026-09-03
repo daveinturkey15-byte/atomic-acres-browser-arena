@@ -48,3 +48,11 @@ dist-*/
 # are not: they are task instructions for an agent, and a round `git add -A` in an
 # earlier attempt tracked them onto the shared branch.
 local-claude-task-*.md
+
+# Scratch checkouts the eye-clearance contract test writes into the repo root on
+# purpose (scripts/qa/eye-clearance-sweep-contract.test.mjs: ES resolution walks
+# up from the probe FILE, so a probe in os.tmpdir() cannot see node_modules and
+# the bare `three` specifier the arena builders import fails). The test removes
+# them in a finally block, but a killed or timed-out run leaves one behind - and
+# on this machine other agents commit under you with `git add -A`.
+.eye-clearance-probe-*/

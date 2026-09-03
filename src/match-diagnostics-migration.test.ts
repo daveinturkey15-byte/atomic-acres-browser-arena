@@ -23,6 +23,21 @@ const map3ArenaExpansionMigration = readFileSync(
   new URL('../worker/migrations/0007_add_map3_arena.sql', import.meta.url),
   'utf8',
 );
+// NUKETOWN2 (owner 2026-09-02, HF-407): 0008 rebuilds the CHECK to the
+// ten-arena set. Same pattern, same reason.
+const nuketown2ArenaExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0008_add_nuketown2_arena.sql', import.meta.url),
+  'utf8',
+);
+// RAID2 (owner 2026-09-02, HF-408): the eleventh arena. Renumbered 0008 -> 0009
+// at integration, because the Nuke Town Rebuild had already taken 0008.
+// Applied AFTER 0008 in the
+// same order production applies them, so this test exercises the real chain
+// rather than the newest migration against a fresh table.
+const raid2ArenaExpansionMigration = readFileSync(
+  new URL('../worker/migrations/0009_add_raid2_arena.sql', import.meta.url),
+  'utf8',
+);
 
 const insertDiagnostic = (database: DatabaseSync, receiptId: string, arena: string): void => {
   database.prepare(`
@@ -58,6 +73,8 @@ describe('match diagnostics arena expansion migration', () => {
       database.exec(arenaExpansionMigration);
       database.exec(testArenaExpansionMigration);
       database.exec(map3ArenaExpansionMigration);
+      database.exec(nuketown2ArenaExpansionMigration);
+      database.exec(raid2ArenaExpansionMigration);
 
       for (const arena of ARENA_IDS) insertDiagnostic(database, `new-${arena}`, arena);
 

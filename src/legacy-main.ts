@@ -20,13 +20,17 @@ import {
 // never takes the trigger away. Every timing constant lives in that module.
 import {
   IDLE_CROUCH_HOLD,
+  IDLE_SPRINT_LATCH,
   beginStanceTransition,
+  clearSprintLatchOnDropShot,
   crouchHeld,
   crouchPressed,
   crouchReleased,
   restingStanceTransitionSample,
   sampleStanceTransition,
+  stepSprintLatch,
   type CrouchHoldState,
+  type SprintLatchState,
   type StanceTransition,
   type StanceTransitionSample,
 } from './prone-transition';
@@ -69,6 +73,7 @@ import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
 import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -94,6 +99,19 @@ import {
   type WeatherState,
 } from './weather/weather-state';
 import { createWindField, sampleWind } from './weather/wind-field';
+// LIGHTING: time-of-day model. Pure numbers only — see the module header for
+// why it can never return a light (PASS 82 light-set freeze).
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  arenaDaylightProfile,
+  isLightingTimeChoice,
+  lightingConditionsAreIdentity,
+  lightingConditionWritesEqual,
+  activeLightingTimeChoiceFrom,
+  resolveLightingConditions,
+  type LightingConditionWrites,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -160,8 +178,21 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
-// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405.
-import { buildMap3 } from './map3-arena';
+// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
+// imported here: Map 3 is the one lazily loaded arena (HF-409, see
+// `arenaFactories` below and `src/arena-factory-registry.ts`).
+// MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
+import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
+// MAP3 (HF-409): eager/lazy arena builders behind one registry.
+import {
+  createArenaFactoryRegistry,
+  eagerArena,
+  lazyArena,
+} from './arena-factory-registry';
+// NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407.
+import { buildNuketown2 } from './nuketown2-arena';
+// RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
+import { buildRaid2 } from './raid2-arena';
 import { collectPresentationObstructionBoxes } from './presentation-obstruction';
 import {
   DOMINATION_TIME_LIMIT_MS,
@@ -246,7 +277,13 @@ import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/kill
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+// MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
+// current arena's mode IS. See src/ui/hud-mode-banner.ts.
+import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
+// HF-418 — the RTX explainer is information, not a preset. See the change
+// handler on #graphics-profile: it restores the select and opens the dialog.
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, bindRtxNativeRuntimeExplainer } from './ui/rtx-native-runtime-explainer';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
   MobileTouchControls,
@@ -569,6 +606,7 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
   dropOverdriveOnElimination,
   overdriveDamageMultiplier,
   overdriveRemainingMs,
@@ -839,12 +877,14 @@ import {
   hostedBotIds,
   hostedBotReplicationActive,
   hostedBotSnapshotContinuity,
+  hostedBotSnapshotStance,
   interpolateHostedBotSnapshot,
   isHostedBotCount,
   type HostedBotCount,
   type HostedBotSnapshot,
 } from './hosted-bots';
 import { admitHostedBotDamage } from './hosted-bot-damage-admission';
+import { botStanceEyeHeightM, botStanceSpeedCap, resolveBotStance } from './bot-stance';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import { MATCH_DIAGNOSTICS_ENDPOINT, MatchDiagnosticUploader } from './match-diagnostics-upload';
@@ -962,6 +1002,7 @@ import {
   type TimedMapWeaponAuthorityState,
   type TimedMapWeaponId,
 } from './timed-map-weapon-authority';
+import { arenaCanAcquireFlamethrower, arenaCanAcquireFlareGun } from './arena-special-weapon-reach';
 import {
   TIMED_MAP_WEAPON_SCHEMA_VERSION,
   type TimedMapWeaponClaimRequestMessage,
@@ -1046,7 +1087,7 @@ import {
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
-  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  railgunSpawnSitesForArena,
   admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
@@ -1273,6 +1314,10 @@ type BotPlayer = {
   perceptionAimError: number;
   networkInterpolation: SnapshotInterpolationBuffer<HostedBotSnapshot>;
   networkContinuity: number;
+  // Lane AR item 3: bots had no stance at all - see src/bot-stance.ts.
+  stance: Stance;
+  stanceHeldUntil: number;
+  lastDamagedAt: number;
 };
 
 type GrenadeEntity = {
@@ -3316,19 +3361,53 @@ let fillLight: THREE.DirectionalLight;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
-const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
-  'atomic-acres': buildArena,
-  'rustworks-1v1': buildRustworks1v1,
-  'gun-range': buildGunRange,
-  'skyline-terminal': buildSkylineTerminal,
-  farcrysis: buildFarcrysis,
-  'high-seas': buildHighSeas,
+/**
+ * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
+ *
+ * Every arena but Map 3 is `eagerArena(...)`: the same static function
+ * reference this map has always held, resolved with no await and no behaviour
+ * change of any kind. Map 3 alone is `lazyArena(...)`, because its builder
+ * reaches the showcase corridors (~10k lines of TSL) and a static entry here
+ * would park all of it in the boot graph of a player who picked Nuke Town -
+ * directly against the live owner priority, "faster map loads".
+ *
+ * The fetch happens in `performArenaSelection`'s asynchronous preparation
+ * phase, BEFORE construction, so `constructArena` stays synchronous inside the
+ * fenced transaction between the WebGPU fence and the authority commit.
+ * `resolved()` throws rather than returning undefined if that ordering is ever
+ * broken, which is the failure mode worth being loud about.
+ */
+const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'atomic-acres': eagerArena(buildArena),
+  'rustworks-1v1': eagerArena(buildRustworks1v1),
+  'gun-range': eagerArena(buildGunRange),
+  'skyline-terminal': eagerArena(buildSkylineTerminal),
+  farcrysis: eagerArena(buildFarcrysis),
+  'high-seas': eagerArena(buildHighSeas),
   // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
-  test1: buildTest1,
-  test2: buildTest2,
-  // MAP3: Map 3 (PREVIEW). See src/map3-arena.ts for why this is authored
-  // architecture rather than the src/map3 showcase corridors.
-  map3: buildMap3,
+  test1: eagerArena(buildTest1),
+  test2: eagerArena(buildTest2),
+  // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
+  //
+  // The loader RESOLVES AND PREPARES. `prepareMap3()` initialises the Rapier
+  // wasm the eighth corridor is built from, and doing it here means
+  // `isResolved(id)` keeps its one meaning for every caller - "the builder can
+  // be called right now" - instead of a lazy arena having a second, invisible
+  // readiness step that only the arena transition knew about.
+  map3: lazyArena(async () => {
+    const module = await import('./map3-arena');
+    await module.prepareMap3();
+    return module.buildMap3;
+  }),
+  // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407. Code-authored replacement
+  // layout for the Nuke Town flow, registered beside the shipped arena so the
+  // main map is never broken mid-pass. See src/nuketown2-arena.ts.
+  nuketown2: eagerArena(buildNuketown2),
+  // RAID2: Raid Rebuild (PREVIEW), HF-408 Lane AQ. Code-authored replacement
+  // layout for the Raid flow, registered beside the shipped arena so the
+  // original is never broken mid-pass. Eager: its builder is synchronous and
+  // needs no wasm prepare step. See src/raid2-arena.ts.
+  raid2: eagerArena(buildRaid2),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -3358,7 +3437,7 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
   const stagingScene = new THREE.Scene();
   let candidate: ArenaMap | null = null;
   try {
-    candidate = arenaFactories[arenaId](stagingScene);
+    candidate = arenaFactories.resolved(arenaId)(stagingScene);
     candidate.root.removeFromParent();
     prepareArenaPresentation(candidate);
     if (recordConstruction) arenaConstructionHistory.push(arenaId);
@@ -3542,6 +3621,15 @@ function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
 // The menu owns prerecorded media. Do not construct, stream, compile, upload,
 // or submit any gameplay arena until the player explicitly deploys.
 let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+/**
+ * MAP3 (HF-409): drives `ArenaMap.update` for the ACTIVE arena only.
+ *
+ * There is exactly one of these and exactly one call site (search `// MAP3:`
+ * in `frame()`). Arenas that do not set `update` - every arena but Map 3 -
+ * pay one property read per frame and nothing else; the context below is
+ * built by a callback the animator only invokes when a hook exists.
+ */
+const arenaFrameAnimator = createArenaFrameAnimator();
 let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
@@ -3984,6 +4072,273 @@ let appliedArenaVisualPolicy: Readonly<{
   reviewCameraIds: readonly string[];
 }> | null = null;
 
+// LIGHTING: ==== time-of-day conditions (Lane AB, PASS 87) ====================
+// The light SET is frozen. buildSky() constructs the hemisphere, ambient, sun
+// and fill lights ONCE at module scope and nothing in this region ever adds,
+// removes, replaces or toggles one — that is the PASS 82 root cause and the
+// reason this whole feature is expressed as uniform writes. Everything below
+// writes colour, intensity, direction, fog colour and exposure into lights that
+// already exist. `src/rendering/lighting-conditions-light-set.test.ts` pins that
+// property against this exact source region, so a future edit that constructs a
+// light here fails a test rather than freezing the game.
+type LightingConditionBaseline = Readonly<{
+  arenaId: ArenaId;
+  sunColor: number;
+  sunIntensity: number;
+  ambientColor: number;
+  ambientIntensity: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  fillColor: number;
+  fillIntensity: number;
+  fogColor: number;
+  exposure: number;
+}>;
+
+const LIGHTING_CONDITION_DEG = Math.PI / 180;
+/**
+ * Below this the re-aimed sun is invisible and would still cost a full static
+ * shadow-map refresh, so `cycle` mode quantises to it. `fixed`/`random` resolve
+ * one hour for the whole match and therefore move the sun exactly zero times.
+ */
+const LIGHTING_CONDITION_SUN_STEP_DEGREES = 0.35;
+/** Absolute elevation clamp applied to the re-aimed sun, in degrees. */
+const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 84 });
+
+const lightingQueryParams = new URLSearchParams(window.location.search);
+const lightingQueryChoice = lightingQueryParams.get('tod');
+const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
+/**
+ * `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode.
+ * It is also writable through the QA hook, because the readability question
+ * this lane had to answer -- at which hour of an arena's band does its shadow
+ * mass cross the safety bound -- is a SCAN, and reloading the page per hour
+ * costs a minute of arena construction for a value that is one uniform write.
+ */
+let lightingCaptureFixedHour: number | null = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
+/**
+ * A LOCAL override, set only by `?tod=` or by the QA hook. It is deliberately
+ * NOT the normal path: the hour is host-authoritative, so the live value comes
+ * from the replicated match config below and a local override exists purely for
+ * deterministic captures and solo experimentation.
+ */
+let lightingTimeChoiceOverride: LightingTimeChoice | null = isLightingTimeChoice(lightingQueryChoice)
+  ? lightingQueryChoice
+  : null;
+/**
+ * HOST-AUTHORITATIVE. A guest reads the host's replicated `config.timeOfDay`;
+ * a host and a solo player read their own. Absent (pre-PASS-87 lobbies and
+ * rejoin envelopes) means the default, so no peer is ever left on a different
+ * sun by an old checkpoint.
+ */
+function activeLightingTimeChoice(): LightingTimeChoice {
+  // The precedence itself is pure and tested in lighting-conditions.ts. Inside a
+  // hosted lobby -- host OR guest -- the replicated value wins outright, so a
+  // `?tod=` URL cannot take one peer off the shared sky; the host changes the
+  // mode through the lobby row, which replicates.
+  const snapshot = privateLobbySnapshot;
+  return activeLightingTimeChoiceFrom({
+    localOverride: lightingTimeChoiceOverride,
+    replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay,
+    hosted: Boolean(snapshot),
+  });
+}
+let lightingConditionBaseline: LightingConditionBaseline | null = null;
+let activeLightingConditions: LightingConditionWrites | null = null;
+let lightingConditionsSkyDarken = 0;
+let lightingConditionsElapsedSeconds = 0;
+/**
+ * The writes that are CURRENTLY IN the lights. The gate below compares against
+ * this record rather than against the resolved hour: the hour is one of two
+ * inputs to the model and weather is the other, so an hour comparison silently
+ * discarded every weather-driven write. See `lightingConditionWritesEqual`.
+ */
+let lightingConditionsAppliedWrites: LightingConditionWrites | null = null;
+let lightingConditionsAppliedElevationDegrees = Number.NaN;
+let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+let lightingConditionsSunReaims = 0;
+let lightingConditionsGateChoice: LightingTimeChoice | null = null;
+let lightingConditionsGateSkyStep = Number.NaN;
+let lightingConditionsGateClockStep = Number.NaN;
+let lightingConditionsGateSeed = Number.NaN;
+let lightingConditionsResolves = 0;
+let lightingConditionsUniformWrites = 0;
+
+const lightingConditionScratchColor = new THREE.Color();
+
+/** Multiplies an authored colour by a bounded per-channel tint, in place. */
+function lightingConditionTint(hex: number, tint: readonly [number, number, number]): THREE.Color {
+  lightingConditionScratchColor.setHex(hex);
+  lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * tint[0]);
+  lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * tint[1]);
+  lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * tint[2]);
+  return lightingConditionScratchColor;
+}
+
+/**
+ * The fog colour every consumer should start from. The nuke charge, the flash
+ * and the arena-change restore all rewrite `scene.fog.color` from the authored
+ * value; routing them through here is what stops those three effects snapping
+ * the sky back to its authored hour for the rest of the match.
+ */
+function conditionedFogBaseColorHex(): number {
+  const authored = activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor;
+  const writes = activeLightingConditions;
+  if (!writes || lightingConditionsAreIdentity(writes)) return authored;
+  return lightingConditionTint(authored, writes.fogTint).getHex();
+}
+
+function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
+  lightingConditionBaseline = Object.freeze(baseline);
+  lightingConditionsAppliedWrites = null;
+  lightingConditionsGateChoice = null;
+  lightingConditionsAppliedElevationDegrees = Number.NaN;
+  lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+}
+
+function resolveActiveLightingConditions(): LightingConditionWrites {
+  return resolveLightingConditions({
+    arenaId: selectedArena.id,
+    matchSeed: weatherMatchSeed,
+    elapsedSeconds: lightingConditionsElapsedSeconds,
+    choice: activeLightingTimeChoice(),
+    skyDarkenAmount: lightingConditionsSkyDarken,
+    // `?todhour=` is the same class of local override as `?tod=` and obeys the
+    // same rule: inside a hosted lobby it is ignored, so the scan hour cannot
+    // desync a guest from the host's sky either.
+    ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
+  });
+}
+
+/**
+ * Re-aims the ALREADY-EXISTING key light. `graphicsRefinement.applyArena` owns
+ * the base offset and the shadow camera; this only rotates the same vector about
+ * the same target, and only when the movement is large enough to be seen — a
+ * sun that jitters by hundredths of a degree would refresh the static shadow map
+ * every frame for no visible gain.
+ */
+function reaimConditionedSun(writes: LightingConditionWrites): void {
+  if (!sunLight) return;
+  const base = activeLighting.sunPosition;
+  const radius = Math.hypot(base[0], base[1], base[2]);
+  if (!(radius > 0)) return;
+  const baseElevation = Math.atan2(base[1], Math.hypot(base[0], base[2])) / LIGHTING_CONDITION_DEG;
+  const baseAzimuth = Math.atan2(base[2], base[0]) / LIGHTING_CONDITION_DEG;
+  const elevation = Math.min(
+    LIGHTING_CONDITION_ELEVATION_CLAMP.maximum,
+    Math.max(LIGHTING_CONDITION_ELEVATION_CLAMP.minimum, baseElevation + writes.sunElevationDeltaDegrees),
+  );
+  const azimuth = baseAzimuth + writes.sunAzimuthDeltaDegrees;
+  const movedEnough = !Number.isFinite(lightingConditionsAppliedElevationDegrees)
+    || Math.abs(elevation - lightingConditionsAppliedElevationDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES
+    || Math.abs(azimuth - lightingConditionsAppliedAzimuthDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES;
+  if (!movedEnough) return;
+  lightingConditionsAppliedElevationDegrees = elevation;
+  lightingConditionsAppliedAzimuthDegrees = azimuth;
+  const flat = Math.cos(elevation * LIGHTING_CONDITION_DEG) * radius;
+  // Same composition graphicsRefinement.applyArena uses: horizontal components
+  // are offsets from the arena centre, the vertical component is absolute.
+  sunLight.position.set(
+    sunLight.target.position.x + flat * Math.cos(azimuth * LIGHTING_CONDITION_DEG),
+    Math.sin(elevation * LIGHTING_CONDITION_DEG) * radius,
+    sunLight.target.position.z + flat * Math.sin(azimuth * LIGHTING_CONDITION_DEG),
+  );
+  sunLight.shadow.needsUpdate = true;
+  lightingConditionsSunReaims += 1;
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
+}
+
+/**
+ * The ONE place time of day reaches the renderer. Every statement below is an
+ * assignment into an existing light, an existing fog instance or the exposure
+ * uniform. No light is created, destroyed, parented or unparented.
+ */
+function applyLightingConditionUniforms(force = false): void {
+  const baseline = lightingConditionBaseline;
+  if (!baseline || baseline.arenaId !== selectedArena.id) return;
+  const choice = activeLightingTimeChoice();
+  // GATE BEFORE THE RESOLVE. This runs every frame, and `resolveLightingConditions`
+  // allocates a frozen record with six frozen tints; at 144 Hz that is ~1,000
+  // short-lived objects a second bought for nothing, because in every mode except
+  // `cycle` the hour is CONSTANT for the whole match. Only two inputs can move --
+  // the weather's sky-darken and, in `cycle`, the clock -- so both are quantised
+  // and compared first. In `fixed`/`random` steady state this function costs four
+  // comparisons and returns.
+  const skyStep = Math.round(lightingConditionsSkyDarken * 256);
+  const clockStep = choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0;
+  if (!force
+    && choice === lightingConditionsGateChoice
+    && skyStep === lightingConditionsGateSkyStep
+    && clockStep === lightingConditionsGateClockStep
+    && weatherMatchSeed === lightingConditionsGateSeed) return;
+  lightingConditionsGateChoice = choice;
+  lightingConditionsGateSkyStep = skyStep;
+  lightingConditionsGateClockStep = clockStep;
+  lightingConditionsGateSeed = weatherMatchSeed;
+  lightingConditionsResolves += 1;
+  const writes = resolveActiveLightingConditions();
+  activeLightingConditions = writes;
+  // GATE ON THE WRITES, NOT ON THE HOUR. The hour is one of TWO inputs to
+  // `resolveLightingConditions`; `skyDarkenAmount` is the other and never enters
+  // `hour`. An hour comparison here therefore threw away every weather-driven
+  // write in `fixed`/`random` (the default is `random`), so the documented
+  // weather-neutralisation composition never reached a light in the shipped
+  // game and `conditionedFogBaseColorHex()` restored a tint the lights had not
+  // been given. Comparing what is about to be WRITTEN against what is already
+  // in the lights cannot have that class of bug.
+  if (!force && lightingConditionWritesEqual(writes, lightingConditionsAppliedWrites)) return;
+  lightingConditionsAppliedWrites = writes;
+  lightingConditionsUniformWrites += 1;
+  const indirect = graphicsRuntime.indirectLightScale;
+  if (sunLight) {
+    sunLight.color.copy(lightingConditionTint(baseline.sunColor, writes.sunTint));
+    sunLight.intensity = baseline.sunIntensity * writes.sunIntensityScale;
+    reaimConditionedSun(writes);
+  }
+  if (ambientLight) {
+    ambientLight.color.copy(lightingConditionTint(baseline.ambientColor, writes.ambientTint));
+    ambientLight.intensity = baseline.ambientIntensity * indirect * writes.ambientIntensityScale;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.copy(lightingConditionTint(baseline.hemisphereSky, writes.hemisphereSkyTint));
+    hemisphereLight.groundColor.copy(lightingConditionTint(baseline.hemisphereGround, writes.hemisphereGroundTint));
+    hemisphereLight.intensity = baseline.hemisphereIntensity * indirect * writes.hemisphereIntensityScale;
+  }
+  if (fillLight) {
+    fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
+    fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
+  }
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
+  // A deterministic review camera owns the exposure while it is set -- that is
+  // the capture contract every viewpoint baseline in the repo rests on -- and it
+  // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
+  // would silently discard it the next time weather nudged the gate open, so the
+  // hour's lift composes ON TOP of whichever exposure actually owns the frame.
+  const ownedExposure = activeArenaReviewExposure ?? baseline.exposure;
+  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale));
+}
+
+/** Telemetry for the QA probes and the debug panel. Read-only. */
+function lightingConditionsTelemetry(): Record<string, unknown> {
+  const writes = activeLightingConditions;
+  return {
+    choice: activeLightingTimeChoice(),
+    localOverride: lightingTimeChoiceOverride,
+    hour: writes ? Number(writes.hour.toFixed(3)) : null,
+    deviation: writes ? Number(writes.deviation.toFixed(4)) : null,
+    sunIntensityScale: writes ? Number(writes.sunIntensityScale.toFixed(4)) : null,
+    shadowFloorScale: writes ? Number(writes.shadowFloorScale.toFixed(4)) : null,
+    exposureScale: writes ? Number(writes.exposureScale.toFixed(4)) : null,
+    skyDarkenAmount: Number(lightingConditionsSkyDarken.toFixed(4)),
+    identity: writes ? lightingConditionsAreIdentity(writes) : true,
+    sunReaims: lightingConditionsSunReaims,
+    uniformWrites: lightingConditionsUniformWrites,
+    resolves: lightingConditionsResolves,
+  };
+}
+// LIGHTING: ==== end time-of-day conditions ====================================
+
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
   renderRuntime.setExposure(effectiveGraphicsExposure(definition.colorPipeline.exposure));
@@ -4034,6 +4389,23 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     budgets: definition.budgets,
     reviewCameraIds: Object.freeze(definition.reviewCameras.map((entry) => entry.id)),
   });
+  // LIGHTING: the authored values written above ARE the arena's identity anchor.
+  // Snapshot them, then compose the resolved hour on top as uniform writes.
+  captureLightingConditionBaseline({
+    arenaId: definition.id,
+    sunColor: definition.lighting.sunColor,
+    sunIntensity: definition.lighting.sunIntensity,
+    ambientColor: definition.lighting.ambientColor,
+    ambientIntensity: definition.lighting.ambientIntensity,
+    hemisphereSky: activeLighting.hemisphereSky,
+    hemisphereGround: activeLighting.hemisphereGround,
+    hemisphereIntensity: activeLighting.hemisphereIntensity,
+    fillColor: activeLighting.fillColor,
+    fillIntensity: activeLighting.fillIntensity,
+    fogColor: definition.fog.color,
+    exposure: definition.colorPipeline.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -4503,7 +4875,11 @@ void mistQuery;
 // host identity and the match start stamp - never Math.random or a local clock.
 let weatherMatchSeed = 0;
 let lastRainUpdateAtMs = 0;
-const weatherOverrideState = (() => {
+// LIGHTING: `let`, not `const`, only so the QA hook below can move the weather
+// WITHOUT a reload. The lane needed to prove that a weather change reaches the
+// lights on the ordinary per-frame path (no forced apply), and a URL-only
+// override can only be set before the arena exists.
+let weatherOverrideState = (() => {
   const requested = new URLSearchParams(window.location.search).get('weather');
   return requested && WEATHER_SEVERITY_LADDER.includes(requested as WeatherState)
     ? requested as WeatherState
@@ -6100,6 +6476,7 @@ let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
+let sprintLatchState: SprintLatchState = IDLE_SPRINT_LATCH;
 let stanceRecoveryUntil = 0;
 // HF-412: the in-flight stance transition and this frame's sample of it. The
 // CAPSULE commits to the new stance on the press (authority never lags); only
@@ -6169,7 +6546,13 @@ function resetWebGpuPresentationEpoch(reason: string, now: number): void {
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
-const MINIMAP_RENDER_HZ = 60;
+// PASS 87 Lane AR item 2 (Lane T's withheld patch, integrator-approved at 30 Hz).
+// The minimap is a full CPU 2D-canvas redraw on the frame loop's own thread and
+// ran once per presented frame. 30 Hz halves that work and is the floor
+// presentationFrameDue clamps to (MIN_GRAPHICS_TARGET_FPS). Cost measured in
+// src/minimap-render-cadence.test.ts: a moved player still reaches the canvas
+// within 2 frames of a 60 fps loop.
+const MINIMAP_RENDER_HZ = 30;
 let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
 let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
@@ -6871,6 +7254,14 @@ function selectLobbyCodeForManualCopy(code: string): void {
 }
 
 function currentMatchRules() {
+  // MAP3 (HF-409 finisher 2): an EXPLORE arena has no clock and no score
+  // limit, so nothing can run out and nobody can win. The registry row keeps
+  // `matchRules.durationMs` because the arena id is also the replay/storage
+  // boundary and a saved match naming map3 must still decode - the RUNTIME
+  // rules are what the match state machine reads, and they follow the KIND.
+  // Without this, walking the showcase ends in a VICTORY/DEFEAT card at five
+  // minutes, which is the same lie as the TEAM DEATHMATCH banner.
+  if (selectedArena.kind === 'explore') return EXPLORE_MATCH_RULES;
   if (gameMode === 'solo') return selectedArena.matchRules;
   // HF-377: the lobby config is the replicated match contract; its kill limit
   // applies identically to TDM (squad score) and FFA (leader kills) because
@@ -8305,9 +8696,12 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
     bot.nextGrenadeAt = nowMonoMs + recoveryRemainingMs(stored.nextGrenadeRemainingMs, checkpoint);
     bot.grenadeActive = false;
     bot.deathVisibleUntil = 0;
+    bot.stance = 'stand';
+    bot.stanceHeldUntil = 0;
+    bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
     bot.positionHistory = [{
-      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-      yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+      yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
     }];
     bot.perception = createBotPerceptionState(interactiveWorldMatchEpoch, bot.id, bot.continuity);
     bot.perceptionCanFire = true;
@@ -8332,9 +8726,13 @@ function initializeFreshHostLobby(): void {
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
+  // LIGHTING: the host's own solo choice seeds the lobby row rather than being
+  // silently reset to the default; from here on the replicated value is the
+  // authority for every peer, this host included.
+  const seedTimeOfDay = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
   privateMatchConfig = selectedArena.id === 'gun-range'
-    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
-    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000, timeOfDay: seedTimeOfDay }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id, timeOfDay: seedTimeOfDay };
   privateMatchMode = privateMatchConfig.mode;
   const squad = sanitizeSquadPresentation(localSquadName, localSquadColor, player.team);
   localSquadName = squad.name;
@@ -10431,6 +10829,17 @@ function renderPrivateLobby(): void {
   killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
   timeLimitInput.disabled = !hostControls || rangeLobby;
   killLimitInput.disabled = !hostControls || rangeLobby;
+  // LIGHTING: the same mirror for the host's TIME OF DAY choice. A guest reads
+  // it and cannot edit it, exactly like the two limits above, because two peers
+  // on different hours are arguing about a different match.
+  const timeOfDayInput = element<HTMLSelectElement>('#lobby-time-of-day');
+  timeOfDayInput.value = (snapshot?.config.timeOfDay ?? privateMatchConfig.timeOfDay) ?? DEFAULT_LIGHTING_TIME_CHOICE;
+  // Gun Range is indoors and Map 3 is preview-pinned: both resolve to the
+  // authored hour whatever is chosen, so the control is disabled rather than
+  // offering a choice that provably does nothing.
+  timeOfDayInput.disabled = !hostControls || arenaDaylightProfile(arenaSelection(
+    (snapshot?.config.arenaId ?? privateMatchConfig.arenaId),
+  ).id).pinned;
   const localMember = members.find((member) => member.id === player.id);
   // HF-328: squad identity is prescribed, so the free name input and colour picker
   // no longer exist in the lobby markup. Project the canonical identity into the
@@ -16712,6 +17121,10 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   // continuous across the drop. `src/prone-transition.test.ts` pins that both
   // prone arms of the old expression stay gone.
   if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
+  // HF-431 (prone) and HF-433 (crouch): leaving the standing stance clears the
+  // sprint latch, so a still-held Shift never resumes sprinting on standing.
+  if (target === 'prone') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
+  if (target === 'crouch') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
   currentSprinting = false;
   return true;
 }
@@ -16757,6 +17170,7 @@ function respawn(
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   currentSprinting = false;
+  sprintLatchState = IDLE_SPRINT_LATCH;
   playerGrounded = false;
   wasGrounded = false;
   lastGroundedAt = -10_000;
@@ -16893,6 +17307,8 @@ async function startGame(
   matchStartPreparing = true;
   matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration = token.generation;
+  beginMatchAdmissionProfile();
+  markMatchAdmission('admission-open');
   lastGameplayPresentedFrame = 0;
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
@@ -17158,6 +17574,7 @@ async function startGame(
     endsAt: Number.POSITIVE_INFINITY,
     winner: null,
   };
+  markMatchAdmission('bot-spawn');
   if (mode === 'solo') {
     await spawnBots();
     assertMatchAdmissionCurrent(token);
@@ -17165,8 +17582,10 @@ async function startGame(
     await spawnBots(privateMatchConfig.hostedBotCount);
     assertMatchAdmissionCurrent(token);
   }
+  markMatchAdmission('corpse-pool');
   await ensureCorpsePresentationPool();
   assertMatchAdmissionCurrent(token);
+  markMatchAdmission('bot-presentations');
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   try {
     await prewarmBotPresentations();
@@ -17203,12 +17622,16 @@ async function startGame(
       // deployments to the menu. Compile the exact rest composition once here,
       // behind compileAndRender's own 12s cold-generation fence, so every
       // guarded admission flush below only ever measures warm frames.
+      markMatchAdmission('rest-composition-compile');
       await renderRuntime.compileAndRender(scene, camera, scene);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('weapon-switch-rehearsal');
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('initial-match-settle');
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -17217,22 +17640,27 @@ async function startGame(
       // surface in control until the browser has delivered a full hitch-free
       // second; deferred driver work or a major collection must never spill
       // into the first controllable frame.
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       // Restore and compile the ordinary rest frame after the staged fire
       // compositions so the first controllable frame starts from exact state.
+      markMatchAdmission('webgl-rest-composition');
       await prewarmExactWebGlMatchComposition();
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     }
   } finally {
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
+    finalizeMatchAdmissionProfile(mode);
   }
   // Admission can legitimately span several seconds of cold renderer work.
   // None of that scheduler time may enter the first live simulation delta.
@@ -17254,10 +17682,22 @@ async function startGame(
   respawnTimer = null;
   respawnEndsAt = 0;
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+  // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
+  // This runs once, before the first frame, so an explore arena never shows a
+  // single frame of TEAM DEATHMATCH / 05:00 / AQUA-CORAL before the per-frame
+  // writer below corrects it.
+  const startBanner = hudModeBanner({
+    arena: selectedArena, site: 'match-start',
+    domination: dominationModeActive(), freeForAll: false, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
+    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  element<HTMLElement>('#timer').hidden = !startBanner.clock;
+  element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
+  element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
+  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
   element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
@@ -17318,7 +17758,8 @@ async function startGame(
   }
   initializeGunRangeMatchClock(mode);
   initializeGunRangeTestBayDoor(mode);
-  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
+  // HF-432 item 5: the core's seat is the arena's (see overdrivePositionForArena).
+  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt, overdrivePositionForArena(selectedArena.id));
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt, hostRecovery);
   const timedWeaponMatchEndsAt = matchRules.durationMs === null
@@ -19650,6 +20091,9 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
     perception: createBotPerceptionState(interactiveWorldMatchEpoch, id, 1),
     perceptionCanFire: true,
     perceptionAimError: 0,
+    stance: 'stand',
+    stanceHeldUntil: 0,
+    lastDamagedAt: Number.NEGATIVE_INFINITY,
     networkInterpolation: new SnapshotInterpolationBuffer<HostedBotSnapshot>(interpolateHostedBotSnapshot),
     networkContinuity: 0,
   });
@@ -19726,6 +20170,9 @@ function activateDormantBot(index: number): boolean {
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
   bot.blockedSince = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bots.set(id, bot);
   return true;
@@ -19814,6 +20261,7 @@ function hostedBotSnapshot(bot: BotPlayer, seq: number): HostedBotSnapshot {
     y: bot.position.y,
     z: bot.position.z,
     yaw: bot.root.rotation.y,
+    stance: bot.stance,
     hp: bot.hp,
     kills: bot.kills,
     deaths: bot.deaths,
@@ -19913,12 +20361,10 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
-    // HF-412: 'stand' is hardcoded because BotPlayer carries no stance at all -
-    // the bot AI never crouches or goes prone, so there is no stance to pose
-    // from. Remote PEERS do carry a replicated stance and do play the prone
-    // transition (see the remote pose call in renderRemotes). Giving bots a
-    // simulated stance is its own ledger row, not part of this one.
-    poseOperator(bot.root, 'stand', speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
+    // Lane AR item 3: replicated like a peer's. A pre-PASS-87 host sends none;
+    // hostedBotSnapshotStance reads that as 'stand'. See src/hosted-bots.ts.
+    bot.stance = hostedBotSnapshotStance(snapshot);
+    poseOperator(bot.root, bot.stance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -20061,6 +20507,9 @@ function applyBotDamage(
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
+  // Lane AR item 3: the single funnel every bot damage path goes through, so
+  // this is the one place "under fire" has to be recorded.
+  bot.lastDamagedAt = now;
   reactOperator(bot.root, zone);
   const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
@@ -20170,6 +20619,9 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.blockedSince = 0;
   bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
   bot.deathVisibleUntil = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bot.root.visible = true;
 }
@@ -20483,13 +20935,13 @@ function updateBots(dt: number, now: number): void {
     }
     if (network.role === 'host' && remotes.size > 0) {
       recordCombatantPose(bot.positionHistory, {
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
       });
     }
     if (botsFrozen) {
       if (pass73AdsRevealCaptureFrozenTargetId !== bot.id) {
-        poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+        poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, debugBotSpeedOverride, now * 0.001, 1, 0, dt);
       }
       continue;
     }
@@ -20569,7 +21021,18 @@ function updateBots(dt: number, now: number): void {
       : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
           : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    // Lane AR item 3. Resolved BEFORE the move, because the stance caps it:
+    // a prone bot that slid at running speed is exactly the authored-mass /
+    // movement-authority mismatch the forging review exists to catch.
+    const stanceDecision = resolveBotStance({
+      hp: bot.hp, alive: bot.alive, lastDamagedAt: bot.lastDamagedAt, now,
+      hasLineOfSight: lineOfSight, travelling: routeMovement === 'advance' || routeMovement === 'retreat',
+      stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil,
+    });
+    bot.stance = stanceDecision.stance;
+    bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
+    const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    const speed = Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     const botCapsuleHeight = 1.7;
     const movementColliders = collidersOverlappingVerticalSpan(
@@ -20610,10 +21073,11 @@ function updateBots(dt: number, now: number): void {
     const lookPitch = lineOfSight
       ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
       : 0;
-    // HF-412: as above - bots have no stance state, so this is the honest pose,
-    // not a drop-shot omission. Only the QA presentation override can put a bot
-    // body prone.
-    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
+    // Lane AR item 3 (was HF-412's honest "bots have no stance state"): the
+    // body now poses from the same field the snapshot replicates and the shot
+    // resolver rewinds to, so a bot plays the crouch and prone transitions a
+    // player does. debugBotStanceOverride still wins for QA captures.
+    poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -24505,6 +24969,26 @@ function showQuadDamageAnnouncement(title: string, subtitle: string): void {
   }, 3_500);
 }
 
+/**
+ * Lane AR item 5: the 2x core may only be claimed by an eye that can SEE it.
+ *
+ * The pickup used to be a horizontal radius plus a scalar height window, and on
+ * both Nuke Towns the core hovers over the bus roof with only 0.10 m of margin
+ * between "standing on the roof" (allowed) and "standing in the aisle"
+ * (rejected). A jump is worth more than 0.10 m, so a player inside the bus
+ * could take the core through the roof slab from inside cover. This is the same
+ * eye-to-pickup trace `acceptTimedMapWeaponClaim` already uses, against the
+ * same live collider set, raised 0.25 m off the core so a claimant standing
+ * exactly on the seat is not occluded by the pedestal itself.
+ */
+const overdriveSightScratch = new THREE.Vector3();
+function overdriveClaimSight(eye: THREE.Vector3): { lineOfSightClear: boolean } {
+  overdriveSightScratch.set(overdriveState.position.x, overdriveState.position.y + 0.25, overdriveState.position.z);
+  return {
+    lineOfSightClear: !activeWorldColliders().some((box) => segmentIntersectsBox(eye, overdriveSightScratch, box)),
+  };
+}
+
 function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   if (network.role !== 'host' || message.generation !== overdriveState.generation || processedNonces.has(message.nonce)) return;
   const remote = remotes.get(message.by);
@@ -24514,7 +24998,7 @@ function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   const claimedPosition = new THREE.Vector3(...message.position);
   const authoritativePosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   if (claimedPosition.distanceTo(authoritativePosition) > 1.25) return;
-  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now);
+  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now, overdriveClaimSight(authoritativePosition));
   if (!result.claimed) return;
   processedNonces.add(message.nonce);
   overdriveState = result.state;
@@ -24534,6 +25018,8 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
     activeUntil: message.activeRemainingMs > 0 ? now + message.activeRemainingMs : 0,
     nextSpawnAt: now + message.nextSpawnInMs,
     position: { x: message.position[0], y: message.position[1], z: message.position[2] },
+    // The wire carries the LIVE position; the seat it returns to is the arena's.
+    home: overdrivePositionForArena(selectedArena.id),
   };
   if (message.available && message.activeRemainingMs === 0 && previousGeneration !== message.generation) {
     overdriveSpawns += 1;
@@ -24589,7 +25075,7 @@ function updateOverdrive(now: number): void {
         network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
       }
     } else {
-      const result = claimOverdrive(overdriveState, player.id, player.position, true, now);
+      const result = claimOverdrive(overdriveState, player.id, player.position, true, now, overdriveClaimSight(player.position));
       if (result.claimed) {
         overdriveState = result.state;
         registerOverdrivePickup(player.id, now);
@@ -24654,7 +25140,7 @@ function trainingDummySupportPoint(target: ArenaMap['targets'][number]): THREE.V
 
 function supportTargetState(id: string): { point: THREE.Vector3; stance: Stance } | null {
   const bot = bots.get(id);
-  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: 'stand' };
+  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: bot.stance };
   const remote = remotes.get(id);
   if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) {
     return { point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: remote.snapshot.stance ?? 'stand' };
@@ -25015,7 +25501,7 @@ function updateNuke(now: number): void {
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
     const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
     if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0x8c536f), charge * 0.24);
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -25026,14 +25512,14 @@ function updateNuke(now: number): void {
   sequence.shockwave.scale.setScalar(0.1 + blastProgress * 180);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   flash.hidden = true;
   flash.style.opacity = '0';
   nukeSequence = null;
@@ -26102,7 +26588,7 @@ function clearFieldSupport(): void {
   nukeShockwave.visible = false;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   const nukeWarning = element<HTMLElement>('#nuke-warning');
   const nukeFlash = element<HTMLElement>('#nuke-flash');
   nukeWarning.hidden = true;
@@ -26222,13 +26708,19 @@ function updatePhysics(dt: number): void {
   }
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
-  const wantsSprint = (
+  // HF-431: sprint latch state machine (Lane AX)
+  const rawSprintInput = (
     actionHeld('sprint', keys, keyProfile)
     || gamepadSprint
     || mobileTouchControls?.state.sprinting === true
-  ) && input.lengthSq() > 0 && playerGrounded;
-  const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
-  if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
+  );
+  sprintLatchState = stepSprintLatch(sprintLatchState, rawSprintInput, player.stance);
+  const wantsSprint = sprintLatchState.latched && input.lengthSq() > 0 && playerGrounded;
+  // HF-433: the auto-stand that used to sit here - hold sprint while crouched
+  // or prone and the player was stood up and sprinted - is gone. `wantsSprint`
+  // cannot be true off the standing stance any more (stepSprintLatch), so it
+  // was also unreachable; leaving it would have re-opened the defect the first
+  // time that latch rule was relaxed.
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
@@ -26851,7 +27343,38 @@ function updateMatchState(now: number): void {
   updateDominationHud();
   const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
     .filter((score) => !score.id.startsWith('host-bot-')));
-  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
+  // MAP3 (HF-409 finisher 3): THE EXPLORE WARMUP DEADLOCK.
+  //
+  // `preserveSoloCountdownCue` exists so a long solo render stall cannot
+  // consume an unseen 3-2-1 edge: while the next cue has not been presented it
+  // pushes warmup's endsAt back to now + N seconds, EVERY FRAME, until that cue
+  // is shown. `lastMatchCountdownCue` starts null, so the cue it waits for is
+  // '3'.
+  //
+  // An explore arena presents no countdown at all - that is the point, there is
+  // no match to count in - so '3' is never presented, `lastMatchCountdownCue`
+  // stays null, and warmup is extended forever. `advanceMatch` only leaves
+  // warmup when `now >= state.endsAt`, which by construction never happens.
+  //
+  // Measured on this tree before this fix: Map 3 sat in `warmup` for the full
+  // 120 s of a boot probe and never reached `active`. That is not cosmetic -
+  // `gameplayInputEnabled()` requires `phase === 'active'`, so the arena the
+  // owner asked to be able to WALK rendered at 53 fps with a correct explore
+  // HUD and would not accept a single movement input, permanently. The
+  // pass74 arena boot smoke fails on map3 for exactly this reason.
+  //
+  // So the hold is gated on there being a cue to hold FOR. This is the same
+  // declared decision the HUD uses, not a second opinion about explore arenas.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  matchState = preserveSoloCountdownCue(
+    matchState,
+    now,
+    lastMatchCountdownCue,
+    gameMode === 'solo' && countdownCueAllowed,
+  );
   const preAdvanceState = matchState;
   const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
@@ -26881,7 +27404,11 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  if (matchState.phase === 'warmup') {
+  // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
+  // match to start, so the 3-2-1 cue and its audio would be announcing one.
+  // `countdownCueAllowed` is computed once, above, because the warmup hold and
+  // the cue presentation must agree - when they disagreed, warmup never ended.
+  if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
       const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
@@ -26892,9 +27419,14 @@ function updateMatchState(now: number): void {
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
   if (matchState.phase === 'active') {
-    const engageSequence = presentMatchCountdownCue('engage');
-    audio.matchCountdown('engage');
-    lastMatchCountdownCue = 'engage';
+    // MAP3 (HF-409 finisher 2): "ENGAGE" is a combat word and the big centre
+    // cue is a match-start cue. An explore arena gets neither - it is opened,
+    // not started - so it is welcomed in instead and nothing counts down.
+    const engageSequence = countdownCueAllowed ? presentMatchCountdownCue('engage') : null;
+    if (countdownCueAllowed) {
+      audio.matchCountdown('engage');
+      lastMatchCountdownCue = 'engage';
+    }
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
     // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
@@ -26902,12 +27434,13 @@ function updateMatchState(now: number): void {
     // announcement that took over or queued behind it.
     presentBanner(
       'match-flow',
-      'ENGAGE',
+      countdownCueAllowed ? 'ENGAGE' : 'EXPLORE',
       privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
       900,
     );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
+      if (engageSequence === null) return;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -27612,7 +28145,15 @@ function updateHud(now: number): void {
     ? [rangeScore, targetHits]
     : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
       : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = dominationModeActive() ? 'DOMINATION' : ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+  // MAP3 (HF-409 finisher 2): see src/ui/hud-mode-banner.ts. Reproduces this
+  // site's previous conditional exactly for every team arena.
+  const banner = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  element<HTMLElement>('#timer').hidden = !banner.clock;
+  element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
@@ -27625,11 +28166,11 @@ function updateHud(now: number): void {
   });
   previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective;
+      : presentation.objective);
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
@@ -27969,6 +28510,7 @@ function flushPendingGraphics(): void {
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
   pendingGraphicsPreset = 'custom';
   graphicsProfileInput.value = 'custom';
+  refreshGraphicsProfileCopy('custom');
   refreshGraphicsPendingBadge();
 });
 document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
@@ -28018,7 +28560,32 @@ hardRefreshButton.addEventListener('click', () => {
     reloadFresh();
   }
 });
+// HF-418 — the RTX row is an EXPLAINER, not a preset. Selecting it must leave
+// the renderer exactly as it was: no staged preset, no advanced-panel refresh,
+// no reload. The select is put back to the mode that is actually active and
+// then the dialog opens. `RTX_NATIVE_RUNTIME_OPTION_VALUE` is deliberately not
+// a member of GraphicsPreset, so even if this branch were ever removed the
+// value could not be persisted - normalizePass65Settings would reject it.
+const rtxNativeRuntimeExplainer = bindRtxNativeRuntimeExplainer(document);
+
+// HF-414/HF-418 — one honest line per mode, plus the expandable detail. Every
+// block is rendered into the shell and all but the active one carry `hidden`,
+// so this only toggles visibility and never composes player-facing copy in the
+// 35k-line module.
+function refreshGraphicsProfileCopy(preset: string): void {
+  for (const node of document.querySelectorAll<HTMLElement>('[data-graphics-profile]')) {
+    node.hidden = node.dataset.graphicsProfile !== preset;
+  }
+}
+refreshGraphicsProfileCopy(displayedGraphicsPreset);
+
 graphicsProfileInput.addEventListener('change', () => {
+  if (graphicsProfileInput.value === RTX_NATIVE_RUNTIME_OPTION_VALUE) {
+    graphicsProfileInput.value = pendingGraphicsPreset ?? displayedGraphicsPreset;
+    refreshGraphicsProfileCopy(graphicsProfileInput.value);
+    rtxNativeRuntimeExplainer.open();
+    return;
+  }
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
   if (preset !== 'custom' && preset in GRAPHICS_PRESET_VALUES) {
@@ -28026,6 +28593,7 @@ graphicsProfileInput.addEventListener('change', () => {
     // can see what they were before deciding to tweak them into a custom set.
     advancedGraphicsBinding.refresh({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset as keyof typeof GRAPHICS_PRESET_VALUES] });
   }
+  refreshGraphicsProfileCopy(preset);
   refreshGraphicsPendingBadge();
 });
 
@@ -28951,6 +29519,19 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  // MAP3 (HF-409): the standalone showcase link. Present only for an arena that
+  // declares a second page, and relative to THIS document, so it resolves
+  // inside whatever release channel the player loaded the game from.
+  const showcaseLink = element<HTMLAnchorElement>('#arena-showcase-link');
+  const showcasePath = selectedArena.showcasePath;
+  if (showcasePath) {
+    showcaseLink.setAttribute('href', showcasePath);
+    showcaseLink.title = `Open the ${selectedArena.displayName} showcase fly-through in a new tab`;
+    showcaseLink.hidden = false;
+  } else {
+    showcaseLink.removeAttribute('href');
+    showcaseLink.hidden = true;
+  }
   canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
@@ -29079,6 +29660,26 @@ function applyArenaLightingForSelection(): void {
   }
   arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
+  // LIGHTING: this function is the canonical "write the AUTHORED lighting into
+  // the frozen light set" path (arena selection and every graphics-settings
+  // apply land here). Re-anchor the baseline on the values it just wrote, then
+  // re-compose the resolved hour — otherwise changing a graphics setting mid
+  // match would silently snap the sky back to the arena's authored hour.
+  captureLightingConditionBaseline({
+    arenaId: selectedArena.id,
+    sunColor: definition?.lighting.sunColor ?? lighting.sunColor,
+    sunIntensity: definition?.lighting.sunIntensity ?? lighting.sunIntensity,
+    ambientColor: definition?.lighting.ambientColor ?? lighting.ambientColor,
+    ambientIntensity: definition?.lighting.ambientIntensity ?? lighting.ambientIntensity,
+    hemisphereSky: lighting.hemisphereSky,
+    hemisphereGround: lighting.hemisphereGround,
+    hemisphereIntensity: lighting.hemisphereIntensity,
+    fillColor: lighting.fillColor,
+    fillIntensity: lighting.fillIntensity,
+    fogColor: definition?.fog.color ?? lighting.fogColor,
+    exposure: definition?.colorPipeline.exposure ?? lighting.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -29164,6 +29765,15 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    // MAP3 (HF-409): fetch a lazily loaded arena's builder chunk HERE, in the
+    // preparation phase, so the construction below stays synchronous inside the
+    // fence. The guard matters: an eager arena must not gain even a microtask
+    // boundary it did not have before, so it never touches this await at all.
+    if (!arenaFactories.isResolved(nextSelection.id)) {
+      profileArenaTransition('arena-factory-load');
+      await arenaFactories.resolve(nextSelection.id);
+      assertAdmission();
+    }
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
@@ -29245,11 +29855,70 @@ async function performArenaSelection(
       // createRenderPipelineAsync, which Dawn compiles on worker threads and
       // outside any fence - with frustum culling disabled so the coverage set
       // is complete; the warm frame and the committing coverage draw then
-      // find every pipeline already built. The fence itself is untouched and
-      // every other arena takes exactly the sequence it took before.
-      if (selectedArena.id === 'farcrysis' && pass64TslSystems) {
-        const farcrysisPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => farcrysisPrecompile.precompileExactScenePass(scene));
+      // find every pipeline already built. The fence itself is untouched.
+      //
+      // LOAD-CUT (pass 85, lane H, HF-417): the arena-id gate this used to
+      // carry was the bug. Lane I found gun-range UNREACHABLE by an in-match
+      // map switch on the shipped PASS 84 build - "[Gun Range map selection
+      // failed] WebGPU queue completion exceeded 12000 ms for submission 614
+      // ... fenced draws 770" - while its FIRST load was fine, so every
+      // instrument that only ever boots straight into an arena stayed green
+      // while the map could not be entered. Measured on the shipped build
+      // (docs/evidence/pass85/lane-h/): an in-session switch into gun-range
+      // creates 234-302 render pipelines, and the switch-matrix phase
+      // attribution reports how many of them are built inside THIS
+      // warm-frame-and-fence window. Whichever arena is entered second carries
+      // that cost, so nothing about it is farcrysis-specific - farcrysis was
+      // simply the first arena heavy enough to lose the race outright. The
+      // off-fence realisation therefore runs for EVERY arena. compileAsync
+      // uses createRenderPipelineAsync, which Dawn compiles on worker threads
+      // outside any submission, so this MOVES work off the fence rather than
+      // adding it: the coverage precompile below then finds the pipelines
+      // already built. THE FENCE IS UNTOUCHED at 12 s, and
+      // src/presentation-prewarm-contract.test.ts pins that this region now
+      // contains no arena-id branch at all.
+      //
+      // LOAD-CUT (pass 85, lane H2, 2026-09-03): the generalisation above was
+      // measured to cost a FIRST LOAD 8.6 s it never gets back. Interleaved A/B
+      // on gun-range, baseline dist and candidate dist back to back on the same
+      // machine minutes apart (docs/evidence/pass87/lane-h2/): the
+      // `visual-definition` phase went 4398 -> 12981 ms (x2.95) against an
+      // internal control of x1.35, and `coverage-submit-fence` did NOT fall to
+      // pay for it. The reason is in the ROOT, not the gate: on an in-session
+      // switch the whole scene's vocabulary is the thing at risk, because the
+      // renderer's cache holds the PREVIOUS arena's permutations; on a cold
+      // session nothing in the scene has been realised yet, the retained
+      // gameplay roots are suppressed and are prewarmed by their own passes
+      // downstream, and the only vocabulary the fenced warm frame can be
+      // surprised by is THE ARENA'S OWN - which is exactly what farcrysis's
+      // 134-217 cold pipelines were (submission 1 of a cold session).
+      //
+      // The in-session-switch case - the one that took the 56-pair matrix from
+      // 55/56 to 56/56 - is byte-for-byte what it was, and neither case reads an
+      // arena id.
+      //
+      // MEASURED AGAIN (lane H2, 2026-09-03): scoping the cold-session root to
+      // the arena recovered only a third of the cost - gun-range's
+      // `visual-definition` went 12981 -> 10049 ms against a 4404 ms baseline,
+      // internal control x0.99 - and `coverage-submit-fence` stayed flat at
+      // x1.00, so the remaining 5.6 s is ADDED work, not moved work. On a cold
+      // session the coverage precompile downstream realises the same set off the
+      // fence anyway and the warm frame in between clears 12 s on every arena
+      // except the one `cold-session-precompile-reach.ts` names with its
+      // evidence. So the cold-session relief is asked of that authority, and
+      // this region still contains no arena id (pinned twice).
+      //
+      // The intermediate step of this lane scoped the COLD-SESSION root to
+      // `arena.root` and measured it: it recovered 2 932 ms of the 8 583 and left
+      // 5 645 ms, so the cold session stopped running the relief at all except
+      // where it is needed. That left the narrowed root reachable ONLY for the
+      // arena the authority names - which would have shipped farcrysis a
+      // NARROWER relief than PASS 86 gives it today, on no evidence. Both
+      // surviving cases therefore take the whole scene, exactly as PASS 86 does.
+      const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
+      if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
+        const scenePassPrecompile = pass64TslSystems;
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);
@@ -29815,6 +30484,25 @@ operatorSkinSelect.addEventListener('change', () => {
   if (network.role === 'host') updateHostSkin(message);
   else if (network.role === 'client') network.send(message);
 });
+// LIGHTING: the SOLO sky. The lobby row is host-authoritative and only exists
+// once a lobby does; solo has no host to defer to, so this writes the SAME
+// replicated field (`privateMatchConfig.timeOfDay`) and applies immediately.
+// Hosting seeds the lobby from it, after which the lobby row is the authority
+// and `activeLightingTimeChoice()` reads the snapshot instead of this.
+const soloTimeOfDaySelect = element<HTMLSelectElement>('#solo-time-of-day');
+soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+soloTimeOfDaySelect.addEventListener('change', () => {
+  const chosen = soloTimeOfDaySelect.value;
+  if (!isLightingTimeChoice(chosen)) {
+    soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+    return;
+  }
+  privateMatchConfig = { ...privateMatchConfig, timeOfDay: chosen };
+  // A local override from `?tod=` would otherwise shadow the player's own
+  // choice for the rest of the session, which reads as a broken control.
+  lightingTimeChoiceOverride = null;
+  applyLightingConditionUniforms(true);
+});
 // Pass 75: the OPERATOR panel. Skin, idle stance and emote are chosen from
 // cards rather than a buried dropdown, each persists locally, and the skin
 // still replicates through the existing host-authoritative lobby-skin path.
@@ -29932,6 +30620,7 @@ const updateLobbyConfigFromUi = (): void => {
   // so this assignment can never silently no-op.
   const timeLimitSelect = element<HTMLSelectElement>('#lobby-time-limit');
   const killLimitSelect = element<HTMLSelectElement>('#lobby-kill-limit');
+  const timeOfDaySelect = element<HTMLSelectElement>('#lobby-time-of-day');
   if (arenaId !== privateMatchConfig.arenaId) {
     timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
     killLimitSelect.value = '';
@@ -29947,6 +30636,10 @@ const updateLobbyConfigFromUi = (): void => {
     // contract; gun-range keeps its fixed untimed practice round.
     durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
     scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value),
+    // LIGHTING: the host's time-of-day mode joins the replicated match contract.
+    // A value the validator does not know collapses to the default rather than
+    // failing the whole lobby snapshot.
+    timeOfDay: isLightingTimeChoice(timeOfDaySelect.value) ? timeOfDaySelect.value : DEFAULT_LIGHTING_TIME_CHOICE,
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -29956,6 +30649,7 @@ element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobby
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-time-limit').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-kill-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-of-day').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
   const team: Team = teamSelect.value === '1' ? 1 : 0;
@@ -30419,7 +31113,15 @@ function frame(now: number, scheduleNext = true): void {
       // Held for the whole window once armed. Toggling it off the instant the
       // presented estimate wobbles made the one surface that explains the frame
       // rate flicker in and out while the player was trying to read it.
-      refreshWarning.hidden = now >= refreshWarningUntil;
+      //
+      // ...except in CAPTURE mode. A deterministic review frame is a
+      // measurement, and this banner lays an opaque strip across the bottom of
+      // it: the Lane AB time-of-day frames for Terminal both carry a "91 HZ
+      // DISPLAY REFRESH" notice over ~8% of the frame. It is constant across a
+      // pair so it cannot flip the sign of a delta, but it dilutes every
+      // percentage-of-frame metric and it is not a clean review capture. The
+      // same flag that hides the viewmodel for a capture hides it.
+      refreshWarning.hidden = debugCaptureViewmodelHidden || now >= refreshWarningUntil;
       lastFpsHudAt = now;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
@@ -30466,6 +31168,15 @@ function frame(now: number, scheduleNext = true): void {
     updateTargets(selectedArena.id === 'gun-range'
       ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
       : visualNow);
+    // MAP3 (HF-409): advance arena-authored animation for the active arena.
+    // `arena` is the admitted arena; staged and cached arenas are never passed
+    // here, so a not-yet-admitted world cannot advance its clock behind the
+    // loading transition. The context factory allocates only when a hook exists.
+    arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
+      arenaId: arena.id,
+      cameraPosition: camera.position,
+      playerVelocity: player.velocity,
+    }));
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
@@ -30545,6 +31256,13 @@ function frame(now: number, scheduleNext = true): void {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, visualNow);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);
       grassSystem?.update(visualNow / 1_000, camera.position, player.position, gameStarted);
+    } else if (selectedArena.id === 'nuketown2') {
+      // HF-426 Job 3. The rebuild's lawn field is built INSIDE `buildNuketown2`
+      // and parks its wind hook on the arena root, so it takes the same single
+      // uniform write per frame the shipped map's lawn does. The light set is
+      // untouched here - `updateArenaArt` writes one uniform and then finds no
+      // rings, nucleus, beacon or fauna on this root and does nothing else.
+      if (arena.id === 'nuketown2') updateArenaArt(arena.root, visualNow);
     } else if (selectedArena.id === 'gun-range') {
       // HF-347: pose the training dummies on HOST time, not this peer's own clock.
       // gunRangeTestBayRenderedDummyPose is a pure function of time with no
@@ -30582,6 +31300,16 @@ function frame(now: number, scheduleNext = true): void {
       : gameStarted
         ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
         : clearWeatherSample(selectedArena.id);
+    // LIGHTING: the hour rides the SAME clock and the SAME match seed the
+    // weather does, so two peers agree on the sun for exactly the reason they
+    // already agree on the sky — and `skyDarkenAmount` pulls the time-of-day
+    // excursion back toward the arena's authored identity as the sky closes in.
+    // This is a uniform write over the frozen light set. `fixed`/`random` write
+    // once per arena apply AND once per weather step that actually changes a
+    // resolved term; `cycle` additionally writes as the clock moves the sun.
+    lightingConditionsElapsedSeconds = weatherElapsedSeconds;
+    lightingConditionsSkyDarken = weatherNow.skyDarkenAmount;
+    applyLightingConditionUniforms();
     const windNow = sampleWind(
       weatherWindField,
       camera.position.x,
@@ -31629,6 +32357,13 @@ const debugWindow = window as Window & {
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
+    // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
+    sampleLightingConditions: () => Record<string, unknown>;
+    setLightingTimeChoice: (choice: string) => Record<string, unknown>;
+    /** LIGHTING: move weather live, unforced, to falsify the uniform-write gate. */
+    setWeatherOverride: (state: string | null) => Record<string, unknown>;
+    /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
+    setLightingFixedHour: (hour: number | null) => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
     sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
@@ -31642,6 +32377,7 @@ const debugWindow = window as Window & {
     /** HF-412: cheap third-person stance-blend read; see sampleBodyStancePose. */
     sampleBodyStancePose: (kind?: 'bot' | 'remote') => ReturnType<typeof sampleBodyStancePose>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
+    prepareArena: (arenaId: ArenaId) => Promise<void>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -32858,6 +33594,35 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     rain: rainPresentation.telemetry(),
     particles: hfParticleRuntime.telemetry(),
   }),
+  // LIGHTING: read-only time-of-day telemetry. No light is touched by reading.
+  sampleLightingConditions: () => lightingConditionsTelemetry(),
+  // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
+  setLightingTimeChoice: (choice: string) => {
+    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: activeLightingTimeChoice() };
+    lightingTimeChoiceOverride = choice;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: move the weather with NO forced apply, so the next ordinary frame
+  // decides for itself whether a uniform write is owed. This is the falsifier
+  // for the gate defect: before the writes-gate fix, a weather change at a fixed
+  // hour resolved new tints and threw them away, and `uniformWrites` did not
+  // move. It writes one module-scope variable the weather sampler already reads.
+  setWeatherOverride: (state: string | null) => {
+    if (state !== null && !WEATHER_SEVERITY_LADDER.includes(state as WeatherState)) {
+      return { accepted: false, weather: weatherOverrideState };
+    }
+    weatherOverrideState = state as WeatherState | null;
+    return { accepted: true, weather: weatherOverrideState, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: the same hook at hour resolution, for the band scan. Still only
+  // uniform writes over the frozen light set -- an hour is an argument to a pure
+  // function here, not a scene change.
+  setLightingFixedHour: (hour: number | null) => {
+    lightingCaptureFixedHour = typeof hour === 'number' && Number.isFinite(hour) ? hour : null;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, fixedHour: lightingCaptureFixedHour, ...lightingConditionsTelemetry() };
+  },
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because
   // five independent conditions can freeze movement and none of them was
@@ -32967,6 +33732,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+      matchAdmissionProfile: lastMatchAdmissionProfile,
       botWeaponVocabulary: botWeaponGpuVocabulary.telemetry(),
     },
     gameStarted,
@@ -34098,6 +34864,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  /**
+   * MAP3 (HF-409 finisher 2): make a NON-ACTIVE arena buildable.
+   *
+   * `traceBallistics(..., arenaId)` builds an arena it is not standing in, on
+   * the spot and synchronously, and that is how the eye-clearance stage-2
+   * sweep probes every arena from one page. A lazily loaded arena (map3) has a
+   * chunk to fetch and a wasm module to initialise before its builder exists,
+   * and neither can happen inside a synchronous call. So the wait is a
+   * separate, awaitable step: call this first and the probe below works.
+   * Resolving an eager arena is a no-op that costs one microtask.
+   */
+  prepareArena: async (arenaId) => { await arenaFactories.resolve(arenaId); },
   traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;
@@ -34309,7 +35087,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = operatorYawToward(bot.position, origin);
-    poseOperator(bot.root, 'stand', 0, performance.now() * 0.001);
+    // QA staging poses the body upright deliberately; the field follows it so
+    // the pose and the replicated/rewound stance can never disagree.
+    bot.stance = 'stand';
+    poseOperator(bot.root, bot.stance, 0, performance.now() * 0.001);
     bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
     return {
@@ -35110,7 +35891,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const haze = bot.root.getObjectByName('neon-purple-bot-haze');
       if (haze) haze.visible = false;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
     }
     botsFrozen = true;
@@ -35598,21 +36379,30 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
     const now = performance.now();
-    if (mode === 'charging') overdriveState = createOverdriveState(now);
-    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: false, nextSpawnAt: now };
+    // HF-432 item 5: the harness stages the ARENA's seat, never the shipped
+    // map's - the debug backdoor `stageRailgunSpawn` below already records.
+    const seat = overdrivePositionForArena(selectedArena.id);
+    if (mode === 'charging') overdriveState = createOverdriveState(now, seat);
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now, seat), available: false, nextSpawnAt: now };
     else if (mode === 'active') overdriveState = {
       generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
-      position: OVERDRIVE_POSITION,
+      position: seat,
+      home: seat,
     };
     else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
     updateOverdrive(now);
     broadcastOverdriveState(now);
   },
   stageRailgunSpawn: (siteIndex = 0) => {
-    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
-    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
-    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
+    // HF-407: the staging path is arena-scoped, not Nuke-Town-scoped. Hard-coding
+    // 'atomic-acres' here while the player stood in another railgun arena would have
+    // staged the pickup at the SHIPPED map's coordinates - a debug backdoor telling a
+    // QA run the weapon works where a real match would put it somewhere else.
+    const stagedSites = gameStarted ? railgunSpawnSitesForArena(selectedArena.id) : null;
+    if (!stagedSites) return railgunState;
+    const boundedIndex = Math.max(0, Math.min(stagedSites.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState(selectedArena.id, 0, (boundedIndex + 0.01) / stagedSites.length, railgunState.generation + 1);
     const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
@@ -35681,16 +36471,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bot.nextGrenadeAt = now + 60_000;
       bot.grenadeActive = false;
       bot.continuity += 1;
+      bot.stance = 'stand';
+      bot.stanceHeldUntil = 0;
+      bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
       bot.positionHistory = [{
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: operatorYawToward(bot.position, origin), stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: operatorYawToward(bot.position, origin), stance: bot.stance, continuity: bot.continuity,
       }];
       bot.root.position.copy(bot.position);
       bot.root.rotation.set(0, operatorYawToward(bot.position, origin), 0);
       bot.root.scale.setScalar(1);
       bot.root.visible = true;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
       if (index < 3) railgunQaHeldDeadBots.add(bot.id);
     }
@@ -36046,6 +36839,59 @@ let lastArenaEffectPrewarmProfile: Readonly<{
   groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
 }> | null = null;
 
+// LOAD-CUT (pass 85, lane H2): MATCH ADMISSION IS THE LARGEST UNMEASURED BLOCK.
+// The arena transition has had a phase profiler since pass 79 and every cut this
+// repo has made to load time was aimed by it. Admission - everything between
+// `startSolo()` and the first live frame - has only ever produced ONE number,
+// and it is 14.4-20.4 s per arena, roughly 30-40% of the wall time between
+// pressing deploy and playing (lane H first-load rows, 2026-09-02). "Attribute
+// it" cannot be done from one number, so this records the same shape the
+// transition profiler records.
+//
+// It is MARKERS ONLY. Every call in the admission block is pinned by exact
+// source string in `src/presentation-prewarm-contract.test.ts`, so nothing here
+// wraps, reorders, adds or removes a step: `markMatchAdmission` stamps
+// performance.now() BETWEEN the existing statements, exactly as
+// `profileArenaTransition` does inside the transition. A mark costs one array
+// push; the block it measures costs seconds.
+let matchAdmissionMarks: { name: string; at: number }[] = [];
+let lastMatchAdmissionProfile: Readonly<{
+  arenaId: string;
+  mode: string;
+  durationMs: number;
+  steps: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+function beginMatchAdmissionProfile(): void {
+  matchAdmissionMarks = [];
+}
+
+function markMatchAdmission(name: string): void {
+  matchAdmissionMarks.push({ name, at: performance.now() });
+}
+
+/**
+ * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ * the LAST mark's duration runs to this call - which is why `finalize` is stamped
+ * at the end of both backend branches rather than inferred.
+ */
+function finalizeMatchAdmissionProfile(mode: string): void {
+  const marks = matchAdmissionMarks;
+  matchAdmissionMarks = [];
+  if (marks.length === 0) return;
+  const completedAt = performance.now();
+  const steps = marks.map((mark, index) => Object.freeze({
+    name: mark.name,
+    durationMs: Number(((index + 1 < marks.length ? marks[index + 1].at : completedAt) - mark.at).toFixed(3)),
+  }));
+  lastMatchAdmissionProfile = Object.freeze({
+    arenaId: selectedArena.id,
+    mode,
+    durationMs: Number((completedAt - marks[0].at).toFixed(3)),
+    steps: Object.freeze(steps),
+  });
+}
+
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
   await yieldBrowserPreparationFrame();
 }
@@ -36102,8 +36948,24 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
     const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
+    // LOAD-CUT (pass 85, lane H): these two rehearsals are SERIALIZED after the
+    // concurrent families above - they stage a transient world PointLight and
+    // three r185 folds the visible light graph into every render object's cache
+    // key, so they cannot overlap - and they ran on every arena. Measured over
+    // 56 in-session map switches on the shipped PASS 84 build:
+    // `flare-first-shot` 2560.6 ms median, `flamethrower-first-shot` 415.4 ms,
+    // out of a 21.3 s median switch. Neither weapon is a loadout weapon; each
+    // has one authored route onto a map, and `arena-special-weapon-reach.ts`
+    // asks those authorities (TIMED_MAP_WEAPON_DEFINITIONS, and the
+    // field-support rule for the care package's crimson flamethrower) instead
+    // of restating an arena list. Nothing leaves the ADMITTED vocabulary: the
+    // full weapon catalogue is still prewarmed above, and
+    // prewarmMatchBoundFirstShotPresentations still rehearses both exact fire
+    // compositions against the complete match scene on every arena before
+    // admission. This only drops the duplicate arena-side rehearsal on arenas
+    // whose own authority can never produce the weapon.
     groups.push(await runGroup('flare-first-shot', () => (
-      flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlareGun(selectedArena) ? Promise.resolve() : flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -36111,7 +36973,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ))
     )));
     groups.push(await runGroup('flamethrower-first-shot', () => (
-      flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
+      !arenaCanAcquireFlamethrower(selectedArena) ? Promise.resolve() : flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
           () => renderRuntime.compileAndRender(scene, camera, scene),

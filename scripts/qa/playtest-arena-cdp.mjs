@@ -19,6 +19,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -28,7 +29,11 @@ const arg = (name, fallback) => {
 
 const BASE = arg('--url', 'http://127.0.0.1:41911');
 const OUTDIR = arg('--outdir', 'artifacts/playtest-pass79');
-const ARENAS = arg('--arenas', 'atomic-acres,farcrysis,high-seas,skyline-terminal,rustworks-1v1,gun-range')
+// PASS 85 Lane N: this default was a hardcoded arena literal, so Test1, Test2
+// and Map 3 were never swept by it and nothing said so. It is now derived from
+// the registry (scripts/qa/arena-roster.mjs) and is a strict superset of what
+// it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 const BOOT_TIMEOUT_MS = Number(arg('--boot-timeout', '180000'));
 

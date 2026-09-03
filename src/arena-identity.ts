@@ -18,6 +18,15 @@ export const ARENA_IDS = Object.freeze([
   // id is the network, replay and storage boundary from the first commit:
   // promoting it later must never require moving it.
   'map3',
+  // NUKETOWN2 (owner 2026-09-02, HF-407). The Nuke Town rejig ships beside the
+  // shipped `atomic-acres` as a PREVIEW so the main map is never broken
+  // mid-pass. The id is the network, replay and storage boundary from the
+  // first commit: when the owner promotes it, the id must not have to move.
+  'nuketown2',
+  // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink. Ships beside the
+  // shipped Raid (`test2`), which keeps its id, so a saved match, a replay or an
+  // old link that names `test2` still resolves to the map it was recorded on.
+  'raid2',
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];

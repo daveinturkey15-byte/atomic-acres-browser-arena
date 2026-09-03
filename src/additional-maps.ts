@@ -3597,8 +3597,52 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   };
   addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
   addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  /**
+   * Engine nacelle seat height. Lane J, 2026-09-02 (eye-clearance triage).
+   *
+   * The nacelles used to sit at y = 1.6, so their 1.9 m body spanned
+   * 0.65 .. 2.55 m. Two consequences, both measured:
+   *  - the wing above them is authored at 2.68 .. 2.96 (visual AND authority,
+   *    `addWingAuthority`), so the engines hung 0.13 m clear of the wing they
+   *    are bolted to - floating geometry under the forging review;
+   *  - the 0.65 m belly left a prone crawl space over a 0.61 m prone eye. The
+   *    eye-clearance sweep flagged all six of skyline-terminal's red rows there
+   *    (d = 0.067 m, prone, both nacelles), and stage 3 was worse than the
+   *    analytic number: `resolveEyeClearance` had nowhere lateral to go, pushed
+   *    the camera UP into the nacelle to its 0.34 m cap (seat y 1.66, i.e.
+   *    inside the engine) and still measured 0.035 m - a metre above the
+   *    player's real eye, looking through the engine's interior.
+   *
+   * Seating the nacelle against the wing underside fixes both at once: the top
+   * lands exactly on 2.68 and the belly rises to 0.78 m, which clears the prone
+   * eye by 0.17 m - past the sweep's 0.15 m probe radius (= the camera's 0.08 m
+   * near plane plus bob margin), so the runtime resolve never engages here at
+   * all. It is a translation only: no size, footprint or material changes, and
+   * the instanced Quality visual below moves with it so authority and mesh stay
+   * coincident.
+   */
+  const NACELLE_CENTRE_Y = 1.73;
+  /**
+   * Nacelle collision authority. Lane J found this transposed against its own
+   * visual and PASS 87 Lane AR (item 12) landed the repair.
+   *
+   * The visual is `engineNacelles` below: a CylinderGeometry of length 4.1 and
+   * radius 0.95, rotated +90 degrees about Z, so its axis lies along X and its
+   * world extent is 4.1 x 1.9 x 1.9 (x, y, z). The authority box was authored
+   * 1.9 x 1.9 x 4.1 - the same three numbers with x and z swapped, i.e. the
+   * engine turned across the aircraft instead of along it. Consequences,
+   * measured from the built arena: 1.10 m of solid stuck out fore and aft of a
+   * pod that visibly ends there (an invisible wall), and 1.10 m of visible pod
+   * on each side had no collision or shot authority at all (shooting through a
+   * jet engine). Both profiles, since the pod was authored.
+   *
+   * Derived-not-copied is asserted in src/additional-maps.test.ts: the size pin
+   * that used to hardcode 1.9/1.9/4.1 now reads the instanced visual's own
+   * world bounds, so the next person to re-orient the pod cannot re-transpose
+   * the collider silently.
+   */
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, NACELLE_CENTRE_Y, 12.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, NACELLE_CENTRE_Y, -8.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -3634,7 +3678,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
   for (const [index, z] of [12, -8].entries()) {
-    nacelleMatrix.compose(new THREE.Vector3(0, 1.6, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
+    // Same seat height as the collision authority above - see NACELLE_CENTRE_Y.
+    nacelleMatrix.compose(new THREE.Vector3(0, NACELLE_CENTRE_Y, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
     engineNacelles.setMatrixAt(index, nacelleMatrix);
   }
   engineNacelles.instanceMatrix.needsUpdate = true;
@@ -3742,7 +3787,13 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
 
   const physicalCover: ArenaMap['physicalCover'] = [
-    { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },
+    // Lane AR item 12: these two follow the repaired nacelle authority above
+    // (4.1 along x, 1.9 across z, plus the same 0.2 m cover margin the other
+    // rows carry). The south row was the transposed footprint; the north
+    // engine at z = -8 had no physicalCover row at all, so half the aircraft's
+    // hard cover was missing from bot cover selection and the minimap.
+    { id: 'jetliner-engine-south', bounds: { minX: -2.25, maxX: 2.25, minZ: 10.85, maxZ: 13.15 }, blocksMovement: true, blocksShots: true },
+    { id: 'jetliner-engine-north', bounds: { minX: -2.25, maxX: 2.25, minZ: -9.15, maxZ: -6.85 }, blocksMovement: true, blocksShots: true },
     { id: 'terminal-backwall', bounds: { minX: -31, maxX: 31, minZ: -34.3, maxZ: -33.9 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-west', bounds: { minX: -12.6, maxX: -7.4, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-east', bounds: { minX: 7.4, maxX: 12.6, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },

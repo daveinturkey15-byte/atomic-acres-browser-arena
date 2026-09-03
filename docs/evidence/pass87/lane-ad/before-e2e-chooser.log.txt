@@ -1,0 +1,32 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:playwright-topology
+> node scripts/qa/run-playwright-with-topology.mjs tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0 --reporter=list
+
+vite v8.1.3 building client environment for production...
+
+✓ built in 2.93s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+{"releaseTopology":"ok","sourceSha":"d329628d7b9573812cd9a1655cb91bca6f20af40","channels":{"experimental":{"pass":"PASS 86","sourceSha":"d329628d7b9573812cd9a1655cb91bca6f20af40","digest":"123563edba9843bc2fb88f3a4b2cddcf79ec4d00fe3f9646473b60ad34f1bf78"},"previous":{"pass":"PASS 72","pagesSha":"d5b77dc3b9e46608264c52eb0737b50590d70eb5","digest":"594ed5be34d78ea1f93a28f7b457c91cababbac8ea737bb6dd06701fee25b22d"},"retained":{"pass":"PASS 70","pagesSha":"3b5e675c54eaea2a2dd721eca6f247c933361587","digest":"59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6"},"historical":{"pass":"PASS 69","pagesSha":"71ec5616504d8e24241450742d01b25c1d6ff4e4","digest":"04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec"},"stable":{"pass":"PASS 67.1","pagesSha":"271cea28299570af8def30e879701ddbd3c4bc12","digest":"10e408e5663dda8fef820aae89bbcda174699bd2661b9d94387d060fdb55914a"},"rollback":{"pass":"PASS 63","sourceSha":"ac85e9b8b46cc2370aee903d564ecf3c4682b24c","digest":"43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579"}}}
+Atomic Acres owned Playwright preview listening at http://127.0.0.1:4291/
+(node:54664) Warning: Failed to load the ES module: C:\Users\david\projects\aa-claude-releaseci\src\changelog.ts. Make sure to set "type": "module" in the nearest package.json file or use the .mjs extension.
+(Use `node --trace-warnings ...` to show where the warning was created)
+SyntaxError: Cannot use 'import.meta' outside a module
+
+   at release-channel-chooser.spec.ts:5
+
+  3 | import { readFileSync } from 'node:fs';
+  4 | import { resolve } from 'node:path';
+> 5 | import { CHANGELOG } from '../../src/changelog';
+    | ^
+  6 | import { PASS66_RELEASE_IDENTITY } from '../../src/release-identity';
+  7 |
+  8 | const releaseChannels = JSON.parse(readFileSync(resolve(process.cwd(), 'release-channels.json'), 'utf8')) as {
+    at Object.<anonymous> (C:\Users\david\projects\aa-claude-releaseci\tests\e2e\release-channel-chooser.spec.ts:5:1)
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+

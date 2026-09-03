@@ -285,6 +285,15 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     modulationHz: 0.085, modulationDepth: 0.09,
     bedPosition: Object.freeze({ x: -20, y: 3, z: 12 }), airPosition: Object.freeze({ x: 22, y: 5, z: -16 }),
   }),
+  // RAID2 (PREVIEW, HF-408): placed on this arena's own plan - the bed over the
+  // circular drive, the air over the pool terrace - and voiced a little brighter
+  // and drier than test2 because the rebuild has far less roof to soak it up.
+  'raid2': Object.freeze({
+    arenaId: 'raid2', identity: 'open-terrace-breeze-and-pool-water', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 54, airFrequencyHz: 182, airLowpassHz: 720, airQ: 1.7, airGain: 0.0068,
+    modulationHz: 0.078, modulationDepth: 0.085,
+    bedPosition: Object.freeze({ x: 0, y: 3, z: 14 }), airPosition: Object.freeze({ x: -10, y: 5, z: -28 }),
+  }),
   // MAP3 (PREVIEW): the bed is the wind in the colonnade bay, the air layer is
   // the open scrub on the far side of the hub. Both are placed off-axis from
   // the hub centre so the layer has a bearing to walk around.
@@ -293,6 +302,16 @@ export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinit
     continuousVoices: 2, bedFrequencyHz: 46, airFrequencyHz: 182, airLowpassHz: 720, airQ: 1.7, airGain: 0.0062,
     modulationHz: 0.073, modulationDepth: 0.11,
     bedPosition: Object.freeze({ x: -34, y: 4, z: -34 }), airPosition: Object.freeze({ x: 30, y: 6, z: 30 }),
+  }),
+  // NUKETOWN2 (PREVIEW, HF-407): the bed is the low mains/transformer hum at
+  // the west cul-de-sac, the air layer is wind over the east back yard's fence
+  // line. Placed at opposite ends of the street so the pair gives the player a
+  // bearing along the one axis the whole map is organised on.
+  'nuketown2': Object.freeze({
+    arenaId: 'nuketown2', identity: 'test-town-street-hum-and-fence-wind', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 54, airFrequencyHz: 188, airLowpassHz: 690, airQ: 1.75, airGain: 0.0061,
+    modulationHz: 0.079, modulationDepth: 0.1,
+    bedPosition: Object.freeze({ x: -24, y: 3, z: -2 }), airPosition: Object.freeze({ x: 18, y: 5, z: 21 }),
   }),
 });
 

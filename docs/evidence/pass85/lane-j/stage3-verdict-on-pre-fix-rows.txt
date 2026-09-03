@@ -1,0 +1,6 @@
+ok   atomic-acres       interior-access-ramp d=0.143 seat=[-11.48,0.505,-11.68]
+ok   atomic-acres       interior-access-ramp d=0.143 seat=[-9.82,0.505,-11.68]
+RED  skyline-terminal   skyline-jetliner-engine-1 d=0.035 seat=[-0.97,1.661,13.72]
+RED  skyline-terminal   skyline-jetliner-engine-2 d=0.035 seat=[-0.97,1.58,-9.72]
+ok   gun-range          gun-range-test-bay-secure-door-leaf d=0.15 seat=[51,1.84,8.64]
+near plane = 0.08; unannotated rows below it on the PRE-FIX tree = 2

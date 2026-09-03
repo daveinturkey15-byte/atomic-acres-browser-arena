@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { computeMatrixVerdict } from './cross-browser-gate-contract.mjs';
+import { MINIMUM_EYE_CLEARANCE_ARENAS, eyeClearanceArenaIds, parkedArenaIds } from './eye-clearance-roster.mjs';
 
 const lane = (name, verdict) => ({ lane: name, verdict });
 
@@ -101,9 +102,45 @@ test('every selectable arena is covered by the derived roster', () => {
   // identical guard in eye-clearance-sweep-contract.test.mjs. The floor and the
   // required set are the only things standing between a collapsed derivation and
   // a gate that reports success while browser-testing nothing.
-  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  // MAP3 (owner 2026-09-02, HF-409, PASS 86): ratcheted BACK UP 7 -> 8 with the
+  // card. The 8 -> 7 drop lasted exactly as long as the withdrawal did. A floor
+  // is a collapsed-derivation alarm and must equal the REAL roster in both
+  // directions - which is why the equality assertion below, not this literal,
+  // is the thing that actually holds it.
+  // HF-423 (PASS 87): 8 -> 10. Both PASS 86 and Lane R independently wrote the
+  // literal `9` from different arithmetic (nine of ten with farcrysis hidden;
+  // nine ids before nuketown2 with it un-hidden). Git merges identical text
+  // without conflict, so the union of the two is TEN, not nine.
+  assert.ok(selectable.length >= 10, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  // MAP3 (HF-409 repair, 2026-09-02): a bare floor only guards DOWNWARD, so a
+  // silently lowered literal would still pass while covering fewer arenas. The
+  // sibling eye-clearance contract was given a floor-equals-derived-roster
+  // equality on the same day; this is that assertion, so the two independent
+  // derivations and the shared floor constant must all agree, and the literal
+  // above cannot be edited on its own in either direction.
+  assert.equal(
+    selectable.length, MINIMUM_EYE_CLEARANCE_ARENAS,
+    `this file's derived roster (${selectable.length}: ${selectable.join(', ')}) must equal `
+    + `the shared roster floor (${MINIMUM_EYE_CLEARANCE_ARENAS}) that eye-clearance-roster.mjs pins`,
+  );
+  assert.deepEqual(
+    [...selectable].sort(), [...eyeClearanceArenaIds()].sort(),
+    'this file and the shared roster derivation must name the SAME arenas, not merely the same count',
+  );
+  // MAP3 joins the required set with its card: an offered arena that no browser
+  // ever loads is exactly the hole this required set exists to catch. FARCRYSIS
+  // joins it at HF-423 for the same reason.
   for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
-  assert.ok(!selectable.includes('farcrysis'), 'farcrysis is selectable:false and must stay out of the required set');
+  // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the
+  // required set. Its exclusion is ASSERTED, not merely dropped - the parked
+  // set is derived from the same registry scrape as the offered set, so a
+  // parked arena cannot quietly slip out of coverage, and a future park or
+  // un-park needs no edit here at all.
+  const parked = parkedArenaIds();
+  assert.ok(parked.length > 0, 'the parked-arena pin must not be vacuous');
+  for (const id of parked) {
+    assert.ok(!selectable.includes(id), `${id} is parked and must not be in this roster`);
+  }
 });

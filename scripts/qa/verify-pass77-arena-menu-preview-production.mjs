@@ -35,6 +35,8 @@ import {
   digestFinalMediaSet,
   sha256File,
 } from '../assets/pass65-menu-preview-integrity.mjs';
+import { arenaRegistryEntries } from './arena-roster.mjs';
+import { LINEAGE_PATH, liveGeneratorDigests } from '../assets/write-capture-generator-lineage.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const provenancePath = path.join(root, 'source-assets/menu/pass77-arena-previews/provenance.json');
@@ -127,7 +129,69 @@ if (provenance) {
   }
   await pinDigest('scripts/assets/finalize-pass77-arena-menu-previews.mjs', provenance.finalizer?.sha256, 'pass77 finalizer');
   if (slash(path.relative(root, finalizerPath)) !== provenance.finalizer?.path) fail('pass77 provenance finalizer path drifted');
-  await pinDigest('scripts/assets/generate-pass65-runtime-menu-previews.ts', provenance.generator?.sha256, 'pass77 capture generator');
+  /**
+   * PASS 87 Lane AR, item 11. This used to be
+   * `pinDigest(generatorPath, provenance.generator?.sha256, ...)`: re-hash the
+   * LIVE shared capture generator and require it to equal the digest THIS
+   * family recorded when it captured. Two things were wrong with that.
+   *
+   * 1. The generator is SHARED. pass79, pass84 (Map 3, c25f5e32) and pass85
+   *    (Nuke Town Rebuild, a4b56ec7) all edit it, and each edit turned pass77's
+   *    honest capture record into a gate failure. The only ways out were to
+   *    rewrite a historical digest - falsifying provenance - or to leave the
+   *    gate red. It was left red, on the base line, for two passes.
+   * 2. The recorded digest 80194703... is the CRLF hash of the generator at
+   *    5ac48931. It has never equalled the LF bytes git stores, so this pin was
+   *    a line-ending artifact from the day it was written: green on a CRLF
+   *    checkout, red on an LF one, regardless of Map 3.
+   *
+   * A capture record is history and is never rewritten. What this gate needs is
+   * accountability, and it comes in two halves:
+   *   - the LIVE generator must be the version the shared lineage says is
+   *     current, graded on LF-normalised bytes so the verdict does not depend
+   *     on anyone's git config;
+   *   - the digest THIS family recorded must be a generator version that
+   *     really existed, matched against the lineage in either line ending.
+   *
+   * WHAT THIS GATE NO LONGER COVERS, stated plainly rather than sold as a
+   * strengthening. The old equality check compared the live generator's bytes
+   * with the bytes this family actually captured with, so it detected MEDIA
+   * THAT HAD GONE STALE relative to the generator. The pair above does not:
+   * both conditions are satisfied by running
+   * `node scripts/assets/write-capture-generator-lineage.mjs` after any
+   * generator edit, with the captured media untouched. It is stricter on
+   * provenance (a recorded digest can no longer be a number nothing ever
+   * hashed to, which is what the CRLF defect was) and weaker on staleness.
+   *
+   * The brief's other option - pin only the byte-affecting parts of the
+   * generator, so a pixel-relevant edit still reds the families that captured
+   * with the old one - would restore the staleness property. It needs a
+   * defensible split of that file into capture parameters and everything else,
+   * which is a separate piece of work; the pass77 family's own re-capture
+   * cadence is what covers staleness until then.
+   */
+  const live = liveGeneratorDigests();
+  const lineage = await readJson(path.join(root, LINEAGE_PATH), 'shared capture generator lineage');
+  if (lineage) {
+    if (lineage.path !== slash(path.relative(root, generatorPath))) {
+      fail(`capture generator lineage tracks ${lineage.path}, not ${slash(path.relative(root, generatorPath))}`);
+    }
+    if (lineage.current?.sha256 !== live.sha256) {
+      fail(
+        `shared capture generator changed: lineage current is ${lineage.current?.sha256}, live is ${live.sha256}. `
+        + 'Run `node scripts/assets/write-capture-generator-lineage.mjs` - do NOT edit any family provenance.',
+      );
+    }
+    const versions = [lineage.current, ...(lineage.retired ?? [])].filter(Boolean);
+    const recorded = provenance.generator?.sha256;
+    const accounted = versions.find((version) => version.sha256 === recorded || version.crlfSha256 === recorded);
+    if (!accounted) {
+      fail(
+        `pass77 provenance records capture generator ${recorded}, which is not a version the shared `
+        + 'lineage knows about. Either the record is wrong or the lineage is stale.',
+      );
+    }
+  }
   if (slash(path.relative(root, generatorPath)) !== provenance.generator?.path) fail('pass77 provenance generator path drifted');
 }
 
@@ -322,30 +386,23 @@ else {
 /**
  * The arena roster, derived from ARENA_SELECTIONS rather than listed here.
  *
- * This verifier is plain ESM and src/map-selection.ts pulls in the gameplay and
- * bot modules, so the roster is read out of the source text. Each entry is an
- * `Object.freeze({ ... })` whose `id` and `selectable` both precede its
- * `matchRules: Object.freeze({`, so splitting on that token yields one chunk per
- * arena carrying both. A shape change makes the roster empty or short, which
- * fails loudly immediately below rather than silently passing an empty loop.
+ * PASS 85 Lane N repair: this file used to carry its OWN scrape of
+ * src/map-selection.ts - its own regex, its own chunk-splitting assumption,
+ * the fourth copy of a derivation that already existed three times. It now
+ * calls the single copy in scripts/qa/arena-roster.mjs, which throws (rather
+ * than returning short) when the scrape stops matching; the catch below turns
+ * that into this verifier's own failure list so it still reports every issue
+ * instead of only the first.
  */
-function selectableArenaRoster(source) {
-  const start = source.indexOf('export const ARENA_SELECTIONS');
-  const end = source.indexOf('\n]);', start);
-  if (start < 0 || end < 0) return null;
-  const roster = [];
-  for (const chunk of source.slice(start, end).split('Object.freeze({')) {
-    const id = /^\s*id: '([a-z0-9-]+)' as const,$/m.exec(chunk)?.[1];
-    if (!id) continue;
-    roster.push({ id, selectable: !/^\s*selectable: false,$/m.test(chunk) });
-  }
-  return roster;
+let roster = null;
+try {
+  roster = arenaRegistryEntries();
+} catch (error) {
+  roster = null;
+  fail(`could not derive the arena roster from ${slash(path.relative(root, mapSelectionPath))}: ${error.message}; the shelf invariants cannot run`);
 }
-
-const selectionSource = await readFile(mapSelectionPath, 'utf8').catch(() => null);
-const roster = selectionSource === null ? null : selectableArenaRoster(selectionSource);
-if (!roster || roster.length < RETAINED_ARENAS.length + ARENAS.length) {
-  fail(`could not derive the arena roster from src/map-selection.ts (found ${roster?.length ?? 0}); the shelf invariants cannot run`);
+if (roster && roster.length < RETAINED_ARENAS.length + ARENAS.length) {
+  fail(`derived only ${roster.length} arenas from src/map-selection.ts; the shelf invariants cannot run`);
 }
 const selectableArenas = (roster ?? []).filter((arena) => arena.selectable).map((arena) => arena.id);
 

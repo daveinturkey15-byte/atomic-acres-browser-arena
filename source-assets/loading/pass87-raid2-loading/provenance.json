@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "familyId": "pass87-raid2-loading-backdrop",
+  "generatedAt": "2026-09-03",
+  "note": "Deployment loading backdrop for Raid Rebuild (raid2, HF-408), derived from the arena's own authoritative WebGPU runtime capture. raid2 never shipped a placeholder: this is its first backdrop. The six Lane I backdrops, the pass79 pair, the pass84 map3 backdrop and all masters are untouched.",
+  "encode": {
+    "captureSize": [
+      2560,
+      1440
+    ],
+    "outputSize": [
+      1536,
+      864
+    ],
+    "resampler": "PIL.Image.LANCZOS",
+    "format": "WEBP",
+    "qualityCeiling": 88,
+    "qualityUsed": {
+      "raid2": 88
+    },
+    "method": 6,
+    "maximumBytes": 239202,
+    "minimumPsnrDb": 40.0,
+    "psnrDb": {
+      "raid2": 42.49
+    },
+    "lowerByteBoundSubstitution": "The shipped family's 169,200 byte lower bound is not asserted here. At the family's own ceiling quality of 88 this content encodes well under it because a bleached travertine estate under a high sun carries very little high-frequency detail, and raising quality above the family ceiling purely to reach a byte count would put this file outside the family it claims to join. The byte floor was a proxy for fidelity, so fidelity is measured directly instead: PSNR against the file's own PNG master, floored at 40.0 dB, which noise cannot satisfy. The family's UPPER bound is kept as a hard assert.",
+    "inheritedFrom": "scripts/art-gen/finalize_lane_i.py"
+  },
+  "finalizer": {
+    "path": "scripts/assets/finalize_pass87_raid2_loading_backdrop.py",
+    "sha256": "57f87f9966f44b6c0c5c4a1f2ac60fab5689d1f98a16cecad5128892dcc2a074"
+  },
+  "generator": {
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "169ad102d3b656f29054fcc7a2a668b159350ae528fb0ce2ee32c8dc01813cf9"
+  },
+  "arenas": [
+    {
+      "arenaId": "raid2",
+      "replaces": null,
+      "previousSha256": null,
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "6b6c52e00f4dd533abcf69fddd6854f7c61bccfbd907d409c6c30de8042187af",
+        "sourceFrame": 180,
+        "sourceFrameSha256": "a2c498aa7572862dd70e7364b0c35b9de4792a38836085acfbe45bcaccaba94c",
+        "reviewNote": "Chosen by eye from the fresh capture, over the poster frame (60) and over 30/120/210. The estate reads as one architectural mass with the pool terrace running away to the left, the open-to-sky courtyard legible inside the house, the circular drive and both balconies in frame, and the sport court and garage wing anchoring the two ends. It is the frame that sells what this rebuild actually changed - three lanes and one building, not a warren."
+      },
+      "master": {
+        "path": "source-assets/loading/pass87-raid2-loading/raid2-loading-master.png",
+        "sha256": "99ef0544faf5eef246d891ae5acbb703d4af5d9f23242d7f224f7064ac92065d"
+      },
+      "encodeQuality": 88,
+      "psnrDb": 42.49,
+      "runtimeFile": {
+        "path": "public/assets/original/loading/raid2-loading.webp",
+        "sha256": "94ff72c5c530fc9b7a4ec1b72d01c6aa84c7f1237a073bc2dc7e82ada60e84ff",
+        "bytes": 63840
+      }
+    }
+  ]
+}

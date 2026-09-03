@@ -40,8 +40,8 @@ const CENTRE_TOLERANCE = 0.06;
 
 /**
  * Triaged 2026-09-02 against the PASS 84 tree. Arenas this lane owns (test1,
- * test2) and the arena that entered at zero (map3) have NO ledger and must
- * stay at zero. Everything else is a pre-existing finding on geometry owned by
+ * test2) and the arenas that entered at zero (map3, raid2) have NO ledger and
+ * must stay at zero. Everything else is a pre-existing finding on geometry owned by
  * another PASS 85 lane, recorded with what it is and who owns it rather than
  * silently excused by a threshold.
  */
@@ -49,6 +49,12 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
   test1: [],
   test2: [],
   map3: [],
+  // NUKETOWN2 (owner 2026-09-02, HF-407): 0 fall-through floors on the first sweep
+  // (29 walkable visuals censused, 29 fully supported, 374 colliders).
+  nuketown2: [],
+  // RAID2 (HF-408): the audit censused 39 walkable visuals and found all 39
+  // fully supported, so an empty ledger is the measurement, not an omission.
+  raid2: [],
   'atomic-acres': [
     // Nuke Town geometry - Lane U (HF-407) is rebuilding this arena's layout.
     // Four garage roof planes whose ridge sits 1.05 m above the box collider
@@ -92,16 +98,23 @@ const ACCEPTED_FALL_THROUGH: Record<string, LedgerRow[]> = {
     { name: 'skyline-quality-uld-0-28', centre: [0, 2.66, 28], reason: 'ULD container lid 0.20 m proud of its collider; Terminal geometry, Lane J' },
   ],
   farcrysis: [
-    // Farcrysis is selectable:false (map-selection.ts) until its load path is
-    // fixed; every row here is a real finding on a hidden arena.
-    { name: 'farcrysis-art-tower-platform', centre: [-8.5, 4.89, -8.5], reason: 'radio-tower platform with no collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-art-cave-arch-top', centre: [52, 3.18, 32], reason: 'cave arch crown with no collider; hidden arena, Farcrysis lane' },
-    { name: '(unnamed Mesh)', centre: [47.66, 1.55, -47.71], reason: 'unnamed shore slab overhanging its plate; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-art-tower-dish', centre: [-8.5, 6.23, -8.5], reason: 'tower dish top face; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-ne-stack-top', centre: [27.43, 3.5, -30.34], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-sw-stack-top', centre: [-27.43, 6.3, 30.34], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-se-stack-top', centre: [30.34, 6.15, 27.43], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
-    { name: 'farcrysis-crate-nw-stack-top', centre: [-30.34, 6.56, -27.43], reason: 'crate stack lid 0.9 m proud of its collider; hidden arena, Farcrysis lane' },
+    // Farcrysis became selectable (PREVIEW) on 2026-09-02, HF-423. Seven of
+    // the eight rows that stood here were excused with the words "hidden
+    // arena", which is not a reason - it is a deferral, and it expired when
+    // the arena entered the menu. All seven were FIXED rather than re-worded:
+    //   - the four crate-stack lids now carry their own cover box
+    //     (src/farcrysis.ts, landmarkCratePlacements tier 1);
+    //   - the tower platform, tower dish and cave arch crown now carry
+    //     collider proxies (src/farcrysis.ts, the art-prop proxy block).
+    // The ledger may only ever shrink, and this is it shrinking.
+    //
+    // What is left is one genuine triage: the seaplane wing overhangs the
+    // fuselage collider, and the audit measures the drop off its outer edge
+    // at 0.25 m onto a collider top of 1.26 m. That is a STEP - it is inside
+    // the character controller's support tolerance and lands on the wreck
+    // itself, not on the sand 1.5 m below. Boxing the whole wing would put a
+    // solid 5 m slab over a piece of beach cover players walk past.
+    { name: '(unnamed Mesh)', centre: [47.66, 1.55, -47.71], reason: 'seaplane wing overhanging the fuselage collider by 0.25 m - a step onto the wreck, not a fall; Farcrysis lane, HF-423' },
   ],
   'high-seas': [
     { name: 'high-seas-bow-upper-chart-table-top', centre: [6.6, 6.98, -18], reason: 'chart table top 0.8 m proud of the table collider; High Seas lane' },
@@ -116,7 +129,7 @@ function audit(): Promise<WalkableArenaResult[]> {
   return auditPromise;
 }
 
-describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
+describe('walkable-surface parity gate (Direction D, all ten arenas)', () => {
   it('constructs every arena without audit errors', async () => {
     const results = await audit();
     expect(results.map(({ id }) => id)).toEqual([...ALL_ARENA_IDS]);
@@ -170,7 +183,7 @@ describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
     const results = await audit();
     // HF-411's own arenas. These have no ledger and never get one: a finding
     // here is the owner's bug coming back.
-    for (const arenaId of ['test1', 'test2', 'map3']) {
+    for (const arenaId of ['test1', 'test2', 'map3', 'nuketown2']) {
       const result = results.find(({ id }) => id === arenaId)!;
       expect(ACCEPTED_FALL_THROUGH[arenaId], `${arenaId} must keep an empty ledger`).toEqual([]);
       expect(result.findings ?? [], `${arenaId}: fall-through floors`).toEqual([]);
@@ -219,7 +232,7 @@ describe('walkable-surface parity gate (Direction D, all nine arenas)', () => {
     // there is no single patch of open air anywhere on it". On the arenas this
     // lane owns the answer is exactly zero, so the weaker of the two floors is
     // never what is holding them clean.
-    for (const arenaId of ['test1', 'test2', 'map3']) {
+    for (const arenaId of ['test1', 'test2', 'map3', 'nuketown2']) {
       const result = results.find(({ id }) => id === arenaId)!;
       const holed = (result.surfaces ?? [])
         .filter((surface) => surface.largestHoleM2 > 0)

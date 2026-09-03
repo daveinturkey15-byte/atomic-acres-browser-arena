@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { auditLegibility } from './hud-legibility-audit.mjs';
 import { OFFSCREEN_ARGS, SILENT_ARGS } from './lib/browser-launch-flags.mjs';
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -31,7 +32,11 @@ const BASE = arg('--url', 'http://127.0.0.1:41876');
 const RENDERER = arg('--renderer', 'webgl2');
 const OUT = resolve(process.cwd(), arg('--out', 'artifacts/pass75/visual-review'));
 const MENU_ONLY = argv.includes('--menu-only');
-const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,rustworks-1v1,gun-range,farcrysis,high-seas')
+// PASS 85 Lane N: this default was a hardcoded six-arena literal, so Test1,
+// Test2 and Map 3 were never swept by it and nothing said so. It is now
+// derived from the registry (scripts/qa/arena-roster.mjs) and is a strict
+// superset of what it covered before; `--arenas` still overrides it.
+const ARENAS = arg('--arenas', defaultBootRoster())
   .split(',').map((entry) => entry.trim()).filter(Boolean);
 
 // The AGENTS.md review viewports. Narrow and ultrawide are where surface

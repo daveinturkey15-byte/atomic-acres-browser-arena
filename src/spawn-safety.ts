@@ -44,6 +44,14 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   // MAP3 (PREVIEW): a bay is 9 m of clear width between pier lines, so a trap
   // radius wider than that would call every legal bay spawn trapped.
   'map3': 8,
+  // NUKETOWN2 (PREVIEW, HF-407): the back yard is 7.5 m deep between the house
+  // back wall and the fence, so a trap radius wider than that would call every
+  // legal spawn on this map trapped. 7 keeps the whole yard usable.
+  'nuketown2': 7,
+  // RAID2 (PREVIEW, HF-408): the tightest legal spawn space on this map is the
+  // 10 m west approach between the boundary and the house, so a trap radius
+  // above that would call every legal west-side spawn trapped. Same 7 as test2.
+  'raid2': 7,
 });
 
 export const FFA_MINIMUM_SPAWN_SEPARATION = 8;

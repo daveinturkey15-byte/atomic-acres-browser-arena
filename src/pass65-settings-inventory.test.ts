@@ -35,7 +35,12 @@ describe('Pass 65 setting inventory', () => {
     // HF-398 joins them: the trace is a pass that exists or does not, and its
     // ray count and recursion depth are baked into the compiled graph, so
     // switching a tier is a rebuild and never a live uniform write.
+    // HF-418 joins them for a third reason: the baked layer allocates three 3D
+    // textures and a composite stage when it is switched on, and needs the
+    // normal MRT attachment to evaluate the SH lobe. Turning it on and off is a
+    // graph change even though changing its TIER between low and high is not.
     for (const key of [
+      'graphics.bakedIndirect',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
@@ -46,6 +51,7 @@ describe('Pass 65 setting inventory', () => {
     // a live apply, which is what the original exclusion list was protecting.
     const topologyOwners = new Set([
       'graphics.antiAliasing', 'graphics.geometryDetail', 'graphics.ambientOcclusion',
+      'graphics.bakedIndirect',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
