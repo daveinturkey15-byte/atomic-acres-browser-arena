@@ -199,7 +199,17 @@ const server = createServer((request, response) => {
   });
   response.end(body);
 });
-await new Promise((ready) => server.listen(PORT, '127.0.0.1', ready));
+await new Promise((ready, reject) => {
+  server.once('error', (error) => {
+    if (error && error.code === 'EADDRINUSE') {
+      console.error(`[switch-matrix] Port ${PORT} already active (reusing external server)`);
+      ready();
+    } else {
+      reject(error);
+    }
+  });
+  server.listen(PORT, '127.0.0.1', ready);
+});
 
 const comfy = await waitForComfyIdle();
 const rivalBrowsers = await waitForQuietBrowsers(RIVAL_WAIT_ATTEMPTS);
@@ -435,6 +445,8 @@ const matchAdmissionProfile = (page) => page.evaluate(() => {
   return {
     arenaId: profile.arenaId, mode: profile.mode, durationMs: profile.durationMs,
     steps: (profile.steps ?? []).map((step) => [step.name, step.durationMs]),
+    ...(profile.achievedWaitMs !== undefined ? { achievedWaitMs: profile.achievedWaitMs } : {}),
+    ...(profile.exitReason !== undefined ? { exitReason: profile.exitReason } : {}),
   };
 });
 
