@@ -1,0 +1,91 @@
+{
+  "contract": "silhouette-findability-v1",
+  "measuredAt": "2026-09-03T01:09:29.475Z",
+  "playerProxyLuminance": 0.085,
+  "weberThreshold": 0.35,
+  "hudStripExcludedPx": 46,
+  "rule": "PASS requires after.camouflageFraction <= before.camouflageFraction for every view",
+  "views": {
+    "corridor-3-street-cell": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-street-cell.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.42982,
+        "camouflageFraction": 0.00382
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after\\corridor-3-street-cell.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.1555,
+        "camouflageFraction": 0.08911
+      },
+      "delta": 0.08529,
+      "verdict": "FAIL"
+    },
+    "corridor-3-street-kerbside": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-street-kerbside.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.40967,
+        "camouflageFraction": 0.00128
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after\\corridor-3-street-kerbside.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.17389,
+        "camouflageFraction": 0.09051
+      },
+      "delta": 0.08923,
+      "verdict": "FAIL"
+    },
+    "corridor-3-grammar": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-grammar.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.43787,
+        "camouflageFraction": 0.03238
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after\\corridor-3-grammar.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.42965,
+        "camouflageFraction": 0.03486
+      },
+      "delta": 0.00248,
+      "verdict": "FAIL"
+    },
+    "hub-overview": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\hub-overview.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.37788,
+        "camouflageFraction": 0.04676
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after\\hub-overview.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.37829,
+        "camouflageFraction": 0.04739
+      },
+      "delta": 0.00063,
+      "verdict": "FAIL"
+    }
+  },
+  "verdict": "FAIL"
+}
