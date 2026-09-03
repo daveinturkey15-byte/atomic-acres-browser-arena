@@ -1135,3 +1135,124 @@ assets and textures and lighting need to be tip top, raid can come next"
   overnight/tomorrow item; (c) undressed ground patch 1.25 × 2.7 m between the
   turning head and the east street lawn; (d) a magenta marker near the south
   driveway in two captures — being identified before the cut.
+
+## PASS 92 publish record — 2026-09-03 19:14 BST
+
+- **Published** by `scripts/orchestration/publish_pass92.py` (exit 0) from head
+  `ce1c8f76` (roll `cb3c5619` + changelog areas labels). gh-pages `8bab9796`;
+  channels exactly `['pass91', 'pass92']` (pass90 retired per HF-400); root
+  chooser generation `f45765ee9b4f`; Pages build `built` at 19:17.
+- **Live checks (19:22):** channel root 200, `map3.html` 200, retired pass90
+  404, `release-index.json` generation `f45765ee9b4f`, identity chunk
+  `release-identity-BwaHgmvg.js` names PASS 92 (plus the historical PASS 64
+  evidence record, byte-identical to PASS 91's chunk), changelog areas
+  `ARENAS · GRAPHICS · PERFORMANCE`.
+- **Gates at the cut (Opus release engineer):** tsc 0; release tests 83/83;
+  plan test 9/9; full suite 578 files / 5659 tests; identity guard OK; freshness
+  guard clean; boot smoke 13/13 on native WebGPU (first run 12/13 — the
+  skyline-terminal MENU boot exceeded its 90 s wait after twelve prior boots,
+  passed standalone in 38 s and 13/13 on re-run: WATCH ITEM, not a Terminal
+  fault). Two content fixes, no gate touched: the changelog title/summary must
+  name the pass (HF-406), and a pre-existing weapon-name regex hit on a QA
+  comment in `src/map3/street-cell.ts`.
+- **Content:** PASS 91 + Nuke Town geometry from owner play (HF-434..437, Opus
+  review HF-443) + HF-438 profile fold + Map 3 street cell + deploy attribution
+  (HF-442) + skills-study docs (HF-439). PREVIEW for owner feedback; the
+  overnight Lane BA loop and the morning Opus verification follow.
+- **Overnight blocker (19:16):** the Lane BA chain launched and failed on every
+  step in 33 s: OMP 18.1.1's main-profile credential store (`agent.db`) is
+  empty (0 credentials, 0 settings), wiped some time after 18:33 when the last
+  GLM job still ran. Owner must `/login` zai and google-antigravity in OMP
+  again; the chain relaunches unchanged afterwards. Cause unknown — gotcha to
+  follow once it is.
+- **Owner 18:58:** "glm usage is at 80% of 5hr window, gemini looks better
+  though" → Lane BA rebalanced: Gemini builds cycles 1–2, GLM cycle 3 + final;
+  automatic fallback between the two; critics stay Gemini.
+
+## HF-444 — owner 2026-09-03 19:25: use the local Qwen model overnight
+
+- "some more resource for you, can you use my qwen local model, i think its 27b
+  iq3xxs with mtp ... 64 or 80k context? ... it can work all night, find some
+  jobs its good at?" → Local Qwen3.8-27B UD-IQ3_XXS (llama-server :8080, ctx
+  65536, native MTP, idle-sleep 180 s) becomes a third cheap worker. Task fit:
+  small-context, mechanical, self-verifying jobs with a gate each — stale
+  comment audit, script usage headers, an unreferenced-export finder
+  (report-only), gotcha drafts from the day's findings, the morning report
+  skeleton. Worktree `aa-claude-qwen`, branch `qwen-tidy-overnight`. GPU rule:
+  Qwen jobs wait while the Lane BA chain holds `ba-running.lock`, so the
+  Nuke Town captures never fight a 13 GiB model for VRAM; Opus verifies every
+  Qwen commit in the morning before anything merges.
+
+## HF-445 — 2026-09-03 19:50: local Qwen moved to port 8090 (WSL docker-proxy holds loopback 8080)
+
+- Symptom: OMP jobs on the local Qwen returned `401 Invalid API key` (Google-style
+  `x-goog-api-key` wording) while llama-server on `0.0.0.0:8080` was healthy.
+- Cause: a Docker container inside WSL (`docker-proxy -host-port 8080 ->
+  172.18.0.4:8080`, up since ~17:10, owner's) is relayed by `wslrelay.exe` onto
+  `127.0.0.1:8080`; Windows prefers the specific loopback bind, so every
+  loopback request lands in the container, not in llama-server.
+- Correction: Qwen relaunched with `-Port 8090` (launcher pre-flight guard
+  green); additive OMP provider `qwen-local-8090` (models.yml backed up);
+  Qwen chain retargeted and relaunched 19:46. Nothing of the owner's touched.
+- Owner decision: DSH, Zoo/Roo, Continue and Hermes still point at `:8080` and
+  will reach the container until either the container moves or those configs
+  move to 8090.
+
+## HF-446 — owner 2026-09-03 20:12: Codex properly configured, Luna 5.6 x-high joins the sweeps
+
+- "can you ensure codex now has proper settings like you do for skills and CI CD
+  etc, i just re enabled my open ai sub, then maybe you can use one of its luna
+  ai agents in the sweeps too, not sol, x high luna 5.6 can do some work for u"
+  → Audit and fix the Codex harness on dave-gaming-pc (shared skill store link,
+  global AGENTS.md bootstrap equivalent to Claude's CLAUDE.md/AKP adapter,
+  model `gpt-5.6-luna` at x-high effort, repo AGENTS.md + cut-ritual
+  conventions honoured, AKP adoption receipt for Codex), prove the route with a
+  bounded smoke task, then give Luna a real sweep job: the skeptic review of the
+  adaptive admission cadence-wait candidate (branch `admission-cadence-wait`).
+  Luna only (never Sol). Opus still decides what ships.
+
+## HF-447 — owner 2026-09-03 22:00: overnight plan to 06:00, budget guard
+
+- Owner: "let me know where we are atm, then i am going to sleep and you can
+  work through the night, i'll come see you at 6"; "you may need to tweak a few
+  things about qwen to make it useful so keep an eye on it"; "be mindful you are
+  at 92% used now so maybe need to pace yourself better through the evening and
+  drop any opus to less".
+- **State at 22:00:** PASS 92 live (19:14). Lane BA round 1 on
+  `nuketown2-tiptop`: cycles 1–2 landed 10 feature commits (road/kerbs, facade
+  recess, street furniture, interiors + lighting, glazed windows, materials,
+  vehicles, pool), 26/26 fidelity+parity on the cycle-2 head; cycle 3 on Gemini
+  (GLM 5-hour limit hit at 21:12, resets 05:04). Codex configured (HF-446),
+  Luna smoke PASS, Luna skeptic review of `admission-cadence-wait` running,
+  Codex native AKP re-attestation running. Qwen chain on :8090 with vision:
+  Q1 partial (1 commit), Q2 empty, Q3 running.
+- **Overnight automation (no orchestrator tokens):** BA round 1 done → BA round
+  2 (cycles 4–6 + final, Gemini primary, GLM fallback) → Luna x-high pre-review
+  of the whole tip-top branch (gates, critic trajectory, SHIP verdict) → Qwen
+  Q1 rerun with low thinking after its chain. 05:15 wake → morning decision
+  with at most one small Opus check; the Opus work moves after the ~11:30
+  weekly reset. Nothing merges or publishes overnight.
+
+## HF-448..451 — owner 2026-09-03 22:15 after playing PASS 92
+
+- **HF-448 (P0):** "there is still massive Z fighting on the house ground floor,
+  needs a big fix" → the polygonOffset tiers did not cure the interiors. Fix
+  geometrically: interior slabs +0.06 m above the ground plane, no ground/lawn/
+  dressing drawn under house or garage footprints, a house-interior class in
+  the coplanar instrument that ignores material offsets, a fidelity assertion,
+  and grazing-angle interior captures. Injected into every remaining overnight
+  build step (round 1 FINAL, round 2 cycles 4–6, FINAL).
+- **HF-449 (P1):** "the stairs are still sticky to navigate" → one invisible
+  smooth ramp collider per flight under presentation-only treads; walk probe
+  both ways with a ground-contact and frame-budget assertion; parity gate kept.
+- **HF-450 (P1):** "the fps seemed bad but maybe as my pc is busy with qwen?" →
+  likely partly Qwen (13.8 GB VRAM when awake) and the overnight captures
+  sharing the GPU while the owner played; but the overnight builder must now
+  quote draw calls / frame time before and after each cycle against the
+  PASS 92 baseline, batch static props, LOD vegetation, and cut density if
+  draw calls grow more than 15 %.
+- **HF-451:** "the graphics/assets/textures/threejs techniques i shared need
+  to be used overnight if compute allows as the map looks and feels like basic
+  geometry atm, but nicely playable so thats good" → the ingested skills are
+  already the builder's brief; the prompt now forbids flat single-colour
+  surfaces anywhere a critic camera can see.
