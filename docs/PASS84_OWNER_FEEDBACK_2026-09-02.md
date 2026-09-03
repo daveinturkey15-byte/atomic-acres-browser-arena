@@ -1197,3 +1197,16 @@ assets and textures and lighting need to be tip top, raid can come next"
 - Owner decision: DSH, Zoo/Roo, Continue and Hermes still point at `:8080` and
   will reach the container until either the container moves or those configs
   move to 8090.
+
+## HF-446 — owner 2026-09-03 20:12: Codex properly configured, Luna 5.6 x-high joins the sweeps
+
+- "can you ensure codex now has proper settings like you do for skills and CI CD
+  etc, i just re enabled my open ai sub, then maybe you can use one of its luna
+  ai agents in the sweeps too, not sol, x high luna 5.6 can do some work for u"
+  → Audit and fix the Codex harness on dave-gaming-pc (shared skill store link,
+  global AGENTS.md bootstrap equivalent to Claude's CLAUDE.md/AKP adapter,
+  model `gpt-5.6-luna` at x-high effort, repo AGENTS.md + cut-ritual
+  conventions honoured, AKP adoption receipt for Codex), prove the route with a
+  bounded smoke task, then give Luna a real sweep job: the skeptic review of the
+  adaptive admission cadence-wait candidate (branch `admission-cadence-wait`).
+  Luna only (never Sol). Opus still decides what ships.
