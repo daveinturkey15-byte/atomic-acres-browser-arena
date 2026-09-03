@@ -101,6 +101,8 @@ const PAVE_Y = ROAD_Y + KERB_H;                    // 0.17
 /** Cell extent along the corridor axis, in corridor-local z. */
 const Z_START = -52;
 const Z_END = -74;
+/** The cell's far extent, so the corridor that owns it can report its true length. */
+export const STREET_CELL_Z_END = Z_END;
 const CELL_LEN = Z_START - Z_END;                  // 22
 
 /** Vertex-attribute part ids for the one ground material. */
@@ -847,17 +849,41 @@ function mergeSimpleUV(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
 export interface StreetCell {
   group: THREE.Group;
   dispose(): void;
-  /** Counts, so a report can state what the cell added without guessing. */
-  stats: { draws: number; materials: number; instances: number };
+  /**
+   * Counts, so a report can state what the cell added without guessing.
+   * `objects` is renderable objects added to the scene graph - NOT draw calls,
+   * which depend on culling and on the shadow pass and are measured with
+   * `scripts/qa/probe-map3-draw-settling.mjs --toggle hf419-street-cell`.
+   */
+  stats: { objects: number; materials: number; instances: number };
 }
 
 /**
- * Build the cell. Everything is created here, at construction; nothing in this
- * module runs per frame, allocates per frame, or creates a GPU resource after
- * this function returns. That is what keeps the pipeline tripwire at 0.
+ * Build the cell. Every geometry and every MATERIAL OBJECT is created here, at
+ * construction, and nothing in this module runs per frame or allocates per
+ * frame - there is no `update()` at all.
+ *
+ * That is NOT the same as "no pipeline is created later", and an earlier draft
+ * of this comment claimed it was. three compiles a render PIPELINE lazily, the
+ * first time an object is actually drawn, so the eight pipelines this cell
+ * needs are compiled at first sight of corridor 3 - about 13 s into a load,
+ * not at construction. Measured, not assumed:
+ * `docs/evidence/pass86/hf419/pipeline-census-after.json` (36 post-mark
+ * creations with the cell, 28 without) and its `verdict: FAIL`.
+ *
+ * The number that surprises people: the eight are ground 1, frontage 1, blade
+ * 1, and FIVE for the one shared item material - one per InstancedMesh family.
+ * Budget pipelines per instanced family, not per material.
  */
 export function createStreetCell(seed = 419): StreetCell {
   const group = new THREE.Group();
+  // Named so `scripts/qa/probe-map3-draw-settling.mjs --toggle hf419-street-cell`
+  // can hide and show the whole cell three frames apart and read the paired
+  // difference in `renderer.info`. A Map 3 HUD draw count sampled once per pose
+  // wanders by ~20 between samples (the scene-wide shadow pass covers
+  // time-varying content near the hub whatever the camera looks at), so a
+  // per-pose before/after subtraction cannot resolve a delta this small.
+  group.name = 'hf419-street-cell';
   const disposables: Array<{ dispose(): void }> = [];
   const rnd = mulberry32(seed);
   /** Instanced families in the cell; the draw-call arithmetic depends on it. */
@@ -869,11 +895,16 @@ export function createStreetCell(seed = 419): StreetCell {
   const ground = new THREE.Mesh(groundGeo, groundMat);
   // SHADOWS OFF, deliberately and measurably. Map 3's sun uses a +-34 m
   // orthographic shadow camera centred on the hub; this cell sits 70-92 m out
-  // along corridor 3, entirely outside it. castShadow there buys no shadow and
-  // costs a shadow-pass draw call per object - it was 5 of the cell's 13 added
-  // draws at the kerbside pose. receiveShadow stays on: it is free here and
-  // keeps the cell correct if the shadow camera is ever widened by another
-  // lane. This is a cost cut, not a loosened gate: no threshold moved.
+  // along corridor 3, entirely outside it, so castShadow here buys no shadow
+  // and costs a shadow-pass draw per casting object. The saving was originally
+  // quoted as "5 of the cell's 13 added draws" off a single HUD sample per
+  // pose; that instrument was later shown to wander by ~20 draws at a fixed
+  // camera, so the honest figure is the paired one in
+  // `docs/evidence/pass86/hf419/draw-settling-after.json`
+  // (`castShadowVariant`), which measures the same toggle with casting forced
+  // back on. receiveShadow stays on: it is free here and keeps the cell correct
+  // if the shadow camera is ever widened by another lane. This is a cost cut,
+  // not a loosened gate: no threshold moved.
   ground.receiveShadow = true;
   group.add(ground);
   disposables.push(groundGeo, groundMat);
@@ -1020,7 +1051,9 @@ export function createStreetCell(seed = 419): StreetCell {
 
   return {
     group,
-    stats: { draws: 2 + FAMILIES + 1, materials: 3, instances },
+    // ground, frontage, 5 instanced families, blade = 8 renderable objects;
+    // ground, frontage, the shared item material and the blade's = 4 materials.
+    stats: { objects: 2 + FAMILIES + 1, materials: 4, instances },
     dispose() {
       disposables.forEach((d) => d.dispose());
       group.clear();

@@ -25,7 +25,7 @@ import {
   createTree, createShrub, createConifer, createFallenLog, createGrassTuft, poissonScatter,
 } from './plants';
 import { createLitterSkirt, hash11, mergeGeometries } from './leaf-geometry';
-import { createStreetCell } from './street-cell';
+import { createStreetCell, STREET_CELL_Z_END } from './street-cell';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, createBarkMaterial, createFlatFoliageMaterial,
   createFoliageMaterial, createFoliageUniforms, createForestFloorMaterial,
@@ -1115,9 +1115,19 @@ export function createGrammarCorridor(seed = 11): Corridor {
   group.add(streetCell.group);
   disposables.push(streetCell);
 
+  // The corridor is as long as its content, not as long as its floor plane.
+  // Rule set 4 starts where the plane above stops (z -52) and runs to z -74,
+  // laying its OWN cambered carriageway rather than standing on this floor -
+  // two coplanar ground surfaces at y = 0.03 would z-fight. `length` drives the
+  // far-end sign in main.ts ("so you always know what you walked"), and while
+  // this returned 52 that sign stood 22 m short of the end, in front of a rule
+  // set the sign itself was already counting. Reported by the content, so the
+  // two follow each other if either moves.
+  const CONTENT_LEN = Math.max(LEN, -STREET_CELL_Z_END);
+
   return {
     group,
-    length: LEN,
+    length: CONTENT_LEN,
     title: 'Shape grammar — four rule sets, one pipeline',
     skill: 'atomic-acres-procedural-art-authoring',
     update() { /* static exhibit */ },
