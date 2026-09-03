@@ -25,11 +25,66 @@ CLAIMED = an author or a metadata field says so and it was not independently con
 | On-disk `ComfyUI/comfyui_version.py` | `0.34.0` (the sibling `ComfyUI_latest/` tree is **older**, 0.33.0 — a misleading directory name) | VERIFIED |
 | 3D nodes present | 106 matched nodes, **every one from `comfy_extras.*` or `comfy_api_nodes.*`** — no third-party pack contributes any 3D node | VERIFIED — `comfyui-3d-node-inventory.json` |
 | "No CUDA extensions" | `comfy_extras/nodes_mesh_postprocess.py` imports only `torch` and `scipy.ndimage`; the implementation is pure Python under `comfy_extras/mesh3d/{postprocess,uv_unwrap,fileio}`; `requirements.txt` names `scipy` and **no** `nvdiffrast`, `xatlas` or `pymeshlab` | VERIFIED by reading the files |
-| Weights installed | **NONE** of the Trellis.2 / Pixal3D / MoGe / BiRefNet weights are on disk | VERIFIED |
+| Weights installed | **NONE** of the six Trellis.2 / Pixal3D / DINOv3 / MoGe / BiRefNet weights are resolvable by the running server | VERIFIED 2026-09-03 by the sound method — see **Minimum VRAM, and how the model folders were actually checked** below. The session-1 method (`ls` of `ComfyUI_portable/ComfyUI/models/`) was **unsound** and is retracted. |
 | Free disk | 662 GB on C: | VERIFIED |
+| Minimum VRAM | **not stated upstream** (see below); local box is RTX 5080, `vram_total` 15.9 GiB | VERIFIED that no figure is published; the requirement itself is OPEN until someone runs it |
 
 The owner's ComfyUI was **not** updated, restarted or queued during this lane. Only read-only
 HTTP GETs and file reads.
+
+## Minimum VRAM, and how the model folders were actually checked (added 2026-09-03)
+
+Two repairs from the skeptic pass. Both are method repairs; neither changes a conclusion.
+
+### Minimum VRAM — NOT STATED UPSTREAM
+
+Brief step 1 asked for minimum VRAM alongside node names and licences, and session 1 recorded no
+figure at all. Fetched 2026-09-03:
+
+| Source | VRAM figure | State |
+|---|---|---|
+| `https://docs.comfy.org/tutorials/3d/trellis2` | **none stated anywhere on the page** | VERIFIED |
+| `https://blog.comfy.org/p/trellis2-and-pixal3d-are-now-native` | **none**; strongest hardware claim is "everything runs on consumer hardware, and everything is free to use, including commercially" | VERIFIED |
+
+So the honest answer to step 1 is **"upstream does not say"**, recorded as such rather than
+guessed. The only measured local datum is the machine it would run on: RTX 5080, `vram_total`
+17 094 475 776 bytes (15.9 GiB), `vram_free` 10 484 798 408 bytes at check time
+(`GET /system_stats`). Register row 45 and the skill both now carry the absence explicitly and
+instruct the first runner to measure peak VRAM and replace the line with a real number. Treat any
+VRAM figure quoted for this route from anywhere else as CLAIMED.
+
+### The model folders — ask the server, never guess the path
+
+Session 1 concluded "no weights installed" from an `ls` of `ComfyUI_portable/ComfyUI/models/`.
+That folder is **not** the tree the running process resolves:
+
+```
+GET /system_stats -> system.argv
+["ComfyUI/main.py", "--windows-standalone-build", "--port", "8188", "--disable-auto-launch",
+ "--log-stdout", "--use-sage-attention", "--disable-pinned-memory",
+ "--models-directory", "C:\Users\david\Downloads\ComfyUI-H3-setup\downloads-current"]
+```
+
+The conclusion was right; the method could not have detected the weights had they been installed,
+which makes it worthless as evidence. Re-measured by asking the server which files each folder
+resolves to for *this* process:
+
+| Endpoint | Response, 2026-09-03 |
+|---|---|
+| `GET /models/diffusion_models` | `["minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimax_music3_dit_fp16.safetensors"]` |
+| `GET /models/vae` | `["minimax_h3_audio_vae_fp32.safetensors", "minimax_h3_video_vae_fp16.safetensors", "minimax_music3_dav.safetensors"]` |
+| `GET /models/clip_vision` | `[]` |
+| `GET /models/geometry_estimation` | `[]` |
+| `GET /models/background_removal` | `[]` |
+
+Zero of the six. **Step 5 remains genuinely blocked** on the ~9.95 GB download, now on evidence
+that could have falsified it. The five files present are the owner's MiniMax H3 / Music3 set and
+are nothing to do with this route.
+
+The unsound method had been written into `comfyui-3d-native-pipeline`, a skill five other
+harnesses read. Its preflight now resolves the root from `/system_stats.argv` and checks the five
+`/models/<folder>` endpoints, and names this lane's own mistake as the worked example. Register
+row 45 carries the same correction.
 
 ## Licences — observed vs claimed
 
@@ -56,6 +111,10 @@ Pixal3D route, int8: `pixal3d_int8_convrot` 5.58 GB → `models/diffusion_models
 `models/geometry_estimation/`; `birefnet` 0.44 GB → `models/background_removal/`.
 **9.95 GB.** Trellis.2 route adds `trellis_2_int8_convrot` 5.25 GB. Sizes read from the
 HuggingFace API with `blobs=true`. VERIFIED.
+
+Those folder names resolve under the **server's** models root, which on this machine is
+`C:\Users\david\Downloads\ComfyUI-H3-setup\downloads-current` (`--models-directory`), not the portable install's own `models/`.
+Read the root from `/system_stats` before downloading anything.
 
 ## Animation-relevant discovery in the same release
 
