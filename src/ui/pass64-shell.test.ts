@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SELECTABLE_ARENAS } from '../map-selection';
 import { createPass64ShellViewModel, renderPass64Shell } from './pass64-shell';
+import { DEFAULT_LIGHTING_TIME_CHOICE } from '../rendering/lighting-conditions';
 
 describe('Pass 66 command shell', () => {
   it('escapes persisted player names before placing them in markup', () => {
@@ -190,5 +191,23 @@ describe('Pass 66 command shell', () => {
     // replace the menu that launched it.
     expect(link).toContain('target="_blank"');
     expect(link).toContain('rel="noopener noreferrer"');
+  });
+
+  // Lane AB (PASS 87): the brief asks that SOLO "picks a random time within the
+  // arena's range unless the player fixes it". The random default shipped, but
+  // for one pass the only way to FIX it was a `?tod=` URL parameter, which is
+  // not a player-facing control. This pins the solo row's existence, its
+  // default, and the fact that it offers exactly the modes the model authors.
+  it('gives a solo player the same TIME OF DAY choice the lobby gives a host', () => {
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    expect(markup).toContain('id="solo-time-of-day"');
+    const solo = /<select id="solo-time-of-day">[\s\S]*?<\/select>/.exec(markup)?.[0] ?? '';
+    const lobby = /<select id="lobby-time-of-day">[\s\S]*?<\/select>/.exec(markup)?.[0] ?? '';
+    expect(solo).not.toBe('');
+    // The two rows are the same replicated field, so they must offer the same
+    // options in the same order and start on the same default. A drift here
+    // would mean a player could pick a mode in solo that no lobby can hold.
+    expect(solo.replace('solo-time-of-day', 'X')).toBe(lobby.replace('lobby-time-of-day', 'X'));
+    expect(solo).toContain(`value="${DEFAULT_LIGHTING_TIME_CHOICE}" selected`);
   });
 });

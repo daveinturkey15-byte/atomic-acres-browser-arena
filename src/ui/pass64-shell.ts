@@ -153,6 +153,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
           .filter((definition) => definition.availability === 'selectable')
           .map((definition) => `<option value="${definition.id}">${escapeAttribute(definition.displayName.toUpperCase())}</option>`)
           .join('')}</select></label>
+        <!-- Lane AB (PASS 87): the SOLO sky. The brief asks that solo "picks a random time within the arena's range unless the player fixes it"; the random default shipped first, but the only way to fix it was a URL parameter, which is not a player-facing control. This is the same replicated field as the lobby row below and writes the same privateMatchConfig.timeOfDay -- in solo there is no host to defer to, so it applies at once; when the player hosts, the lobby row takes over and this value seeds it. -->
+        <label>TIME OF DAY<select id="solo-time-of-day">${LIGHTING_TIME_CHOICES.map((choice) => `<option value="${choice}"${choice === DEFAULT_LIGHTING_TIME_CHOICE ? ' selected' : ''}>${LIGHTING_TIME_CHOICE_LABELS[choice]}</option>`).join('')}</select></label>
       </div>
       <div id="selected-kit-summary" class="selected-kit-summary"></div>
       <button id="field-kit-redeploy" type="button" hidden>REDEPLOY NOW WITH SELECTED FIELD KIT</button>

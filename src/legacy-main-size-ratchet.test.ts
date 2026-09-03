@@ -60,7 +60,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_799;
+const LINE_CEILING = 36_822;
 
 /**
  * When the file falls this far below the ceiling, the ceiling is stale and the
@@ -96,7 +96,7 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
   },
   {
     date: '2026-09-03',
-    lines: 36_799,
+    lines: 36_822,
     note:
       'PASS 87 Lane AB: the time-of-day uniform-write plumbing in the `// LIGHTING:` '
       + 'region -- the per-arena baseline capture, the re-aim of the existing key light, '
@@ -108,7 +108,10 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'writes uniforms only -- no light is created, destroyed or toggled, which is the '
       + 'PASS 82 constraint and is pinned against this source region by '
       + 'src/rendering/lighting-conditions-light-set.test.ts. Measured on the tree merged '
-      + 'with integration head 54c15b1e (Lane AQ Raid Rebuild, AD, AE), not estimated.',
+      + 'with integration head 54c15b1e (Lane AQ Raid Rebuild, AD, AE), not estimated. '
+      + 'The last 23 of these lines are the SOLO time-of-day row: the brief asks that a '
+      + 'solo player be able to fix the hour, and for one pass the only way to do it was '
+      + 'a URL parameter.',
   },
 ];
 

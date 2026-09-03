@@ -85,6 +85,7 @@ const ARENA_CAMERAS = Object.freeze({
   test1: 'test1-tower-overview',
   test2: 'test2-estate-overview',
   nuketown2: 'nuketown2-street-centre',
+  raid2: 'raid2-estate-overview',
   map3: 'map3-hub-vista',
 });
 
@@ -111,6 +112,7 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
   test1: null,
   test2: null,
   nuketown2: null,
+  raid2: null,
   map3: 'overcast',
 });
 
@@ -121,7 +123,7 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
  * only rows in this sweep whose correct answer is known in advance, which makes
  * them the check on the instrument rather than on the lane.
  */
-const PINNED_ARENAS = new Set(['gun-range', 'map3', 'nuketown2']);
+const PINNED_ARENAS = new Set(['gun-range', 'map3', 'nuketown2', 'raid2']);
 
 /**
  * How far a PINNED arena is allowed to move before this run stops being

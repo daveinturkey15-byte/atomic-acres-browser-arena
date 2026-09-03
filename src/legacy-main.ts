@@ -8700,9 +8700,13 @@ function initializeFreshHostLobby(): void {
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
+  // LIGHTING: the host's own solo choice seeds the lobby row rather than being
+  // silently reset to the default; from here on the replicated value is the
+  // authority for every peer, this host included.
+  const seedTimeOfDay = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
   privateMatchConfig = selectedArena.id === 'gun-range'
-    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
-    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000, timeOfDay: seedTimeOfDay }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id, timeOfDay: seedTimeOfDay };
   privateMatchMode = privateMatchConfig.mode;
   const squad = sanitizeSquadPresentation(localSquadName, localSquadColor, player.team);
   localSquadName = squad.name;
@@ -30296,6 +30300,25 @@ operatorSkinSelect.addEventListener('change', () => {
   const message: LobbySkinMessage = { type: 'lobby-skin', by: player.id, skinId: chosen, nonce: randomNonce() };
   if (network.role === 'host') updateHostSkin(message);
   else if (network.role === 'client') network.send(message);
+});
+// LIGHTING: the SOLO sky. The lobby row is host-authoritative and only exists
+// once a lobby does; solo has no host to defer to, so this writes the SAME
+// replicated field (`privateMatchConfig.timeOfDay`) and applies immediately.
+// Hosting seeds the lobby from it, after which the lobby row is the authority
+// and `activeLightingTimeChoice()` reads the snapshot instead of this.
+const soloTimeOfDaySelect = element<HTMLSelectElement>('#solo-time-of-day');
+soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+soloTimeOfDaySelect.addEventListener('change', () => {
+  const chosen = soloTimeOfDaySelect.value;
+  if (!isLightingTimeChoice(chosen)) {
+    soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+    return;
+  }
+  privateMatchConfig = { ...privateMatchConfig, timeOfDay: chosen };
+  // A local override from `?tod=` would otherwise shadow the player's own
+  // choice for the rest of the session, which reads as a broken control.
+  lightingTimeChoiceOverride = null;
+  applyLightingConditionUniforms(true);
 });
 // Pass 75: the OPERATOR panel. Skin, idle stance and emote are chosen from
 // cards rather than a buried dropdown, each persists locally, and the skin
