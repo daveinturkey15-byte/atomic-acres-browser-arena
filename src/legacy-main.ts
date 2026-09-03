@@ -853,6 +853,7 @@ import {
   hostedBotIds,
   hostedBotReplicationActive,
   hostedBotSnapshotContinuity,
+  hostedBotSnapshotStance,
   interpolateHostedBotSnapshot,
   isHostedBotCount,
   type HostedBotCount,
@@ -20009,8 +20010,12 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     // Lane AR item 3: replicated like a peer's. The host sends the stance it
     // simulated; the guest poses from it, so both ends play the same body
     // transition instead of the guest inventing a permanent stand.
-    bot.stance = snapshot.stance;
-    poseOperator(bot.root, snapshot.stance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
+    // A host that predates the field sends no stance; hostedBotSnapshotStance
+    // reads that as the 'stand' those builds actually simulated, so a PASS 87
+    // guest on a PASS 86 host poses bots instead of refusing their snapshots.
+    const replicatedStance = hostedBotSnapshotStance(snapshot);
+    bot.stance = replicatedStance;
+    poseOperator(bot.root, replicatedStance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,

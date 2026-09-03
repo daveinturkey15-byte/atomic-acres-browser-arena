@@ -11,7 +11,12 @@ import {
   resolveBotStance,
 } from './bot-stance';
 import { movementProfile, type Stance } from './gameplay';
-import { isHostedBotSnapshot, interpolateHostedBotSnapshot } from './hosted-bots';
+import {
+  LEGACY_HOSTED_BOT_STANCE,
+  hostedBotSnapshotStance,
+  interpolateHostedBotSnapshot,
+  isHostedBotSnapshot,
+} from './hosted-bots';
 
 /**
  * PASS 87 Lane AR, item 3 (Lane Y follow-up): bots have no stance.
@@ -121,9 +126,33 @@ describe('hosted bot stance replication (Lane AR item 3)', () => {
   it('is part of the validated wire shape, like a peer stance', () => {
     expect(isHostedBotSnapshot(SNAPSHOT)).toBe(true);
     expect(isHostedBotSnapshot({ ...SNAPSHOT, stance: 'prone' })).toBe(true);
-    const { stance: _dropped, ...withoutStance } = SNAPSHOT;
-    expect(isHostedBotSnapshot(withoutStance)).toBe(false);
     expect(isHostedBotSnapshot({ ...SNAPSHOT, stance: 'crawl' })).toBe(false);
+  });
+
+  /**
+   * SKEPTIC FOLLOW-UP. Adding a REQUIRED field to a wire message without a
+   * protocol bump is a silent cross-version break: PASS 86 and PASS 87 are both
+   * selectable from the same chooser origin at MULTIPLAYER_PROTOCOL_VERSION 18,
+   * so a PASS 87 guest would have rejected every bot-state message a PASS 86
+   * host sent and seen no bots at all. The field is therefore optional to
+   * READERS and defaulted, not required.
+   */
+  it('accepts a stance-less snapshot from a pre-PASS-87 host and reads it as stand', () => {
+    const { stance: _dropped, ...legacySnapshot } = SNAPSHOT;
+    expect(isHostedBotSnapshot(legacySnapshot)).toBe(true);
+    expect(hostedBotSnapshotStance(legacySnapshot)).toBe(LEGACY_HOSTED_BOT_STANCE);
+    expect(LEGACY_HOSTED_BOT_STANCE).toBe('stand');
+    expect(hostedBotSnapshotStance(SNAPSHOT)).toBe('crouch');
+    // A present stance is still validated exactly as before.
+    expect(isHostedBotSnapshot({ ...legacySnapshot, stance: null })).toBe(false);
+    expect(isHostedBotSnapshot({ ...legacySnapshot, stance: 'crawl' })).toBe(false);
+  });
+
+  it('normalises a legacy snapshot as it leaves the interpolator', () => {
+    const { stance: _dropped, ...legacySnapshot } = SNAPSHOT;
+    const rendered = interpolateHostedBotSnapshot(legacySnapshot, { ...legacySnapshot, x: 5, seq: 10 }, 0.5);
+    expect(rendered.stance).toBe('stand');
+    expect(rendered.x).toBe(3);
   });
 
   it('is taken whole from the newer snapshot, never blended', () => {
@@ -142,7 +171,8 @@ describe('the shipped bot paths read the stance field (Lane AR item 3)', () => {
     // separate call in a 36,000-line module and a regression in any one of them
     // is invisible: the body just stands up again.
     expect(LEGACY).toContain("poseOperator(bot.root, debugBotStanceOverride ?? bot.stance,");
-    expect(LEGACY).toContain('poseOperator(bot.root, snapshot.stance,');
+    expect(LEGACY).toContain('const replicatedStance = hostedBotSnapshotStance(snapshot);');
+    expect(LEGACY).toContain('poseOperator(bot.root, replicatedStance,');
     expect(LEGACY).toContain('yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,');
     expect(LEGACY).toContain('bot.position.y + botStanceEyeHeightM(bot.stance)');
     expect(LEGACY).not.toContain("stance: 'stand', continuity: bot.continuity");
