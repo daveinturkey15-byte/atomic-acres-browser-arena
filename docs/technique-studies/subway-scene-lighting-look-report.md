@@ -185,6 +185,24 @@ append-only files, stage a blob built from `HEAD` plus your own hunk (`git hash-
 `git update-index --cacheinfo`) rather than `git add <file>`. I used that route for the vault
 note and it worked cleanly.
 
+**B2a — and it is worse on `skill-baseline.json` than on the register: a concurrent write can
+crash the guard, not just misattribute it.** Observed live during this repair pass, minutes
+apart:
+
+- `skill_regression_guard.py` aborted with an unhandled
+  `json.decoder.JSONDecodeError: Invalid \escape: line 4 column 20` — a **torn read** of
+  `skill-baseline.json` while another lane was writing it. The guard does not read the baseline
+  atomically and has no retry, so a routine concurrent write turns a gate into a stack trace. A
+  lane that hits this and does not look twice could reasonably conclude the baseline is corrupt.
+- Re-read seconds later, the file was valid but had been **regenerated at `00:03:40Z` and had
+  dropped from 162 skills to 150**, which immediately put 13 unrelated skills into `[add]` drift
+  with no evaluation record.
+
+This lane's skill survived both events intact (present, `f0a9ebbe…`, `drift=0` under a scoped
+check), and none of it is this lane's to repair. Recommend: write the baseline atomically
+(temp file + `os.replace`) and read it with a short retry, so a gate cannot be defeated by the
+concurrency the sweep itself creates.
+
 **B3 — STANDS. The vault cannot be pushed from this machine.** `git push origin master` on
 `desky-bootstrap-clone` returns **403 Write access to repository not granted** (re-confirmed
 this pass). Commits `5e16b7b` and the anchor repair `d3d7958` are local-only, as are the
