@@ -107,6 +107,14 @@ the same room.
 
 ## 3. Job 1 — the held regression REPRODUCES, and it is one phase
 
+> **Claim-state note.** "The 56-pair matrix went 55/56 -> 56/56" is a FIRST-PASS
+> result (`switch-matrix-before-c13ec02c.json` vs `switch-matrix-after-b082bc83-dirty.json`,
+> both committed under `docs/evidence/pass85/lane-h/`). This pass did not re-run
+> that comparison — the roster has since grown to nine selectable arenas, so the
+> equivalent run is 72 pairs, and it is section 13. Wherever "56/56" appears
+> below it is **CLAIMED from the first pass's committed receipts**, never
+> re-verified here.
+
 **VERIFIED. The hold was correct.** Interleaved A/B, baseline dist `aa9befca`
 against the lane candidate, back to back per arena:
 
@@ -190,9 +198,10 @@ transition region contains zero arena ids and that is now pinned by TWO test
 files. Removing an entry requires the measurement that a cold boot of that arena
 survives without it, not an argument.
 
-**Predicted result on every arena except farcrysis: the cold-session path is
-byte-for-byte PASS 86, so `visual-definition` returns to its baseline and the
-first-load regression goes to zero.** The final measurement is in section 3a.
+**Predicted result on every arena except farcrysis: the cold-session path takes
+the same sequence PASS 86 takes (one extra boolean, one skipped branch), so
+`visual-definition` returns to its baseline and the first-load regression goes to
+zero.** The final measurement is in section 3a.
 
 ## 3a. THE RESULT — the first-load regression is gone
 
@@ -236,8 +245,8 @@ x0.99.
 
 **CLAIM-STATE: VERIFIED that the regression is removed to within the baseline's
 own measurement spread on the two arenas that carried it. CLAIMED, not verified,
-for the other seven selectable arenas** — the cold-session code path is now
-byte-for-byte PASS 86 for every arena the authority does not name, so there is no
+for the other seven selectable arenas** — the cold-session path now takes the
+same sequence PASS 86 takes for every arena the authority does not name, so there is no
 mechanism by which they could differ, but only these two were measured.
 
 The whole arc, one phase, one arena, four interleaved A/Bs:
@@ -446,7 +455,7 @@ that commit `8715aa8c` now publishes is the counter that will show it.
   untouched — VERIFIED: 0 occurrences in this pass's diff, all call sites intact.
   No light is toggled at runtime by anything in this pass.
 
-## 8. Gotcha worth keeping (cross-harness)
+## 7. Gotcha worth keeping (cross-harness)
 
 **Symptom → Cause → Correction → Verify.**
 
@@ -475,7 +484,7 @@ each receipt, plus the control column: in this lane's decisive row (high-seas)
 the control moved x1.02 while the phase under test moved x1.69, which is what
 makes that row evidence rather than an anecdote.
 
-## 9. Open items for the orchestrator
+## 8. Open items for the orchestrator
 
 1. **OPEN — the eight/ten-arena boot smoke was not re-run in this window.**
    PASS 86 ran it 12/12 on `aa9befca`, the head this branch merges. This pass's
@@ -514,7 +523,7 @@ makes that row evidence rather than an anecdote.
    `Co-Authored-By: Claude Opus 5.1`; the harness system prompt mandates
    `Claude Fable 5.1`. Every commit in this lane follows the brief.
 
-## 10. Ownership and boundaries
+## 9. Ownership and boundaries
 
 - Files changed by this pass: `src/legacy-main.ts` (the `// LOAD-CUT:` region of
   the arena transition and the match-admission block — both explicitly in this
@@ -537,7 +546,7 @@ makes that row evidence rather than an anecdote.
 - `src/legacy-main.ts` remains pure LF (0 CRLF) after every edit; all edits were
   made with `newline=''` writers.
 
-## 11. Commits in this pass (on top of the merge `a2efa280`)
+## 10. Commits in this pass (on top of the merge `a2efa280`)
 
 | commit | what it lands |
 |---|---|
@@ -548,7 +557,7 @@ makes that row evidence rather than an anecdote.
 | `b4ee52d9` | receipts stamp `distBundle` — the build measured, not the tree the probe ran from |
 | `89d760ba` | cold-session relief asked of an evidenced authority; switch relief unconditional and unchanged |
 
-## 12. Verification
+## 11. Verification
 
 - **`npx tsc --noEmit`: exit 0** at the final source commit `89d760ba`. (It was
   NOT clean on the first attempt — `cold-session-precompile-reach.ts` had an
@@ -582,7 +591,7 @@ makes that row evidence rather than an anecdote.
 - **ComfyUI idle** for the whole window (`GET /queue` empty), and every receipt
   stamps its own free-VRAM and rival-browser reading.
 
-## 13. What the orchestrator has to decide
+## 12. What the orchestrator has to decide
 
 1. **Merge or hold.** The correctness fix (in-session switches) is unchanged and
    is the reason to merge. The first-load regression that caused the hold is
@@ -599,9 +608,9 @@ makes that row evidence rather than an anecdote.
      under every precompile in the game.
 3. **Strike "menu-time prewarm" from the job list** (section 4b) — `AGENTS.md`
    forbids it.
-4. **The boot smoke owes a run before merge** (section 9, item 1).
+4. **The boot smoke owes a run before merge** (section 8, item 1).
 
-## 14. Gate results (this pass, final build `89d760ba`)
+## 13. Gate results (this pass, final build `89d760ba`)
 
 ### In-combat pipeline tripwire (PASS 82 invariant), 75 s each
 
@@ -634,5 +643,5 @@ The roster GREW since the first pass: PASS 86 shipped Nuke Town Rebuild
 56, and **no instrument has ever exercised an in-session switch into or out of
 nuketown2**. That alone is worth the run.
 
-Status and result: see section 15.
+Status and result below.
 
