@@ -1,0 +1,105 @@
+{
+  "before": "artifacts\\hf420\\c2b-high-seas",
+  "after": "artifacts\\hf420\\c3-high-seas",
+  "shots": {
+    "sea-down": {
+      "meanBefore": [
+        0.009849,
+        0.013653,
+        0.161604
+      ],
+      "meanAfter": [
+        0.009849,
+        0.013655,
+        0.161631
+      ],
+      "roiMeanBefore": [
+        0.0,
+        0.0,
+        0.168115
+      ],
+      "roiMeanAfter": [
+        0.0,
+        2e-06,
+        0.168145
+      ],
+      "meanAbsDelta": 0.00012,
+      "maxAbsDelta": 0.21568627,
+      "changedPixelFraction": 0.08827582,
+      "roiMeanAbsDelta": 0.00010577,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.09167589,
+      "poolCoverageBefore": 0.11696018
+    },
+    "sea-grazing": {
+      "meanBefore": [
+        0.312111,
+        0.441942,
+        0.529293
+      ],
+      "meanAfter": [
+        0.31214,
+        0.441956,
+        0.529314
+      ],
+      "roiMeanBefore": [
+        0.301435,
+        0.435156,
+        0.524557
+      ],
+      "roiMeanAfter": [
+        0.30146,
+        0.435197,
+        0.524602
+      ],
+      "meanAbsDelta": 0.00028226,
+      "maxAbsDelta": 0.23137255,
+      "changedPixelFraction": 0.17755534,
+      "roiMeanAbsDelta": 0.00027349,
+      "silhouetteMaxShiftPx": 1,
+      "silhouetteMeanShiftPx": 0.011719,
+      "silhouetteColumnsMoved": 30,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.15491482,
+      "poolCoverageBefore": 0.17249566
+    },
+    "sea-wide": {
+      "meanBefore": [
+        0.283046,
+        0.387028,
+        0.474494
+      ],
+      "meanAfter": [
+        0.283048,
+        0.387038,
+        0.474504
+      ],
+      "roiMeanBefore": [
+        0.180065,
+        0.311282,
+        0.412376
+      ],
+      "roiMeanAfter": [
+        0.180065,
+        0.311284,
+        0.412376
+      ],
+      "meanAbsDelta": 0.00017368,
+      "maxAbsDelta": 0.2745098,
+      "changedPixelFraction": 0.11324192,
+      "roiMeanAbsDelta": 0.00015353,
+      "silhouetteMaxShiftPx": 1,
+      "silhouetteMeanShiftPx": 0.012891,
+      "silhouetteColumnsMoved": 33,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.17732503,
+      "poolCoverageBefore": 0.17053385
+    }
+  }
+}

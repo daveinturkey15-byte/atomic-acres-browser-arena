@@ -1,0 +1,245 @@
+{
+  "note": "2560x1440, quality profile, headless installed Chrome, native WebGPU. n=90 frames per sample.",
+  "rows": [
+    {
+      "build": "before-farcrysis",
+      "arena": "farcrysis",
+      "presentationFrameP50Ms": 22.699999928474426,
+      "presentationFrameP95Ms": 28.899999976158142,
+      "cpuFrameP50Ms": 18.799999952316284,
+      "cpuFrameP95Ms": 23.100000023841858,
+      "steadyStateFps": 42.710706149375184,
+      "sampleCount": 90
+    },
+    {
+      "build": "before-map3-run1",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.600000023841858,
+      "presentationFrameP95Ms": 15.5,
+      "cpuFrameP50Ms": 6.200000047683716,
+      "cpuFrameP95Ms": 8.800000071525574,
+      "steadyStateFps": 90.47044632520503,
+      "sampleCount": 90
+    },
+    {
+      "build": "before-map3-run2",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.100000023841858,
+      "presentationFrameP95Ms": 13.899999976158142,
+      "cpuFrameP50Ms": 5.899999976158142,
+      "cpuFrameP95Ms": 8,
+      "steadyStateFps": 97.96451507056568,
+      "sampleCount": 90
+    },
+    {
+      "build": "before-map3-run3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 11.200000047683716,
+      "presentationFrameP95Ms": 15.199999928474426,
+      "cpuFrameP50Ms": 6.600000023841858,
+      "cpuFrameP95Ms": 9.699999928474426,
+      "steadyStateFps": 88.28722778311254,
+      "sampleCount": 90
+    },
+    {
+      "build": "before-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 17.90000009536743,
+      "presentationFrameP95Ms": 29.399999976158142,
+      "cpuFrameP50Ms": 11.300000071525574,
+      "cpuFrameP95Ms": 18.899999976158142,
+      "steadyStateFps": 51.95404953095732,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-high-seas-run2",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 12.600000023841858,
+      "presentationFrameP95Ms": 18.399999976158142,
+      "cpuFrameP50Ms": 7.900000095367432,
+      "cpuFrameP95Ms": 11.199999928474426,
+      "steadyStateFps": 74.13509060955519,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-high-seas",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 16.100000023841858,
+      "presentationFrameP95Ms": 23.700000047683716,
+      "cpuFrameP50Ms": 7.899999976158142,
+      "cpuFrameP95Ms": 12.399999976158142,
+      "steadyStateFps": 60.54897739116362,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-map3-run2",
+      "arena": "map3",
+      "presentationFrameP50Ms": 8.5,
+      "presentationFrameP95Ms": 13,
+      "cpuFrameP50Ms": 5.100000023841858,
+      "cpuFrameP95Ms": 7.5,
+      "steadyStateFps": 110.19958368402752,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-map3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 8.899999976158142,
+      "presentationFrameP95Ms": 12.899999976158142,
+      "cpuFrameP50Ms": 5.100000023841858,
+      "cpuFrameP95Ms": 7.200000047683716,
+      "steadyStateFps": 110.96042411213722,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-rustworks-run2",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 11.799999952316284,
+      "presentationFrameP95Ms": 15.199999928474426,
+      "cpuFrameP50Ms": 7.200000047683716,
+      "cpuFrameP95Ms": 9.399999976158142,
+      "steadyStateFps": 83.2639467129107,
+      "sampleCount": 90
+    },
+    {
+      "build": "c1-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 11.399999976158142,
+      "presentationFrameP95Ms": 15.699999928474426,
+      "cpuFrameP50Ms": 7,
+      "cpuFrameP95Ms": 9.400000095367432,
+      "steadyStateFps": 83.37965536593286,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2-farcrysis",
+      "arena": "farcrysis",
+      "presentationFrameP50Ms": 20.899999976158142,
+      "presentationFrameP95Ms": 27.799999952316284,
+      "cpuFrameP50Ms": 16.799999952316284,
+      "cpuFrameP95Ms": 21.5,
+      "steadyStateFps": 46.37740904817802,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2-map3-run1",
+      "arena": "map3",
+      "presentationFrameP50Ms": 11.799999952316284,
+      "presentationFrameP95Ms": 16.700000047683716,
+      "cpuFrameP50Ms": 6.899999976158142,
+      "cpuFrameP95Ms": 10.600000023841858,
+      "steadyStateFps": 82.88819304103188,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 11.399999976158142,
+      "presentationFrameP95Ms": 15.199999928474426,
+      "cpuFrameP50Ms": 6.900000095367432,
+      "cpuFrameP95Ms": 9.200000047683716,
+      "steadyStateFps": 85.8287240110182,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2b-high-seas",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 11.800000071525574,
+      "presentationFrameP95Ms": 19,
+      "cpuFrameP50Ms": 7.199999928474426,
+      "cpuFrameP95Ms": 11.300000071525574,
+      "steadyStateFps": 77.57283227508054,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2b-map3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.100000023841858,
+      "presentationFrameP95Ms": 19.799999952316284,
+      "cpuFrameP50Ms": 5.5,
+      "cpuFrameP95Ms": 8.299999952316284,
+      "steadyStateFps": 79.36507936507937,
+      "sampleCount": 90
+    },
+    {
+      "build": "c2b-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 12.800000071525574,
+      "presentationFrameP95Ms": 18.5,
+      "cpuFrameP50Ms": 7.199999928474426,
+      "cpuFrameP95Ms": 10.399999976158142,
+      "steadyStateFps": 72.17321571772253,
+      "sampleCount": 90
+    },
+    {
+      "build": "c3-high-seas",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 12.900000095367432,
+      "presentationFrameP95Ms": 19,
+      "cpuFrameP50Ms": 8,
+      "cpuFrameP95Ms": 12,
+      "steadyStateFps": 73.44540558327981,
+      "sampleCount": 90
+    },
+    {
+      "build": "c3-map3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 14.199999928474426,
+      "presentationFrameP95Ms": 26.5,
+      "cpuFrameP50Ms": 8.300000071525574,
+      "cpuFrameP95Ms": 16.199999928474426,
+      "steadyStateFps": 54.888089283029046,
+      "sampleCount": 90
+    },
+    {
+      "build": "c3-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 15.600000023841858,
+      "presentationFrameP95Ms": 28.600000023841858,
+      "cpuFrameP50Ms": 9.5,
+      "cpuFrameP95Ms": 16.399999976158142,
+      "steadyStateFps": 57.87781350482315,
+      "sampleCount": 90
+    },
+    {
+      "build": "c4-high-seas",
+      "arena": "high-seas",
+      "presentationFrameP50Ms": 10.399999976158142,
+      "presentationFrameP95Ms": 13.200000047683716,
+      "cpuFrameP50Ms": 6.5,
+      "cpuFrameP95Ms": 8.199999928474426,
+      "steadyStateFps": 94.24083769633508,
+      "sampleCount": 90
+    },
+    {
+      "build": "c4-map3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10,
+      "presentationFrameP95Ms": 15.199999928474426,
+      "cpuFrameP50Ms": 5.899999976158142,
+      "cpuFrameP95Ms": 8.100000023841858,
+      "steadyStateFps": 89.9280575582415,
+      "sampleCount": 90
+    },
+    {
+      "build": "c4-rustworks",
+      "arena": "rustworks-1v1",
+      "presentationFrameP50Ms": 10.800000071525574,
+      "presentationFrameP95Ms": 14.299999952316284,
+      "cpuFrameP50Ms": 6.5,
+      "cpuFrameP95Ms": 8.299999952316284,
+      "steadyStateFps": 88.23529411764706,
+      "sampleCount": 90
+    },
+    {
+      "build": "c5-map3",
+      "arena": "map3",
+      "presentationFrameP50Ms": 10.299999952316284,
+      "presentationFrameP95Ms": 16.699999928474426,
+      "cpuFrameP50Ms": 5.899999976158142,
+      "cpuFrameP95Ms": 8.699999928474426,
+      "steadyStateFps": 87.62535294358544,
+      "sampleCount": 90
+    }
+  ]
+}

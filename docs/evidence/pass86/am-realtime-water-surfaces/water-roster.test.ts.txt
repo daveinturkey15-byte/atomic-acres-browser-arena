@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest';
+import { ARENA_IDS } from '../arena-identity';
+import { ARENA_SELECTIONS } from '../map-selection';
+import {
+  WATER_BODIES,
+  WATER_POOLS,
+  WATER_ROSTER_OPT_OUTS,
+  arenaHasWater,
+  waterBodyId,
+  waterPoolsForArena,
+} from './water-authoring';
+
+/**
+ * HF-420: "a pool or pond in every level" is a ROSTER problem, not a shader
+ * problem, and this is the gate that makes it real.
+ *
+ * The defect this exists to prevent is specific and has bitten this repo
+ * before: a gate that iterates a HARDCODED list of arenas that have water
+ * cannot fail for an arena that has none - the arena is not a failure, it is
+ * simply absent from the loop. So the roster here is DERIVED from the arena
+ * roster, every exclusion is written down with a reason, and an id that is
+ * neither watered nor excused fails.
+ */
+function unwateredArenaIds(ids: readonly string[]): readonly string[] {
+  return ids.filter((id) => !arenaHasWater(id) && !(id in WATER_ROSTER_OPT_OUTS));
+}
+
+describe('water roster (derived from the arena roster)', () => {
+  it('DERIVES the roster: an arena id with no water and no opt-out is a failure', () => {
+    // The falsifier, permanently mechanised rather than performed once by hand:
+    // a scratch id that no water table has ever heard of must be reported.
+    expect(unwateredArenaIds([...ARENA_IDS, 'scratch-water-arena']))
+      .toContain('scratch-water-arena');
+    // ...and the check is not vacuous - it passes ids through unchanged.
+    expect(unwateredArenaIds([])).toEqual([]);
+  });
+
+  it('gives every arena in the roster water or a written-down reason not to', () => {
+    expect(unwateredArenaIds(ARENA_IDS)).toEqual([]);
+  });
+
+  it('keeps the opt-out list honest: only real ids, each with a real reason', () => {
+    for (const [id, reason] of Object.entries(WATER_ROSTER_OPT_OUTS)) {
+      expect(ARENA_IDS).toContain(id);
+      expect(reason.length).toBeGreaterThan(20);
+      // An opt-out for an arena that HAS water is a contradiction, and the most
+      // likely way this table goes stale.
+      expect(arenaHasWater(id)).toBe(false);
+    }
+  });
+
+  it('never lets a pool become gameplay authority', () => {
+    // WATER_BODIES is the host-authoritative table (level, swimmable,
+    // amplitudeScale). Pools are presentation only, and this is the assertion
+    // that keeps the two from merging by accident.
+    for (const id of ARENA_IDS) {
+      for (const pool of waterPoolsForArena(id)) {
+        expect(pool.swimmable).toBe(false);
+        expect(pool.shape).toBeTruthy();
+        // No horizon skirt: a 3.2 km ring under a small pool would draw
+        // through the whole arena.
+        expect(pool.horizonRadius).toBe(0);
+        expect(pool.arenaId).toBe(id);
+        // Distinct, stable name per body so an arena may own several.
+        expect(waterBodyId(pool)).not.toBe(id);
+      }
+    }
+  });
+
+  it('names every body uniquely inside its arena', () => {
+    for (const id of ARENA_IDS) {
+      const ids = [
+        ...(WATER_BODIES[id as keyof typeof WATER_BODIES] ? [id] : []),
+        ...waterPoolsForArena(id).map(waterBodyId),
+      ];
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it('reports coverage with its fixtures named, not as a bare ratio', () => {
+    // "3 of 9" over-states a gap when two of the nine are test fixtures. Any
+    // coverage number this lane quotes has to come from here.
+    const fixtures = ['test1', 'test2'];
+    const shippable = ARENA_IDS.filter((id) => !fixtures.includes(id));
+    const watered = shippable.filter((id) => arenaHasWater(id));
+    const selectable = ARENA_SELECTIONS.filter((a) => a.selectable !== false).map((a) => a.id);
+    expect(shippable.length).toBe(7);
+    expect(watered.length + Object.keys(WATER_ROSTER_OPT_OUTS)
+      .filter((id) => !fixtures.includes(id)).length).toBe(shippable.length);
+    // Every selectable arena is covered by the same rule.
+    expect(selectable.filter((id) => !arenaHasWater(id) && !(id in WATER_ROSTER_OPT_OUTS)))
+      .toEqual([]);
+  });
+});

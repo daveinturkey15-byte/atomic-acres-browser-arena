@@ -1,0 +1,138 @@
+{
+  "before": "artifacts\\hf420\\c2b-map3",
+  "after": "artifacts\\hf420\\c3-map3",
+  "shots": {
+    "grazing": {
+      "meanBefore": [
+        0.198653,
+        0.218637,
+        0.25929
+      ],
+      "meanAfter": [
+        0.198657,
+        0.218643,
+        0.259299
+      ],
+      "roiMeanBefore": [
+        0.243704,
+        0.253839,
+        0.284953
+      ],
+      "roiMeanAfter": [
+        0.243703,
+        0.253843,
+        0.284956
+      ],
+      "meanAbsDelta": 0.00030972,
+      "maxAbsDelta": 0.24313725,
+      "changedPixelFraction": 0.207602,
+      "roiMeanAbsDelta": 0.00033372,
+      "silhouetteMaxShiftPx": 2,
+      "silhouetteMeanShiftPx": 0.042188,
+      "silhouetteColumnsMoved": 88,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.19571289,
+      "poolCoverageBefore": 0.13056288
+    },
+    "shallow-down": {
+      "meanBefore": [
+        0.032831,
+        0.039298,
+        0.076068
+      ],
+      "meanAfter": [
+        0.032831,
+        0.039298,
+        0.076068
+      ],
+      "roiMeanBefore": [
+        0.027098,
+        0.032524,
+        0.06113
+      ],
+      "roiMeanAfter": [
+        0.027097,
+        0.032523,
+        0.061129
+      ],
+      "meanAbsDelta": 0.00018702,
+      "maxAbsDelta": 0.1254902,
+      "changedPixelFraction": 0.1154872,
+      "roiMeanAbsDelta": 0.0001632,
+      "silhouetteMaxShiftPx": 0,
+      "silhouetteMeanShiftPx": 0.0,
+      "silhouetteColumnsMoved": 0,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.09541748,
+      "poolCoverageBefore": 0.11488525
+    },
+    "shoreline": {
+      "meanBefore": [
+        0.080955,
+        0.087574,
+        0.119563
+      ],
+      "meanAfter": [
+        0.080973,
+        0.0876,
+        0.119604
+      ],
+      "roiMeanBefore": [
+        0.057516,
+        0.066362,
+        0.100597
+      ],
+      "roiMeanAfter": [
+        0.057539,
+        0.0664,
+        0.100665
+      ],
+      "meanAbsDelta": 0.0002207,
+      "maxAbsDelta": 0.16078431,
+      "changedPixelFraction": 0.15418701,
+      "roiMeanAbsDelta": 0.00031886,
+      "silhouetteMaxShiftPx": 2,
+      "silhouetteMeanShiftPx": 0.051562,
+      "silhouetteColumnsMoved": 120,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.16436388,
+      "poolCoverageBefore": 0.1733469
+    },
+    "wide": {
+      "meanBefore": [
+        0.356018,
+        0.355956,
+        0.369716
+      ],
+      "meanAfter": [
+        0.356018,
+        0.355957,
+        0.369717
+      ],
+      "roiMeanBefore": [
+        0.163534,
+        0.167016,
+        0.191268
+      ],
+      "roiMeanAfter": [
+        0.163535,
+        0.167016,
+        0.19127
+      ],
+      "meanAbsDelta": 0.00032867,
+      "maxAbsDelta": 0.06666667,
+      "changedPixelFraction": 0.22212592,
+      "roiMeanAbsDelta": 0.00029448,
+      "silhouetteMaxShiftPx": 18,
+      "silhouetteMeanShiftPx": 0.155469,
+      "silhouetteColumnsMoved": 288,
+      "width": 2560,
+      "height": 1440,
+      "poolCoverage": 0.12909532,
+      "poolCoverageBefore": 0.25516873
+    }
+  }
+}
