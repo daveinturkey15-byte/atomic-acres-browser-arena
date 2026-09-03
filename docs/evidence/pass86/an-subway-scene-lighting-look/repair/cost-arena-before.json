@@ -1,0 +1,351 @@
+{
+  "capturedAt": "2026-09-03T01:54:09.727Z",
+  "route": "arena",
+  "label": "arena-before",
+  "dist": "C:\\Users\\david\\projects\\aa-claude-subwaylook\\dist",
+  "samplesPerView": 15,
+  "keys": [],
+  "machine": {
+    "freeVramMib": 7884,
+    "comfyQueueDepth": 0,
+    "waitedAttempts": 0
+  },
+  "pageErrors": [],
+  "results": {
+    "arena": {
+      "arena-godrays-depth2": {
+        "world": {
+          "x": -36,
+          "y": 1.7,
+          "z": 13
+        },
+        "yaw": 1.5708,
+        "pitch": 0.04,
+        "draws": {
+          "n": 15,
+          "median": 85,
+          "min": 85,
+          "max": 85
+        },
+        "triangles": {
+          "n": 15,
+          "median": 145147,
+          "min": 145127,
+          "max": 145175
+        },
+        "samples": [
+          {
+            "calls": 85,
+            "triangles": 145127
+          },
+          {
+            "calls": 85,
+            "triangles": 145139
+          },
+          {
+            "calls": 85,
+            "triangles": 145139
+          },
+          {
+            "calls": 85,
+            "triangles": 145147
+          },
+          {
+            "calls": 85,
+            "triangles": 145159
+          },
+          {
+            "calls": 85,
+            "triangles": 145151
+          },
+          {
+            "calls": 85,
+            "triangles": 145135
+          },
+          {
+            "calls": 85,
+            "triangles": 145139
+          },
+          {
+            "calls": 85,
+            "triangles": 145131
+          },
+          {
+            "calls": 85,
+            "triangles": 145135
+          },
+          {
+            "calls": 85,
+            "triangles": 145175
+          },
+          {
+            "calls": 85,
+            "triangles": 145159
+          },
+          {
+            "calls": 85,
+            "triangles": 145171
+          },
+          {
+            "calls": 85,
+            "triangles": 145167
+          },
+          {
+            "calls": 85,
+            "triangles": 145151
+          }
+        ]
+      },
+      "arena-godrays-depth10": {
+        "world": {
+          "x": -44,
+          "y": 1.7,
+          "z": 13
+        },
+        "yaw": 1.5708,
+        "pitch": 0.04,
+        "draws": {
+          "n": 15,
+          "median": 81,
+          "min": 81,
+          "max": 81
+        },
+        "triangles": {
+          "n": 15,
+          "median": 125927,
+          "min": 125811,
+          "max": 126083
+        },
+        "samples": [
+          {
+            "calls": 81,
+            "triangles": 125815
+          },
+          {
+            "calls": 81,
+            "triangles": 125811
+          },
+          {
+            "calls": 81,
+            "triangles": 125811
+          },
+          {
+            "calls": 81,
+            "triangles": 125835
+          },
+          {
+            "calls": 81,
+            "triangles": 125859
+          },
+          {
+            "calls": 81,
+            "triangles": 125883
+          },
+          {
+            "calls": 81,
+            "triangles": 125903
+          },
+          {
+            "calls": 81,
+            "triangles": 125927
+          },
+          {
+            "calls": 81,
+            "triangles": 125951
+          },
+          {
+            "calls": 81,
+            "triangles": 125971
+          },
+          {
+            "calls": 81,
+            "triangles": 125991
+          },
+          {
+            "calls": 81,
+            "triangles": 126015
+          },
+          {
+            "calls": 81,
+            "triangles": 126039
+          },
+          {
+            "calls": 81,
+            "triangles": 126059
+          },
+          {
+            "calls": 81,
+            "triangles": 126083
+          }
+        ]
+      },
+      "arena-godrays-depth16": {
+        "world": {
+          "x": -50,
+          "y": 1.7,
+          "z": 13
+        },
+        "yaw": 1.5708,
+        "pitch": 0.04,
+        "draws": {
+          "n": 15,
+          "median": 81,
+          "min": 81,
+          "max": 81
+        },
+        "triangles": {
+          "n": 15,
+          "median": 126759,
+          "min": 126739,
+          "max": 126811
+        },
+        "samples": [
+          {
+            "calls": 81,
+            "triangles": 126767
+          },
+          {
+            "calls": 81,
+            "triangles": 126767
+          },
+          {
+            "calls": 81,
+            "triangles": 126759
+          },
+          {
+            "calls": 81,
+            "triangles": 126759
+          },
+          {
+            "calls": 81,
+            "triangles": 126751
+          },
+          {
+            "calls": 81,
+            "triangles": 126743
+          },
+          {
+            "calls": 81,
+            "triangles": 126755
+          },
+          {
+            "calls": 81,
+            "triangles": 126739
+          },
+          {
+            "calls": 81,
+            "triangles": 126755
+          },
+          {
+            "calls": 81,
+            "triangles": 126759
+          },
+          {
+            "calls": 81,
+            "triangles": 126767
+          },
+          {
+            "calls": 81,
+            "triangles": 126775
+          },
+          {
+            "calls": 81,
+            "triangles": 126787
+          },
+          {
+            "calls": 81,
+            "triangles": 126799
+          },
+          {
+            "calls": 81,
+            "triangles": 126811
+          }
+        ]
+      },
+      "arena-vegetation-depth14": {
+        "world": {
+          "x": 0,
+          "y": 1.7,
+          "z": 48
+        },
+        "yaw": -3.1416,
+        "pitch": -0.04,
+        "draws": {
+          "n": 15,
+          "median": 101,
+          "min": 101,
+          "max": 101
+        },
+        "triangles": {
+          "n": 15,
+          "median": 357119,
+          "min": 357099,
+          "max": 357167
+        },
+        "samples": [
+          {
+            "calls": 101,
+            "triangles": 357147
+          },
+          {
+            "calls": 101,
+            "triangles": 357155
+          },
+          {
+            "calls": 101,
+            "triangles": 357159
+          },
+          {
+            "calls": 101,
+            "triangles": 357167
+          },
+          {
+            "calls": 101,
+            "triangles": 357147
+          },
+          {
+            "calls": 101,
+            "triangles": 357119
+          },
+          {
+            "calls": 101,
+            "triangles": 357119
+          },
+          {
+            "calls": 101,
+            "triangles": 357123
+          },
+          {
+            "calls": 101,
+            "triangles": 357107
+          },
+          {
+            "calls": 101,
+            "triangles": 357099
+          },
+          {
+            "calls": 101,
+            "triangles": 357107
+          },
+          {
+            "calls": 101,
+            "triangles": 357103
+          },
+          {
+            "calls": 101,
+            "triangles": 357111
+          },
+          {
+            "calls": 101,
+            "triangles": 357115
+          },
+          {
+            "calls": 101,
+            "triangles": 357131
+          }
+        ]
+      }
+    }
+  },
+  "boot": "active"
+}

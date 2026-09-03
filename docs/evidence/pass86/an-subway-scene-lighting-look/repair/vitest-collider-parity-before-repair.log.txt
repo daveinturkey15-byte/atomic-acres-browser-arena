@@ -1,0 +1,64 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-subwaylook
+
+ ❯ src/collider-visual-parity-gate.test.ts (6 tests | 2 failed) 22153ms
+     × flags NO walk-through mesh beyond the accepted, triaged ledger 50ms
+     × Direction C: rates every substantial visible mesh for gunfire beyond the accepted shoot-through ledger 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > flags NO walk-through mesh beyond the accepted, triaged ledger
+AssertionError: map3: new walk-through meshes need triage and a ledger row: expected [ { …(7) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "centre": [
++       -54.2,
++       3.26,
++       13,
++     ],
++     "instanced": false,
++     "name": "map3-station-bay-halos",
++     "path": "Map3 arena/map3-lane-godrays/map3-station-bay/map3-station-bay-kit/map3-station-bay-halos",
++     "presentationOnly": false,
++     "size": [
++       36.8,
++       6.45,
++       3.2,
++     ],
++     "vertices": 104,
++   },
++ ]
+
+ ❯ src/collider-visual-parity-gate.test.ts:133:96
+    131|         ));
+    132|       });
+    133|       expect(unexpected, `${result.id}: new walk-through meshes need t…
+       |                                                                                                ^
+    134|     }
+    135|   }, 120_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/collider-visual-parity-gate.test.ts > collider/visual parity gate (all six arenas) > Direction C: rates every substantial visible mesh for gunfire beyond the accepted shoot-through ledger
+AssertionError: map3: 1 unrated ghost shot surface(s) over ceiling 0: map3-station-bay-halos @ [-54.2,3.26,13] size [36.8,6.45,3.2]: expected 1 to be less than or equal to 0
+ ❯ src/collider-visual-parity-gate.test.ts:153:9
+    151|         summary.length,
+    152|         `${result.id}: ${summary.length} unrated ghost shot surface(s)…
+    153|       ).toBeLessThanOrEqual(ceiling);
+       |         ^
+    154|       // A row that matches nothing is rot: the geometry it excused is…
+    155|       // Delete the row so the ledger only ever shrinks truthfully.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  03:11:30
+   Duration  25.55s (transform 27.98s, setup 0ms, import 1.17s, tests 22.15s, environment 0ms)
+

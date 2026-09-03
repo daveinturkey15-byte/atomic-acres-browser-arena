@@ -1,5 +1,23 @@
 # HF-421 — Map 3 corridor lighting trial: measured results
 
+> **SUPERSEDED IN PART — read `repair/MEASUREMENTS-REPAIR.md` first.**
+>
+> A skeptic pass found that this build turned `src/collider-visual-parity-gate.test.ts`
+> RED on the **shipping arena**, shipped a URL-driven debug surface into the
+> playable arena, put the dressing course across every god-ray slit and darkened
+> the whole floor. All four are fixed on this branch. Two claims below are wrong
+> and are retracted there with evidence:
+>
+> - **§2's draw/triangle deltas** were one HUD sample per view on the standalone
+>   showcase page only. The corrected figure is a deterministic **+10 draws**, on
+>   the showcase page AND on the arena route, measured 15 frames per view.
+> - **§4's "4.1x better readability, no probe regressed"** was a single frame of a
+>   scene containing a moving 52-intensity light on an 11 s loop. Swept over a
+>   full tram period, twice, the effect is **not resolvable** either way.
+>
+> §5's "no gate was touched" was true of gate FILES and false of gate STATE.
+> §6's findings and the art-direction analysis stand unchanged.
+
 Lane AN (`subway-scene-lighting-look`), Claude Code / Opus 5.1, `dave-gaming-pc`,
 2026-09-03 overnight. Branch `contrib/dave-gaming-pc/claude/hf421-subway-lighting-trial`,
 worktree `C:/Users/david/projects/aa-claude-subwaylook`.
@@ -116,8 +134,13 @@ and no bloom threshold was lowered.
 - `npm run build` → exit 0.
 - No `ShaderMaterial`, `RawShaderMaterial` or `onBeforeCompile`; no imported mesh, image,
   font or LUT; nothing derived from the reference video. Every surface is TSL.
-- No gate, threshold, timeout, test or safety bound was changed. `ART_DIRECTION_SAFETY_BOUNDS`
-  and `src/rendering/art-direction.ts` were **not edited** — see §6.
+- No gate, threshold, timeout, test or safety bound was changed IN SOURCE, and
+  `ART_DIRECTION_SAFETY_BOUNDS` / `src/rendering/art-direction.ts` were **not
+  edited** — see §6. **CORRECTION:** this line originally read "no gate was
+  touched", which invited the reading that the gates were passing. They were
+  not: the collider/visual parity gate was RED on the Map 3 arena, and the three
+  test files chosen here did not exercise it. Fixed and evidenced in
+  `repair/MEASUREMENTS-REPAIR.md` §1.
 
 ## 6. What was NOT done, and why
 

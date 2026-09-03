@@ -1,0 +1,505 @@
+{
+  "generatedAt": "2026-09-03T02:00:26.521Z",
+  "port": 4224,
+  "viewport": {
+    "WIDTH": 2560,
+    "HEIGHT": 1440
+  },
+  "gpuFreeMiB": 8166,
+  "cases": {
+    "before": {
+      "label": "before-bay-off",
+      "url": "http://localhost:4224/map3.html?probe=1&bay=0",
+      "hud": "180 fps · 140 draws · 321k tris · WebGPU · shim 31/120 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D",
+      "viewport": {
+        "w": 2560,
+        "h": 1440
+      },
+      "image": {
+        "width": 2560,
+        "height": 1440
+      },
+      "sweep": {
+        "frames": 15,
+        "intervalMs": 850,
+        "spanSeconds": 11.9,
+        "worstFrameIndex": 1
+      },
+      "frameTimeMs": {
+        "samples": 539,
+        "p50": 5.6,
+        "p95": 5.7
+      },
+      "probes": [
+        {
+          "probe": "left",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1113,
+            "y0": 714,
+            "x1": 1152,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 0.23,
+          "separationMedian": 6.728,
+          "separationBest": 43.186,
+          "silhouetteMedianLuma": 128.036,
+          "backgroundMedianLuma": 123.738,
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471
+        },
+        {
+          "probe": "centre",
+          "distanceM": 15.02,
+          "rect": {
+            "x0": 1262,
+            "y0": 714,
+            "x1": 1298,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 1.349,
+          "separationMedian": 11.501,
+          "separationBest": 25.961,
+          "silhouetteMedianLuma": 170.241,
+          "backgroundMedianLuma": 164.47,
+          "silhouettePixels": 1638,
+          "backgroundPixels": 4796
+        },
+        {
+          "probe": "right",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1408,
+            "y0": 714,
+            "x1": 1447,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 2.489,
+          "separationMedian": 7.448,
+          "separationBest": 30.198,
+          "silhouetteMedianLuma": 158.241,
+          "backgroundMedianLuma": 151.518,
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471
+        }
+      ],
+      "perFrame": [
+        {
+          "frame": 0,
+          "medianSeparation": 2.325,
+          "separations": [
+            2.158,
+            2.325,
+            3.639
+          ]
+        },
+        {
+          "frame": 1,
+          "medianSeparation": 1.77,
+          "separations": [
+            1.77,
+            1.349,
+            2.489
+          ]
+        },
+        {
+          "frame": 2,
+          "medianSeparation": 2.008,
+          "separations": [
+            0.23,
+            2.008,
+            3.353
+          ]
+        },
+        {
+          "frame": 3,
+          "medianSeparation": 6.217,
+          "separations": [
+            14.442,
+            5.795,
+            6.217
+          ]
+        },
+        {
+          "frame": 4,
+          "medianSeparation": 6.14,
+          "separations": [
+            28.306,
+            6.14,
+            3.795
+          ]
+        },
+        {
+          "frame": 5,
+          "medianSeparation": 20.689,
+          "separations": [
+            30.799,
+            20.689,
+            8.723
+          ]
+        },
+        {
+          "frame": 6,
+          "medianSeparation": 10.579,
+          "separations": [
+            0.584,
+            23.297,
+            10.579
+          ]
+        },
+        {
+          "frame": 7,
+          "medianSeparation": 18.501,
+          "separations": [
+            33.745,
+            18.501,
+            11.438
+          ]
+        },
+        {
+          "frame": 8,
+          "medianSeparation": 20.986,
+          "separations": [
+            6.37,
+            20.986,
+            30.198
+          ]
+        },
+        {
+          "frame": 9,
+          "medianSeparation": 25.961,
+          "separations": [
+            43.186,
+            25.961,
+            7.651
+          ]
+        },
+        {
+          "frame": 10,
+          "medianSeparation": 11.501,
+          "separations": [
+            41.964,
+            11.501,
+            7.723
+          ]
+        },
+        {
+          "frame": 11,
+          "medianSeparation": 7.795,
+          "separations": [
+            8.511,
+            4.322,
+            7.795
+          ]
+        },
+        {
+          "frame": 12,
+          "medianSeparation": 6.728,
+          "separations": [
+            6.728,
+            19.43,
+            4.723
+          ]
+        },
+        {
+          "frame": 13,
+          "medianSeparation": 4.927,
+          "separations": [
+            3.085,
+            11.86,
+            4.927
+          ]
+        },
+        {
+          "frame": 14,
+          "medianSeparation": 7.448,
+          "separations": [
+            1.53,
+            10.681,
+            7.448
+          ]
+        }
+      ],
+      "worstFrameMedianSeparation": 1.77,
+      "medianSeparation": 7.448
+    },
+    "after": {
+      "label": "after-bay-on",
+      "url": "http://localhost:4224/map3.html?probe=1",
+      "hud": "180 fps · 152 draws · 323k tris · WebGPU · shim 34/129 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D",
+      "viewport": {
+        "w": 2560,
+        "h": 1440
+      },
+      "image": {
+        "width": 2560,
+        "height": 1440
+      },
+      "sweep": {
+        "frames": 15,
+        "intervalMs": 850,
+        "spanSeconds": 11.9,
+        "worstFrameIndex": 10
+      },
+      "frameTimeMs": {
+        "samples": 538,
+        "p50": 5.6,
+        "p95": 5.7
+      },
+      "probes": [
+        {
+          "probe": "left",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1113,
+            "y0": 714,
+            "x1": 1152,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 1.298,
+          "separationMedian": 8.651,
+          "separationBest": 36.999,
+          "silhouetteMedianLuma": 145.036,
+          "backgroundMedianLuma": 131.526,
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471
+        },
+        {
+          "probe": "centre",
+          "distanceM": 15.02,
+          "rect": {
+            "x0": 1262,
+            "y0": 714,
+            "x1": 1298,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 0.277,
+          "separationMedian": 10.442,
+          "separationBest": 31.568,
+          "silhouetteMedianLuma": 170.453,
+          "backgroundMedianLuma": 166.02,
+          "silhouettePixels": 1638,
+          "backgroundPixels": 4796
+        },
+        {
+          "probe": "right",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1408,
+            "y0": 714,
+            "x1": 1447,
+            "y1": 826
+          },
+          "frames": 15,
+          "separationWorst": 1.919,
+          "separationMedian": 8.28,
+          "separationBest": 36.211,
+          "silhouetteMedianLuma": 160.241,
+          "backgroundMedianLuma": 154.518,
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471
+        }
+      ],
+      "perFrame": [
+        {
+          "frame": 0,
+          "medianSeparation": 8.431,
+          "separations": [
+            17.579,
+            8.431,
+            2.639
+          ]
+        },
+        {
+          "frame": 1,
+          "medianSeparation": 14.438,
+          "separations": [
+            29.932,
+            14.438,
+            3.795
+          ]
+        },
+        {
+          "frame": 2,
+          "medianSeparation": 8.723,
+          "separations": [
+            4.131,
+            11.714,
+            8.723
+          ]
+        },
+        {
+          "frame": 3,
+          "medianSeparation": 10.856,
+          "separations": [
+            36.999,
+            10.856,
+            10.651
+          ]
+        },
+        {
+          "frame": 4,
+          "medianSeparation": 11.583,
+          "separations": [
+            8.266,
+            11.583,
+            15.511
+          ]
+        },
+        {
+          "frame": 5,
+          "medianSeparation": 31.568,
+          "separations": [
+            21.442,
+            31.568,
+            36.211
+          ]
+        },
+        {
+          "frame": 6,
+          "medianSeparation": 29.777,
+          "separations": [
+            36.336,
+            29.777,
+            5.438
+          ]
+        },
+        {
+          "frame": 7,
+          "medianSeparation": 2.723,
+          "separations": [
+            30.092,
+            2.723,
+            1.919
+          ]
+        },
+        {
+          "frame": 8,
+          "medianSeparation": 1.485,
+          "separations": [
+            1.485,
+            0.277,
+            8.28
+          ]
+        },
+        {
+          "frame": 9,
+          "medianSeparation": 3.013,
+          "separations": [
+            3.013,
+            2.761,
+            3.511
+          ]
+        },
+        {
+          "frame": 10,
+          "medianSeparation": 1.298,
+          "separations": [
+            1.298,
+            0.34,
+            3.723
+          ]
+        },
+        {
+          "frame": 11,
+          "medianSeparation": 10.097,
+          "separations": [
+            16.696,
+            10.097,
+            5.723
+          ]
+        },
+        {
+          "frame": 12,
+          "medianSeparation": 4.293,
+          "separations": [
+            2.692,
+            4.293,
+            19.714
+          ]
+        },
+        {
+          "frame": 13,
+          "medianSeparation": 10.442,
+          "separations": [
+            8.235,
+            10.442,
+            17.583
+          ]
+        },
+        {
+          "frame": 14,
+          "medianSeparation": 15.438,
+          "separations": [
+            8.651,
+            25.685,
+            15.438
+          ]
+        }
+      ],
+      "worstFrameMedianSeparation": 1.298,
+      "medianSeparation": 8.651
+    }
+  },
+  "pose": {
+    "x": 12.727922061357855,
+    "y": 1.7,
+    "z": 12.727922061357859,
+    "yaw": 3.9269908169872414,
+    "pitch": 0
+  },
+  "verdict": {
+    "perProbe": [
+      {
+        "probe": "left",
+        "worstBefore": 0.23,
+        "worstAfter": 1.298,
+        "worstDelta": 1.068,
+        "medianBefore": 6.728,
+        "medianAfter": 8.651,
+        "medianDelta": 1.923,
+        "regressedOnWorst": false
+      },
+      {
+        "probe": "centre",
+        "worstBefore": 1.349,
+        "worstAfter": 0.277,
+        "worstDelta": -1.072,
+        "medianBefore": 11.501,
+        "medianAfter": 10.442,
+        "medianDelta": -1.059,
+        "regressedOnWorst": true
+      },
+      {
+        "probe": "right",
+        "worstBefore": 2.489,
+        "worstAfter": 1.919,
+        "worstDelta": -0.57,
+        "medianBefore": 7.448,
+        "medianAfter": 8.28,
+        "medianDelta": 0.832,
+        "regressedOnWorst": true
+      }
+    ],
+    "probesRegressedOnWorstFrame": [
+      "centre",
+      "right"
+    ],
+    "separationBefore": 7.448,
+    "separationAfter": 8.651,
+    "separationDelta": 1.203,
+    "worstFrameSeparationBefore": 1.77,
+    "worstFrameSeparationAfter": 1.298,
+    "readabilityHolds": false,
+    "frameTimeP50Before": 5.6,
+    "frameTimeP50After": 5.6,
+    "frameTimeP95Before": 5.7,
+    "frameTimeP95After": 5.7,
+    "frameTimeWithin10Pct": true
+  }
+}

@@ -1,0 +1,711 @@
+{
+  "capturedAt": "2026-09-03T01:43:02.642Z",
+  "route": "showcase",
+  "label": "showcase-nullab",
+  "dist": "C:\\Users\\david\\projects\\aa-claude-subwaylook\\dist",
+  "samplesPerView": 15,
+  "machine": {
+    "freeVramMib": 5175,
+    "comfyQueueDepth": 0,
+    "waitedAttempts": 1
+  },
+  "pageErrors": [],
+  "results": {
+    "after": {
+      "corridor-6-volume-godrays-mouth": {
+        "pose": {
+          "x": 11.31370849898476,
+          "y": 1.7,
+          "z": 11.313708498984763,
+          "yaw": 3.9269908169872414,
+          "pitch": -0.05
+        },
+        "draws": {
+          "n": 15,
+          "median": 158,
+          "min": 158,
+          "max": 158
+        },
+        "triangles": {
+          "n": 15,
+          "median": 324094,
+          "min": 324078,
+          "max": 324106
+        },
+        "samples": [
+          {
+            "calls": 158,
+            "triangles": 324106
+          },
+          {
+            "calls": 158,
+            "triangles": 324086
+          },
+          {
+            "calls": 158,
+            "triangles": 324090
+          },
+          {
+            "calls": 158,
+            "triangles": 324094
+          },
+          {
+            "calls": 158,
+            "triangles": 324090
+          },
+          {
+            "calls": 158,
+            "triangles": 324094
+          },
+          {
+            "calls": 158,
+            "triangles": 324098
+          },
+          {
+            "calls": 158,
+            "triangles": 324078
+          },
+          {
+            "calls": 158,
+            "triangles": 324094
+          },
+          {
+            "calls": 158,
+            "triangles": 324082
+          },
+          {
+            "calls": 158,
+            "triangles": 324098
+          },
+          {
+            "calls": 158,
+            "triangles": 324098
+          },
+          {
+            "calls": 158,
+            "triangles": 324086
+          },
+          {
+            "calls": 158,
+            "triangles": 324094
+          },
+          {
+            "calls": 158,
+            "triangles": 324094
+          }
+        ]
+      },
+      "corridor-6-volume-godrays-inside": {
+        "pose": {
+          "x": 19.798989873223327,
+          "y": 1.7,
+          "z": 19.798989873223334,
+          "yaw": 3.9269908169872414,
+          "pitch": 0.1
+        },
+        "draws": {
+          "n": 15,
+          "median": 142,
+          "min": 142,
+          "max": 142
+        },
+        "triangles": {
+          "n": 15,
+          "median": 287150,
+          "min": 287134,
+          "max": 287162
+        },
+        "samples": [
+          {
+            "calls": 142,
+            "triangles": 287138
+          },
+          {
+            "calls": 142,
+            "triangles": 287146
+          },
+          {
+            "calls": 142,
+            "triangles": 287150
+          },
+          {
+            "calls": 142,
+            "triangles": 287134
+          },
+          {
+            "calls": 142,
+            "triangles": 287150
+          },
+          {
+            "calls": 142,
+            "triangles": 287146
+          },
+          {
+            "calls": 142,
+            "triangles": 287150
+          },
+          {
+            "calls": 142,
+            "triangles": 287150
+          },
+          {
+            "calls": 142,
+            "triangles": 287142
+          },
+          {
+            "calls": 142,
+            "triangles": 287154
+          },
+          {
+            "calls": 142,
+            "triangles": 287158
+          },
+          {
+            "calls": 142,
+            "triangles": 287158
+          },
+          {
+            "calls": 142,
+            "triangles": 287154
+          },
+          {
+            "calls": 142,
+            "triangles": 287142
+          },
+          {
+            "calls": 142,
+            "triangles": 287162
+          }
+        ]
+      },
+      "corridor-6-volume-godrays-shafts": {
+        "pose": {
+          "x": 25.809397513308983,
+          "y": 1.7,
+          "z": 22.273863607376253,
+          "yaw": 4.476990816987241,
+          "pitch": 0.02
+        },
+        "draws": {
+          "n": 15,
+          "median": 149,
+          "min": 149,
+          "max": 149
+        },
+        "triangles": {
+          "n": 15,
+          "median": 264864,
+          "min": 264848,
+          "max": 264876
+        },
+        "samples": [
+          {
+            "calls": 149,
+            "triangles": 264864
+          },
+          {
+            "calls": 149,
+            "triangles": 264876
+          },
+          {
+            "calls": 149,
+            "triangles": 264864
+          },
+          {
+            "calls": 149,
+            "triangles": 264872
+          },
+          {
+            "calls": 149,
+            "triangles": 264868
+          },
+          {
+            "calls": 149,
+            "triangles": 264864
+          },
+          {
+            "calls": 149,
+            "triangles": 264872
+          },
+          {
+            "calls": 149,
+            "triangles": 264868
+          },
+          {
+            "calls": 149,
+            "triangles": 264848
+          },
+          {
+            "calls": 149,
+            "triangles": 264868
+          },
+          {
+            "calls": 149,
+            "triangles": 264860
+          },
+          {
+            "calls": 149,
+            "triangles": 264876
+          },
+          {
+            "calls": 149,
+            "triangles": 264848
+          },
+          {
+            "calls": 149,
+            "triangles": 264852
+          },
+          {
+            "calls": 149,
+            "triangles": 264864
+          }
+        ]
+      },
+      "corridor-1-nature": {
+        "pose": {
+          "x": 0,
+          "y": 1.7,
+          "z": -20,
+          "yaw": 0,
+          "pitch": -0.05
+        },
+        "draws": {
+          "n": 15,
+          "median": 143,
+          "min": 143,
+          "max": 143
+        },
+        "triangles": {
+          "n": 15,
+          "median": 522286,
+          "min": 522170,
+          "max": 522318
+        },
+        "samples": [
+          {
+            "calls": 143,
+            "triangles": 522170
+          },
+          {
+            "calls": 143,
+            "triangles": 522202
+          },
+          {
+            "calls": 143,
+            "triangles": 522214
+          },
+          {
+            "calls": 143,
+            "triangles": 522230
+          },
+          {
+            "calls": 143,
+            "triangles": 522242
+          },
+          {
+            "calls": 143,
+            "triangles": 522270
+          },
+          {
+            "calls": 143,
+            "triangles": 522286
+          },
+          {
+            "calls": 143,
+            "triangles": 522294
+          },
+          {
+            "calls": 143,
+            "triangles": 522298
+          },
+          {
+            "calls": 143,
+            "triangles": 522290
+          },
+          {
+            "calls": 143,
+            "triangles": 522278
+          },
+          {
+            "calls": 143,
+            "triangles": 522286
+          },
+          {
+            "calls": 143,
+            "triangles": 522290
+          },
+          {
+            "calls": 143,
+            "triangles": 522310
+          },
+          {
+            "calls": 143,
+            "triangles": 522318
+          }
+        ]
+      }
+    },
+    "before": {
+      "corridor-6-volume-godrays-mouth": {
+        "pose": {
+          "x": 11.31370849898476,
+          "y": 1.7,
+          "z": 11.313708498984763,
+          "yaw": 3.9269908169872414,
+          "pitch": -0.05
+        },
+        "draws": {
+          "n": 15,
+          "median": 158,
+          "min": 158,
+          "max": 158
+        },
+        "triangles": {
+          "n": 15,
+          "median": 324010,
+          "min": 323970,
+          "max": 324078
+        },
+        "samples": [
+          {
+            "calls": 158,
+            "triangles": 324054
+          },
+          {
+            "calls": 158,
+            "triangles": 324066
+          },
+          {
+            "calls": 158,
+            "triangles": 324066
+          },
+          {
+            "calls": 158,
+            "triangles": 324078
+          },
+          {
+            "calls": 158,
+            "triangles": 324070
+          },
+          {
+            "calls": 158,
+            "triangles": 324054
+          },
+          {
+            "calls": 158,
+            "triangles": 324022
+          },
+          {
+            "calls": 158,
+            "triangles": 323970
+          },
+          {
+            "calls": 158,
+            "triangles": 323978
+          },
+          {
+            "calls": 158,
+            "triangles": 323990
+          },
+          {
+            "calls": 158,
+            "triangles": 324010
+          },
+          {
+            "calls": 158,
+            "triangles": 323986
+          },
+          {
+            "calls": 158,
+            "triangles": 323994
+          },
+          {
+            "calls": 158,
+            "triangles": 324010
+          },
+          {
+            "calls": 158,
+            "triangles": 323982
+          }
+        ]
+      },
+      "corridor-6-volume-godrays-inside": {
+        "pose": {
+          "x": 19.798989873223327,
+          "y": 1.7,
+          "z": 19.798989873223334,
+          "yaw": 3.9269908169872414,
+          "pitch": 0.1
+        },
+        "draws": {
+          "n": 15,
+          "median": 142,
+          "min": 142,
+          "max": 142
+        },
+        "triangles": {
+          "n": 15,
+          "median": 287098,
+          "min": 286930,
+          "max": 287222
+        },
+        "samples": [
+          {
+            "calls": 142,
+            "triangles": 286930
+          },
+          {
+            "calls": 142,
+            "triangles": 286954
+          },
+          {
+            "calls": 142,
+            "triangles": 286978
+          },
+          {
+            "calls": 142,
+            "triangles": 287002
+          },
+          {
+            "calls": 142,
+            "triangles": 287026
+          },
+          {
+            "calls": 142,
+            "triangles": 287050
+          },
+          {
+            "calls": 142,
+            "triangles": 287074
+          },
+          {
+            "calls": 142,
+            "triangles": 287098
+          },
+          {
+            "calls": 142,
+            "triangles": 287118
+          },
+          {
+            "calls": 142,
+            "triangles": 287142
+          },
+          {
+            "calls": 142,
+            "triangles": 287166
+          },
+          {
+            "calls": 142,
+            "triangles": 287190
+          },
+          {
+            "calls": 142,
+            "triangles": 287214
+          },
+          {
+            "calls": 142,
+            "triangles": 287222
+          },
+          {
+            "calls": 142,
+            "triangles": 287222
+          }
+        ]
+      },
+      "corridor-6-volume-godrays-shafts": {
+        "pose": {
+          "x": 25.809397513308983,
+          "y": 1.7,
+          "z": 22.273863607376253,
+          "yaw": 4.476990816987241,
+          "pitch": 0.02
+        },
+        "draws": {
+          "n": 15,
+          "median": 153,
+          "min": 153,
+          "max": 153
+        },
+        "triangles": {
+          "n": 15,
+          "median": 264372,
+          "min": 264344,
+          "max": 264384
+        },
+        "samples": [
+          {
+            "calls": 153,
+            "triangles": 264376
+          },
+          {
+            "calls": 153,
+            "triangles": 264344
+          },
+          {
+            "calls": 153,
+            "triangles": 264364
+          },
+          {
+            "calls": 153,
+            "triangles": 264380
+          },
+          {
+            "calls": 153,
+            "triangles": 264360
+          },
+          {
+            "calls": 153,
+            "triangles": 264368
+          },
+          {
+            "calls": 153,
+            "triangles": 264372
+          },
+          {
+            "calls": 153,
+            "triangles": 264372
+          },
+          {
+            "calls": 153,
+            "triangles": 264384
+          },
+          {
+            "calls": 153,
+            "triangles": 264380
+          },
+          {
+            "calls": 153,
+            "triangles": 264368
+          },
+          {
+            "calls": 153,
+            "triangles": 264384
+          },
+          {
+            "calls": 153,
+            "triangles": 264368
+          },
+          {
+            "calls": 153,
+            "triangles": 264372
+          },
+          {
+            "calls": 153,
+            "triangles": 264364
+          }
+        ]
+      },
+      "corridor-1-nature": {
+        "pose": {
+          "x": 0,
+          "y": 1.7,
+          "z": -20,
+          "yaw": 0,
+          "pitch": -0.05
+        },
+        "draws": {
+          "n": 15,
+          "median": 143,
+          "min": 143,
+          "max": 143
+        },
+        "triangles": {
+          "n": 15,
+          "median": 522342,
+          "min": 522310,
+          "max": 522354
+        },
+        "samples": [
+          {
+            "calls": 143,
+            "triangles": 522310
+          },
+          {
+            "calls": 143,
+            "triangles": 522326
+          },
+          {
+            "calls": 143,
+            "triangles": 522338
+          },
+          {
+            "calls": 143,
+            "triangles": 522346
+          },
+          {
+            "calls": 143,
+            "triangles": 522350
+          },
+          {
+            "calls": 143,
+            "triangles": 522334
+          },
+          {
+            "calls": 143,
+            "triangles": 522354
+          },
+          {
+            "calls": 143,
+            "triangles": 522326
+          },
+          {
+            "calls": 143,
+            "triangles": 522342
+          },
+          {
+            "calls": 143,
+            "triangles": 522346
+          },
+          {
+            "calls": 143,
+            "triangles": 522354
+          },
+          {
+            "calls": 143,
+            "triangles": 522338
+          },
+          {
+            "calls": 143,
+            "triangles": 522354
+          },
+          {
+            "calls": 143,
+            "triangles": 522342
+          },
+          {
+            "calls": 143,
+            "triangles": 522338
+          }
+        ]
+      }
+    }
+  },
+  "beforeQuery": "",
+  "nullAb": true,
+  "deltas": {
+    "corridor-6-volume-godrays-mouth": {
+      "draws": 0,
+      "drawsWorstCase": 0,
+      "triangles": 84,
+      "trianglesWorstCase": 136
+    },
+    "corridor-6-volume-godrays-inside": {
+      "draws": 0,
+      "drawsWorstCase": 0,
+      "triangles": 52,
+      "trianglesWorstCase": 232
+    },
+    "corridor-6-volume-godrays-shafts": {
+      "draws": -4,
+      "drawsWorstCase": -4,
+      "triangles": 492,
+      "trianglesWorstCase": 532
+    },
+    "corridor-1-nature": {
+      "draws": 0,
+      "drawsWorstCase": 0,
+      "triangles": -56,
+      "trianglesWorstCase": 8
+    }
+  }
+}
