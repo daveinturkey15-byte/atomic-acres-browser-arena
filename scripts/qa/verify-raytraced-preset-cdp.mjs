@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// HF-398 — cold admission + live-wiring proof for the RAY TRACED preset, on the
-// REAL WebGPU route in installed Chrome, driven over CDP.
+// HF-398/HF-438 — cold admission + live-wiring proof for the ray-traced
+// reflection stage (QUALITY light tier, MAX full tier), on the REAL WebGPU
+// route in installed Chrome, driven over CDP.
 //
 // Adapted from verify-arena-boot-cdp.mjs, with three differences that matter:
 //
@@ -15,7 +16,7 @@
 //     the run asserts the preset the RUNTIME resolved rather than the one the
 //     harness asked for. (The header used to say the fourth option "is not in
 //     the menu yet". It has been in the menu since src/ui/pass64-shell.ts:229
-//     shipped `<option value="raytraced">RAY TRACED</option>`; the seeding is
+//     shipped; since HF-438 the trace rides in QUALITY and MAX themselves. The seeding is
 //     kept because it survives a cold profile with no click.)
 //
 //  3. IT READS THE LINEAR STAGE RECEIPT. Green boot is not evidence a player
@@ -32,11 +33,11 @@
 //     tracer with nothing in the world smooth enough to spawn a ray, reported
 //     as a healthy preset. A trace that reflects nothing is the defect this
 //     harness exists to catch, so `reflectiveMeshes > 0` is now part of `ok`
-//     for the raytraced preset.
+//     for a trace-carrying preset (high, max).
 //
 // Usage:
 //   node scripts/qa/verify-raytraced-preset-cdp.mjs --url http://127.0.0.1:41917 \
-//        --presets high,raytraced --arenas atomic-acres,... --per-arena 180000
+//        --presets high,max --arenas atomic-acres,... --per-arena 180000
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -52,7 +53,7 @@ const arg = (name, fallback) => {
 const BASE = arg('--url', 'http://127.0.0.1:41917');
 const PER_ARENA_MS = Number(arg('--per-arena', '180000'));
 const OUT = arg('--out', 'artifacts/qa/raytraced-preset');
-const PRESETS = arg('--presets', 'high,raytraced').split(',').map((v) => v.trim()).filter(Boolean);
+const PRESETS = arg('--presets', 'high,max').split(',').map((v) => v.trim()).filter(Boolean);
 // Flips ONLY the ray-tracing control through the real Options surface after
 // boot, which turns the preset into Custom with exactly one difference. It is
 // how the A/B pair is produced, and it doubles as proof that the control is
@@ -204,7 +205,8 @@ async function runOne(preset, arena) {
     record.proxyShapes = proxy ? Number(proxy[1]) : null;
     record.proxyCandidates = proxy ? Number(proxy[2]) : null;
     record.reflectiveMeshes = proxy ? Number(proxy[3]) : null;
-    if (preset === 'raytraced' && record.ok) {
+    const TRACE_PRESETS = new Set(['high', 'max']);
+    if (TRACE_PRESETS.has(preset) && record.ok) {
       if (!proxy) {
         record.ok = false;
         record.error = 'no rayTracedProxy receipt: the trace never extracted a proxy scene';

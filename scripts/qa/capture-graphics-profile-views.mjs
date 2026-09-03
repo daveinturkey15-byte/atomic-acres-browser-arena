@@ -24,7 +24,7 @@
 // Usage:
 //   node scripts/qa/capture-graphics-profile-views.mjs --url http://localhost:41977 \
 //     --arena atomic-acres --cameras nuke-town-overview,nuke-town-street-axis \
-//     --presets performance,balanced,high,raytraced,max --out artifacts/graphics-audit/views
+//     --presets performance,balanced,high,max --out artifacts/graphics-audit/views
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -39,7 +39,7 @@ const arg = (name, fallback) => {
 
 const BASE = arg('--url', 'http://localhost:41977');
 const ARENA = arg('--arena', 'atomic-acres');
-const PRESETS = arg('--presets', 'performance,balanced,high,raytraced,max').split(',');
+const PRESETS = arg('--presets', 'performance,balanced,high,max').split(',');
 const CAMERAS = arg('--cameras', (VIEWPOINT_CATALOG[ARENA] ?? []).slice(0, 2).join(',')).split(',').filter(Boolean);
 const OUT_DIR = arg('--out', 'artifacts/graphics-audit/views');
 const WIDTH = Number(arg('--width', '1280'));

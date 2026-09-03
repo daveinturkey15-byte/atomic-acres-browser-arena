@@ -19,6 +19,48 @@ it at head. **CLAIMED** = asserted elsewhere and not re-checked here.
 
 ---
 
+## REVISION — HF-438 (2026-09-03): the RAY TRACED rung is retired; its trace
+## folds into QUALITY (light) and MAX (full)
+
+**Owner, verbatim:** "I don't think we should have a ray tracing AND an RTX
+mode ... the RTX mode as a separate runtime is fine, and just bake some ray
+tracing into the quality profile and then even more in the max."
+
+What changed, mechanically:
+
+- **The ladder is now PERFORMANCE, BALANCED, QUALITY, MAX (+ CUSTOM), and the
+  RTX entry stays exactly what it was** — the native-runtime explainer, which
+  never changed a renderer value and still does not. **VERIFIED** at head
+  (`src/graphics-settings-registry.ts`, `src/ui/graphics-profile-descriptions.ts`,
+  pinned by `src/graphics-profile-contract.test.ts`).
+- **QUALITY (light tier):** `rayTracing` off → `reflections` and
+  `ambientOcclusion` off → `high` (the retired rung's own tier: 0.5 resolution
+  scale, 12 samples, denoise — "the lower sample count"). MSAA 4x and SSR LOW
+  are KEPT: the owner said bake ray tracing INTO the profile, not trade for it.
+  **VERIFIED** (control set at head).
+- **MAX (full tier):** `rayTracing` off → `reflections` on top of the full
+  stack (ultra AO, ultra PMREM probes, high SSGI were already MAX's).
+  BALANCED and PERFORMANCE take none of it. Refractions stay a Custom opt-in.
+  **VERIFIED** (control set at head).
+- **Cold-compile fence: NOT widened.** Menu-time precompile keeps covering the
+  named control sets — which now include the trace for QUALITY and MAX — and
+  the tripwire (pipelines compiled during combat = 0) is re-verified per preset
+  in the PASS 92 evidence run (`docs/evidence/pass92/graphics-fold/`).
+  **Quality now compiles the reflection pipelines**: pipeline counts at
+  admission move from 374/300/251 (old QUALITY) and 478/392/364 (old MAX) to
+  the figures recorded in §3-R below. **Measured numbers there; nothing on
+  this line is invented.**
+- **Storage migration:** a saved `raytraced` preference loads as QUALITY on
+  every machine — never as the automatic default. **VERIFIED** by unit test
+  (`src/pass65-raytraced-capability.test.ts`).
+- **Every control keeps its existing tier definition; only the presets'
+  control sets changed.** §2's RAY TRACED column and §3's RAY TRACED rows are
+  kept below as the HISTORICAL record of the retired rung — they describe a
+  control set that no longer ships.
+
+
+---
+
 ## 0. The three answers, first
 
 **Q: Is RTX above or below MAX?**
@@ -116,22 +158,29 @@ that says exactly this and changes nothing (§6).
 | 1 | PERFORMANCE | `performance` | Lowest gameplay-safe profile. Sub-native render scale, no shadows, no AA, screen-space stack structurally absent. |
 | 2 | **BALANCED** *(new)* | `balanced` | **HF-418.** Native resolution, shadows, full geometry and QUALITY's grade — without the passes that add a target, an attachment or a march. |
 | 3 | QUALITY | `high` | The intended look, and the auto-selected default on 8+ cores / 8+ GB. |
-| 4 | RAY TRACED | `raytraced` | Classic recursive (Whitted) ray tracing in shaders. Software. Any WebGPU adapter. |
-| 5 | MAX | `max` | Every effect at its highest tier plus a 1.15x supersample. |
-| 6 | CUSTOM | `custom` | The last named profile plus the player's edits. |
+| 4 | MAX | `max` | Every effect at its highest tier plus a 1.15x supersample — and, since HF-438, the ray-traced reflection stage at its full tier. |
+| 5 | CUSTOM | `custom` | The last named profile plus the player's edits. |
 | — | RTX — WHAT IS IT? | `rtx-native-runtime-info` | **Not a profile.** Opens an explainer; changes no renderer setting. |
+
+*(HF-438: the former rung 4, RAY TRACED `raytraced`, is RETIRED. Its reflection
+stage went to QUALITY at the light tier and MAX at the full tier; a stored
+`raytraced` preference loads as QUALITY. The RTX explainer entry is unchanged.)*
 
 Order matters and is pinned: before HF-418 the list led with QUALITY (because
 it is the default), which made PERFORMANCE below it read as a step *up*.
-
----
 
 ## 2. The control sets, in rendering terms
 
 All 40 controls, per profile. The "what it does" column is the rendering
 meaning, not the label.
 
-| Control | Rendering meaning | PERFORMANCE | BALANCED | QUALITY | RAY TRACED | MAX |
+**RETIRED COLUMN (HF-438).** The RAY TRACED column below is the historical
+record of the retired rung's control set. QUALITY now ALSO carries
+`rayTracing: reflections` (light tier) and `ambientOcclusion: high`; MAX now
+ALSO carries `rayTracing: reflections` (full tier). Every tier definition is
+unchanged; only the presets' control sets moved.
+
+| Control | Rendering meaning | PERFORMANCE | BALANCED | QUALITY | RAY TRACED *(retired)* | MAX |
 |---|---|---|---|---|---|---|
 | `renderScale` | Fraction of the window actually rendered, then resampled | 0.75 | **1.00** | 1.00 | 1.00 | **1.15** (supersample) |
 | `adaptiveResolution` | Distress valve; demotes under sustained frame pressure | on | on | on | on | on |
@@ -182,18 +231,21 @@ this document does not):
 |---|---|
 | `performance` | `445a9754` |
 | `balanced` | `0753ee34` |
-| `high` (QUALITY) | `de90e589` |
-| `raytraced` | `d65fbd25` |
-| `max` | `2be3a371` |
-
-> **PASS 89 re-fingerprint.** Every hash above changed at the PASS 89
+| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
+| `max` (HF-438 full tier) | `03ee2e10` |
+| `raytraced` (RETIRED — historical) | `d65fbd25` |
+| `max` (pre-fold, historical) | `2be3a371` |
+> **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
+> changed because the fold moved real values into those presets; `performance`
+> and `balanced` are untouched. The retired `raytraced` row and the pre-fold
+> `max` row are kept as historical record only — they pin nothing.
+> **PASS 89 re-fingerprint (historical).** Every hash changed at the PASS 89
 > integration, and not because a measured value moved: Lane AL added ONE new
 > control, `bakedIndirect`, to the control set, so every preset's key-sorted
-> fingerprint is new. The tiers are `performance` off, `balanced` low, `high`
+> fingerprint was new. The tiers were `performance` off, `balanced` low, `high`
 > (QUALITY) low, `raytraced` high, `max` high; BALANCED's is argued at its row
 > in `src/graphics-settings-registry.ts`. The tier ladder is pinned in
 > `src/graphics-settings-registry.test.ts`, and Lane AL pins separately that LOW
-> and HIGH differ only in BAKE cost, never in per-frame cost
 > (`src/rendering/lighting/baked-indirect.test.ts`).
 >
 > **What is therefore NOT re-measured.** Section 3's frame times were captured
@@ -264,6 +316,11 @@ run; 13 of 15 carry that stamp, and the **two** that say "not stamped"
 (`performance-atomic-acres`, `balanced-atomic-acres`) were taken before the
 gate existed. (An earlier draft said "three"; recounted from the raw JSON.) Every row: `backend: webgpu`, `admissionOutcome:
 admitted`, `errors: 0`, `pipelinesInCombat: 0`.
+
+**HF-438 (2026-09-03).** The RAY TRACED rows above are HISTORICAL — that rung
+is retired. The re-measured post-fold ladder (performance, balanced, high,
+max on atomic-acres) is recorded in §3-R below with its pipeline-count delta;
+nothing in this historical table was rewritten.
 
 ### The ladder, averaged over the three arenas
 
@@ -531,6 +588,15 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
    in `legacy-main.ts`. `scripts/qa/verify-rtx-explainer-headless.mjs` is the
    runtime falsifier: it drives the real menu and fails if the persisted
    graphics settings move by a single control.
+5. **HF-438 (this revision): the fold.** The RAY TRACED rung retired; QUALITY
+   carries the trace at the light tier (`rayTracing: reflections`, AO `high`),
+   MAX at the full tier; BALANCED and PERFORMANCE take none of it; refractions
+   stay a Custom opt-in; a stored `raytraced` preference loads as QUALITY. The
+   control-set fingerprints for `high`/`max` were re-derived per the tripwire
+   and the re-measured ladder is recorded in §3-R
+   (`docs/evidence/pass92/graphics-fold/`). The cold-compile admission fence
+   was not widened; the audit tripwire (zero pipelines in combat) is re-run per
+   preset in the same evidence.
 
 ---
 
@@ -559,30 +625,33 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   measured in all 15 cost rows but never captured, so the visual half of the
   ladder is demonstrated on a single map. Related and separate: **no captured
   frame demonstrates a ray-traced reflection**, because both authored cameras
-  are matte outdoor views; the "RAY TRACED is a different trade, not a
+  are matte outdoor views; the "the retired rung is a different trade, not a
   superset" half of Q1 is argued from the control set, not observed in a
   pixel. Re-run, one browser at a time on a quiet GPU:
   `node scripts/qa/capture-graphics-profile-views.mjs --arena skyline-terminal
-  --presets performance,balanced,high,raytraced,max`, and add a wet-surface or
+  --presets performance,balanced,high,max`, and add a wet-surface or
   interior camera before claiming the reflection visually.
-- **OPEN (dead capability wiring, refuted claim — see §0 Q3):** the RAY TRACED
-  demotion to QUALITY for a non-WebGPU route is **unreachable in the shipped
-  build**. `GraphicsRouteCapability.rayTracingCapable` is supplied only by
-  `src/pass65-raytraced-capability.test.ts`; the five production call sites
-  (`src/legacy-main.ts:1815`, `:1845`, `:28070`, `:28093`,
-  `src/pass65-renderer-feature-inventory.ts:463`) omit the argument. Either
-  wire it — pass `{ rayTracingCapable: renderRuntime.backend === 'webgpu' }`
-  at the four `legacy-main` sites and prove the demotion with a headless run
-  on the non-WebGPU route — or delete the branches and the reason string
+- **OPEN (dead capability wiring, refuted claim — see §0 Q3; partially
+  resolved by HF-438):** the retired preset's whole-rung demotion branch is
+  DELETED (`resolveGraphicsRuntime` no longer special-cases any preset; the
+  surviving gate switches only the `rayTracing` control off, with a reason,
+  keeping the player's rung — including the folded QUALITY/MAX). What remains
+  unwired: `GraphicsRouteCapability.rayTracingCapable` is still supplied only
+  by `src/pass65-raytraced-capability.test.ts`; the production call sites
+  (`src/legacy-main.ts`, `src/pass65-renderer-feature-inventory.ts`) omit the
+  argument, so on a non-WebGPU route the folded presets keep the trace flag
+  until the TSL graph the WebGL2 fallback never builds. Either wire it — pass
+  `{ rayTracingCapable: renderRuntime.backend === 'webgpu' }` at the
+  `legacy-main` sites and prove the control-level switch-off headless — or
+  delete the gate and the reason string
   `RAY_TRACED_REQUIRES_WEBGPU_REASON` as dead code. Both are runtime changes
-  and were outside this lane's boundary; the player-facing copy that depended
-  on the claim has been corrected instead.
+  and remain outside a graphics-copy lane's boundary.
 - **OPEN (coverage):** five of the eight selectable arenas were never measured
   — `rustworks-1v1`, `gun-range`, `test1`, `test2`, `map3`. The brief asked
   for the registry roster; this matrix is 3 of 8. `farcrysis` is
   `selectable: false` and out of scope until it is unhidden. Command, one launch per cell, on a quiet GPU, one browser at a time:
   `node scripts/qa/audit-graphics-profiles.mjs --url http://localhost:<port>
-  --preset <performance|balanced|high|raytraced|max> --arena <arena> --out
+  --preset <performance|balanced|high|max> --arena <arena> --out
   artifacts/graphics-audit`.
 - **OPEN (statistics):** every cell of §3 is n=1 over one 14 s window, and the
   ordering among the bottom four rungs sits inside the noise floor this

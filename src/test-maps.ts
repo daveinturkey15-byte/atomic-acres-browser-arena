@@ -290,8 +290,8 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
   // where the forge finds no readable canvas and skips the bake entirely.
   const materials = test1Materials();
   const { hardpan, road, plywood, plywoodDark, sandbag, steel, cinder } = materials;
-  // Observation glazing: the RAY TRACED preset needs something to reflect on
-  // every arena, and this is Test1's only smooth surface.
+  // Observation glazing: the ray-traced reflection stage (QUALITY/MAX) needs
+  // something to reflect on every arena, and this is Test1's only smooth surface.
   const rangeGlass = new THREE.MeshStandardMaterial({
     color: 0xb8ccd4, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.42,
   });
@@ -932,8 +932,8 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
   rect('test2 living window lintel', -18, -14, 1.9, 3.4, 3.6, 4, stucco);
   // Glazed door recessed INTO the south wall's own 0.4 m thickness, so the
   // ballistic census sees it explained by the wall it is fitted to and the
-  // movement census sees a collider under it. This is also RAY TRACED coverage:
-  // the preset needs smooth surfaces to reflect on, and the demolished villa
+  // movement census sees a collider under it. This is also ray-traced coverage:
+  // QUALITY and MAX need smooth surfaces to reflect on, and the demolished villa
   // wings took the old build's glazing with them.
   rect('test2 living glazing south', -23, -19, 0.7, 2.6, 3.75, 3.85, glass, { solid: false, shots: true });
   rect('test2 living sofa run', -22, -18, 0, 0.7, -1.4, -0.6, timber);

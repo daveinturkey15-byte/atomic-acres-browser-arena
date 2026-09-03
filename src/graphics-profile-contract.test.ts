@@ -47,8 +47,12 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
   performance: '445a9754',
   balanced: '0753ee34',
-  high: 'de90e589',
-  max: '2be3a371',
+  // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
+  // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
+  // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
+  // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
+  high: '430da2ad',
+  max: '03ee2e10',
 });
 
 describe('HF-418 graphics ladder', () => {

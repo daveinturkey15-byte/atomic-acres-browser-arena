@@ -12,11 +12,12 @@
  * The honest answer he was owed is two separate facts that a single menu entry
  * had been blurring:
  *
- *  1. The web build's RAY TRACED preset is genuine classic recursive ray
- *     tracing computed in shaders. It is real, it is shipped, and it touches
- *     no RT core, because no shipping browser exposes a ray-query or
- *     acceleration-structure API. It runs on any WebGPU adapter, AMD and Intel
- *     included. It is NOT "RTX", and it is NOT NVIDIA-only.
+ *  1. The web build carries genuine classic recursive ray tracing computed in
+ *     shaders — since HF-438 inside the QUALITY (light) and MAX (full)
+ *     profiles rather than as a separate rung. It is real, it is shipped, and
+ *     it touches no RT core, because no shipping browser exposes a ray-query
+ *     or acceleration-structure API. It runs on any WebGPU adapter, AMD and
+ *     Intel included. It is NOT "RTX", and it is NOT NVIDIA-only.
  *  2. Hardware RTX rendering needs a NATIVE runtime — Three.js/TSL on top,
  *     native Vulkan and the GPU's ray-tracing cores underneath, with the
  *     browser removed from the picture. That is a separate downloadable
@@ -101,9 +102,9 @@ export const RTX_NATIVE_RUNTIME_COPY: RtxNativeRuntimeCopy = Object.freeze({
     'This is not a setting we have switched off and not a driver flag you can turn on. There is nothing in the browser to call.',
   ]),
   whatYouHaveInstead: Object.freeze([
-    'RAY TRACED, in the list above, is genuine recursive ray tracing computed in shaders: real reflections and refractions off real geometry, including geometry that is off screen.',
+    'QUALITY and MAX in the list above carry genuine recursive ray tracing computed in shaders: real reflections off real geometry, including geometry that is off screen. QUALITY runs it at a light tier; MAX at the full tier.',
     'It runs on any WebGPU graphics card — AMD, Intel and NVIDIA alike. It is not NVIDIA-only and it is not using RTX hardware.',
-    'It sits between QUALITY and MAX in cost: it pays for the trace by dropping 4x multisampling and screen-space reflections rather than by adding to MAX.',
+    'Ray-traced refractions stay a Custom-only opt-in for now, and the RTX rung itself does not exist on this ladder: the trace lives inside QUALITY and MAX.',
   ]),
   howToGetIt: 'COMING SOON — no desktop build has been released. Nothing to download yet, and this screen will carry the link when there is.',
   reassurance: 'Closing this changes nothing. Your graphics profile has not been altered.',

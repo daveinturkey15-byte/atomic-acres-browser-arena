@@ -6,7 +6,8 @@
  * beautiful lighting etc, get it all working in a nice way that wont murder
  * FPS". The single largest gap between this build and that sentence is that
  * nothing in it computes an indirect bounce below the MAX profile: `SSGI` is
- * off on PERFORMANCE, BALANCED, QUALITY and RAY TRACED, and `indirectLighting`
+ * off on PERFORMANCE and BALANCED — QUALITY and MAX now carry the ray-traced
+ * reflection stage, and MAX also carries SSGI — and `indirectLighting`
  * is a scalar on a hemisphere approximation, not a bounce. A wall facing away
  * from the sun is lit by a constant, so it reads flat, and the shaded side of
  * every interior reads as the same grey whatever colour the room is.
@@ -24,8 +25,8 @@
  * once, offline (or once behind the loading screen), and the result is a small
  * 3D grid of spherical-harmonic coefficients.
  *
- * WHAT IT IS TRACED AGAINST. The SAME analytic proxy set the RAY TRACED preset
- * traces against (`raytracing/analytic-proxy-scene.ts`): a capped set of yaw-
+ * WHAT IT IS TRACED AGAINST. The SAME analytic proxy set the ray-traced
+ * reflection stage in QUALITY and MAX traces against (`raytracing/analytic-proxy-scene.ts`): a capped set of yaw-
  * oriented boxes, spheres and a ground plane fitted to the arena's largest
  * occluders. Re-using it is deliberate and has three consequences worth stating
  * before someone discovers them:
