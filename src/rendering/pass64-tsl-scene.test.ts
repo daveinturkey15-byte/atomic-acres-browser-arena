@@ -291,6 +291,68 @@ describe('Pass 64 authored TSL pipeline set', () => {
     previousTarget.dispose();
   });
 
+  /**
+   * HF-420 defect: `graphics.oceanWaveAmplitude` changes with the quality
+   * profile WITHOUT an arena swap, and only the perimeter ocean's uniform was
+   * re-read for it. A pond therefore kept whatever amplitude it happened to be
+   * constructed with, so the HF-358 "profile gain x authored scale" rule -
+   * documented in the surrounding code as a FIXED defect - quietly did not
+   * hold for ponds. Map 3 is the case that exposes it: two ponds, no sea, so
+   * the perimeter path this used to rely on does not even run.
+   */
+  it('re-applies profile gain x authored scale to PONDS on a graphics change, not only to the sea', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY.map3()).definition;
+    const graphics = {
+      principalSamples: 1,
+      volumetricScale: 0.5,
+      ambientOcclusion: {
+        quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false,
+      },
+      post: {
+        bloomStrength: 0,
+        exposureScale: 1,
+        toneMapping: 'agx' as const,
+        filmGrainScale: 0,
+        vignetteStrength: 0,
+        sharpness: 0,
+      },
+      // NOT RUSTWORKS_OCEAN_AMPLITUDE.*: all three profiles are deliberately
+      // the SAME 1.55 (wave height is gameplay authority, not a quality knob),
+      // so writing this test against two of them would assert nothing at all.
+      // Two distinct gains are the only way to see the uniform follow.
+      oceanWaveAmplitude: 1.55,
+      reflectionScale: 1,
+      reflectionQuality: 'high' as const,
+      environmentIntensity: 1,
+    };
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, graphics);
+    const pools = systems.root.getObjectByName('Pass 64 TSL water pools') as THREE.Group;
+    expect(pools.children.length).toBeGreaterThan(0);
+    const scales = pools.children.map((pool) => (pool.userData.waterBody as { amplitudeScale: number }).amplitudeScale);
+    // Constructed with the profile gain applied...
+    expect(pools.children.map((pool) => (pool.userData.waveAmplitudeUniform as { value: number }).value))
+      .toEqual(scales.map((scale) => 1.55 * scale));
+    // ...and it must FOLLOW a later profile change with no arena swap. Before
+    // the fix this assertion failed: the uniforms kept the construction value.
+    systems.applyGraphics({ ...graphics, oceanWaveAmplitude: 0.62 });
+    expect(pools.children.map((pool) => (pool.userData.waveAmplitudeUniform as { value: number }).value))
+      .toEqual(scales.map((scale) => 0.62 * scale));
+    expect(pools.children.map((pool) => pool.userData.waveAmplitude))
+      .toEqual(scales.map((scale) => 0.62 * scale));
+    // And the ponds are OBSERVABLE: an arena with no perimeter body used to
+    // publish oceanWaveAmplitude 0 and nothing else, so "no water" and "pond
+    // water" read identically in diagnostics.
+    expect(systems.root.userData.pass65AdvancedGraphics).toMatchObject({
+      oceanWaveAmplitude: 0,
+      oceanPoolCount: pools.children.length,
+      oceanPoolWaveAmplitude: Math.max(...scales.map((scale) => 0.62 * scale)),
+    });
+    systems.dispose();
+  });
+
   it('allocates the selected HDR samples and applies bounded volumetric/post settings', async () => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
@@ -337,6 +399,12 @@ describe('Pass 64 authored TSL pipeline set', () => {
         dustMotes: 48,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+      // HF-420: ponds are published alongside the perimeter ocean rather than
+      // folded into it, so an arena with ponds and no sea (Map 3) stops
+      // reporting 0 for both. RustRig has a sea and no ponds, so both read 0
+      // here - and this exact-shape assertion is what makes that additive.
+      oceanPoolCount: 0,
+      oceanPoolWaveAmplitude: 0,
       bloomStrength: 0,
       filmGrainScale: 0,
       vignetteStrength: 0.35,

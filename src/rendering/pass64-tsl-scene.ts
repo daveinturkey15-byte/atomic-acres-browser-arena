@@ -47,7 +47,11 @@ import type { GraphicsRuntime } from '../pass65-settings';
 // GPU surface. Arena gating comes from the water-authoring registry, not a
 // hard-coded rustworks check.
 import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
-import { sharedWaterBodyForArena, waterPoolsForArena } from '../water/water-authoring';
+import {
+  sharedWaterBodyForArena,
+  waterPoolsForArena,
+  type WaterBodyDefinition,
+} from '../water/water-authoring';
 import {
   applyArenaEnvironmentIbl,
   observeArenaEnvironment,
@@ -770,6 +774,27 @@ function applyArenaSystemLayout(
       water.userData.dryFootprintMask = 'none';
     }
   }
+  // HF-420 defect fix: ponds were built with an amplitude and then never
+  // re-read one. `graphics.oceanWaveAmplitude` changes on every quality-profile
+  // change WITHOUT an arena swap, and only the perimeter uniform above was
+  // updated for it, so a pond kept the amplitude it was constructed with and
+  // the HF-358 "profile gain x authored scale" rule - which the comment above
+  // documents as a FIXED defect - silently did not hold for ponds. Applied here
+  // from the same expression, reading each pond's own authored body out of
+  // userData so the two paths cannot drift apart.
+  const poolGroup = root.getObjectByName('Pass 64 TSL water pools');
+  if (poolGroup) {
+    for (const pool of poolGroup.children) {
+      const poolBody = pool.userData.waterBody as WaterBodyDefinition | undefined;
+      if (!poolBody) continue;
+      const poolAmplitude = graphics.oceanWaveAmplitude === undefined
+        ? oceanAmplitudeForBody(poolBody)
+        : graphics.oceanWaveAmplitude * poolBody.amplitudeScale;
+      const poolUniform = pool.userData.waveAmplitudeUniform as { value: number } | undefined;
+      if (poolUniform) poolUniform.value = poolAmplitude;
+      pool.userData.waveAmplitude = poolAmplitude;
+    }
+  }
   // HF-420: pools and ponds follow the same registry-driven swap as the
   // perimeter ocean. Rebuilt in place when the arena changes, and the retired
   // group's whole subtree is disposed (each pond owns a PlaneGeometry and a
@@ -1316,6 +1341,18 @@ export function createPass64TslSceneSystems(
         dustMotes: dust?.geometry.drawRange.count ?? 0,
       },
       oceanWaveAmplitude: Number(water?.userData.waveAmplitude ?? 0),
+      // HF-420: the field above is the PERIMETER ocean's amplitude and stays
+      // pinned to 0 for a bodyless arena (Pass 75). An arena can now animate
+      // water with no perimeter body at all - Map 3 has two ponds and no sea -
+      // so ponds are published ADDITIVELY rather than by redefining the pinned
+      // field, and diagnostics can tell "no water" from "pond water" instead of
+      // reading 0 for both.
+      oceanPoolCount: root.getObjectByName('Pass 64 TSL water pools')?.children.length ?? 0,
+      oceanPoolWaveAmplitude: Math.max(
+        0,
+        ...(root.getObjectByName('Pass 64 TSL water pools')?.children ?? [])
+          .map((pool) => Number(pool.userData.waveAmplitude ?? 0)),
+      ),
       bloomStrength: activeGraphics.post.bloomStrength,
       filmGrainScale: activeGraphics.post.filmGrainScale,
       vignetteStrength: activeGraphics.post.vignetteStrength,
