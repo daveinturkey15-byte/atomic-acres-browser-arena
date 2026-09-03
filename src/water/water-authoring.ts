@@ -46,6 +46,24 @@ export type WaterOptics = Readonly<{
    * produced by the absorption integral acting on it, never by this number.
    */
   backscatter: number;
+  /**
+   * ASYMPTOTIC in-water scattering colour: what the body looks like when the
+   * column is optically deep and nothing from the floor survives.
+   *
+   * Not a second palette entry and not art direction. Absorption on its own
+   * drives deep water to BLACK - exp(-sigma * path) goes to zero and there is
+   * nothing else in the integral - and real deep water is not black: what you
+   * see is light backscattered out of the upper column before it was absorbed.
+   * The standard single-scattering form carries both terms,
+   *
+   *   L = L_floor * T  +  L_scatter * (1 - T)
+   *
+   * so colour tends to the floor when the water is thin and to the water's own
+   * scattering colour when it is deep. One mix by the MEASURED transmission -
+   * never by view angle or wave slope, which is what made the old palette lerp
+   * a painting rather than a model.
+   */
+  scatter: number;
 }>;
 
 export const WATER_TYPES: Readonly<Record<WaterTypeId, WaterOptics>> = Object.freeze({
@@ -54,12 +72,16 @@ export const WATER_TYPES: Readonly<Record<WaterTypeId, WaterOptics>> = Object.fr
     extinction: Object.freeze({ r: 0.40, g: 0.075, b: 0.035 }),
     defaultDepth: 6,
     backscatter: 0.55,
+    // Deep tropical blue: past the shelf, blue backscatter is all that leaves.
+    scatter: 0x0d4a7a,
   }),
   // Jerlov oceanic III / coastal 1: slightly more yellow substance.
   'open-ocean': Object.freeze({
     extinction: Object.freeze({ r: 0.45, g: 0.095, b: 0.055 }),
     defaultDepth: 12,
     backscatter: 0.60,
+    // Open water, a shade colder and darker than the lagoon.
+    scatter: 0x083b63,
   }),
   // Jerlov coastal 5-9 under a night sky. NOTE the ordering: in coastal and
   // turbid water, dissolved organic matter absorbs BLUE hard, so the
@@ -70,12 +92,17 @@ export const WATER_TYPES: Readonly<Record<WaterTypeId, WaterOptics>> = Object.fr
     extinction: Object.freeze({ r: 0.62, g: 0.26, b: 0.42 }),
     defaultDepth: 14,
     backscatter: 0.72,
+    // Coastal jade: green is this class's transmission minimum, so the deep
+    // colour is green for exactly the same reason its surf is.
+    scatter: 0x12463c,
   }),
   // Humic/algal pond: blue AND red absorbed hard, green survives.
   'murky-pond': Object.freeze({
     extinction: Object.freeze({ r: 1.50, g: 0.80, b: 2.00 }),
     defaultDepth: 0.35,
     backscatter: 0.40,
+    // Olive: silt and algae scatter, and only green leaves the column.
+    scatter: 0x2b4423,
   }),
 });
 

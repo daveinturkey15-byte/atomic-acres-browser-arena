@@ -13,6 +13,7 @@ import {
   oceanOpticsForBody,
   oceanPathLength,
   oceanRoughnessFromSlope,
+  oceanDeepScatterColor,
   oceanScatteredRadiance,
   oceanTransmission,
 } from './ocean-tsl';
@@ -231,5 +232,45 @@ describe('HF-420 broadband bubble backscatter', () => {
         expect(channel).toBeLessThanOrEqual(1);
       }
     }
+  });
+});
+
+describe('HF-420 deep-water scattering closure', () => {
+  it('tends to the water type scattering colour, not to black, as the column deepens', () => {
+    // Absorption on its own is a black hole. This is the term that stops a deep
+    // ocean rendering as one, and it is physics rather than a floor constant:
+    // it is the light backscattered out of the upper column.
+    const optics = WATER_TYPES['open-ocean'];
+    const deep = oceanDeepScatterColor(optics);
+    const far = oceanScatteredRadiance({ r: 0.09, g: 0.49, b: 0.58 }, 0, optics, 400);
+    expect(far.r).toBeCloseTo(deep.r, 4);
+    expect(far.g).toBeCloseTo(deep.g, 4);
+    expect(far.b).toBeCloseTo(deep.b, 4);
+    // ...and it is not black.
+    expect(deep.r + deep.g + deep.b).toBeGreaterThan(0.1);
+  });
+
+  it('tends to the floor colour as the column thins, so a shore still reads shallow', () => {
+    const optics = WATER_TYPES['clear-lagoon'];
+    const floor = { r: 0.4, g: 0.72, b: 0.68 };
+    const thin = oceanScatteredRadiance(floor, 0, optics, 0.0001);
+    expect(thin.r).toBeCloseTo(floor.r, 3);
+    expect(thin.g).toBeCloseTo(floor.g, 3);
+    expect(thin.b).toBeCloseTo(floor.b, 3);
+  });
+
+  it('is monotone between the two ends and never leaves [0, 1]', () => {
+    const optics = WATER_TYPES['murky-pond'];
+    const floor = { r: 0.2, g: 0.35, b: 0.24 };
+    let previous = oceanScatteredRadiance(floor, 0, optics, 0);
+    for (let path = 0.1; path <= 8; path += 0.1) {
+      const here = oceanScatteredRadiance(floor, 0, optics, path);
+      for (const channel of [here.r, here.g, here.b]) {
+        expect(channel).toBeGreaterThanOrEqual(0);
+        expect(channel).toBeLessThanOrEqual(1);
+      }
+      previous = here;
+    }
+    expect(previous.g).toBeGreaterThan(0);
   });
 });

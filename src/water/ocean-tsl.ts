@@ -223,10 +223,30 @@ export function oceanScatteredRadiance(
   pathLength: number,
 ): Readonly<{ r: number; g: number; b: number }> {
   const transmission = oceanTransmission(optics, pathLength);
+  const deep = {
+    r: ((optics.scatter >> 16) & 0xff) / 255,
+    g: ((optics.scatter >> 8) & 0xff) / 255,
+    b: (optics.scatter & 0xff) / 255,
+  };
+  const floor = {
+    r: Math.min(1, base.r + density),
+    g: Math.min(1, base.g + density),
+    b: Math.min(1, base.b + density),
+  };
+  // L = L_floor * T + L_scatter * (1 - T).
   return Object.freeze({
-    r: Math.min(1, base.r + density) * transmission.r,
-    g: Math.min(1, base.g + density) * transmission.g,
-    b: Math.min(1, base.b + density) * transmission.b,
+    r: floor.r * transmission.r + deep.r * (1 - transmission.r),
+    g: floor.g * transmission.g + deep.g * (1 - transmission.g),
+    b: floor.b * transmission.b + deep.b * (1 - transmission.b),
+  });
+}
+
+/** The asymptotic colour of a water type: what an optically deep column shows. */
+export function oceanDeepScatterColor(optics: WaterOptics): Readonly<{ r: number; g: number; b: number }> {
+  return Object.freeze({
+    r: ((optics.scatter >> 16) & 0xff) / 255,
+    g: ((optics.scatter >> 8) & 0xff) / 255,
+    b: (optics.scatter & 0xff) / 255,
   });
 }
 
@@ -386,7 +406,15 @@ export function createOceanTslWater(
   );
   const bubbleDensity = bubbleTrail.mul(turbulence).mul(backscatterStrength);
   const scatteredRadiance = color(body.palette.shallow).add(bubbleDensity).clamp(0, 1);
-  const physicalWater = scatteredRadiance.mul(transmission);
+  // Single-scattering closure: L = L_floor * T + L_scatter * (1 - T). Without
+  // the second term absorption alone drives deep water to black, because
+  // exp(-sigma * path) goes to zero and nothing else is in the integral. Real
+  // deep water is the light backscattered out of the upper column, which is
+  // what `scatter` is. The blend weight is the MEASURED transmission - not a
+  // view angle and not a wave slope, which is the whole difference between this
+  // and the palette lerp it replaced.
+  const deepScatter = uniform(new THREE.Color(optics?.scatter ?? 0));
+  const physicalWater = mix(deepScatter, scatteredRadiance, transmission);
   const darkWater = mix(paletteWater, physicalWater, useExtinction);
   const keyLight = body.night
     ? vec3(0.25, 0.85, 0.35).normalize()
@@ -455,6 +483,7 @@ export function createOceanTslWater(
   water.userData.waterExtinction = optics ? [optics.extinction.r, optics.extinction.g, optics.extinction.b] : null;
   water.userData.waterColumnDepth = oceanColumnDepth(body);
   water.userData.waterBackscatter = optics?.backscatter ?? 0;
+  water.userData.waterScatterColor = optics?.scatter ?? null;
   water.userData.totalSteepness = OCEAN_TOTAL_STEEPNESS;
   water.userData.waterBody = body;
   water.userData.swimmable = body.swimmable;
