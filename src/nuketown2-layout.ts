@@ -130,3 +130,78 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
   // rather than in the middle of the room.
   position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.9] as const),
 })));
+
+/**
+ * THE MOVING TRUCK - size, and the one thing HF-426 knowingly got wrong.
+ *
+ * SIZE IS MEASURED (schematic 3). On the BO7 minimap the truck is 130 px of a
+ * 400 px street axis = 0.325 L end to end, split into a hollow-drawn cargo box
+ * (72 px, 0.180 L) and a solid-drawn cab (58 px, 0.145 L). Here: 6.5 m box +
+ * 5.2 m cab = 11.7 m = 0.325 L exactly.
+ *
+ * `z` IS THE HF-432 ITEM 5 CORRECTION. The reference puts the truck 0.076 L
+ * SOUTH of the road centre-line and HF-426 put it ON the centre-line, with the
+ * deviation recorded in schematic 5.5 for one stated reason: `OVERDRIVE_POSITION`
+ * in `src/overdrive.ts` was a single global {0, 3.75, 0}, so the 2x-damage core
+ * could only sit over a truck standing at the world origin, and moving it was
+ * weapons code outside that lane. The orchestrator authorised the weapons
+ * change for this pass, so the truck goes where the reference has it and the
+ * core goes with it: 0.076 L x 36 = 2.74 m, authored 2.75 (0.0764 L, deviation
+ * 0.0004 L). `overdrivePositionForArena('nuketown2')` reads this field, so the
+ * core cannot be left behind if the truck moves again.
+ *
+ * `deckY` AND `roofY` ARE BOTH SET BY THE CORE, not by taste, and the two
+ * constraints pull in opposite directions. `claimOverdrive` is a pure
+ * height-and-radius rule over the arena's own core position, so with a
+ * standing eye height of 1.70 m:
+ *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - coreY| <= 1.90
+ *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
+ *   - a player STANDING IN THE CARGO BOX must NOT claim, because a core you can
+ *     take from inside cover is not a contested position at all - and because
+ *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
+ *     precisely so an interior cannot claim through the roof slab. That needs
+ *     coreY - (deckY + 1.70) > 1.90, i.e. deckY < 0.15. Authored 0.05, dy 2.00.
+ * The margin is 0.10 m and `nuketown2-fidelity.test.ts` calls `claimOverdrive`
+ * to prove it rather than restating the arithmetic.
+ */
+export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
+  boxLength: 6.5,
+  cabLength: 5.2,
+  width: 2.6,
+  /** 0.0764 L south of the road centre-line; reference 0.076 L. */
+  z: 2.75,
+  deckY: 0.05,
+  roofY: 3.15,
+  cabRoofY: 2.9,
+  /** Cab centre along the street: box half plus cab half. */
+  cabX: 6.5 / 2 + 5.2 / 2,
+  /** Height of the 2x-damage core over the cargo-box roof. */
+  coreHeightOverRoof: 0.6,
+});
+
+/**
+ * THE RETRO COACH, parked across the turning head from the truck. CLOSED
+ * cover: the reference's minimap draws it hatched end to end, and the
+ * first-party preview still shows a sealed streamlined body, not a school bus
+ * you walk through. It is a solid 3.3 m body and that is the whole of its job.
+ *
+ * WHERE IT SITS IS AN OFFSET FROM THE TRUCK, because that is how the schematic
+ * measures it: the coach centre is 0.178 L along the street and 0.150 L across
+ * it from the truck's cargo box. HF-426 authored 5.0 and 4.0 m (0.139 / 0.111 L)
+ * and pulled both in, because with the truck sitting on the centre-line rather
+ * than 0.076 L south of it the measured pair put the coach's flank over the
+ * kerb. With the truck where the reference has it (see above) that reason is
+ * gone and the measured offsets are authored exactly: 6.4 m = 0.1778 L against
+ * 0.178, and 5.4 m = 0.1500 L against 0.150.
+ */
+const COACH_OFFSET_ALONG = 6.4;
+const COACH_OFFSET_ACROSS = 5.4;
+export const NUKETOWN2_STREET_COACH = Object.freeze({
+  length: 9.1,
+  width: 2.6,
+  height: 3.3,
+  offsetAlong: COACH_OFFSET_ALONG,
+  offsetAcross: COACH_OFFSET_ACROSS,
+  x: -COACH_OFFSET_ALONG,
+  z: NUKETOWN2_CENTRAL_TRUCK.z - COACH_OFFSET_ACROSS,
+});

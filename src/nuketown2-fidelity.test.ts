@@ -23,6 +23,7 @@ import {
   OVERDRIVE_POSITION,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
 } from './overdrive';
 import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
@@ -332,10 +333,18 @@ describe('Nuke Town Rebuild fidelity', () => {
     const truck = map.physicalCover.find((cover) => cover.id === 'nuketown2-central-truck');
     expect(truck, 'exactly one moving truck owns the turning head').toBeDefined();
     expect(map.physicalCover.filter((cover) => cover.id.includes('truck'))).toHaveLength(1);
-    // The cargo box is centred on the world origin, which is load-bearing: the
-    // global OVERDRIVE_POSITION {0, 3.75, 0} has to land on its roof.
+    // The cargo box is centred on the world origin ALONG the street, which is
+    // load-bearing: the core's x is the box's own centre.
     expect(truck!.bounds.minX).toBeCloseTo(-NUKETOWN2_CENTRAL_TRUCK.boxLength / 2, 10);
-    expect((truck!.bounds.minZ + truck!.bounds.maxZ) / 2).toBeCloseTo(0, 10);
+    // HF-432 item 5: the truck stands where the REFERENCE has it, 0.076 L
+    // south of the road centre-line, and the 2x core follows it because
+    // OVERDRIVE_POSITION is per-arena now. HF-426 had to centre it on the
+    // world origin and recorded the difference as a deviation (schematic 5.5).
+    expect((truck!.bounds.minZ + truck!.bounds.maxZ) / 2).toBeCloseTo(NUKETOWN2_CENTRAL_TRUCK.z, 10);
+    expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.z - 0.076 * L)).toBeLessThan(TOL);
+    expect(NUKETOWN2_CENTRAL_TRUCK.z / L, 'truck offset across the street').toBeCloseTo(0.076, 3);
+    // ...and it is still ON the carriageway.
+    expect(truck!.bounds.maxZ).toBeLessThan(NUKETOWN2_SECTION.streetHalfWidth);
     expect(truck!.blocksShots).toBe(true);
     expect(truck!.blocksMovement).toBe(true);
     // Schematic §3: the truck is 0.325 L end to end, split 0.180 L of hollow
@@ -377,9 +386,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     // The truck's interior is a real room: a standing eye at the origin, on the
     // deck, is under a roof and inside two flanks, and it is NOT blocked.
-    expect(isBlocked({ x: 0, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
+    expect(isBlocked({ x: 0, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
     // ...and its mouth is at the -x end, so it is enterable from the road.
-    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS),
+    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS),
       'truck cargo box mouth').toBe(false);
 
     // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
@@ -395,12 +404,25 @@ describe('Nuke Town Rebuild fidelity', () => {
 
     // Coach size and placement, schematic §3: 0.253 L long, and offset from the
     // truck's cargo box by 0.178 L along the street and 0.150 L across it.
+    //
+    // HF-432 item 5: those two offsets are now EXACT. HF-426 authored 5.0 and
+    // 4.0 m and recorded the 0.039 L difference, because with the truck pinned
+    // to the world origin the measured pair put the coach's flank over the
+    // kerb. With the truck 0.076 L south where the reference has it, that
+    // reason is gone.
     expect(Math.abs(NUKETOWN2_STREET_COACH.length - 0.253 * L)).toBeLessThan(TOL);
-    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.x) - 0.178 * L)).toBeLessThan(TOL);
-    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.z) - 0.150 * L)).toBeLessThan(TOL);
-    // Both street bodies stay on the carriageway.
+    expect(NUKETOWN2_STREET_COACH.offsetAlong / L, 'coach offset along the street').toBeCloseTo(0.178, 3);
+    expect(NUKETOWN2_STREET_COACH.offsetAcross / L, 'coach offset across the street').toBeCloseTo(0.150, 3);
+    // ...and the offsets are what the placement is actually built from, so the
+    // two can never describe different things.
+    expect(Math.abs(NUKETOWN2_STREET_COACH.x)).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAlong, 10);
+    expect(NUKETOWN2_CENTRAL_TRUCK.z - NUKETOWN2_STREET_COACH.z).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAcross, 10);
+    // Both street bodies stay on the carriageway, on OPPOSITE sides of the
+    // road centre-line - which is what the reference draws and what HF-426
+    // could not do with the truck sitting on it.
     expect(NUKETOWN2_STREET_COACH.z - NUKETOWN2_STREET_COACH.width / 2)
       .toBeGreaterThan(-NUKETOWN2_SECTION.streetHalfWidth);
+    expect(Math.sign(NUKETOWN2_STREET_COACH.z)).toBe(-Math.sign(NUKETOWN2_CENTRAL_TRUCK.z));
 
     // Every declared vehicle body is real cover in both authorities. A body the
     // player can see and shoot but walk through is the failure this pins.
@@ -821,8 +843,23 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle head car wheel 01',
       'nuketown2 street-vehicle head car wheel 10',
       'nuketown2 street-vehicle head car wheel 11',
+      // HF-432 ITEM 5 - DELIBERATE ADDITION, with the reason. The truck moved
+      // 0.076 L SOUTH of the road centre-line, where the reference has it, so
+      // the four parts that used to be their own 180-degree partners across
+      // z = 0 (the two cargo-box flanks, the box roof and the deck) no longer
+      // are. Nothing was added to the arena and nothing changed name: the same
+      // bodies stopped being self-symmetric because the body they belong to is
+      // no longer on the axis. The exception's plan-area cap and both per-half
+      // cover floors below are measured on this larger set and still hold -
+      // 127.0 m2 of 181.4, and the four halves at 73.1 / 53.9 / 64.5 / 62.5 m2
+      // against a 20 m2 floor, which is BETTER balanced than the 89.3 m2 the
+      // centred truck produced.
       'nuketown2 street-vehicle truck box bulkhead',
+      'nuketown2 street-vehicle truck box flank 0',
+      'nuketown2 street-vehicle truck box flank 1',
+      'nuketown2 street-vehicle truck box roof',
       'nuketown2 street-vehicle truck cab',
+      'nuketown2 street-vehicle truck deck',
       'nuketown2 street-vehicle truck roof step 0',
       'nuketown2 street-vehicle truck roof step 1',
       'nuketown2 street-vehicle truck roof step 2',
@@ -926,28 +963,42 @@ describe('Nuke Town Rebuild fidelity', () => {
     // be taken from INSIDE the vehicle - which is exactly the case
     // src/overdrive.ts' v6 height-window tightening exists to prevent.
     const EYE = 1.7; // movementProfile(standing).eyeHeight
-    const claimFrom = (feetY: number, x: number, z: number): boolean => (
-      claimOverdrive(createOverdriveState(0), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
-    );
+    const t = NUKETOWN2_CENTRAL_TRUCK;
+    // HF-432 item 5: the core's seat is the ARENA's now, and it is DERIVED
+    // from the truck rather than transcribed - so a truck that moves again
+    // cannot leave the core behind, which is the failure
+    // src/railgun-authority.ts' header records against the shipped map.
+    const SEAT = overdrivePositionForArena('nuketown2');
+    expect(SEAT.x).toBeCloseTo(0, 10);
+    expect(SEAT.z).toBeCloseTo(t.z, 10);
+    expect(SEAT.y).toBeCloseTo(t.roofY + t.coreHeightOverRoof, 10);
+    // THE SHIPPED MAP'S SEAT IS UNTOUCHED, byte for byte, which is the
+    // condition the orchestrator attached to this weapons change.
+    expect(OVERDRIVE_POSITION).toEqual({ x: 0, y: 3.75, z: 0 });
+    expect(overdrivePositionForArena('atomic-acres')).toBe(OVERDRIVE_POSITION);
+    expect(overdrivePositionForArena('some-arena-with-no-core')).toBe(OVERDRIVE_POSITION);
 
-    expect(OVERDRIVE_POSITION.y).toBe(3.75);
+    const claimFrom = (feetY: number, x: number, z: number): boolean => (
+      claimOverdrive(createOverdriveState(0, SEAT), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
+    );
     // Standing on the cargo-box roof, at the core: CLAIMED. dy 1.10.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.roofY, 0, 0), 'box roof').toBe(true);
+    expect(claimFrom(t.roofY, 0, t.z), 'box roof').toBe(true);
     // Standing on the deck directly beneath it: REJECTED. dy 2.00.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.deckY, 0, 0), 'cargo box interior').toBe(false);
+    expect(claimFrom(t.deckY, 0, t.z), 'cargo box interior').toBe(false);
     // Standing on the road beside the truck: REJECTED. dy 2.05.
-    expect(claimFrom(0, 1.2, 3.0), 'road').toBe(false);
+    expect(claimFrom(0, 1.2, t.z + 3.0), 'road').toBe(false);
     // Standing on the CAB roof: REJECTED by radius. The cab roof is a real
     // walkable surface on the climb route, and it is 0.25 m below the box roof,
     // so height alone would admit it.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.cabRoofY, NUKETOWN2_CENTRAL_TRUCK.cabX, 0), 'cab roof').toBe(false);
+    expect(claimFrom(t.cabRoofY, t.cabX, t.z), 'cab roof').toBe(false);
     // Standing on any roof-access tread: REJECTED - not by height (the top tread
     // is well inside the height window) but by RADIUS, because every tread
-    // footprint is more than 1.65 m from the origin in plan. Climbing half way
+    // footprint is more than 1.65 m from the core in plan. Climbing half way
     // must not be a way to take the core out of a covered position.
+    const treadZ = t.z - (t.width / 2 + 2.45) / 2;
     for (const [top, x0, x1] of [[0.80, 7.0, 8.2], [1.75, 5.8, 7.0], [2.60, 4.6, 5.8]] as const) {
       for (const x of [x0, x1, (x0 + x1) / 2]) {
-        for (const z of [1.35, 1.9, 2.4]) {
+        for (const z of [treadZ - 0.55, treadZ, treadZ + 0.55]) {
           expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
         }
       }
@@ -966,10 +1017,15 @@ describe('Nuke Town Rebuild fidelity', () => {
       const dt = 1 / 120;
       // Approach the treads from the road, climb them, step onto the cab roof,
       // then onto the cargo-box roof and walk to the core.
+      const t = NUKETOWN2_CENTRAL_TRUCK;
+      // The treads are on the truck's NORTH flank - the middle of the road -
+      // so the climb is contested rather than handed to whichever team the
+      // truck's 0.076 L offset put it nearer.
+      const treadZ = t.z - (t.width / 2 + 2.45) / 2;
       const route: Array<[number, number]> = [
-        [7.6, 1.9], [6.4, 1.9], [5.2, 1.9], [NUKETOWN2_CENTRAL_TRUCK.cabX, 0], [0, 0],
+        [7.6, treadZ], [6.4, treadZ], [5.2, treadZ], [t.cabX, t.z], [0, t.z],
       ];
-      physics.teleportEye({ x: 9.6, y: 1.9, z: 1.9 });
+      physics.teleportEye({ x: 9.6, y: 1.9, z: treadZ });
       let vy = 0;
       for (const waypoint of route) {
         for (let step = 0; step < 420; step += 1) {
@@ -990,7 +1046,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       }
       const end = physics.eyePosition();
       // Standing (or mid-hop) on the roof over the core, not on the road.
-      expect(Math.hypot(end.x, end.z), 'reached the core in plan').toBeLessThan(1.2);
+      expect(Math.hypot(end.x, end.z - NUKETOWN2_CENTRAL_TRUCK.z), 'reached the core in plan').toBeLessThan(1.2);
       expect(end.y, 'eye height on the truck roof').toBeGreaterThan(NUKETOWN2_CENTRAL_TRUCK.roofY + 1.5);
     } finally {
       physics.dispose();

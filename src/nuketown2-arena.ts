@@ -95,12 +95,14 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
   NUKETOWN2_GROUND_STOREY_H,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_UPPER_Y0,
@@ -118,6 +120,8 @@ import {
  */
 export {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_HOUSE_LAYOUT,
@@ -382,61 +386,6 @@ export const NUKETOWN2_SECTION = Object.freeze({
 });
 
 /**
- * The moving truck, centred on the world origin: the reference's "island of
- * cover in the otherwise open cul-de-sac", and the OPEN body of the two.
- *
- * SIZE IS MEASURED. On the BO7 minimap the truck is 130 px of a 400 px street
- * axis = 0.325 L end to end, split into a hollow-drawn cargo box (72 px,
- * 0.180 L) and a solid-drawn cab (58 px, 0.145 L). Here: 6.5 m box + 5.2 m cab
- * = 11.7 m = 0.325 L exactly.
- *
- * `deckY` AND `roofY` ARE BOTH SET BY THE 2x-DAMAGE CORE, not by taste, and the
- * two constraints pull in opposite directions. `OVERDRIVE_POSITION` is a single
- * global {0, 3.75, 0} and `claimOverdrive` is a pure height-and-radius rule, so
- * with a standing eye height of 1.70 m:
- *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - 3.75| <= 1.90
- *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
- *   - a player STANDING IN THE CARGO BOX must NOT claim, because a core you can
- *     take from inside cover is not a contested position at all - and because
- *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
- *     precisely so an interior cannot claim through the roof slab. That needs
- *     3.75 - (deckY + 1.70) > 1.90, i.e. deckY < 0.15. Authored 0.05, dy 2.00.
- * The margin is 0.10 m and `nuketown2-fidelity.test.ts` calls `claimOverdrive`
- * to prove it rather than restating the arithmetic.
- */
-export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
-  boxLength: 6.5,
-  cabLength: 5.2,
-  width: 2.6,
-  deckY: 0.05,
-  roofY: 3.15,
-  cabRoofY: 2.9,
-  /** Cab centre along the street: box half plus cab half. */
-  cabX: 6.5 / 2 + 5.2 / 2,
-});
-
-/**
- * The retro coach parked across the turning head from the truck. CLOSED cover:
- * the reference's minimap draws it hatched end to end, and the first-party
- * preview still of the map shows a sealed streamlined body, not a school bus
- * you walk through. It is a solid 3.3 m body and that is the whole of its job.
- *
- * WHERE IT SITS is measured as an OFFSET FROM THE TRUCK, because the truck's
- * own position is pinned by the core rather than by the reference. On the
- * minimap the coach centre is 0.178 L along the street and 0.150 L across it
- * from the truck's cargo box. Here 5.0 m (0.139 L) and 4.0 m (0.111 L): both
- * inside the lane's 5 %-of-street-length tolerance, and pulled in because the
- * measured pair would put the coach's flank over the kerb.
- */
-export const NUKETOWN2_STREET_COACH = Object.freeze({
-  length: 9.1,
-  width: 2.6,
-  height: 3.3,
-  x: -5,
-  z: -4,
-});
-
-/**
  * The treads that make the truck roof - and therefore the 2x-damage core - a
  * place a player can actually get to. Measured, not assumed: the jump apex from
  * flat ground is 6.35^2 / (2 x 24.5) = 0.823 m and autostep is 0.42 m, so a
@@ -444,10 +393,17 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
  * with nothing beside it is unreachable, which is what the first cut of the old
  * bus shipped.
  *
- * Three treads against the CAB's +z flank, then 0.30 m up onto the cab roof
- * (2.90) and 0.25 m from there onto the cargo-box roof (3.15). Climbing over
- * the cab is both the shortest route and the one that keeps every tread far
- * from the core.
+ * Three treads against the CAB's ROAD-SIDE flank, then 0.30 m up onto the cab
+ * roof (2.90) and 0.25 m from there onto the cargo-box roof (3.15). Climbing
+ * over the cab is both the shortest route and the one that keeps every tread
+ * far from the core.
+ *
+ * HF-432 item 5: the treads are on the truck's NORTH flank, i.e. the middle of
+ * the road, not the kerb side. The truck now stands 0.076 L SOUTH of the road
+ * centre-line where the reference has it, so treads on its south flank would
+ * have handed the south team the shorter climb to the 2x core on a body the
+ * reference put there for cover, not for fairness. Climbing from the middle of
+ * the carriageway is also the only climb both teams contest.
  *
  * WHY THEY SIT WHERE THEY SIT. Every tread footprint is more than
  * `OVERDRIVE_PICKUP_RADIUS` (1.65 m) from the world origin in plan - the
@@ -455,7 +411,7 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
  * claim: the core is taken on the box roof or not at all.
  */
 const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.freeze([
-  // [tread top, x from, x to]
+  // [tread top, x from, x to] - z is derived from the truck's own position
   Object.freeze([0.80, 7.0, 8.2] as const),
   Object.freeze([1.75, 5.8, 7.0] as const),
   Object.freeze([2.60, 4.6, 5.8] as const),
@@ -1017,26 +973,26 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
   const flank = W / 2 - T / 2;
 
   // Cab, solid closed cover, on the +x end.
-  streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, 0], [t.cabLength, t.cabRoofY, W], m.truckCab);
+  streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, t.z], [t.cabLength, t.cabRoofY, W], m.truckCab);
   // Cargo box: deck, bulkhead against the cab, two flanks and a roof. The -x
   // end is OPEN, which is the mouth.
-  streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, 0], [t.boxLength, T, W], m.truckBox, { cast: false });
-  streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, 0],
+  streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
+  streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, t.z],
     [T, t.roofY - t.deckY, W], m.truckBox);
   for (const [index, side] of [-1, 1].entries()) {
-    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, side * flank],
+    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, t.z + side * flank],
       [t.boxLength, t.roofY - t.deckY, T], m.truckBox);
   }
-  streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, 0], [t.boxLength, T, W], m.truckBox);
+  streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
   for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
-    streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, 0], [0.9, 0.84, W + 0.2], m.rubber,
+    streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, t.z], [0.9, 0.84, W + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
   }
 
   // ROOF ACCESS. See TRUCK_ROOF_STEPS: the 2x-damage core rides this roof, and
   // a roof nothing can climb is a feature that does not exist.
   for (const [index, [top, x0, x1]] of TRUCK_ROOF_STEPS.entries()) {
-    streetVehicle(builder, `truck roof step ${index}`, [(x0 + x1) / 2, top / 2, (W / 2 + 2.45) / 2],
+    streetVehicle(builder, `truck roof step ${index}`, [(x0 + x1) / 2, top / 2, t.z - (W / 2 + 2.45) / 2],
       [x1 - x0, top, 2.45 - W / 2], m.block);
   }
 }
@@ -1082,11 +1038,23 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // pins it there), so without this the south half of the carriageway carries
   // no street body at all and the north team owns the head. Solid, waist-high,
   // parked against the south kerb.
-  streetVehicle(builder, 'head car body', [4.5, 0.72, 4.6], [4.4, 1.0, 1.9], m.carA);
-  streetVehicle(builder, 'head car cabin', [4.3, 1.55, 4.6], [2.2, 0.66, 1.7], m.carGlass);
+  // HF-432 item 5 MOVED IT, and the move is load-bearing twice over. At
+  // (4.5, 4.6) it stood where the truck now does. It goes onto the ROAD
+  // CENTRE-LINE instead, in the gap the reference's own measurements leave
+  // between the two street bodies: the coach is 0.150 L north of the truck and
+  // both are 2.6 m wide, so the reference's pair leaves 2.8 m of open
+  // carriageway straight down z = 0. With the truck no longer straddling that
+  // line, nothing else on this 36 m road breaks it, and the arena's derived
+  // MAX_STREET_CENTRE_RUN_METRES band exists precisely to stop that. Parked
+  // across it, this body keeps the longest clear centre-line run at 19.8 m
+  // inside the 21.2 m band - and it is still the coach's counterweight, which
+  // is the other property nuketown2-fidelity.test.ts measures.
+  const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
+  streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
+  streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
   for (const [index, dx] of [-1.5, 1.5].entries()) {
     for (const [side, dz] of [-1, 1].entries()) {
-      streetVehicle(builder, `head car wheel ${index}${side}`, [4.5 + dx, 0.34, 4.6 + dz * 0.9],
+      streetVehicle(builder, `head car wheel ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 0.9],
         [0.68, 0.68, 0.3], m.rubber, { solid: false, shots: false, cast: false });
     }
   }
@@ -1420,7 +1388,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
         id: 'nuketown2-central-truck',
         bounds: {
           minX: -t.boxLength / 2, maxX: t.cabX + t.cabLength / 2,
-          minZ: -t.width / 2, maxZ: t.width / 2,
+          minZ: t.z - t.width / 2, maxZ: t.z + t.width / 2,
           minY: 0, maxY: t.roofY,
         },
         blocksMovement: true,

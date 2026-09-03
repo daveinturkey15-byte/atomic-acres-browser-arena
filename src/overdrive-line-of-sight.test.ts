@@ -12,6 +12,7 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
 } from './overdrive';
 import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
 
@@ -33,22 +34,30 @@ import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
  * the bus can claim, at any height - so a future roof, floor or core move
  * cannot silently re-open it.
  */
-const CORE_SIGHT_POINT: Point3 = { x: OVERDRIVE_POSITION.x, y: OVERDRIVE_POSITION.y + 0.25, z: OVERDRIVE_POSITION.z };
 const NOW = 10_000_000;
 
+/**
+ * HF-432 item 5: the core's seat is PER ARENA now, so every probe below takes
+ * the seat of the arena it is probing. The shipped map's seat resolves to the
+ * same {0, 3.75, 0} it always had, so its half of this file is unchanged in
+ * everything but spelling.
+ */
+type Seat = Readonly<{ x: number; y: number; z: number }>;
+const sightPoint = (seat: Seat): Point3 => ({ x: seat.x, y: seat.y + 0.25, z: seat.z });
+
 /** The same trace `overdriveClaimSight` runs in src/legacy-main.ts. */
-function sightFrom(eye: Point3, colliders: readonly Box2[]): { lineOfSightClear: boolean } {
-  return { lineOfSightClear: !colliders.some((box) => segmentIntersectsBox(eye, CORE_SIGHT_POINT, box)) };
+function sightFrom(eye: Point3, colliders: readonly Box2[], seat: Seat): { lineOfSightClear: boolean } {
+  return { lineOfSightClear: !colliders.some((box) => segmentIntersectsBox(eye, sightPoint(seat), box)) };
 }
 
-function spawnedState() {
-  return advanceOverdrive(createOverdriveState(0), NOW);
+function spawnedState(seat: Seat) {
+  return advanceOverdrive(createOverdriveState(0, seat), NOW);
 }
 
-function claims(eye: Point3, colliders: readonly Box2[] | null): boolean {
+function claims(eye: Point3, colliders: readonly Box2[] | null, seat: Seat = OVERDRIVE_POSITION): boolean {
   return claimOverdrive(
-    spawnedState(), 'probe', eye, true, NOW,
-    colliders ? sightFrom(eye, colliders) : undefined,
+    spawnedState(seat), 'probe', eye, true, NOW,
+    colliders ? sightFrom(eye, colliders, seat) : undefined,
   ).claimed;
 }
 
@@ -59,25 +68,25 @@ function claims(eye: Point3, colliders: readonly Box2[] | null): boolean {
  * roof slab over an open aisle, not as a filled box, which is exactly why a
  * claim from below is geometrically possible at all.
  */
-function roofSlabUnderCore(map: ArenaMap): Box2 {
+function roofSlabUnderCore(map: ArenaMap, seat: Seat): Box2 {
   const candidates = map.physicsColliders.filter((box) => (
-    box.minX <= OVERDRIVE_POSITION.x && box.maxX >= OVERDRIVE_POSITION.x
-    && box.minZ <= OVERDRIVE_POSITION.z && box.maxZ >= OVERDRIVE_POSITION.z
+    box.minX <= seat.x && box.maxX >= seat.x
+    && box.minZ <= seat.z && box.maxZ >= seat.z
     && (box.maxY ?? 0) > 1.5
   ));
   expect(candidates.length, 'a solid must stand under the core on this arena').toBeGreaterThan(0);
   return candidates.sort((a, b) => (b.maxY ?? 0) - (a.maxY ?? 0))[0]!;
 }
 
-const ARENAS: ReadonlyArray<[string, () => ArenaMap]> = [
-  ['nuke-town (shipped)', () => buildArena(new THREE.Scene())],
-  ['nuke-town rebuild (nuketown2)', () => buildNuketown2(new THREE.Scene())],
+const ARENAS: ReadonlyArray<[string, () => ArenaMap, Seat]> = [
+  ['nuke-town (shipped)', () => buildArena(new THREE.Scene()), overdrivePositionForArena('atomic-acres')],
+  ['nuke-town rebuild (nuketown2)', () => buildNuketown2(new THREE.Scene()), overdrivePositionForArena('nuketown2')],
 ];
 
 describe('2x Damage Core line of sight (Lane AR item 5)', () => {
-  it.each(ARENAS)('%s: a roof-slab claim from inside the bus is rejected at every height', (_label, build) => {
+  it.each(ARENAS)('%s: a roof-slab claim from inside the bus is rejected at every height', (_label, build, seat) => {
     const map = build();
-    const slab = roofSlabUnderCore(map);
+    const slab = roofSlabUnderCore(map, seat);
     const slabUnderside = slab.minY ?? 0;
 
     // Every eye height an aisle player can reach - prone through standing
@@ -88,10 +97,10 @@ describe('2x Damage Core line of sight (Lane AR item 5)', () => {
     let guardedClaims = 0;
     let sweptEyeHeights = 0;
     for (let eyeY = 0.6; eyeY < slabUnderside - 0.02; eyeY += 0.05) {
-      const eye: Point3 = { x: OVERDRIVE_POSITION.x, y: eyeY, z: OVERDRIVE_POSITION.z };
+      const eye: Point3 = { x: seat.x, y: eyeY, z: seat.z };
       sweptEyeHeights += 1;
-      if (claims(eye, null)) unguardedClaims += 1;
-      if (claims(eye, map.physicsColliders)) guardedClaims += 1;
+      if (claims(eye, null, seat)) unguardedClaims += 1;
+      if (claims(eye, map.physicsColliders, seat)) guardedClaims += 1;
     }
     // The defect, measured: the scalar window alone DID admit claims from
     // inside the bus. If this ever reaches zero the arena changed and this test
@@ -111,14 +120,14 @@ describe('2x Damage Core line of sight (Lane AR item 5)', () => {
     });
   });
 
-  it.each(ARENAS)('%s: a player standing on the bus roof still claims it', (_label, build) => {
+  it.each(ARENAS)('%s: a player standing on the bus roof still claims it', (_label, build, seat) => {
     const map = build();
-    const roofY = roofSlabUnderCore(map).maxY ?? 0;
+    const roofY = roofSlabUnderCore(map, seat).maxY ?? 0;
     // A standing eye on the roof: the position the pickup exists to reward.
-    const eye: Point3 = { x: OVERDRIVE_POSITION.x, y: roofY + 1.7, z: OVERDRIVE_POSITION.z };
-    expect(Math.abs(eye.y - OVERDRIVE_POSITION.y), 'the roof eye must still be inside the height window')
+    const eye: Point3 = { x: seat.x, y: roofY + 1.7, z: seat.z };
+    expect(Math.abs(eye.y - seat.y), 'the roof eye must still be inside the height window')
       .toBeLessThanOrEqual(OVERDRIVE_PICKUP_HEIGHT_WINDOW_M);
-    expect(claims(eye, map.physicsColliders), 'the roof position must remain claimable').toBe(true);
+    expect(claims(eye, map.physicsColliders, seat), 'the roof position must remain claimable').toBe(true);
   });
 
   it('an unblocked eye is unaffected: the radius and window still decide', () => {

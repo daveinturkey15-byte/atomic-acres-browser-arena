@@ -230,7 +230,7 @@ consequence of §5.1 and it is the flow the owner is asking for.
 |---|---|---|---|
 | The road is a stub with one open end | tongue at one end of the street | carriageway runs the full 36 m, closed by the perimeter wall at both ends | The playable area is a fenced rectangle. A one-ended road would hand the closed end to whichever team is nearer it. |
 | The houses sit ~0.08 L toward the road's closed end | house centres 32 px off the polygon's street-axis centre | houses centred on x = ±1.25 | Follows from the above: with the turning head centred, centred houses are what keeps the two teams equal. |
-| Truck sits across the road centre-line | truck ~0.076 L south of it | truck box centred on z = 0 | `OVERDRIVE_POSITION` in `src/overdrive.ts` is a single global `{0, 3.75, 0}`, not a per-arena value. The 2x core is the owner's kept feature; moving it is weapons code, outside this lane. |
+| ~~Truck sits across the road centre-line~~ **RESOLVED, HF-432 item 5** | truck ~0.076 L south of it | truck box centred on z = **+2.75 (0.0764 L)** | Was a deviation because `OVERDRIVE_POSITION` in `src/overdrive.ts` was a single global `{0, 3.75, 0}`. HF-432's orchestrator authorised the weapons change: the core is per-arena now (`overdrivePositionForArena`, plus a `home` seat on `OverdriveState` so a death drop returns to the right place), and it is **derived from `NUKETOWN2_CENTRAL_TRUCK`** rather than transcribed. The shipped Nuke Town's seat is unchanged. |
 | Vehicle widths | 0.105–0.110 L as drawn | 2.6 m (0.072 L) | Minimap stroke inflation, §3 caveat 1. Deviation 0.038 L, inside the lane's 0.05 L tolerance. |
 
 ---
@@ -279,8 +279,9 @@ row is inside the lane's 5 %-of-L (1.8 m) tolerance.
 | — hollow cargo box | 0.180 L = 6.48 m | 6.5 m | 0.001 L |
 | — solid cab | 0.145 L = 5.22 m | 5.2 m | 0.001 L |
 | Coach length | 0.253 L = 9.11 m | 9.1 m | 0.000 L |
-| Coach offset, along street | 0.178 L = 6.41 m | 5.0 m | 0.039 L |
-| Coach offset, across street | 0.150 L = 5.40 m | 4.0 m | 0.039 L |
+| Coach offset, along street | 0.178 L = 6.41 m | **6.4 m** (HF-432 item 5) | 0.0002 L |
+| Coach offset, across street | 0.150 L = 5.40 m | **5.4 m** (HF-432 item 5) | 0.000 L |
+| Truck offset across the street | 0.076 L = 2.74 m | **2.75 m** (HF-432 item 5) | 0.0004 L |
 | Truck: open / coach: closed | truck open | truck open, coach solid | ✔ corrected |
 | Spawns | back yards behind each house | z = ±30 / ±32, inside the fence | ✔ |
 | Sheds (registry) | — | (±14, ±24.5), inside the yards | ✔ moved from ±24 x, which is now outside the map |

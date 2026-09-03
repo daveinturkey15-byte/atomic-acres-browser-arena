@@ -606,6 +606,7 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
   dropOverdriveOnElimination,
   overdriveDamageMultiplier,
   overdriveRemainingMs,
@@ -17755,7 +17756,8 @@ async function startGame(
   }
   initializeGunRangeMatchClock(mode);
   initializeGunRangeTestBayDoor(mode);
-  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
+  // HF-432 item 5: the core's seat is the arena's (see overdrivePositionForArena).
+  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt, overdrivePositionForArena(selectedArena.id));
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt, hostRecovery);
   const timedWeaponMatchEndsAt = matchRules.durationMs === null
@@ -25014,6 +25016,8 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
     activeUntil: message.activeRemainingMs > 0 ? now + message.activeRemainingMs : 0,
     nextSpawnAt: now + message.nextSpawnInMs,
     position: { x: message.position[0], y: message.position[1], z: message.position[2] },
+    // The wire carries the LIVE position; the seat it returns to is the arena's.
+    home: overdrivePositionForArena(selectedArena.id),
   };
   if (message.available && message.activeRemainingMs === 0 && previousGeneration !== message.generation) {
     overdriveSpawns += 1;
@@ -36370,12 +36374,16 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
     const now = performance.now();
-    if (mode === 'charging') overdriveState = createOverdriveState(now);
-    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: false, nextSpawnAt: now };
+    // HF-432 item 5: the harness stages the ARENA's seat, never the shipped
+    // map's - the debug backdoor `stageRailgunSpawn` below already records.
+    const seat = overdrivePositionForArena(selectedArena.id);
+    if (mode === 'charging') overdriveState = createOverdriveState(now, seat);
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now, seat), available: false, nextSpawnAt: now };
     else if (mode === 'active') overdriveState = {
       generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
-      position: OVERDRIVE_POSITION,
+      position: seat,
+      home: seat,
     };
     else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
     updateOverdrive(now);
