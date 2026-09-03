@@ -110,9 +110,17 @@ describe('HF-364 scene-pass assembly', () => {
     expect(systems.linearSourceStages).toEqual([
       'scene-pass-linear-hdr',
       'motion-blur-velocity-smear',
+      // HF-418 / Lane AL. Two stages were BEING BUILT and not being reported:
+      // the ray-traced layer's, missing since HF-398 landed, and the baked
+      // probe layer's, new here. `pass64LinearSourceStages` is a hand-written
+      // enumeration and neither had ever been added to it, so the published
+      // receipt described a chain the installed pipeline did not have. This
+      // pin now asserts the complete chain.
+      'baked-indirect-probe-add',
       'ssgi-screen-space-bounce-add',
       'contact-occlusion-multiply',
       'ssr-screen-space-reflection-add',
+      'raytraced-reflection-refraction-add',
       'depth-guarded-bloom-add',
       'godrays-volumetric-shaft-add',
       'depth-of-field-bokeh',
