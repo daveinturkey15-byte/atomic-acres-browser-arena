@@ -116,6 +116,14 @@ import {
   createNuketown2DriveMaterial,
   createNuketown2KerbMaterial,
 } from './nuketown2-street-materials';
+import {
+  createNuketown2CeilingLightMaterial,
+  createNuketown2DrywallMaterial,
+  createNuketown2GarageFloorMaterial,
+  createNuketown2GarageWallMaterial,
+  createNuketown2TileFloorMaterial,
+  createNuketown2WoodFloorMaterial,
+} from './nuketown2-interior-materials';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -617,6 +625,9 @@ type Nuketown2Materials = Readonly<{
   interior: THREE.Material;
   /** HF-434: the interior floor - interior's paint at the -1 decal tier. */
   interiorFloor: THREE.Material;
+  kitchenFloor: THREE.Material;
+  warmLight: THREE.Material;
+  coldLight: THREE.Material;
   fence: THREE.Material;
   block: THREE.Material;
   busShell: THREE.Material;
@@ -713,8 +724,13 @@ function nuketown2Materials(): Nuketown2Materials {
   windowGlass.transparent = true;
   windowGlass.opacity = 0.38;
   const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
-  const interiorFloor = withOffset(standard(0xdbd1ba, 0.92, 0.01), 'nuketown2-house-floor', -1);
-  const garageFloor = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-garage-floor', -1);
+  const interiorFloor = createNuketown2WoodFloorMaterial();
+  const kitchenFloor = createNuketown2TileFloorMaterial();
+  const garageFloor = createNuketown2GarageFloorMaterial();
+  const interior = createNuketown2DrywallMaterial(0xdbd1ba);
+  const garageSiding = createNuketown2GarageWallMaterial();
+  const warmLight = createNuketown2CeilingLightMaterial(true);
+  const coldLight = createNuketown2CeilingLightMaterial(false);
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
@@ -748,6 +764,9 @@ function nuketown2Materials(): Nuketown2Materials {
     drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
     driveDecal,
     garageFloor,
+    kitchenFloor,
+    warmLight,
+    coldLight,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
     // with the hue carried to the reference's blue (measured 117.9).
     sidingA: standard(0x46809f, 0.76, 0),
@@ -755,7 +774,7 @@ function nuketown2Materials(): Nuketown2Materials {
     // rather than its painted-metal 0.58/0.18 - this is board, not panel.
     sidingB: standard(0xd9a43b, 0.76, 0),
     // The ORANGE wing: siding-coral, unchanged.
-    garageSiding: standard(0xac5644, 0.76, 0),
+    garageSiding,
     // The shipped map's `chrome`, verbatim - it is what dresses BOTH garage
     // doors there. The opening itself stays a hole (it is a route); this is the
     // door leaf parked in its head, which is what you see from the street.
@@ -765,7 +784,7 @@ function nuketown2Materials(): Nuketown2Materials {
     trimDecal,
     roof: standard(0x444c4d, 0.86, 0.03),
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
-    interior: standard(0xdbd1ba, 0.92, 0.01),
+    interior,
     interiorFloor,
     // wood-deck: the plank fence, the same timber the shipped map decks with.
     fence: standard(0x673b24, 0.92, 0.02),
@@ -1049,6 +1068,80 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // of it hung over the void.
   pair(builder, 'house upper crate', [-0.5, UPPER_Y0 + LOW_COVER / 2, zMid - 3.0],
     [1.4, LOW_COVER, 1.4], m.interior);
+  // --- HF-440 Cycle 2: Interior lighting look & domestic dressing -----------
+  // Ceiling light practical fixtures (emissive lenses driven above bloom threshold):
+  // Ground front room:
+  pair(builder, 'house front ceiling light housing', [-3.2, GROUND_H - 0.04, -13.2], [1.1, 0.06, 0.7], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house front ceiling light lens', [-3.2, GROUND_H - 0.07, -13.2], [0.95, 0.02, 0.55], m.warmLight,
+    { solid: false, shots: false, cast: false });
+  // Ground back room:
+  pair(builder, 'house back ceiling light housing', [-1.25, GROUND_H - 0.04, -19.5], [1.1, 0.06, 0.7], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house back ceiling light lens', [-1.25, GROUND_H - 0.07, -19.5], [0.95, 0.02, 0.55], m.warmLight,
+    { solid: false, shots: false, cast: false });
+  // Upper front sniper room:
+  pair(builder, 'house upper front ceiling light housing', [-1.25, ROOF_Y0 - 0.04, -13.0], [1.1, 0.06, 0.7], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper front ceiling light lens', [-1.25, ROOF_Y0 - 0.07, -13.0], [0.95, 0.02, 0.55], m.warmLight,
+    { solid: false, shots: false, cast: false });
+  // Upper back room:
+  pair(builder, 'house upper back ceiling light housing', [-1.25, ROOF_Y0 - 0.04, -19.5], [1.1, 0.06, 0.7], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper back ceiling light lens', [-1.25, ROOF_Y0 - 0.07, -19.5], [0.95, 0.02, 0.55], m.warmLight,
+    { solid: false, shots: false, cast: false });
+
+  // Doorway architrave casings (symmetrical trim on both jambs and head):
+  // Ground partition door (door height is 2.4 m):
+  pair(builder, 'house ground door casing left', [-2.7 - 0.9 - 0.03, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house ground door casing right', [-2.7 + 0.9 + 0.03, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house ground door casing head', [-2.7, DOOR_HEAD_Y + 0.05, PARTITION_Z], [1.92, 0.10, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+  // Upper partition door (door height is 2.4 m, well below 6.2 ceiling):
+  pair(builder, 'house upper door casing left', [-2.7 - 0.9 - 0.03, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper door casing right', [-2.7 + 0.9 + 0.03, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper door casing head', [-2.7, UPPER_Y0 + DOOR_HEAD_Y + 0.05, PARTITION_Z], [1.92, 0.10, WALL_T + 0.04], m.trim,
+    { solid: false, shots: false, cast: true });
+
+  // Baseboard trim molding along ground floor partitions and exterior walls:
+  const baseW0 = -2.7 - 0.9 - HOUSE_X0;
+  pair(builder, 'house ground baseboard north west', [(HOUSE_X0 + -3.6) / 2, 0.07, PARTITION_Z - WALL_T / 2 - 0.015], [baseW0, 0.14, 0.03], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house ground baseboard south west', [(HOUSE_X0 + -3.6) / 2, 0.07, PARTITION_Z + WALL_T / 2 + 0.015], [baseW0, 0.14, 0.03], m.trim,
+    { solid: false, shots: false, cast: false });
+  const baseW1 = HOUSE_X1 - WALL_T - (-1.8);
+  pair(builder, 'house ground baseboard north east', [(-1.8 + HOUSE_X1 - WALL_T) / 2, 0.07, PARTITION_Z - WALL_T / 2 - 0.015], [baseW1, 0.14, 0.03], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house ground baseboard south east', [(-1.8 + HOUSE_X1 - WALL_T) / 2, 0.07, PARTITION_Z + WALL_T / 2 + 0.015], [baseW1, 0.14, 0.03], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house ground baseboard west wall', [HOUSE_X0 + WALL_T / 2 + 0.015, 0.07, zMid], [0.03, 0.14, HOUSE_DEPTH - WALL_T * 2], m.trim,
+    { solid: false, shots: false, cast: false });
+
+  // Domestic kitchen & living dressing:
+  pair(builder, 'house kitchen counter top', [-4.8, LOW_COVER + 0.02, HOUSE_FRONT_Z - 2.8], [3.28, 0.05, 1.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen upper cabinets', [HOUSE_X0 + 0.55, 2.15, HOUSE_FRONT_Z - 2.8], [0.50, 0.80, 2.4], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen floor pad', [-4.8, 0.005, HOUSE_FRONT_Z - 2.8], [3.6, 0.01, 2.2], m.kitchenFloor,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house living bench top', [1.5, LOW_COVER + 0.02, HOUSE_BACK_Z + 2.4], [3.08, 0.05, 1.08], m.interiorFloor,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house living shelf', [HOUSE_X1 - WALL_T - 0.3, 1.25, HOUSE_BACK_Z + 3.0], [0.55, 2.10, 1.80], m.trim,
+    { solid: false, shots: false, cast: true });
+
+  // Upper floor stairwell guard rail & balustrade:
+  pair(builder, 'house stair rail post 0', [STAIR_X1 + 0.04, UPPER_Y0 + 0.50, -16.5], [0.08, 1.00, 0.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house stair rail post 1', [STAIR_X1 + 0.04, UPPER_Y0 + 0.50, STAIRWELL_Z0], [0.08, 1.00, 0.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house stair rail bar', [STAIR_X1 + 0.04, UPPER_Y0 + 0.92, (-16.5 + STAIRWELL_Z0) / 2], [0.06, 0.08, -16.5 - STAIRWELL_Z0], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house stair rail mid bar', [STAIR_X1 + 0.04, UPPER_Y0 + 0.48, (-16.5 + STAIRWELL_Z0) / 2], [0.04, 0.04, -16.5 - STAIRWELL_Z0], m.trim,
+    { solid: false, shots: false, cast: true });
 }
 
 /**
@@ -1104,6 +1197,38 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   // walking in from the yard hit it inside the doorway - onto the outboard
   // wall, where a workbench belongs.
   pair(builder, 'garage bench', [8.1, LOW_COVER / 2, GARAGE_BACK_Z + 3.5], [1.4, LOW_COVER, 4.0], m.interior);
+  // --- HF-440 Cycle 2: Garage lighting, rafters, door hardware & workshop ---
+  // Overhead fluorescent dual-tube light fixture:
+  pair(builder, 'garage tube light housing', [cx, H - 0.06, zMid], [0.35, 0.08, 2.4], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'garage tube light tube 0', [cx - 0.08, H - 0.12, zMid], [0.06, 0.06, 2.2], m.coldLight,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'garage tube light tube 1', [cx + 0.08, H - 0.12, zMid], [0.06, 0.06, 2.2], m.coldLight,
+    { solid: false, shots: false, cast: false });
+
+  // Roll-up garage door tracks and coiled drum:
+  pair(builder, 'garage door track left', [DOOR[0] + 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'garage door track right', [DOOR[1] - 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'garage door drum', [cx, H - 0.35, zFront + 0.22], [DOOR[1] - DOOR[0] + 0.2, 0.35, 0.35], m.trim,
+    { solid: false, shots: false, cast: true });
+
+  // Exposed ceiling rafters (span inside wall envelope, top below 3.4 m wall):
+  for (const rz of [-17.5, -19.5, -21.5]) {
+    pair(builder, `garage rafter ${rz}`, [cx, H - 0.12, rz], [GARAGE_WIDTH - WALL_T * 2 - 0.1, 0.16, 0.08], m.trim,
+      { solid: false, shots: false, cast: false });
+  }
+
+  // Workbench enhancements (wood worktop, lower tool shelf, pegboard, vice):
+  pair(builder, 'garage bench top', [8.1, LOW_COVER + 0.02, GARAGE_BACK_Z + 3.5], [1.46, 0.05, 4.06], m.interiorFloor,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'garage bench lower shelf', [8.1, 0.20, GARAGE_BACK_Z + 3.5], [1.20, 0.04, 3.80], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'garage tool pegboard', [GARAGE_X1 - WALL_T / 2 - 0.02, 1.95, GARAGE_BACK_Z + 3.5], [0.04, 1.20, 3.80], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'garage bench vice', [7.6, LOW_COVER + 0.12, GARAGE_BACK_Z + 1.8], [0.22, 0.18, 0.22], m.trim,
+    { solid: false, shots: false, cast: true });
 }
 
 /**
