@@ -17,13 +17,15 @@ Claim-state on every row: VERIFIED (measured/ran here), CLAIMED, OPEN.
 | 7 | Spawn table from `scripts/qa/solve-spawn-layouts.ts` | VERIFIED | `--arenas raid2` reports "authored passes the gate"; 12/12 legal, span 20.0 m, cross-team 64 m, 0 LoS pairs |
 | 8 | Visual module + judgeset cameras `src/rendering/arenas/raid2.ts` | VERIFIED | 10 cameras, mirrored into `scripts/qa/viewpoint-catalog.mjs` |
 | 9 | Art-direction row above the distinctiveness floor | VERIFIED | 0.02562 vs 0.02157 floor (18.8% headroom), nearest gun-range; `art-direction.test.ts` 14/14 |
-| 10 | `src/raid2-fidelity.test.ts` with derived bands | VERIFIED | 18/18 green |
-| 11 | Collider/visual parity audit green on `raid2` | VERIFIED | 0 invisible colliders, 0 walk-through meshes |
-| 12 | Walkable-surface parity green on `raid2` | VERIFIED | 39 walkable visuals, 39 supported, 0 fall-through |
-| 13 | Eye-clearance stages 1-3 | PARTIAL | stage 1 VERIFIED (3177 legal hug spots, 5 colliders with no legal adjacent stance); stages 2-3 NOT RUN (browser stages), ledger entry is the -1 UNMEASURED sentinel so the ratchet stays RED for raid2 |
+| 10 | `src/raid2-fidelity.test.ts` with derived bands | VERIFIED | 24/24 green (18 original + reachability 19-21 + readability 22-23 + derived density band 8b) |
+| 10b | Vertical REACHABILITY gate | VERIFIED (repair pass) | `scripts/qa/raid2-reachability.ts`. Pre-fix: U1 0/2600, U2 0/1907, U3 0/2872, U3B 0/230, U4 24/2240, U4B 0/190 reachable, 4/15 patrol points dead. Post-fix: **100% on all six regions, 15/15 patrol points**. The gate fails on the geometry as it was authored |
+| 11 | Collider/visual parity audit green on `raid2` | VERIFIED | 0 invisible colliders, 0 walk-through meshes (212 colliders, 216 meshes) |
+| 12 | Walkable-surface parity green on `raid2` | VERIFIED | 42 walkable visuals, 42 supported, 0 fall-through |
+| 13 | Eye-clearance stages 1-3 | VERIFIED (repair pass) | all three run headless. Stage 1: 3216 legal spots, 4 colliders with no legal adjacent stance. Stage 2 first run: 13 violations, ALL of them `raid2 wing glazing` (a pane 0.3 m proud of a solid wall); stage 3 confirmed the runtime resolve could not clear any. Pane removed; stage 2 re-run 0 violations, stage 3 re-run 0 remaining. `docs/eye-clearance/ledger.json` ceilings.raid2 = **0**, a measured zero |
 | 14 | Spawn-quality gate | VERIFIED | `src/spawn-layout-quality.test.ts` green after the spread fix |
 | 15 | Headless boot smoke on the built bundle | VERIFIED | `PASS73_NATIVE_WEBGPU=1 playwright ... --grep raid2` -> "raid2: boots a clean visible solo match" (41.7 s), adapter nvidia/blackwell, headless |
-| 16 | Menu preview capture through the sanctioned generator | OPEN | camera recipe authored (`source-assets/menu/pass87-raid2-preview/choreography.json`); NO clip encoded, so `raid2` is declared in `MEDIA_PENDING_ARENAS` with empty media paths and the card shows the standby frame |
+| 16 | Menu preview capture through the sanctioned generator | VERIFIED (repair pass) | 240 frames at 2560x1440 through `generate-pass65-runtime-menu-previews.ts` (webgpu, hardware adapter, one resident arena root, raid2 constructed first, viewmodel hidden, exact first/final loop seam); encoded by the new `finalize-pass87-raid2-menu-preview.mjs` under its own cache key `pass87-raid2-preview-v1`, asserted byte-distinct from all nine other arenas. `raid2` REMOVED from `MEDIA_PENDING_ARENAS`, which is empty again |
+| 16b | Deployment loading backdrop | VERIFIED (repair pass) | `public/assets/original/loading/raid2-loading.webp`, frame 180 of raid2's own capture, 1536x864 WebP q88, 63,840 bytes, 42.49 dB PSNR against its own master (floor 40.0), distinct from all nine others. This gap was found by running `qa:pass77:menu-previews`, which the lane had never run |
 | 17 | `npx tsc --noEmit` + focused vitest | VERIFIED | tsc clean; every touched test file green |
 | 18 | Report | VERIFIED | `artifacts/lane-report.md` |
 | 19 | Judgeset frames captured | VERIFIED | 10/10, `docs/evidence/pass85/lane-aq/judgeset/` |

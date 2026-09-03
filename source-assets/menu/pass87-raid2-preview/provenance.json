@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "familyId": "pass87-raid2-menu-preview",
+  "cacheKey": "pass87-raid2-preview-v1",
+  "generatedAt": "2026-09-02",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "note": "Additive family for Raid Rebuild (raid2, HF-408), the arena registered on 2026-09-02. Replaces the labelled PREVIEW STANDBY card it shipped with - the one item the do-not-repeat list in the lane brief named explicitly - and never a byte-copy of another arena, which is the placeholder defect the pass79 family had to undo. The retained pass66-runtime-preview-v15 media, its cache-family lock, and the pass77, pass79 and pass84 families are untouched by this finalizer.",
+  "finalMediaSet": {
+    "algorithm": "sha256-ordered-name-size-bytes-v1",
+    "fileCount": 3,
+    "totalBytes": 13732034,
+    "sha256": "155270122ff958ffe3a09c124eb03028240dbb49fed8cff27426a080cc6ea7ee"
+  },
+  "finalizer": {
+    "path": "scripts/assets/finalize-pass87-raid2-menu-preview.mjs",
+    "sha256": "2759775cc61100cc435e8b81dda411ebb068ba37378ca0082821562dc496b87b"
+  },
+  "generator": {
+    "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+    "sha256": "169ad102d3b656f29054fcc7a2a668b159350ae528fb0ce2ee32c8dc01813cf9"
+  },
+  "arenas": [
+    {
+      "arenaId": "raid2",
+      "recipeId": "pass87-raid2-menu-preview-v1",
+      "presentationId": "menu-video-runtime-helo-raid2-v1",
+      "kind": "helicopter",
+      "posterFrame": 60,
+      "capture": {
+        "source": "authoritative-runtime-arena",
+        "backendRequired": "webgpu",
+        "backendUsed": "webgpu",
+        "softwareAdapter": false,
+        "compatReason": null,
+        "receiptPath": "artifacts/pass65/menu-preview-rotor-review/runtime-capture-receipt.json",
+        "inputsStable": true,
+        "driftedInputPaths": [],
+        "capturedFrames": 240,
+        "frameSetSha256": "6b6c52e00f4dd533abcf69fddd6854f7c61bccfbd907d409c6c30de8042187af",
+        "frameSetBytes": 361766714
+      },
+      "runtimeFiles": [
+        {
+          "path": "public/assets/original/menu-previews/raid2.mp4",
+          "sha256": "70078fbf29f557327ce8bfc56c121d9c679c704322d32e5e46fab0abed2fe228"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webm",
+          "sha256": "8a5735c8546af5423f47bf1679359c8ea6f27b42a9a8e208731ae017355aed36"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webp",
+          "sha256": "3054a0219a35bc6d316c0d0efbcbc898e65999974b548718c5b16db5528e29de"
+        }
+      ],
+      "reviewSheet": {
+        "path": "docs/assets/pass87-menu-previews/raid2-review-frames.webp",
+        "sha256": "bf6c5cca1481d43f7dc8d994c189421cc65c80f96cf6d778c518b62185f3fdf6"
+      }
+    }
+  ]
+}

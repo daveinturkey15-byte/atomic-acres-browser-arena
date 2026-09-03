@@ -39,6 +39,10 @@ const PASS79_CACHE_KEY = 'pass79-test-arena-preview-v1';
 // reason the comment above records: a new byte under an old key is exactly
 // what the cache-family lock exists to prevent.
 const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
+// RAID2 (HF-408): its own family key, same rule again - the bytes under it were
+// encoded by scripts/assets/finalize-pass87-raid2-menu-preview.mjs from raid2's
+// own authoritative runtime capture, and no other arena's key is reused.
+const PASS87_CACHE_KEY = 'pass87-raid2-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -196,11 +200,16 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     width: 2560,
     height: 1440,
   }),
-  // RAID2 (PREVIEW, HF-408). `mediaAvailable: false` is the honest field and
-  // the load-bearing one: no capture for this arena has been committed yet, and
-  // an entry that claimed one would put a 404 behind the menu card. The menu
-  // falls back to its still frame until a clip lands, which is the same
-  // behaviour every arena had before its own capture existed.
+  // RAID2 (PREVIEW, HF-408). This entry shipped `mediaAvailable: false` with
+  // three empty strings for one pass - the honest standby state - and the
+  // repair pass took it off standby the only legitimate way: by capturing
+  // raid2's OWN flyover through the sanctioned generator
+  // (AA_PREVIEW_REVIEW_ONLY=1 AA_PREVIEW_ARENAS=raid2, 240 frames at 2560x1440
+  // on the WebGPU route, hardware adapter, one resident arena root, raid2
+  // constructed first) and encoding it with the Pass 66 profiles through
+  // scripts/assets/finalize-pass87-raid2-menu-preview.mjs, which asserts the
+  // encoded bytes are byte-distinct from all nine other arenas before they are
+  // allowed near public/.
   'raid2': Object.freeze({
     arenaId: 'raid2',
     frame: 'helicopter',
@@ -208,15 +217,10 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     motionLabel: 'AUTHORED ESTATE FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     presentationId: 'menu-video-runtime-helo-raid2-v1',
-    mediaAvailable: false,
-    // EMPTY, not a path. A pending arena must declare NO media at all: an
-    // empty string can never collide with a shipped path, so this card can
-    // never accidentally play another arena's flyover. The capture lands here
-    // together with its own cache key ('pass87-raid2-preview-v1', reserved):
-    // reusing another family's key for new bytes is what the cache lock forbids.
-    webm: '',
-    mp4: '',
-    poster: '',
+    mediaAvailable: true,
+    webm: `${ROOT}/raid2.webm?v=${PASS87_CACHE_KEY}`,
+    mp4: `${ROOT}/raid2.mp4?v=${PASS87_CACHE_KEY}`,
+    poster: `${ROOT}/raid2.webp?v=${PASS87_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

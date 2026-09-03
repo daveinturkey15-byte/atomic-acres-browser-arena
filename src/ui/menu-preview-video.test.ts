@@ -39,6 +39,10 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
   // standby (no media, empty URLs) for one commit and then captured its own
   // flyover; it never carried another arena's bytes under any key.
   map3: 'pass84-map3-preview-v1',
+  // RAID2 (owner 2026-09-02, HF-408): its own additive family, the fifth. Same
+  // history as map3 - standby for one pass, then its own capture - and the same
+  // rule: new bytes never ship under an accepted family's key.
+  raid2: 'pass87-raid2-preview-v1',
 });
 
 /**
@@ -60,14 +64,10 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * already ships media` below. It is empty, and should stay empty.
  */
 const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
-  // RAID2 (owner 2026-09-02, HF-408). The arena shipped in this pass; its
-  // camera recipe is authored (source-assets/menu/pass87-raid2-preview/
-  // choreography.json) but no capture has been encoded against it yet, so the
-  // card shows the standby frame rather than a path that would 404. This entry
-  // is the thing that must be DELETED when the capture lands - and
-  // `has no arena stuck in standby that already ships media` below is what
-  // fails if somebody ships the media and forgets to remove it.
-  'raid2',
+  // RAID2 (HF-408) sat here for one pass and has been REMOVED by capturing the
+  // flyover, exactly as map3 was before it. That is the mechanism working: a
+  // newly registered arena gets an honest place to stand, and it leaves by
+  // shipping its own bytes rather than by pointing at somebody else's.
 ]);
 
 const ACCEPTED_COCKPIT_SOURCE_SHA256 = '25a2556e5eccddf53e8214acbe71386820e818e359f35aa5b6a074cc3b4142c5';
@@ -119,7 +119,11 @@ describe('prerecorded map-selection previews', () => {
     // rosters rather than written down again.
     expect(assets).toHaveLength((ARENA_SELECTIONS.length - MEDIA_PENDING_ARENAS.size) * 3);
     // owner 2026-09-02 (HF-405): eight arenas shipping media became nine.
-    expect(assets).toHaveLength(27);
+    // HF-408 the same day: nine became TEN, when raid2 left standby by
+    // capturing its own flyover. Pinned as a literal on purpose - deriving it
+    // from ARENA_SELECTIONS alone would silently accept a build where an arena
+    // quietly stopped shipping media.
+    expect(assets).toHaveLength(30);
   });
 
   // MAP3 (HF-405). Two obligations the allowlist above would otherwise leave
