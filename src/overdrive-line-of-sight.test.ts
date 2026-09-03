@@ -13,6 +13,7 @@ import {
   claimOverdrive,
   createOverdriveState,
 } from './overdrive';
+import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
 
 /**
  * PASS 87 Lane AR, item 5 - the 2x Damage Core could be claimed through the bus
@@ -85,8 +86,10 @@ describe('2x Damage Core line of sight (Lane AR item 5)', () => {
     // underside: above that the player is no longer under the roof.
     let unguardedClaims = 0;
     let guardedClaims = 0;
+    let sweptEyeHeights = 0;
     for (let eyeY = 0.6; eyeY < slabUnderside - 0.02; eyeY += 0.05) {
       const eye: Point3 = { x: OVERDRIVE_POSITION.x, y: eyeY, z: OVERDRIVE_POSITION.z };
+      sweptEyeHeights += 1;
       if (claims(eye, null)) unguardedClaims += 1;
       if (claims(eye, map.physicsColliders)) guardedClaims += 1;
     }
@@ -96,6 +99,16 @@ describe('2x Damage Core line of sight (Lane AR item 5)', () => {
     expect(unguardedClaims, 'the scalar height window alone must be shown to be insufficient here')
       .toBeGreaterThan(0);
     expect(guardedClaims, 'no eye inside the bus may claim the core once sight is required').toBe(0);
+    recordResidualReceipt(`item-05-overdrive-${_label.replace(/[^a-z0-9]+/giu, '-').replace(/^-|-$/gu, '').toLowerCase()}`, {
+      item: 'Lane AR item 5 - 2x Damage Core claimed through the bus roof slab',
+      arena: _label,
+      slabUndersideM: slabUnderside,
+      sweepFromEyeM: 0.6,
+      sweepStepM: 0.05,
+      sweptEyeHeights: sweptEyeHeights,
+      claimsWithHeightWindowOnly: unguardedClaims,
+      claimsWithLineOfSight: guardedClaims,
+    });
   });
 
   it.each(ARENAS)('%s: a player standing on the bus roof still claims it', (_label, build) => {

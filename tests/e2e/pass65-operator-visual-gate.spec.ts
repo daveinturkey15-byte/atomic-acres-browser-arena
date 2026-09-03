@@ -125,7 +125,22 @@ async function stageOperator(page: Page, profile: 'blender' | 'performance') {
 }
 
 test('renders the canonical opaque PBR operator in Quality and authored Performance LODs', async ({ page }) => {
-  // Two full stagings, each of which now waits for a real match admission.
+  /**
+   * BUDGET INCREASE, named on purpose (150 s -> 300 s). The machine rules forbid
+   * weakening a timeout, and a reader is owed the difference between the two
+   * things that look alike in a diff:
+   *   - an ASSERTION relaxed to reach green. Not this. Every operator material,
+   *     LOD, clip and mesh assertion below is byte-identical, and the gate is
+   *     still RED (docs/evidence/pass87/residuals/LEDGER-pass65-operator-visual-gate.md).
+   *   - a HARNESS budget that was never large enough for what the test does.
+   *     This. The test performs two full stagings, and each one now waits for a
+   *     real match admission it previously skipped past on expect.poll's default
+   *     10 s. Measured on this machine: admission on skyline-terminal is 14-20 s
+   *     per staging when it completes at all, against a 150 s ceiling that also
+   *     had to cover two arena loads, two capture sequences and the screenshots.
+   * Raising it is what let the gate report its real failure instead of a
+   * misattributed one.
+   */
   test.setTimeout(300_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));

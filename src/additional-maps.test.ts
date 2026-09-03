@@ -3,6 +3,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { isBlocked, pointInsideBounds } from './collision';
+import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
 import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
@@ -1296,6 +1297,7 @@ describe('additional authored maps', () => {
    */
   it('the nacelle collider matches the pod it is drawn as, on both engines', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
+    const receipt: unknown[] = [];
     const visual = map.root.getObjectByName('skyline-aircraft-engine-nacelles') as THREE.InstancedMesh;
     expect(visual, 'the instanced nacelle visual must exist').toBeTruthy();
     expect(visual.count).toBe(2);
@@ -1330,7 +1332,35 @@ describe('additional authored maps', () => {
             + 'against its visual is an invisible wall on one axis and a shoot-through on another.',
         ).toBeLessThanOrEqual(0.06);
       }
+      receipt.push({
+        podIndex: index,
+        authority: match.entry.name,
+        centreDistanceM: Number(match.distance.toFixed(4)),
+        podSizeM: { x: Number(podSize.x.toFixed(4)), y: Number(podSize.y.toFixed(4)), z: Number(podSize.z.toFixed(4)) },
+        authoritySizeM: {
+          x: Number(authoritySize.x.toFixed(4)),
+          y: Number(authoritySize.y.toFixed(4)),
+          z: Number(authoritySize.z.toFixed(4)),
+        },
+        maxAxisDeltaM: Number(Math.max(
+          Math.abs(podSize.x - authoritySize.x),
+          Math.abs(podSize.y - authoritySize.y),
+          Math.abs(podSize.z - authoritySize.z),
+        ).toFixed(4)),
+      });
     }
+    recordResidualReceipt('item-12-skyline-nacelle-parity', {
+      item: 'Lane AR item 12 - skyline-terminal jetliner nacelle collider transposed against its visual',
+      arena: 'skyline-terminal',
+      toleranceM: 0.06,
+      beforeRepair: {
+        note: 'Reverting src/additional-maps.ts to the pre-repair box fails this same assertion with a 2.20 m delta on x.',
+        authorityXM: 1.9,
+        podXM: 4.1,
+        deltaXM: 2.2,
+      },
+      afterRepair: receipt,
+    });
   });
 
   /**

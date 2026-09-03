@@ -6,6 +6,7 @@ import {
   advancePresentationFrameAnchor,
   presentationFrameDue,
 } from './pass65-settings';
+import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
 
 /**
  * PASS 87 Lane AR, item 2 - the minimap redraw cadence, and the responsiveness
@@ -85,6 +86,17 @@ describe('minimap redraw cadence (Lane AR item 2)', () => {
     // Stated as the ratio the change is justified by, so a later cadence tweak
     // that quietly restores the old cost fails here.
     expect(after.length / before.length).toBeCloseTo(0.5, 2);
+    recordResidualReceipt('item-02-minimap-cadence', {
+      item: 'Lane AR item 2 - minimap redraw cadence',
+      shippedMinimapHz: shippedMinimapHz(),
+      predecessorHz: 60,
+      frames,
+      loopFps: 60,
+      redrawsBefore: before.length,
+      redrawsAfter: after.length,
+      ratio: after.length / before.length,
+      note: 'Redraw COUNT only. The main-thread ms/frame saving is not measured here and is OPEN in the lane report.',
+    });
   });
 
   it('does not drift or stall on an uneven frame loop', () => {
