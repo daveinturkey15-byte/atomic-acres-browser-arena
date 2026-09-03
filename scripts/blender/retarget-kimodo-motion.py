@@ -243,6 +243,10 @@ def load_g1_skeleton(directory: Path) -> dict:
     missing = sorted(set(meta["names"]) - set(G1_TO_OPERATOR))
     if missing:
         raise RuntimeError("correspondence table is missing G1 joints: " + repr(missing))
+    if not isinstance(meta.get("fps"), (int, float)) or meta["fps"] <= 0:
+        raise RuntimeError(
+            "skeleton.json carries no usable fps. The scene frame rate must come from "
+            "the source, not from Blender's default, or the clip bakes out at the wrong speed.")
     return meta
 
 
@@ -356,11 +360,25 @@ def main() -> None:
         source_parents = g1["parents"]
         source_offsets = [tuple(o) for o in g1["restOffsets"]]
         source_rest_hip = g1["restHipHeightM"]
+        source_fps = g1["fps"]
     else:
         source_names = SOMA30_NAMES
         source_parents = SOMA30_PARENTS
         source_offsets = SOMA30_OFFSETS
         source_rest_hip = SOMA_REST_HIP_HEIGHT_M
+        # Kimodo/SOMA-30 clips are natively 24 fps, which is also Blender's
+        # factory default, so this path is unchanged by being made explicit.
+        source_fps = 24
+
+    # THE SCENE FRAME RATE IS PART OF THE RETARGET, NOT A DISPLAY SETTING.
+    # One key is inserted per source frame, and the glTF exporter converts key
+    # indices to SECONDS using scene.render.fps. Leaving it at Blender's default
+    # 24 while baking a 30 fps source exported the first trial clip at
+    # 76/24 = 3.1667 s instead of 76/30 = 2.5333 s - a walk running 25% slow,
+    # with every per-second figure measured off it wrong by the same factor,
+    # and nothing in the file to say so.
+    bpy.context.scene.render.fps = int(round(source_fps))
+    bpy.context.scene.render.fps_base = bpy.context.scene.render.fps / float(source_fps)
 
     motion = load_motion(motion_dir, len(source_names))
     frames = motion["frames"]
@@ -507,6 +525,9 @@ def main() -> None:
         "clip": clip_name,
         "frames": frames,
         "sourceSkeleton": source_skeleton,
+        "sourceFps": source_fps,
+        "sceneFps": bpy.context.scene.render.fps / bpy.context.scene.render.fps_base,
+        "clipDurationS": round(frames / float(source_fps), 4),
         "drivenJoints": sorted(dest for _, _, dest in driven),
         "drivenCount": len(driven),
         "unmappedSourceJoints": sorted(
