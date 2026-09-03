@@ -1210,3 +1210,25 @@ assets and textures and lighting need to be tip top, raid can come next"
   bounded smoke task, then give Luna a real sweep job: the skeptic review of the
   adaptive admission cadence-wait candidate (branch `admission-cadence-wait`).
   Luna only (never Sol). Opus still decides what ships.
+
+## HF-447 — owner 2026-09-03 22:00: overnight plan to 06:00, budget guard
+
+- Owner: "let me know where we are atm, then i am going to sleep and you can
+  work through the night, i'll come see you at 6"; "you may need to tweak a few
+  things about qwen to make it useful so keep an eye on it"; "be mindful you are
+  at 92% used now so maybe need to pace yourself better through the evening and
+  drop any opus to less".
+- **State at 22:00:** PASS 92 live (19:14). Lane BA round 1 on
+  `nuketown2-tiptop`: cycles 1–2 landed 10 feature commits (road/kerbs, facade
+  recess, street furniture, interiors + lighting, glazed windows, materials,
+  vehicles, pool), 26/26 fidelity+parity on the cycle-2 head; cycle 3 on Gemini
+  (GLM 5-hour limit hit at 21:12, resets 05:04). Codex configured (HF-446),
+  Luna smoke PASS, Luna skeptic review of `admission-cadence-wait` running,
+  Codex native AKP re-attestation running. Qwen chain on :8090 with vision:
+  Q1 partial (1 commit), Q2 empty, Q3 running.
+- **Overnight automation (no orchestrator tokens):** BA round 1 done → BA round
+  2 (cycles 4–6 + final, Gemini primary, GLM fallback) → Luna x-high pre-review
+  of the whole tip-top branch (gates, critic trajectory, SHIP verdict) → Qwen
+  Q1 rerun with low thinking after its chain. 05:15 wake → morning decision
+  with at most one small Opus check; the Opus work moves after the ~11:30
+  weekly reset. Nothing merges or publishes overnight.
