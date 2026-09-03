@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass87ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass88ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 87. */
+const pass87ReleasedAt = '2026-09-03T04:33:06+01:00';
 /** gh-pages publish receipt for PASS 86. */
 const pass86ReleasedAt = '2026-09-03T00:48:11+01:00';
 /** gh-pages publish receipt for PASS 85. */
@@ -132,6 +134,23 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass88',
+    pass: 'PASS 88',
+    title: 'Pass 88 · Faster First Loads Without Losing the Switch Fix',
+    releasedAt: pass88ReleasedAt,
+    areas: Object.freeze(['PERFORMANCE', 'ARENAS']),
+    summary: 'Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time.',
+    highlights: Object.freeze([
+      'Switching arenas mid-session no longer fails the compile fence on any of the 56 arena pairs, and a cold first load of Gun Range or High Seas is back to its PASS 86 time (the first attempt had made them up to half slower)',
+      'Match admission - the 14-20 seconds between pressing deploy and playing - is measured step by step for the first time, so the next cut can attack it',
+      'The cold-session shader relief runs only on the arenas measured to need it, with the arena list derived from a pinned authority rather than hardcoded',
+      'Pass 87 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
