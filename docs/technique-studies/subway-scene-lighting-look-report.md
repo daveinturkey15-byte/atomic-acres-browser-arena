@@ -38,13 +38,30 @@ emitter kit, a dark-enough value target and a grime layer — all inside the exi
 | Item | Path | State |
 | --- | --- | --- |
 | Study | `docs/technique-studies/subway-scene-lighting-look.md` (this worktree) | LANDED |
-| Register row 48 | AKP `references/ai-3d-technique-register.md` | LANDED, pushed (see §4 note — it went in under another lane's commit) |
-| Skill | vault `Skills/game-development/threejs-webgpu-interior-lighting-look/SKILL.md` | LANDED, committed `5e16b7b` |
-| Eval record | AKP `skill-evaluations/threejs-webgpu-interior-lighting-look.json` | LANDED, committed `cbe9c52`, pushed |
-| Vault note section | vault `Dev-Practices/AI 3D Technique Register.md` | LANDED locally, push blocked (§4) |
-| SkillScan | v1.1.5 → **SAFE** | VERIFIED |
-| Flat-view relink | `link_skills.ps1` → 162/162 across all 7 harness roots | VERIFIED |
-| Scoped guard accept | `skill_regression_guard.py accept` | **BLOCKED** (§4) |
+| Register row 48 | AKP `references/ai-3d-technique-register.md` | LANDED, on `origin/main` (see B2 — it went in under another lane's commit) |
+| Skill | vault `Skills/game-development/threejs-webgpu-interior-lighting-look/SKILL.md` | LANDED, `5e16b7b` + anchor repair `d3d7958`; **local only, push 403** (B3) |
+| Eval record | AKP `skill-evaluations/threejs-webgpu-interior-lighting-look.json` | LANDED, `cbe9c52` + `025b9b3`, pushed |
+| Vault note section | vault `Dev-Practices/AI 3D Technique Register.md` | LANDED locally, push blocked (B3) |
+| SkillScan | v1.1.5 → **SAFE** (re-run after the anchor repair) | VERIFIED |
+| Baseline acceptance | `skill-baseline.json` carries the skill at `f0a9ebbe…` | **ACCEPTED** (see B1 — swept in by another lane) |
+| Flat-view relink | `link_skills.ps1` → 162/162 across all 7 harness roots | VERIFIED (after repairing a machine-wide break — B0) |
+
+**Canonical identity of the skill, as of this repair pass — one hash, everywhere:**
+
+| Where | SKILL.md sha256 |
+| --- | --- |
+| Vault canonical (`HEAD` = `d3d7958`, and on disk) | `f0a9ebbe4aba8dc2ab8c1912e3a4936eeff726b51fd63ee4320c974b409ee732` |
+| Hermes canonical root, `~/.claude/skills` junction, `~/.qoder` copy | identical, all three |
+| Eval record `candidate_sha256` | identical |
+| Frozen `skill-baseline.json` | identical |
+
+The earlier hash `f1a05724…` quoted in the first draft of this report is **superseded**: it was
+the pre-repair file, before the skill's `surface-forge.ts` anchor was corrected to
+`rendering/surface-forge.ts` (both anchors re-checked on disk — `src/rendering/surface-forge.ts`
+and `src/map3/foliage-material.ts` exist). The matching SkillScan identifiers are `dir_sha256
+569c3064b7c0622d429cf9723af8b6ea53b849c00317612076474e80f107cc03`, task
+`8ba8e2e1-3a37-43ba-ac46-b17795f358eb`; the pre-repair scan (`8cf60ac4…` / `94c4855c-…`) was
+also SAFE. Anyone verifying the skill against the old hash would have concluded it had drifted.
 
 ---
 
@@ -52,63 +69,101 @@ emitter kit, a dark-enough value target and a grime layer — all inside the exi
 
 | Claim | State | Evidence |
 | --- | --- | --- |
-| Source resolved without login; post is one line + one video, no repo/article/thread | VERIFIED | `api.fxtwitter.com` HTTP 200 JSON read in full |
-| It is a browser game in Chrome at `localhost:8080`, tab "Ashworth St", Linux | VERIFIED | Visible in all 17 extracted frames |
-| Not path traced / not real-time GI / not baked GI | VERIFIED by named falsifiers | §1 |
-| Emissive + fog + decals + filmic post is the whole recipe | VERIFIED (consistent, nothing contradicts) | Study §4 |
+| Source resolved without login; post is one line of text over one video, `replying_to` null, one media facet, no linked repo/article/video page | VERIFIED | `api.fxtwitter.com` HTTP 200 JSON, read in full three times (author, skeptic, repair). Text is exactly `Claude Fable 5.1 Ultracode subway fps game` |
+| The author added no self-replies underneath | **CLAIMED** | The mirror returns the tweet object only and reports **85 replies** (84 at first read — the counter drifts); enumerating them needs a login, which is not permitted. Not verifiable by any allowed route |
+| It is a browser game in Chrome at `localhost:8080`, tab "Ashworth St", Linux/GNOME | VERIFIED | Visible in all 17 extracted frames; independently reproduced by the skeptic from a fresh download at t=40 s and t=150 s |
+| Not path traced / not real-time GI / not baked GI | VERIFIED by named falsifiers | §1; all three re-confirmed independently from a re-extracted frame |
+| Emissive + fog + decals + motes + filmic post is the whole recipe | VERIFIED (consistent, nothing contradicts) | Study §4 |
 | Built by Claude Fable 5.1 under `ultracode` | CLAIMED (author's caption) | Post text |
-| Renderer is three.js WebGL2 with an UnrealBloom-class chain | CLAIMED | Source not published |
-| Fixed exposure, no auto-exposure adaptation | CLAIMED | 13 s frame sampling |
+| Renderer is three.js WebGL2 with an UnrealBloom-class chain | CLAIMED — *attempted and negative*, not untried | Source not published. The containing YouTube video (chapter `28:36 — UltraCode Subway FPS Test`) was fetched login-free and names no renderer; its ASR track 404s without a session |
+| Fixed exposure, no auto-exposure adaptation | CLAIMED | 13 s frame sampling would not catch a fast ramp |
 | Film grain present | OPEN | Indistinguishable from H.264 noise at 2.1 Mbps |
-| SSAO present | OPEN, probably absent | No junction darkening |
-| Licence of the source | UNKNOWN → all-rights-reserved; method only | Nothing stated anywhere |
-| Skill discoverable from every harness | VERIFIED | 162/162, junction, read-through probe OK |
-| Skill accepted into the frozen baseline | **NO — blocked** | §4 |
-| Any performance number for our repo | **NOT MEASURED** | Study lane; GPU was at 14.3/16.3 GiB (owner's work) all evening; no browser launched |
+| SSAO present | OPEN, probably absent | No junction darkening anywhere |
+| Licence of the source | UNKNOWN → all-rights-reserved; method only | Nothing stated anywhere. Nothing was copied; no frame, image or media is committed in any repo, and the skill directory is `SKILL.md` only |
+| Every repo anchor and art-direction bound the skill cites is exact | VERIFIED | Re-read at `0c7aab53`; `corridors.ts:357` = `headlightMat.emissiveNode = rgb(0xffe899, 2.5);`, `PARTICLE_MAX_LIGHT_SHAFTS = 6`, `bloomThresholdScale [1,1.3]`, `MINIMUM_COMPOSED_BLOOM_THRESHOLD 1.02`, `vignetteBase ≤ 0.24`. No fence weakened; both fences restated as fences |
+| Skill discoverable from every harness | VERIFIED **now**, after a repair | `link_skills.ps1 -VerifyOnly`: OK 162/162 on all seven roots, junction, read-through probe OK. It was **broken** when the skeptic checked (B0) |
+| Skill accepted into the frozen baseline | **VERIFIED — it is accepted** | `skill-baseline.json` carries `threejs-webgpu-interior-lighting-look` at sha256 `f0a9ebbe…`, matching disk; baseline `generated_at 2026-09-02T21:07:00Z`, committed on AKP main at `612b413` |
+| Any performance number for our repo | **NOT MEASURED** | Study lane; GPU at 14.3/16.3 GiB (owner's own work) all evening; no browser launched. All measurement deferred to §5 |
 
 ---
 
 ## 4. Blockers and process findings for the orchestrator
 
-**B1 — the scoped baseline accept is blocked by three unrelated skills, and this blocks all
-four skill lanes tonight.** `skill_regression_guard.py accept --skill
-threejs-webgpu-interior-lighting-look` exits 1 and refuses to write `skill-baseline.json`
-because of three pre-existing policy failures in skills nobody in this sweep owns:
+**B0 — RESOLVED, but the cause deserves a look: skill discovery was dead machine-wide.**
+`C:/Users/david/.agents/skills` — the shared flat view — was an **empty real directory**
+(0 entries, last written 2026-09-02 22:17). Claude Code, Codex, dsh, Continue and Antigravity
+all junction into it and so discovered **zero skills**; OMP's root was missing; the
+read-through probe failed. It also inflated `technique_register_guard.py` from 9 problems to 60
+with spurious REG-8 "not mirrored to Codex" rows. Repaired with the sanctioned relink
+(`link_skills.ps1`, no flags — additive, junctions only); **verified after: OK 162/162 on all
+seven roots, probe OK, register guard back to 9.**
 
-| Skill | Description length | Over the 360 ceiling by |
-| --- | --- | --- |
-| `gem-nano-agent-debug` | 367 | 7 chars |
-| `wow-spp-local-mod-restore` | 373 | 13 chars |
-| `game-release-benchmark-guard` | 377 | 17 chars |
+This is **a known failure mode with a written gotcha already in AKP** —
+`gotchas/skill-mirror-tools-disagree-junctions-vs-copies.md` (commit `8dc73d0`, Hermes Desktop,
+21:50 the same evening, recording the identical empty-flat-view event at 160 skills). It
+records the hazard too: the obvious "fix", `sync_skill_mirrors.py --apply`, makes **real
+copies** resolved by newest-wins mtime, and copy-into-a-junction is write-through — it would
+overwrite canonical skills with stale Qoder copies. **Do not run it in this topology.** What is
+still unknown is what emptied the flat view at 22:17 while lanes were running (a concurrent lane
+invoking the linker in a mode that clears then aborts is the obvious suspect). Worth a guard,
+because any lane can silently kill skill discovery for every harness on this machine.
 
-Mine is 271 (a WARN only). `--force` exists and was **not** used: forcing would launder that
-unreviewed drift into the baseline, which the intake procedure forbids in as many words.
-`comfyui-3d-native-pipeline` and `open-world-city-art-loop` are absent from the baseline for
-exactly the same reason, so this is one 37-character fix that unblocks four lanes. It needs
-an owner or a lane that owns those three skills; trimming another skill's description is a
-routing change and needs its own eval record.
+**B1 — RETRACTED. The "three over-length descriptions block four lanes" blocker was false, and
+its prescribed fix was a no-op. Nobody should act on it.** The first draft of this report
+claimed `gem-nano-agent-debug` (367), `wow-spp-local-mod-restore` (373) and
+`game-release-benchmark-guard` (377) exceeded a 360-char ceiling, and that one 37-character trim
+would unblock four lanes. Measured: they are **326 / 330 / 330 — all under 360**, untouched
+since long before this lane, and the ceiling is **WARN-only and never fails the guard** (it
+prints ten such warnings and still reports PASS).
 
-**B2 — the shared AKP register file is being committed wholesale by concurrent lanes.** My
-row 48 was written into the working tree and then swept into commit `3776400` by the HF-420
-lane, which staged the whole file. Nothing was lost (the row is byte-identical on
-`origin/main`), but the ledger's authorship is wrong and a lane that had been mid-edit could
-have had a half-written row published. Recommend: for shared append-only files, stage a blob
-built from `HEAD` plus your own hunk (`git hash-object -w` + `git update-index --cacheinfo`)
-rather than `git add <file>`. I used that route for the vault note and it worked cleanly.
+The real output of a scoped accept is:
 
-**B3 — the vault cannot be pushed from this machine.** `git push origin master` on
-`desky-bootstrap-clone` returns **403 Write access to repository not granted**. My commit
-`5e16b7b` is local-only, and so are the HF-419 and HF-420 skill commits ahead of it. Owner
-credential item; nothing an agent should work around.
+```
+PASS skill-regression-guard skills=162 drift=0 warnings=10
+FAIL requested skills are not all drifted: ['threejs-webgpu-interior-lighting-look']
+```
 
-**B4 — `link_skills.ps1` and the AKP register config disagree about Qoder.** The link script's
-harness roster has no Qoder entry, so the register guard's REG-8 stays red for every new skill
-until someone copies it there by hand (I copied mine; hash-identical to canonical). Either add
-Qoder to `link_skills.ps1` or record a `mirror_exemptions` entry — one of the two, deliberately.
+— i.e. **there is nothing to accept, because the skill is already accepted.**
+`skill-baseline.json` carries it at `f0a9ebbe…`, byte-matching disk;
+`comfyui-3d-native-pipeline` and `open-world-city-art-loop` are in the baseline too. All three
+lanes this report called blocked are in fact **complete**. The acceptance was swept in by the
+HF-419 lane's commit `612b413` rather than written by this lane — the same shared-file
+authorship problem as B2, recurring on the baseline instead of the register.
+**Do not trim `gem-nano-agent-debug`, `wow-spp-local-mod-restore` or
+`game-release-benchmark-guard` on this basis** — it would be an unnecessary routing change to
+three unrelated skills, each then needing its own evaluation record.
 
-**B5 — pre-existing register-guard debt, untouched:** rows 24 and 32 pin no commit; the Qoder
-mirrors of `ai-3d-asset-generation-loop` and `threejs-webgpu-water` have diverged from
-canonical; `local-video-generation` is unaccepted and drifted. All other lanes' or older debt.
+**B2 — the shared AKP files are being committed wholesale by concurrent lanes.** My row 48 was
+written into the working tree and then swept into commit `3776400` by the HF-420 lane, which
+staged the whole register file; the baseline acceptance went the same way under `612b413` (B1).
+Nothing was lost — the row is byte-identical on `origin/main` — but the ledger's authorship is
+wrong, and a lane mid-edit could have had a half-written row published. Recommend: for shared
+append-only files, stage a blob built from `HEAD` plus your own hunk (`git hash-object -w` +
+`git update-index --cacheinfo`) rather than `git add <file>`. I used that route for the vault
+note and it worked cleanly.
+
+**B3 — STANDS. The vault cannot be pushed from this machine.** `git push origin master` on
+`desky-bootstrap-clone` returns **403 Write access to repository not granted** (re-confirmed
+this pass). Commits `5e16b7b` and the anchor repair `d3d7958` are local-only, as are the
+HF-419/HF-420 skill commits ahead of them. Owner credential item; nothing an agent should work
+around. Note the skill is nonetheless **live** for every harness — the harness roots junction to
+the canonical store on disk, not to the remote.
+
+**B4 — `link_skills.ps1` and the AKP register config still disagree about Qoder.** The link
+script's harness roster has no Qoder entry, while `scripts/technique-register-config.json`
+declares `~/.qoder/skills` as a mirror root, so REG-8 goes red for every new skill until it is
+hand-copied. I copied mine (verified hash-identical to canonical at `f0a9ebbe…`). Per the B0
+gotcha, Qoder is genuinely the one root that needs **copies**, must never be the source, and
+must never be bulk-synced. Decide deliberately: add Qoder to `link_skills.ps1` as a copy-mode
+root, or record a `mirror_exemptions` entry.
+
+**B5 — pre-existing register-guard debt, untouched — 9 problems after the B0 repair (not the 13
+first reported, and not the 60 seen while the flat view was broken).** None names this lane's
+skill; REG-4 and REG-8 are both clear for it. The nine: rows 24 and 32 pin no commit (REG-5 ×2);
+`threejs-webgpu-water` drifted and unaccepted, drifted since its evaluation, and its Qoder mirror
+disagrees (REG-4 ×2, REG-7); `local-video-generation` absent from the baseline and drifted since
+its evaluation (REG-4 ×2); `open-world-city-art-loop` not mirrored to Qoder (REG-8) and missing
+from the vault note (REG-9, HF-419's to close). No guard was weakened and nothing was forced.
 
 ---
 

@@ -13,14 +13,37 @@ quality tiers), Lane AB (dynamic lighting), HF-418 (graphics ladder), Map 3 corr
   graphics? Subway game."*
 - **Resolved** without logging in, via `https://api.fxtwitter.com/bijanbowen/status/2094931925513261273`
   (HTTP 200, JSON). **State: RESOLVED.** No auth wall was hit; no search substitute was used.
-- **Author:** BijanBowen (`@bijanbowen`), verified individual, Boston MA, YouTube
-  <https://www.youtube.com/@bijanbowen>. **Posted:** Tue 01 Sep 2026 23:34 UTC.
+- **Author:** BijanBowen (`@bijanbowen`). **Posted:** Tue 01 Sep 2026 23:34 UTC. Author
+  fields are quoted from the payload rather than assumed: `verification` =
+  `{"verified": true, "verified_at": null, "type": "individual"}` — so "verified individual"
+  is **sourced**, not inferred — location `Boston, MA`, website `bijanbowen.com`, description
+  a bare link to <https://www.youtube.com/@bijanbowen>, 8,795 followers, joined Apr 2023.
 - **Post text, verbatim and complete:** `Claude Fable 5.1 Ultracode subway fps game`
-  That is the entire caption. **There is no thread, no reply chain of the author's, no linked
-  repository, no linked article, and no linked video page.** The post is one line of text over
-  one attached video.
+  That is the entire caption. **VERIFIED from the JSON:** `replying_to` is null, `quote` is
+  false, `is_note_tweet` is false, and `raw_text.facets` contains exactly one facet — the
+  media `t.co` — so the post is not a reply, not a quote, not a long note, and links to **no
+  repository, no article and no video page**. **CLAIMED, not verifiable by this route:** that
+  the author added no self-replies underneath. The mirror returns the tweet object only and
+  reports **85 replies** (84 at first read - the counter drifts), and enumerating them needs a
+  login, which is not permitted. The
+  post is one line of text over one attached video.
 - **Artefact:** a single 3 min 35 s (215.2 s) screen recording, 3840x2160, H.264/MP4, served
-  from `video.twimg.com`. Engagement at read time: 1350 likes, 117,668 views, 84 replies.
+  from `video.twimg.com`. Engagement at first read: 1,350 likes, 117,668 views, 84 replies;
+  on re-check during the skeptic pass: 1,363 / 119,226 / 84; on the repair pass:
+  1,404 / 125,520 / 85. Only the counters move - the text, `replying_to` and the single media
+  facet are identical on all three reads.
+- **The longer-form container, found off the profile rather than off the post (VERIFIED):**
+  the profile's bio link goes to the author's YouTube channel, and its newest video is
+  *"Claude Fable 5.1 Is INSANE — Hands-On With the BEST Model Yet!"*
+  (`https://www.youtube.com/watch?v=9Z9rPZavjUU`, 39 min), whose public description lists a
+  chapter **`28:36 - UltraCode Subway FPS Test`**. The shared clip is therefore an **excerpt
+  of a model test**, not a project announcement — which is exactly why there is no repository
+  and nothing to run. Fetched login-free (channel page HTTP 200, watch page HTTP 200): the
+  description names **no renderer** (zero occurrences of `three.js`, `WebGL`, `WebGPU` or
+  `localhost` anywhere in the page), and although an auto-generated caption track is listed,
+  its signed `timedtext` URL returns **HTTP 404** without a session. So the renderer
+  identification in §2 stays CLAIMED **for want of a public statement, not for want of
+  looking**.
 - **Licence: UNKNOWN.** No licence is stated anywhere on the post, and no code exists to
   licence. The video is the author's own copyrighted screen recording. **Nothing from it may
   be copied** — not frames, not textures, not UI, not the station identity. This study records
@@ -36,6 +59,13 @@ Fetched the post JSON, the poster thumbnail, and the 1280x720 variant of the vid
 13 s spacing with ffmpeg, plus two lanczos-upscaled crops for close inspection. Frames were
 read directly. **No browser was launched** (owner rule), and no measurement was taken on this
 machine's GPU (it was at 14.3/16.3 GiB used by the owner's own work throughout).
+
+Followed up in the skeptic/repair pass, because the profile-linked destinations sit *outside*
+the post and had not been tried: the channel listing and the containing video's watch page
+were both fetched login-free (HTTP 200 each) and read for a renderer statement. Result above —
+the chapter exists, the renderer is never named, the ASR transcript is not reachable without a
+session. Recorded so that the CLAIMED renderer is documented as *attempted and negative*
+rather than *untried*.
 
 ---
 
@@ -60,7 +90,10 @@ setting; CLAIMED by the author, and consistent with the artefact).
 published — so this stays CLAIMED. The evidence for it: browser + `localhost:8080`, the
 specific soft wide bloom shape, the ACES-like highlight roll-off, and the fact that a single
 agent session produced it (three.js is overwhelmingly the route agents take). It is
-**not** WebGPU-specific in anything I can see.
+**not** WebGPU-specific in anything I can see. The one cheap route that could have upgraded
+this — the 39 min video that contains the clip as chapter `28:36 UltraCode Subway FPS Test` —
+was fetched and read in §1: it names no renderer, and its auto-caption track is not reachable
+without a session. CLAIMED stands, with the negative check on the record.
 
 ### Scene content (VERIFIED by inspection)
 
@@ -186,12 +219,15 @@ place. Our corridor is a Map 3 service corridor, not a subway station.
 
 | Claim | State | Evidence |
 | --- | --- | --- |
-| The post is one line of text plus one 215 s video; no repo, no article, no thread | VERIFIED | fxtwitter JSON, read in full |
+| The post is one line of text plus one 215 s video, and is not a reply, quote or note tweet; it links to no repo, article or video page | VERIFIED | fxtwitter JSON read in full: `replying_to` null, `quote` false, `is_note_tweet` false, `raw_text.facets` = one media facet |
+| The author added no self-replies under the post | CLAIMED | The mirror returns the tweet object only and reports 85 replies (84 at first read); enumerating them needs a login, which was not permitted |
+| The author is a verified individual, Boston MA, with the YouTube channel in the bio | VERIFIED | Author payload: `verification {verified: true, type: "individual"}`, `location "Boston, MA"`, description = the channel URL |
+| The clip is an excerpt of a 39 min model-test video whose chapter list names "UltraCode Subway FPS Test" | VERIFIED | `youtube.com/watch?v=9Z9rPZavjUU` fetched login-free, HTTP 200, chapter `28:36` in the description |
 | It is a browser game in Chrome at `localhost:8080`, tab "Ashworth St", on Linux | VERIFIED | Visible in every extracted frame |
 | Built by Claude Fable 5.1 under Claude Code `ultracode` | CLAIMED (author's own caption) | Post text |
 | Not path traced; not real-time GI; not baked GI | VERIFIED by falsifier | No sampling noise; **no colour bleed** off saturated props; **no cast shadows at all** |
 | Emissive + fog + bloom + filmic grade is the whole recipe | VERIFIED (consistent, nothing contradicts) | §4 frame observations |
-| Renderer is three.js WebGL2 with an UnrealBloom-class chain | CLAIMED | Bloom shape, roll-off, platform; source not published |
+| Renderer is three.js WebGL2 with an UnrealBloom-class chain | CLAIMED | Bloom shape, roll-off, platform; source not published. Cheapest upgrade route was tried and failed: the containing YouTube video's description names no renderer and its ASR track 404s without a session |
 | Fixed exposure (no auto-exposure adaptation) | CLAIMED | 13 s frame sampling; a denser sample could refute |
 | Film grain present | OPEN | Indistinguishable from H.264 noise at 2.1 Mbps |
 | SSAO present | OPEN — probably absent | No junction darkening observed |
