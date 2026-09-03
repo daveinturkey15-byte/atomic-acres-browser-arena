@@ -42,8 +42,17 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * ten with farcrysis hidden; nine ids before nuketown2 with it un-hidden; ten
  * with raid2 but farcrysis still hidden), and git merges identical text without
  * conflict. The union of the three rosters is ELEVEN.
+ * HF-429 (owner, 2026-09-03) PARKED farcrysis again, so the real
+ * selectable roster is TEN and this floor follows it DOWN. Lowering a floor
+ * is normally the exact move this comment forbids, so read the rule
+ * precisely: the floor is an alarm on the SCRAPE collapsing, and the contract
+ * test asserts it EQUALS the derived roster in both directions. A floor left
+ * at 11 against a real roster of 10 does not gate harder - it reds every run
+ * and gets switched off. Never lower it to get a RUN green; do lower it when
+ * the roster itself legitimately shrinks, in the same commit as the registry
+ * edit that shrank it.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 11;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 10;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the
@@ -73,6 +82,31 @@ export function eyeClearanceArenaIds() {
       + `${MAP_SELECTION_PATH}; expected at least ${MINIMUM_EYE_CLEARANCE_ARENAS}. `
       + 'Refusing to report success on a roster that tests nothing.',
     );
+  }
+  return ids;
+}
+
+/**
+ * Every arena the registry PARKS (`selectable: false`), in registry order.
+ *
+ * HF-429, 2026-09-03. The two contract tests each carried a literal list of
+ * arenas that "must be covered", and farcrysis has now moved between that list
+ * and its complement three times - each move needing both tests rewritten, and
+ * each rewrite an opportunity to drop the arena from coverage silently. The
+ * parked set is derived from the SAME scrape as the offered set and is its exact
+ * complement, so the two are asserted against each other instead of retyped:
+ * a parked arena must be absent from the swept roster, and the pin fails as
+ * vacuous if nothing is parked at all.
+ */
+export function parkedArenaIds() {
+  const source = readFileSync(MAP_SELECTION_PATH, 'utf8');
+  const body = source.slice(source.indexOf('ARENA_SELECTIONS'));
+  const found = [...body.matchAll(/id:\s*'([a-z0-9-]+)'\s*as const/gu)];
+  const ids = [];
+  for (let index = 0; index < found.length; index += 1) {
+    const start = found[index].index;
+    const end = index + 1 < found.length ? found[index + 1].index : body.length;
+    if (/selectable:\s*false/u.test(body.slice(start, end))) ids.push(found[index][1]);
   }
   return ids;
 }

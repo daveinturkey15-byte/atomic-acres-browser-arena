@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SELECTABLE_ARENAS } from '../map-selection';
+import { ARENA_SELECTIONS, SELECTABLE_ARENAS } from '../map-selection';
 import { createPass64ShellViewModel, renderPass64Shell } from './pass64-shell';
 import { DEFAULT_LIGHTING_TIME_CHOICE } from '../rendering/lighting-conditions';
 
@@ -33,13 +33,13 @@ describe('Pass 66 command shell', () => {
       'terminal',
       'rustrig',
       'gun-range',
-      // farcrysis (HF-423, 2026-09-02): un-hidden as a PREVIEW card, solo only.
-      // It was hidden by the owner on 2026-08-28 because it took 279 s to load
-      // and then killed the tab; it re-enters the menu behind measured cold
-      // admission evidence (docs/evidence/pass87/lane-r/farcrysis-admission.json),
-      // and it sits HERE rather than at the end because ARENA_SELECTIONS is what
-      // decides the order and the assertion above holds this list to it.
-      'farcrysis',
+      // farcrysis is ABSENT from this list, and that is the whole content of
+      // HF-429 (owner, 2026-09-03): the arena is PARKED, `selectable: false`,
+      // so it is not offered. Its registry row, its measured admission evidence
+      // (docs/evidence/pass87/lane-r/farcrysis-admission.json) and every ledger
+      // row it earned are untouched - only the card is gone. The assertion
+      // directly above holds this list to SELECTABLE_ARENAS, so this list can
+      // never drift from the flag on its own.
       'high-seas',
       // owner 2026-08-30: Test1/Test2 arenas added.
       'test1',
@@ -55,13 +55,35 @@ describe('Pass 66 command shell', () => {
       // selectable and labelled PREVIEW, shipped BESIDE `test2` not instead of it.
       'raid-rebuild',
     ]);
-    // The negative pin that used to read "farcrysis is not offered" is not
-    // dropped, it is inverted: the arena must now BE in the menu, and it must be
-    // labelled PREVIEW there, which is a stronger statement than its absence was.
-    expect(markup).toContain('data-arena-route="farcrysis"');
-    // Bounded so it cannot reach the NEXT card and pass on someone else's
-    // PREVIEW label: the match may not cross another data-arena-route.
-    expect(markup).toMatch(/data-arena-route="farcrysis"(?:(?!data-arena-route=)[\s\S])*?PREVIEW/);
+    // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
+    // This pin has now swung three times - absent, present-and-PREVIEW, absent
+    // again - so it is written DERIVED rather than as a third literal: every
+    // registry row flagged `selectable: false` must render no card, and every
+    // flagged-selectable row must render exactly one. A future park or un-park
+    // moves one field in src/map-selection.ts and nothing here.
+    for (const entry of ARENA_SELECTIONS) {
+      const rendered = markup.includes(`data-arena-route="${entry.routeId}"`);
+      expect(rendered, `${entry.id} card rendered=${rendered}, selectable=${entry.selectable !== false}`)
+        .toBe(entry.selectable !== false);
+    }
+    // Not vacuous: something really is parked, and it really is still a
+    // registered arena that old links decode to.
+    expect(ARENA_SELECTIONS.some((entry) => entry.selectable === false)).toBe(true);
+    // The PREVIEW label, also derived. A card that the registry labels
+    // PREVIEW must say so where a player reads it, and the match is bounded
+    // so it cannot run into the NEXT card and borrow its label. `[^]` is the
+    // any-character class here on purpose: it needs no backslash escape, and
+    // a mis-escaped [\s\S] inside a template literal silently degrades to
+    // [sS], which matches almost nothing and passes vacuously.
+    const previewCards = SELECTABLE_ARENAS.filter(
+      (row) => /PREVIEW/.test(`${row.selectorLabel} ${row.rulesLabel}`),
+    );
+    expect(previewCards.length, 'the PREVIEW pin must not be vacuous').toBeGreaterThan(0);
+    for (const entry of previewCards) {
+      expect(markup, `${entry.id} must be labelled PREVIEW`).toMatch(
+        new RegExp(`data-arena-route="${entry.routeId}"(?:(?!data-arena-route=)[^])*?PREVIEW`),
+      );
+    }
     expect(markup).toContain(`${SELECTABLE_ARENAS.length} deployable spaces · choose before launch`);
   });
 

@@ -86,9 +86,10 @@ describe('opening arena selection', () => {
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
     // HF-359: 2-bot solo combat map with fieldSupport disabled.
-    // HF-423 (2026-09-02): shipped as a PREVIEW card - selectable, but solo
-    // only, so the hosted-lobby roster and the MP lab sweep do not pick it up
-    // before anyone has played it. The bot counts are unchanged.
+    // HF-429 (2026-09-03): PARKED at the owner's decision - `selectable: false`
+    // and the PREVIEW word off the card copy. Everything else on the row is
+    // unchanged, which is the point: parking is one field, not a rollback, and
+    // this pin is what proves the rest of Lane R is still here.
     expect(arenaSelection('farcrysis')).toMatchObject({
       id: 'farcrysis',
       selectorLabel: 'FARCrySIS',
@@ -97,9 +98,10 @@ describe('opening arena selection', () => {
       multiplayer: false,
       fieldSupport: false,
       overdrive: false,
+      selectable: false,
       soloBotCount: 2,
       maximumSoloBots: 2,
-      rulesLabel: 'PREVIEW · 5 MIN · SOLO · 2 BOTS',
+      rulesLabel: '5 MIN · SOLO · 2 BOTS',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
     expect(arenaSelection('high-seas')).toMatchObject({

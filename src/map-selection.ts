@@ -223,7 +223,33 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     eye-clearance, walkable-parity and cross-browser rosters all derive from this
     //     registry, so un-hiding it here is what puts it into those gates.
     // It ships `multiplayer: false`: solo only until the owner has played it.
-    selectable: true,
+    //
+    // PARKED AGAIN 2026-09-03 (HF-429, owner decision at the PASS 89 candidate).
+    // `selectable: false` and the PREVIEW word is off the card copy, so the
+    // arena is not offered and does not advertise itself as nearly-ready.
+    //
+    // WHAT IS *NOT* REVERTED, and why parking is not a rollback. Everything
+    // Lane R landed stays exactly as it is: the solved spawn table, the terrain
+    // collision proxy in `raycastMeshes` that took the HF-402 spawn-floor rule
+    // from 6.44 % to 100 % coverage, the admission receipts, and the
+    // admission-evidence guard. A parked build passes that guard with no
+    // receipt, because the guard asks for a receipt from arenas that are
+    // OFFERED. Nothing was deleted to make a gate green.
+    //
+    // WHAT MOVED WITH THE CARD. Every roster-dependent pin is DERIVED from this
+    // registry rather than re-typed, so this one field is the only edit:
+    //   * the selectable count falls 11 -> 10, and the eye-clearance and
+    //     cross-browser contract FLOORS are computed from the derived roster,
+    //     not from a literal (that is what made a hidden arena a silent gate
+    //     hole the last two times).
+    //   * `src/arena-selectability.test.ts` asserts the hidden set BY FLAG -
+    //     every registry row with `selectable === false` - and never by a
+    //     hardcoded id list, so the next park or un-park needs no test edit.
+    //   * the walkable, collider and eye-clearance LEDGERS keep their farcrysis
+    //     rows and their measured numbers. Farcrysis stays measured; it is
+    //     hidden, not withdrawn, and deleting the measurements would lose the
+    //     evidence that got it this far.
+    selectable: false,
     legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
     prototype: true,
     selectorLabel: 'FARCrySIS',
@@ -232,7 +258,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'SIS',
     menuLede: 'Fight through a flooded jungle research station — an original beach-and-jungle homage with dense collision cover, a ruined core, and golden-hour beach light.',
     summary: 'Jungle island research station · dense cover · golden-hour beach',
-    rulesLabel: 'PREVIEW · 5 MIN · SOLO · 2 BOTS',
+    rulesLabel: '5 MIN · SOLO · 2 BOTS',
     soloBotCount: 2,
     maximumSoloBots: 2,
     // PREVIEW ships solo-only. The MP lab roster is computed as

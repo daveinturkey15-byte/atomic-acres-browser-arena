@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -253,7 +256,7 @@ describe('bakeIrradianceVolume', () => {
     expect(session.progress()).toBeLessThan(1 / probes);
   });
 
-  it('honours the per-frame budget on a REAL-SIZED proxy at both tiers (the 198 ms stall)', () => {
+  it('stops at the FIRST ray past the deadline on a REAL-SIZED proxy at both tiers (the 198 ms stall)', () => {
     // THE DEFECT THIS PINS. The stepper used to check its deadline every 16
     // probes. One HIGH probe on a 24-occluder proxy is 128 rays at two bounces
     // against every shape, so sixteen of them is ~200 ms of straight-line
@@ -264,66 +267,75 @@ describe('bakeIrradianceVolume', () => {
     // 24 occluders is not an arbitrary fixture size: it is the count every
     // shipped arena's own runtime receipt reports (`...:24:...`).
     //
-    // THE SECOND HALF OF THE FIX WAS THE CLOCK. Checking per ray is not enough
-    // if the clock cannot see 3 ms: `Date.now()` on Windows advances in ~15.6 ms
-    // steps, and the per-ray stepper still spent 31 ms in one step until the
-    // deadline moved to `performance.now()`.
-    //
-    // BEST OF THREE ATTEMPTS, AND WHY THAT IS NOT A WEAKENING. The quantity is
-    // deterministic; contention can only inflate it, never deflate it. This
-    // suite runs twenty-one files in parallel on the owner's shared workstation,
-    // where a descheduled thread has read 44 ms on code whose quiet-machine
-    // worst step is 5.13 ms. Taking the smallest of three attempts measures the
-    // code rather than the machine. It does not let the OLD stepper through:
-    // its overshoot is intrinsic, ~20 ms at LOW on this fixture on a QUIET
-    // machine, so every attempt fails.
-    //
-    // Quiet-machine distribution from the committed instrument
-    // `scripts/qa/measure-bake-step-budget.mjs`, 150 steps, three runs each,
-    // which is what the bounds below are set from:
-    //   FIXED  LOW  p95 3.03-3.10  worst 3.37-3.53
-    //   FIXED  HIGH p95 3.03-3.06  worst 3.16-3.20
-    //   BEFORE LOW  p95 5.65-5.95  worst 6.62-9.47
-    //   BEFORE HIGH p95 14.2-17.3  worst 16.9-19.9
-    // PASS 89: attempts raised 3 -> 8, and NOTHING ELSE. Both bounds are
-    // untouched. The estimator is the same one this test already argued for -
-    // contention can only INFLATE a step, never deflate it, so the smallest
-    // attempt is the one closest to the code's own cost - and more attempts
-    // only make that estimate better. At three attempts this test read p95
-    // 4.76 ms against its 4.5 ms bound inside the full 578-file suite on the
-    // owner's shared workstation, while reading 3.0-3.2 ms run after run on
-    // the same commit in isolation: that is the machine being measured, not
-    // the code. It still cannot let the OLD stepper through - its overshoot is
-    // intrinsic, ~20 ms at LOW on this fixture on a QUIET machine, so every
-    // attempt fails however many are taken. The structural half of this fix,
-    // "can stop INSIDE a probe", is above and needs no clock at all.
-    const BUDGET_ATTEMPTS = 8;
+    // MEASURED AGAINST AN INJECTED CLOCK, and that is a TIGHTER bound than the
+    // wall-clock percentile this test used to carry, not a looser one. The old
+    // form allowed p95 4.5 ms and worst 6 ms against a 3 ms budget, and it
+    // still went red inside the full suite (4.76 ms p95) while reading
+    // 3.0-3.2 ms in isolation on the same commit: on a shared workstation a
+    // wall clock measures the machine. With one tick of the clock per ray the
+    // property becomes exact - a step may cross the deadline by AT MOST ONE
+    // RAY, at both tiers, on the real proxy - and no amount of contention can
+    // move it. The old stepper fails it by three orders of magnitude, because
+    // it consulted the clock 2048 rays apart.
     const scene = twentyFourOccluderProxy();
     expect(scene.shapes.length).toBe(24);
+    const BUDGET = 3;
     for (const tier of ['low', 'high'] as const) {
-      let best: number[] | null = null;
-      for (let attempt = 0; attempt < BUDGET_ATTEMPTS; attempt += 1) {
-        const session = beginIrradianceBake(scene, DAYLIGHT, {
-          arenaId: `budget-${tier}-${attempt}`,
-          tuning: resolveBakedIndirectTuning(tier),
-          fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
-        });
-        const durations: number[] = [];
-        // A slice of the bake, not the whole thing: the property is a property
-        // of every step, and a full HIGH bake of this volume is ~20 s.
-        while (durations.length < 150 && !session.done()) {
-          const before = performance.now();
-          session.step(3);
-          durations.push(performance.now() - before);
-        }
-        expect(durations.length, `${tier} steps`).toBe(150);
-        const sorted = [...durations].sort((a, b) => a - b);
-        if (best === null || sorted[sorted.length - 1] < best[best.length - 1]) best = sorted;
+      let ticks = 0;
+      const session = beginIrradianceBake(scene, DAYLIGHT, {
+        arenaId: `budget-${tier}`,
+        tuning: resolveBakedIndirectTuning(tier),
+        fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
+        // One tick per READ of the clock. `traceRay` is the only work between
+        // two deadline reads, so a step's budget is spent in units of rays.
+        // The handful of reads that are NOT a ray - the deadline itself, an
+        // empty probe skipped - only make a step stop EARLIER, so they bias
+        // the assertion below towards strictness, never towards passing.
+        now: () => ticks++,
+      });
+      const probes = BAKED_INDIRECT_RUNTIME_GRID[0] * BAKED_INDIRECT_RUNTIME_GRID[1] * BAKED_INDIRECT_RUNTIME_GRID[2];
+      const rays = resolveBakedIndirectTuning(tier).raysPerProbe;
+      const overshoots: number[] = [];
+      for (let step = 0; step < 40 && !session.done(); step += 1) {
+        const before = ticks;
+        const startedAtProgress = session.progress();
+        session.step(BUDGET);
+        const raysTraced = Math.round((session.progress() - startedAtProgress) * probes * rays);
+        expect(ticks, `${tier}: the step must consult the clock`).toBeGreaterThan(before);
+        overshoots.push(raysTraced);
       }
-      const sorted = best as number[];
-      expect(sorted[Math.floor(sorted.length * 0.95)], `${tier} p95 step ms`).toBeLessThanOrEqual(4.5);
-      expect(sorted[sorted.length - 1], `${tier} worst step ms`).toBeLessThanOrEqual(6);
+      expect(overshoots.length, `${tier}: the loop must actually step`).toBeGreaterThan(0);
+      for (const spent of overshoots) {
+        // At most the budget plus the one ray that crossed it. The old
+        // sixteen-probe stepper traces 2048 rays here whatever the budget is,
+        // so it misses this by three orders of magnitude.
+        expect(spent, `${tier}: one step may cross a ${BUDGET}-tick budget by at most one ray`)
+          .toBeLessThanOrEqual(BUDGET + 1);
+      }
+      // Not vacuous, in both directions: real work happened, and the budget is
+      // what stopped it rather than the bake running out of probes.
+      expect(Math.max(...overshoots), `${tier}: the steps must trace something`).toBeGreaterThan(0);
+      expect(session.done(), `${tier}: 40 bounded steps must not finish the bake`).toBe(false);
     }
+  });
+
+  it('reads its deadline from a sub-millisecond clock, not from Date.now', () => {
+    // The other half of the 198 ms fix, and the half an injected clock cannot
+    // see. Checking per ray is not enough if the clock cannot resolve 3 ms:
+    // Date.now() on Windows advances in ~15.6 ms steps, and the first per-ray
+    // stepper still spent 31 ms in one step until the deadline moved to
+    // performance.now(). Pinned at the SOURCE, the way the light-set freeze is,
+    // because a unit test cannot observe which clock a correct-looking module
+    // chose.
+    const source = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), 'baked-indirect.ts'),
+      'utf8',
+    );
+    const clockBody = source.slice(source.indexOf('const nowMs ='), source.indexOf('export function beginIrradianceBake'));
+    expect(clockBody).toMatch(/performance/);
+    expect(clockBody).toMatch(/clock\.now\(\)/);
+    // Date.now survives only as the fallback for a host with no performance.
+    expect(clockBody.indexOf('clock.now()')).toBeLessThan(clockBody.indexOf('Date.now()'));
   });
 
   it('a partially stepped volume is readable and non-negative rather than undefined', () => {

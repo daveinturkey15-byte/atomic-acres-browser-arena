@@ -226,6 +226,22 @@ export type BakeOptions = Readonly<{
    * for.
    */
   fixedDimensions?: readonly [number, number, number];
+  /**
+   * The clock the per-frame deadline is measured against. Tests only;
+   * production leaves it unset and gets `nowMs`.
+   *
+   * PASS 89. `step()`'s contract - "stop at the first ray past the deadline" -
+   * is a property of the CODE, but the only test of it was a wall-clock
+   * measurement, which on a shared workstation measures the MACHINE: it read
+   * 3.0-3.2 ms in isolation and 4.8-9.6 ms inside the full 578-file suite, on
+   * the same commit. Injecting the clock makes the property testable exactly,
+   * at both tiers, on the real proxy, with no timing slop at all - a strictly
+   * tighter bound than any wall-clock percentile, and one that cannot be
+   * evaded by a machine being quiet. The real-clock choice is pinned
+   * separately, at the source, by "reads its deadline from a sub-millisecond
+   * clock".
+   */
+  now?: () => number;
 }>;
 
 /**
@@ -567,7 +583,8 @@ export function beginIrradianceBake(
   lighting: BakeLighting,
   options: BakeOptions,
 ): IrradianceBakeSession {
-  const startedAt = nowMs();
+  const clock = options.now ?? nowMs;
+  const startedAt = clock();
   const { tuning } = options;
   if (!tuning.enabled) throw new Error('bakeIrradianceVolume: the OFF tier bakes nothing.');
   const digest = computeBakeDigest(scene, lighting, tuning);
@@ -667,8 +684,8 @@ export function beginIrradianceBake(
     step(budgetMs: number): boolean {
       if (finished) return true;
       const unbounded = !Number.isFinite(budgetMs);
-      const deadline = nowMs() + budgetMs;
-      const expired = (): boolean => !unbounded && nowMs() >= deadline;
+      const deadline = clock() + budgetMs;
+      const expired = (): boolean => !unbounded && clock() >= deadline;
       while (cursor < probeCount) {
         if (!probeStarted) {
           if (!beginProbe(cursor)) {
@@ -706,7 +723,7 @@ export function beginIrradianceBake(
           bounces: tuning.bounces,
           occluderShapes: scene.shapes.length,
           filledProbes,
-          elapsedMs: finished ? elapsedMs : nowMs() - startedAt,
+          elapsedMs: finished ? elapsedMs : clock() - startedAt,
         }),
       });
     },
