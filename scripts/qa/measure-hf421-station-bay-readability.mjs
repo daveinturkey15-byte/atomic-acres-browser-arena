@@ -50,6 +50,25 @@ const PORT = Number(opt('--port', '4221'));
 const OUT = opt('--out', 'artifacts/hf421/readability');
 const WIDTH = Number(opt('--width', '2560'));
 const HEIGHT = Number(opt('--height', '1440'));
+/**
+ * HOW MANY FRAMES EACH CASE IS MEASURED OVER, AND WHY IT IS NOT ONE.
+ *
+ * The kit's one exposure moment is a service tram that runs the bay on an
+ * 11.0 s loop carrying a 52-intensity point light. A SINGLE frame therefore
+ * measures wherever the tram happened to be, and it moves the answer a long
+ * way: two back-to-back runs of the one-frame version of this harness returned
+ * after-medians of 7.353 and 15.575 for the same build and the same pose, and
+ * one probe read 0.417 in one run and 8.358 in the other. That is not a
+ * measurement, it is a sample of a moving light.
+ *
+ * So each case is swept over `--frames` screenshots spaced `--interval-ms`
+ * apart, covering more than one full tram period, and each probe reports its
+ * MINIMUM separation across the sweep as well as the median. The minimum is
+ * the number the readability bar is judged on: a silhouette has to stay
+ * readable at the worst moment of the loop, not the best.
+ */
+const FRAMES = Number(opt('--frames', '15'));
+const INTERVAL_MS = Number(opt('--interval-ms', '850'));
 
 /** Corridor 6 sits on spoke 5; its group origin is 18 m from the hub. */
 const ANGLE = (5 * Math.PI) / 4;
@@ -205,29 +224,69 @@ async function runCase(page, label, query, pose) {
     return { rects, viewport: { w, h }, hud: hud ? hud.textContent.split('|')[0].trim() : null };
   });
 
-  const png = await page.screenshot({ path: resolve(OUT, `${label}.png`) });
-  const img = sharp(png);
-  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
-  const probes = geom.rects.map((r, i) => ({
-    probe: ['left', 'centre', 'right'][i] ?? `probe-${i}`,
-    distanceM: r.distanceM,
-    rect: { x0: Math.round(r.x0), y0: Math.round(r.y0), x1: Math.round(r.x1), y1: Math.round(r.y1) },
-    ...measureRect(data, info.channels, info.width, info.height, r),
-  }));
+  // The camera and the probes are both static, so the projected rectangles are
+  // computed once and reused for every frame of the sweep.
+  const names = ['left', 'centre', 'right'];
+  const sweep = [];
+  let imageInfo = null;
+  let worstFrame = { index: -1, medianSeparation: Infinity, png: null };
+  for (let frame = 0; frame < FRAMES; frame += 1) {
+    const png = await page.screenshot();
+    const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+    imageInfo = { width: info.width, height: info.height };
+    const measured = geom.rects.map((r, i) => ({
+      probe: names[i] ?? `probe-${i}`,
+      distanceM: r.distanceM,
+      rect: { x0: Math.round(r.x0), y0: Math.round(r.y0), x1: Math.round(r.x1), y1: Math.round(r.y1) },
+      ...measureRect(data, info.channels, info.width, info.height, r),
+    }));
+    const med = median(measured.map((m) => m.separation).filter((v) => v !== null)) ?? Infinity;
+    sweep.push({ frame, medianSeparation: Number(med.toFixed(3)), probes: measured });
+    if (frame === 0) writeFileSync(resolve(OUT, `${label}.png`), png);
+    if (med < worstFrame.medianSeparation) worstFrame = { index: frame, medianSeparation: Number(med.toFixed(3)), png };
+    if (frame < FRAMES - 1) await page.waitForTimeout(INTERVAL_MS);
+  }
+  if (worstFrame.png) writeFileSync(resolve(OUT, `${label}-worst.png`), worstFrame.png);
+
+  // Per probe, across the whole sweep: worst, median and best separation. The
+  // bar is judged on `worst`; `median` is there so a single bad frame and a
+  // uniformly bad case can be told apart.
+  const probes = geom.rects.map((r, i) => {
+    const series = sweep.map((f) => f.probes[i]).filter((m) => m && m.separation !== null);
+    const seps = series.map((m) => m.separation);
+    return {
+      probe: names[i] ?? `probe-${i}`,
+      distanceM: r.distanceM,
+      rect: { x0: Math.round(r.x0), y0: Math.round(r.y0), x1: Math.round(r.x1), y1: Math.round(r.y1) },
+      frames: seps.length,
+      separationWorst: seps.length ? Number(Math.min(...seps).toFixed(3)) : null,
+      separationMedian: seps.length ? Number(median(seps).toFixed(3)) : null,
+      separationBest: seps.length ? Number(Math.max(...seps).toFixed(3)) : null,
+      silhouetteMedianLuma: series.length ? Number(median(series.map((m) => m.silhouetteMedianLuma)).toFixed(3)) : null,
+      backgroundMedianLuma: series.length ? Number(median(series.map((m) => m.backgroundMedianLuma)).toFixed(3)) : null,
+      silhouettePixels: series.length ? series[0].silhouettePixels : 0,
+      backgroundPixels: series.length ? series[0].backgroundPixels : 0,
+    };
+  });
 
   return {
     label,
     url,
     hud: geom.hud,
     viewport: geom.viewport,
-    image: { width: info.width, height: info.height },
+    image: imageInfo,
+    sweep: { frames: FRAMES, intervalMs: INTERVAL_MS, spanSeconds: Number(((FRAMES - 1) * INTERVAL_MS / 1000).toFixed(2)), worstFrameIndex: worstFrame.index },
     frameTimeMs: {
       samples: frames.length,
       p50: Number(pct(frames, 50).toFixed(3)),
       p95: Number(pct(frames, 95).toFixed(3)),
     },
     probes,
-    medianSeparation: Number(median(probes.map((p) => p.separation).filter((v) => v !== null)).toFixed(3)),
+    perFrame: sweep.map((f) => ({ frame: f.frame, medianSeparation: f.medianSeparation, separations: f.probes.map((m) => m.separation) })),
+    // The number the bar is judged on: the median probe at the WORST moment of
+    // the tram loop, not the median of each probe's best moment.
+    worstFrameMedianSeparation: Number(worstFrame.medianSeparation.toFixed(3)),
+    medianSeparation: Number(median(probes.map((p) => p.separationMedian).filter((v) => v !== null)).toFixed(3)),
   };
 }
 
@@ -263,11 +322,35 @@ async function main() {
 
   const b = report.cases.before;
   const a = report.cases.after;
+  // PER PROBE, WORST FRAME AGAINST WORST FRAME. The bar is "separation at 15 m
+  // in the darkest authored view is >= the before value", and a median over
+  // three probes hides a probe that went to zero, so every probe is compared
+  // on its own and the verdict names the ones that regressed.
+  const perProbe = b.probes.map((bp, i) => {
+    const ap = a.probes[i];
+    return {
+      probe: bp.probe,
+      worstBefore: bp.separationWorst,
+      worstAfter: ap.separationWorst,
+      worstDelta: Number((ap.separationWorst - bp.separationWorst).toFixed(3)),
+      medianBefore: bp.separationMedian,
+      medianAfter: ap.separationMedian,
+      medianDelta: Number((ap.separationMedian - bp.separationMedian).toFixed(3)),
+      regressedOnWorst: ap.separationWorst < bp.separationWorst,
+    };
+  });
   report.verdict = {
+    perProbe,
+    probesRegressedOnWorstFrame: perProbe.filter((p) => p.regressedOnWorst).map((p) => p.probe),
     separationBefore: b.medianSeparation,
     separationAfter: a.medianSeparation,
     separationDelta: Number((a.medianSeparation - b.medianSeparation).toFixed(3)),
-    readabilityHolds: a.medianSeparation >= b.medianSeparation,
+    worstFrameSeparationBefore: b.worstFrameMedianSeparation,
+    worstFrameSeparationAfter: a.worstFrameMedianSeparation,
+    // Both halves have to hold: the median over the sweep must not fall, AND
+    // no individual probe may be worse at its worst moment than it was before.
+    readabilityHolds: a.medianSeparation >= b.medianSeparation
+      && perProbe.every((p) => !p.regressedOnWorst),
     frameTimeP50Before: b.frameTimeMs.p50,
     frameTimeP50After: a.frameTimeMs.p50,
     frameTimeP95Before: b.frameTimeMs.p95,
