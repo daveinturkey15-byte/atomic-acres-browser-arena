@@ -21,6 +21,8 @@ The strongest causal chain is therefore: open-ended 40-script task -> many tool 
 
 Related chain evidence: Q3 eventually reached a normal stop and produced commit `91b03154`; Q4 failed with the same context-size class (`66307` tokens, OMP log line 38) and then ended after a length/compaction retry; Q5 remained active at the experiment cutoff after compactions at 72,096 and 66,877 context tokens. This is evidence of a harness-level runaway/retry risk, not proof that every small Qwen task fails.
 
+Final observation at 22:33:17: Q5 again stopped for length and scheduled a compaction retry; no terminal session exit or usable final result was observed.
+
 ## Trials
 
 All three trials were defined as the same task: add one usage header to `scripts/qa/find-coplanar-pairs.ts`, with the file restored using `git checkout -- scripts/qa/find-coplanar-pairs.ts` between trials. The target was clean before the trial queue. A Qwen chain job was already using the single-slot local server, so no trial or raw API request was issued concurrently.
