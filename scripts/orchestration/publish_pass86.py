@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Publish the Pass 86 candidate as its own gh-pages channel and retire every other tree.
 
+NOTE ON THE FARCRYSIS GUARD (HF-423, edited 2026-09-03): this pass is ALREADY PUBLISHED
+and this script will not be run again for it. The farcrysis guard below is edited here only
+because roll_pass.py copies THIS file to make the NEXT pass's publish script at the cut, so
+the template is the only place a guard can be changed before the script that needs it
+exists. Everything in that guard is pass-number-derived and rolls with the copy - the
+receipt path is built from LIVE_TREE, so it names the cut pass's own
+docs/evidence/pass<N>/lane-r/ directory with no literal to forget to update.
+
 Sibling of publish_pass85.py, with one policy change from the owner (HF-400).
 
 Owner, 2026-09-02 06:58 BST, verbatim: "also when you push the next pass, pin this version
@@ -21,8 +29,8 @@ Gated BEFORE this runs, never after: tsc 0, full vitest floor, the arenas verifi
 the REAL player path, and a COLD visitor with an empty profile launching on the first click.
 
 Guards kept from publish_pass85.py, unchanged in strictness: the build freshness guard
-(refuses a stale hand-copied dist), the farcrysis-unselectable guard (checked against the
-bytes the minifier emits, with its own red test), the content-addressed root chooser with
+(refuses a stale hand-copied dist), the farcrysis-admission guard (receipt-backed; the
+parked case still passes, and it keeps its own red test), the content-addressed root chooser with
 its inline-escape self-test, and the in-build fallback guard - which is now STRICTER: it
 must resolve to the PASS 85 backup, not merely to something that exists.
 
@@ -52,6 +60,25 @@ LIVE_TREE = "pass86"
 BACKUP_TREE = "pass85"
 BACKUP_CHANNEL = f"channels/{BACKUP_TREE}"
 POLICY = "HF-400"
+
+# HF-423: farcrysis ships as a selectable PREVIEW card. The receipt below replaces the
+# selectable:false flag check that used to stand here. A flag is flipped in one line; a
+# receipt has to be earned by running the arena, so this is the strictly harder gate.
+#
+# The path is derived from LIVE_TREE, never written out, because roll_pass.py rolls
+# `pass{N}` tokens when it copies this file: a literal would name the wrong pass in the
+# rolled script, and a receipt read from the wrong directory is not evidence at all.
+#
+# 1.60 is a RATIO ceiling against an atomic-acres control measured in the same machine
+# window, never an absolute millisecond budget: an absolute budget is a fence that has to
+# be widened whenever the owner's ComfyUI is busy, and a fence that gets widened is not a
+# fence. A busy machine slows the control too, so the ratio is immune to it. The committed
+# evidence measures a worst pair ratio of 1.2833; the ceiling exists so a REGRESSION cannot
+# ship, not to be moved when one does.
+FARCRYSIS_ADMISSION_RECEIPT = os.path.join(
+    SRC, "docs", "evidence", LIVE_TREE, "lane-r", "farcrysis-admission.json")
+FARCRYSIS_ADMISSION_RATIO_CEILING = 1.60
+FARCRYSIS_ADMISSION_MIN_RUNS = 3
 
 # HF-400. The ONLY tree the owner asked to keep beside the new pass. Everything else under
 # channels/ is retired by enumeration below. A publish that would drop this one is a bug;
@@ -137,8 +164,9 @@ older tree was retired by run-time enumeration and the post-state was asserted
 to be exactly those two before this commit.
 
 Gated before publish: tsc 0, full vitest floor, real-player-path arena checks,
-cold-visitor first-click launch, build freshness guard, farcrysis-unselectable
-guard, in-build fallback resolves to channels/pass85.
+cold-visitor first-click launch, build freshness guard, farcrysis-admission
+guard (receipt-backed; the parked case still passes), in-build fallback resolves
+to channels/pass85.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"""
 
@@ -160,36 +188,123 @@ def sh(cmd, cwd=SRC, check=True, timeout=3600):
     return p.stdout + p.stderr
 
 
-def assert_farcrysis_not_selectable(dist_dir):
-    """Owner, 2026-08-28: farcrysis stays unselectable in ANY live published version.
+def farcrysis_is_selectable_in_build(dist_dir):
+    """Read the BYTES the minifier emits, exactly as the old guard did.
 
-    Checked against the BYTES the minifier actually emits, not the bytes one imagines.
-    The first version of this guard searched for data-arena-id="farcrysis" and passed
-    green on every bundle - including ones with farcrysis selectable - because the menu
-    interpolates arena ids at runtime and that byte sequence never exists. A guard is
-    only as good as its red test; this one has one below in main().
-
-    Real shape (verified in dist bytes): the arena registry serializes as
-    routeId:`farcrysis`,selectable:!1 (template quotes survive esbuild; !1 is false).
-    The rule: every farcrysis registry entry in every chunk must carry selectable:!1
-    within its entry window; an entry without it means the menu will offer the arena.
-    No farcrysis entry at all is also acceptable (arena fully removed).
+    The registry serializes as routeId:`farcrysis`,selectable:!1 (template quotes survive
+    esbuild; !1 is false). An entry without selectable:!1 in its window is an entry the menu
+    will offer. Kept byte-level for the reason the first version of the old guard existed to
+    record: searching for data-arena-id="farcrysis" passed green on every bundle, including
+    ones with farcrysis selectable, because the menu interpolates arena ids at runtime.
     """
     entry_rx = re.compile(rb"routeId:[`'\"]farcrysis[`'\"]")
-    ok_rx = re.compile(rb"selectable:(?:!1|false)")
+    off_rx = re.compile(rb"selectable:(?:!1|false)")
     entries_seen = 0
+    selectable_entries = 0
     for path in glob.glob(os.path.join(dist_dir, "assets", "*.js")):
         with open(path, "rb") as fh:
             data = fh.read()
         for match in entry_rx.finditer(data):
             entries_seen += 1
             window = data[max(0, match.start() - 100):match.end() + 200]
-            if not ok_rx.search(window):
-                sys.exit("REFUSING TO PUBLISH: a farcrysis registry entry in "
-                         f"{os.path.basename(path)} does not carry selectable:false - "
-                         "the menu would offer the parked arena. Fix src/map-selection.ts.")
-    print(f"  farcrysis-unselectable guard: OK ({entries_seen} registry entr"
-          f"{'y' if entries_seen == 1 else 'ies'} checked, all selectable:false)")
+            if not off_rx.search(window):
+                selectable_entries += 1
+    return entries_seen, selectable_entries
+
+
+def farcrysis_admission_bundle_digest(dist_dir):
+    """sha256 over the built JS bundle, byte-identical to the collector's own digest.
+
+    Same recipe as scripts/qa/collect-farcrysis-admission-evidence.mjs: every assets/*.js
+    file, sorted by name, each contributing its NAME then its BYTES. The name is hashed too
+    so that a rename alone cannot leave the digest equal.
+    """
+    digest = hashlib.sha256()
+    for name in sorted(os.path.basename(p) for p in
+                       glob.glob(os.path.join(dist_dir, "assets", "*.js"))):
+        digest.update(name.encode("utf-8"))
+        with open(os.path.join(dist_dir, "assets", name), "rb") as fh:
+            digest.update(fh.read())
+    return digest.hexdigest()
+
+
+def assert_farcrysis_admission_evidence(dist_dir):
+    """HF-423: farcrysis may enter the menu ONLY behind measured admission evidence.
+
+    Owner, 2026-08-28: farcrysis stays out of the menu until it loads. That rule is not
+    relaxed here, it is made checkable. The old guard asked whether a flag was off. This one
+    asks the question the flag was standing in for: does the arena actually admit, on THIS
+    tree, repeatably, on a quiet machine, without compiling pipelines in the match and
+    without dying?
+
+    A tree that still ships farcrysis unselectable passes trivially - the parked arena is
+    still allowed, and no receipt is read.
+    """
+    entries_seen, selectable_entries = farcrysis_is_selectable_in_build(dist_dir)
+    if selectable_entries == 0:
+        print(f"  farcrysis-admission guard: OK (parked - {entries_seen} registry "
+              f"entr{'y' if entries_seen == 1 else 'ies'}, none selectable)")
+        return
+
+    if not os.path.isfile(FARCRYSIS_ADMISSION_RECEIPT):
+        sys.exit("REFUSING TO PUBLISH: the build offers farcrysis in the menu but there is no "
+                 f"admission receipt at {FARCRYSIS_ADMISSION_RECEIPT}. Run "
+                 "`node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3` against "
+                 "the dist about to be published.")
+    with open(FARCRYSIS_ADMISSION_RECEIPT, encoding="utf-8") as fh:
+        receipt = json.load(fh)
+
+    if receipt.get("contract") != "farcrysis-admission-evidence-v1":
+        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt is not a "
+                 f"farcrysis-admission-evidence-v1 document ({receipt.get('contract')!r}).")
+
+    # The receipt must describe THIS build. Keyed on the bundle bytes, not on the git SHA:
+    # committing the receipt changes HEAD, so a receipt pinned to HEAD could never match the
+    # tree that contains it, and a guard that cannot be satisfied gets deleted. The bundle
+    # digest has no such circularity - it is what the probe loaded and what gh-pages serves.
+    built = farcrysis_admission_bundle_digest(dist_dir)
+    claimed = (receipt.get("bundle") or {}).get("sha256")
+    if claimed != built:
+        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt measured bundle "
+                 f"{str(claimed)[:12]}..., but this dist is {built[:12]}.... Rebuild, then "
+                 "re-run `node scripts/qa/collect-farcrysis-admission-evidence.mjs --runs 3`. "
+                 "A receipt for other bytes is not evidence about these.")
+
+    # A run taken while ComfyUI had work queued is void, and the collector says so itself
+    # rather than making the reader guess. The ratio survives a busy machine better than an
+    # absolute budget would, but "better" is not "immune", and the receipt already carries
+    # the fact - so it is checked rather than trusted.
+    if receipt.get("contended") is not False:
+        sys.exit("REFUSING TO PUBLISH: the farcrysis admission receipt is marked "
+                 f"contended={receipt.get('contended')!r} "
+                 f"({receipt.get('contendedNote')}). Re-run the collector on a quiet GPU with "
+                 "an empty ComfyUI queue; a contended measurement is not evidence.")
+
+    summary = receipt.get("summary") or {}
+    runs = receipt.get("runs") or 0
+    if runs < FARCRYSIS_ADMISSION_MIN_RUNS:
+        sys.exit(f"REFUSING TO PUBLISH: the farcrysis admission receipt has {runs} run(s); "
+                 f"{FARCRYSIS_ADMISSION_MIN_RUNS} paired runs are required. One run is an "
+                 "anecdote.")
+    if not summary.get("allAdmitted"):
+        sys.exit("REFUSING TO PUBLISH: not every farcrysis run in the admission receipt "
+                 "reached 'admitted'.")
+    if summary.get("anyCrashed") or summary.get("anyPageErrors"):
+        sys.exit("REFUSING TO PUBLISH: a farcrysis admission run crashed or logged a page "
+                 "error. That is the 279 s failure this guard exists for.")
+    if (summary.get("maxMenuPipelines") or 0) != 0:
+        sys.exit("REFUSING TO PUBLISH: farcrysis created "
+                 f"{summary.get('maxMenuPipelines')} WebGPU pipeline(s) inside the match. "
+                 "Lane C's load fix has regressed; fix it by compiling less, never by "
+                 "widening the admission fence.")
+    worst = summary.get("worstPairRatio")
+    if worst is None or worst > FARCRYSIS_ADMISSION_RATIO_CEILING:
+        sys.exit("REFUSING TO PUBLISH: farcrysis admits at "
+                 f"{worst}x the atomic-acres control measured in the same window "
+                 f"(ceiling {FARCRYSIS_ADMISSION_RATIO_CEILING}x).")
+    print(f"  farcrysis-admission guard: OK ({runs} paired runs, uncontended, all admitted, "
+          f"0 in-match pipelines, worst pair ratio {worst}x <= "
+          f"{FARCRYSIS_ADMISSION_RATIO_CEILING}x)")
 
 
 def assert_release_identity(dist_dir):
@@ -235,19 +350,75 @@ def release_identity_guard_red_test():
 
 
 def farcrysis_guard_red_test():
-    """Prove the farcrysis guard can fire before trusting its pass (it shipped vacuous once)."""
+    """Prove the admission guard can fire before trusting its pass.
+
+    The old farcrysis guard shipped vacuous once, so its successor keeps a red test - and
+    fires it on the axes that actually matter now. Four halves are proved: a selectable build
+    whose receipt is over the ratio ceiling must refuse; a selectable build whose receipt is
+    marked contended must refuse; a selectable build with NO receipt at all must refuse; and
+    the parked build must still pass with no receipt present.
+    """
     import tempfile
+    global FARCRYSIS_ADMISSION_RECEIPT
+    saved = FARCRYSIS_ADMISSION_RECEIPT
+
+    def fires(dist_dir, label):
+        try:
+            assert_farcrysis_admission_evidence(dist_dir)
+        except SystemExit:
+            return
+        sys.exit(f"REFUSING: the farcrysis admission guard failed its own red test - {label}")
+
     with tempfile.TemporaryDirectory() as red_dir:
         os.makedirs(os.path.join(red_dir, "assets"))
-        with open(os.path.join(red_dir, "assets", "red.js"), "wb") as fh:
+        with open(os.path.join(red_dir, "assets", "red-selectable.js"), "wb") as fh:
             fh.write(b"id:`farcrysis`,routeId:`farcrysis`,legacyAliases:[]")
-        fired = False
+        # The digest MATCHES on purpose in both bad receipts, so each refusal below can only
+        # come from the field under test. A red test that fails for an incidental reason
+        # proves nothing about the check it claims to exercise.
+        digest = farcrysis_admission_bundle_digest(red_dir)
+
+        def write_receipt(name, **overrides):
+            body = {"contract": "farcrysis-admission-evidence-v1",
+                    "bundle": {"sha256": digest},
+                    "runs": 3,
+                    "contended": False,
+                    "contendedNote": "red test",
+                    "summary": {"allAdmitted": True, "anyCrashed": False,
+                                "anyPageErrors": False, "maxMenuPipelines": 0,
+                                "worstPairRatio": 1.2833}}
+            body.update(overrides)
+            path = os.path.join(red_dir, name)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(body, fh)
+            return path
+
         try:
-            assert_farcrysis_not_selectable(red_dir)
-        except SystemExit:
-            fired = True
-        if not fired:
-            sys.exit("REFUSING: the farcrysis guard failed its own red test - it cannot fire")
+            # (a) over the ratio ceiling
+            FARCRYSIS_ADMISSION_RECEIPT = write_receipt(
+                "red-ratio.json",
+                summary={"allAdmitted": True, "anyCrashed": False, "anyPageErrors": False,
+                         "maxMenuPipelines": 0, "worstPairRatio": 99.0})
+            fires(red_dir, "it cannot fire on a receipt over the pair-ratio ceiling")
+            # (b) measured on a contended machine
+            FARCRYSIS_ADMISSION_RECEIPT = write_receipt("red-contended.json", contended=True)
+            fires(red_dir, "it accepted a receipt measured on a contended machine")
+            # (c) no receipt at all behind a selectable build
+            FARCRYSIS_ADMISSION_RECEIPT = os.path.join(red_dir, "absent.json")
+            fires(red_dir, "it accepted a selectable build with no receipt at all")
+            # (d) the good receipt on the same bytes must PASS, or (a)-(c) prove nothing:
+            #     a guard that refuses everything is not a guard, it is a wall.
+            FARCRYSIS_ADMISSION_RECEIPT = write_receipt("green.json")
+            assert_farcrysis_admission_evidence(red_dir)
+        finally:
+            FARCRYSIS_ADMISSION_RECEIPT = saved
+
+        # The parked case must still pass with no receipt present.
+        parked = os.path.join(red_dir, "parked")
+        os.makedirs(os.path.join(parked, "assets"))
+        with open(os.path.join(parked, "assets", "green.js"), "wb") as fh:
+            fh.write(b"id:`farcrysis`,routeId:`farcrysis`,selectable:!1,legacyAliases:[]")
+        assert_farcrysis_admission_evidence(parked)
 
 
 def canonical_channel_bytes(channels):
@@ -736,7 +907,7 @@ def dry_run(gh_pages_dir, plan_json, rollback=False):
         if os.path.isdir(DIST):
             run_guard("build-freshness", verdicts, assert_build_is_not_stale)
             run_guard("farcrysis-red-test", verdicts, farcrysis_guard_red_test)
-            run_guard("farcrysis-unselectable", verdicts, assert_farcrysis_not_selectable, DIST)
+            run_guard("farcrysis-admission", verdicts, assert_farcrysis_admission_evidence, DIST)
             # HF-406: the tree must call itself the pass it is stamped as.
             run_guard("release-identity-red-test", verdicts, release_identity_guard_red_test)
             run_guard("release-identity", verdicts, assert_release_identity, DIST)
@@ -874,7 +1045,7 @@ def main(argv=None):
         sys.exit(f"no build at {DIST}")
     assert_build_is_not_stale()
     farcrysis_guard_red_test()
-    assert_farcrysis_not_selectable(DIST)
+    assert_farcrysis_admission_evidence(DIST)
     # HF-406: refuse a tree that does not call itself the pass src/release-identity.ts
     # stamped. Three prior publishes shipped under the previous pass number.
     release_identity_guard_red_test()

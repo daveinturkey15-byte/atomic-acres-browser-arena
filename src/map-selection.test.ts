@@ -85,17 +85,21 @@ describe('opening arena selection', () => {
       rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
-    // HF-359: 2-bot solo combat map with fieldSupport disabled
+    // HF-359: 2-bot solo combat map with fieldSupport disabled.
+    // HF-423 (2026-09-02): shipped as a PREVIEW card - selectable, but solo
+    // only, so the hosted-lobby roster and the MP lab sweep do not pick it up
+    // before anyone has played it. The bot counts are unchanged.
     expect(arenaSelection('farcrysis')).toMatchObject({
       id: 'farcrysis',
       selectorLabel: 'FARCrySIS',
       displayName: 'Farcrysis',
-      multiplayer: true,
+      prototype: true,
+      multiplayer: false,
       fieldSupport: false,
       overdrive: false,
       soloBotCount: 2,
       maximumSoloBots: 2,
-      rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+      rulesLabel: 'PREVIEW · 5 MIN · SOLO · 2 BOTS',
       matchRules: { durationMs: 300_000, scoreLimit: null },
     });
     expect(arenaSelection('high-seas')).toMatchObject({

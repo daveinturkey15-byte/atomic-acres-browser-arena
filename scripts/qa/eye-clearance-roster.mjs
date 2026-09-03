@@ -28,16 +28,22 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
 
 /**
  * Floor on the derived roster, matching `MINIMUM_SWEPT_ARENAS` in
- * sweep-eye-clearance-spots.ts. 8 = the nine ids in arena-identity.ts minus
- * hidden farcrysis. Raise it when an arena is added; never lower it to get a
- * run green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, back to 7
+ * sweep-eye-clearance-spots.ts. 10 = every id in arena-identity.ts, nothing
+ * subtracted. Raise it when an arena is added; never lower it to get a run
+ * green. Raised 7 -> 8 on 2026-09-02 (HF-405) when Map 3 shipped, back to 7
  * while its card was withdrawn (HF-409), 8 again when the corridor showcase became
- * the arena, and 9 the same day (HF-407) when the Nuke Town Rebuild shipped: the
- * floor is an alarm on the SCRAPE collapsing, so it has to equal the real roster.
- * Raised 9 -> 10 on 2026-09-03 (HF-408, Lane AQ) when the Raid Rebuild `raid2`
- * shipped selectable.
+ * the arena, 9 the same day (HF-407) when the Nuke Town Rebuild shipped, 10 at
+ * HF-423 when farcrysis was un-hidden as a PREVIEW card, and 11 at HF-408 when
+ * the Raid Rebuild `raid2` shipped selectable: the floor is an alarm on the
+ * SCRAPE collapsing, so it has to equal the real roster.
+ *
+ * The merge of PASS 86, Lane R and Lane AQ is why this reads 11 and not 10:
+ * THREE sides independently wrote a literal from different arithmetic (nine of
+ * ten with farcrysis hidden; nine ids before nuketown2 with it un-hidden; ten
+ * with raid2 but farcrysis still hidden), and git merges identical text without
+ * conflict. The union of the three rosters is ELEVEN.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 10;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 11;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the
@@ -179,4 +185,58 @@ export function forcedProbesForArena(ledger, arena) {
  */
 export function unverifiedCeilingFor(ledger, arena) {
   return (ledger.unverifiedCeiling ?? {})[arena];
+}
+
+/**
+ * ARENA-SIDE SUB-CEILING (HF-423).
+ *
+ * A raw violation ceiling stops being a ratchet when most of what it counts is
+ * the instrument rather than the arena. farcrysis measured 441 on its first
+ * sweep, and 373 of those name `farcrysis-terrain-proxy-*` - the ground - as
+ * the surface, because stage 1 seats its eye heights on a hardcoded ground
+ * plane of y = 0 and only 22.0 % of farcrysis's legal spots sit where that is
+ * true. 441 is the honestly measured number and it stays as the raw ceiling.
+ * But as a REGRESSION guard it is worth almost nothing: the arena's own 68 real
+ * rows could grow more than fivefold - every catwalk, platform and trunk in the
+ * map going bad at once - and 441 would still be green.
+ *
+ * So the ledger may name, per arena, a set of surface-name prefixes that are
+ * known instrument artefacts, and a much tighter ceiling on everything else.
+ * Both are enforced. This is a TIGHTENING, not a re-baseline: it adds a second
+ * gate to an arena that previously had one loose one, and it survives the
+ * stage-1 fix - when stage 1 learns to seat eye heights on a real heightfield
+ * the raw count collapses toward the arena-side count and the sub-ceiling is
+ * already the binding one.
+ *
+ * Excluding a surface class from the sub-count is NOT excusing it. The excluded
+ * rows are still counted in the raw number, still ratcheted there, and the
+ * ledger's `measured` note says exactly why they exist and what will retire
+ * them.
+ */
+export function arenaSideCeiling(arena, ledger) {
+  const entry = ledger?.arenaSideCeilings?.[arena];
+  if (!entry) return null;
+  const prefixes = entry.excludeSurfacePrefixes ?? [];
+  if (!Array.isArray(prefixes) || prefixes.length === 0 || !Number.isInteger(entry.ceiling)) {
+    throw new Error(
+      `eye-clearance: arenaSideCeilings.${arena} must carry an integer \`ceiling\` and a non-empty `
+      + '`excludeSurfacePrefixes` array. A sub-ceiling that excludes nothing, or that has no number, '
+      + 'would silently pass everything.',
+    );
+  }
+  return { ceiling: entry.ceiling, excludeSurfacePrefixes: prefixes, note: entry.note ?? null };
+}
+
+/**
+ * How many of `violations` are the arena's own, i.e. do not name one of the
+ * excluded surface classes. `null` when the arena has no sub-ceiling committed.
+ * A row with no surface name counts as arena-side: the conservative direction.
+ */
+export function countArenaSideViolations(arena, violations, ledger) {
+  const sub = arenaSideCeiling(arena, ledger);
+  if (!sub) return null;
+  return violations.filter((row) => {
+    const surface = String(row?.surface ?? '');
+    return !sub.excludeSurfacePrefixes.some((prefix) => surface.startsWith(prefix));
+  }).length;
 }
