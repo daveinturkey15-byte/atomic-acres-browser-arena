@@ -1,0 +1,73 @@
+{
+  "hub-overview": {
+    "pose": {
+      "x": 0,
+      "y": 1.7,
+      "z": -4,
+      "yaw": 0,
+      "pitch": -0.05
+    },
+    "samples": [
+      "click to look around · WASD to walk · WebGPU · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": null,
+    "fpsMax": null
+  },
+  "corridor-1-nature": {
+    "pose": {
+      "x": 0,
+      "y": 1.7,
+      "z": -20,
+      "yaw": 0,
+      "pitch": -0.05
+    },
+    "samples": [
+      "179 fps · 145 draws · 520k tris · WebGPU · shim 46/148 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 179,
+    "fpsMax": 179
+  },
+  "corridor-6-volume-godrays-mouth": {
+    "pose": {
+      "x": 11.31370849898476,
+      "y": 1.7,
+      "z": 11.313708498984763,
+      "yaw": 3.9269908169872414,
+      "pitch": -0.05
+    },
+    "samples": [
+      "180 fps · 152 draws · 323k tris · WebGPU · shim 46/148 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 180,
+    "fpsMax": 180
+  },
+  "corridor-6-volume-godrays-inside": {
+    "pose": {
+      "x": 19.798989873223327,
+      "y": 1.7,
+      "z": 19.798989873223334,
+      "yaw": 3.9269908169872414,
+      "pitch": 0.1
+    },
+    "samples": [
+      "175 fps · 137 draws · 288k tris · WebGPU · shim 46/148 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 175,
+    "fpsMax": 175
+  },
+  "corridor-6-volume-godrays-shafts": {
+    "pose": {
+      "x": 25.809397513308983,
+      "y": 1.7,
+      "z": 22.273863607376253,
+      "yaw": 4.476990816987241,
+      "pitch": 0.02
+    },
+    "samples": [
+      "179 fps · 144 draws · 265k tris · WebGPU · shim 48/151 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D"
+    ],
+    "fpsMin": 179,
+    "fpsMax": 179
+  },
+  "__pageErrors": []
+}

@@ -1,0 +1,161 @@
+{
+  "generatedAt": "2026-09-03T00:41:02.499Z",
+  "port": 4221,
+  "viewport": {
+    "WIDTH": 2560,
+    "HEIGHT": 1440
+  },
+  "gpuFreeMiB": 4969,
+  "cases": {
+    "before": {
+      "label": "before-bay-off",
+      "url": "http://localhost:4221/map3.html?probe=1&bay=0",
+      "hud": "178 fps · 140 draws · 321k tris · WebGPU · shim 31/120 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D",
+      "viewport": {
+        "w": 2560,
+        "h": 1440
+      },
+      "image": {
+        "width": 2560,
+        "height": 1440
+      },
+      "frameTimeMs": {
+        "samples": 537,
+        "p50": 5.6,
+        "p95": 5.7
+      },
+      "probes": [
+        {
+          "probe": "left",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1113,
+            "y0": 714,
+            "x1": 1152,
+            "y1": 826
+          },
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471,
+          "silhouetteMedianLuma": 121.968,
+          "backgroundMedianLuma": 120.526,
+          "separation": 1.442
+        },
+        {
+          "probe": "centre",
+          "distanceM": 15.02,
+          "rect": {
+            "x0": 1262,
+            "y0": 714,
+            "x1": 1298,
+            "y1": 826
+          },
+          "silhouettePixels": 1638,
+          "backgroundPixels": 4796,
+          "silhouetteMedianLuma": 165.241,
+          "backgroundMedianLuma": 167.638,
+          "separation": 2.397
+        },
+        {
+          "probe": "right",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1408,
+            "y0": 714,
+            "x1": 1447,
+            "y1": 826
+          },
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471,
+          "silhouetteMedianLuma": 158.313,
+          "backgroundMedianLuma": 154.746,
+          "separation": 3.567
+        }
+      ],
+      "medianSeparation": 2.397
+    },
+    "after": {
+      "label": "after-bay-on",
+      "url": "http://localhost:4221/map3.html?probe=1",
+      "hud": "180 fps · 150 draws · 322k tris · WebGPU · shim 34/129 · NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) D",
+      "viewport": {
+        "w": 2560,
+        "h": 1440
+      },
+      "image": {
+        "width": 2560,
+        "height": 1440
+      },
+      "frameTimeMs": {
+        "samples": 535,
+        "p50": 5.6,
+        "p95": 5.7
+      },
+      "probes": [
+        {
+          "probe": "left",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1113,
+            "y0": 714,
+            "x1": 1152,
+            "y1": 826
+          },
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471,
+          "silhouetteMedianLuma": 159.465,
+          "backgroundMedianLuma": 132.598,
+          "separation": 26.868
+        },
+        {
+          "probe": "centre",
+          "distanceM": 15.02,
+          "rect": {
+            "x0": 1262,
+            "y0": 714,
+            "x1": 1298,
+            "y1": 826
+          },
+          "silhouettePixels": 1638,
+          "backgroundPixels": 4796,
+          "silhouetteMedianLuma": 188.461,
+          "backgroundMedianLuma": 178.526,
+          "separation": 9.936
+        },
+        {
+          "probe": "right",
+          "distanceM": 15.21,
+          "rect": {
+            "x0": 1408,
+            "y0": 714,
+            "x1": 1447,
+            "y1": 826
+          },
+          "silhouettePixels": 1716,
+          "backgroundPixels": 5471,
+          "silhouetteMedianLuma": 160.241,
+          "backgroundMedianLuma": 156.667,
+          "separation": 3.574
+        }
+      ],
+      "medianSeparation": 9.936
+    }
+  },
+  "pose": {
+    "x": 12.727922061357855,
+    "y": 1.7,
+    "z": 12.727922061357859,
+    "yaw": 3.9269908169872414,
+    "pitch": 0
+  },
+  "verdict": {
+    "separationBefore": 2.397,
+    "separationAfter": 9.936,
+    "separationDelta": 7.539,
+    "readabilityHolds": true,
+    "frameTimeP50Before": 5.6,
+    "frameTimeP50After": 5.6,
+    "frameTimeP95Before": 5.7,
+    "frameTimeP95After": 5.7,
+    "frameTimeWithin10Pct": true
+  }
+}

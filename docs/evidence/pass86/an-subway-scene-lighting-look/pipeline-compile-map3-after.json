@@ -1,0 +1,78 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-03T00:43:22.616Z",
+  "label": "hf421-map3-after",
+  "arena": "map3",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-subwaylook\\dist",
+  "seconds": 45,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 45.014,
+    "rafCallbacks": 2513,
+    "stallCount": 1,
+    "stallsPerMinute": 1.33,
+    "frozenFractionPercent": 0.3,
+    "medianStallMs": 133.4,
+    "maxStallMs": 133.4
+  },
+  "pipelines": {
+    "beforeWindow": 469,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.3,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 628,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 0.3,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 155366,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 155101,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": [
+    {
+      "startMs": 181522.6,
+      "endMs": 181656,
+      "durationMs": 133.4
+    }
+  ]
+}
