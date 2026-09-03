@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_100;
+const LINE_CEILING = 37_188;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -230,6 +230,16 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
       + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
       + 'the auto-stand it fed - so the net is comment, not code.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_188,
+    note:
+      'PASS 93 Luna rehearsal scope: the legacy integration keeps the existing admission '
+      + 'fence and state-walk contract, while wiring the new data-derived scheduler, safe-window '
+      + 'frame slices, synchronous switch fallback and admission-profile registry. Measured '
+      + 'on the requested branch after the change; the pure decision core is in '
+      + 'src/weapon-rehearsal-scheduler.ts.',
   },
 ];
 
