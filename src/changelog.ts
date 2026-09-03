@@ -142,12 +142,17 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     pass: 'PASS 88',
     title: 'Pass 88 · Faster First Loads Without Losing the Switch Fix',
     releasedAt: pass88ReleasedAt,
-    areas: Object.freeze(['PERFORMANCE', 'ARENAS']),
+    areas: Object.freeze(['PERFORMANCE', 'ARENAS', 'GRAPHICS']),
     summary: 'Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time.',
     highlights: Object.freeze([
       'Switching arenas mid-session no longer fails the compile fence on any of the 56 arena pairs, and a cold first load of Gun Range or High Seas is back to its PASS 86 time (the first attempt had made them up to half slower)',
       'Match admission - the 14-20 seconds between pressing deploy and playing - is measured step by step for the first time, so the next cut can attack it',
       'The cold-session shader relief runs only on the arenas measured to need it, with the arena list derived from a pinned authority rather than hardcoded',
+      // HF-418 item 3 (Lane AI, PASS 89 integration). Authored on a branch
+      // where pass85 was the pending top entry; pass85 published before the
+      // merge, so the highlight moved here, to the entry the release stamp
+      // names. src/graphics-profile-contract.test.ts pins that placement.
+      'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
       'Pass 87 stays published as the single safe backup; every older channel is retired',
     ]),
   }),

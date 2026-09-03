@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_624;
+const LINE_CEILING = 36_654;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -147,7 +147,15 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'PASS 88 candidate: Lane H2 load-time second pass (admission attribution markers, cold-session precompile reach) '
       + 'merged; measured on the merged head.',
   },
-];
+  {
+    date: '2026-09-03',
+    lines: 36_654,
+    note:
+      'PASS 89 integration, Lane AI (HF-418): +30 lines wiring the BALANCED preset, the '
+      + 'per-mode copy panel and the RTX native-runtime explainer into the settings shell '
+      + '(src/ui/pass64-shell.ts holds the markup; these are the legacy-main call sites). '
+      + 'Measured at the merged head.',
+  },];
 
 function legacyMainSource(): string {
   return readFileSync(resolve(__dirname, 'legacy-main.ts'), 'utf8');

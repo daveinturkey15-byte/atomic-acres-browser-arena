@@ -14,6 +14,8 @@ import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-di
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
 import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
+import { GRAPHICS_PROFILE_DESCRIPTIONS } from './graphics-profile-descriptions'; // HF-414/HF-418
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, rtxNativeRuntimeExplainerMarkup, RTX_NATIVE_RUNTIME_OPTION_LABEL } from './rtx-native-runtime-explainer'; // HF-418
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog'; // HF-360
@@ -226,6 +228,65 @@ function fieldKitPanelMarkup(): string {
   </div>`;
 }
 
+/**
+ * HF-418 — the graphics ladder, its truthful per-profile copy, and the RTX
+ * explainer entry.
+ *
+ * THREE THINGS CHANGED HERE AND EACH ONE WAS ASKED FOR.
+ *
+ * 1. ORDER. The list now climbs: PERFORMANCE, BALANCED, QUALITY, RAY TRACED,
+ *    MAX. It used to lead with QUALITY because that is the default, which made
+ *    PERFORMANCE below it read as a step up.
+ * 2. COPY. One paragraph for all five modes is replaced by one honest line per
+ *    mode plus an expandable detail block, both generated from
+ *    GRAPHICS_PROFILE_DESCRIPTIONS, which is itself pinned to the measured
+ *    audit by graphics-profile-contract.test.ts. Every block is rendered and
+ *    all but the active one are `hidden`, so this stays a pure string function
+ *    and legacy-main only toggles visibility.
+ * 3. RTX. The last entry is NOT a preset. Its value is not a member of
+ *    `GraphicsPreset`, and legacy-main puts the select straight back before
+ *    opening the explainer dialog, so selecting it cannot change the renderer.
+ *    That is the whole point: the owner asked what RTX is and where it sits,
+ *    and the answer is that it is a native runtime that does not exist yet,
+ *    not a rung on this ladder.
+ */
+function graphicsPresetRowMarkup(): string {
+  const options = GRAPHICS_PROFILE_DESCRIPTIONS
+    .map(({ id, label }) => `<option value="${id}">${label}</option>`)
+    .join('');
+  const detail = GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => `
+        <div class="graphics-profile-detail" data-graphics-profile="${profile.id}" hidden>
+          <p class="graphics-profile-intended">${profile.intendedFor}</p>
+          <h5>TURNS ON</h5><ul>${profile.turnsOn.map((line) => `<li>${line}</li>`).join('')}</ul>
+          <h5>LEAVES OFF</h5><ul>${profile.leavesOff.map((line) => `<li>${line}</li>`).join('')}</ul>
+          <p class="graphics-profile-reference"><small>${profile.referenceFrameNote}</small></p>
+        </div>`).join('');
+  const summaries = GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => `
+        <p class="graphics-profile-summary" data-graphics-profile="${profile.id}" title="${profile.intendedFor}" hidden>${profile.summary}</p>`).join('');
+  // CUSTOM has no audit row because it has no fixed control set, but it is a
+  // selectable option and the detail panel is keyed by the selected value: with
+  // no `custom` block the panel opened onto nothing at all, under a heading
+  // promising what the mode turns on. It gets a block that says why it is empty
+  // and where the real answer is. `graphics-profile-contract.test.ts` now
+  // asserts a detail block for EVERY selectable option, so a future rung cannot
+  // repeat this.
+  const customDetail = `
+        <div class="graphics-profile-detail" data-graphics-profile="custom" hidden>
+          <p class="graphics-profile-intended">For players who want to set individual controls themselves.</p>
+          <h5>TURNS ON</h5><ul><li>Whatever you set. CUSTOM has no fixed control set of its own: it starts from the last named mode you had selected and keeps every change you make in Advanced Graphics.</li></ul>
+          <h5>LEAVES OFF</h5><ul><li>Whatever you leave off. Because the set is yours, no measured cost line can be quoted for it.</li></ul>
+          <p class="graphics-profile-reference"><small>Open ADVANCED GRAPHICS below to see and change the individual controls. Every named mode above lists its own measured cost at 2560x1440 on an RTX 5080; CUSTOM cannot, because its control set is not fixed.</small></p>
+        </div>`;
+  return `<div class="graphics-preset-row">
+        <label>GRAPHICS MODE<select id="graphics-profile">${options}<option value="custom">CUSTOM</option><option value="${RTX_NATIVE_RUNTIME_OPTION_VALUE}">${RTX_NATIVE_RUNTIME_OPTION_LABEL}</option></select></label>
+        <div id="graphics-profile-copy">${summaries}
+        <p class="graphics-profile-summary" data-graphics-profile="custom" hidden>Your own values, started from the last named mode you had selected. Editing any advanced control saves the mode as Custom.</p>
+        </div>
+        <details id="graphics-profile-detail-panel"><summary>WHAT THIS MODE TURNS ON, AND WHAT IT COSTS</summary>${detail}${customDetail}</details>
+      </div>
+      ${rtxNativeRuntimeExplainerMarkup()}`;
+}
+
 function optionsPanelMarkup(): string {
   const audioBusLabels: Record<typeof AUDIO_BUS_IDS[number], string> = {
     master: 'MASTER', sfx: 'SFX', movement: 'MOVEMENT', ui: 'UI', announcements: 'ANNOUNCEMENTS',
@@ -241,10 +302,7 @@ function optionsPanelMarkup(): string {
     </div>
     <section id="graphics-settings" class="settings-section" aria-labelledby="graphics-settings-title">
       <header><b id="graphics-settings-title">GRAPHICS</b><span id="graphics-effective">EFFECTIVE: QUALITY</span><button id="graphics-save" type="button">SAVE GRAPHICS</button></header>
-      <div class="graphics-preset-row">
-        <label>GRAPHICS MODE<select id="graphics-profile"><option value="high">QUALITY</option><option value="performance">PERFORMANCE</option><option value="raytraced">RAY TRACED</option><option value="max">MAX</option><option value="custom">CUSTOM</option></select></label>
-        <p>Quality is the balanced default. Performance reduces presentation cost. Max cranks every setting. Editing any advanced control saves the mode as Custom.</p>
-      </div>
+      ${graphicsPresetRowMarkup()}
       <details id="advanced-graphics" class="advanced-settings">
         <summary><span>ADVANCED GRAPHICS</span><small>REAL WEBGPU / PRESENTATION CONTROLS + CAPABILITY LIMITS</small></summary>
         ${advancedGraphicsMarkup()}

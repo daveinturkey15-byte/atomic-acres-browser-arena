@@ -207,6 +207,19 @@ describe('Advanced Graphics canonical registry', () => {
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
+      // HF-418 BALANCED. It takes NOTHING from the screen-space stack: every
+      // member of this family is either a new render-target attachment (SSR),
+      // a per-pixel raymarch (shafts), an expensive gather (SSGI) or an effect
+      // that replaces pixels (DoF, motion blur). Its whole proposition is
+      // QUALITY's LOOK - native resolution, shadows, the filmic grade - without
+      // QUALITY's per-frame structures, so this row stays identical to
+      // PERFORMANCE's. If a future edit promotes one of these into Balanced,
+      // this line is where it has to be argued.
+      balanced: {
+        volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+        rayTracing: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+      },
       high: {
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'off',
@@ -233,6 +246,9 @@ describe('Advanced Graphics canonical registry', () => {
         depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
       },
     } as const;
+    // A preset with no row here would be silently unpinned, which is exactly
+    // how a table stops being "the promise" it says it is.
+    expect(Object.keys(matrix).sort()).toEqual(Object.keys(GRAPHICS_PRESET_VALUES).sort());
     for (const [name, expected] of Object.entries(matrix)) {
       const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
       for (const key of SCREEN_SPACE_KEYS) {
@@ -376,6 +392,15 @@ describe('Advanced Graphics weather controls', () => {
         weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false,
         wetSurfaces: true, ambientLife: 0.6,
       },
+      // HF-418 BALANCED. Rain and air sit BETWEEN the two neighbouring rungs,
+      // and the storm CEILING is left open rather than capped as PERFORMANCE
+      // caps it: the ceiling is not the cost, the instance count is, so this
+      // profile thins the count instead of hiding a weather state the arenas
+      // were authored to reach.
+      balanced: {
+        weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
+        wetSurfaces: true, ambientLife: 0.8,
+      },
       high: {
         weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1,
@@ -389,6 +414,9 @@ describe('Advanced Graphics weather controls', () => {
         wetSurfaces: true, ambientLife: 1.5,
       },
     } as const;
+    // A preset with no row here would be silently unpinned, which is exactly
+    // how a table stops being "the promise" it says it is.
+    expect(Object.keys(matrix).sort()).toEqual(Object.keys(GRAPHICS_PRESET_VALUES).sort());
     for (const [name, expected] of Object.entries(matrix)) {
       const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
       for (const key of WEATHER_KEYS) {

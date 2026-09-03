@@ -1282,17 +1282,21 @@
     },
     {
       "id": "presentation-profile",
-      "title": "Performance, Quality, Ray Traced, Max and Custom presentation profiles",
+      "title": "Performance, Balanced, Quality, Ray Traced, Max and Custom presentation profiles",
       "availability": "active",
       "owner": "src/pass65-settings.ts + src/render-profile.ts",
       "sourceProbes": [
         {
           "path": "src/pass65-settings.ts",
-          "symbol": "export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom'"
+          "symbol": "export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom'"
         },
         {
           "path": "src/render-profile.ts",
           "symbol": "renderProfileConfig"
+        },
+        {
+          "path": "src/ui/graphics-profile-descriptions.ts",
+          "symbol": "GRAPHICS_PROFILE_DESCRIPTIONS"
         }
       ],
       "pipelineIds": [],
@@ -1302,7 +1306,7 @@
           "graphics.preset",
           "graphics.geometryDetail"
         ],
-        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
+        "effectiveValue": "Performance uses the lowest gameplay-safe presentation values; Balanced adds native resolution, shadows and the Quality grade without the passes that add a target, an attachment or a raymarch; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save",
         "rationale": "Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics."
       },
       "budget": "Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.",
@@ -2258,5 +2262,5 @@
     "adjustable": 27,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "f646075ae5dba8e062e0954447a293bb5d8d2fe16377eced7642be4546350f80"
+  "inventorySha256": "a24a22746b9b826834e27f6590214dc09a0962cc5d6670e27b122e1a3fdab4ba"
 }

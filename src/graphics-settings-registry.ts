@@ -692,7 +692,7 @@ export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = 
  * The exact shipped matrix is pinned in graphics-settings-registry.test.ts;
  * changing a value here without changing that table fails the suite.
  */
-export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
+export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   // PERFORMANCE — deliberately untouched. This is the compatibility-forced and
   // low-spec preset; nothing in the screen-space stack runs here at all.
   performance: Object.freeze({
@@ -714,6 +714,93 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // scan, so they survive the low-spec preset; the air is thinned instead
     // because ambient instances are per-frame fill rate.
     wetSurfaces: true, ambientLife: 0.6,
+  }),
+  // ===================================================================
+  // BALANCED — HF-418. The rung between Performance and Quality.
+  // ===================================================================
+  //
+  // Owner, 2026-09-02 19:10, verbatim: "maybe make a new balanced profile that
+  // doesnt look shit like performance but will run nice and look good?"
+  //
+  // HOW IT WAS DERIVED, AND WHY THESE CONTROLS AND NOT OTHERS. The HF-414
+  // audit measured Performance, Quality, Ray Traced and Max cold and in a
+  // settled match at 2560x1440 on the owner's RTX 5080
+  // (docs/GRAPHICS_PROFILES_2026-09-03.md, evidence under
+  // docs/evidence/pass87/graphics-profiles/). Balanced takes the controls that
+  // carry most of what a player reads as "it looks good" for the least frame
+  // cost, and refuses the ones whose cost is a new render target, a new MRT
+  // attachment or a new raymarch:
+  //
+  //   TAKEN FROM QUALITY (cheap, and the whole reason Performance looks poor)
+  //     renderScale 1.00   Performance renders at 0.75 and upsamples. That is
+  //                        the single largest reason it "looks shit": every
+  //                        edge in the frame is reconstructed. Native
+  //                        resolution costs fill rate and nothing else - no
+  //                        new pass, no new target, no new pipeline.
+  //     geometryDetail full  Restores the authored representation. This is a
+  //                        streaming/vertex cost, not a per-pixel one.
+  //     shadows HIGH       A shadowed scene reads as lit; an unshadowed one
+  //                        reads as flat. This is the biggest single look win
+  //                        in the ladder.
+  //     indirectLighting HIGH  A scalar on the environment contribution
+  //                        (lightingScale in pass65-settings.ts). It changes a
+  //                        uniform, not the graph.
+  //     reflectionQuality HIGH  The baked PMREM probe tier. Load-time cost,
+  //                        zero per-frame cost.
+  //     bloomQuality CINEMATIC  Already-built stage, different uniforms.
+  //     anisotropy 8       Sampler state. Free at this resolution.
+  //     particle/decal/smoke HIGH  Capacity ceilings the arenas were authored
+  //                        against. Smoke in particular is gameplay-visible
+  //                        and must not read differently from Quality.
+  //
+  //   DELIBERATELY NOT TAKEN (each one buys a new per-frame structure)
+  //     MSAA 4x -> SMAA    A 4-sample principal HDR target multiplies pipeline
+  //                        variants and bandwidth across every material in the
+  //                        arena. The RAY TRACED preset's own notes call this
+  //                        trade "the single biggest saving" in the ladder, and
+  //                        the same argument applies here with nothing bought
+  //                        in exchange. SMAA is one display-side post stage.
+  //     SSR OFF            Quality's screen-space reflections add the normal
+  //                        and material MRT attachments; the registry's own
+  //                        Quality note names that as its main new cost.
+  //     Sun shafts OFF     A 24-step raymarch of the sun shadow map per pixel.
+  //     shadowResolution MEDIUM  1024 rather than 2048 (see resolveGraphicsRuntime).
+  //                        Quarter the shadow-map fill for a softness
+  //                        difference that is invisible at engagement range on
+  //                        the static update mode both profiles use.
+  //     AO / SSGI / DoF / motion blur / ray tracing  all off, as on Quality or
+  //                        below it. Nothing here replaces or gathers pixels.
+  //
+  //   BETWEEN THE TWO
+  //     Rain at 0.75 of the authored density with the ceiling left open, and
+  //     the air at 0.8. Rain is pure fill rate and it is the one family a
+  //     mid-range machine feels immediately; the CEILING is not the cost, the
+  //     instance count is, so Balanced thins the count rather than hiding the
+  //     storm state Performance caps away.
+  //     Grain and vignette sit between the two profiles' authored values.
+  //
+  // TODO(HF-418 item 4, Lane AL): the lighting-feature controls Lane AL is
+  // building - baked indirect, SSR tiers, AO tiers, contact shadows, each with
+  // a measured cost and a per-profile default - had not landed when this
+  // profile was authored. When they do, BALANCED is the profile whose defaults
+  // have to be argued first: it is the rung where "beautiful lighting that
+  // wont murder FPS" (owner, 19:10) is actually decided, and its current
+  // lighting position is deliberately conservative (indirect HIGH, everything
+  // screen-space OFF) precisely so that adding a cheap baked tier is a clear
+  // improvement rather than a swap. The control-set hash in
+  // graphics-profile-contract.test.ts will fail the moment that edit lands,
+  // which is the intended tripwire: the audit doc must be re-measured with it.
+  balanced: Object.freeze({
+    renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
+    antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
+    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
+    environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
+    particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
+    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.24, vignette: 0.14,
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+    weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
+    wetSurfaces: true, ambientLife: 0.8,
   }),
   // QUALITY — the auto-selected default on 8-core/8 GB machines, so it takes
   // only the two cheapest additive effects and both at their LOW tier:

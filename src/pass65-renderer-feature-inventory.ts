@@ -77,12 +77,15 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/pass65-settings.test.ts + src/adaptive-quality.test.ts',
   }),
   feature({
-    id: 'presentation-profile', title: 'Performance, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
+    id: 'presentation-profile', title: 'Performance, Balanced, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
-      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom'" },
+      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },
+      // HF-414/HF-418: the player-facing copy is part of this feature now, and
+      // it is pinned to the measured audit by graphics-profile-contract.test.ts.
+      { path: 'src/ui/graphics-profile-descriptions.ts', symbol: 'GRAPHICS_PROFILE_DESCRIPTIONS' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
+    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Balanced adds native resolution, shadows and the Quality grade without the passes that add a target, an attachment or a raymarch; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
     budget: 'Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.',
     verifier: 'src/pass65-settings.test.ts + src/render-profile.test.ts',
   }),

@@ -109,21 +109,37 @@ describe('Pass 66 command shell', () => {
   // great to have a 4th graphics mode above performance ... plus extra RTX things like
   // raytracing", so this test pinned an intent he has since overridden. Re-pinned, not
   // relaxed: the list is still exact and ordered, and now also asserts the honest NAME.
-  // It must never ship as "RTX" — no browser exposes a ray-tracing pipeline or RT cores,
-  // so that label would be a claim the build cannot back.
-  it('exposes five simple graphics modes and keeps WebGPU tuning under Advanced Graphics', () => {
+  //
+  // HF-418 (owner 2026-09-02 19:10) re-pins it again, and STRENGTHENS it twice.
+  // A sixth rendering mode, BALANCED, sits between PERFORMANCE and QUALITY, and
+  // the list is now asserted to CLIMB rather than to lead with the default. The
+  // RTX rule is unchanged in substance and tightened in form: no option that
+  // maps to a rendering profile may carry the letters RTX, because no browser
+  // exposes a ray-tracing pipeline or RT cores. What is now allowed is exactly
+  // one option that is NOT a profile — the native-runtime EXPLAINER, whose value
+  // is outside GraphicsPreset and which changes no renderer setting at all
+  // (src/ui/rtx-native-runtime-explainer.ts, src/graphics-profile-contract.test.ts).
+  it('exposes the climbing graphics ladder plus the RTX explainer, and keeps WebGPU tuning under Advanced Graphics', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
-    expect([...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
-      .map((match) => [match[1], match[2]])).toEqual([
-      ['high', 'QUALITY'],
+    const options = [...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
+      .map((match) => [match[1], match[2]]);
+    expect(options).toEqual([
       ['performance', 'PERFORMANCE'],
+      ['balanced', 'BALANCED'],
+      ['high', 'QUALITY'],
       ['raytraced', 'RAY TRACED'],
       ['max', 'MAX'],
       ['custom', 'CUSTOM'],
+      ['rtx-native-runtime-info', 'RTX — WHAT IS IT?'],
     ]);
-    expect(presetMarkup, 'no browser exposes RT cores; RTX would be an unbackable claim')
-      .not.toMatch(/RTX/i);
+    for (const [value, label] of options) {
+      if (value === 'rtx-native-runtime-info') continue;
+      expect(label, `${value}: no browser exposes RT cores; RTX would be an unbackable claim`)
+        .not.toMatch(/RTX/i);
+      expect(value, 'the explainer value is the only non-preset entry')
+        .not.toMatch(/RTX/i);
+    }
     expect(markup).toContain('id="advanced-graphics"');
     expect(markup).toContain('ADVANCED GRAPHICS');
     expect(markup).toMatch(/id="graphics-target-fps"[^>]+type="range"[^>]+min="30" max="360"/);

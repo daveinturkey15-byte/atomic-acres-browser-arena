@@ -4,6 +4,18 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
 import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
 import { ARENA_SELECTIONS, SELECTABLE_ARENAS } from '../../src/map-selection';
+import { GRAPHICS_PROFILE_DESCRIPTIONS } from '../../src/ui/graphics-profile-descriptions';
+import { RTX_NATIVE_RUNTIME_OPTION_LABEL } from '../../src/ui/rtx-native-runtime-explainer';
+
+// The GRAPHICS MODE select, as shipped: every rung in the description registry
+// in ladder order, then CUSTOM (no fixed control set, so it has no registry
+// row), then the RTX native-runtime explainer, which is not a preset at all.
+const EXPECTED_GRAPHICS_OPTION_LABELS = [
+  ...GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => profile.label),
+  'CUSTOM',
+  RTX_NATIVE_RUNTIME_OPTION_LABEL,
+];
+
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
@@ -185,7 +197,19 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
     // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
     // still named the old four, so the change shipped with its own e2e red.
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'RAY TRACED', 'MAX', 'CUSTOM']);
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder.
+    // AGENTS.md makes this spec mandatory for every HUD/menu change, so this
+    // is the site that must never go stale: BALANCED joined the ladder, the
+    // list CLIMBS, and the last entry is the RTX native-runtime EXPLAINER,
+    // which is not a preset and changes no renderer setting.
+    // PASS 89: DERIVED, not re-typed. This list has now gone stale twice for
+    // the same reason - a rung moved in the shipped ladder and three browser
+    // assertions kept naming the old one. The ladder's order and labels stay
+    // pinned literally, ONCE, in src/graphics-profile-contract.test.ts; here
+    // we assert the rendered DOM equals that shipped ladder.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(EXPECTED_GRAPHICS_OPTION_LABELS.length);
+    await expect(page.locator('#graphics-profile option')).toHaveText(EXPECTED_GRAPHICS_OPTION_LABELS);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
     await expect(page.locator('#graphics-target-fps')).toBeHidden();
     await page.locator('#advanced-graphics summary').click();

@@ -32,14 +32,23 @@ export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
 /**
  * The preset ladder, in the order a player climbs it.
  *
+ * `balanced` is HF-418 (owner, 2026-09-02 19:10: "maybe make a new balanced
+ * profile that doesnt look shit like performance but will run nice and look
+ * good?"). It sits between `performance` and `high`; its control set and the
+ * reason for every entry in it are in graphics-settings-registry.ts, derived
+ * from the HF-414 cost audit.
+ *
  * `raytraced` is HF-398, and its id says what it does. It is NOT called `rtx`:
  * no shipping browser exposes a hardware ray-tracing pipeline, so RT cores are
  * unreachable from a tab and a preset named after them would be a claim the
  * build cannot back. This id reaches the player directly — the effective-preset
  * badge prints it uppercased — so it has to be true as a label and not merely
- * as an internal token.
+ * as an internal token. The word RTX appears in exactly one place in the
+ * player-facing build, and it is not a preset: it is the native-runtime
+ * EXPLAINER (src/ui/rtx-native-runtime-explainer.ts), which changes no
+ * renderer setting at all.
  */
-export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom';
+export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';
 
 export type GraphicsSettings = Readonly<AdvancedGraphicsValues & {
@@ -166,7 +175,7 @@ export type CapabilityHints = Readonly<{
 
 export const MIN_GRAPHICS_TARGET_FPS = 30;
 export const MAX_GRAPHICS_TARGET_FPS = 360;
-const PRESETS = new Set<GraphicsPreset>(['performance', 'high', 'raytraced', 'max', 'custom']);
+const PRESETS = new Set<GraphicsPreset>(['performance', 'balanced', 'high', 'raytraced', 'max', 'custom']);
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
