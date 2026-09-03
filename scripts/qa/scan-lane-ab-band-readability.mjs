@@ -53,6 +53,7 @@ const ARENA_CAMERAS = Object.freeze({
   'high-seas': 'high-seas-starboard-overview',
   test1: 'test1-tower-overview',
   test2: 'test2-estate-overview',
+  nuketown2: 'nuketown2-street-centre',
 });
 
 const ARENA_HEAVY_WEATHER = Object.freeze({
@@ -63,6 +64,7 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
   'high-seas': 'storm',
   test1: null,
   test2: null,
+  nuketown2: null,
 });
 
 const ARENAS = arg('--arenas', 'atomic-acres,skyline-terminal,test1')

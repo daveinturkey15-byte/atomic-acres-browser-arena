@@ -74,6 +74,7 @@ const ARENA_CAMERAS = Object.freeze({
   'high-seas': 'high-seas-starboard-overview',
   test1: 'test1-tower-overview',
   test2: 'test2-estate-overview',
+  nuketown2: 'nuketown2-street-centre',
   map3: 'map3-hub-vista',
 });
 
@@ -99,17 +100,18 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
   'high-seas': 'storm',
   test1: null,
   test2: null,
+  nuketown2: null,
   map3: 'overcast',
 });
 
 /**
- * The NULL EXPERIMENT. These two arenas are `pinned: true` in
+ * The NULL EXPERIMENT. These three arenas are `pinned: true` in
  * `ARENA_DAYLIGHT_PROFILES`, so every choice resolves to the identity write and
  * their excursion deltas must be zero to within the noise floor. They are the
  * only rows in this sweep whose correct answer is known in advance, which makes
  * them the check on the instrument rather than on the lane.
  */
-const PINNED_ARENAS = new Set(['gun-range', 'map3']);
+const PINNED_ARENAS = new Set(['gun-range', 'map3', 'nuketown2']);
 
 /**
  * How far a PINNED arena is allowed to move before this run stops being
