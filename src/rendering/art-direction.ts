@@ -698,13 +698,26 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
   // shipped arenas. See the numbers recorded beside `gain`.
   'nuketown2': frozen({
     id: 'nuketown2',
-    brief: 'Suburban test town under bleached noon - over-lit board siding, violet shade, one saturated bus.',
+    brief: 'Suburban rebuild under a low warm sun - amber siding highlights, violet shade, one cream-and-red coach.',
     cdl: {
       // Searched 2026-09-02, not felt: the brightest in-bounds gain in the
-      // catalog (over-lit), the maximum legal lift (noon haze never lets the
+      // catalog (over-lit), the maximum legal lift (haze never lets the
       // blacks close), and a gamma RAMP that opens red and closes blue, which
       // is what puts the violet in the shade while the sunlit siding stays
-      // near-white. Weakest pair 0.02446 against atomic-acres - above the
+      // near-white.
+      //
+      // HF-426 JOB 3, 2026-09-03: NOT RE-SEARCHED, ON PURPOSE. Job 3 re-lit
+      // the arena to the shipped map's evening (see rendering/arenas/
+      // nuketown2.ts), and the obvious move was to warm this row to match. It
+      // is left exactly as searched, for two measured reasons. First,
+      // `gradeThroughArena` - the instrument the distinctiveness gate runs -
+      // reads ONLY this row: no light, no fog, no sky enters it, so re-tuning
+      // by eye could only move the 0.02446 weakest pair DOWN toward the
+      // 0.02157 floor with nothing measured in exchange. Second, the row
+      // already does over a low sun what it was searched to do over noon:
+      // warm gain with red opened and blue closed puts amber in the highlight
+      // and violet in the shade, which IS the golden-hour read. What changed
+      // is the brief above, which described the light rather than the grade. Weakest pair 0.02446 against atomic-acres - above the
       // test's 0.02157 floor AND above the shipped catalog's own weakest pair
       // (rustworks-1v1 vs gun-range, 0.02262), measured by the same instrument.
       // Being closest to atomic-acres is the correct outcome to check hardest:
