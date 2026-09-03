@@ -10,31 +10,31 @@ const shellHtml = readFileSync('release-shell/index.html', 'utf8');
 const staging = readFileSync('scripts/release/stage-release-topology.mjs', 'utf8');
 const playwrightServer = readFileSync('scripts/qa/playwright-web-server.mjs', 'utf8');
 
-describe('Pass 88 release topology', () => {
-  // Re-pinned from PASS 87 on 2026-09-02 (the pass88 cut). The pass82 publish shipped with
+describe('Pass 89 release topology', () => {
+  // Re-pinned from PASS 88 on 2026-09-02 (the pass89 cut). The pass82 publish shipped with
   // the PASS 81 stamp still in place - the same never-stamped-the-new-pass failure this
   // test was written for on PASS 80. Re-pinned at EQUAL strictness - every field still
   // exact - and the protected fallback pins below are untouched.
-  it('identifies this source as Pass 88 without moving any protected fallback pin', () => {
+  it('identifies this source as Pass 89 without moving any protected fallback pin', () => {
     expect(PASS66_RELEASE_IDENTITY).toMatchObject({
-      pass: 'PASS 88',
-      label: 'PASS 88',
+      pass: 'PASS 89',
+      label: 'PASS 89',
       state: 'RELEASE CANDIDATE',
-      route: 'channels/pass88',
-      runtimeLabel: 'PASS 88',
+      route: 'channels/pass89',
+      runtimeLabel: 'PASS 89',
     });
-    expect(config.latest.label).toBe('PASS 88');
+    expect(config.latest.label).toBe('PASS 89');
     // The identity's route must be the channel the config actually stages, or the shell
     // links players at a 404 - which is exactly how a correct bundle came to announce
     // itself as the wrong pass. This assertion did not exist before.
     expect(config.experimental.path).toBe(PASS66_RELEASE_IDENTITY.route);
     // HF-400, owner 2026-09-02: "pin this version and remove all past versions, this can
-    // be the safe backup". PASS 87 is the single pinned backup the in-build chooser
+    // be the safe backup". PASS 88 is the single pinned backup the in-build chooser
     // (src/bootstrap.ts) falls back to; PASS 73 at channels/the-big-one is retired by the
-    // pass88 publish and must no longer be offered anywhere - a card that 404s is worse
+    // pass89 publish and must no longer be offered anywhere - a card that 404s is worse
     // than no card. Owner policy change, not a weakened pin: the backup is still exact.
-    expect(config.pass87Backup).toMatchObject({
-      pass: 'PASS 87', path: 'channels/pass87',
+    expect(config.pass88Backup).toMatchObject({
+      pass: 'PASS 88', path: 'channels/pass88',
     });
     expect(config.pass73Retained).toBeUndefined();
     expect(config.previous).toMatchObject({
@@ -221,7 +221,7 @@ describe('Pass 88 release topology', () => {
   // failure on every retry, recoverable only by a full rebuild.
   it('validates the candidate pass identity before it moves anything out of the dist root', () => {
     const validation = staging.indexOf('Experimental candidate does not contain');
-    // Lane AR (PASS 88): the moves became copy-then-remove so a throw cannot empty the dist root;
+    // Lane AR (PASS 89): the moves became copy-then-remove so a throw cannot empty the dist root;
     // the first COPY is the first thing that touches the channel.
     const firstMove = staging.indexOf("cpSync(join(distRoot, 'index.html')");
     expect(validation).toBeGreaterThan(-1);
@@ -302,7 +302,7 @@ describe('Pass 88 release topology', () => {
 // The cross-browser proof that a reload converges lives outside the unit suite, because it
 // needs three real browser HTTP caches; this is the structural half.
 describe('the published chooser cannot be assembled from two publishes', () => {
-  const publish = readFileSync('scripts/orchestration/publish_pass88.py', 'utf8');
+  const publish = readFileSync('scripts/orchestration/publish_pass89.py', 'utf8');
 
   it('gives index.html the substitution points publish needs, and no second cacheable list', () => {
     // The channel list is INLINED. A separate release-channel-config.js is still written
@@ -380,7 +380,7 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     // HF-400, owner 2026-09-02 06:58 BST: "also when you push the next pass, pin this
     // version and remove all past versions, this can be the safe backup". The threshold
     // moves from two recent predecessors to ONE because the owner changed the policy - the
-    // chooser now carries exactly PASS 88 and the pinned PASS 87 backup - not because the
+    // chooser now carries exactly PASS 89 and the pinned PASS 88 backup - not because the
     // gate was inconvenient. What it still refuses is the 2026-08-30 complaint itself: the
     // newest pass beside nothing but an ancient fallback.
     expect(publish).toContain('def assert_predecessors_offered(channels)');
@@ -390,8 +390,8 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     expect(publish).toContain('pin this version and remove all past versions, this can be the safe backup');
     expect(publish).toContain('"experimental": {');
     expect(publish).toContain('"previous": {');
-    expect(publish).toContain('PASS 87 · SAFE BACKUP');
-    expect(publish).toContain('KEEP_AT_LEAST = {"pass87"}');
+    expect(publish).toContain('PASS 88 · SAFE BACKUP');
+    expect(publish).toContain('KEEP_AT_LEAST = {"pass88"}');
     // The retired copy must not linger: a label for a tree this publish deletes is a card
     // that would 404 if anyone pasted it back.
     expect(publish).not.toContain('PASS 82 · PREVIOUS VERSION');
@@ -406,10 +406,10 @@ describe('the published chooser cannot be assembled from two publishes', () => {
   it('retires every other tree by enumerating gh-pages at run time and asserts the exact post-state', () => {
     // HF-400. A hardcoded RETIRE list is how a tree survives a retirement it was meant
     // for - the script must read channels/ off the checkout and delete everything that
-    // is not pass88 or pass87, then look at the disk again before committing.
+    // is not pass89 or pass88, then look at the disk again before committing.
     expect(publish).toContain('EXPECTED_POST_STATE = {LIVE_TREE, BACKUP_TREE}');
-    expect(publish).toContain('LIVE_TREE = "pass88"');
-    expect(publish).toContain('BACKUP_TREE = "pass87"');
+    expect(publish).toContain('LIVE_TREE = "pass89"');
+    expect(publish).toContain('BACKUP_TREE = "pass88"');
     expect(publish).toContain('def enumerate_channel_trees(gh_pages_dir)');
     expect(publish).toContain('os.listdir(channels_dir)');
     expect(publish).toContain('def plan_retirements(gh_pages_dir)');
@@ -476,14 +476,14 @@ describe('the published chooser cannot be assembled from two publishes', () => {
     expect(publish).toContain('if path != BACKUP_CHANNEL:');
   });
 
-  it('keeps the build-freshness guard at exactly the pass87 scope plus the dist-pass88 copy', () => {
+  it('keeps the build-freshness guard at exactly the pass88 scope plus the dist-pass89 copy', () => {
     // A hand-copied dist-passNN published as green is the regression class this guard
     // closes (2026-08-31). Its scope is what makes it a gate: every directory it skips is
     // a directory whose files can go newer than the build without the guard noticing. The
-    // pass88 copy of the guard once quietly added `artifacts` to that skip list under a
+    // pass89 copy of the guard once quietly added `artifacts` to that skip list under a
     // commit line saying the guard was unchanged; the skeptic caught it. Pin the set so
     // the next narrowing has to be made here, in the open.
-    const pass87 = readFileSync('scripts/orchestration/publish_pass87.py', 'utf8');
+    const pass88 = readFileSync('scripts/orchestration/publish_pass88.py', 'utf8');
     const guardOf = (source: string) => source.slice(
       source.indexOf('def assert_build_is_not_stale():'),
       source.indexOf('STALE BUILD:'),
@@ -494,10 +494,10 @@ describe('the published chooser cannot be assembled from two publishes', () => {
       return new Set(match![1].match(/"([^"]+)"/g)!.map((literal) => literal.slice(1, -1)));
     };
     const pass84Guard = guardOf(publish);
-    const pass83Set = excluded(guardOf(pass87));
+    const pass83Set = excluded(guardOf(pass88));
     const pass84Set = excluded(pass84Guard);
     expect(pass83Set.size).toBeGreaterThan(0);
-    expect(pass84Set).toEqual(new Set([...pass83Set, 'dist-pass88']));
+    expect(pass84Set).toEqual(new Set([...pass83Set, 'dist-pass89']));
     expect(pass84Set.has('artifacts')).toBe(false);
     expect(pass84Guard).toContain('not d.startswith("dist-")');
     expect(pass84Guard).toContain('if not name.endswith((".ts", ".tsx", ".css", ".html", ".json")):');

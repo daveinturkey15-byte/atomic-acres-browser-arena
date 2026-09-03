@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass88ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass89ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 88. */
+const pass88ReleasedAt = '2026-09-03T04:57:44+01:00';
 /** gh-pages publish receipt for PASS 87. */
 const pass87ReleasedAt = '2026-09-03T04:33:06+01:00';
 /** gh-pages publish receipt for PASS 86. */
@@ -138,11 +140,30 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
     // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass89',
+    pass: 'PASS 89',
+    title: 'Pass 89 · Balanced Profile, RTX Explainer, Time of Day & Lighting Tiers',
+    releasedAt: pass89ReleasedAt,
+    areas: Object.freeze(['GRAPHICS', 'LIGHTING', 'ARENAS']),
+    summary: 'Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework.',
+    highlights: Object.freeze([
+      'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
+      'Selecting RTX now explains what it is - a separate native runtime - instead of silently switching the web renderer',
+      'Time of day on every arena, chosen by the host in the private lobby and replicated to everyone, without touching the frozen light set',
+      'Baked indirect lighting as an adjustable tier per profile: colour bleed and soft fill from an offline path-traced probe volume that costs nothing per frame',
+      'Farcrysis is parked off the menu until its rework with the new vegetation, water and interior-lighting techniques',
+      'Pass 88 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
     id: 'pass88',
     pass: 'PASS 88',
     title: 'Pass 88 · Faster First Loads Without Losing the Switch Fix',
     releasedAt: pass88ReleasedAt,
-    areas: Object.freeze(['PERFORMANCE', 'ARENAS', 'GRAPHICS']),
+    areas: Object.freeze(['PERFORMANCE', 'ARENAS']),
     summary: 'Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time.',
     highlights: Object.freeze([
       'Switching arenas mid-session no longer fails the compile fence on any of the 56 arena pairs, and a cold first load of Gun Range or High Seas is back to its PASS 86 time (the first attempt had made them up to half slower)',
@@ -152,7 +173,6 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
       // where pass85 was the pending top entry; pass85 published before the
       // merge, so the highlight moved here, to the entry the release stamp
       // names. src/graphics-profile-contract.test.ts pins that placement.
-      'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
       'Pass 87 stays published as the single safe backup; every older channel is retired',
     ]),
   }),

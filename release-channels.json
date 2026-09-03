@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 88",
-    "description": "Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time."
+    "label": "PASS 89",
+    "description": "Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework."
   },
   "experimental": {
-    "pass": "PASS 88",
-    "label": "PASS 88",
-    "description": "Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time.",
-    "path": "channels/pass88"
+    "pass": "PASS 89",
+    "label": "PASS 89",
+    "description": "Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework.",
+    "path": "channels/pass89"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass87Backup": {
-    "label": "PASS 87 · SAFE BACKUP",
+  "pass88Backup": {
+    "label": "PASS 88 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 87",
-    "path": "channels/pass87"
+    "pass": "PASS 88",
+    "path": "channels/pass88"
   }
 }
