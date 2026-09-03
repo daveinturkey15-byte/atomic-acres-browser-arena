@@ -82,6 +82,22 @@ export const UPLOAD_EVERY_STEPS = 8;
 /** How long the scene root must be stable before the proxy is extracted. */
 export const EXTRACTION_DEBOUNCE_MS = 1_000;
 
+/**
+ * The cap on that wait.
+ *
+ * MEASURED IN THE LIVE BUILD 2026-09-03: the scene root of a running match has
+ * 58-64 direct children and they CHURN - pooled presentation groups, prewarmed
+ * corpses, one `window-debris:*` group per pane of glass anybody breaks. A rule
+ * that waits for the root to hold still for a full second can therefore wait
+ * forever in combat, which is exactly what happened to the first attempt at this
+ * fix: it detected the arena swap and then never got a settled moment to act on
+ * it. Stability is still preferred, because extracting mid-stream is how a layer
+ * bakes an empty scene; but after this long the extraction happens anyway, and
+ * the empty-scene rule is enforced on the RESULT instead - a proxy with no
+ * shapes is discarded and re-attempted rather than bound.
+ */
+export const REDERIVE_MAXIMUM_WAIT_MS = 6_000;
+
 export type BakedIndirectRuntimeSources = BakedIndirectSources & Readonly<{
   /** The arena sun, for the bake's lighting AND for the scene-root fallback. */
   sun: THREE.DirectionalLight | THREE.PointLight | null;
@@ -161,18 +177,36 @@ export function bakeLightingFromSun(
   });
 }
 
+/**
+ * The app's own published arena identity, which is the cheap exact answer to
+ * "did the arena change".
+ *
+ * `legacy-main.ts` writes `document.documentElement.dataset.arenaId` on every
+ * arena selection. Reading it costs a property access, it cannot be confused by
+ * pooled objects appearing and disappearing under the scene root, and it is
+ * already the identity every other headless check in this repository keys on.
+ * Injectable so a unit test can drive it without a DOM.
+ */
+export function readPublishedArenaId(): string | null {
+  const scope = globalThis as unknown as {
+    document?: { documentElement?: { dataset?: Record<string, string | undefined> } };
+  };
+  return scope.document?.documentElement?.dataset?.arenaId ?? null;
+}
+
 export function buildBakedIndirectRuntime(
   sources: BakedIndirectRuntimeSources,
   tuning: BakedIndirectTuning,
   cache: BakedIndirectVolumeCache = () => null,
   now: () => number = () => (typeof performance === 'undefined' ? Date.now() : performance.now()),
+  arenaId: () => string | null = readPublishedArenaId,
 ): BakedIndirectRuntime {
   const graph = buildBakedIndirectLightNode(sources, tuning, BAKED_INDIRECT_RUNTIME_GRID, 'runtime');
   let active = tuning;
   let session: IrradianceBakeSession | null = null;
   let boundDigest: string | null = null;
   let stepsSinceUpload = 0;
-  let lastRootSignature = '';
+  let lastRootSignature = -1;
   let signatureStableSince = Number.POSITIVE_INFINITY;
   let state: 'none' | 'cache' | 'baking' | 'baked' = 'none';
   // Set when an input the digest covers has changed under a settled scene, so
@@ -181,12 +215,15 @@ export function buildBakedIndirectRuntime(
   // detected by the two keys below.
   let digestDirty = false;
   // What was true the last time the proxy was actually extracted and hashed.
-  // Re-derivation is gated on THESE changing, not on `boundDigest` being null,
-  // and both are cheap enough to evaluate every frame: a string compare and a
-  // handful of vector operations. Extraction only happens when one of them
-  // moves, so the frame cost of the guard is not the cost of the guard's job.
-  let derivedForSignature: string | null = null;
+  // Re-derivation is gated on THESE changing, not on `boundDigest` being null.
+  // Both are cheap enough to evaluate every frame - a property read and a
+  // handful of vector operations - and the expensive half (walking ten thousand
+  // scene nodes) happens only when one of them moves.
+  let everDerived = false;
+  let derivedForArena: string | null = null;
   let derivedForLighting: string | null = null;
+  /** When the current outstanding change was first observed. */
+  let pendingSince: number | null = null;
 
   // The scene-pass assembler hands this module the camera, not the scene, and
   // the camera is parented into the scene. Walking up beats changing an
@@ -226,58 +263,69 @@ export function buildBakedIndirectRuntime(
     graph.setVolume(session.volume());
   };
 
-  /**
-   * A cheap structural fingerprint of the scene root's direct children.
-   *
-   * The count alone is not enough: an arena swap that happens to replace one
-   * set of top-level groups with the same NUMBER of groups reads as unchanged,
-   * and that is the case B1 shipped. `Object3D.id` is a stable per-object
-   * counter, so summing the ids alongside the count distinguishes "the same
-   * children" from "a different set of children" without walking the tree.
-   */
-  const rootSignature = (root: THREE.Object3D): string => {
-    let sum = 0;
-    for (const child of root.children) sum = (sum + child.id) % 0xffffffff;
-    return `${root.children.length}:${sum}`;
-  };
-
   /** The quantised sun, as a key. Cheap; no allocation beyond the string. */
   const lightingKey = (lighting: BakeLighting): string => [
     ...lighting.sunDirection, ...lighting.sunColour,
   ].join(',');
 
+  /**
+   * WHY THE ARENA IDENTITY AND NOT THE SCENE STRUCTURE.
+   *
+   * The obvious re-derivation trigger is "the set of children under the scene
+   * root changed". It was tried and it does not work in the live build: the
+   * root's 58-64 children churn during a match, so a structural fingerprint
+   * either never settles (no re-bake ever happens - measured) or re-extracts on
+   * every broken window. The arena's published id changes exactly when the arena
+   * changes and at no other time. `root.name` is the fallback for a headless
+   * fixture with no document.
+   */
+  const currentArenaKey = (root: THREE.Object3D): string => arenaId() ?? root.name ?? '';
+
   const maybeStartBake = (): void => {
     const root = sceneRoot();
     if (!root) return;
-    const signature = rootSignature(root);
     const at = now();
     // SETTLING, not throttling. The arena streams in after the pipeline is
-    // assembled, so the test is "the root has stopped changing", not "enough
-    // time has passed since I last looked". Extracting on the first frame is
-    // how a layer ends up baking an empty scene and reporting it as healthy.
+    // assembled, so the preferred test is "the root has stopped changing", not
+    // "enough time has passed since I last looked". Extracting on the first
+    // frame is how a layer ends up baking an empty scene and reporting it as
+    // healthy. `REDERIVE_MAXIMUM_WAIT_MS` caps the wait; the empty-scene rule is
+    // then enforced on the extraction's result.
+    const signature = root.children.length;
     if (signature !== lastRootSignature) {
       lastRootSignature = signature;
       signatureStableSince = at;
-      return;
     }
-    if (at - signatureStableSince < EXTRACTION_DEBOUNCE_MS) return;
-    // The lighting is derived BEFORE the guard, because the sun crossing a
-    // quantisation cell is one of the two things that must re-open it. It is a
-    // few vector operations; the expensive half is the extraction below.
+    // Derived BEFORE the guard, because the sun crossing a quantisation cell is
+    // one of the three things that must re-open it.
     const lighting = bakeLightingFromSun(sources.sun);
     const lightKey = lightingKey(lighting);
-    // Re-derive when anything the digest covers may have moved: a settled root
-    // whose structure differs from the one we last hashed, a sun that has left
-    // its quantisation cell, or a tier change. Otherwise there is nothing new
-    // to hash and the extraction is skipped - that is the frame-cost guard, and
-    // it is a guard on RE-HASHING, not on ever hashing again.
-    if (!digestDirty
-      && derivedForSignature === signature
-      && derivedForLighting === lightKey) return;
-    digestDirty = false;
-    derivedForSignature = signature;
-    derivedForLighting = lightKey;
+    const arenaKey = currentArenaKey(root);
+    const outstanding = digestDirty
+      || !everDerived
+      || derivedForArena !== arenaKey
+      || derivedForLighting !== lightKey;
+    if (!outstanding) {
+      pendingSince = null;
+      return;
+    }
+    if (pendingSince === null) pendingSince = at;
+    const settled = at - signatureStableSince >= EXTRACTION_DEBOUNCE_MS;
+    const waitedLongEnough = at - pendingSince >= REDERIVE_MAXIMUM_WAIT_MS;
+    if (!settled && !waitedLongEnough) return;
+
     const proxy = extractProxyScene(root, THREE, ARENA_PROXY_EXTRACTION);
+    if (proxy.shapes.length === 0) {
+      // RULE 2. A sky-only volume is a CORRECT image of nothing, and binding one
+      // would look healthy in every receipt. Wait and try again instead.
+      pendingSince = at;
+      return;
+    }
+    digestDirty = false;
+    everDerived = true;
+    derivedForArena = arenaKey;
+    derivedForLighting = lightKey;
+    pendingSince = null;
     const digest = computeBakeDigest(proxy, lighting, active);
     // Publishing the proxy is what makes the BUILD-TIME half of this feature
     // possible: `scripts/qa/extract-arena-proxy.mjs` reads it out of a headless
@@ -287,10 +335,10 @@ export function buildBakedIndirectRuntime(
     // exists; nothing is serialised unless something asks for it.
     const scope = globalThis as unknown as { __ATOMIC_ACRES_BAKE_PROXY__?: unknown };
     scope.__ATOMIC_ACRES_BAKE_PROXY__ = {
-      arenaId: root.name || 'arena', digest, tier: active.tier, lighting, scene: proxy,
+      arenaId: arenaKey || 'arena', digest, tier: active.tier, lighting, scene: proxy,
     };
     if (digest === boundDigest) return;
-    startBake(proxy, lighting, digest, root.name || 'arena');
+    startBake(proxy, lighting, digest, arenaKey || 'arena');
   };
 
   return Object.freeze({

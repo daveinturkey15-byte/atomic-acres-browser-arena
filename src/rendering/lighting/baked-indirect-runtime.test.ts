@@ -11,8 +11,10 @@ import {
 import { publishBakedIndirectReceipt } from './baked-indirect-node';
 import {
   EXTRACTION_DEBOUNCE_MS,
+  REDERIVE_MAXIMUM_WAIT_MS,
   bakeLightingFromSun,
   buildBakedIndirectRuntime,
+  readPublishedArenaId,
   type BakedIndirectRuntimeSources,
 } from './baked-indirect-runtime';
 
@@ -226,10 +228,17 @@ describe('buildBakedIndirectRuntime', () => {
     // sampled the FIRST arena's volume, at the first arena's origin. Every
     // measurement row taken for this lane was a cold single-arena page load -
     // the one condition under which that is invisible.
+    //
+    // The trigger is the app's own published arena id
+    // (`documentElement.dataset.arenaId`), injected here because this fixture
+    // has no DOM. A structural fingerprint of the scene root was tried first and
+    // measured NOT to work in the live build: the root's children churn during a
+    // match, so it never settled and the re-bake never happened.
     const { root, camera, sun } = arenaScene();
     let clock = 0;
+    let arena = 'arena-one';
     const runtime = buildBakedIndirectRuntime(
-      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock,
+      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock, () => arena,
     );
     runtime.beforeRender();
     clock += EXTRACTION_DEBOUNCE_MS + 1;
@@ -238,8 +247,8 @@ describe('buildBakedIndirectRuntime', () => {
     expect(runtime.source()).toBe('baked');
     const firstArena = runtime.graph.receipt().digest;
 
-    // Swap the arena: every mass out, a different set in, exactly what an arena
-    // transition does to the scene root.
+    // Swap the arena: every mass out, a different set in, and the published id
+    // moves - exactly what an arena transition does.
     for (const child of [...root.children]) {
       if (child.name.startsWith('wall-') || child.name === 'floor') root.remove(child);
     }
@@ -253,13 +262,41 @@ describe('buildBakedIndirectRuntime', () => {
       root.add(mesh);
     }
     root.updateMatrixWorld(true);
+    arena = 'arena-two';
     clock += 1;
-    runtime.beforeRender();                       // notices the new structure
+    runtime.beforeRender();                       // notices the new id
     clock += EXTRACTION_DEBOUNCE_MS + 1;
     runtime.beforeRender();                       // re-derives and restarts
     expect(runtime.source()).toBe('baking');
     expect(runtime.graph.receipt().digest).not.toBe(firstArena);
     runtime.dispose();
+  });
+
+  it('re-derives even when the scene root never holds still, after the capped wait', () => {
+    // The live condition the first fix attempt died on: a match whose scene root
+    // gains and loses pooled children continuously, so "stable for a second"
+    // never becomes true. The wait is capped, and the empty-scene rule is then
+    // enforced on the extraction's RESULT instead of on the clock.
+    const { root, camera, sun } = arenaScene();
+    let clock = 0;
+    let arena = 'arena-one';
+    const runtime = buildBakedIndirectRuntime(
+      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock, () => arena,
+    );
+    const churn = (frames: number) => {
+      for (let frame = 0; frame < frames; frame += 1) {
+        clock += 16;
+        // One transient child added and removed on alternate frames: the root's
+        // child count never repeats for a whole second.
+        if (frame % 2 === 0) root.add(new THREE.Object3D());
+        else root.remove(root.children[root.children.length - 1]);
+        runtime.beforeRender();
+      }
+    };
+    churn(Math.ceil(REDERIVE_MAXIMUM_WAIT_MS / 16) + 4);
+    expect(runtime.source()).not.toBe('none');
+    runtime.dispose();
+    expect(arena).toBe('arena-one');
   });
 
   it('RE-BAKES when the sun leaves its quantisation cell under a live session (B1)', () => {
@@ -315,6 +352,9 @@ describe('buildBakedIndirectRuntime', () => {
     }
     expect(runtime.source()).toBe('baked');
     expect(runtime.graph.receipt().digest).toBe(settled);
+    // And with no DOM at all the published-id reader answers null rather than
+    // throwing, which is what makes it safe to call every frame.
+    expect(readPublishedArenaId()).toBeNull();
     runtime.dispose();
   });
 
