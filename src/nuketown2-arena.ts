@@ -1198,6 +1198,28 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [0.02, GROUND_H - 0.08, run[1]! - run[0]!], m.interior,
       { solid: false, shots: false, cast: false });
   });
+  // HF-440 Cycle 3: Interior partition wall domestic dressing
+  // Breaks up massive blank foreground drywall surface with framed artwork, clock & switch
+  // Framed vintage wall art on the large foreground partition:
+  pair(builder, 'house living art frame', [-5.1, 1.75, PARTITION_Z - WALL_T / 2 - 0.015], [1.20, 0.80, 0.03], m.fence,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house living art canvas', [-5.1, 1.75, PARTITION_Z - WALL_T / 2 - 0.022], [1.06, 0.66, 0.015], m.sign,
+    { solid: false, shots: false, cast: false });
+  // Mid-century starburst wall clock:
+  pair(builder, 'house living wall clock rim', [-3.95, 2.05, PARTITION_Z - WALL_T / 2 - 0.015], [0.32, 0.32, 0.03], m.chrome,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house living wall clock face', [-3.95, 2.05, PARTITION_Z - WALL_T / 2 - 0.022], [0.26, 0.26, 0.015], m.trim,
+    { solid: false, shots: false, cast: false });
+  // Light switch plate beside the passage architrave:
+  pair(builder, 'house living switch plate', [-3.45, 1.25, PARTITION_Z - WALL_T / 2 - 0.01], [0.09, 0.14, 0.015], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house living switch toggle', [-3.45, 1.25, PARTITION_Z - WALL_T / 2 - 0.018], [0.02, 0.04, 0.012], m.chrome,
+    { solid: false, shots: false, cast: false });
+  // Architectural crown molding along the partition-ceiling joint:
+  pair(builder, 'house living crown molding west', [(HOUSE_X0 + -3.6) / 2, 2.93, PARTITION_Z - WALL_T / 2 - 0.02], [baseW0, 0.06, 0.04], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house living crown molding east', [(-1.8 + HOUSE_X1 - WALL_T) / 2, 2.93, PARTITION_Z - WALL_T / 2 - 0.02], [baseW1, 0.06, 0.04], m.trim,
+    { solid: false, shots: false, cast: false });
 
   // Domestic kitchen & living dressing:
   pair(builder, 'house kitchen counter top', [-4.8, LOW_COVER + 0.02, HOUSE_FRONT_Z - 2.8], [3.28, 0.05, 1.08], m.trim,
