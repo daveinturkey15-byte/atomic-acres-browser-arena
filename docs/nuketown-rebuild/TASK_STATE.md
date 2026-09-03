@@ -39,13 +39,62 @@
   `src/rendering/arenas/nuketown2.ts` and `src/graphics-refinement.ts`.
 
 ## Job 3 — approved visual style
-- **State**: PENDING, not started by this pass.
-- Port the shipped Nuke Town's look: `src/rendering/arenas/atomic-acres.ts`,
-  `src/nuketown-lawn-field.ts`, `src/nuketown-forest-surround.ts`, the mountain
-  ring, and the art-direction row — keeping the distinctiveness floor against
-  the shipped map.
-- Start from `REFERENCE_SCHEMATIC.md` §5.3 (house colours) and §9 (what this
-  pass already re-derived, and what it deliberately left alone).
+- **State**: DONE 2026-09-03 (Claude Opus 5.1), gates green.
+- **Materials.** `nuketown2Materials()` is the shipped map's palette, MEASURED
+  rather than eyeballed: the mean albedo of each PBR texture set `atomic-acres`
+  streams, at that set's authored roughness/metalness, plus its flat-authored
+  `white` / `mustard` / `chrome` and art-kit's `MAT.rubber` / `MAT.cream`.
+  Nothing is imported. Three reference overrides: houses BLUE / YELLOW /
+  ORANGE (§5.3 — green+yellow are the ORIGINAL Nuketown's), a cream-and-red
+  coach, and a plain box van. `pair()` now takes `[north, south]` materials so
+  the two houses differ by paint alone; geometry, and therefore the symmetry
+  gate, is untouched.
+- **Lawn.** `buildNuketownRebuildLawnField` grows the shipped map's field on
+  regions DERIVED from `NUKETOWN2_GROUND_DRESSING`'s `material: 'lawn'`
+  rectangles plus their rotational partners, with `builder.colliders` as the
+  keep-out truth, so neither extents nor keep-outs can drift. 9,953 tufts,
+  149,295 triangles, 8 draws.
+- **Surrounds.** The forest ring and mountain ring take an ENVELOPE each; the
+  shipped map's envelope holds its authored numbers exactly (its own tests stay
+  green) and the rebuild's is fitted to 36 × 84: forest 44.5–70 m, massif from
+  66 m, no ground skirt (this arena authors its own ground, now 270 m so the
+  massif is not standing half on nothing).
+- **Light and grade.** Key, fill, fog curve, atmosphere and exposure are the
+  shipped map's. Sky is `estate-golden-hour` — the shipped `sunset-farmland`
+  resolves to an ASSET this arena may not have. Shadow normal bias stays 0.044
+  (derived from this footprint's own 44 × 92 m volume). The art-direction CDL
+  is left EXACTLY as searched; only its brief prose changed.
+- **Three corrections the first capture round measured**, not predicted: the
+  road rendered as a hole at a texture-mean albedo on an untextured box; the
+  perimeter was a concrete compound wall in both yard frames; and the overhead
+  review camera stood inside the new forest ring.
+
+## Evidence from Job 3 (2026-09-03)
+- tsc clean; 97 targeted gate tests green (nuketown2 fidelity 16, nuketown
+  fidelity, art direction, arena visual definition, map selection, menu preview
+  video, lawn field, forest surround, mountain backdrop).
+- Collider/visual parity **0** invisible colliders, **0** walk-through meshes.
+  Walkable-surface parity **0** fall-through floors.
+- Art-direction distinctiveness, the test's own instrument: floor 0.02157,
+  `atomic-acres` vs `nuketown2` **0.02446**, unchanged by this pass and still
+  above the shipped catalog's own weakest pair (0.02262).
+- Review-camera capture 7/7 on hardware WebGPU, three rounds:
+  `artifacts/viewpoint-regression/hf426-job3`, `-v2`, `-v3` (final).
+- Arena boot smoke: `nuketown2` boots a clean visible solo match, 29.7 s.
+- 60 s headless solo run on `nuketown2`: 0 page errors, 0 console errors,
+  **100 mean FPS**, p95 14 ms, still active at the end
+  (`artifacts/qa/nuketown2-job3-solo-60s.json`).
+- Menu preview + loading backdrop re-captured through the sanctioned
+  generators. `qa:pass77:menu-previews` verified; generator lineage 6/6 after
+  the additive repair described below.
+
+### Open, and not this lane's
+- `qa:pass65:menu-previews` reports 11 digest-mismatch / drift lines against
+  PASS 65's frozen expectations of the shared capture generator. Verified
+  PRE-EXISTING on this head (identical output with Job 3's changes stashed).
+- The shared generator lineage was stale for the same reason and HAS been
+  repaired here, additively, with `write-capture-generator-lineage.mjs` — the
+  tool the failure names. No recorded digest was edited in place.
 
 ## Evidence from the rebuild pass
 - tsc clean; 270 targeted gate tests green (16 fidelity, spawn quality,
