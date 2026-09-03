@@ -213,7 +213,7 @@ export function nuketownRebuildLawnRegions(
 ): readonly GrassRegionRect[] {
   const regions: GrassRegionRect[] = [];
   for (const piece of dressing) {
-    if (piece.material !== 'lawn') continue;
+    if (piece.material !== 'lawn' || piece.id.includes('infill')) continue;
     const minX = Math.min(piece.x0, piece.x1);
     const maxX = Math.max(piece.x0, piece.x1);
     const minZ = Math.min(piece.z0, piece.z1);

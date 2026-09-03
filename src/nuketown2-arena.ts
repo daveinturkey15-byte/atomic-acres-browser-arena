@@ -1228,6 +1228,8 @@ export const NUKETOWN2_GROUND_DRESSING = Object.freeze([
   // The verge either side of the head, running out to the map edge.
   Object.freeze({ id: 'street lawn west', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: HOUSE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
   Object.freeze({ id: 'street lawn east', material: 'lawn' as const, x0: GARAGE_X1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  // HF-440: Infill between turning head (x=8) and east lawn (x=9.25), in front of drive.
+  Object.freeze({ id: 'street lawn turning infill', material: 'lawn' as const, x0: TURNING_HEAD_HALF, x1: GARAGE_X1, z0: -TURNING_HEAD_HALF, z1: KERB_Z }),
   // Back yard lawn: the whole strip between the house back wall and the fence.
   Object.freeze({ id: 'yard lawn', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: NUKETOWN2_BOUNDS.maxX, z0: YARD_FENCE_Z, z1: HOUSE_BACK_Z }),
   // Border path outside the fence.
