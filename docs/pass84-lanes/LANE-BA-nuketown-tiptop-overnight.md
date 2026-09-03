@@ -56,3 +56,22 @@ time on ports 4280-4289; explicit-path commits (GLM trailer); Gemini critics
 write their scores to docs/evidence/pass93/nuketown2-tiptop/cycle-N/ and never
 edit code. Report with claim-states; the Opus reviewer after the reset verifies
 the captures, the gates and the scores before PASS 93.
+
+## Addendum 2026-09-03 19:05 — carry-overs from the HF-443 review
+
+Targets added for the overnight builder/critic cycles (each needs its own gate
+line in the lane report):
+
+1. **Breakable ground-floor glass** on the Rebuild, matching the shipped Nuke
+   Town's house glass (`house-navigation.ts`, `breakable: kind === 'glass'`):
+   needs the `breakableWindowId` + dynamic-collider path, which arena `box()`
+   solids do not have. Keep the walk-through budget `nuketown2: 0` in the
+   collider-visual parity gate.
+2. **Bot line-of-sight through glass:** bots read `map.colliders`; a pane the
+   player shoots through must not blind the bots. Prove with a bot-LOS unit test
+   on a pane before/after.
+3. **Undressed ground patch** (≈1.25 × 2.7 m) between the turning head (x = 8) and
+   `street lawn east` (x = 9.25): dress it at tier −2 and re-run the coplanar
+   instrument (FINDINGS must stay 0; UNAUDITED list must not grow).
+4. **Forest contact skirts:** if the pre-cut follow-up did not land the
+   polygonOffset −3 fence, land it here and take a far-edge render for the critic.

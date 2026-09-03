@@ -1111,3 +1111,27 @@ assets and textures and lighting need to be tip top, raid can come next"
   + profile fold (HF-438) + deploy attribution docs + the reviewed Nuke Town
   geometry. Target cut 20:30, no later than 21:00, as a PREVIEW for owner
   feedback (mechanical gates; full play verification overnight).
+
+## HF-443 — Opus review of the Nuke Town geometry branch, 2026-09-03 19:00
+
+- **Verdict:** GLM's four commits (HF-434..437) VERIFIED-OK on real geometry and
+  real Rapier probes; three review commits added (`7caa643d`, `7dd21b1e`,
+  `205f615c`): stair-headroom gate now uses capsule + autostep (the rule the arena
+  derives), the descent probe asserts upper-floor waypoints and a monotone walk,
+  truck openings measured on the built bodies, and the coplanar instrument no
+  longer silently skips the lawn field, forest ring and mountains (16 meshes now
+  listed as UNAUDITED instead of "skipped: 0").
+- **Depth math:** near 0.02 m, far 180 m → depth quantum ≈ 1.07 cm at 60 m,
+  1.9 cm at 80 m; the old +0.02 m decals and exactly-coplanar floors/road were the
+  z-fighting. Tiers ground 0 → road/floors −1 → lawn/dashes −2 (integer
+  polygonOffset units, as WebGPU depthBias requires; verified to reach the WebGPU
+  path in three 0.185.1).
+- **Gates at 205f615c:** tsc 0; 48/48 (fidelity, parity, shed registry, map
+  selection, factory registry); coplanar FINDINGS 0; nuketown2 boot smoke 27.8 s
+  on native WebGPU.
+- **OPEN (not tonight):** (a) forest contact skirts at +27 mm may still shimmer
+  beyond ~95 m — polygonOffset −3 requested as a follow-up; (b) ground-floor glass
+  is permanent (shipped Nuke Town's breaks) and bots may not see through it →
+  overnight/tomorrow item; (c) undressed ground patch 1.25 × 2.7 m between the
+  turning head and the east street lawn; (d) a magenta marker near the south
+  driveway in two captures — being identified before the cut.
