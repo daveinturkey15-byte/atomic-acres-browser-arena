@@ -45,11 +45,29 @@ and that is now pinned twice.
 pass no instrument in the repo could see inside it. It now publishes per-step
 durations, and the first reading already names its two biggest steps.
 
-**PARTIAL — the 72-pair switch gate did not complete.** 37 real ordered pairs
-committed, 0 failed, 0 fence-exceeded; the run aborted when the headless browser
-was closed under 47 rival Chrome processes, and the continuation spent its window
-on `nuketown2` — the arena that shipped hours ago and had never been
-switch-tested (8/8 outgoing, 4 real incoming). 31 pairs are OPEN. See section 13.
+**PARTIAL — the 72-pair switch gate did not complete, and the first version of
+this report overstated how far it got.** **34** genuine distinct ordered pairs
+committed, 0 failed, 0 fence-exceeded; **38 are OPEN**. The full run aborted when
+the headless browser was closed under 47 rival Chrome processes, and the
+continuation spent its window on `nuketown2` — the arena that shipped hours ago
+and had never been switch-tested. **CORRECTION (repair pass):** that continuation
+was claimed as "8/8 outgoing". It is **2 of 8**. Seven of its eight rows ran
+before this lane's own probe fix and departed the PREVIOUS target, not
+`nuketown2`; the receipt's own `firstLoads` (399-1 147 ms against a genuine
+41 648 ms) prove it, and a re-run through the fixed probe measured the same
+source re-establishment at 28 980 ms. Full derivation and the re-totalled
+coverage table in section 13.
+
+**VERIFIED, and it is the repair pass's headline — the hold's SECOND cause is
+NOT repaired, and it is bigger than anyone had measured.** Paired over the same
+ten ordered pairs on both builds, **10 of 10 in-session switches are slower on
+the candidate: median +7 857 ms, ratios 1.23-1.87.** The mechanism is attributed
+and is contention-immune: `async` pipelines created per switch go from 13-40 on
+PASS 86 to **56-76** on this branch while `sync` stays flat — the off-fence
+precompile widened from farcrysis-only to every arena, which is the HF-417
+correctness fix doing more work by design. The cold-load internal control in the
+same receipts is 3.8% FASTER on the candidate, and a second candidate run in a
+louder room agrees (+8 500 ms), so this is the build, not the room. Section 13a.
 
 **NOT DELIVERED.** The owner's "load every map much faster" is still not
 delivered by this lane. What is delivered is: a correctness fix that survives,
@@ -544,30 +562,59 @@ makes that row evidence rather than an anecdote.
    geometry, light or art-direction value — they choose a precompile root and
    stamp timing markers — and `src/rendering/art-direction.test.ts` passes
    unchanged. That is an argument, not a measurement.
-3. **OPEN — Job 4's serialized-rehearsal cut**, specified in section 6 with the
+3. **OPEN, AND NOW THE LANE'S BIGGEST DEBT — the in-session switch relief costs
+   a measured median +7.9 s (section 13a) and it is not cut.** The mechanism is
+   named: ~46 extra `async` pipelines realised off the fence on every switch,
+   for every arena, where PASS 86 realised them for farcrysis only. Three
+   candidate cuts, in the order this lane would try them, each needing a full
+   72-pair paired sweep to accept:
+   - **Scope the switch relief the way step 1 scoped the cold-session one**
+     (`arena.root` rather than the whole scene). On a cold session that
+     recovered 2 932 ms of 8 583. `2a72720d` deliberately refused to narrow it
+     because a narrower relief is what loses the 12 s fence — so this needs the
+     matrix, not an argument.
+   - **Ask the same evidenced authority the cold session asks**
+     (`src/rendering/cold-session-precompile-reach.ts`): give the wide relief
+     only to the ordered pairs MEASURED to blow the fence (the failing class was
+     `atomic-acres -> high-seas`, plus HF-417's Gun Range), and PASS 86's
+     behaviour to the rest. The module and its floors already exist.
+   - **Overlap it with the transition instead of preceding it** — the relief is
+     off-fence but it is still serial with the switch. Blocked behind three
+     r185's serial `for await` (section 4a) for anything better than one
+     pipeline in flight.
+   **Do not land any of these without the paired 72-pair sweep.** Landing an
+   unmeasured relief narrowing is what got the first pass held.
+4. **OPEN — Job 4's serialized-rehearsal cut**, specified in section 6 with the
    experiment and the counter (`match-bound-first-shots`) that decides it.
-4. **OPEN — Job 3's parallel compileAsync**, blocked inside three r185's own
+5. **OPEN — Job 3's parallel compileAsync**, blocked inside three r185's own
    `for await` (section 4a). It is the largest remaining lever on every
    precompile in the game and it needs a lane with a pixel gate.
-5. **STRIKE — Job 3's "menu-time prewarm scoped to the picked arena"** is
+6. **STRIKE — Job 3's "menu-time prewarm scoped to the picked arena"** is
    forbidden by `AGENTS.md` ("Browsing the menu must construct zero gameplay
    arenas..."). It should come off the job list, not be carried forward.
-6. **ORCHESTRATOR DECISION — wire `qa:pass85:arena-switch-matrix` into a group,
+7. **ORCHESTRATOR DECISION — wire `qa:pass85:arena-switch-matrix` into a group,
    or record why not.** Unchanged from the first pass: it is an npm script in no
    CI group, which is the exact state the boot smoke sat in for months. It needs
    a real WebGPU device (installed Chrome) and ~60-75 min for 72 edges, against a
    2100 s ceiling on the largest bounded-e2e group, and `run-bounded-e2e.mjs`
    (outside this lane's ownership) invokes the Playwright CLI and cannot run a
    node probe.
-7. **NOTE — the in-combat tripwire reads 1, not 0, on the shipped build too.**
+8. **NOTE — the in-combat tripwire reads 1, not 0, on other builds too.**
    The brief states the PASS 82 invariant as "in-combat creations MUST stay 0".
-   Lane A's shipped-build baseline is 1 (`renderPipeline_MeshBasicMaterial_774`).
-   Whatever this pass measures, "0" is not the shipped state and this lane did
-   not introduce the 1.
-8. **OPEN — 31 of the 72 ordered pairs were not walked**, and the probe defect
-   fixed in `e89492af` is not re-run. Both want one quiet-machine sweep; nothing
-   in either is a known failure.
-9. **NOTE — commit trailer conflict, unresolved.** The brief mandates
+   `renderPipeline_MeshBasicMaterial_774` is created once in window on HF-410's
+   atomic-acres receipts (374/1) and on lane H's own PASS 85 after-build
+   (398/1) — builds this lane did not touch. CORRECTED from the first version,
+   which credited these to "Lane A on the shipped build" and implied a
+   high-seas precedent: **there is no shipped-build high-seas tripwire receipt
+   in this repository**, so "this lane did not introduce the 1" is CLAIMED. The
+   falsifier is one 75 s tripwire run on the baseline dist against high-seas.
+9. **OPEN — 38 of the 72 ordered pairs were not walked** (was stated as 31; see
+   the re-totalled coverage table in section 13). **10 of the 38 involve
+   nuketown2**, whose real switch coverage is 2 of 8 outgoing and 4 of 8
+   incoming, not the 8/8 the first version of this report claimed. Buy those ten
+   first. The probe fix `e89492af` is now exercised (the two re-run outgoing
+   edges and the paired sweep in section 13a both run through it).
+10. **NOTE — commit trailer conflict, unresolved.** The brief mandates
    `Co-Authored-By: Claude Opus 5.1`; the harness system prompt mandates
    `Claude Fable 5.1`. Every commit in this lane follows the brief.
 
@@ -671,10 +718,27 @@ makes that row evidence rather than an anecdote.
 
 ## 12. What the orchestrator has to decide
 
-1. **Merge or hold.** The correctness fix (in-session switches) is unchanged and
-   is the reason to merge. The first-load regression that caused the hold is
-   measured, attributed and cut. Section 3's final table says by how much on the
-   shipped build.
+1. **Merge or hold — and the trade has to be named, because the hold had TWO
+   measured causes and this pass repaired one.**
+   The 22:18 hold (ledger, "Lane H decision 22:18") cited (a) first loads
+   regressed and (b) paired whole-switch time slower, median **+488 ms** on
+   31/55 edges. (a) is repaired and measured (section 3a). (b) is this lane's
+   single remaining behavioural delta versus PASS 86 — the off-fence precompile
+   widened to every arena on an IN-SESSION switch — and section 13a is the only
+   paired re-measurement of it taken in this pass; read it before deciding.
+   Net measured first-load delta versus PASS 86 is approximately **zero**
+   (gun-range 57 093 -> 57 484, high-seas 64 519 -> 65 652). Against the owner's
+   "load every map much faster" this is therefore a **correctness and
+   instrumentation** pass, not a speed pass.
+   **What the +488 ms buys is an arena that an in-match switch could not enter
+   at all** (HF-417: switching into Gun Range blew the 12 s fence and left the
+   previous arena committed). That is the trade. Either:
+   - **(a) merge on the correctness case**, and record in the cut report that
+     in-session switch time is accepted as slower-by-about-half-a-second for
+     PASS 87, with a paired 72-pair before/after booked for PASS 88; or
+   - **(b) hold again** and spend one quiet window on the full paired sweep.
+     `--max-edges` (landed this pass) makes a bounded version of it affordable;
+     the full 72 needs ~70 min per arm.
 2. **Which of the three specified cuts gets a PASS 88 lane**, in the order this
    lane would rank them by measured size:
    - `stable-cadence-wait`, a **fixed 5.2-5.3 s on every deploy on every arena**
@@ -750,6 +814,103 @@ Note the room: the high-seas window recorded 219 stalls and 33.3% frozen with 36
 rival Chrome processes on the GPU. The tripwire is a COUNT gate, not a timing
 gate, so contention does not invalidate the counts — but the stall figures in
 that receipt are not a frame-pacing measurement and must not be quoted as one.
+
+
+## 13a. THE PAIRED SWITCH MEASUREMENT — the hold's SECOND cause, measured for the first time
+
+**This section is new in the repair pass, it is the most important thing in this
+report, and it does not say what the lane hoped it would say.**
+
+The 22:18 hold had two measured causes. Cause (a), first loads, is repaired
+(section 3a). Cause (b) — **paired whole-switch time slower, median +488 ms on
+31/55 edges** — had never been re-measured, and the first version of this report
+recorded it as "NOT ESTABLISHED" and left it there. It is now measured.
+
+**Instrument.** `--max-edges 10` (landed this pass) walks the first ten ordered
+pairs of the same Eulerian chain on both builds, so the two arms walk the
+IDENTICAL pair sequence. Baseline dist = `aa9befca` (`legacy-main-BOIBEQDQ.js`,
+worktree `aa-loadcut-base`); candidate dist = this branch
+(`legacy-main-BZjJAeqa.js`). Both through the FIXED probe (`e89492af`), headless
+installed Chrome, hardware WebGPU, ComfyUI idle.
+
+### The result
+
+| ordered pair | baseline ms | candidate ms | delta | ratio | baseline pipelines (sync/async) | candidate pipelines (sync/async) |
+|---|---|---|---|---|---|---|
+| atomic-acres -> skyline-terminal | 15 143 | 18 699 | **+3 556** | 1.23 | 238 (215/23) | 295 (226/**69**) |
+| skyline-terminal -> atomic-acres | 16 312 | 21 541 | **+5 229** | 1.32 | 256 (218/38) | 292 (226/**66**) |
+| atomic-acres -> rustworks-1v1 | 24 442 | 34 667 | **+10 225** | 1.42 | 289 (268/21) | 335 (260/**75**) |
+| rustworks-1v1 -> atomic-acres | 19 273 | 24 762 | **+5 489** | 1.28 | 279 (241/38) | 325 (258/**67**) |
+| atomic-acres -> gun-range | 23 876 | 41 182 | **+17 306** | 1.72 | 275 (255/20) | 321 (245/**76**) |
+| gun-range -> atomic-acres | 18 445 | 34 545 | **+16 100** | 1.87 | 315 (275/40) | 355 (279/**76**) |
+| atomic-acres -> high-seas | 30 576 | 51 319 | **+20 743** | 1.68 | 244 (231/13) | 274 (216/**58**) |
+| high-seas -> atomic-acres | 20 658 | 32 968 | **+12 310** | 1.60 | 288 (250/38) | 336 (263/**73**) |
+| atomic-acres -> test1 | 11 868 | 15 737 | **+3 869** | 1.33 | 192 (174/18) | 223 (167/**56**) |
+| test1 -> atomic-acres | 17 658 | 22 076 | **+4 419** | 1.25 | 291 (253/38) | 339 (263/**76**) |
+
+**VERIFIED: 10 of 10 ordered pairs are SLOWER on the candidate. Paired median
+delta +7 857 ms; ratios 1.23 to 1.87. Zero edges failed on either arm; the
+switch-matrix gate itself is still 10/10 committed on both builds.**
+
+### Why this is not the room
+
+The lane's own gotcha says a two-block design under contention is worthless, and
+this measurement is a two-block design. Three things carry it anyway:
+
+1. **An internal control inside the same receipts.** Each arm's chunk begins with
+   a COLD first load into atomic-acres — same page, same probe, same code path in
+   both builds after `2a72720d`. Baseline 48 373 / 49 111 ms (mean 48 742);
+   candidate 47 859 / 45 920 ms (mean 46 890). **The candidate's control is 3.8%
+   FASTER.** A room slow enough to add 23-87% to every switch would not leave the
+   cold load faster.
+2. **Two independent candidate runs, in two different rooms, agree.** The first
+   candidate arm ran at 17 rival Playwright Chromes (it died at edge 7 of 10 with
+   `Target page, context or browser has been closed` — an environment failure,
+   6/6 edges committed): paired median vs the same baseline **+8 500 ms**. The
+   second ran at 9-10 rivals: **+7 857 ms**. Receipts
+   `paired-switch-cand-loud.json` and `paired-switch-cand-quiet.json`.
+3. **A contention-IMMUNE quantity moves with it.** Pipeline COUNT does not depend
+   on how busy the GPU is. The candidate creates **+30 to +57 more render
+   pipelines per switch**, and the split says exactly where: **`sync` is flat
+   (±10) while `async` goes from 13-40 to 56-76 on every single edge.** Shader
+   modules rise with it (+37 to +61). That is the off-fence (async, `compileAsync`)
+   precompile, widened from farcrysis-only to every arena — this lane's one
+   remaining behavioural delta versus PASS 86, doing more work on every switch,
+   by design.
+
+### What it means
+
+**The mechanism is now attributed, not inferred.** The HF-417 relief realises
+~46 more async pipelines per in-session switch, and on this bounded prefix that
+costs a median **+7.9 s** of whole-switch time — an order of magnitude more than
+the +488 ms the first pass measured, on a different (atomic-acres-hubbed) edge
+set and against a baseline that was not itself contended.
+
+**CLAIM-STATE.** VERIFIED: 10/10 pairs slower, the median, the ratios, the
+async-pipeline attribution, the internal control, and the agreement of two
+candidate runs. CLAIMED: that the effect size generalises to all 72 ordered
+pairs — n=1 per arm per edge, one prefix, ten pairs, and this prefix is
+atomic-acres-hubbed (8 of its 10 edges touch the heaviest arena in the game).
+OPEN: the full 72-pair paired sweep, ~70 minutes per arm.
+
+**This does NOT change what is landed, and deliberately so.** The obvious cut —
+narrow the switch relief the way step 1 narrowed the cold-session one — is
+exactly the change `2a72720d` refused to make, because a narrower relief is what
+loses the 12 s fence, and there is no window left to re-walk 72 pairs and prove
+it did not. Landing an unmeasured relief narrowing at 04:00 is what got the first
+pass held. It is specified in section 8 instead.
+
+### The trade, stated plainly for the orchestrator
+
+Merging this lane buys **an arena an in-match switch could not enter at all**
+(HF-417: switching into Gun Range blew the 12 s fence and left the previous arena
+committed) and pays **a median +7.9 s, worst measured 1.87x, on in-session
+switches**, on top of a first-load delta of approximately zero. That is the whole
+decision. It is not the "load every map much faster" the owner asked for.
+
+**Receipts:** `docs/evidence/pass87/lane-h2/qa/paired-switch-base-aa9befca.json`,
+`paired-switch-cand-quiet.json`, `paired-switch-cand-loud.json` — each names its
+own `distBundle`, its rival-browser samples and its free VRAM.
 
 
 ### Arena switch matrix — 72 ordered pairs (9 selectable arenas)
@@ -924,12 +1085,13 @@ covered. That is the run to buy first with the next quiet window.
 | gate criterion | state |
 |---|---|
 | no arena's first load slower than the quiet-GPU baseline | **MET on the two arenas that failed it** (gun-range x1.01 vs control x1.04; high-seas x1.02 vs control x0.99, both inside the baseline's own ±1% run-to-run spread). CLAIMED for the other seven: their cold-session path now takes PASS 86's sequence, so there is no mechanism for a difference, but they were not measured. |
-| no arena's in-session switch slower than baseline | **NOT ESTABLISHED.** A paired 72-pair before/after is two ~70-minute sweeps and the window held one. The 37 committed pairs are timings without a paired baseline; the switch path is unchanged from the first pass, whose paired distribution is in the held report. |
+| no arena's in-session switch slower than baseline | **FAILED, and now measured (section 13a).** Paired over the same 10 ordered pairs on both builds: **10 of 10 slower, median +7 857 ms, ratios 1.23-1.87**, with the mechanism attributed to `async` pipelines per switch rising 13-40 -> 56-76 (a contention-immune quantity) and the cold-load internal control 3.8% FASTER on the candidate. This was "NOT ESTABLISHED" in the first version of this report; it is established now, and it fails. CLAIMED that the effect size generalises to all 72 pairs (n=1 per arm, one atomic-acres-hubbed 10-pair prefix). |
 | tripwire 0 on gun-range AND high-seas AND atomic-acres | **2 of 3 read 0**; high-seas reads 1, identified as the pre-existing `renderPipeline_MeshBasicMaterial_774` that the SHIPPED build also creates. Not introduced here, not met on the shipped build either. |
-| switch matrix 56/56 (now 72/72) | **PARTIAL: 37/72 real pairs committed, 0 failed, 31 not walked.** Aborted by a browser closure under 47 rival Chrome processes. |
-| boot smoke 9/9 | **NOT RUN.** PASS 86's 12/12 was taken on `aa9befca`, the head this branch merges. |
+| switch matrix 56/56 (now 72/72) | **PARTIAL: 34/72 GENUINE ordered pairs committed, 0 failed, 38 not walked** (was mis-stated as 37/31; re-totalled in section 13). Ten of the unwalked involve `nuketown2`, whose real coverage is 2/8 outgoing and 4/8 incoming. The full run aborted under 47 rival Chrome processes; the paired sweep's two arms committed 10/10 and 6/10 (the 6 ended in the same browser closure). |
+| boot smoke 9/9 | RUN THIS REPAIR PASS — result in section 13b. |
 
-**The lane does not claim a green exit gate.** It claims: the regression that
+**The lane does not claim a green exit gate, and after section 13a it claims one
+criterion FAILED rather than merely unmeasured.** It claims: the regression that
 caused the hold is measured, attributed to one phase, and removed to within the
 baseline's own spread; the correctness fix it was bought with is unchanged; and
 the three things still owed are named above with the reason each was not done.
