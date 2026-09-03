@@ -110,6 +110,12 @@ import {
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_UPPER_Y0,
 } from './nuketown2-layout';
+import {
+  createNuketown2AsphaltMaterial,
+  createNuketown2DashMaterial,
+  createNuketown2DriveMaterial,
+  createNuketown2KerbMaterial,
+} from './nuketown2-street-materials';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -587,45 +593,45 @@ function streetVehicle(
 // ---------------------------------------------------------------------------
 
 type Nuketown2Materials = Readonly<{
-  ground: THREE.MeshStandardMaterial;
-  lawn: THREE.MeshStandardMaterial;
-  asphalt: THREE.MeshStandardMaterial;
-  kerb: THREE.MeshStandardMaterial;
-  drive: THREE.MeshStandardMaterial;
+  ground: THREE.Material;
+  lawn: THREE.Material;
+  asphalt: THREE.Material;
+  kerb: THREE.Material;
+  drive: THREE.Material;
   /** HF-434: the driveway/border-path DECALS - polygonOffset tier -1. */
-  driveDecal: THREE.MeshStandardMaterial;
+  driveDecal: THREE.Material;
   /** HF-434: the garage floor - drive's paint at the -1 decal tier. */
-  garageFloor: THREE.MeshStandardMaterial;
+  garageFloor: THREE.Material;
   /** North house board siding - the reference's BLUE house. */
-  sidingA: THREE.MeshStandardMaterial;
+  sidingA: THREE.Material;
   /** South house board siding - the reference's YELLOW house. */
-  sidingB: THREE.MeshStandardMaterial;
+  sidingB: THREE.Material;
   /** Both garage wings - the reference's ORANGE. */
-  garageSiding: THREE.MeshStandardMaterial;
+  garageSiding: THREE.Material;
   /** The up-and-over garage door leaf parked in its head. */
-  garageDoor: THREE.MeshStandardMaterial;
-  trim: THREE.MeshStandardMaterial;
+  garageDoor: THREE.Material;
+  trim: THREE.Material;
   /** HF-434: the road DASHES - polygonOffset tier -2, over the -1 road. */
-  trimDecal: THREE.MeshStandardMaterial;
-  roof: THREE.MeshStandardMaterial;
-  interior: THREE.MeshStandardMaterial;
+  trimDecal: THREE.Material;
+  roof: THREE.Material;
+  interior: THREE.Material;
   /** HF-434: the interior floor - interior's paint at the -1 decal tier. */
-  interiorFloor: THREE.MeshStandardMaterial;
-  fence: THREE.MeshStandardMaterial;
-  block: THREE.MeshStandardMaterial;
-  busShell: THREE.MeshStandardMaterial;
-  busTrim: THREE.MeshStandardMaterial;
-  truckCab: THREE.MeshStandardMaterial;
-  truckBox: THREE.MeshStandardMaterial;
-  carA: THREE.MeshStandardMaterial;
-  carGlass: THREE.MeshStandardMaterial;
+  interiorFloor: THREE.Material;
+  fence: THREE.Material;
+  block: THREE.Material;
+  busShell: THREE.Material;
+  busTrim: THREE.Material;
+  truckCab: THREE.Material;
+  truckBox: THREE.Material;
+  carA: THREE.Material;
+  carGlass: THREE.Material;
   /** HF-434: the coach window BANDS - polygonOffset tier -1 over the body. */
-  coachGlass: THREE.MeshStandardMaterial;
+  coachGlass: THREE.Material;
   /** HF-435: the ground-floor window panes - real glass, visible and pale. */
-  windowGlass: THREE.MeshStandardMaterial;
-  rubber: THREE.MeshStandardMaterial;
-  sign: THREE.MeshStandardMaterial;
-  planter: THREE.MeshStandardMaterial;
+  windowGlass: THREE.Material;
+  rubber: THREE.Material;
+  sign: THREE.Material;
+  planter: THREE.Material;
 }>;
 
 /**
@@ -693,9 +699,11 @@ function nuketown2Materials(): Nuketown2Materials {
     return material;
   };
   const lawn = withOffset(standard(0x496438, 1, 0), 'nuketown2-lawn-decal', -2);
-  const asphalt = withOffset(standard(0x41464a, 0.98, 0.02), 'nuketown2-asphalt-road', -1);
-  const driveDecal = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-drive-decal', -1);
-  const trimDecal = withOffset(standard(0xf0e4c9, 0.68, 0.03), 'nuketown2-trim-decal', -2);
+  // HF-440 Cycle 1 Priority 2: procedural TSL carriageway, kerbs, aprons and worn dashes
+  const asphalt = createNuketown2AsphaltMaterial();
+  const driveDecal = createNuketown2DriveMaterial();
+  const trimDecal = createNuketown2DashMaterial();
+  const kerb = createNuketown2KerbMaterial();
   const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
   // HF-435: the house window panes. Visible from the street (pale, slightly
   // transparent - the gun-range control room's glazing idiom), not a batched
@@ -736,7 +744,7 @@ function nuketown2Materials(): Nuketown2Materials {
     asphalt,
     // concrete-poured, fresh at the kerb and weathered on the apron - the
     // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
-    kerb: standard(0xa9a697, 0.94, 0.02),
+    kerb,
     drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
     driveDecal,
     garageFloor,
