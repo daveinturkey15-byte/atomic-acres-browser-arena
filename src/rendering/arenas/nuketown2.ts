@@ -134,6 +134,10 @@ export const definition = createProceduralArenaVisualDefinition({
     // shadows running toward the viewer are all in one frame. Nothing above
     // reviews any of them.
     camera('nuketown2-into-sun-street', [14, 1.85, -9], [-11.6, 4.2, 6.7], 'light-occlusion', 1.08),
+    // Fixed judgeset interior stations (HF-440 Lane BA):
+    camera('nuketown2-north-interior', [-1.25, 1.7, -19.5], [-1.25, 1.6, -12.0], 'geometry', 1.08),
+    camera('nuketown2-south-interior', [1.25, 1.7, 19.5], [1.25, 1.6, 12.0], 'geometry', 1.08),
+    camera('nuketown2-garage', [6.75, 1.7, -20.5], [6.75, 1.5, -14.0], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',
