@@ -1415,25 +1415,23 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
     streetVehicle(builder, `coach waist stripe ${index}`, [c.x, 1.35, c.z + side * c.width / 2],
       [c.length - 0.6, 0.5, 0.08], m.busTrim, { solid: false, shots: false, cast: false });
     streetVehicle(builder, `coach window band ${index}`, [c.x, 2.25, c.z + side * c.width / 2],
-      // HF-434: the band is a decal 0.04 m proud of the body face - the
-      // window-band class the owner named - so it draws on the -1 coachGlass
-      // tier instead of the body-clean carGlass.
-      [c.length - 1.6, 0.8, 0.08], m.coachGlass, { solid: false, shots: false, cast: false });
+      [c.length - 0.6, 0.9, 0.08], m.coachGlass, { solid: false, shots: false, cast: false });
   }
-  // Front and rear wrap-around chrome bumpers:
-  streetVehicle(builder, 'coach bumper front', [c.x - c.length / 2 - 0.10, 0.35, c.z],
+  streetVehicle(builder, 'coach bumper front', [c.x + c.length / 2 + 0.1, 0.35, c.z],
     [0.22, 0.30, c.width + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
-  streetVehicle(builder, 'coach bumper rear', [c.x + c.length / 2 + 0.10, 0.35, c.z],
+  streetVehicle(builder, 'coach bumper rear', [c.x - c.length / 2 - 0.1, 0.35, c.z],
     [0.22, 0.30, c.width + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
   // Chrome front grille bar & dual headlights/taillights:
-  streetVehicle(builder, 'coach front grille', [c.x - c.length / 2 - 0.02, 1.05, c.z],
+  streetVehicle(builder, 'coach front grille', [c.x + c.length / 2 + 0.02, 1.05, c.z],
     [0.06, 0.22, c.width - 0.8], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
   for (const side of [-1, 1]) {
-    streetVehicle(builder, `coach headlight ${side}`,
-      [c.x - c.length / 2 - 0.04, 0.95, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
-      { solid: false, shots: false, cast: false, presentationOnly: true });
+    // Coach rear faces west (into cul-de-sac entrance): ruby-red taillights
     streetVehicle(builder, `coach taillight ${side}`,
-      [c.x + c.length / 2 + 0.04, 1.05, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.26, 0.16], m.taillight,
+      [c.x - c.length / 2 - 0.04, 0.95, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.24, 0.18], m.taillight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    // Coach front faces east (toward turning head): illuminated headlights
+    streetVehicle(builder, `coach headlight ${side}`,
+      [c.x + c.length / 2 + 0.04, 1.05, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.22, 0.20], m.headlight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
   }
   // Wheels: keep the exact 2 expected asymmetric meshes plus decorative hubcaps and arches

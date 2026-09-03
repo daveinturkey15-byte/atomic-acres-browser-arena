@@ -180,8 +180,9 @@ export function createNuketown2TaillightMaterial(): MeshStandardNodeMaterial {
   mat.name = 'nuketown2-taillight-lens';
   mat.type = 'MeshStandardMaterial';
 
-  mat.colorNode = vec3(0.92, 0.12, 0.08);
-  mat.emissiveNode = vec3(2.5, 0.20, 0.12);
+  mat.colorNode = vec3(0.85, 0.08, 0.05);
+  // Subtle ruby-red taillight glow without over-blooming into a magenta artifact
+  mat.emissiveNode = vec3(0.45, 0.04, 0.02);
 
   return mat;
 }
