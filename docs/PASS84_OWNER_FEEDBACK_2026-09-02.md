@@ -944,3 +944,21 @@ sprint (fresh Shift after standing); menu music not halved (game music only).
   Lane AV (Raid) launched; AV is deferred to ~11:45 on Gemini. Opus continues
   only on Nuke Town (skeptic on Jobs 1-2, then Job 3 visual style) so priority 1
   is not delayed; the PASS 90 cut carries Nuke Town + chiptune/drop-shot.
+
+### HF-426 progress 08:40 BST — Nuke Town Rebuild layout is now measured from first-party minimaps
+The Gemini research was REJECTED by the Opus skeptic (three of five citations did
+not exist; it reproduced our old layout again). Redone from the two Treyarch
+minimaps (BO2 512 px and BO7 4096 px, which agree to ~1%): the playable map is
+2.36:1 with the LONG AXIS ACROSS THE STREET (yard-house-road-house-yard), the
+road is a stub opening into a cul-de-sac turning head (0.45 L), the MOVING TRUCK
+is the open body (2x core on its cargo-box roof, climb via the cab treads) and
+the 1960s COACH is closed cover, the houses nearly face each other (0.065 L
+offset) with the garages set back 0.168 L behind their own driveway aprons, fence
+gaps kept but off-axis from their rotational partners (the symmetric version
+gave an 82 m clear lane). Arena rebuilt at 36 x 84 m (absolute scale is an
+ANCHOR - one constant, no public source gives metres); 16 fidelity bands derived
+from the schematic; spawn gate, parity 0/0, walkable 0, boot smoke 13/13, 60 s
+run 99 fps zero errors. Commit f3615486. Job 3 (the shipped Nuke Town's approved
+look: blue/yellow/orange houses, cream/red coach, lawn field, forest surround
+and mountain ring re-fitted to the new footprint, menu preview re-captured) is
+running on Opus now; PASS 90 follows.
