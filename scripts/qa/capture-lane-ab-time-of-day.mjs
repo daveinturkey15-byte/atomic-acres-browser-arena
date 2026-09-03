@@ -39,6 +39,16 @@
 // excursion deltas must come out at zero. A run whose pinned arenas do not read
 // zero is not evidence about any arena, and this script says so.
 //
+// AND THE SAME MISTAKE, ONCE MORE, IN THE FRAME-TIME COLUMN
+// v2 fixed the pixel baseline and left the frame-time one exactly as broken:
+// the identity was frame-sampled ONCE per record and never paired, so
+// `frameP50DeltaMs` had no measured error bar. Its own evidence then carried
+// +4.5 ms and -18.0 ms swings, which cannot falsify a ~1 ms/frame budget in
+// either direction. v3 frame-samples the control pair (that difference is the
+// record's `frameNoiseMs`) and every interleaved identity, so each state's
+// frame delta is paired and each verdict carries `frameWithinNoise`. A delta
+// inside `frameNoiseMs` is reported as unresolvable rather than as a number.
+//
 // Runs INSTALLED CHROME HEADLESS over CDP. A run that asked for WebGPU and got
 // anything else, or got the Microsoft software adapter, is INVALIDATED rather
 // than written as evidence.
@@ -332,20 +342,33 @@ try {
         // the review frame (Gun Range's target carriers, the Firing Range
         // silhouettes) moves here on its own, and a verdict smaller than this
         // number is not a claim about lighting.
-        const controlA = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-a.png`), false);
-        const controlB = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-b.png`), false);
+        const controlA = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-a.png`), true);
+        const controlB = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-b.png`), true);
         record.pairNoisePoints = Number(
           Math.abs(controlB.stats.shadowMassPercent - controlA.stats.shadowMassPercent).toFixed(2),
         );
+        // THE FRAME-TIME NOISE FLOOR, in the same units and from the same pair
+        // as the pixel one. v2 of this script frame-sampled the identity ONCE
+        // per record and never paired it, so `frameP50DeltaMs` had no
+        // characterised error bar and could not falsify a 1 ms budget in either
+        // direction -- the same mistake v1 made with pixels. Two identity
+        // samples taken exactly the way a verdict sample is taken bound what
+        // this instrument can resolve, and every frame-time verdict below is
+        // stated against THIS number rather than against the owner's budget.
+        record.frameNoiseMs = controlA.frame && controlB.frame
+          ? Number(Math.abs(controlB.frame.p50 - controlA.frame.p50).toFixed(3))
+          : null;
 
         for (const tod of TIME_STATES) {
           // THE INTERLEAVE. The identity is re-applied and re-shot immediately
           // before every excursion, so each verdict is a pair of frames about a
           // second apart on one deploy.
+          // Frame-sampled EVERY round, not just the first: an excursion's frame
+          // time is only meaningful against an identity measured beside it.
           const before = await captureChoice(
             'authored',
             resolve(OUT, arena, `${arena}--${weather}--authored-for-${tod}.png`),
-            record.states.length === 0,
+            true,
           );
           const state = await captureChoice(tod, resolve(OUT, arena, `${arena}--${weather}--${tod}.png`), true);
           record.states.push({ tod, ...state, before });
@@ -379,14 +402,13 @@ try {
 // ---- judgement -------------------------------------------------------------
 const findings = [];
 const instrumentFindings = [];
-let frameTimeBaselineMs = null;
 for (const record of runs) {
   if (!record.states?.length) continue;
   for (const state of record.states) {
     // The paired identity frame, taken ~1 s before this one on the same deploy.
     const before = state.before;
     if (!before) continue;
-    if (before.frame) frameTimeBaselineMs = before.frame.p50;
+    const frameTimeBaselineMs = before.frame ? before.frame.p50 : null;
     const shadowGrowth = Number((state.stats.shadowMassPercent - before.stats.shadowMassPercent).toFixed(2));
     const floorDrop = before.stats.lumaP05 - state.stats.lumaP05;
     const highlightGrowth = Number((state.stats.highlightMassPercent - before.stats.highlightMassPercent).toFixed(2));
@@ -396,12 +418,18 @@ for (const record of runs) {
       shadowFloorDropSteps: floorDrop,
       highlightMassGrowthPoints: highlightGrowth,
       drawCallDelta: drawDelta,
-      // Frame time is compared against the record's ONE identity sample: the
-      // baseline is only frame-sampled on the first round, because sampling it
-      // three times costs three seconds of drift for a number that does not move.
+      // Frame time against the identity sampled IMMEDIATELY BEFORE this state,
+      // on the same deploy — paired exactly like the pixel metric.
       frameP50DeltaMs: frameTimeBaselineMs === null
         ? null
         : Number((state.frame.p50 - frameTimeBaselineMs).toFixed(3)),
+      // ... and whether that delta is inside what the record's own identity/
+      // identity pair could resolve. A delta smaller than the noise floor is
+      // NOT a measurement of the lane, and this instrument says so instead of
+      // quoting a decimal place it cannot support.
+      frameWithinNoise: frameTimeBaselineMs === null || record.frameNoiseMs === null
+        ? null
+        : Math.abs(state.frame.p50 - frameTimeBaselineMs) <= record.frameNoiseMs,
       meanLumaDelta: Number((state.stats.meanLuma - before.stats.meanLuma).toFixed(2)),
       // Reported, never subtracted. A verdict inside the record's own control
       // pair is a number this instrument cannot resolve, and saying so is the
@@ -428,6 +456,20 @@ for (const record of runs) {
     }
   }
 }
+// A record whose OWN control pair moves further than the null tolerance cannot
+// resolve a verdict at the resolution the safety threshold is stated at. v2
+// computed `pairNoisePoints` and printed it but never compared it to anything,
+// so a record that was self-evidently too noisy still issued verdicts (the
+// pre-merge sweep's gun-range record spread 0.87 points against a 0.5
+// tolerance and was trusted). This is the guard the header always claimed.
+for (const record of runs) {
+  if (!record.states?.length || record.pairNoisePoints === null || record.pairNoisePoints === undefined) continue;
+  if (record.pairNoisePoints > PINNED_NULL_TOLERANCE_POINTS) {
+    instrumentFindings.push(`${record.arena}/${record.weather}: control pair spread `
+      + `${record.pairNoisePoints}pt exceeds the ${PINNED_NULL_TOLERANCE_POINTS}pt resolution this run `
+      + 'claims, so its verdicts are not finer than its own noise');
+  }
+}
 if (instrumentFindings.length) exitCode = 3;
 
 const report = {
@@ -438,7 +480,7 @@ const report = {
   frameSamples: FRAME_SAMPLES,
   safety: SAFETY,
   instrument: {
-    version: 'interleaved-identity-baseline-v2',
+    version: 'interleaved-identity-baseline-v3-paired-frame-time',
     pinnedNullTolerancePoints: PINNED_NULL_TOLERANCE_POINTS,
     pinnedArenas: [...PINNED_ARENAS],
   },
