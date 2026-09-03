@@ -101,6 +101,8 @@ import {
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
+  NUKETOWN2_GROUND_FLOOR_T,
+  NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
@@ -123,7 +125,6 @@ import {
   createNuketown2GarageWallMaterial,
   createNuketown2GlassMaterial,
   createNuketown2PoolWaterMaterial,
-  createNuketown2TileFloorMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
 import {
@@ -201,6 +202,8 @@ const YARD_FENCE_Z = HOUSE_BACK_Z - YARD_DEPTH;            // -36
 /** Storey heights. Ground 3.0, upper 2.9, both slabs 0.3, roof deck at 6.5. */
 const GROUND_H = NUKETOWN2_GROUND_STOREY_H;
 const FLOOR_T = NUKETOWN2_FLOOR_T;
+const GROUND_FLOOR_T = NUKETOWN2_GROUND_FLOOR_T;
+const GROUND_FLOOR_TOP = NUKETOWN2_GROUND_FLOOR_TOP;
 const UPPER_Y0 = NUKETOWN2_UPPER_Y0;                        // 3.3
 const UPPER_H = 2.9;
 const ROOF_Y0 = UPPER_Y0 + UPPER_H;                         // 6.2
@@ -290,10 +293,11 @@ export const NUKETOWN2_HOUSE_STAIR = Object.freeze({
   /** Outboard edge: the inside face of the west wall. */
   x0: HOUSE_X0 + WALL_T,
   width: 1.65,
-  riser: 0.3,
+  /** The smooth ramp rises from the raised slab to the upper slab over 11 authored rise bands. */
+  riser: (UPPER_Y0 - GROUND_FLOOR_TOP) / 11,
   /** 0.42 m: over the 0.22 m Rapier autostep minimum width, under the 6.05 m the room has. */
   going: 0.42,
-  /** 11 x 0.30 = 3.30 = NUKETOWN2_UPPER_Y0, so the top tread IS the upper floor. */
+  /** 11 rise bands span the raised ground-floor slab to the upper floor. */
   risers: 11,
   landingDepth: 0.9,
 });
@@ -328,11 +332,21 @@ const STAIR_FOOT_Z = STAIR_HEAD_Z
  * and the well opens a capsule radius (plus 0.12 m, five times the
  * controller's own 0.025 m skin) before tread 2's near edge.
  */
-const STAIR_MAX_FEET_UNDER_CEILING = GROUND_H - STANDING_CAPSULE_M - AUTOSTEP_M;
+const STAIR_MAX_FEET_UNDER_CEILING = GROUND_H - GROUND_FLOOR_TOP - STANDING_CAPSULE_M - AUTOSTEP_M;
 const STAIR_FIRST_UNCOVERED_TREAD = Math.floor(STAIR_MAX_FEET_UNDER_CEILING / NUKETOWN2_HOUSE_STAIR.riser);
 const STAIRWELL_Z0 = STAIR_FOOT_Z
   + NUKETOWN2_HOUSE_STAIR.going * STAIR_FIRST_UNCOVERED_TREAD
   - STANDING_RADIUS_M - 0.12;
+
+/** Small plan overlap at both ends keeps the capsule from catching a seam. */
+const STAIR_RAMP_LANDING_OVERLAP = 0.12;
+const STAIR_RAMP_START_Z = STAIR_FOOT_Z - STAIR_RAMP_LANDING_OVERLAP;
+const STAIR_LANDING_START_Z = STAIR_HEAD_Z - NUKETOWN2_HOUSE_STAIR.landingDepth;
+const STAIR_RAMP_END_Z = STAIR_LANDING_START_Z + STAIR_RAMP_LANDING_OVERLAP;
+const STAIR_RAMP_RUN = STAIR_RAMP_END_Z - STAIR_RAMP_START_Z;
+const STAIR_RAMP_RISE = UPPER_Y0 - GROUND_FLOOR_TOP;
+const STAIR_RAMP_ANGLE = Math.atan2(STAIR_RAMP_RISE, STAIR_RAMP_RUN);
+const STAIR_RAMP_THICKNESS = 0.16;
 
 /**
  * HF-435: the derived stair-well geometry, EXPORTED so the fidelity gate can
@@ -343,6 +357,15 @@ export const NUKETOWN2_STAIRWELL = Object.freeze({
   footZ: STAIR_FOOT_Z,
   headZ: STAIR_HEAD_Z,
   wellZ0: STAIRWELL_Z0,
+  rampStartZ: STAIR_RAMP_START_Z,
+  rampEndZ: STAIR_RAMP_END_Z,
+  rampBottomY: GROUND_FLOOR_TOP,
+  rampTopY: UPPER_Y0,
+  rampRun: STAIR_RAMP_RUN,
+  rampRise: STAIR_RAMP_RISE,
+  rampAngleRadians: STAIR_RAMP_ANGLE,
+  landingOverlap: STAIR_RAMP_LANDING_OVERLAP,
+  rampThickness: STAIR_RAMP_THICKNESS,
 });
 
 /**
@@ -647,7 +670,6 @@ type Nuketown2Materials = Readonly<{
   interior: THREE.Material;
   /** HF-434: the interior floor - interior's paint at the -1 decal tier. */
   interiorFloor: THREE.Material;
-  kitchenFloor: THREE.Material;
   warmLight: THREE.Material;
   coldLight: THREE.Material;
   fence: THREE.Material;
@@ -756,7 +778,6 @@ function nuketown2Materials(): Nuketown2Materials {
   const windowGlass = createNuketown2GlassMaterial();
   const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
   const interiorFloor = createNuketown2WoodFloorMaterial();
-  const kitchenFloor = createNuketown2TileFloorMaterial();
   const garageFloor = createNuketown2GarageFloorMaterial();
   const interior = createNuketown2DrywallMaterial(0xdbd1ba);
   const garageSiding = createNuketown2GarageWallMaterial();
@@ -799,7 +820,6 @@ function nuketown2Materials(): Nuketown2Materials {
     drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
     driveDecal,
     garageFloor,
-    kitchenFloor,
     warmLight,
     coldLight,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
@@ -868,12 +888,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const zMid = (HOUSE_FRONT_Z + HOUSE_BACK_Z) / 2;   // -16.5
   const cx = NUKETOWN2_HOUSE_LAYOUT[0]!.x;           // -1.25
 
-  // Ground slab and roof deck.
-  // HF-434: the floor top is EXACTLY coplanar with the ground slab's top face
-  // (143 m2 of interior floor racing the world slab every frame). The floor
-  // stays where every interior eye-probe expects it and draws on the -1
-  // interiorFloor tier, which pins the race at every range.
-  pair(builder, 'house floor', [cx, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interiorFloor, { cast: false });
+  // Ground-floor interior slab and roof deck. The slab is independently raised
+  // above the outdoor plane; `buildNuketown2()` also removes the outdoor ground
+  // tiles and all lawn regions from this plan footprint, so no offset tier is
+  // being asked to hide a second surface underneath the room.
+  pair(builder, 'house floor', [cx, GROUND_FLOOR_TOP - GROUND_FLOOR_T / 2, zMid],
+    [HOUSE_WIDTH, GROUND_FLOOR_T, HOUSE_DEPTH], m.interiorFloor, { cast: false });
   pair(builder, 'house roof deck', [cx, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH], m.roof);
 
   // West side wall, full height both storeys.
@@ -902,10 +922,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // a painting.
   const FRONT_DOOR = doorRun('house front door');
   const groundFrontRuns: [number, number][] = [
-    [HOUSE_X0, FRONT_WINDOW_A[0]],
+    [HOUSE_X0 + WALL_T, FRONT_WINDOW_A[0]],
     [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
     [FRONT_DOOR[1], FRONT_WINDOW_B[0]],
-    [FRONT_WINDOW_B[1], HOUSE_X1],
+    [FRONT_WINDOW_B[1], HOUSE_X1 - WALL_T],
   ];
   groundFrontRuns.forEach((run, index) => {
     pair(builder, `house front pier ${index}`,
@@ -961,8 +981,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   // --- front wall, upper floor: the power window ---------------------------
   const upperFrontRuns: [number, number][] = [
-    [HOUSE_X0, UPPER_WINDOW[0]],
-    [UPPER_WINDOW[1], HOUSE_X1],
+    [HOUSE_X0 + WALL_T, UPPER_WINDOW[0]],
+    [UPPER_WINDOW[1], HOUSE_X1 - WALL_T],
   ];
   upperFrontRuns.forEach((run, index) => {
     pair(builder, `house upper front pier ${index}`,
@@ -1011,8 +1031,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // --- back wall: back door and one upper window ---------------------------
   const BACK_DOOR = doorRun('house back door');
   const groundBackRuns: [number, number][] = [
-    [HOUSE_X0, BACK_DOOR[0]],
-    [BACK_DOOR[1], HOUSE_X1],
+    [HOUSE_X0 + WALL_T, BACK_DOOR[0]],
+    [BACK_DOOR[1], HOUSE_X1 - WALL_T],
   ];
   groundBackRuns.forEach((run, index) => {
     pair(builder, `house back pier ${index}`,
@@ -1025,7 +1045,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const backDoorCx = (BACK_DOOR[0] + BACK_DOOR[1]) / 2;
   pair(builder, 'house back door pediment trim', [backDoorCx, DOOR_HEAD_Y + 0.08, -23.05], [backDoorW + 0.16, 0.16, 0.10], m.trim,
     { solid: false, shots: false, cast: true });
-  [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
+  [[HOUSE_X0 + WALL_T, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
   });
@@ -1059,20 +1079,43 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [backUpperWx, UPPER_Y0 + 0.83, zBack - WALL_T / 2 - 0.015], [backUpperW + 0.06, 0.08, 0.03], m.trim,
     { solid: false, shots: false, cast: false });
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
-  // Ten 0.30 m risers and a 0.90 m landing, climbing toward the street. The
-  // riser is inside the 0.42 m autostep and the going is over the 0.22 m
-  // Rapier autostep minimum width, so this WALKS: it is not a jump puzzle and
-  // it is not a ramp the bots cannot read. Where it stands, and why it is not
-  // where the previous cut put it, is derived at NUKETOWN2_HOUSE_STAIR.
+  // Presentation treads remain visible, but one smooth rotated cuboid owns
+  // movement for the complete flight. The ramp angle is below Rapier's 50°
+  // climb ceiling and overlaps the floor/landing at both ends by 0.12 m.
   const STAIR_W = NUKETOWN2_HOUSE_STAIR.width;
   const STAIR_CX = NUKETOWN2_HOUSE_STAIR.x0 + STAIR_W / 2;
-  const RISER = NUKETOWN2_HOUSE_STAIR.riser;
   const GOING = NUKETOWN2_HOUSE_STAIR.going;
   const risers = NUKETOWN2_HOUSE_STAIR.risers;
+  const rampLength = Math.hypot(STAIR_RAMP_RUN, STAIR_RAMP_RISE);
+  const rampCentreY = (GROUND_FLOOR_TOP + UPPER_Y0) / 2
+    - Math.cos(STAIR_RAMP_ANGLE) * STAIR_RAMP_THICKNESS / 2;
+  const rampMaterial = m.interior.clone();
+  rampMaterial.name = 'nuketown2-house-stair-collision-authority';
+  rampMaterial.visible = false;
+  const rampRotation: [number, number, number] = [-STAIR_RAMP_ANGLE, 0, 0];
+  const northRamp = box(builder, 'nuketown2 north house stair ramp',
+    [STAIR_CX, rampCentreY, (STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
+    [STAIR_W, STAIR_RAMP_THICKNESS, rampLength], rampMaterial,
+    { rotation: rampRotation });
+  const southRamp = box(builder, 'nuketown2 south house stair ramp',
+    [-STAIR_CX, rampCentreY, -(STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
+    [STAIR_W, STAIR_RAMP_THICKNESS, rampLength], rampMaterial,
+    { rotation: [STAIR_RAMP_ANGLE, 0, 0] });
+  northRamp.userData.collisionOnly = true;
+  southRamp.userData.collisionOnly = true;
+  // The lightweight `colliders` channel is intentionally axis-aligned for
+  // point/doorway queries; retain the exact rotated OBBs in physicsColliders,
+  // which is the live CharacterPhysics authority for this collision-only ramp.
+  const rampBounds = new Set(builder.physicsColliders.slice(-2));
+  builder.colliders = builder.colliders.filter((bounds) => !rampBounds.has(bounds));
   for (let i = 0; i < risers - 1; i += 1) {
-    const top = RISER * (i + 1);
+    const treadZ = STAIR_FOOT_Z + GOING * (i + 0.5);
+    const top = GROUND_FLOOR_TOP
+      + ((treadZ - STAIR_RAMP_START_Z) / STAIR_RAMP_RUN) * STAIR_RAMP_RISE;
+    const treadThickness = 0.08;
     pair(builder, `house stair ${i}`,
-      [STAIR_CX, top / 2, STAIR_FOOT_Z + GOING * (i + 0.5)], [STAIR_W, top, GOING], m.interior);
+      [STAIR_CX, top - treadThickness / 2, treadZ], [STAIR_W, treadThickness, GOING], m.interior,
+      { solid: false, shots: false, cast: true });
   }
   // The landing. Its top IS the upper floor slab's top, so a player walks off
   // it rather than stepping up onto the floor, and it is deep enough to turn
@@ -1174,10 +1217,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
 
   // Baseboard trim molding along ground floor partitions and exterior walls:
-  const baseW0 = -2.7 - 0.9 - HOUSE_X0;
-  pair(builder, 'house ground baseboard north west', [(HOUSE_X0 + -3.6) / 2, 0.07, PARTITION_Z - WALL_T / 2 - 0.015], [baseW0, 0.14, 0.03], m.trim,
+  const baseW0 = -2.7 - 0.9 - (HOUSE_X0 + WALL_T);
+  pair(builder, 'house ground baseboard north west', [(HOUSE_X0 + WALL_T + -3.6) / 2, 0.07, PARTITION_Z - WALL_T / 2 - 0.015], [baseW0, 0.14, 0.03], m.trim,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'house ground baseboard south west', [(HOUSE_X0 + -3.6) / 2, 0.07, PARTITION_Z + WALL_T / 2 + 0.015], [baseW0, 0.14, 0.03], m.trim,
+  pair(builder, 'house ground baseboard south west', [(HOUSE_X0 + WALL_T + -3.6) / 2, 0.07, PARTITION_Z + WALL_T / 2 + 0.015], [baseW0, 0.14, 0.03], m.trim,
     { solid: false, shots: false, cast: false });
   const baseW1 = HOUSE_X1 - WALL_T - (-1.8);
   pair(builder, 'house ground baseboard north east', [(-1.8 + HOUSE_X1 - WALL_T) / 2, 0.07, PARTITION_Z - WALL_T / 2 - 0.015], [baseW1, 0.14, 0.03], m.trim,
@@ -1226,8 +1269,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house kitchen upper cabinets', [HOUSE_X0 + 0.55, 2.15, HOUSE_FRONT_Z - 2.8], [0.50, 0.80, 2.4], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'house kitchen floor pad', [-4.8, 0.005, HOUSE_FRONT_Z - 2.8], [3.6, 0.01, 2.2], m.kitchenFloor,
-    { solid: false, shots: false, cast: false });
   pair(builder, 'house living bench top', [1.5, LOW_COVER + 0.02, HOUSE_BACK_Z + 2.4], [3.08, 0.05, 1.08], m.interiorFloor,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house living shelf', [HOUSE_X1 - WALL_T - 0.3, 1.25, HOUSE_BACK_Z + 3.0], [0.55, 2.10, 1.80], m.trim,
@@ -1258,9 +1299,9 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   const zMid = (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2;
   const cx = (GARAGE_X0 + GARAGE_X1) / 2;
 
-  // HF-434: exactly coplanar with the ground slab like the house floor, so it
-  // draws on the -1 garageFloor tier for the same reason.
-  pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.garageFloor, { cast: false });
+  // The garage has the same independent raised interior slab as the houses.
+  pair(builder, 'garage floor', [cx, GROUND_FLOOR_TOP - GROUND_FLOOR_T / 2, zMid],
+    [GARAGE_WIDTH, GROUND_FLOOR_T, GARAGE_DEPTH], m.garageFloor, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, GARAGE_DEPTH], m.roof);
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
 
@@ -1275,7 +1316,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 
   // Garage door: a 3.5 m opening onto the driveway apron, headed at 3.0 m.
   const DOOR = doorRun('garage vehicle door');
-  [[GARAGE_X0, DOOR[0]], [DOOR[1], GARAGE_X1]].forEach((run, index) => {
+  [[GARAGE_X0 + WALL_T, DOOR[0]], [DOOR[1], GARAGE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
   });
@@ -1285,7 +1326,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 
   // Rear door into the back yard.
   const REAR = doorRun('garage rear door');
-  [[GARAGE_X0, REAR[0]], [REAR[1], GARAGE_X1]].forEach((run, index) => {
+  [[GARAGE_X0 + WALL_T, REAR[0]], [REAR[1], GARAGE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
   });
@@ -1299,11 +1340,11 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage bench', [8.1, LOW_COVER / 2, GARAGE_BACK_Z + 3.5], [1.4, LOW_COVER, 4.0], m.interior);
   // --- HF-440 Cycle 2: Garage lighting, rafters, door hardware & workshop ---
   // Overhead fluorescent dual-tube light fixture:
-  pair(builder, 'garage tube light housing', [cx, H - 0.06, zMid], [0.35, 0.08, 2.4], m.trim,
+  pair(builder, 'garage tube light housing', [cx, H - 0.12, zMid], [0.35, 0.08, 2.4], m.trim,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'garage tube light tube 0', [cx - 0.08, H - 0.12, zMid], [0.06, 0.06, 2.2], m.coldLight,
+  pair(builder, 'garage tube light tube 0', [cx - 0.08, H - 0.20, zMid], [0.06, 0.06, 2.2], m.coldLight,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'garage tube light tube 1', [cx + 0.08, H - 0.12, zMid], [0.06, 0.06, 2.2], m.coldLight,
+  pair(builder, 'garage tube light tube 1', [cx + 0.08, H - 0.20, zMid], [0.06, 0.06, 2.2], m.coldLight,
     { solid: false, shots: false, cast: false });
 
   // Roll-up garage door tracks and coiled drum:
@@ -1597,6 +1638,60 @@ export const NUKETOWN2_BUILDING_FOOTPRINTS = Object.freeze([
   Object.freeze({ id: 'garage', x0: GARAGE_X0, x1: GARAGE_X1, z0: GARAGE_BACK_Z, z1: GARAGE_FRONT_Z }),
 ]);
 
+type Nuketown2PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
+
+function planRectOverlaps(first: Nuketown2PlanRect, second: Nuketown2PlanRect): boolean {
+  return Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0) > 1e-4
+    && Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0) > 1e-4;
+}
+
+/** Both authored structures and their exact 180-degree partners own ground cuts. */
+function allNuketown2BuildingFootprints(): readonly Nuketown2PlanRect[] {
+  return Object.freeze([
+    ...NUKETOWN2_BUILDING_FOOTPRINTS,
+    ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => Object.freeze({
+      x0: -footprint.x1,
+      x1: -footprint.x0,
+      z0: -footprint.z1,
+      z1: -footprint.z0,
+    })),
+  ]);
+}
+
+/**
+ * Build the outdoor ground as a tiled cover with exact structure cut-outs.
+ * A single 270 m slab used to continue through every house and garage, where
+ * it was coplanar with the old interior slabs. The cuts are deliberately
+ * plan-only and use the same exported footprint table as the structures.
+ */
+function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
+  const cuts = allNuketown2BuildingFootprints();
+  const xCuts = [...new Set([
+    NUKETOWN2_BOUNDS.minX,
+    NUKETOWN2_BOUNDS.maxX,
+    ...cuts.flatMap((cut) => [cut.x0, cut.x1]),
+  ])].sort((first, second) => first - second);
+  const zCuts = [...new Set([
+    NUKETOWN2_BOUNDS.minZ,
+    NUKETOWN2_BOUNDS.maxZ,
+    ...cuts.flatMap((cut) => [cut.z0, cut.z1]),
+  ])].sort((first, second) => first - second);
+  let tile = 0;
+  for (let x = 0; x < xCuts.length - 1; x += 1) {
+    for (let z = 0; z < zCuts.length - 1; z += 1) {
+      const x0 = xCuts[x]!;
+      const x1 = xCuts[x + 1]!;
+      const z0 = zCuts[z]!;
+      const z1 = zCuts[z + 1]!;
+      const cell = { x0, x1, z0, z1 };
+      if (cuts.some((cut) => planRectOverlaps(cell, cut))) continue;
+      centred(builder, `ground tile ${tile}`, [(x0 + x1) / 2, -0.7, (z0 + z1) / 2],
+        [x1 - x0, 1.4, z1 - z0], m.ground, { cast: false });
+      tile += 1;
+    }
+  }
+}
+
 /**
  * The road surface, kerbs, turning head, driveway aprons and lawns.
  *
@@ -1867,15 +1962,18 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   const m = nuketown2Materials();
 
   // Ground runs well past the fence so the horizon is continuous scrub rather
-  // than an 84 m slab in a void. One draw call either way.
+  // than an 84 m slab in a void. The outdoor slab is tiled only where it is
+  // not beneath a house or garage footprint; each interior floor is the sole
+  // walking/drawing surface in its own plan cut.
   //
   // HF-426 Job 3: 220 -> 270 m. The mountain ring's outer radius is 132 m, and
   // at 220 the slab stopped at 110 - INSIDE the main ridge's own 100..132 band,
   // so the massif would have stood half on the plain and half on nothing. 270
   // puts the plain's edge 3 m past the ridge's outer foot, where the massif
-  // itself hides it. This slab is also why the rebuild takes the backdrop's
-  // rings WITHOUT its rolling ground skirt: it already has ground out there.
-  centred(builder, 'ground', [0, -0.7, 0], [270, 1.4, 270], m.ground, { cast: false });
+  // itself hides it. This tiled slab is also why the rebuild takes the
+  // backdrop's rings WITHOUT its rolling ground skirt: it has ground out there
+  // everywhere except the four exact building cuts.
+  buildNuketown2Ground(builder, m);
   // Everything after this index is a real solid on the map. The ground slab is
   // a 220 x 220 m collider - the world floor - and any keep-out set that
   // includes it rejects the entire arena, which is exactly what a first cut of

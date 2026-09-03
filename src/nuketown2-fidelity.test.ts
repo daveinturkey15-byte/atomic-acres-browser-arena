@@ -20,7 +20,7 @@ import {
   NUKETOWN2_WINDOWS,
   buildNuketown2,
 } from './nuketown2-arena';
-import { NUKETOWN2_GROUND_STOREY_H, NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
+import { NUKETOWN2_GROUND_FLOOR_TOP, NUKETOWN2_GROUND_STOREY_H, NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
@@ -29,6 +29,7 @@ import {
 } from './overdrive';
 import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
+import { nuketownRebuildLawnRegions } from './nuketown-lawn-field';
 
 /**
  * NUKE TOWN REBUILD fidelity guard (HF-407, re-derived end to end under HF-426).
@@ -66,36 +67,81 @@ const STANDING_RADIUS_M = STANCE_SHAPES.stand.radius;
  * point: a route a player has to hop up is not a route a player walks, and the
  * stair, the doors and the landing all have to be walkable standing.
  */
-async function walkStanding(
+type StandingWalkProbe = {
+  trace: Array<{ x: number; y: number; z: number }>;
+  frameCount: number;
+  maxConsecutiveUngroundedFrames: number;
+  slopeAdjustedFrames: number;
+  waypointFrames: number[];
+  completed: boolean;
+};
+
+async function walkStandingDetailed(
   map: ArenaMap,
   startEye: readonly [number, number, number],
   route: ReadonlyArray<readonly [number, number]>,
-): Promise<Array<{ x: number; y: number; z: number }>> {
+  frameBudget: number,
+): Promise<StandingWalkProbe> {
   const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
   try {
     const dt = 1 / 120;
     physics.teleportEye({ x: startEye[0], y: startEye[1], z: startEye[2] });
     const trace: Array<{ x: number; y: number; z: number }> = [];
+    const waypointFrames: number[] = [];
     let vy = 0;
+    let frameCount = 0;
+    let consecutiveUngroundedFrames = 0;
+    let maxConsecutiveUngroundedFrames = 0;
+    let slopeAdjustedFrames = 0;
+    let completed = true;
     for (const waypoint of route) {
-      for (let step = 0; step < 1400; step += 1) {
+      let reached = false;
+      for (let step = 0; step < 1400 && frameCount < frameBudget; step += 1) {
         const eye = physics.eyePosition();
         const dx = waypoint[0] - eye.x;
         const dz = waypoint[1] - eye.z;
         const distance = Math.hypot(dx, dz);
-        if (distance < 0.2) break;
+        if (distance < 0.2) {
+          reached = true;
+          break;
+        }
         const advance = Math.min(distance, 3.6 * dt);
         vy += -24.5 * dt;
         const result = physics.move({ x: (dx / distance) * advance, y: vy * dt, z: (dz / distance) * advance }, dt);
+        frameCount += 1;
         if (result.grounded) vy = 0;
+        if (result.grounded) consecutiveUngroundedFrames = 0;
+        else {
+          consecutiveUngroundedFrames += 1;
+          maxConsecutiveUngroundedFrames = Math.max(maxConsecutiveUngroundedFrames, consecutiveUngroundedFrames);
+        }
+        if (result.slopeAdjusted) slopeAdjustedFrames += 1;
       }
+      if (!reached) completed = false;
       const eye = physics.eyePosition();
       trace.push({ x: eye.x, y: eye.y, z: eye.z });
+      waypointFrames.push(frameCount);
+      if (!reached) break;
     }
-    return trace;
+    return {
+      trace,
+      frameCount,
+      maxConsecutiveUngroundedFrames,
+      slopeAdjustedFrames,
+      waypointFrames,
+      completed,
+    };
   } finally {
     physics.dispose();
   }
+}
+
+async function walkStanding(
+  map: ArenaMap,
+  startEye: readonly [number, number, number],
+  route: ReadonlyArray<readonly [number, number]>,
+): Promise<Array<{ x: number; y: number; z: number }>> {
+  return (await walkStandingDetailed(map, startEye, route, 10_000)).trace;
 }
 /**
  * Eye height for a player standing on the upper floor slab: slab top 3.3 m plus
@@ -104,6 +150,7 @@ async function walkStanding(
  */
 const UPPER_FLOOR_EYE_Y = 4.96;
 const sprintSpeed = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
+const STAIR_TRAVERSAL_FRAME_BUDGET = 2_400;
 
 const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
 const depth = NUKETOWN2_BOUNDS.maxZ - NUKETOWN2_BOUNDS.minZ;
@@ -528,7 +575,68 @@ describe('Nuke Town Rebuild fidelity', () => {
     // cut now, and this probe stands in the doorway itself: house-side, garage
     // side, and the threshold between them.
     for (const x of [3.6, 4.35, 5.1]) {
-      expect(isBlocked({ x, y: 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
+      expect(isBlocked({ x, y: NUKETOWN2_GROUND_FLOOR_TOP + 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
+    }
+  });
+
+  it('raises every interior slab and cuts the outdoor ground and lawn from its footprint', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const overlap = (first: { x0: number; x1: number; z0: number; z1: number },
+      second: { x0: number; x1: number; z0: number; z1: number }): number => (
+      Math.max(0, Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0))
+      * Math.max(0, Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0))
+    );
+    const footprints = [
+      ...NUKETOWN2_BUILDING_FOOTPRINTS,
+      ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => ({
+        x0: -footprint.x1,
+        x1: -footprint.x0,
+        z0: -footprint.z1,
+        z1: -footprint.z0,
+      })),
+    ];
+    const floors = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && (node.name.endsWith('house floor') || node.name.endsWith('garage floor'))
+    ));
+    expect(floors, 'two house floors and two garage floors').toHaveLength(4);
+    for (const floor of floors) {
+      const floorBox = new THREE.Box3().setFromObject(floor);
+      expect(floorBox.max.y, `${floor.name} top`).toBeGreaterThanOrEqual(0.05);
+      expect(floorBox.max.y, `${floor.name} uses the raised floor datum`)
+        .toBeCloseTo(NUKETOWN2_GROUND_FLOOR_TOP, 6);
+    }
+    const lowerInteriorEdges = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh
+      && (node.name.includes('ground partition') || node.name.includes('ground baseboard'))
+    ));
+    expect(lowerInteriorEdges.length, 'ground partition and skirting are present').toBeGreaterThan(0);
+    for (const edge of lowerInteriorEdges) {
+      const edgeBox = new THREE.Box3().setFromObject(edge);
+      expect(edgeBox.min.y, `${edge.name} has no gap above the floor`).toBeLessThanOrEqual(NUKETOWN2_GROUND_FLOOR_TOP);
+      expect(edgeBox.max.y, `${edge.name} reaches the raised floor`).toBeGreaterThanOrEqual(NUKETOWN2_GROUND_FLOOR_TOP);
+    }
+
+    const dressingIds = new Set(NUKETOWN2_GROUND_DRESSING.map((piece) => piece.id));
+    const outdoorBoxes = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh
+      && (node.name.includes('ground tile') || [...dressingIds].some((id) => node.name.includes(id)))
+    ));
+    expect(outdoorBoxes.length, 'ground tiles and authored dressing remain auditable').toBeGreaterThan(0);
+    for (const outdoor of outdoorBoxes) {
+      const plan = planFootprint(outdoor);
+      for (const footprint of footprints) {
+        expect(overlap(plan, footprint), `${outdoor.name} inside ${JSON.stringify(footprint)}`).toBe(0);
+      }
+    }
+
+    // The instanced field has no BoxGeometry to inspect, so audit its canonical
+    // lawn regions directly from the same dressing table the builder consumes.
+    for (const region of nuketownRebuildLawnRegions(NUKETOWN2_GROUND_DRESSING)) {
+      for (const footprint of footprints) {
+        expect(overlap({ x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ }, footprint),
+          `lawn region inside ${JSON.stringify(footprint)}`).toBe(0);
+      }
     }
   });
 
@@ -546,6 +654,13 @@ describe('Nuke Town Rebuild fidelity', () => {
     const map = buildNuketown2(new THREE.Scene());
     const stair = NUKETOWN2_HOUSE_STAIR;
     const cx = stair.x0 + stair.width / 2;
+    const rampMeshes = map.root.children.filter((node): node is THREE.Mesh => node.name.includes('house stair ramp'));
+    expect(rampMeshes, 'one collision-only ramp per house flight').toHaveLength(2);
+    for (const ramp of rampMeshes) {
+      expect(ramp.userData.collisionOnly, `${ramp.name} collision-only registration`).toBe(true);
+      expect(ramp.visible, `${ramp.name} remains in the parity scene graph`).toBe(true);
+      expect((ramp.material as THREE.Material).visible, `${ramp.name} is not rendered`).toBe(false);
+    }
 
     // The authored flight has to be walkable BY THE ENGINE'S OWN NUMBERS, not
     // by eye: the riser inside autostep, the going wider than the autostep
@@ -554,19 +669,24 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(STANDING_RADIUS_M).toBeCloseTo(0.38, 10);
     expect(stair.riser).toBeLessThan(CHARACTER_PHYSICS_CONFIG.autostepHeight);
     expect(stair.going).toBeGreaterThan(CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth);
-    expect(stair.riser * stair.risers).toBeCloseTo(3.3, 10);
+    expect(stair.riser * stair.risers).toBeCloseTo(NUKETOWN2_UPPER_Y0 - NUKETOWN2_GROUND_FLOOR_TOP, 10);
 
     for (const house of NUKETOWN2_HOUSE_LAYOUT) {
       const s = house.facing;   // north house +1, south house is its exact negation
       const at = (x: number, z: number) => [s * x, s * z] as const;
-      const trace = await walkStanding(map, [s * (cx + 2.6), 1.7, s * -21.0], [
+      const upProbe = await walkStandingDetailed(map, [s * (cx + 2.6), 1.7, s * -21.0], [
         at(cx + 2.6, -22.2),    // along the back wall, behind the flight
         at(cx, -22.2),          // square on to the bottom tread
         at(cx, -17.0),          // up the flight and onto the landing
         at(cx, -13.0),          // through the head of the stair into the FRONT upper room
         at(-2.7, -13.0),        // across to the internal door
         at(-2.7, -19.5),        // and back into the BACK upper room
-      ]);
+      ], STAIR_TRAVERSAL_FRAME_BUDGET);
+      const trace = upProbe.trace;
+      expect(upProbe.completed, `${house.id} up stair completed within the frame budget`).toBe(true);
+      expect(upProbe.frameCount, `${house.id} up stair frame budget`).toBeLessThanOrEqual(STAIR_TRAVERSAL_FRAME_BUDGET);
+      expect(upProbe.maxConsecutiveUngroundedFrames, `${house.id} up stair ground contact`).toBeLessThanOrEqual(1);
+      expect(upProbe.slopeAdjustedFrames, `${house.id} up stair used the smooth ramp`).toBeGreaterThan(0);
       const label = (index: number) => `${house.id} waypoint ${index} at ${JSON.stringify(trace[index])}`;
       // Still on the ground floor for the approach.
       expect(trace[1]!.y, label(1)).toBeLessThan(2.0);
@@ -584,12 +704,20 @@ describe('Nuke Town Rebuild fidelity', () => {
       // stairs". The up-route above proves the climb; this one starts in the
       // FRONT upper room, takes the landing, and descends the whole flight
       // walking (no jump), ending on the back-room ground floor.
-      const down = await walkStanding(map, [s * cx, NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
+      const downProbe = await walkStandingDetailed(map, [s * cx, NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
         at(cx, -14.8),          // out of the front upper room toward the landing
         at(cx, -17.0),          // onto the landing, turned down the flight
-        at(cx, -21.5),          // down the flight, treads 0.30 m each
+        at(cx, -21.5),          // down the smooth flight
         at(cx + 2.4, -22.3),    // off the bottom tread into the BACK room
-      ]);
+      ], STAIR_TRAVERSAL_FRAME_BUDGET);
+      const down = downProbe.trace;
+      expect(downProbe.completed, `${house.id} down stair completed within the frame budget`).toBe(true);
+      expect(downProbe.frameCount, `${house.id} down stair frame budget`).toBeLessThanOrEqual(STAIR_TRAVERSAL_FRAME_BUDGET);
+      expect(downProbe.maxConsecutiveUngroundedFrames, `${house.id} down stair ground contact`).toBeLessThanOrEqual(1);
+      expect(downProbe.slopeAdjustedFrames, `${house.id} down stair used the smooth ramp`).toBeGreaterThan(0);
+      if (process.env.NUKETOWN2_STAIR_PROBE_REPORT === '1') {
+        console.log(`STAIR-PROBE ${house.id} up=${JSON.stringify({ frames: upProbe.frameCount, maxUngrounded: upProbe.maxConsecutiveUngroundedFrames, slopeAdjusted: upProbe.slopeAdjustedFrames, waypoints: upProbe.waypointFrames })} down=${JSON.stringify({ frames: downProbe.frameCount, maxUngrounded: downProbe.maxConsecutiveUngroundedFrames, slopeAdjusted: downProbe.slopeAdjustedFrames, waypoints: downProbe.waypointFrames })}`);
+      }
       const downLabel = (index: number) => `${house.id} down waypoint ${index} at ${JSON.stringify(down[index])}`;
       // REVIEW TIGHTENING (Opus, PASS 92). The original pair of assertions only
       // said "ended up low", which a capsule that fell through a hole in the
@@ -613,9 +741,14 @@ describe('Nuke Town Rebuild fidelity', () => {
     // standing capsule, and a landing at least a capsule diameter deep, all
     // computed from the same NUKETOWN2_STAIRWELL numbers the build used.
     const well = NUKETOWN2_STAIRWELL;
+    expect(well.rampBottomY, 'ramp bottom meets the raised floor').toBe(NUKETOWN2_GROUND_FLOOR_TOP);
+    expect(well.rampTopY, 'ramp top meets the upper landing').toBe(NUKETOWN2_UPPER_Y0);
+    expect(well.landingOverlap, 'ramp bottom/top landing overlap').toBeGreaterThan(0);
+    expect(well.rampAngleRadians, 'ramp stays below the controller slope ceiling')
+      .toBeLessThan(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);
     const deckUnderside = NUKETOWN2_WINDOWS.find((entry) => entry.id === 'upper front')!.headY;
     for (let i = 0; i < NUKETOWN2_HOUSE_STAIR.risers - 1; i += 1) {
-      const top = NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
+      const top = NUKETOWN2_GROUND_FLOOR_TOP + NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
       const centreZ = well.footZ + NUKETOWN2_HOUSE_STAIR.going * (i + 0.5);
       const ceiling = centreZ < well.wellZ0 ? NUKETOWN2_GROUND_STOREY_H : deckUnderside;
       // REVIEW TIGHTENING (Opus, PASS 92). The rule this arena DERIVED is

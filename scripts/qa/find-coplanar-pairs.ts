@@ -35,7 +35,7 @@ import * as THREE from 'three';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
-import { buildNuketown2 } from '../../src/nuketown2-arena';
+import { buildNuketown2, NUKETOWN2_BUILDING_FOOTPRINTS } from '../../src/nuketown2-arena';
 
 const NEAR_METERS = 0.03;
 
@@ -66,12 +66,13 @@ function materialNameOf(mesh: THREE.Mesh): string {
   return material.name || material.type;
 }
 
-function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[] } {
+function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]; collisionOnlySlopes: string[] } {
   const scene = new THREE.Scene();
   const map = buildNuketown2(scene);
   const boxes: Box[] = [];
   let skipped = 0;
   const skippedNames: string[] = [];
+  const collisionOnlySlopes: string[] = [];
   // REVIEW FIX (Opus, PASS 92): TRAVERSE, do not iterate the direct children.
   // The arena root also carries three art GROUPS - the instanced lawn field,
   // the forest ring and the mountain backdrop - and iterating `children` walked
@@ -95,6 +96,7 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
     if (mesh.userData.sourceMeshes !== undefined) return;
     const label = mesh.name || mesh.type;
     if ((mesh as THREE.InstancedMesh).isInstancedMesh === true) { skipped += 1; skippedNames.push(`${label} (instanced)`); return; }
+    if (mesh.userData.collisionOnly === true) { collisionOnlySlopes.push(label); return; }
     if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; skippedNames.push(`${label} (rotated)`); return; }
     const geometry = mesh.geometry as THREE.BoxGeometry;
     if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
@@ -112,18 +114,38 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
       top: world.y + p.height / 2,
     });
   });
-  return { boxes, skipped, skippedNames };
+  return { boxes, skipped, skippedNames, collisionOnlySlopes };
+}
+
+type PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
+
+const BUILDING_FOOTPRINTS: readonly PlanRect[] = Object.freeze([
+  ...NUKETOWN2_BUILDING_FOOTPRINTS,
+  ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => Object.freeze({
+    x0: -footprint.x1,
+    x1: -footprint.x0,
+    z0: -footprint.z1,
+    z1: -footprint.z0,
+  })),
+]);
+
+function overlapInsideBuilding(first: Box, second: Box): boolean {
+  return BUILDING_FOOTPRINTS.some((footprint) => (
+    Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
+    && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
+  ));
 }
 
 function main(): void {
   const outIndex = process.argv.indexOf('--out');
   const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
-  const { boxes, skipped, skippedNames } = collectBoxes();
+  const { boxes, skipped, skippedNames, collisionOnlySlopes } = collectBoxes();
 
   const rows: string[] = [];
   let findings = 0;
   let fenced = 0;
   let benign = 0;
+  let houseInteriorFindings = 0;
   for (let a = 0; a < boxes.length; a += 1) {
     for (let b = a + 1; b < boxes.length; b += 1) {
       const first = boxes[a]!;
@@ -135,8 +157,13 @@ function main(): void {
       if (gap > NEAR_METERS) continue;
       const sameMaterial = first.materialId === second.materialId;
       const fencedByOffset = first.polygonOffsetFactor < 0 || second.polygonOffsetFactor < 0;
-      const verdict = fencedByOffset ? 'FENCED  ' : sameMaterial ? 'BENIGN  ' : 'FINDING ';
-      if (fencedByOffset) fenced += 1; else if (sameMaterial) benign += 1; else findings += 1;
+      const houseInterior = overlapInsideBuilding(first, second);
+      const verdict = houseInterior ? 'HOUSE-INTERIOR-FINDING '
+        : fencedByOffset ? 'FENCED  ' : sameMaterial ? 'BENIGN  ' : 'FINDING ';
+      if (houseInterior) houseInteriorFindings += 1;
+      else if (fencedByOffset) fenced += 1;
+      else if (sameMaterial) benign += 1;
+      else findings += 1;
       rows.push([
         verdict,
         `dy=${gap.toFixed(4)}m`,
@@ -151,6 +178,9 @@ function main(): void {
   const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   const header = [
     `# nuketown2 coplanar top-face pairs (HF-434 instrument)`,
+    `# HOUSE-INTERIOR pairs<=${NEAR_METERS}m (offsets ignored): ${houseInteriorFindings}`,
+    `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${collisionOnlySlopes.length}`
+      + `${collisionOnlySlopes.length > 0 ? ` - ${collisionOnlySlopes.join(', ')}` : ''}`,
     `# head ${sha} · generated ${new Date().toISOString()}`,
     `# boxes=${boxes.length} · pairs<=${NEAR_METERS}m: ${rows.length}`
       + ` · FINDINGS (different materials, no offset): ${findings}`

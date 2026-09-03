@@ -95,6 +95,14 @@ export const NUKETOWN2_GROUND_STOREY_H = 3.0;
 export const NUKETOWN2_FLOOR_T = 0.3;
 export const NUKETOWN2_UPPER_Y0 = NUKETOWN2_GROUND_STOREY_H + NUKETOWN2_FLOOR_T;
 
+/**
+ * The ground-floor interior slab is deliberately raised above the outdoor
+ * ground plane. Its bottom may sink into the surrounding world floor, but its
+ * top is the one authoritative indoor walking surface.
+ */
+export const NUKETOWN2_GROUND_FLOOR_T = 0.16;
+export const NUKETOWN2_GROUND_FLOOR_TOP = NUKETOWN2_GROUND_FLOOR_T / 2;
+
 const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 const HOUSE_FRONT_Z = NUKETOWN2_HOUSE_FRONT_Z;
 const UPPER_Y0 = NUKETOWN2_UPPER_Y0;
