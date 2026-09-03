@@ -302,8 +302,15 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(Math.abs((NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth) - 0.2765 * L))
       .toBeLessThan(TOL);
     // Carriageway width = the width of the tongue the road leaves the polygon
-    // through: 0.328 L (BO7 131 px of 400; BO2 60 px of 181 = 0.331).
+    // through: DRAWN 0.328 L (BO7 131 px of 400; BO2 60 px of 181 = 0.331).
+    // HF-437 re-derived: the schematic's own stroke correction (section 3
+    // caveat 1 - drawn outlines are ~0.038 L too fat) brings the road to
+    // 0.290 L, authored 2 x 5.3 = 10.6 m = 0.294 L, so the kerb-side strips
+    // widen to 0.131 L each (4.7 m) while the house fronts keep the measured
+    // 0.2765 L offset. The drawn band still holds; the corrected band pins it.
     expect(Math.abs(NUKETOWN2_SECTION.streetHalfWidth * 2 - 0.328 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_SECTION.streetHalfWidth * 2 - 0.294 * L), 'stroke-corrected carriageway')
+      .toBeLessThan(0.01 * L);
     // House depth 0.363 L (145 px), frontage 0.303 L (121 px).
     expect(Math.abs(NUKETOWN2_SECTION.houseDepth - 0.363 * L)).toBeLessThan(TOL);
     expect(Math.abs(NUKETOWN2_SECTION.houseWidth - 0.303 * L)).toBeLessThan(TOL);

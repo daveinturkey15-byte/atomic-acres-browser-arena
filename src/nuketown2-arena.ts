@@ -1311,6 +1311,18 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 1.4], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, KERB_Z - 2.2], [3.6, LOW_COVER, 2.0], m.planter);
+  // HF-437 - THE WIDENED STRIP'S COVER. The strip grew 4.1 -> 4.7 m (see
+  // NUKETOWN2_FRONT_VERGE_DEPTH), and the reference dresses exactly this band:
+  // low garden walls and kerb-side planters (schematic 2, S5 street level).
+  // Both are solid and shot-rated by default - movement AND shot authority.
+  // Low wall on the west verge, hard against the widened band, clear of the
+  // kerb (z ends 0.025 m inboard of it) and of the turning-head decal (x ends
+  // 0.1 m short of it): a vaultable waist wall that breaks the kerb-side run.
+  pair(builder, 'verge low wall', [-9.4, LOW_COVER / 2, KERB_Z - 0.35], [2.6, LOW_COVER, 0.35], m.block);
+  // Kerb-side planter on the east verge, in the widened band between the drive
+  // edging and the outer planter (x [8.8, 11.2] leaves 0.5 m to that planter's
+  // x0 = 11.7).
+  pair(builder, 'verge kerb planter', [10.0, LOW_COVER / 2, KERB_Z - 0.75], [2.4, LOW_COVER, 1.1], m.planter);
   // The town sign at the far end of each verge: two posts and a board, the one
   // authored landmark that tells you which end you are looking at.
   for (const [index, dx] of [-1.4, 1.4].entries()) {

@@ -54,19 +54,35 @@ export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -18, maxX: 18, minZ: -42, 
 
 /**
  * Half-width of the carriageway. The reference's road leaves the playable
- * polygon through a tongue 0.328 of the street length wide (BO7 minimap 131 of
- * 400 px; BO2 minimap 60 of 181 px = 0.331 — the two agree to 1 %), so the
- * road is 11.8 m of asphalt, not the 9 m two-lane strip the old cut assumed.
+ * polygon through a tongue DRAWN 0.328 of the street length wide (BO7 minimap
+ * 131 of 400 px; BO2 minimap 60 of 181 px = 0.331 - the two agree to 1 %).
+ *
+ * HF-437 applies the schematic's OWN stroke correction to that drawn width.
+ * Section 3 caveat 1 records that the minimaps draw outlines with a thick
+ * stroke worth about 0.038 L (vehicle bodies measure 0.105-0.110 L as drawn
+ * against the authored 2.6 m = 0.072 L); a drawn BOUNDARY inflates the road
+ * by the same stroke on each side. Stroke-corrected carriageway:
+ * 0.328 - 0.038 = 0.290 L = 10.44 m, authored 2 x 5.3 = 10.6 m (0.294 L,
+ * 0.004 L over the corrected measurement, well inside the lane's 0.05 L
+ * tolerance and still under the drawn 0.328).
  */
-export const NUKETOWN2_STREET_HALF_WIDTH = 5.9;
+export const NUKETOWN2_STREET_HALF_WIDTH = 5.3;
 
 /**
- * Kerb line to house front. The reference's two house front walls stand 0.553
- * of the street length apart (BO7 minimap: 221 px of 400), so each front wall
- * is 0.2765 L = 9.95 m off the road centre-line; 5.9 of that is carriageway and
- * the remaining 4.1 m is the front verge the driveways and mailboxes stand on.
+ * Kerb line to house front - THE STRIP THE OWNER CALLED TOO NARROW ("the
+ * areas on the side of the main street need to be a bit wider", PASS 91).
+ *
+ * The reference ratio, stated: the two house front walls stand 0.553 of the
+ * street length apart (BO7 minimap: 221 px of 400), so each front wall is
+ * 0.2765 L = 9.95 m off the road centre-line; subtract the stroke-corrected
+ * carriageway half (0.290 L / 2 = 0.145 L) and the strip is 0.131 L.
+ * At L = 36: 9.95 - 5.3 = 4.65 m of strip, authored 4.7 m = 0.131 L - up from
+ * 4.1 m (+15 %), while the centre-line-to-house-front total stays 10.0 m
+ * (0.278 L, deviation 0.0013 L from the measured 0.2765), so the houses and
+ * the measured frontage band do not move. The extra 0.6 m carries the new
+ * verge cover (low wall and kerb-side planter, HF-437).
  */
-export const NUKETOWN2_FRONT_VERGE_DEPTH = 4.1;
+export const NUKETOWN2_FRONT_VERGE_DEPTH = 4.7;
 
 /** Depth of a house, front wall to back wall. 0.361 L against the reference's 0.363. */
 export const NUKETOWN2_HOUSE_DEPTH = 13;
