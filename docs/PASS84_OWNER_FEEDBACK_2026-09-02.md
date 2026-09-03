@@ -1027,3 +1027,36 @@ suite 5656/0; parity 0/0; walkable 0; boot smoke 13/13; identity OK. Rollback:
 `python scripts/orchestration/publish_pass91.py --rollback`. NOT run: the 60 s
 solo run on the refined arena (compute budget). Next (after the weekly reset,
 ~11:30 BST 2026-09-04): Raid Opus verification -> PASS 92.
+
+## HF-434..HF-438 — owner 2026-09-03 17:15 after playing PASS 91 (voice)
+**Statement (transcribed):** "loads of z-fighting all through the map so that needs
+fixing. some of the geometry needs adjustments like stairs and being able to walk
+up and down stairs and go out of windows and putting glass on the windows. one of
+the trucks in the street needs a side entrance so you can go in over the left
+side, right side, or the end, more similar to the actual Nuketown map. the areas
+on the side of the main street need to be a bit wider and have cover - look at
+the Black Ops 2 map yourself. I don't think we should have a ray tracing AND an
+RTX mode ... the RTX mode as a separate runtime is fine, and just bake some ray
+tracing into the quality profile and then even more in the max. the chiptune
+music sounds good. the animations feel pretty good."
+- **HF-434 z-fighting on Nuke Town Rebuild (P0):** coplanar surfaces flicker
+  across the map. Likely causes: the ground-dressing decal plates at +0.02 m over
+  the slab (and the lawn plate) with the 0.02 m near plane's coarser depth
+  (~1 cm at 60 m), fence/wall/roof overlaps. Fix: decals via polygonOffset or a
+  depth-tested offset that survives distance, or split the slab so nothing is
+  coplanar; sweep every coplanar pair with the parity instrument; capture
+  far-distance frames before/after.
+- **HF-435 stairs + windows:** stairs walkable up AND down (traversal probe both
+  ways); upstairs windows you can go out of (jump-out openings like the
+  reference); glass panes on the ground-floor windows (shot-through, see-through,
+  a pane you cannot walk through).
+- **HF-436 truck side entrances:** the open truck's cargo box enterable from the
+  left side, the right side and the end, as the reference's moving truck.
+- **HF-437 street side areas:** the strips beside the main street wider, with
+  cover pieces, per the reference (re-check the minimap's kerb-side zones).
+- **HF-438 profiles:** no separate RAY TRACED preset; fold its features into
+  Quality (lightly) and Max (more); RTX stays as the separate-runtime explainer.
+  Lane AI's ladder doc, control-set hashes and the e2e option pins re-derived.
+- Lanes: AU3 (HF-434..437, GLM first with Opus verification after the reset),
+  AI2 (HF-438, GLM then Opus). Compute: 13% left this week; Opus resumes ~11:30
+  BST 2026-09-04.
