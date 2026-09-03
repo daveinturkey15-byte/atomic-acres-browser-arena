@@ -1005,3 +1005,11 @@ way?"
   speed factor like the prone one; BO2-style ~0.6 of walk), no sprint while
   crouched, and the sprint latch clears on crouch the way HF-431 did for prone;
   unit tests on the movement state machine + the drop-shot e2e spec extended.
+- **Owner 15:25:** "we have 13% usage remaining this week and it resets in 20
+  hours, so lets plan like that." Plan: finish only the nearly-done Nuke Town
+  refinement worker (all six HF-432 items + HF-433 committed; gates/report left)
+  when the Opus API recovers from 529, cut PASS 91 with it, then STOP Opus work
+  until the reset (~11:30 BST 2026-09-04). Raid's Opus verification (Lane AV
+  check-and-finish; Gemini's Jobs 1-2 are on the branch, unverified) resumes
+  after the reset -> PASS 92. No Gemini bulk work tonight either: every Gemini
+  branch needs an Opus check before it ships.
