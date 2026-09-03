@@ -125,6 +125,11 @@ import {
   createNuketown2TileFloorMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
+import {
+  createNuketown2FenceMaterial,
+  createNuketown2LapSidingMaterial,
+  createNuketown2RoofMaterial,
+} from './nuketown2-facade-materials';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -729,6 +734,10 @@ function nuketown2Materials(): Nuketown2Materials {
   const garageSiding = createNuketown2GarageWallMaterial();
   const warmLight = createNuketown2CeilingLightMaterial(true);
   const coldLight = createNuketown2CeilingLightMaterial(false);
+  const roof = createNuketown2RoofMaterial();
+  const sidingA = createNuketown2LapSidingMaterial(0x46809f, 'nuketown2-siding-north-blue');
+  const sidingB = createNuketown2LapSidingMaterial(0xd9a43b, 'nuketown2-siding-south-yellow');
+  const fence = createNuketown2FenceMaterial();
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
@@ -767,10 +776,8 @@ function nuketown2Materials(): Nuketown2Materials {
     coldLight,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
     // with the hue carried to the reference's blue (measured 117.9).
-    sidingA: standard(0x46809f, 0.76, 0),
-    // The YELLOW house: the shipped map's `mustard` hex, at siding roughness
-    // rather than its painted-metal 0.58/0.18 - this is board, not panel.
-    sidingB: standard(0xd9a43b, 0.76, 0),
+    sidingA,
+    sidingB,
     // The ORANGE wing: siding-coral, unchanged.
     garageSiding,
     // The shipped map's `chrome`, verbatim - it is what dresses BOTH garage
@@ -780,12 +787,12 @@ function nuketown2Materials(): Nuketown2Materials {
     // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
     trim: standard(0xf0e4c9, 0.68, 0.03),            // SOLID users: sills, heads, lintels
     trimDecal,
-    roof: standard(0x444c4d, 0.86, 0.03),
+    roof,
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
     interior,
     interiorFloor,
     // wood-deck: the plank fence, the same timber the shipped map decks with.
-    fence: standard(0x673b24, 0.92, 0.02),
+    fence,
     block: standard(0x9d9a8c, 0.94, 0.01),
     // THE COACH. Cream body (art-kit `MAT.cream`) at the shipped coach's own
     // paint spec, with a red waistline - the reference's cream/red streamlined
