@@ -1182,3 +1182,18 @@ assets and textures and lighting need to be tip top, raid can come next"
   Qwen jobs wait while the Lane BA chain holds `ba-running.lock`, so the
   Nuke Town captures never fight a 13 GiB model for VRAM; Opus verifies every
   Qwen commit in the morning before anything merges.
+
+## HF-445 — 2026-09-03 19:50: local Qwen moved to port 8090 (WSL docker-proxy holds loopback 8080)
+
+- Symptom: OMP jobs on the local Qwen returned `401 Invalid API key` (Google-style
+  `x-goog-api-key` wording) while llama-server on `0.0.0.0:8080` was healthy.
+- Cause: a Docker container inside WSL (`docker-proxy -host-port 8080 ->
+  172.18.0.4:8080`, up since ~17:10, owner's) is relayed by `wslrelay.exe` onto
+  `127.0.0.1:8080`; Windows prefers the specific loopback bind, so every
+  loopback request lands in the container, not in llama-server.
+- Correction: Qwen relaunched with `-Port 8090` (launcher pre-flight guard
+  green); additive OMP provider `qwen-local-8090` (models.yml backed up);
+  Qwen chain retargeted and relaunched 19:46. Nothing of the owner's touched.
+- Owner decision: DSH, Zoo/Roo, Continue and Hermes still point at `:8080` and
+  will reach the container until either the container moves or those configs
+  move to 8090.
