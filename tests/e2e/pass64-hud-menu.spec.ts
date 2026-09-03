@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
 import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
+import { SELECTABLE_ARENAS } from '../../src/map-selection';
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
@@ -54,23 +55,31 @@ test.describe('Pass 64 command HUD and menu contract', () => {
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
     const cards = page.locator('.map-card');
-    // Six arenas ship since farcrysis and High Seas landed; this expectation
-    // still pinned the four-arena roster from before they were added.
-    await expect(cards).toHaveCount(6);
-    await expect(cards).toHaveText([
-      /NUKE TOWN/, /TERMINAL/, /RUSTRIG/, /GUN RANGE/, /FARCrySIS/, /HIGH SEAS/,
-    ]);
+    /**
+     * PASS 87 Lane AR, item 1. This used to pin a frozen six-row list, and by
+     * PASS 86 it named an arena the menu no longer offers (farcrysis is hidden)
+     * and missed four it does (test1, test2, map3, nuketown2). A hand-written
+     * roster in a browser gate is a second source of truth: it goes stale on
+     * the pass that adds an arena, and the red it produces looks like a menu
+     * regression rather than a stale test.
+     *
+     * Derived from SELECTABLE_ARENAS - the same export the menu builds its
+     * cards from - so Raid Rebuild and anything after it are covered the day
+     * they land. The ORDER and the machine ids are still asserted exactly;
+     * that is the contract this test owns.
+     */
+    await expect(cards).toHaveCount(SELECTABLE_ARENAS.length);
     expect(await cards.evaluateAll((elements) => elements.map((element) => ({
       id: (element as HTMLElement).dataset.arenaId,
       route: (element as HTMLElement).dataset.arenaRoute,
-    })))).toEqual([
-      { id: 'atomic-acres', route: 'nuke-town' },
-      { id: 'skyline-terminal', route: 'terminal' },
-      { id: 'rustworks-1v1', route: 'rustrig' },
-      { id: 'gun-range', route: 'gun-range' },
-      { id: 'farcrysis', route: 'farcrysis' },
-      { id: 'high-seas', route: 'high-seas' },
-    ]);
+    })))).toEqual(SELECTABLE_ARENAS.map((arena) => ({ id: arena.id, route: arena.routeId })));
+    // AGENTS.md pins these four display labels; the rest are the registry's.
+    await expect(cards.nth(0)).toContainText(/NUKE TOWN/u);
+    await expect(cards.nth(1)).toContainText(/TERMINAL/u);
+    await expect(cards.nth(2)).toContainText(/RUSTRIG/u);
+    await expect(cards.nth(3)).toContainText(/GUN RANGE/u);
+    // A hidden arena must never reach the deployment shell.
+    expect(SELECTABLE_ARENAS.map((arena) => arena.id)).not.toContain('farcrysis');
 
     await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
     await expect(page.locator('#menu-preview-video')).toBeVisible();
@@ -139,17 +148,40 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#graphics-target-fps')).toBeVisible();
     await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
     await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
-    await expect(page.locator('[data-graphics-setting]')).toHaveCount(22);
-    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]')).toHaveCount(6);
     await expect(page.locator('#graphics-frame-rate-limit')).toHaveAttribute('max', '361');
     await expect(page.locator('#graphics-frame-rate-limit-value')).toHaveText('UNCAPPED');
     const registry = await page.evaluate(() => (
       window.__ATOMIC_ACRES_DEBUG__.snapshot().settings as {
-        advancedGraphicsRegistry: { registeredKeys: string[]; controls: Array<{ runtimeConsumer: string }> };
+        advancedGraphicsRegistry: {
+          registeredKeys: string[];
+          controls: Array<{ key: string; runtimeConsumer: string }>;
+          unavailableCapabilities: Array<{ id: string; reason: string }>;
+        };
       }
     ).advancedGraphicsRegistry);
-    expect(registry.registeredKeys).toHaveLength(22);
+    /**
+     * PASS 87 Lane AR, item 1. These two were frozen counts - 22 controls and 6
+     * disabled capabilities - and the shipped renderer-feature inventory has
+     * since grown to 40, so this spec failed on a number rather than on a
+     * contract. AGENTS.md states the contract itself: the panel is GENERATED
+     * from the canonical inventory and every visible control must have a real
+     * runtime consumer. Asserted that way, this now catches what a frozen count
+     * never could - a control rendered with no registry row behind it, or a
+     * registry row that renders nothing - and it does not go stale when the
+     * inventory grows.
+     */
+    expect(registry.registeredKeys.length, 'the advanced panel must be generated from a non-empty inventory')
+      .toBeGreaterThan(0);
+    await expect(page.locator('[data-graphics-setting]')).toHaveCount(registry.registeredKeys.length);
+    const renderedKeys = await page.locator('[data-graphics-setting]')
+      .evaluateAll((elements) => elements.map((element) => (element as HTMLElement).dataset.graphicsSetting));
+    expect([...renderedKeys].sort(), 'every registry key renders exactly one control, and no control is orphaned')
+      .toEqual([...registry.registeredKeys].sort());
     expect(registry.controls.every(({ runtimeConsumer }) => runtimeConsumer.length > 0)).toBe(true);
+    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]'))
+      .toHaveCount(registry.unavailableCapabilities.length);
+    expect(registry.unavailableCapabilities.every(({ reason }) => reason.length > 0),
+      'a disabled capability must say why').toBe(true);
     const layout = await page.evaluate(() => ({
       pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-options')!.scrollWidth
@@ -393,6 +425,25 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.contract).toBe('pass64-command-v2');
       expect(layout.pageOverflowX).toBe(0);
       expect(layout.menuOverflowX).toBe(0);
+      /**
+       * PASS 87 Lane AR, item 1. The cheapest way to make the line above green
+       * is to give #menu `overflow: clip`, which makes scrollWidth equal
+       * clientWidth for everything, forever. This proves the measurement is
+       * still able to see an overflow: inject one, confirm it is reported, take
+       * it out again. Without this, a future "fix" could blind the assertion
+       * and nothing would say so.
+       */
+      const sensitivity = await page.evaluate(() => {
+        const menu = document.querySelector<HTMLElement>('#menu')!;
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:absolute;left:0;top:0;width:200%;height:1px;pointer-events:none';
+        menu.appendChild(probe);
+        const overflow = menu.scrollWidth - menu.clientWidth;
+        probe.remove();
+        return { overflow, restored: menu.scrollWidth - menu.clientWidth };
+      });
+      expect(sensitivity.overflow, 'menuOverflowX must still be able to report an overflow').toBeGreaterThan(0);
+      expect(sensitivity.restored, 'and the probe must leave nothing behind').toBe(0);
       expect(layout.withinViewport).toBe(true);
       expect(layout.mapWithinMenu).toBe(true);
       expect(layout.showcaseInsideWorkspace).toBe(true);
@@ -432,7 +483,9 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         pageOverflowX: 0,
         menuOverflowX: 0,
         withinViewport: true,
-        mapCardCount: 6,
+        // Lane AR item 1: was a frozen 6. Derived, for the reason written on
+        // the registry test above.
+        mapCardCount: SELECTABLE_ARENAS.length,
       });
       await captureReview(page, testInfo, 'setup', highDpiViewport);
     } finally {

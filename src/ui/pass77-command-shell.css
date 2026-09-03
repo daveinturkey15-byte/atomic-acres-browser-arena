@@ -210,7 +210,33 @@
 #menu.pass64-command-deck::after {
   content: '';
   position: absolute;
-  inset: -20%;
+  /*
+   * PASS 87 Lane AR, item 1. This was `inset: -20%`, and it was the ENTIRE
+   * deployment-shell overflow: measured headless on installed Chrome, hiding
+   * this one pseudo-element took menuOverflowX from 70/224/279/336/450/608 to
+   * exactly 0 at narrow/laptop/review/desktop/owner/ultrawide. Every other
+   * element in the shell was already inside its container - the card grid
+   * included, which is why the overflow scaled with the VIEWPORT (a flat ~19%
+   * of the shell at every width) and not with the number of arena cards.
+   *
+   * `#menu` clips at its own border (`overflow: hidden`), so nothing of this
+   * layer past the right or bottom edge was ever visible; it only made the
+   * shell report content it could not show, which is what
+   * tests/e2e/pass64-hud-menu.spec.ts fails on and what a reader of that
+   * failure would waste time chasing in the card grid.
+   *
+   * The bleed that does the visual work is top-left - the gradient is anchored
+   * at 22% 12% - so the layer keeps its negative top/left offset and simply
+   * stops extending past the far edges. The budget is arithmetic, not taste:
+   * the box spans [-20%, 80%], the bloom animation scales it 1.12 about its
+   * centre (30%) and translates it 2% of its own width, so the furthest right
+   * edge reaches 30% + 56% + 2% = 88% of the shell. It cannot overflow, and
+   * the animation stays the same compositor-only opacity/transform pair.
+   */
+  top: -20%;
+  left: -20%;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
   background: radial-gradient(38% 38% at 22% 12%, rgb(232 120 31 / 0.10), transparent 70%);
