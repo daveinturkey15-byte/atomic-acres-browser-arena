@@ -18,3 +18,16 @@ Worktree `C:\Users\david\projects\aa-claude-music`, branch
    played (evidence under docs/evidence/pass89/lane-aw/).
 5. tsc, focused vitest, commit with explicit paths, push. Machine rules as every
    lane; never touch aa-omp-pass84's working tree.
+
+## Also in this lane — Lane AX, HF-431: drop shot from sprint
+In `src/legacy-main.ts` (LF-terminated: edit with python newline='' or sed; never
+rewrite with CRLF) and `src/prone-transition.ts` (HF-412): when the prone /
+drop-shot key is pressed while sprinting, perform the drop shot AND clear the
+sprint latch, so a still-held Shift does not resume sprinting while prone or on
+standing up; sprint requires a fresh Shift press after the stance returns to
+stand. Pin it with a unit test on the stance/sprint state machine and extend
+tests/e2e/pass85-drop-shot.spec.ts with the keyboard sequence (Shift held, Z ->
+prone, not sprinting; stand -> still not sprinting until Shift is pressed again).
+Keep the drop-shot timing constants unchanged. tsc + focused vitest
+(src/prone-transition.test.ts, src/key-bindings.test.ts, src/gameplay.test.ts)
++ the e2e spec headless (PASS73_NATIVE_WEBGPU=1, private port).

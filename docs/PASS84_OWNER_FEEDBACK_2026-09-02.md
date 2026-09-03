@@ -914,3 +914,12 @@ distinct procedural variations/tracks of ~90 s each, shuffled order with no
 immediate repeat, seamless swap, persisted volume respected; a unit test pins the
 count, the durations and the no-repeat shuffle; a headless run records which
 tracks played over 5 minutes.
+
+## HF-431 — owner 2026-09-03 07:08: drop shot from sprint must not resume sprinting
+**Statement (verbatim):** "if I am sprinting and press Z it should do the drop shot
+but then not keep sprinting if i am still holding Shift, sort that too". Lane AX
+(with AW): pressing the prone/drop-shot key while sprinting performs the drop shot;
+the sprint latch is cleared so a still-held Shift does not resume sprinting from
+prone (sprint must be re-pressed after standing); unit test on the stance/sprint
+state machine + a headless keyboard sequence test (Shift held, Z, stays prone and
+not sprinting; stand, Shift again sprints).
