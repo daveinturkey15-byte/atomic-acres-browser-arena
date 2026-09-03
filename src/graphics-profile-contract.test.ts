@@ -48,14 +48,13 @@ const PINNED_CONTROL_SET_HASHES = Object.freeze({
   performance: '445a9754',
   balanced: '0753ee34',
   high: 'de90e589',
-  raytraced: 'd65fbd25',
   max: '2be3a371',
 });
 
 describe('HF-418 graphics ladder', () => {
   it('climbs in one order across the descriptions and the settings menu', () => {
     expect(GRAPHICS_PROFILE_DESCRIPTIONS.map(({ id }) => id))
-      .toEqual(['performance', 'balanced', 'high', 'raytraced', 'max']);
+      .toEqual(['performance', 'balanced', 'high', 'max']);
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
     expect([...presetMarkup.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)]
@@ -63,7 +62,6 @@ describe('HF-418 graphics ladder', () => {
       ['performance', 'PERFORMANCE'],
       ['balanced', 'BALANCED'],
       ['high', 'QUALITY'],
-      ['raytraced', 'RAY TRACED'],
       ['max', 'MAX'],
       ['custom', 'CUSTOM'],
       [RTX_NATIVE_RUNTIME_OPTION_VALUE, 'RTX — WHAT IS IT?'],
@@ -239,25 +237,17 @@ describe('HF-418 RTX explainer', () => {
   });
 
   it('keeps the RTX word off every rendering profile', () => {
-    // The skill's naming rule. RAY TRACED is genuine recursive ray tracing and
-    // may say so; it may never claim the hardware it does not touch.
+    // The skill's naming rule. The ray-traced controls QUALITY and MAX carry
+    // are genuine recursive ray tracing and may say so; no profile may claim
+    // the hardware none of them touch.
     for (const profile of GRAPHICS_PROFILE_DESCRIPTIONS) {
       const text = [profile.label, profile.summary, profile.intendedFor,
         ...profile.turnsOn, ...profile.leavesOff].join(' ');
-      if (profile.id === 'raytraced') {
-        // The one profile allowed to mention RTX does so only to DENY it.
-        expect(text).toMatch(/it is not RTX and it uses no ray-tracing hardware/i);
-        expect(text).not.toMatch(/\bRT cores\b/i);
-        expect(text).not.toMatch(/hardware.accelerat/i);
-        // Path tracing may only ever be DENIED here, never claimed. The
-        // author of the method is explicit that recursive ray tracing is not
-        // path tracing, and repeating that mislabel in a settings string is
-        // the same class of error as the RTX one.
-        expect(text).toMatch(/\bno path tracing\b/i);
-        expect(text).not.toMatch(/(?<!\bno )path.trac/i);
-        continue;
-      }
       expect(text, profile.id).not.toMatch(/\bRTX\b/);
+      // And a retired rung cannot come back through its old copy either: the
+      // path-tracing denial belongs to the controls' own wording, never as a
+      // claim.
+      expect(text, profile.id).not.toMatch(/(?<!\bno )path.trac/i);
     }
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
@@ -265,6 +255,8 @@ describe('HF-418 RTX explainer', () => {
     const rtxOptions = [...presetMarkup.matchAll(/<option value="([^"]+)">([^<]*RTX[^<]*)<\/option>/g)];
     expect(rtxOptions).toHaveLength(1);
     expect(rtxOptions[0][1]).toBe(RTX_NATIVE_RUNTIME_OPTION_VALUE);
+    // The retired preset id is gone from the shipped select, not merely hidden.
+    expect(presetMarkup).not.toContain('raytraced');
   });
 
   it('says what the native runtime is, why the browser cannot do it, and offers no dead link', () => {

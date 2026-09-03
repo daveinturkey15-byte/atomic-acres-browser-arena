@@ -208,6 +208,8 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     // assertions kept naming the old one. The ladder's order and labels stay
     // pinned literally, ONCE, in src/graphics-profile-contract.test.ts; here
     // we assert the rendered DOM equals that shipped ladder.
+    // HF-438: the RAY TRACED rung retired; the derived roster follows the
+    // registry without another manual edit here.
     await expect(page.locator('#graphics-profile option')).toHaveCount(EXPECTED_GRAPHICS_OPTION_LABELS.length);
     await expect(page.locator('#graphics-profile option')).toHaveText(EXPECTED_GRAPHICS_OPTION_LABELS);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');

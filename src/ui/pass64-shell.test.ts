@@ -138,10 +138,15 @@ describe('Pass 66 command shell', () => {
   // the list is now asserted to CLIMB rather than to lead with the default. The
   // RTX rule is unchanged in substance and tightened in form: no option that
   // maps to a rendering profile may carry the letters RTX, because no browser
-  // exposes a ray-tracing pipeline or RT cores. What is now allowed is exactly
-  // one option that is NOT a profile — the native-runtime EXPLAINER, whose value
+  // exposes a ray-tracing pipeline or RT cores. What is allowed is exactly one
+  // option that is NOT a profile — the native-runtime EXPLAINER, whose value
   // is outside GraphicsPreset and which changes no renderer setting at all
   // (src/ui/rtx-native-runtime-explainer.ts, src/graphics-profile-contract.test.ts).
+  //
+  // HF-438 (owner 2026-09-03) retires the RAY TRACED rung entirely — "I don't
+  // think we should have a ray tracing AND an RTX mode" — so the list is five
+  // options again: four named rungs (QUALITY and MAX now carry the ray-traced
+  // controls) plus CUSTOM, plus the explainer.
   it('exposes the climbing graphics ladder plus the RTX explainer, and keeps WebGPU tuning under Advanced Graphics', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
@@ -151,7 +156,6 @@ describe('Pass 66 command shell', () => {
       ['performance', 'PERFORMANCE'],
       ['balanced', 'BALANCED'],
       ['high', 'QUALITY'],
-      ['raytraced', 'RAY TRACED'],
       ['max', 'MAX'],
       ['custom', 'CUSTOM'],
       ['rtx-native-runtime-info', 'RTX — WHAT IS IT?'],

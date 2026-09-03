@@ -206,7 +206,7 @@ export function grainSeedFor(profile: FrozenFilmicGradeProfile, timeMs: number):
 
 /** Maps a graphics preset id onto a grade profile id. Fail-closed on unknowns. */
 export function gradeProfileIdForGraphicsPreset(
-  preset: 'performance' | 'balanced' | 'high' | 'max' | 'custom' | 'raytraced' | string,
+  preset: 'performance' | 'balanced' | 'high' | 'max' | 'custom' | string,
 ): GradeProfileId {
   if (preset === 'performance') return 'performance';
   // HF-418 BALANCED takes QUALITY's grade rather than PERFORMANCE's. The grade
@@ -217,16 +217,11 @@ export function gradeProfileIdForGraphicsPreset(
   if (preset === 'balanced') return 'quality';
   if (preset === 'high') return 'quality';
   if (preset === 'max') return 'max';
-  // HF-397 sits between Quality and Max in the preset ladder and carries the richest
-  // (max) filmic grade; the grade adds tunable uniforms only, never new pipelines.
-  //
-  // The id is 'raytraced'. It was written here as 'rtx' by a lane that landed hours
-  // before the preset itself, and GraphicsPreset never had an 'rtx' member - so this
-  // branch was unreachable and RAY TRACED silently fell through to the DEFAULT grade,
-  // rendering with QUALITY's look. The owner-facing LABEL is deliberately "RAY TRACED"
-  // and not "RTX": no browser exposes a hardware ray-tracing pipeline or RT cores, so
-  // "RTX" would be a claim the build cannot back.
-  if (preset === 'raytraced') return 'max';
+  // HF-397's 'raytraced' preset mapped here onto the max grade; HF-438 retired
+  // that preset id entirely (its controls folded into QUALITY and MAX, whose
+  // mappings above are unchanged), so there is no special case left: any
+  // unknown id — including the retired 'raytraced' and the never-valid 'rtx' —
+  // fails closed to the default grade below.
   return DEFAULT_GRADE_PROFILE_ID;
 }
 

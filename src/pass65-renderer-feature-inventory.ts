@@ -79,7 +79,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'presentation-profile', title: 'Performance, Balanced, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
-      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom'" },
+      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },
       // HF-414/HF-418: the player-facing copy is part of this feature now, and
       // it is pinned to the measured audit by graphics-profile-contract.test.ts.

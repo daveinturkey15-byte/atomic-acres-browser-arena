@@ -52,12 +52,16 @@ describe('HF-418 baked indirect: the profile defaults, and the argument for each
     expect(GRAPHICS_PRESET_VALUES.high.bakedIndirect).toBe('low');
   });
 
-  it('RAY TRACED has it on HIGH, because the trace computes no bounce at all', () => {
+  it('QUALITY carries the trace on the LOW bake; MAX carries trace and HIGH bake together', () => {
     // Classic recursive ray tracing has no global illumination. The documented
     // failure mode is raising a flat ambient constant until the scene is milk.
-    // This is what gets raised instead, and it is why the RAY TRACED preset
-    // takes the expensive tier while spending nothing per frame for it.
-    expect(GRAPHICS_PRESET_VALUES.raytraced.bakedIndirect).toBe('high');
+    // HF-438 folds the trace into the ladder: QUALITY keeps its argued LOW
+    // bake (its SSR LOW march still supplies reflective detail), while MAX —
+    // the rung that also holds SSGI — carries the expensive tier, which costs
+    // bake time and nothing per frame either way.
+    expect(GRAPHICS_PRESET_VALUES.high.bakedIndirect).toBe('low');
+    expect(GRAPHICS_PRESET_VALUES.high.rayTracing).toBe('reflections');
+    expect(GRAPHICS_PRESET_VALUES.max.bakedIndirect).toBe('high');
   });
 
   it('MAX has it on HIGH, alongside SSGI rather than instead of it', () => {

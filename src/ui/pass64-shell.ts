@@ -243,10 +243,11 @@ function fieldKitPanelMarkup(): string {
  *
  * THREE THINGS CHANGED HERE AND EACH ONE WAS ASKED FOR.
  *
- * 1. ORDER. The list now climbs: PERFORMANCE, BALANCED, QUALITY, RAY TRACED,
- *    MAX. It used to lead with QUALITY because that is the default, which made
- *    PERFORMANCE below it read as a step up.
- * 2. COPY. One paragraph for all five modes is replaced by one honest line per
+ * 1. ORDER. The list now climbs: PERFORMANCE, BALANCED, QUALITY, MAX. It used
+ *    to lead with QUALITY because that is the default, which made PERFORMANCE
+ *    below it read as a step up. HF-438 retired the RAY TRACED rung; its
+ *    controls live inside QUALITY and MAX now.
+ * 2. COPY. One paragraph for all four modes is replaced by one honest line per
  *    mode plus an expandable detail block, both generated from
  *    GRAPHICS_PROFILE_DESCRIPTIONS, which is itself pinned to the measured
  *    audit by graphics-profile-contract.test.ts. Every block is rendered and

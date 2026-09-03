@@ -21,17 +21,18 @@
  *    preset's values change, the hash changes, and
  *    graphics-profile-contract.test.ts fails until the doc changes too. A
  *    description cannot go stale silently.
- *  - No line claims hardware the build does not use. RAY TRACED never says
- *    RTX, RT cores, hardware acceleration or path tracing (the naming rule in
- *    the shared skill `threejs-rtx-runtime-route`), and the RTX explainer is
- *    not a profile at all (src/ui/rtx-native-runtime-explainer.ts).
+ *  - No line claims hardware the build does not use. The ray-traced controls
+ *    that QUALITY and MAX now carry never say RTX, RT cores, hardware
+ *    acceleration or path tracing (the naming rule in the shared skill
+ *    `threejs-rtx-runtime-route`), and the RTX explainer is not a profile at
+ *    all (src/ui/rtx-native-runtime-explainer.ts).
  *  - `referenceFrameNote` states the machine a claim is true on. "Smooth" with
  *    no machine attached is the kind of sentence that produced the owner's
  *    "150 fps -> 40 fps" report in the first place.
  */
 import { GRAPHICS_PRESET_VALUES, type AdvancedGraphicsValues } from '../graphics-settings-registry';
 
-export type GraphicsProfilePresentationId = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max';
+export type GraphicsProfilePresentationId = 'performance' | 'balanced' | 'high' | 'max';
 
 /**
  * Cost class. Deliberately coarse: the audit measured one machine on three
@@ -59,12 +60,14 @@ export type GraphicsProfileDescription = Readonly<{
 }>;
 
 /**
- * The four selectable rendering profiles plus RAY TRACED, in ladder order.
+ * The four selectable rendering profiles, in ladder order.
  *
  * ORDER IS PART OF THE CONTRACT: a player reads a settings list as a ladder,
  * so the list must climb. Before HF-418 it read QUALITY, PERFORMANCE, RAY
  * TRACED, MAX, CUSTOM — Quality first because it is the default, which made
- * the second entry look like a step up from the first.
+ * the second entry look like a step up from the first. HF-438 (owner
+ * 2026-09-03) retired the RAY TRACED rung entirely: its controls fold into
+ * QUALITY (light) and MAX (full).
  */
 export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[] = Object.freeze([
   Object.freeze({
@@ -119,24 +122,6 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'Screen-space global illumination, depth of field and motion blur — the expensive gather and the two effects that replace pixels. Those belong to a profile you pick on purpose.',
     ]),
     referenceFrameNote: '"Decent PC" reference: measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.1 ms median frame, with zero pipelines compiled during play on any arena measured. Its distance from BALANCED on that card is inside the noise and is not claimed. A slower card gives up frame rate here before it gives up looks.',
-  }),
-  Object.freeze({
-    id: 'raytraced',
-    label: 'RAY TRACED',
-    summary: 'Real recursive ray tracing in shaders: true reflections off real geometry, including geometry that is off screen. Works on any WebGPU card — it is not RTX and it uses no ray-tracing hardware.',
-    intendedFor: 'Any WebGPU graphics card that can already hold QUALITY. Not an NVIDIA-only profile.',
-    costClass: 'high',
-    turnsOn: Object.freeze([
-      'World-space reflection rays traced against the arena, with hard shadow rays inside the reflected image.',
-      'The highest baked reflection probe tier and ambient occlusion at high.',
-      'The richest colour grade in the ladder.',
-    ]),
-    leavesOff: Object.freeze([
-      'It mostly BUYS the trace rather than adding it: 4x multisampling drops to SMAA and screen-space reflections turn off, because the trace supersedes them and running both would pay for reflected light twice. Ten controls differ from QUALITY in all, two of them reductions; rain and airborne detail do go slightly up, so it is not a pure trade.',
-      'No indirect bounce (classic recursive ray tracing computes none) and no path tracing.',
-      'Players, bots and vehicles are not in the traced set, so no reflection can show you an enemy that PERFORMANCE could not.',
-    ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame, which is far BELOW MAX (21.0 ms) on every arena measured and sits in the same band as QUALITY. The step up from QUALITY is inside the run-to-run noise on this machine and is not claimed as a number. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer: the trace is built inside the WebGPU/TSL graph and exists on no other route.',
   }),
   Object.freeze({
     id: 'max',

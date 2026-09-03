@@ -246,22 +246,6 @@ describe('Advanced Graphics canonical registry', () => {
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
-      // HF-398 RAY TRACED. Screen-space reflections are OFF here on purpose:
-      // the trace supersedes them and reaches off-screen geometry too, so
-      // running both would double-count reflected light and pay twice. SSGI is
-      // off for the same reason it is off on Quality — it is the expensive
-      // gather, and classic ray tracing computes no indirect bounce either.
-      // Motion blur stays at zero because it is the one effect that removes
-      // information, on the preset whose whole proposition is detail.
-      raytraced: {
-        // Classic recursive tracing computes NO indirect bounce, so this is the
-        // preset that needs the baked one most; it is what gets raised instead
-        // of a flat ambient constant.
-        bakedIndirect: 'high',
-        volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
-        rayTracing: 'reflections',
-        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
-      },
       max: {
         bakedIndirect: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
@@ -439,10 +423,6 @@ describe('Advanced Graphics weather controls', () => {
         weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1,
       },
-      raytraced: {
-        weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
-        wetSurfaces: true, ambientLife: 1.15,
-      },
       max: {
         weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1.5,
@@ -467,12 +447,11 @@ describe('Advanced Graphics weather controls', () => {
     // invisible on the preset most machines land on.
     expect(GRAPHICS_PRESET_VALUES.high.weatherIntensity).toBe('storm');
     // Airborne detail rises monotonically with the preset ladder: a heavier
-    // preset that showed LESS air would be a straight defect.
+    // preset that showed LESS air would be a straight defect. (HF-438: the
+    // RAY TRACED rung was retired; its 1.15 air no longer sits in between.)
     expect(GRAPHICS_PRESET_VALUES.performance.ambientLife)
       .toBeLessThan(GRAPHICS_PRESET_VALUES.high.ambientLife);
     expect(GRAPHICS_PRESET_VALUES.high.ambientLife)
-      .toBeLessThan(GRAPHICS_PRESET_VALUES.raytraced.ambientLife);
-    expect(GRAPHICS_PRESET_VALUES.raytraced.ambientLife)
       .toBeLessThan(GRAPHICS_PRESET_VALUES.max.ambientLife);
     // Wet ground costs two material writes on a 2.5 s scan, so no preset has a
     // performance reason to drop it - it stays a taste control on every rung.
