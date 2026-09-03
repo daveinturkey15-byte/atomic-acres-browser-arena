@@ -70,21 +70,25 @@ const SETS = {
     ],
   },
   // The only body in the game whose Gerstner slope reaches the foam gate:
-  // the turbulent control for the backscatter proof.
+  // the turbulent control for the backscatter proof. The rig deck is at y ~ 0
+  // and the sea at y = -19.5, so every pose here is OFF the rig and low, or the
+  // ocean is not in the frame at all.
   rustworks: {
     arena: 'rustworks-1v1',
     shots: [
-      { name: 'storm-wide', x: 0, y: 6, z: 24, yaw: YAW_MINUS_Z, pitch: -0.22 },
-      { name: 'storm-grazing', x: 0, y: 3, z: 28, yaw: YAW_MINUS_Z, pitch: -0.05 },
-      { name: 'storm-down', x: 0, y: 6, z: 28, yaw: YAW_MINUS_Z, pitch: -0.75 },
+      { name: 'storm-wide', x: 0, y: 6, z: 130, yaw: YAW_MINUS_Z, pitch: -0.30 },
+      { name: 'storm-grazing', x: 0, y: -18.0, z: 130, yaw: YAW_MINUS_Z, pitch: -0.02 },
+      { name: 'storm-down', x: 0, y: -12, z: 130, yaw: YAW_MINUS_Z, pitch: -0.95 },
     ],
   },
-  farcrysis: {
-    arena: 'farcrysis',
+  // Calm shared ocean: the colour-model control that carries no foam and no
+  // backscatter, so a change here is absorption and nothing else.
+  'high-seas': {
+    arena: 'high-seas',
     shots: [
-      { name: 'lagoon-shore', x: 0, y: 2.0, z: -50, yaw: YAW_MINUS_Z, pitch: -0.08 },
-      { name: 'lagoon-wade', x: 0, y: 1.1, z: -57.5, yaw: YAW_MINUS_Z, pitch: -0.12 },
-      { name: 'lagoon-high', x: 0, y: 10, z: -52, yaw: YAW_MINUS_Z, pitch: -0.5 },
+      { name: 'sea-wide', x: 0, y: 4, z: 120, yaw: YAW_MINUS_Z, pitch: -0.20 },
+      { name: 'sea-grazing', x: 0, y: -0.9, z: 120, yaw: YAW_MINUS_Z, pitch: -0.02 },
+      { name: 'sea-down', x: 0, y: 6, z: 120, yaw: YAW_MINUS_Z, pitch: -1.0 },
     ],
   },
 };
@@ -167,8 +171,28 @@ for (const shot of set.shots) {
   }, shot);
   await new Promise((r) => setTimeout(r, 2500));
   await page.screenshot({ path: `${OUT}/${shot.name}.png` });
-  telemetry.push({ ...shot });
-  console.log('[hf420] captured', shot.name);
+  // Coverage probe: the same frame with the pool group hidden. Differencing the
+  // pair says exactly which pixels the authored ponds own, so "the pond is in
+  // this shot" is measured rather than asserted from a dark screenshot.
+  const hidden = await page.evaluate(() => {
+    const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+    const pools = scene.getObjectByName('Pass 64 TSL water pools');
+    if (!pools) return false;
+    pools.visible = false;
+    return true;
+  });
+  if (hidden) {
+    await new Promise((r) => setTimeout(r, 1200));
+    await page.screenshot({ path: `${OUT}/${shot.name}-nopool.png` });
+    await page.evaluate(() => {
+      const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+      const pools = scene.getObjectByName('Pass 64 TSL water pools');
+      if (pools) pools.visible = true;
+    });
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  telemetry.push({ ...shot, poolCoverageProbe: hidden });
+  console.log('[hf420] captured', shot.name, hidden ? '(+ pool-hidden probe)' : '');
 }
 // Frame-time budget from the game's own instrument, after the captures, with
 // the camera released back to the player.

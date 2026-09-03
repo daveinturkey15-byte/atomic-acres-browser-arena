@@ -61,9 +61,13 @@ export const WATER_TYPES: Readonly<Record<WaterTypeId, WaterOptics>> = Object.fr
     defaultDepth: 12,
     backscatter: 0.60,
   }),
-  // Coastal 5-9 under a night sky: turbid, short paths in every channel.
+  // Jerlov coastal 5-9 under a night sky. NOTE the ordering: in coastal and
+  // turbid water, dissolved organic matter absorbs BLUE hard, so the
+  // transmission minimum moves out of the blue and into the GREEN
+  // (~550-570 nm). That is why surf and churned coastal water read jade and
+  // not cyan, and it is a property of the water type, never of the bubbles.
   'storm-ocean': Object.freeze({
-    extinction: Object.freeze({ r: 0.62, g: 0.30, b: 0.22 }),
+    extinction: Object.freeze({ r: 0.62, g: 0.26, b: 0.42 }),
     defaultDepth: 14,
     backscatter: 0.72,
   }),

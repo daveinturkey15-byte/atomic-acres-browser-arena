@@ -123,6 +123,24 @@ export function oceanRoughnessFromSlope(slopeMagnitude: number): number {
  * one. Refraction (which brings the depth read with it) is deliberately out of
  * scope for this pass.
  */
+/**
+ * Foam / breaking-energy gate. These are the EXISTING thresholds, lifted out of
+ * the expression under names so the backscatter term can be proved to read the
+ * same estimator as the foam. Values unchanged.
+ */
+export const OCEAN_FOAM_CREST_LOW = 0.88;
+export const OCEAN_FOAM_CREST_HIGH = 1.28;
+export const OCEAN_FOAM_SLOPE_LOW = 0.06;
+export const OCEAN_FOAM_SLOPE_HIGH = 0.2;
+
+/**
+ * How much earlier in normalised crest height the bubble cloud starts than the
+ * whitecap does. Bubbles outlive the crest that made them; this is the SPATIAL
+ * proxy for that lag. It is NOT temporal persistence - a world-fixed decaying
+ * foam field is step 3 of the physical stack and is out of scope for this pass.
+ */
+export const OCEAN_BACKSCATTER_DECAY = 0.34;
+
 /** Minimum cosine used when slanting the path, so a grazing view stays finite. */
 export const OCEAN_MIN_VIEW_COSINE = 0.18;
 
@@ -154,6 +172,62 @@ export function oceanColumnDepth(body: WaterBodyDefinition): number {
   const optics = oceanOpticsForBody(body);
   if (!optics) return 0;
   return body.opticalDepth ?? optics.defaultDepth;
+}
+
+
+/**
+ * Broadband bubble backscatter density, mirroring the TSL graph.
+ *
+ * Entrained air scatters light almost spectrally FLAT. The green shift people
+ * see in surf is not a property of the bubbles: it is the water's own
+ * absorption acting on the light the bubbles returned. So this returns a single
+ * SCALAR, and the colour comes from putting it upstream of the absorption
+ * integral - see oceanScatteredRadiance.
+ *
+ * Density is driven by the SAME crest/slope estimator that drives foam (foam is
+ * the bubbles that reached the surface, backscatter is the ones that did not),
+ * so the two can never disagree, and it is EXACTLY zero below the foam slope
+ * gate - a still pond is unaffected, bit for bit.
+ */
+export function oceanBackscatterDensity(
+  normalizedCrest: number,
+  slopeMagnitude: number,
+  optics: WaterOptics | null,
+): number {
+  if (!optics) return 0;
+  const turbulence = smoothstepScalar(OCEAN_FOAM_SLOPE_LOW, OCEAN_FOAM_SLOPE_HIGH, slopeMagnitude);
+  if (turbulence === 0) return 0;
+  const trail = smoothstepScalar(
+    OCEAN_FOAM_CREST_LOW - OCEAN_BACKSCATTER_DECAY,
+    OCEAN_FOAM_CREST_HIGH,
+    normalizedCrest,
+  );
+  return trail * turbulence * optics.backscatter;
+}
+
+function smoothstepScalar(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * The radiance leaving the surface: the flat bubble term added to the
+ * water-leaving reference BEFORE the column absorbs it. Injecting it after
+ * absorption instead is the classic failure - the hue shift cannot happen, and
+ * the water goes grey and washed out rather than bright and green.
+ */
+export function oceanScatteredRadiance(
+  base: Readonly<{ r: number; g: number; b: number }>,
+  density: number,
+  optics: WaterOptics,
+  pathLength: number,
+): Readonly<{ r: number; g: number; b: number }> {
+  const transmission = oceanTransmission(optics, pathLength);
+  return Object.freeze({
+    r: Math.min(1, base.r + density) * transmission.r,
+    g: Math.min(1, base.g + density) * transmission.g,
+    b: Math.min(1, base.b + density) * transmission.b,
+  });
 }
 
 /**
@@ -241,8 +315,9 @@ export function createOceanTslWater(
     ),
   );
   const normalizedCrest = height.div(max(waveAmplitude, float(0.001))).mul(0.5).add(0.5);
-  const crestFoam = smoothstep(float(0.88), float(1.28), normalizedCrest)
-    .mul(smoothstep(float(0.06), float(0.2), slope));
+  const turbulence = smoothstep(float(OCEAN_FOAM_SLOPE_LOW), float(OCEAN_FOAM_SLOPE_HIGH), slope);
+  const crestFoam = smoothstep(float(OCEAN_FOAM_CREST_LOW), float(OCEAN_FOAM_CREST_HIGH), normalizedCrest)
+    .mul(turbulence);
   const shimmer = sin(positionWorld.x.mul(0.071)
     .add(positionWorld.z.mul(0.093))
     .add(animationTime.mul(0.45))).mul(0.5).add(0.5);
@@ -292,7 +367,26 @@ export function createOceanTslWater(
   // radiance (bottom plus in-water scattering) that the column then absorbs;
   // it is <= 1 per channel and transmission is <= 1, so the bloom-threshold
   // contract above is preserved by construction.
-  const physicalWater = color(body.palette.shallow).mul(transmission);
+  // --- HF-420 broadband bubble backscatter ---------------------------------
+  // Injected UPSTREAM of the absorption integral, as a spectrally flat scalar.
+  // Adding it downstream (a white tint on the finished colour) is the classic
+  // failure: absorption never acts on the scattered light, the hue shift cannot
+  // happen, and the water goes grey instead of green.
+  //
+  // Density reads the SAME crest/slope estimator as the foam above - foam is the
+  // bubbles that reached the surface, backscatter is the ones that did not - so
+  // the two cannot disagree, and `turbulence` is exactly zero below the foam
+  // slope gate, which makes a still pond bit-identical to the pre-backscatter
+  // build.
+  const backscatterStrength = uniform(optics?.backscatter ?? 0);
+  const bubbleTrail = smoothstep(
+    float(OCEAN_FOAM_CREST_LOW - OCEAN_BACKSCATTER_DECAY),
+    float(OCEAN_FOAM_CREST_HIGH),
+    normalizedCrest,
+  );
+  const bubbleDensity = bubbleTrail.mul(turbulence).mul(backscatterStrength);
+  const scatteredRadiance = color(body.palette.shallow).add(bubbleDensity).clamp(0, 1);
+  const physicalWater = scatteredRadiance.mul(transmission);
   const darkWater = mix(paletteWater, physicalWater, useExtinction);
   const keyLight = body.night
     ? vec3(0.25, 0.85, 0.35).normalize()
@@ -360,6 +454,7 @@ export function createOceanTslWater(
   water.userData.waterType = body.waterType ?? null;
   water.userData.waterExtinction = optics ? [optics.extinction.r, optics.extinction.g, optics.extinction.b] : null;
   water.userData.waterColumnDepth = oceanColumnDepth(body);
+  water.userData.waterBackscatter = optics?.backscatter ?? 0;
   water.userData.totalSteepness = OCEAN_TOTAL_STEEPNESS;
   water.userData.waterBody = body;
   water.userData.swimmable = body.swimmable;

@@ -6,12 +6,17 @@ import {
   OCEAN_ROUGHNESS_FLAT,
   OCEAN_ROUGHNESS_ROUGH,
   OCEAN_SLOPE_FULL_ROUGHNESS,
+  OCEAN_BACKSCATTER_DECAY,
+  OCEAN_FOAM_SLOPE_LOW,
+  oceanBackscatterDensity,
   oceanColumnDepth,
   oceanOpticsForBody,
   oceanPathLength,
   oceanRoughnessFromSlope,
+  oceanScatteredRadiance,
   oceanTransmission,
 } from './ocean-tsl';
+import { OCEAN_BANDS, OCEAN_REFERENCE_AMPLITUDE } from './ocean-spectrum';
 import { WATER_POOLS, WATER_TYPES, waterBodyForArena } from './water-authoring';
 // HF-362 grade-chain reference: profile bloom thresholds live here and are
 // fail-closed asserted > 1.0 linear (true emitters only).
@@ -142,6 +147,89 @@ describe('HF-420 physical water colour', () => {
       const straightDown = oceanTransmission(WATER_TYPES['murky-pond'], oceanPathLength(depth, 1));
       expect(straightDown.g).toBeGreaterThan(straightDown.r);
       expect(straightDown.g).toBeGreaterThan(straightDown.b);
+    }
+  });
+});
+
+/** Peak summed |d(height)/dx, d(height)/dz| for a body at a given amplitude. */
+function peakSlope(amplitude: number): number {
+  return OCEAN_BANDS.reduce(
+    (sum, band) => sum + band.weight * amplitude * band.waveNumber,
+    0,
+  );
+}
+
+describe('HF-420 broadband bubble backscatter', () => {
+  it('is EXACTLY zero for a Map 3 pond, at every crest height', () => {
+    // The still-water control the whole proof rests on. A pond's amplitude puts
+    // its steepest possible slope far below the foam gate, so the term is a
+    // hard zero rather than a small number - the pond's pixels are unchanged.
+    const pond = (WATER_POOLS.map3 ?? [])[0]!;
+    const pondSlope = peakSlope(OCEAN_REFERENCE_AMPLITUDE * pond.amplitudeScale);
+    expect(pondSlope).toBeLessThan(OCEAN_FOAM_SLOPE_LOW);
+    const optics = WATER_TYPES[pond.waterType!];
+    for (let crest = 0; crest <= 1.5; crest += 0.05) {
+      expect(oceanBackscatterDensity(crest, pondSlope, optics)).toBe(0);
+    }
+  });
+
+  it('is non-zero on the storm spectrum, and trails the whitecap', () => {
+    const storm = waterBodyForArena('rustworks-1v1')!;
+    const stormSlope = peakSlope(OCEAN_REFERENCE_AMPLITUDE * storm.amplitudeScale);
+    expect(stormSlope).toBeGreaterThan(OCEAN_FOAM_SLOPE_LOW);
+    const optics = WATER_TYPES[storm.waterType!];
+    // At the whitecap itself.
+    expect(oceanBackscatterDensity(1.2, stormSlope, optics)).toBeGreaterThan(0);
+    // BELOW the foam threshold the bubbles are still there: the cloud outlives
+    // the crest that made it, which is what stops it reading as a moving decal.
+    expect(oceanBackscatterDensity(0.88 - OCEAN_BACKSCATTER_DECAY / 2, stormSlope, optics))
+      .toBeGreaterThan(0);
+    // ...and it is weaker there than at the crest.
+    expect(oceanBackscatterDensity(0.88 - OCEAN_BACKSCATTER_DECAY / 2, stormSlope, optics))
+      .toBeLessThan(oceanBackscatterDensity(1.2, stormSlope, optics));
+  });
+
+  it('has no colour of its own: the shift comes from absorption acting on it', () => {
+    // This test IS the skill's primary gotcha, mechanised. Same flat density,
+    // two injection points.
+    const optics = WATER_TYPES['storm-ocean'];
+    const base = { r: 0.09, g: 0.49, b: 0.58 };
+    const path = 6;
+    const transmission = oceanTransmission(optics, path);
+    const upstream = oceanScatteredRadiance(base, 0.4, optics, path);
+    const absorbedOnly = oceanScatteredRadiance(base, 0, optics, path);
+    // UPSTREAM: the added light is filtered by the water, so it arrives
+    // green-shifted - green gains more than red or blue, in absolute terms.
+    const gainR = upstream.r - absorbedOnly.r;
+    const gainG = upstream.g - absorbedOnly.g;
+    const gainB = upstream.b - absorbedOnly.b;
+    expect(gainG).toBeGreaterThan(gainR);
+    expect(gainG).toBeGreaterThan(gainB);
+    // ...and it is brighter than the un-scattered water.
+    expect(upstream.g).toBeGreaterThan(absorbedOnly.g);
+    // DOWNSTREAM (the failure mode): the same flat term added AFTER absorption
+    // gains exactly the same amount in every channel - grey milk, no hue shift.
+    const downstream = {
+      r: absorbedOnly.r + 0.4, g: absorbedOnly.g + 0.4, b: absorbedOnly.b + 0.4,
+    };
+    expect(downstream.r - absorbedOnly.r).toBeCloseTo(downstream.g - absorbedOnly.g, 12);
+    expect(downstream.g - absorbedOnly.g).toBeCloseTo(downstream.b - absorbedOnly.b, 12);
+    // The two are not the same picture: if they ever agree, the term has been
+    // moved downstream and the model is wrong.
+    expect(Math.abs(gainG - gainR)).toBeGreaterThan(1e-3);
+    // Transmission ordering is what produced it: green survives best in coastal
+    // water, which is why surf reads jade rather than cyan.
+    expect(transmission.g).toBeGreaterThan(transmission.r);
+    expect(transmission.g).toBeGreaterThan(transmission.b);
+  });
+
+  it('cannot push the surface above the bloom bound', () => {
+    const optics = WATER_TYPES['clear-lagoon'];
+    for (const density of [0, 0.25, 0.5, 1, 4]) {
+      const out = oceanScatteredRadiance({ r: 1, g: 1, b: 1 }, density, optics, 0.0001);
+      for (const channel of [out.r, out.g, out.b]) {
+        expect(channel).toBeLessThanOrEqual(1);
+      }
     }
   });
 });
