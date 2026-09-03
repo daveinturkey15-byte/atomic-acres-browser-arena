@@ -130,6 +130,17 @@ import {
   createNuketown2LapSidingMaterial,
   createNuketown2RoofMaterial,
 } from './nuketown2-facade-materials';
+import {
+  createNuketown2CarPaintMaterial,
+  createNuketown2ChromeMaterial,
+  createNuketown2CoachMaterial,
+  createNuketown2HeadlightMaterial,
+  createNuketown2TaillightMaterial,
+  createNuketown2TireMaterial,
+  createNuketown2TruckBoxMaterial,
+  createNuketown2TruckCabMaterial,
+  createNuketown2VehicleGlassMaterial,
+} from './nuketown2-vehicle-materials';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -536,7 +547,7 @@ function makeBuilder(scene: THREE.Scene, name: string): Builder {
   };
 }
 
-type BoxOptions = Parameters<typeof box>[5];
+type BoxOptions = Parameters<typeof box>[5] & { presentationOnly?: boolean };
 
 /**
  * Emit a body AND its exact 180-degree partner, `(x, z) -> (-x, -z)`.
@@ -598,8 +609,12 @@ function streetVehicle(
   size: [number, number, number],
   material: THREE.Material,
   options: BoxOptions = {},
-): void {
-  box(builder, `nuketown2 street-vehicle ${name}`, position, size, material, options);
+): THREE.Mesh {
+  const mesh = box(builder, `nuketown2 street-vehicle ${name}`, position, size, material, options);
+  if (options.presentationOnly) {
+    mesh.userData.presentationOnly = true;
+  }
+  return mesh;
 }
 
 // ---------------------------------------------------------------------------
@@ -647,6 +662,9 @@ type Nuketown2Materials = Readonly<{
   /** HF-435: the ground-floor window panes - real glass, visible and pale. */
   windowGlass: THREE.Material;
   rubber: THREE.Material;
+  chrome: THREE.Material;
+  headlight: THREE.Material;
+  taillight: THREE.Material;
   sign: THREE.Material;
   planter: THREE.Material;
 }>;
@@ -722,8 +740,15 @@ function nuketown2Materials(): Nuketown2Materials {
   const trimDecal = createNuketown2DashMaterial();
   const kerb = createNuketown2KerbMaterial();
   const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
-  // HF-435: the house window panes. Visible from the street (pale, slightly
-  // transparent - the gun-range control room's glazing idiom), not a batched
+  const busShell = createNuketown2CoachMaterial();
+  const truckCab = createNuketown2TruckCabMaterial();
+  const truckBox = createNuketown2TruckBoxMaterial();
+  const carA = createNuketown2CarPaintMaterial(0x3d6f80, 'nuketown2-car-aqua');
+  const carGlass = createNuketown2VehicleGlassMaterial();
+  const rubber = createNuketown2TireMaterial();
+  const chrome = createNuketown2ChromeMaterial();
+  const headlight = createNuketown2HeadlightMaterial();
+  const taillight = createNuketown2TaillightMaterial();
   // decal: the pane is a collider and a ballistic surface.
   const windowGlass = createNuketown2GlassMaterial();
   const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
@@ -794,33 +819,18 @@ function nuketown2Materials(): Nuketown2Materials {
     // wood-deck: the plank fence, the same timber the shipped map decks with.
     fence,
     block: standard(0x9d9a8c, 0.94, 0.01),
-    // THE COACH. Cream body (art-kit `MAT.cream`) at the shipped coach's own
-    // paint spec, with a red waistline - the reference's cream/red streamlined
-    // body - as the one saturated thing on the map.
-    busShell: standard(0xe7dbc1, 0.48, 0.25),
+    busShell,
     busTrim,
-    // THE MOVING TRUCK: a plain box van. Painted cab, matte panel box, no
-    // livery, because the reference's is a hire truck and because the eye is
-    // meant to go to the coach beside it.
-    truckCab: standard(0xdedac9, 0.55, 0.24),
-    truckBox: standard(0xd3cdbb, 0.78, 0.06),
-    // The two parked cars are the only POLISHED surfaces on the map, and that
-    // is deliberate rather than decorative: the ray-traced preset's proxy
-    // extraction admits a surface at roughness <= 0.22 with a footprint over
-    // 6 m2, and with everything else here authored matte (board siding, dry
-    // asphalt, painted vehicle panels) the arena first measured ZERO reflective
-    // meshes - the tracer had nothing to reflect at all. Car paint really is
-    // ~0.2 rough and genuinely metallic, and a 4.4 x 1.9 m body clears the
-    // footprint floor where the 2.2 x 1.7 m glass house does not, so the honest
-    // fix was to author the paint correctly rather than to gloss a road.
-    // Job 3 re-keys the HUE into the shipped map's own aqua family and leaves
-    // the two numbers the preset classifies on exactly where they were.
-    carA: standard(0x3d6f80, 0.2, 0.62),
-    carGlass: standard(0x2b3d47, 0.14, 0.5),         // SOLID users: the car cabins
+    truckCab,
+    truckBox,
+    carA,
+    carGlass,
     coachGlass,
     windowGlass,
-    // art-kit `MAT.rubber`, verbatim.
-    rubber: standard(0x202628, 0.9, 0.02),
+    rubber,
+    chrome,
+    headlight,
+    taillight,
     sign: standard(0xdbd1ba, 0.78, 0.06),
     // Hedges, the yard crate, the patio table and the alley planter are one
     // material and four of the five uses are garden mass, so it is keyed as
@@ -1330,11 +1340,34 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
       [SIDE_OPENING_HALF * 2, t.roofY - HEADER_Y, T], m.truckBox);
   }
   streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
+  // Front chrome bumper, grille, headlights, and cab windshield:
+  streetVehicle(builder, 'truck bumper front', [t.cabX + t.cabLength / 2 + 0.12, 0.35, t.z],
+    [0.22, 0.30, W + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  streetVehicle(builder, 'truck grille', [t.cabX + t.cabLength / 2 + 0.02, 1.45, t.z],
+    [0.06, 0.70, W - 0.7], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  streetVehicle(builder, 'truck windshield', [t.cabX + t.cabLength / 2 + 0.02, 2.25, t.z],
+    [0.06, 0.65, W - 0.4], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
+  for (const side of [-1, 1]) {
+    streetVehicle(builder, `truck headlight ${side}`,
+      [t.cabX + t.cabLength / 2 + 0.04, 0.95, t.z + side * (W / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    streetVehicle(builder, `truck taillight ${side}`,
+      [-boxHalf - 0.04, 0.85, t.z + side * (W / 2 - 0.25)], [0.06, 0.22, 0.16], m.taillight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+  }
+  streetVehicle(builder, 'truck rear step bar', [-boxHalf - 0.10, 0.45, t.z],
+    [0.18, 0.14, W - 0.2], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  // Wheels: keep the exact 3 expected asymmetric meshes plus decorative hubcaps and arches
   for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
     streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, t.z], [0.9, 0.84, W + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
+    for (const side of [-1, 1]) {
+      streetVehicle(builder, `truck hubcap ${index} ${side}`, [x, 0.42, t.z + side * (W / 2 + 0.12)],
+        [0.38, 0.38, 0.03], m.chrome, { solid: false, shots: false, cast: false, presentationOnly: true });
+      streetVehicle(builder, `truck wheel arch ${index} ${side}`, [x, 0.88, t.z + side * (W / 2 + 0.01)],
+        [1.06, 0.10, 0.06], m.truckBox, { solid: false, shots: false, cast: true, presentationOnly: true });
+    }
   }
-
   // ROOF ACCESS. See TRUCK_ROOF_STEPS: the 2x-damage core rides this roof, and
   // a roof nothing can climb is a feature that does not exist.
   for (const [index, [top, x0, x1]] of TRUCK_ROOF_STEPS.entries()) {
@@ -1371,11 +1404,33 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
       // tier instead of the body-clean carGlass.
       [c.length - 1.6, 0.8, 0.08], m.coachGlass, { solid: false, shots: false, cast: false });
   }
+  // Front and rear wrap-around chrome bumpers:
+  streetVehicle(builder, 'coach bumper front', [c.x - c.length / 2 - 0.10, 0.35, c.z],
+    [0.22, 0.30, c.width + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  streetVehicle(builder, 'coach bumper rear', [c.x + c.length / 2 + 0.10, 0.35, c.z],
+    [0.22, 0.30, c.width + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  // Chrome front grille bar & dual headlights/taillights:
+  streetVehicle(builder, 'coach front grille', [c.x - c.length / 2 - 0.02, 1.05, c.z],
+    [0.06, 0.22, c.width - 0.8], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  for (const side of [-1, 1]) {
+    streetVehicle(builder, `coach headlight ${side}`,
+      [c.x - c.length / 2 - 0.04, 0.95, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    streetVehicle(builder, `coach taillight ${side}`,
+      [c.x + c.length / 2 + 0.04, 1.05, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.26, 0.16], m.taillight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+  }
+  // Wheels: keep the exact 2 expected asymmetric meshes plus decorative hubcaps and arches
   for (const [index, x] of [-2.9, 2.9].entries()) {
     streetVehicle(builder, `coach wheel ${index}`, [c.x + x, 0.42, c.z], [1.0, 0.84, c.width + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
+    for (const side of [-1, 1]) {
+      streetVehicle(builder, `coach hubcap ${index} ${side}`, [c.x + x, 0.42, c.z + side * (c.width / 2 + 0.12)],
+        [0.44, 0.44, 0.03], m.chrome, { solid: false, shots: false, cast: false, presentationOnly: true });
+      streetVehicle(builder, `coach wheel arch ${index} ${side}`, [c.x + x, 0.88, c.z + side * (c.width / 2 + 0.01)],
+        [1.16, 0.10, 0.06], m.busShell, { solid: false, shots: false, cast: true, presentationOnly: true });
+    }
   }
-  // THE HEAD CAR, and why it exists. The reference's aerial of the turning head
   // shows the truck, the coach AND a couple of civilian cars standing in it, so
   // this body is the reference's own. It is authored here rather than in
   // `cars()` because it earns its place as the COACH'S COUNTERWEIGHT: the coach
@@ -1398,10 +1453,31 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
   streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
   streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
+  // Head car bumpers, sloped windows, and separate wheels with hubcaps:
+  streetVehicle(builder, 'head car bumper front', [HEAD_CAR[0] + 2.25, 0.30, HEAD_CAR[1]],
+    [0.16, 0.22, 1.94], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  streetVehicle(builder, 'head car bumper rear', [HEAD_CAR[0] - 2.25, 0.30, HEAD_CAR[1]],
+    [0.16, 0.22, 1.94], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+  streetVehicle(builder, 'head car windshield', [HEAD_CAR[0] + 0.95, 1.48, HEAD_CAR[1]],
+    [0.25, 0.55, 1.66], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
+  streetVehicle(builder, 'head car rear window', [HEAD_CAR[0] - 1.35, 1.48, HEAD_CAR[1]],
+    [0.25, 0.55, 1.66], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
+  for (const side of [-1, 1]) {
+    streetVehicle(builder, `head car headlight ${side}`,
+      [HEAD_CAR[0] + 2.22, 0.68, HEAD_CAR[1] + side * 0.70], [0.06, 0.16, 0.30], m.headlight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    streetVehicle(builder, `head car taillight ${side}`,
+      [HEAD_CAR[0] - 2.22, 0.68, HEAD_CAR[1] + side * 0.70], [0.06, 0.16, 0.30], m.taillight,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+  }
   for (const [index, dx] of [-1.5, 1.5].entries()) {
     for (const [side, dz] of [-1, 1].entries()) {
       streetVehicle(builder, `head car wheel ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 0.9],
         [0.68, 0.68, 0.3], m.rubber, { solid: false, shots: false, cast: false });
+      streetVehicle(builder, `head car hubcap ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 1.07],
+        [0.34, 0.34, 0.03], m.chrome, { solid: false, shots: false, cast: false, presentationOnly: true });
+      streetVehicle(builder, `head car wheel arch ${index}${side}`, [HEAD_CAR[0] + dx, 0.72, HEAD_CAR[1] + dz * 0.96],
+        [0.88, 0.08, 0.06], m.carA, { solid: false, shots: false, cast: true, presentationOnly: true });
     }
   }
 }
@@ -1421,10 +1497,29 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
   const cz = GARAGE_FRONT_Z + 4.6;
   pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA);
   pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass);
+  // Driveway sedan bumpers, sloped windows, headlights, taillights, and wheels:
+  pair(builder, 'car bumper front', [cx, 0.30, cz + 2.25], [1.94, 0.22, 0.16], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'car bumper rear', [cx, 0.30, cz - 2.25], [1.94, 0.22, 0.16], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'car windshield slope', [cx, 1.48, cz + 0.95], [1.66, 0.55, 0.25], m.carGlass,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'car rear window slope', [cx, 1.48, cz - 1.35], [1.66, 0.55, 0.25], m.carGlass,
+    { solid: false, shots: false, cast: false });
+  for (const side of [-1, 1]) {
+    pair(builder, `car headlight ${side}`, [cx + side * 0.70, 0.68, cz + 2.22], [0.30, 0.16, 0.06], m.headlight,
+      { solid: false, shots: false, cast: false });
+    pair(builder, `car taillight ${side}`, [cx + side * 0.70, 0.68, cz - 2.22], [0.30, 0.16, 0.06], m.taillight,
+      { solid: false, shots: false, cast: false });
+  }
   for (const [index, dz] of [-1.5, 1.5].entries()) {
     for (const [side, dx] of [-1, 1].entries()) {
-      pair(builder, `car wheel ${index}${side}`, [cx + dx * 0.9, 0.34, cz + dz], [0.3, 0.68, 0.68], m.rubber,
+      pair(builder, `car wheel ${index}${side}`, [cx + dx * 0.95, 0.34, cz + dz], [0.26, 0.68, 0.68], m.rubber,
         { solid: false, shots: false, cast: false });
+      pair(builder, `car hubcap ${index}${side}`, [cx + dx * 1.08, 0.34, cz + dz], [0.03, 0.34, 0.34], m.chrome,
+        { solid: false, shots: false, cast: false });
+      pair(builder, `car wheel arch ${index}${side}`, [cx + dx * 0.96, 0.72, cz + dz], [0.06, 0.08, 0.88], m.carA,
+        { solid: false, shots: false, cast: true });
     }
   }
 }
