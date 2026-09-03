@@ -233,3 +233,24 @@ export function createNuketown2CeilingLightMaterial(warm = true): MeshStandardNo
 
   return mat;
 }
+
+/**
+ * Procedural physical glass material with subtle specular fresnel reflectance and sky tint.
+ */
+export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
+  const mat = new MeshStandardNodeMaterial({
+    roughness: 0.08,
+    metalness: 0.15,
+    transparent: true,
+    opacity: 0.42,
+  });
+  mat.name = 'nuketown2-window-glass';
+  mat.type = 'MeshStandardMaterial';
+
+  const p = positionWorld;
+  const baseTint = vec3(0.60, 0.72, 0.78);
+  const shimmer = fbm2(vec2(p.x.mul(1.5), p.y.mul(1.5)), 2).sub(float(0.5)).mul(float(0.035));
+  mat.colorNode = baseTint.add(shimmer);
+
+  return mat;
+}

@@ -121,6 +121,7 @@ import {
   createNuketown2DrywallMaterial,
   createNuketown2GarageFloorMaterial,
   createNuketown2GarageWallMaterial,
+  createNuketown2GlassMaterial,
   createNuketown2TileFloorMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
@@ -719,10 +720,7 @@ function nuketown2Materials(): Nuketown2Materials {
   // HF-435: the house window panes. Visible from the street (pale, slightly
   // transparent - the gun-range control room's glazing idiom), not a batched
   // decal: the pane is a collider and a ballistic surface.
-  const windowGlass = standard(0x9fb6bd, 0.18, 0.08);
-  windowGlass.name = 'nuketown2-window-glass';
-  windowGlass.transparent = true;
-  windowGlass.opacity = 0.38;
+  const windowGlass = createNuketown2GlassMaterial();
   const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
   const interiorFloor = createNuketown2WoodFloorMaterial();
   const kitchenFloor = createNuketown2TileFloorMaterial();
@@ -914,6 +912,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       { solid: false, shots: false, cast: true });
     pair(builder, `house front window jamb ${index} 1`, [window[1] - 0.035, 1.625, zFront], [0.07, 1.25, WALL_T + 0.02], m.trim,
       { solid: false, shots: false, cast: true });
+    // Double-hung meeting rail and vertical muntin divider:
+    pair(builder, `house front window meeting rail ${index}`, [wx, 1.55, zFront], [width, 0.05, 0.08], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, `house front window mullion ${index}`, [wx, 1.52, zFront], [0.05, 0.98, 0.08], m.trim,
+      { solid: false, shots: false, cast: true });
+    // Interior window stool ledge and apron trim:
+    pair(builder, `house front window stool ${index}`, [wx, 0.99, zFront + WALL_T / 2 + 0.035], [width + 0.10, 0.03, 0.07], m.trim,
+      { solid: false, shots: false, cast: false });
+    pair(builder, `house front window apron ${index}`, [wx, 0.93, zFront + WALL_T / 2 + 0.015], [width + 0.06, 0.08, 0.03], m.trim,
+      { solid: false, shots: false, cast: false });
   }
   pair(builder, 'house front door lintel',
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
@@ -955,12 +963,30 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // HF-440 Cycle 1 Priority 3: upper front window projecting sill nosing and jamb reveals
     pair(builder, 'house upper window sill nose', [wx, UPPER_Y0 + 0.86, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
       { solid: false, shots: false, cast: true });
-    pair(builder, 'house upper window jamb 0', [UPPER_WINDOW[0] + 0.035, UPPER_Y0 + UPPER_H / 2, zFront], [0.07, UPPER_H, WALL_T + 0.02], m.trim,
+    pair(builder, 'house upper window jamb 0', [UPPER_WINDOW[0] + 0.035, UPPER_Y0 + 1.35, zFront], [0.07, 2.70, WALL_T + 0.02], m.trim,
       { solid: false, shots: false, cast: true });
-    pair(builder, 'house upper window jamb 1', [UPPER_WINDOW[1] - 0.035, UPPER_Y0 + UPPER_H / 2, zFront], [0.07, UPPER_H, WALL_T + 0.02], m.trim,
+    pair(builder, 'house upper window jamb 1', [UPPER_WINDOW[1] - 0.035, UPPER_Y0 + 1.35, zFront], [0.07, 2.70, WALL_T + 0.02], m.trim,
       { solid: false, shots: false, cast: true });
+    // HF-440 Cycle 2: Glazed double-hung upper window with glass pane on upper sash
+    pair(builder, 'house upper front window glass',
+      [wx, 5.42, zFront], [width - 0.10, 1.44, 0.06], m.windowGlass,
+      { solid: false, shots: false, cast: false });
+    pair(builder, 'house upper front window meeting rail',
+      [wx, UPPER_Y0 + 1.40, zFront], [width, 0.06, 0.08], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, 'house upper front window mullion 0',
+      [wx - width / 4, 5.39, zFront], [0.05, 1.38, 0.07], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, 'house upper front window mullion 1',
+      [wx + width / 4, 5.39, zFront], [0.05, 1.38, 0.07], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, 'house upper front window stool',
+      [wx, UPPER_Y0 + 0.89, zFront + WALL_T / 2 + 0.035], [width + 0.10, 0.03, 0.07], m.trim,
+      { solid: false, shots: false, cast: false });
+    pair(builder, 'house upper front window apron',
+      [wx, UPPER_Y0 + 0.83, zFront + WALL_T / 2 + 0.015], [width + 0.06, 0.08, 0.03], m.trim,
+      { solid: false, shots: false, cast: false });
   }
-
   // --- back wall: back door and one upper window ---------------------------
   const BACK_DOOR = doorRun('house back door');
   const groundBackRuns: [number, number][] = [
@@ -992,6 +1018,25 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const backUpperWx = (BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2;
   pair(builder, 'house upper back sill nose', [backUpperWx, UPPER_Y0 + 0.86, -23.05], [backUpperW + 0.12, 0.08, 0.10], m.trim,
     { solid: false, shots: false, cast: true });
+  // HF-440 Cycle 2: Glazed double-hung upper back window with glass pane on upper sash
+  pair(builder, 'house upper back window glass',
+    [backUpperWx, 5.42, zBack], [backUpperW - 0.10, 1.44, 0.06], m.windowGlass,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper back window meeting rail',
+    [backUpperWx, UPPER_Y0 + 1.40, zBack], [backUpperW, 0.06, 0.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper back window mullion 0',
+    [backUpperWx - backUpperW / 4, 5.39, zBack], [0.05, 1.38, 0.07], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper back window mullion 1',
+    [backUpperWx + backUpperW / 4, 5.39, zBack], [0.05, 1.38, 0.07], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper back window stool',
+    [backUpperWx, UPPER_Y0 + 0.89, zBack - WALL_T / 2 - 0.035], [backUpperW + 0.10, 0.03, 0.07], m.trim,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper back window apron',
+    [backUpperWx, UPPER_Y0 + 0.83, zBack - WALL_T / 2 - 0.015], [backUpperW + 0.06, 0.08, 0.03], m.trim,
+    { solid: false, shots: false, cast: false });
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
   // Ten 0.30 m risers and a 0.90 m landing, climbing toward the street. The
   // riser is inside the 0.42 m autostep and the going is over the 0.22 m
