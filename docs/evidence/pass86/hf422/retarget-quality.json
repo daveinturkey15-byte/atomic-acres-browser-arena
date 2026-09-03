@@ -1,8 +1,16 @@
 {
   "lane": "HF-422",
-  "generatedAt": "2026-09-03T00:38:01.221Z",
-  "glbNote": "Blender NLA export carrying the 24 authored clips plus the trial clip. Uncompressed float accessors, so every row below is produced by the SAME tool on the SAME file - the only like-for-like comparison available (see the shipped-GLB finding in the lane report).",
+  "generatedAt": "2026-09-03T01:11:07.039Z",
   "tool": "scripts/animation/measure-retarget-quality.mjs",
+  "glbNote": "Blender NLA export carrying the 24 authored clips plus the trial clip. Uncompressed float accessors, so every row below is produced by the SAME tool on the SAME file. Re-baked after the frame-rate fix, so the scene exports at the trial source 30 fps; the authored actions are natively 24 fps and their sampler times in THIS file are therefore 25% short. Nothing below is a per-second figure, so that does not affect these rows - see foot-contact-analysis.json for the per-second forms, which state each clip native rate.",
+  "metricCaveat": {
+    "doNotCompareSlideAcrossClips": "The slideM figures below are NOT comparable between clips and no ratio between two of them means anything.",
+    "defect": "The planted set is built with Array.filter, which discards contiguity, and slide is then summed between CONSECUTIVE SURVIVING samples. Frames from two different stance phases end up adjacent, so each swing-phase jump between them is added to the slide. A clip with one stance phase is over-counted by exactly zero; MB_Walk_Gun_Debug has six per foot and is over-counted by 53% on Foot.L (naive 3.2981 m against a contiguous 2.1617 m).",
+    "secondDefect": "The 3 cm band is a fixed absolute window, so when a clip feet barely lift the band swallows the swing phase and the metric degenerates into total foot path length. MB_Walk_Gun_Debug feet lift 0.0935 m and 60 of its 76 frames land inside the band (79%); authored Walk feet lift 0.196 m and 11 of 33 do (33%). That asymmetry, times the 2.3x clip length, is the whole of the 5.3x ratio an earlier draft of this evidence reported as the deciding number. It was withdrawn.",
+    "lowestFootYPools": "lowestFootY is the minimum over Foot.L, Foot.R, PT.L and PT.R pooled. PT.L/PT.R are NOT toes - they are Root-parented helper bones (rest translation 0.568,0.627,0.227 and -0.018,0.423,0.659 in Swat.gltf, not mirrored, no children, 0.42-0.63 m off the floor) that no authored clip animates. Read the per-bone minima in foot-contact-analysis.json instead: the trial clip actual FEET bottom out at +0.0442 and +0.0492, higher than every authored clip +0.0224.",
+    "useInstead": "docs/evidence/pass86/hf422/foot-contact-analysis.json and scripts/animation/hf422-foot-contact-analysis.mjs.",
+    "toolNotPatched": "measure-retarget-quality.mjs is outside Lane AO ownership and was NOT modified. The exact patch (contiguous runs, band-fraction refusal, and an accessor refusal for the meshopt-compressed shipped GLB) is in the lane report."
+  },
   "clips": {
     "MB_Walk_Gun_Debug": {
       "file": "artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb",

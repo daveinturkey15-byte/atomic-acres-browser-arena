@@ -1,114 +1,172 @@
 # HF-422 Map 3 trial — MotionBricks G1-34 → operator retarget
 
-**Verdict: NO-GO. Do not build `motion-bricks.cpp`.**
+**Verdict: NO-GO. Do not build `motion-bricks.cpp` for this rig.**
 Lane AO, PASS 86 overnight, 2026-09-03. Branch
 `contrib/dave-gaming-pc/claude/hf422-motionbricks-map3`. Nothing published, nothing shipped.
 
-The trial answered its question in 2 h 20 m of the 3 h budget, without a native build, without a
-GPU, and without downloading the 0.73 GB model. **It measures the RETARGET, which is the gate the
-generator sits behind. It says nothing whatever about MotionBricks' generation quality.**
+**This document was rewritten after skeptic review. The first draft justified the same verdict
+with a number that does not exist.** The corrections are in "What was withdrawn" below, stated
+before anything else, because the withdrawn number was the headline of the version that was
+committed first and a reader who saw only that version was misled.
 
-## The question, and the answer
+The trial measures the RETARGET, which is the gate the generator sits behind. **It says nothing
+whatever about MotionBricks' generation quality** — the 0.73 GB model was never downloaded and
+never run.
 
-> Does G1-34 motion, retargeted onto our 62-joint operator rig, read as a human soldier — or as a
-> robot?
+## What was withdrawn
 
-It never got as far as reading like anything. The retarget is mechanically correct — the joint
-order is recovered from published metadata, the layout is proved from the bytes, the weapon grip
-is untouched — and the resulting clip **slides its feet 5.3× further than the shipped `Walk` on
-the identical metric, in the identical file, measured by the identical tool**, and is the only
-clip in that file whose lowest foot is *below* the ground plane.
+| Withdrawn claim | Why it was wrong |
+|---|---|
+| "slides its feet **5.3×** further than the shipped `Walk`" | An artifact of the measuring tool. `measure-retarget-quality.mjs` builds its planted set with `Array.filter`, which discards contiguity, then sums horizontal distance between *consecutive surviving samples* — so it also sums the swing-phase jump between separate stance phases. Over-count is **zero** on a one-stance clip and **53%** on this six-stance one. Its 3 cm band is absolute, so it swallowed **79%** of the low-lifting trial clip against **33%** of the authored walk. That asymmetry, times a 2.3× clip-length difference, is the entire ratio. |
+| G4 **FAIL — foot slide 2.69 to 3.81 m** | Withdrawn. Measured on contiguous stance the trial clip slides **less per stance frame than the authored walk** (0.0400 m vs 0.0574 m), and on the repo's own pass-77 contact metric its stance foot is broadly consistent with the ground speed it carries. **There is no foot-slide failure here.** |
+| "`PT.L` at **3.81 m** of toe slide, where every authored clip pins the toes at 0.0000 m" | `PT.L`/`PT.R` are **not toes**. In `Swat.gltf` they are `Root`-parented, childless, **not mirrored** (rest `(0.568, 0.627, 0.227)` and `(-0.018, 0.423, 0.659)`) and sit **0.42–0.63 m off the floor**. The authored clips do not "pin" them — they never animate them at all. A real defect is hiding here, but it is a different one; see finding 3. |
+| G5 "ground penetration 0.0168 m, the only negative in the file" | That minimum belongs to `PT.R`. The trial clip's actual **feet bottom out at +0.0442 and +0.0492 — higher off the ground than every authored clip's +0.0224.** The retargeted feet never penetrate the floor. |
+| "the travelling variant differs by 0.04 m, which is how you can tell travel was never the problem" | The same non-contiguity artifact. On contiguous stance the two bakes differ by **1.55×** (`Foot.L` 2.1617 vs 1.3959 m) and **2.43×** (`Foot.R` 1.5916 vs 0.6561 m). The falsifier did not distinguish what it claimed to. |
+| "`g1skel34` **does** have toes, correcting the technique study" | The joints `left_toe_base`/`right_toe_base` do exist — but the conclusion drawn from them was wrong, because it was drawn about destination bones that are not toes. |
+
+None of the withdrawn claims were re-run into new evidence. All measurements below were taken
+this pass, after the frame-rate fix, with `scripts/animation/hf422-foot-contact-analysis.mjs`,
+whose implementation of the pass-77 method reproduces the repo's own frozen constants
+(`Walk` 1.3559 against 1.3416, **1.07%**; `Run` 3.0803 against 3.0832, **0.09%**).
+
+## What the verdict now rests on
+
+**One structural finding, which no amount of tuning can fix.**
+
+### 1. `g1skel34` has no head and no neck. At all.
+
+All 34 joint names, read from `motionbricks.joint_names` in `g1-f32/support.gguf`, run
+`pelvis → legs → 3 waist links → shoulders → arms → hand roll`. There is no `head`, no `neck`,
+no `skull`, no cervical link of any kind. The chain simply stops at the shoulders.
+
+So the operator's `Neck` and `Head` **cannot be driven by any G1 clip** — the retarget script
+raises rather than fake them, and the report records
+`operatorJointsSourceCannotDrive: ["Neck", "Head"]`. The head stays welded to the chest for the
+whole clip. For a soldier that must aim, track and telegraph attention, that is not a polish
+item; it is the wrong source skeleton. **This is the decisive finding and it is a property of
+the released model, not of this retarget** — `docs/DEMO.md` "Initial limitations" states G1 is
+the only skeleton the released model supports.
+
+### 2. The feet lift less than half as far as the authored walk, and asymmetrically
+
+| clip | `Foot.L` lift | `Foot.R` lift | L/R asymmetry |
+|---|---:|---:|---:|
+| authored `Walk` | 0.1960 m | 0.1961 m | 0.0001 m |
+| authored `Run` | 0.5376 m | 0.5357 m | 0.0019 m |
+| **`MB_Walk_Gun_Debug`** | **0.0935 m** | **0.0669 m** | **0.0266 m (40%)** |
+
+Frame-rate independent, band independent, tool independent — it is the range of a world-space Y
+coordinate. The authored clips are symmetric to a tenth of a millimetre; the trial clip's left
+foot lifts 40% higher than its right.
+
+This is also *why* the repo's own contact detector becomes unreliable on this clip. Swept over
+the contact-height gate, the authored clips are stable and the trial clip is not:
+
+| contact gate | `Walk` (authored) | `MB_Walk_Gun_Debug` |
+|---|---:|---:|
+| **0.10** (pass-77's own constant) | 1.3559 m/s (616 samples) | **0.2683 m/s (66 samples)** |
+| 0.15 | 1.3558 m/s | 1.1214 m/s |
+| 0.20 | 1.3558 m/s | 1.2137 m/s |
+| 0.25 | 1.2474 m/s | 1.1386 m/s |
+
+At the canonical gate only **66 of 1920** samples survive on the trial clip and it reports a
+spurious 0.27 m/s. Widen the gate and it recovers 1.07–1.21 m/s against an operator-scale target
+of **1.273 m/s** — i.e. **the stance foot is broadly right**, which is exactly why the foot-slide
+failure was withdrawn. The instability is the finding, not the number.
+
+*(Honest limit: `walk_gun` is a slow tactical gait, and no authored clip of a comparable gait
+exists to compare against. The lift shortfall is a measured fact; reading it as "a shuffle" is an
+interpretation that G6 would have settled and G6 was never run.)*
+
+### 3. The retarget writes metres of motion onto two bones the shipped clips never touch
+
+`PT.L`/`PT.R` are `Root`-parented helper bones — the name reads as *pole target*, but nothing in
+the tree states their semantics, and this lane did not establish them.
+
+| | authored `Walk` | authored `Run` | `MB_Walk_Gun_Debug` |
+|---|---:|---:|---:|
+| `PT.L` height | 0.4669 m, **static** | 0.4206 m, **static** | **−0.0135 m**, path **3.81 m** |
+| `PT.R` height | 0.4669 m, **static** | 0.4233 m, **static** | **−0.0168 m**, path **3.87 m** |
+
+All 24 authored clips leave them completely still (lift 0.0000 m, path 0.0000 m) at roughly knee
+height. This retarget drags both to the floor and moves them nearly 4 m. **This is Lane AO's own
+bug, not MotionBricks'** — the `left_toe_base → PT.L` row was inherited from the pre-existing
+Kimodo correspondence table and never questioned. It is fixable by simply not mapping `PT.*`, and
+it is called out here so that the next lane fixes it rather than inheriting it a third time.
+
+### 4. Coverage, for the record
+
+20 of the operator's 62 joints are driven (SOMA-30 reaches 22); 18 vary by >0.5° against the
+authored `Walk`'s 20. G1's three waist links are effectively co-located — a single 3-DoF waist
+where the operator carries a four-segment spine. Its rest hip sits at 0.7872 m against SOMA-30's
+0.9887 m, so a G1 clip needs a **25.6% larger root scale** onto the same figure.
 
 ## Gate results
 
 | # | Bar | Result | Evidence |
 |---|---|---|---|
-| G1 | 34 joint names and parents recovered from published metadata, not guessed | **PASS** | `motionbricks.joint_names` + `joint_parents` in `g1-f32/support.gguf` (5,472 B, sha256 `5d41cae4…07200`, matches the repo's own `SHA256SUMS`). Transcribed into `src/animation/motionbricks-g1-retarget.ts` |
-| G2 | Phase 1 reproduces the frame table exactly for all 15 styles | **PASS** | `mbstyle-inventory.json`: 15/15 predicted `(parameter_count − 11)/412` equals the frame count in the tensor dims. Rotation matrices orthonormal to 9.3e-7 worst case |
-| G3 | Zero tracks on any `OPERATOR_JOINTS_RETARGET_MUST_NOT_DRIVE` joint | **PASS by the repo's operative definition; the literal wording is unsatisfiable** — see below | 40 barred joints carry tracks in the trial clip **and in all 24 authored clips, identically** (186 channels each). No finger or thumb channel *varies* |
-| G4 | Foot slide ≤ 0.06 m | **FAIL — 2.69 to 3.81 m** | `retarget-quality.json` |
-| G4b | No finger or thumb channel varies over the clip | **PASS** | `gripChannelsVarying: []` |
-| G5 | No limb inversion, hip drift ≤ 0.05 m, ground penetration ≤ 0.02 m | **PARTIAL** — penetration 0.0168 m, inside tolerance but the only negative in the file; limb inversion NOT ASSESSED (needs G6's capture) | `lowestFootY: -0.0168` vs `+0.0224` for every authored clip |
-| G6 | Three-quarter capture reads as a human carrying a weapon | **NOT REACHED** | Stopped on G4 as the plan instructs |
-| G7 | Tripwire 0, prewarm ceiling unchanged at 14, focused vitest green, tsc 0 | **PASS on what a no-capture run can show** | ceiling test 9/9 green and untouched; 31 focused tests green; tripwire needs a session, not run |
+| G1 | 34 joint names and parents recovered from published metadata, not guessed | **PASS** | `motionbricks.joint_names` + `joint_parents` in `g1-f32/support.gguf` (5,472 B, sha256 `5d41cae4…07200`, matches the repo's own `SHA256SUMS`) |
+| G2 | Phase 1 reproduces the frame table exactly for all 15 styles | **PASS** | `mbstyle-inventory.json`: 15/15 predicted `(parameter_count − 11)/412` equals the tensor frame count. Worst rotation orthonormality error 9.293e-7 |
+| G3 | Zero tracks on any `OPERATOR_JOINTS_RETARGET_MUST_NOT_DRIVE` joint | **PASS by the repo's operative definition (variation); unsatisfiable as literally worded** | 40 barred joints carry tracks in the trial clip **and identically in all 24 authored clips** (186 channels each) — Blender writes a channel per bone per action. No gate was changed |
+| G4 | Foot slide ≤ 0.06 m | **NOT FAILED — and the bar is unsatisfiable as written** | Contiguous stance slide 2.1617 m / 1.5916 m over 60 and 51 band frames, i.e. **0.0400 and 0.0354 m per stance frame against the authored walk's 0.0574 and 0.0565**. The shipped `Walk` measures 0.5738 m on the literal metric, so no locomotion clip of any provenance passes 0.06 m. **The gate was left exactly as written and was not used to decide anything.** |
+| G4b | No finger or thumb channel varies over the clip | **PASS** | `gripChannelsVarying: []`. Authored `Walk` shows 4 and `Idle_Gun` 10, so the check is live |
+| G5 | No limb inversion, hip drift ≤ 0.05 m, ground penetration ≤ 0.02 m | **PARTIAL** — no ground penetration by the feet (min **+0.0442 m**, higher than every authored clip). Hip drift 0.0024 m in place. `PT.*` reach −0.0168 m, which is finding 3, not penetration. Limb inversion **NOT ASSESSED** — needs G6's capture | `foot-contact-analysis.json` |
+| G6 | Three-quarter capture reads as a human carrying a weapon | **NOT REACHED — readability was never measured** | No capture was taken. Nothing here licenses any claim about how the clip *looks* |
+| G7 | Tripwire 0, prewarm ceiling unchanged at 14, focused vitest green, tsc 0 | **PASS on what a no-capture run can show** | ceiling test 9/9 green and untouched; 40 focused tests green; `tsc` exit 0; tripwire needs a session, not run |
 
-## The number
+**G4 and G5 no longer carry the verdict. G1 does, supported by findings 2 and 4.**
 
-Every row below is `scripts/animation/measure-retarget-quality.mjs` on
-`artifacts/motion/retargeted/hf422-mb-walk-gun-inplace.glb` — one file, which the Blender NLA
-export fills with the 24 authored clips **plus** the trial clip, all in uncompressed float
-accessors. Same tool, same encoding, same rig, same session.
+## How strong is this verdict, honestly
 
-| clip | Foot.L slide | Foot.R slide | PT.L | PT.R | lowest foot Y |
-|---|---:|---:|---:|---:|---:|
-| authored `Walk` | 0.5738 m | 0.6219 m | 0.0000 | 0.0000 | **+0.0224** |
-| authored `Run` | 0.5058 m | 0.8278 m | 0.0000 | 0.0000 | +0.0220 |
-| authored `Idle_Gun` | 0.0000 m | 0.0000 m | 0.0000 | 0.0000 | +0.0228 |
-| **`MB_Walk_Gun_Debug`** | **3.2981 m** | **2.9638 m** | **3.8126** | **2.6876** | **−0.0168** |
+Weaker than the first draft claimed, and it should be read that way.
 
-**5.3× the authored walk on the feet, and the toes move at all where every authored clip pins
-them at exactly zero.** The clip is baked in place — the root carries no travel — so this is
-genuine sliding, not travel counted as slide. The travelling variant measures 3.34 m for
-comparison; the difference between the two is 0.04 m, which is how you can tell the travel was
-never the problem.
+- Finding 1 is **decisive and unfixable** within this model release: a source skeleton with no
+  head and no neck cannot animate a soldier's head.
+- Finding 2 is **real but interpretable**: the lift shortfall is measured, the reading of it as a
+  shuffle is not, because G6 was never run.
+- Finding 3 is **this lane's own bug** and counts against the harness, not the source.
+- Finding 4 is a **cost** argument, not a defect.
 
-### The G4 bar is mis-calibrated, and the trial fails anyway
+What would change the verdict: a MotionBricks release with a human skeleton carrying a
+head and neck. Nothing else in this document would need to move.
 
-Stated honestly because it matters for the next lane and because the bar must not be quietly
-moved: **0.06 m came from a band (0.020–0.052 m) measured on four Kimodo clips that are two
-idles, a crouched reload and a hit reaction** — near-static clips where every frame really is a
-plant. A *walk* has swing phases, and the shipped `Walk` measures 0.57 m on this same metric. So
-no locomotion clip of any provenance, authored or generated, can pass a 0.06 m bar as written.
+**Recommendation: do not spend the day on the C++23/Vulkan build.** The named shortfall list (a
+sprint cycle above 3.08 m/s, crouch and prone stance idles and their transitions, a reload body)
+is better served by the route already proven on this rig — the four measured Kimodo clips waiting
+to be landed — and by authoring in Blender. The one thing MotionBricks does that Kimodo cannot,
+**stance changes under a movement command**, remains genuinely unserved and is worth revisiting
+if a later release adds a human skeleton.
 
-The gate is left exactly as written. The verdict does not depend on it: against the only fair
-comparator — the authored walk this clip would have to beat to be worth anything — the trial is
-**5.3× worse**, and that is not a close call either.
+## Two harness defects found on the way, neither of them MotionBricks' fault
 
-## Two defects found on the way, neither of them MotionBricks' fault
+### 1. The bake exported a 30 fps source at 24 fps — FIXED this pass
 
-### 1. `measure-retarget-quality.mjs` cannot read the shipped GLB, and says so with a number
+`retarget-kimodo-motion.py` never set `scene.render.fps`, so Blender's default 24 applied: the
+trial clip's sampler ran `1/24 … 76/24`, making it **3.1667 s instead of 2.5333 s and 25% slow**,
+with nothing in the file to say so. The frame rate now comes from `skeleton.json` (the `soma30`
+path keeps 24, which is both its native rate and Blender's default, so that path is unchanged),
+`sourceFps`/`sceneFps`/`clipDurationS` are recorded in the retarget report, and both trial GLBs
+were re-baked. Every measurement in this document is from the corrected bakes.
 
-`pass65-third-person-operator-lod0.glb` uses `EXT_meshopt_compression` and normalized SHORT
-(`componentType` 5122) accessors. The measurer reads every accessor as raw `Float32` out of the
-buffer view, so on the shipped asset it returns `lowestFootY: -1.33e+74`, `Body NaN`, "180 deg"
-for most joints — **and `0.0000 m` foot slide for every foot, which reads as a pass.** It is a
-tool that reports green on a file it cannot decode.
+Because one Blender scene exports every action at one scene fps, the 24 fps authored actions
+carry 30 fps sampler times **in these re-baked files**. Every frame-based figure here is
+unaffected; every per-second figure states the clip's native rate explicitly.
 
-This lane worked around it (measuring the Blender output, where the trial clip and the authored
-baselines sit side by side in float accessors), so the finding is reported, not patched — the
-file is outside this lane's ownership. The exact patch is in the lane report.
+### 2. `measure-retarget-quality.mjs` has two defects and is outside this lane's ownership
 
-### 2. Driving `PT.L`/`PT.R` from a non-actuated source toe is wrong on this rig
+Reported, not patched. The exact patch is in the lane report.
 
-`g1skel34` **does** carry `left_toe_base`/`right_toe_base`, contradicting the pre-trial
-expectation that a robot source has no toe and the operator's toes would sit at rest. That is
-good news that turns out not to help: the G1 toe links are non-actuated extensions that simply
-follow the ankle, and on the operator's flat-hierarchy rig — where `PT.*` is keyed as world
-translation and every authored clip holds it at exactly 0.0000 m of slide — driving them from
-source FK gives the toes the whole foot swing. `PT.L` at 3.81 m is the worst number in the table.
+- **It cannot decode the shipped GLB, and says so with a number.**
+  `pass65-third-person-operator-lod0.glb` uses `EXT_meshopt_compression` and normalized SHORT
+  (`componentType` 5122) accessors; the tool reads every accessor as raw `Float32`, returning
+  `lowestFootY: -1.33e+74`, `Body NaN` — **and `0.0000 m` foot slide on every foot, which reads
+  as a pass.**
+- **Its slide metric is not contiguity-aware**, as set out at the top of this document, and its
+  `lowestFootY` pools `PT.*` in with the feet. Both produced withdrawn claims above.
 
-## What this does and does not license
-
-- It **does not** say MotionBricks generates bad motion. This trial never ran the model.
-- It **does** say the `g1skel34` → 62-joint operator retarget, done by the same global-delta
-  method that produced four shippable Kimodo clips, produces a clip that would need per-clip
-  hand correction to be usable. **That costs more than authoring the clip in Blender**, which is
-  the honest alternative and is what the report is obliged to say.
-- The decisive structural reasons, all measured rather than argued: G1 has **no head and no neck
-  link at all**, so the operator's head is locked to the chest for the whole clip; its waist is a
-  single 3-DoF joint where the operator carries a four-segment spine; its rest hip sits at
-  0.7872 m against SOMA-30's 0.9887 m, so a G1 clip needs a **25.6% larger root scale** than a
-  Kimodo clip onto the same figure.
-
-**Recommendation: do not spend the day on the C++23/Vulkan build.** The named shortfall list
-(a sprint cycle above 3.08 m/s, crouch and prone stance idles and their transitions, a reload
-body) is better served by the route that is already proven on this rig — the four measured Kimodo
-clips waiting to be landed into `pass65-third-person-operator-lod0/1/2.glb` — and by authoring in
-Blender where a clip has to be exactly right.
-
-The one thing MotionBricks does that Kimodo cannot — **stance changes under a movement command** —
-remains genuinely unserved. It is worth revisiting only if a later release adds a human skeleton;
-`docs/DEMO.md` "Initial limitations" states G1 is the only skeleton the released model supports.
+`docs/evidence/pass86/hf422/retarget-quality.json` still carries that tool's raw output — the
+tool was not modified and the numbers were not massaged — but it now carries a `metricCaveat`
+block so those numbers can never be read as a cross-clip comparison again.
 
 ## Provenance and licence
 
