@@ -886,11 +886,31 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `house front window glass ${index}`, [wx, 1.55, zFront], [width, 1.1, 0.06], m.windowGlass,
       { ballisticMaterial: 'glass', cast: false });
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
+    // HF-440 Cycle 1 Priority 3: facade bays with real recess (projecting sill nosing, lintel trim, jamb reveals)
+    pair(builder, `house front window sill nose ${index}`, [wx, 0.96, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, `house front window lintel trim ${index}`, [wx, 2.15, -9.96], [width + 0.12, 0.10, 0.08], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, `house front window jamb ${index} 0`, [window[0] + 0.035, 1.625, zFront], [0.07, 1.25, WALL_T + 0.02], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, `house front window jamb ${index} 1`, [window[1] - 0.035, 1.625, zFront], [0.07, 1.25, WALL_T + 0.02], m.trim,
+      { solid: false, shots: false, cast: true });
   }
   pair(builder, 'house front door lintel',
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
     [FRONT_DOOR[1] - FRONT_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
-
+  const doorW = FRONT_DOOR[1] - FRONT_DOOR[0];
+  const doorCx = (FRONT_DOOR[0] + FRONT_DOOR[1]) / 2;
+  pair(builder, 'house front door pediment trim', [doorCx, DOOR_HEAD_Y + 0.08, -9.95], [doorW + 0.16, 0.16, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house front door casing 0', [FRONT_DOOR[0] - 0.04, DOOR_HEAD_Y / 2, -9.97], [0.08, DOOR_HEAD_Y, 0.06], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house front door casing 1', [FRONT_DOOR[1] + 0.04, DOOR_HEAD_Y / 2, -9.97], [0.08, DOOR_HEAD_Y, 0.06], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house front string course', [cx, GROUND_H, -9.97], [HOUSE_WIDTH + 0.08, 0.10, 0.06], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house front roof fascia', [cx, ROOF_Y0 + 0.06, -9.95], [HOUSE_WIDTH + 0.16, 0.12, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
   // --- front wall, upper floor: the power window ---------------------------
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0, UPPER_WINDOW[0]],
@@ -913,6 +933,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // (apex 0.82 + the 0.42 m autostep up-cast = 1.24) walks out and drops to
     // the verge. The roof deck itself closes the head, exactly like an eave.
     pair(builder, 'house upper window sill', [wx, UPPER_Y0 + 0.45, zFront], [width, 0.9, WALL_T], m.trim);
+    // HF-440 Cycle 1 Priority 3: upper front window projecting sill nosing and jamb reveals
+    pair(builder, 'house upper window sill nose', [wx, UPPER_Y0 + 0.86, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, 'house upper window jamb 0', [UPPER_WINDOW[0] + 0.035, UPPER_Y0 + UPPER_H / 2, zFront], [0.07, UPPER_H, WALL_T + 0.02], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, 'house upper window jamb 1', [UPPER_WINDOW[1] - 0.035, UPPER_Y0 + UPPER_H / 2, zFront], [0.07, UPPER_H, WALL_T + 0.02], m.trim,
+      { solid: false, shots: false, cast: true });
   }
 
   // --- back wall: back door and one upper window ---------------------------
@@ -928,6 +955,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
     [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
+  const backDoorW = BACK_DOOR[1] - BACK_DOOR[0];
+  const backDoorCx = (BACK_DOOR[0] + BACK_DOOR[1]) / 2;
+  pair(builder, 'house back door pediment trim', [backDoorCx, DOOR_HEAD_Y + 0.08, -23.05], [backDoorW + 0.16, 0.16, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
@@ -938,7 +969,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house upper back sill',
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + 0.45, zBack],
     [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
-
+  const backUpperW = BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0];
+  const backUpperWx = (BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2;
+  pair(builder, 'house upper back sill nose', [backUpperWx, UPPER_Y0 + 0.86, -23.05], [backUpperW + 0.12, 0.08, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
   // Ten 0.30 m risers and a 0.90 m landing, climbing toward the street. The
   // riser is inside the 0.42 m autostep and the going is over the 0.22 m
