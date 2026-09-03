@@ -24583,6 +24583,26 @@ function showQuadDamageAnnouncement(title: string, subtitle: string): void {
   }, 3_500);
 }
 
+/**
+ * Lane AR item 5: the 2x core may only be claimed by an eye that can SEE it.
+ *
+ * The pickup used to be a horizontal radius plus a scalar height window, and on
+ * both Nuke Towns the core hovers over the bus roof with only 0.10 m of margin
+ * between "standing on the roof" (allowed) and "standing in the aisle"
+ * (rejected). A jump is worth more than 0.10 m, so a player inside the bus
+ * could take the core through the roof slab from inside cover. This is the same
+ * eye-to-pickup trace `acceptTimedMapWeaponClaim` already uses, against the
+ * same live collider set, raised 0.25 m off the core so a claimant standing
+ * exactly on the seat is not occluded by the pedestal itself.
+ */
+const overdriveSightScratch = new THREE.Vector3();
+function overdriveClaimSight(eye: THREE.Vector3): { lineOfSightClear: boolean } {
+  overdriveSightScratch.set(overdriveState.position.x, overdriveState.position.y + 0.25, overdriveState.position.z);
+  return {
+    lineOfSightClear: !activeWorldColliders().some((box) => segmentIntersectsBox(eye, overdriveSightScratch, box)),
+  };
+}
+
 function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   if (network.role !== 'host' || message.generation !== overdriveState.generation || processedNonces.has(message.nonce)) return;
   const remote = remotes.get(message.by);
@@ -24592,7 +24612,7 @@ function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   const claimedPosition = new THREE.Vector3(...message.position);
   const authoritativePosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   if (claimedPosition.distanceTo(authoritativePosition) > 1.25) return;
-  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now);
+  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now, overdriveClaimSight(authoritativePosition));
   if (!result.claimed) return;
   processedNonces.add(message.nonce);
   overdriveState = result.state;
@@ -24667,7 +24687,7 @@ function updateOverdrive(now: number): void {
         network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
       }
     } else {
-      const result = claimOverdrive(overdriveState, player.id, player.position, true, now);
+      const result = claimOverdrive(overdriveState, player.id, player.position, true, now, overdriveClaimSight(player.position));
       if (result.claimed) {
         overdriveState = result.state;
         registerOverdrivePickup(player.id, now);
