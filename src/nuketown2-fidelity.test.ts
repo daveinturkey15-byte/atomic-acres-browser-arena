@@ -7,6 +7,7 @@ import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_HOUSE_STAIR,
   NUKETOWN2_GROUND_DRESSING,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
@@ -16,12 +17,13 @@ import {
   NUKETOWN2_STREET_LENGTH,
   buildNuketown2,
 } from './nuketown2-arena';
+import { NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
   createOverdriveState,
 } from './overdrive';
-import { CharacterPhysics } from './physics';
+import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 
 /**
@@ -49,6 +51,46 @@ import { shedPlacementsForArena } from './destructible-shed-registry';
  */
 
 const PLAYER_RADIUS = 0.44;
+/** The STANDING capsule, from the physics module rather than from memory. */
+const STANDING_CAPSULE_M = 2 * (STANCE_SHAPES.stand.halfHeight + STANCE_SHAPES.stand.radius);
+const STANDING_RADIUS_M = STANCE_SHAPES.stand.radius;
+/**
+ * Walk a STANDING capsule along a waypoint list on the REAL CharacterPhysics
+ * against the REAL built colliders, with gravity and NO JUMP. No jump is the
+ * point: a route a player has to hop up is not a route a player walks, and the
+ * stair, the doors and the landing all have to be walkable standing.
+ */
+async function walkStanding(
+  map: ArenaMap,
+  startEye: readonly [number, number, number],
+  route: ReadonlyArray<readonly [number, number]>,
+): Promise<Array<{ x: number; y: number; z: number }>> {
+  const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+  try {
+    const dt = 1 / 120;
+    physics.teleportEye({ x: startEye[0], y: startEye[1], z: startEye[2] });
+    const trace: Array<{ x: number; y: number; z: number }> = [];
+    let vy = 0;
+    for (const waypoint of route) {
+      for (let step = 0; step < 1400; step += 1) {
+        const eye = physics.eyePosition();
+        const dx = waypoint[0] - eye.x;
+        const dz = waypoint[1] - eye.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 0.2) break;
+        const advance = Math.min(distance, 3.6 * dt);
+        vy += -24.5 * dt;
+        const result = physics.move({ x: (dx / distance) * advance, y: vy * dt, z: (dz / distance) * advance }, dt);
+        if (result.grounded) vy = 0;
+      }
+      const eye = physics.eyePosition();
+      trace.push({ x: eye.x, y: eye.y, z: eye.z });
+    }
+    return trace;
+  } finally {
+    physics.dispose();
+  }
+}
 /**
  * Eye height for a player standing on the upper floor slab: slab top 3.3 m plus
  * 1.66 m. `isBlocked` excludes a collider only when `eye - 1.65 > collider.maxY`
@@ -399,6 +441,56 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(isBlocked({ x, y: 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
     }
   });
+
+  it('walks a STANDING player up each stair, onto the landing and into both upper rooms', async () => {
+    // HF-432 item 1. The owner after PASS 90: "still some issues with where
+    // stairs are". The stair now stands against the WEST (blind) wall of the
+    // BACK room and lands at the internal partition - see NUKETOWN2_HOUSE_STAIR
+    // for why, including what the two first-party minimaps do and do not draw.
+    //
+    // This probe is the whole claim: a STANDING capsule, on the real
+    // CharacterPhysics against the real built colliders, with gravity and NO
+    // JUMP, walks in off the back-room floor, up the flight, onto the landing,
+    // through the head of the stair into the FRONT upper room, and back
+    // through the internal door into the BACK upper room.
+    const map = buildNuketown2(new THREE.Scene());
+    const stair = NUKETOWN2_HOUSE_STAIR;
+    const cx = stair.x0 + stair.width / 2;
+
+    // The authored flight has to be walkable BY THE ENGINE'S OWN NUMBERS, not
+    // by eye: the riser inside autostep, the going wider than the autostep
+    // minimum width, and the capsule the arena assumes equal to the real one.
+    expect(STANDING_CAPSULE_M).toBeCloseTo(1.82, 10);
+    expect(STANDING_RADIUS_M).toBeCloseTo(0.38, 10);
+    expect(stair.riser).toBeLessThan(CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    expect(stair.going).toBeGreaterThan(CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth);
+    expect(stair.riser * stair.risers).toBeCloseTo(3.3, 10);
+
+    for (const house of NUKETOWN2_HOUSE_LAYOUT) {
+      const s = house.facing;   // north house +1, south house is its exact negation
+      const at = (x: number, z: number) => [s * x, s * z] as const;
+      const trace = await walkStanding(map, [s * (cx + 2.6), 1.7, s * -21.0], [
+        at(cx + 2.6, -22.2),    // along the back wall, behind the flight
+        at(cx, -22.2),          // square on to the bottom tread
+        at(cx, -17.0),          // up the flight and onto the landing
+        at(cx, -13.0),          // through the head of the stair into the FRONT upper room
+        at(-2.7, -13.0),        // across to the internal door
+        at(-2.7, -19.5),        // and back into the BACK upper room
+      ]);
+      const label = (index: number) => `${house.id} waypoint ${index} at ${JSON.stringify(trace[index])}`;
+      // Still on the ground floor for the approach.
+      expect(trace[1]!.y, label(1)).toBeLessThan(2.0);
+      // On the landing: feet on the 3.3 m slab, so the eye is 1.70 m above it.
+      expect(trace[2]!.y, label(2)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      // In the FRONT upper room - past the partition, on the street side.
+      expect(trace[3]!.y, label(3)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(Math.sign(trace[3]!.z - house.z), label(3)).toBe(house.facing);
+      // ...and back through the internal door into the BACK upper room.
+      expect(trace[5]!.y, label(5)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
+      expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
+    }
+  }, 120_000);
 
   it('keeps the power position real: the upper front window is an opening, and the rare gun lives there', () => {
     const map = buildNuketown2(new THREE.Scene());

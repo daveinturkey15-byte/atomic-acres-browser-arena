@@ -193,6 +193,108 @@ const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
 const GARAGE_BACK_Z = HOUSE_BACK_Z;                               // -23, flush with the house
 const GARAGE_DEPTH = GARAGE_FRONT_Z - GARAGE_BACK_Z;              // 7
 
+/**
+ * Height of the STANDING player capsule, from `STANCE_SHAPES.stand` in
+ * `src/physics.ts`: 2 x (halfHeight 0.53 + radius 0.38). Authored here rather
+ * than imported because this module is the arena and `physics.ts` pulls in the
+ * Rapier adapter; `nuketown2-fidelity.test.ts` imports STANCE_SHAPES and
+ * asserts this number against it, so it cannot drift.
+ */
+const STANDING_CAPSULE_M = 1.82;
+/** Plan radius of that capsule, same source. */
+const STANDING_RADIUS_M = 0.38;
+/** `CHARACTER_PHYSICS_CONFIG.autostepHeight`, same source, same reason. */
+const AUTOSTEP_M = 0.42;
+
+/**
+ * THE STAIR - HF-432 item 1, owner after PASS 90: "still some issues with
+ * where stairs are".
+ *
+ * WHAT THE REFERENCE DOES AND DOES NOT DECIDE, checked rather than assumed.
+ * Both first-party minimaps were re-fetched on 2026-09-03 to read the stair
+ * footprint the lane brief expected to find drawn on them:
+ *   S3 BO7 `Nuketown_2025_MiniMap_BO7.png`  HTTP 200, 2,761,702 bytes, served
+ *      image/webp, 4096 x 4096 - an OVAL-CROPPED, rotated, red-tinted
+ *      presentation. The two house fills resolve as grey blocks with NO
+ *      interior linework inside either of them.
+ *   S2 BO2 `Nuketown_2025_Minimap_BOII.png` HTTP 200, 46,120 bytes, served
+ *      image/webp - the same oval crop, 253 x 498 px of playable art.
+ * NEITHER DRAWS A STAIR. So the stair's position is DERIVED, and the
+ * derivation - not a pixel - is the contract:
+ *
+ *   1. NOT the party wall. The east wall is the one the garage shares, and it
+ *      carries the garage link door; the garage only overlaps 7 m of the
+ *      house's 13 m depth, so a 5.1 m flight on that wall leaves no run of
+ *      wall long enough for a 1.8 m door. The flight stands against the WEST
+ *      wall, which is blind.
+ *   2. IN THE BACK ROOM, climbing toward the street, landing at the internal
+ *      partition. The previous cut ran it out of the FRONT room and put a
+ *      6.05 x 1.95 m hole through the upper FRONT room - the room Activision's
+ *      own guide calls the map's biggest power position and the room this
+ *      arena stands its rare-gun site in. That room now has a complete floor.
+ *      It also ran the flight THROUGH the ground-floor partition: treads 9 and
+ *      10 interpenetrated it.
+ *   3. ENTERED HEAD ON. 0.95 m of ground floor stands behind the bottom tread,
+ *      so a player walks onto the flight facing up it instead of stepping onto
+ *      its flank - which only tread 0 (0.30 m, inside the 0.42 m autostep) is
+ *      low enough to allow.
+ *   4. THE WELL OPENS ONLY WHERE IT MUST, and where it must is not where the
+ *      arithmetic first said - see STAIRWELL_Z0, which is the one number in
+ *      this arena that a probe corrected rather than confirmed.
+ *
+ * The LANDING is a 0.90 m tread at the top, against the partition, and the
+ * upper leaf of that partition stops at the flight's inboard edge, so the head
+ * of the stair opens straight into the front upper room: a landing and an
+ * upper hallway, not a hole to hop out of.
+ */
+export const NUKETOWN2_HOUSE_STAIR = Object.freeze({
+  /** Outboard edge: the inside face of the west wall. */
+  x0: HOUSE_X0 + WALL_T,
+  width: 1.65,
+  riser: 0.3,
+  /** 0.42 m: over the 0.22 m Rapier autostep minimum width, under the 6.05 m the room has. */
+  going: 0.42,
+  /** 11 x 0.30 = 3.30 = NUKETOWN2_UPPER_Y0, so the top tread IS the upper floor. */
+  risers: 11,
+  landingDepth: 0.9,
+});
+
+/** Inboard edge of the flight. */
+const STAIR_X1 = NUKETOWN2_HOUSE_STAIR.x0 + NUKETOWN2_HOUSE_STAIR.width;
+/** House mid-line: where the internal partition stands on both storeys. */
+const HOUSE_MID_Z = (HOUSE_FRONT_Z + HOUSE_BACK_Z) / 2;
+/** Front edge of the landing, flush with the partition's back face. */
+const STAIR_HEAD_Z = HOUSE_MID_Z - WALL_T / 2;
+/** Bottom of the flight. */
+const STAIR_FOOT_Z = STAIR_HEAD_Z
+  - NUKETOWN2_HOUSE_STAIR.landingDepth
+  - NUKETOWN2_HOUSE_STAIR.going * (NUKETOWN2_HOUSE_STAIR.risers - 1);
+/**
+ * Where the upper floor stops and the stairwell opens - MEASURED, and not the
+ * obvious thing.
+ *
+ * The obvious rule is "the slab may cover a tread as long as the standing
+ * capsule fits under it", feet + STANDING_CAPSULE_M <= GROUND_H, which allows
+ * feet up to 1.18 m. That rule is WRONG and the traversal probe in
+ * `nuketown2-fidelity.test.ts` caught it on the first run: Rapier's autostep
+ * casts the capsule UP by `autostepHeight` BEFORE it casts forward, so taking
+ * a step under a ceiling needs
+ *
+ *     feet + STANDING_CAPSULE_M + AUTOSTEP_M <= GROUND_H
+ *
+ * i.e. 0.76 m of feet in a 3.0 m storey. Authored the obvious way the flight
+ * stalled with the player wedged on tread 2's nosing at 0.76 m, grounded and
+ * blocked, for as long as the probe walked it: a staircase that looks right,
+ * measures right and cannot be climbed. Only treads 0 and 1 may keep a ceiling
+ * and the well opens a capsule radius (plus 0.12 m, five times the
+ * controller's own 0.025 m skin) before tread 2's near edge.
+ */
+const STAIR_MAX_FEET_UNDER_CEILING = GROUND_H - STANDING_CAPSULE_M - AUTOSTEP_M;
+const STAIR_FIRST_UNCOVERED_TREAD = Math.floor(STAIR_MAX_FEET_UNDER_CEILING / NUKETOWN2_HOUSE_STAIR.riser);
+const STAIRWELL_Z0 = STAIR_FOOT_Z
+  + NUKETOWN2_HOUSE_STAIR.going * STAIR_FIRST_UNCOVERED_TREAD
+  - STANDING_RADIUS_M - 0.12;
+
 /** Radius of the cul-de-sac turning head at the middle of the road. */
 const TURNING_HEAD_HALF = 8;
 
@@ -679,42 +781,56 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + UPPER_H - 0.45, zBack],
     [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
 
-  // --- stair, hard against the east wall -----------------------------------
-  // 11 risers of 0.30 m. Autostep is 0.42 m, so this walks; it is not a jump
-  // puzzle and it is not a ramp the bots cannot read.
-  const STAIR_X0 = 2.3;
-  const STAIR_X1 = HOUSE_X1 - WALL_T;               // 3.95
-  const STAIR_W = STAIR_X1 - STAIR_X0;
-  const STAIR_CX = (STAIR_X0 + STAIR_X1) / 2;
-  const RISER = 0.3;
-  const GOING = 0.55;
-  const STAIR_TOP_Z = HOUSE_FRONT_Z - 1.0;          // first step just inside the front room
-  const risers = Math.round(UPPER_Y0 / RISER);      // 11
-  for (let i = 0; i < risers; i += 1) {
+  // --- stair: BACK room, hard against the WEST (blind) wall ----------------
+  // Ten 0.30 m risers and a 0.90 m landing, climbing toward the street. The
+  // riser is inside the 0.42 m autostep and the going is over the 0.22 m
+  // Rapier autostep minimum width, so this WALKS: it is not a jump puzzle and
+  // it is not a ramp the bots cannot read. Where it stands, and why it is not
+  // where the previous cut put it, is derived at NUKETOWN2_HOUSE_STAIR.
+  const STAIR_W = NUKETOWN2_HOUSE_STAIR.width;
+  const STAIR_CX = NUKETOWN2_HOUSE_STAIR.x0 + STAIR_W / 2;
+  const RISER = NUKETOWN2_HOUSE_STAIR.riser;
+  const GOING = NUKETOWN2_HOUSE_STAIR.going;
+  const risers = NUKETOWN2_HOUSE_STAIR.risers;
+  for (let i = 0; i < risers - 1; i += 1) {
     const top = RISER * (i + 1);
     pair(builder, `house stair ${i}`,
-      [STAIR_CX, top / 2, STAIR_TOP_Z - GOING * (i + 0.5)], [STAIR_W, top, GOING], m.interior);
+      [STAIR_CX, top / 2, STAIR_FOOT_Z + GOING * (i + 0.5)], [STAIR_W, top, GOING], m.interior);
   }
+  // The landing. Its top IS the upper floor slab's top, so a player walks off
+  // it rather than stepping up onto the floor, and it is deep enough to turn
+  // on rather than being a nosing you arrive at mid-stride.
+  pair(builder, 'house stair landing',
+    [STAIR_CX, UPPER_Y0 / 2, STAIR_HEAD_Z - NUKETOWN2_HOUSE_STAIR.landingDepth / 2],
+    [STAIR_W, UPPER_Y0, NUKETOWN2_HOUSE_STAIR.landingDepth], m.interior);
 
   // --- upper floor slab, with the stairwell left open ----------------------
-  pair(builder, 'house upper floor west',
-    [(HOUSE_X0 + STAIR_X0) / 2, GROUND_H + FLOOR_T / 2, zMid],
-    [STAIR_X0 - HOUSE_X0, FLOOR_T, HOUSE_DEPTH], m.interior);
-  const wellZ0 = STAIR_TOP_Z - GOING * risers;      // deep end of the stair run
-  const wellZ1 = STAIR_TOP_Z;
-  pair(builder, 'house upper floor east front',
-    [(STAIR_X0 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, (wellZ1 + HOUSE_FRONT_Z) / 2],
-    [HOUSE_X1 - STAIR_X0, FLOOR_T, HOUSE_FRONT_Z - wellZ1], m.interior);
-  pair(builder, 'house upper floor east back',
-    [(STAIR_X0 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, (HOUSE_BACK_Z + wellZ0) / 2],
-    [HOUSE_X1 - STAIR_X0, FLOOR_T, wellZ0 - HOUSE_BACK_Z], m.interior);
+  // East of the flight the slab is continuous over the whole house. The west
+  // strip carries the well, which runs from the back wall to the landing and
+  // nowhere else: 4.34 x 1.95 m in the BACK room, against the previous cut's
+  // 6.05 x 1.95 m under the front window.
+  pair(builder, 'house upper floor east',
+    [(STAIR_X1 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, zMid],
+    [HOUSE_X1 - STAIR_X1, FLOOR_T, HOUSE_DEPTH], m.interior);
+  pair(builder, 'house upper floor west back',
+    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (HOUSE_BACK_Z + STAIRWELL_Z0) / 2],
+    [STAIR_X1 - HOUSE_X0, FLOOR_T, STAIRWELL_Z0 - HOUSE_BACK_Z], m.interior);
+  pair(builder, 'house upper floor west front',
+    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (STAIR_HEAD_Z + HOUSE_FRONT_Z) / 2],
+    [STAIR_X1 - HOUSE_X0, FLOOR_T, HOUSE_FRONT_Z - STAIR_HEAD_Z], m.interior);
 
   // --- internal partitions, both storeys, one doorway each -----------------
   const PARTITION_Z = zMid;
   const INNER_DOOR: [number, number] = [-3.5, -1.9];
   for (const [storey, y0, h] of [['ground', 0, GROUND_H], ['upper', UPPER_Y0, UPPER_H]] as const) {
-    const x1 = storey === 'upper' ? STAIR_X0 : HOUSE_X1;
-    [[HOUSE_X0, INNER_DOOR[0]], [INNER_DOOR[1], x1]].forEach((run, index) => {
+    // The UPPER leaf stops at the flight's inboard edge: that 1.95 m gap is
+    // the head of the stair, so the landing opens straight into the front
+    // upper room. The two upper rooms are therefore joined twice - by the
+    // landing on the west and by the internal door in the middle - which is
+    // the "landing and upper hallway" this pass owes, and it is why the
+    // stairwell no longer has to be crossed to use the upper floor.
+    const x0 = storey === 'upper' ? STAIR_X1 : HOUSE_X0;
+    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1]].forEach((run, index) => {
       if (run[1]! - run[0]! <= 0.05) return;
       pair(builder, `house ${storey} partition ${index}`,
         [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
@@ -727,7 +843,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The upper crate lives in the BACK upper room, deliberately clear of the
   // front window seat that both the rare-gun site and the fidelity gate stand
   // on.
-  pair(builder, 'house upper crate', [-4.5, UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, zMid - 3.0],
+  // HF-432 item 1: this stood at UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, which
+  // put its underside at 3.45 on a slab whose top is 3.30 - a crate floating
+  // 0.15 m in the air, which the forging review forbids. UPPER_Y0 IS the slab
+  // top (GROUND_H + FLOOR_T), so the crate sits on it.
+  // Moved east of the flight (HF-432 item 1): at x = -4.5 it spanned
+  // x [-5.2, -3.8] and the stairwell now opens over x [-6.75, -4.80], so 0.4 m
+  // of it hung over the void.
+  pair(builder, 'house upper crate', [-0.5, UPPER_Y0 + LOW_COVER / 2, zMid - 3.0],
     [1.4, LOW_COVER, 1.4], m.interior);
 }
 
