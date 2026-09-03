@@ -136,11 +136,15 @@ describe('prerecorded map-selection previews', () => {
     // own flyover landed. This pin is RAISED, never lowered - it is the second,
     // hand-written half of the count above, and its whole job is to fail if a
     // new arena is quietly parked in MEDIA_PENDING_ARENAS instead of captured.
-    // HF-408 the same day: nine became TEN, when raid2 left standby by
-    // capturing its own flyover. Pinned as a literal on purpose - deriving it
-    // from ARENA_SELECTIONS alone would silently accept a build where an arena
+    // HF-408 the same day: raid2 left standby by capturing its own flyover.
+    // At the PASS 87 integration merge this pin read 30 from BOTH sides for
+    // different reasons - ten arenas with farcrysis un-hidden (HF-423) and ten
+    // with raid2 registered (HF-408) - so git merged the literal without a
+    // conflict and it had to be re-counted by hand. The union is ELEVEN arenas
+    // shipping media, so 33. Pinned as a literal on purpose - deriving it from
+    // ARENA_SELECTIONS alone would silently accept a build where an arena
     // quietly stopped shipping media.
-    expect(assets).toHaveLength(30);
+    expect(assets).toHaveLength(33);
   });
 
   // MAP3 (HF-405). Two obligations the allowlist above would otherwise leave
