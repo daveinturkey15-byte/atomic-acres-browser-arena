@@ -1078,3 +1078,13 @@ assets and textures and lighting need to be tip top, raid can come next"
   pass (HF-434..437), an Opus "tip top" pass on layout, assets, textures and
   lighting with the brief-driven critic loop and the judgeset; Raid (Lane AV
   check-and-finish) waits behind it. Compute: 13% left; Opus "a little".
+- **Owner 17:35 (HF-441):** "if load time is a quick win, get that in; can we get a
+  build live tonight with partial improvements for nuketown maybe by 7-9pm? i can
+  give feedback then". Plan: PASS 92 cut ~20:00-20:30 with whatever GLM-3 has
+  landed green (z-fighting, stairs/windows/glass, truck openings, side strips), the
+  profile fold if GLM-4 lands, the skills study docs. Mechanical gates only
+  tonight (fidelity, parity, walkable, spawn, full suite, boot smoke); the Opus
+  review of the GLM branches follows after the reset. Load time: no quick win is
+  on the shelf - H2 shipped the first-load fix in PASS 88; the remaining levers
+  (switch median +0.5 s, deploy 14-20 s attribution) are a day's work each, so
+  they are not in tonight's build.
