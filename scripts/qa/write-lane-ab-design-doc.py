@@ -25,9 +25,9 @@ coloured / time-of-day / weather lighting everywhere"), 2026-09-02 17:05
 which this is.
 
 Every number in this document is generated from
-`src/rendering/lighting-conditions.ts`, not typed by hand. Regenerate it with
-`npx tsx scripts/qa/lane-ab-tod-table.mjs > artifacts/tod-table.md`, the same for
-`lane-ab-tod-summary.mjs`, then `python scripts/qa/write-lane-ab-design-doc.py`.
+`src/rendering/lighting-conditions.ts` by `artifacts/tod-table.mjs` and
+`artifacts/tod-summary.mjs`, not typed by hand. Regenerate with
+`npx tsx artifacts/tod-summary.mjs`.
 
 ---
 
@@ -245,14 +245,23 @@ art direction a lie. Weather sets are the ones the arena already authors in
 
 MID = """
 
-Two arenas are **pinned** to the identity at every choice, so no consumer has to
-remember they are special:
+Three arenas are **pinned** to the identity at every choice, so no consumer has
+to remember they are special:
 
 - **Gun Range** is indoors. Its weather profile is already `clear`-only for the
   same reason; its daylight profile matches.
 - **Map 3** is PREVIEW and Lane V owns its look while it is being built. A second
   lane moving its sun underneath it would be a merge conflict rendered on screen.
   Its row is the template below, filled in with a zero-width band.
+- **Nuke Town Rebuild** is PREVIEW for the same reason and Lane AK owns it. Its
+  row exists at all because the table is a `Record<ArenaId, ...>`: a lane branch
+  typechecks against the roster IT has, so an arena added on the integration line
+  is invisible until the merge - and the merge probe that found this one did not
+  produce a type error, it produced `Cannot read properties of undefined
+  (reading 'hourRange')` out of the import-time safety sweep and took five
+  unrelated test files down with it. There is now a test that names a missing row
+  instead. Its anchor is its own art direction's *bleached noon*, deliberately a
+  different hour from the shipped Nuke Town's warm sunset.
 
 ### Preset template (for Nuke Town Rebuild, Map 3 and any new arena)
 

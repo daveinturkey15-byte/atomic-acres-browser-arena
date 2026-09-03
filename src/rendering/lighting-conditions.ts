@@ -203,6 +203,20 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   test1: profile('test1', 'dry-range-hard-morning-sun', false, 10.5, [10, 13], [7, 17], [12, 70], 34, 6),
   // Raid: golden-hour hillside estate. Narrow — golden hour IS the identity.
   test2: profile('test2', 'golden-hour-hillside', false, 17, [16, 18.5], [6, 19.5], [8, 60], 26, 6),
+  // NUKETOWN2 (PREVIEW, HF-407). PINNED, and this row exists ONLY so the table
+  // covers the roster: a `Record<ArenaId, ...>` with a missing id compiles
+  // against a stale roster and then throws inside the import-time safety sweep
+  // the moment the arena ships, which is exactly how this row got written (the
+  // merge probe against the integration head that carries nuketown2 failed to
+  // collect five test files with `Cannot read properties of undefined`).
+  // Pinned means every choice resolves to the identity, so Lane AK's map is
+  // untouched by this lane while it is being built -- the boundary the brief
+  // draws. Its authored hour is its OWN art direction's, 'bleached noon', which
+  // is deliberately a different time of day from the shipped Nuke Town's warm
+  // sunset; the two are the same place and the art pass pushed them apart on
+  // purpose. That lane fills this row in with a measured band (section 4 of
+  // docs/DYNAMIC_LIGHTING_2026-09-03.md is the procedure).
+  nuketown2: profile('nuketown2', 'suburban-bleached-noon-preview-pinned', true, 12, [12, 12], [6, 20], [8, 62], 46, 6),
   // MAP3 (PREVIEW). PINNED on purpose: Lane V owns this map's look while it is
   // being built, and a second lane moving its sun underneath it would be a
   // merge conflict rendered on screen. This row is the TEMPLATE that lane fills

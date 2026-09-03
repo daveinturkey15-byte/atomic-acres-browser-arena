@@ -58,9 +58,15 @@ describe('arena daylight catalog', () => {
     }
   });
 
-  it('pins the indoor arena and the preview map, and only those', () => {
+  it('pins the roofed arena and the PREVIEW maps, and only those', () => {
+    // Two reasons to pin, and both are deliberate: gun-range has a roof, and
+    // map3 / nuketown2 are PREVIEW maps whose own lanes own their look while
+    // they are being built — a second lane moving their sun underneath them
+    // would be a merge conflict rendered on screen. This list is asserted
+    // exactly so that promoting a preview out of PREVIEW cannot silently leave
+    // it pinned, and so that adding a pin needs a reason written down.
     const pinned = ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned);
-    expect([...pinned].sort()).toEqual(['gun-range', 'map3']);
+    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2']);
   });
 
   it('gives rustworks-1v1 the narrowest outdoor band (its night is the safety datum)', () => {
@@ -233,9 +239,35 @@ describe('replication: two peers, no traffic', () => {
   });
 });
 
+describe('the table covers the roster, and says so before it throws', () => {
+  it('has a profile for every arena id, including ones added by another lane', () => {
+    // This is not a restatement of the Record type. A lane branch typechecks
+    // against the roster IT has, so an arena added on the integration line is
+    // invisible here until the merge — and what the merge then produced was not
+    // a type error but `Cannot read properties of undefined (reading
+    // 'hourRange')` thrown out of the import-time safety sweep, which took five
+    // unrelated test files down with it (measured 2026-09-03 against the head
+    // carrying nuketown2). A missing row must name itself.
+    const missing = ARENA_IDS.filter((arenaId) => !ARENA_DAYLIGHT_PROFILES[arenaId]);
+    expect(missing, `ARENA_DAYLIGHT_PROFILES has no row for ${missing.join(', ')}. `
+      + 'A new arena needs one before it can ship: start it pinned (every choice resolves '
+      + 'to the identity, so this lane cannot touch a map another lane is still building) '
+      + 'and give it a measured band later — see the preset template in '
+      + 'docs/DYNAMIC_LIGHTING_2026-09-03.md.').toEqual([]);
+  });
+
+  it('never resolves a profile-less arena into a write', () => {
+    for (const arenaId of ARENA_IDS) {
+      const writes = resolveLightingConditions({ arenaId, matchSeed: 7, elapsedSeconds: 61 });
+      expect(Number.isFinite(writes.hour)).toBe(true);
+      expect(Number.isFinite(writes.sunIntensityScale)).toBe(true);
+    }
+  });
+});
+
 describe('pinned arenas are provably constant', () => {
   it('resolves the identity for gun-range and map3 at every choice, seed and clock', () => {
-    for (const arenaId of ['gun-range', 'map3'] as const) {
+    for (const arenaId of ['gun-range', 'map3', 'nuketown2'] as const) {
       for (const choice of LIGHTING_TIME_CHOICES) {
         for (const elapsedSeconds of [0, 120, 750]) {
           const writes = resolveLightingConditions({ arenaId, matchSeed: 99, elapsedSeconds, choice });

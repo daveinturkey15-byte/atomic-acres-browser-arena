@@ -60,7 +60,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_408;
+const LINE_CEILING = 36749;
 
 /**
  * When the file falls this far below the ceiling, the ceiling is stale and the
@@ -87,6 +87,20 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'PASS 86 integration: Lane W viewmodel fit (HF-410), Lane Y drop shots (HF-412), '
       + 'Lane U Nuke Town Rebuild registration (HF-407) and Lane V Map 3 explore with the '
       + 'lazy arena registry and explore HUD (HF-409) grew the file; measured at the merged head.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 36749,
+    note:
+      'PASS 87 Lane AB: the time-of-day uniform-write plumbing in the `// LIGHTING:` '
+      + 'region -- the per-arena baseline capture, the re-aim of the existing key light, '
+      + 'the one apply function and its per-frame gate, the lobby mirror and the QA hooks. '
+      + 'The extraction the header asks for was already done: the whole model is pure and '
+      + 'lives in src/rendering/lighting-conditions.ts (~700 lines, zero THREE imports). '
+      + 'What is left here is exactly the code that must touch the light objects, and it '
+      + 'writes uniforms only -- no light is created, destroyed or toggled, which is the '
+      + 'PASS 82 constraint and is pinned against this source region by '
+      + 'src/rendering/lighting-conditions-light-set.test.ts.',
   },
 ];
 

@@ -6,9 +6,9 @@ coloured / time-of-day / weather lighting everywhere"), 2026-09-02 17:05
 which this is.
 
 Every number in this document is generated from
-`src/rendering/lighting-conditions.ts`, not typed by hand. Regenerate it with
-`npx tsx scripts/qa/lane-ab-tod-table.mjs > artifacts/tod-table.md`, the same for
-`lane-ab-tod-summary.mjs`, then `python scripts/qa/write-lane-ab-design-doc.py`.
+`src/rendering/lighting-conditions.ts` by `artifacts/tod-table.mjs` and
+`artifacts/tod-summary.mjs`, not typed by hand. Regenerate with
+`npx tsx artifacts/tod-summary.mjs`.
 
 ---
 
@@ -233,15 +233,25 @@ art direction a lie. Weather sets are the ones the arena already authors in
 | Firing Range | dry-range-hard-morning-sun | 10:00-13:00 | 10:30 | clear | 0.956..1.048 | 1.051 | 1.011 | -4.8..6.3 | -1.7..8.5 |
 | Raid | golden-hour-hillside | 16:00-18:30 | 17:00 | clear | 0.574..1.150 | 1.490 | 1.102 | -16.6..9.2 | -1.9..2.9 |
 | Map 3 | open-scrub-midmorning-preview-pinned **(pinned)** | 10:00-10:00 | 10:00 | clear, overcast | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
+| Nuke Town Rebuild | suburban-bleached-noon-preview-pinned **(pinned)** | 12:00-12:00 | 12:00 | clear | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
 
-Two arenas are **pinned** to the identity at every choice, so no consumer has to
-remember they are special:
+Three arenas are **pinned** to the identity at every choice, so no consumer has
+to remember they are special:
 
 - **Gun Range** is indoors. Its weather profile is already `clear`-only for the
   same reason; its daylight profile matches.
 - **Map 3** is PREVIEW and Lane V owns its look while it is being built. A second
   lane moving its sun underneath it would be a merge conflict rendered on screen.
   Its row is the template below, filled in with a zero-width band.
+- **Nuke Town Rebuild** is PREVIEW for the same reason and Lane AK owns it. Its
+  row exists at all because the table is a `Record<ArenaId, ...>`: a lane branch
+  typechecks against the roster IT has, so an arena added on the integration line
+  is invisible until the merge - and the merge probe that found this one did not
+  produce a type error, it produced `Cannot read properties of undefined
+  (reading 'hourRange')` out of the import-time safety sweep and took five
+  unrelated test files down with it. There is now a test that names a missing row
+  instead. Its anchor is its own art direction's *bleached noon*, deliberately a
+  different hour from the shipped Nuke Town's warm sunset.
 
 ### Preset template (for Nuke Town Rebuild, Map 3 and any new arena)
 
@@ -406,6 +416,19 @@ anchor 10:00 | band 10:00-10:00 | arc 06:00-19:00 | elev 12-66 deg | az swing 0 
 | midday + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
 | late | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
 | late + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+
+### Nuke Town Rebuild (`nuketown2`) — suburban-bleached-noon-preview-pinned — PINNED
+anchor 12:00 | band 12:00-12:00 | arc 06:00-20:00 | elev 8-62 deg | az swing 46 deg | cycle 6 min
+| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
+|---|---|---|---|---|---|---|---|---|
+| authored | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| authored + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| early | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| early + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| midday | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| midday + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| late | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| late + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
 
 ---
 
