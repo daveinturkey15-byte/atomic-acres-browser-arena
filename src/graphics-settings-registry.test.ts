@@ -203,11 +203,13 @@ describe('Advanced Graphics canonical registry', () => {
     // that the owner can read what Max gets without opening the renderer.
     const matrix = {
       performance: {
+        bakedIndirect: 'off',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       high: {
+        bakedIndirect: 'off',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
@@ -220,11 +222,13 @@ describe('Advanced Graphics canonical registry', () => {
       // Motion blur stays at zero because it is the one effect that removes
       // information, on the preset whose whole proposition is detail.
       raytraced: {
+        bakedIndirect: 'off',
         volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
+        bakedIndirect: 'off',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
         // MAX is untouched by HF-398. It already cannot deploy against the
         // 4000 ms admission bound; adding a large new fragment shader to it
@@ -261,6 +265,7 @@ describe('Advanced Graphics canonical registry', () => {
       // and throws on a breach, so this is the same fail-closed check the arena
       // build runs — not a restatement of it.
       const runtime = resolveScreenSpacePostRuntime({
+        bakedIndirect: 'off',
         volumetricLightShafts: preset.volumetricLightShafts,
         screenSpaceReflections: preset.screenSpaceReflections,
         screenSpaceGi: preset.screenSpaceGi,
@@ -283,6 +288,7 @@ describe('Advanced Graphics canonical registry', () => {
     // Depth of field is the one bound that is a function of a slider rather than
     // a tier, so pin the shipped Max strength against the ceiling directly.
     const maxRuntime = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
       depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,

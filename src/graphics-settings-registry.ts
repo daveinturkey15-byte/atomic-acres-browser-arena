@@ -10,6 +10,10 @@ import { AMBIENT_LIFE_RANGE } from './particles/ambient-life-settings';
 // tracer's own numbers and bounds so a tier can never exist here that the
 // resolver does not know how to clamp.
 import type { RayTracingTier } from './rendering/raytracing/raytracing-profile';
+// HF-418 - the baked irradiance-probe tier. Same argument as the line above:
+// the type lives with the bake's own numbers and bounds, so a tier can never
+// exist here that the resolver does not know how to clamp.
+import type { BakedIndirectTier } from './rendering/lighting/baked-indirect';
 
 export type AntiAliasingMode = 'off' | 'msaa-2x' | 'msaa-4x' | 'fxaa' | 'smaa';
 export type ShadowResolution = 'medium' | 'high';
@@ -54,6 +58,12 @@ export type AdvancedGraphicsValues = Readonly<{
   shadowUpdateMode: ShadowUpdateMode;
   shadowFilter: ShadowFilterMode;
   indirectLighting: LightingTier;
+  /**
+   * HF-418 - offline path-traced irradiance probes, sampled per pixel. The one
+   * lighting control whose per-frame cost is the same at every tier: the tier
+   * decides how long the OFFLINE trace ran, not what the frame does.
+   */
+  bakedIndirect: BakedIndirectTier;
   ambientOcclusion: AmbientOcclusionQuality;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
@@ -111,6 +121,7 @@ export type GraphicsRuntimeConsumer =
   | 'shadow-runtime'
   | 'arena-lighting'
   | 'ambient-occlusion'
+  | 'baked-indirect'
   | 'material-refinement'
   | 'atmosphere-runtime'
   | 'presentation-budget'
@@ -270,6 +281,23 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Scales arena hemisphere and ambient bounce approximations without inventing path tracing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'live', runtimeConsumer: 'arena-lighting',
+  }),
+  // HF-418 / Lane AL. THE ONE CONTROL IN THIS CATEGORY THAT IS ALMOST FREE.
+  // Everything else here is a per-frame march whose tier is a cost; this is a
+  // 3D texture fetch whose tier decided how long an OFFLINE path trace ran.
+  // That asymmetry is why the profile defaults turn it on where they turn the
+  // marches off, and the description says so without saying "free", because
+  // the bake is real work - it is just work the frame does not do.
+  //
+  // It is also the answer to the one thing RAY TRACED structurally cannot do.
+  // Classic recursive ray tracing computes no indirect bounce at all; the
+  // documented failure is raising a flat ambient constant until the scene is
+  // milk. This is what gets raised instead.
+  control({
+    key: 'bakedIndirect', id: 'graphics-baked-indirect', category: 'lighting', label: 'Baked indirect light',
+    description: 'Light that has bounced off the world once or twice, traced before you got here: shaded sides pick up the colour of what is next to them instead of going flat grey. Costs the frame almost nothing.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'pipeline-rebuild', runtimeConsumer: 'baked-indirect',
   }),
   control({
     key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
@@ -556,6 +584,17 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadowFilter: runtimeEvidence('src/legacy-main.ts', 'shadowMapTypeForFilter', 'settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
+  // The stronger claim, and it is earned: `publishBakedIndirectReceipt` writes
+  // the BOUND volume's grid, digest, occluder count and LIVE gain onto
+  // documentElement from the code that actually bound it, so a headless check
+  // can tell "bound and correctly invisible" from "never bound" without a debug
+  // hook. That is the distinction the 2026-08-31 IBL bug existed inside of.
+  bakedIndirect: runtimeEvidence(
+    'src/rendering/lighting/baked-indirect-runtime.ts',
+    'buildBakedIndirectRuntime',
+    'render.atomicSignal.advancedGraphics.screenSpace.bakedIndirect',
+    'documentElement.dataset.bakedIndirect (publishBakedIndirectReceipt)',
+  ),
   screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
   screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
   // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
@@ -698,7 +737,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
@@ -730,7 +769,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
     screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -800,7 +839,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
   raytraced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'high',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 16, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -844,7 +883,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'high' | 'r
     // 1.15x supersample, and it is the one control with no enforced bound.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    shadowFilter: 'auto', indirectLighting: 'high', ambientOcclusion: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
     screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'off', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
