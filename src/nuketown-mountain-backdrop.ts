@@ -72,6 +72,56 @@ export const NUKETOWN_BACKDROP_MAX_HEIGHT_M = 34;
 /** The ground skirt never rises above this (kept below the arena ground). */
 export const NUKETOWN_BACKDROP_SKIRT_Y_M = -0.42;
 
+/**
+ * HF-426 Job 3 — the ring is now FITTED to a footprint instead of assuming one.
+ *
+ * The shipped map is a 62 x 64 m near-square, so one circular envelope suits it
+ * on both axes. The Nuke Town Rebuild is 36 x 84 (bounds x +/-18, z +/-42,
+ * corner 45.7 m), and dropping the shipped envelope on it would put the
+ * foothill feet 18 m past the long fence while leaving 46 m of empty plain on
+ * the short axis — the backdrop would read as a wall on one axis and as nothing
+ * on the other. Both maps therefore declare their own envelope and every ring
+ * radius below is derived from it, so a footprint change moves the massif.
+ *
+ * `skirt` is the second difference. The shipped map has no ground of its own
+ * past the fence, so the backdrop brings a rolling disc. The rebuild's arena
+ * authors a 270 x 270 m ground slab (`buildNuketown2`), which already runs 3 m
+ * past this envelope's outer radius, so a second ground layer there would only
+ * z-fight the first.
+ */
+export type NuketownBackdropEnvelope = Readonly<{
+  /** Nothing in the massif comes closer to the origin than this. */
+  minRadialM: number;
+  /** ... and nothing goes beyond it (camera far plane 180 m minus the map corner). */
+  maxRadialM: number;
+  /** Crest ceiling. */
+  maxHeightM: number;
+  /** Build the rolling beyond-fence ground disc under the rings. */
+  skirt: boolean;
+}>;
+
+/** The shipped map's envelope: exactly the constants above, unchanged. */
+export const NUKETOWN_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.freeze({
+  minRadialM: NUKETOWN_BACKDROP_MIN_RADIAL_M,
+  maxRadialM: NUKETOWN_BACKDROP_MAX_RADIAL_M,
+  maxHeightM: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+  skirt: true,
+});
+
+/**
+ * The rebuild's envelope. 66 m of clearance against a 45.7 m map corner is
+ * 20 m past the long fence and 48 m past the short one — the same read the
+ * shipped map gets from 58 against its own 44.6 m corner. The outer radius and
+ * crest ceiling are unchanged: they are set by the 180 m camera far plane, not
+ * by the map (132 + 45.7 = 177.7).
+ */
+export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.freeze({
+  minRadialM: 66,
+  maxRadialM: NUKETOWN_BACKDROP_MAX_RADIAL_M,
+  maxHeightM: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+  skirt: false,
+});
+
 const SEED = 0x0a82_5c17;
 /**
  * Dusk horizon haze. Deliberately NOT the arena's fog colour: 0xb1c0be is
@@ -284,10 +334,10 @@ export function nuketownBackdropGroundNormal(x: number, z: number, target = new 
 }
 
 /** The rolling beyond-fence ground disc, vertex-coloured scrub to forest floor. */
-function buildGroundSkirt(): THREE.BufferGeometry {
+function buildGroundSkirt(outerRadius: number): THREE.BufferGeometry {
   // A ring grid, not a triangle fan: CircleGeometry has no interior vertices,
   // so it cannot carry a height field at all.
-  const geometry = new THREE.RingGeometry(0.5, NUKETOWN_BACKDROP_MAX_RADIAL_M, 72, 16);
+  const geometry = new THREE.RingGeometry(0.5, outerRadius, 72, 16);
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.getAttribute('position');
   const colors = new Float32Array(positions.count * 3);
@@ -316,7 +366,17 @@ function buildGroundSkirt(): THREE.BufferGeometry {
  * Build the backdrop under `parent`. Deterministic; art-only. Returns stats
  * for telemetry/tests. Four meshes = four draws.
  */
-export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownMountainBackdrop {
+export function buildNuketownMountainBackdrop(
+  parent: THREE.Object3D,
+  envelope: NuketownBackdropEnvelope = NUKETOWN_BACKDROP_ENVELOPE,
+): NuketownMountainBackdrop {
+  // Ring radii as OFFSETS from the envelope's inner edge, so the shipped map's
+  // authored 64 / 92 / 96 / 132 / 116 fall out of `minRadialM = 58` unchanged
+  // and any other footprint gets the same massif, fitted.
+  const foothillsInner = envelope.minRadialM + 6;
+  const foothillsOuter = envelope.minRadialM + 34;
+  const ridgeInner = envelope.minRadialM + 38;
+  const farRangeInner = envelope.minRadialM + 58;
   const group = new THREE.Group();
   group.name = 'nuketown-mountain-backdrop';
   group.userData.presentationOnly = true;
@@ -351,8 +411,8 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
     buildRidgeRing({
       name: 'nuketown-mountain-foothills',
       segments: 108,
-      innerRadius: NUKETOWN_BACKDROP_MIN_RADIAL_M + 6, // 64
-      outerRadius: 92,
+      innerRadius: foothillsInner,
+      outerRadius: foothillsOuter,
       heightMin: 4,
       heightMax: 12,
       footColor: 0x2f3a2c,
@@ -368,10 +428,10 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
     buildRidgeRing({
       name: 'nuketown-mountain-ridge',
       segments: 144,
-      innerRadius: 96,
-      outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M, // 132
+      innerRadius: ridgeInner,
+      outerRadius: envelope.maxRadialM,
       heightMin: 13,
-      heightMax: NUKETOWN_BACKDROP_MAX_HEIGHT_M - 4, // 30
+      heightMax: envelope.maxHeightM - 4,
       footColor: 0x2d3444,
       crestColor: 0x3b4358,
       phase: 4.7,
@@ -387,10 +447,10 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
     buildRidgeRing({
       name: 'nuketown-mountain-far-range',
       segments: 120,
-      innerRadius: 116,
-      outerRadius: NUKETOWN_BACKDROP_MAX_RADIAL_M,
+      innerRadius: farRangeInner,
+      outerRadius: envelope.maxRadialM,
       heightMin: 20,
-      heightMax: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+      heightMax: envelope.maxHeightM,
       footColor: 0x323a51,
       crestColor: 0x414a63,
       phase: 8.3,
@@ -399,12 +459,20 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
     }),
     ridgeMaterial,
   );
-  const skirt = new THREE.Mesh(buildGroundSkirt(), skirtMaterial);
-  skirt.name = 'nuketown-backdrop-ground-skirt';
-  skirt.position.y = NUKETOWN_BACKDROP_SKIRT_Y_M;
+  // The skirt is the arena's beyond-fence GROUND. An arena that authors its own
+  // ground out to this envelope declares `skirt: false` and takes the rings
+  // alone, rather than laying a second ground layer on top of the first.
+  const skirt = envelope.skirt
+    ? new THREE.Mesh(buildGroundSkirt(envelope.maxRadialM), skirtMaterial)
+    : null;
+  if (skirt) {
+    skirt.name = 'nuketown-backdrop-ground-skirt';
+    skirt.position.y = NUKETOWN_BACKDROP_SKIRT_Y_M;
+  }
 
   let triangles = 0;
-  for (const mesh of [skirt, foothills, ridge, farRange]) {
+  const meshes: THREE.Mesh[] = skirt ? [skirt, foothills, ridge, farRange] : [foothills, ridge, farRange];
+  for (const mesh of meshes) {
     if (mesh !== skirt) mesh.name = mesh.geometry.name;
     mesh.castShadow = false;
     mesh.receiveShadow = false;
@@ -417,7 +485,7 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
   }
 
   parent.add(group);
-  const stats: NuketownBackdropStats = { meshes: 4, triangles: Math.round(triangles) };
+  const stats: NuketownBackdropStats = { meshes: meshes.length, triangles: Math.round(triangles) };
   return {
     group,
     stats,
@@ -425,7 +493,7 @@ export function buildNuketownMountainBackdrop(parent: THREE.Object3D): NuketownM
       foothills.geometry.dispose();
       ridge.geometry.dispose();
       farRange.geometry.dispose();
-      skirt.geometry.dispose();
+      skirt?.geometry.dispose();
       ridgeMaterial.dispose();
       skirtMaterial.dispose();
     },

@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "familyId": "pass85-nuketown2-menu-preview",
   "cacheKey": "pass85-nuketown2-preview-v1",
-  "generatedAt": "2026-09-02",
+  "generatedAt": "2026-09-03",
   "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
   "note": "Additive family for the Nuke Town Rebuild (HF-407), the arena authored and registered on 2026-09-02. Replaces the labelled PREVIEW STANDBY card it shipped with for one commit - never a byte-copy of another arena, which is the placeholder defect the pass79 family had to undo. The retained pass66-runtime-preview-v15 media, its cache-family lock, and the pass77, pass79 and pass84 families are untouched by this finalizer.",
   "finalMediaSet": {
     "algorithm": "sha256-ordered-name-size-bytes-v1",
     "fileCount": 3,
-    "totalBytes": 13812571,
-    "sha256": "55288f8d93e89d5f934a5910c7453e60e56bff150865e112a926129f110b50d4"
+    "totalBytes": 14522256,
+    "sha256": "205caffb8425c5df7b37f1e195620151b57084adaa45fd28ffd5b2d18c49f69b"
   },
   "finalizer": {
     "path": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
@@ -17,7 +17,7 @@
   },
   "generator": {
     "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-    "sha256": "317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b"
+    "sha256": "dd7714cae50184f859b1eb24a8429bfaf02c105b09a928b65fd9305b79e730f9"
   },
   "arenas": [
     {
@@ -36,26 +36,26 @@
         "inputsStable": true,
         "driftedInputPaths": [],
         "capturedFrames": 240,
-        "frameSetSha256": "9d957ccead28da1b230e21037fb7a3ccebd1a97202042a40ba7efd8026f47379",
-        "frameSetBytes": 325411977
+        "frameSetSha256": "b63e88263bda03a75545350169b9a343b9fbae390e85018841ebed429e37faf8",
+        "frameSetBytes": 375922597
       },
       "runtimeFiles": [
         {
           "path": "public/assets/original/menu-previews/nuketown2.mp4",
-          "sha256": "6bf1a5f343094229cd91642e868a7a92a3b95f6b0d0d0216e98f330edefe5a52"
+          "sha256": "88ab344dad32add5c015a630e1b90e7166931679a11f2553c47804c01fdae42e"
         },
         {
           "path": "public/assets/original/menu-previews/nuketown2.webm",
-          "sha256": "720037396ddb2b4060efd5e9dfef8c3ef97feb694fd23167a082cdf0425a7d4a"
+          "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
         },
         {
           "path": "public/assets/original/menu-previews/nuketown2.webp",
-          "sha256": "524e3fd351231fbf85538ca395e0c47e3741b39e355962b50e98832fd5a03390"
+          "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
         }
       ],
       "reviewSheet": {
         "path": "docs/assets/pass85-menu-previews/nuketown2-review-frames.webp",
-        "sha256": "b3449524e3aa45d0d38f0ab5050622b5ed57dcfb66d6286d5a9af4bcc5b0dfb5"
+        "sha256": "441eecc1a42ce6044e4638b3f1b0d5229ea056af1869475d53ab6d61719cb6ad"
       }
     }
   ]

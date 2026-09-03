@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "familyId": "pass85-nuketown2-loading-backdrop",
-  "generatedAt": "2026-09-02",
+  "generatedAt": "2026-09-03",
   "note": "Deployment loading backdrop for the Nuke Town Rebuild (HF-407), derived from the arena's own authoritative WebGPU runtime capture. The rebuild never shipped a placeholder: this is its first backdrop. The six Lane I backdrops, the pass79 pair, the pass84 Map 3 backdrop, and all masters are untouched.",
   "encode": {
     "captureSize": [
@@ -22,7 +22,7 @@
     "maximumBytes": 239202,
     "minimumPsnrDb": 40.0,
     "psnrDb": {
-      "nuketown2": 42.28
+      "nuketown2": 40.36
     },
     "lowerByteBoundSubstitution": "The shipped family's 169,200 byte lower bound is not asserted here, for the reason the pass84 family recorded first: a flat-shaded first-pass arena under a bleached noon sky carries very little high-frequency detail, and raising quality above the family ceiling purely to reach a byte count would put this file outside the family it claims to join. The byte floor was a proxy for fidelity, so fidelity is measured directly instead: PSNR against the file's own PNG master, floored at 40.0 dB, which noise cannot satisfy. The family's UPPER bound is kept as a hard assert.",
     "inheritedFrom": "scripts/art-gen/finalize_lane_i.py"
@@ -33,13 +33,13 @@
   },
   "generator": {
     "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-    "sha256": "317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b"
+    "sha256": "dd7714cae50184f859b1eb24a8429bfaf02c105b09a928b65fd9305b79e730f9"
   },
   "arenas": [
     {
       "arenaId": "nuketown2",
       "replaces": null,
-      "previousSha256": null,
+      "previousSha256": "c5efefe10dd1acbf5592e2db8360075e82e6c72ed96093d409af90c21f93e7d1",
       "capture": {
         "source": "authoritative-runtime-arena",
         "backendRequired": "webgpu",
@@ -49,21 +49,21 @@
         "inputsStable": true,
         "driftedInputPaths": [],
         "capturedFrames": 240,
-        "frameSetSha256": "9d957ccead28da1b230e21037fb7a3ccebd1a97202042a40ba7efd8026f47379",
+        "frameSetSha256": "b63e88263bda03a75545350169b9a343b9fbae390e85018841ebed429e37faf8",
         "sourceFrame": 150,
-        "sourceFrameSha256": "450fb14e6c22ecf331ea4829842f5a88a95ed527403ec99310e692f24325f3c3",
+        "sourceFrameSha256": "c10dbe9f027ca378eb51ab23767454d249523fcf5b1b9800ffb07a0733d05470",
         "reviewNote": "Both houses read at once with the road between them and the bus lying across it, the 2x-damage core visible floating over the bus roof (which is the owner's kept feature and the one thing a still frame can prove), a moving truck at each end of the street, both driveway cars, both back yards with their sheds, and the perimeter fence closing the lot. Deliberately not the poster frame (60), which looks down the street from one end rather than across the whole lot."
       },
       "master": {
         "path": "source-assets/loading/pass85-nuketown2-loading/nuketown2-loading-master.png",
-        "sha256": "9a05c935bb6539ca47ce4f55d6369ae68b5fc7d57ba2c57aa3ad51d56c3f9bc3"
+        "sha256": "ea4805667955f72da2a55de3382ef250d3735eb6032da963500c0e953c034b46"
       },
       "encodeQuality": 88,
-      "psnrDb": 42.28,
+      "psnrDb": 40.36,
       "runtimeFile": {
         "path": "public/assets/original/loading/nuketown2-loading.webp",
-        "sha256": "c5efefe10dd1acbf5592e2db8360075e82e6c72ed96093d409af90c21f93e7d1",
-        "bytes": 58292
+        "sha256": "131d939356bd66592e0e2d4f47786628034d57a5bad0238bb198acb3dceedf6c",
+        "bytes": 82654
       }
     }
   ]

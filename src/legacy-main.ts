@@ -31247,6 +31247,13 @@ function frame(now: number, scheduleNext = true): void {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, visualNow);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);
       grassSystem?.update(visualNow / 1_000, camera.position, player.position, gameStarted);
+    } else if (selectedArena.id === 'nuketown2') {
+      // HF-426 Job 3. The rebuild's lawn field is built INSIDE `buildNuketown2`
+      // and parks its wind hook on the arena root, so it takes the same single
+      // uniform write per frame the shipped map's lawn does. The light set is
+      // untouched here - `updateArenaArt` writes one uniform and then finds no
+      // rings, nucleus, beacon or fauna on this root and does nothing else.
+      if (arena.id === 'nuketown2') updateArenaArt(arena.root, visualNow);
     } else if (selectedArena.id === 'gun-range') {
       // HF-347: pose the training dummies on HOST time, not this peer's own clock.
       // gunRangeTestBayRenderedDummyPose is a pure function of time with no

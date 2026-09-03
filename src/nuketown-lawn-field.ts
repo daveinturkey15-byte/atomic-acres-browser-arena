@@ -41,6 +41,7 @@ import { GRASS_GROUND_REGIONS, GRASS_MAX_HEIGHT, grassPlacementAllowed } from '.
 import {
   buildInstancedGrassField,
   type GrassClumpTint,
+  type GrassRegionRect,
   type InstancedGrassField,
 } from './rendering/instanced-grass-field';
 
@@ -48,6 +49,13 @@ import {
 export const NUKETOWN_LAWN_BLADE_HEIGHT_M = GRASS_MAX_HEIGHT;
 /** Fixed placement seed — identical lawn on every peer. */
 export const NUKETOWN_LAWN_SEED = 0x1aa2_82f1;
+/**
+ * Keep-out inflation for the rebuild's collider-driven placement, in metres.
+ * The same 0.34 m `COLLIDER_MARGIN` grass-placement.ts applies to the shipped
+ * map's colliders — blades must not grow flush against a wall face or they
+ * z-fight the wall's own base edge.
+ */
+export const NUKETOWN_LAWN_KEEPOUT_MARGIN_M = 0.34;
 
 const rect = (cx: number, cz: number, sizeX: number, sizeZ: number): Box2 => ({
   minX: cx - sizeX / 2,
@@ -158,6 +166,125 @@ export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean)
       // the field read as stubble sitting on top of the lawn. A first cut at
       // 0.46/0.56/0.42 with valueBase 0.80 over-corrected - it came back dry
       // and olive rather than kept - so this lands between the two.
+      rootShade: [0.56, 0.65, 0.5],
+    },
+    tint: NUKETOWN_LAWN_TINT,
+  });
+  parent.add(field.group);
+  return field;
+}
+
+// ---------------------------------------------------------------------------
+// NUKETOWN2 (HF-426 Job 3) - the same lawn on the rebuilt map
+// ---------------------------------------------------------------------------
+
+/**
+ * One of the rebuild's plan rectangles. Structural, not an import: this module
+ * must not import `nuketown2-arena.ts`, which imports this one back.
+ * `NUKETOWN2_GROUND_DRESSING` satisfies it exactly, and the CALLER passes it -
+ * so the lawn's extents are the arena's own authored extents rather than a
+ * second copy of them that can silently drift. Re-typing those numbers here is
+ * precisely the failure that put 38 m2 of lawn inside each house's front room
+ * on an early cut of the layout (see the export's own comment in the arena).
+ */
+export type NuketownGroundDressingPiece = Readonly<{
+  id: string;
+  material: string;
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}>;
+
+/**
+ * The rebuild's lawn REGIONS: every `material: 'lawn'` rectangle in the plan,
+ * plus the 180-degree partner the arena's own `pair()` emits for each of them.
+ * Everything else in the table - the driveway apron and the border path - is
+ * hard surface and is outside the regions BY CONSTRUCTION, exactly as the
+ * shipped map's asphalt and pavements are.
+ *
+ * On the corrected 36 x 84 footprint this is 4 authored rectangles becoming 8
+ * regions, of which the yard lawn (z -36..-23 and its partner +23..+36) is by
+ * far the largest - the back yards are the map's long axis now, so they are
+ * where a lawn is actually seen.
+ */
+export function nuketownRebuildLawnRegions(
+  dressing: readonly NuketownGroundDressingPiece[],
+): readonly GrassRegionRect[] {
+  const regions: GrassRegionRect[] = [];
+  for (const piece of dressing) {
+    if (piece.material !== 'lawn') continue;
+    const minX = Math.min(piece.x0, piece.x1);
+    const maxX = Math.max(piece.x0, piece.x1);
+    const minZ = Math.min(piece.z0, piece.z1);
+    const maxZ = Math.max(piece.z0, piece.z1);
+    regions.push({ minX, maxX, minZ, maxZ });
+    // The rotational partner, the same transform `pair()` applies: (x, z) -> (-x, -z).
+    regions.push({ minX: -maxX, maxX: -minX, minZ: -maxZ, maxZ: -minZ });
+  }
+  return Object.freeze(regions);
+}
+
+/**
+ * Build the rebuild's lawn field. Same donor, same suburban preset, same tint
+ * and same blade material as the shipped map's - this is the port, not a
+ * variant - with two things supplied by the caller instead of by a table here:
+ *
+ *   - REGIONS come from the arena's own ground-dressing rectangles;
+ *   - KEEP-OUTS are the arena's own colliders, handed over at build time. The
+ *     shipped map needs a hand-mirrored prop table (and a containment test to
+ *     stop it drifting) because its lawn is built in a sibling group long after
+ *     `buildArena` has returned. This one is built from INSIDE `buildNuketown2`
+ *     with `builder.colliders` in scope, so the keep-outs cannot be stale: a
+ *     shed, hedge or fence added to the arena is a keep-out on the same tick.
+ *
+ * Presentation only: no colliders, no raycast surfaces, blades capped at the
+ * 0.25 m art-only ceiling. Deterministic (fixed seed, no Math.random).
+ */
+export function buildNuketownRebuildLawnField(
+  parent: THREE.Object3D,
+  options: Readonly<{
+    dressing: readonly NuketownGroundDressingPiece[];
+    keepOuts: readonly Box2[];
+    reduced?: boolean;
+  }>,
+): InstancedGrassField {
+  const reduced = options.reduced === true;
+  const compatRoute = typeof document !== 'undefined'
+    && document.documentElement?.dataset.renderBackend === 'webgl2';
+  const keepOuts = options.keepOuts;
+  const field = buildInstancedGrassField({
+    name: 'nuketown2-lawn',
+    // A different stream from the shipped map's, so the two maps do not carry
+    // the same tuft pattern in the same world coordinates.
+    seed: NUKETOWN_LAWN_SEED ^ 0x0002_6426,
+    regions: nuketownRebuildLawnRegions(options.dressing),
+    // The shipped map's own cell sizes, unchanged. Measured on the rebuild's
+    // 1,144 m2 of lawn: 9,953 tufts / 149 k triangles / 8 draws, against an
+    // arena budget of 650 k triangles and 420 draws whose solid geometry is
+    // 230 boxes. A sparser cell was tried first and rejected - the owner's
+    // standing note on this map's grass is that it "still feels poor", and
+    // there is no budget reason here to under-plant it.
+    cellSizeM: reduced ? 0.5 : compatRoute ? 0.36 : 0.3,
+    bladeHeightM: NUKETOWN_LAWN_BLADE_HEIGHT_M,
+    bladeWidthM: 0.062,
+    bladeBendM: 0.055,
+    bladesPerTuft: reduced || compatRoute ? 2 : 3,
+    scaleRange: [0.68, 1.0],
+    placementAllowed: (x, z) => !keepOuts.some((box) => (
+      x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+    )),
+    material: {
+      color: 0x5e9e41,
+      roughness: 0.89,
+      metalness: 0.02,
+      swayAmount: 0.045,
+      windSpeed: 0.8,
+      sssColor: 0xa4cb55,
+      sssStrength: 0.29,
       rootShade: [0.56, 0.65, 0.5],
     },
     tint: NUKETOWN_LAWN_TINT,

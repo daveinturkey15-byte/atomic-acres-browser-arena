@@ -6,13 +6,14 @@ import type { ArenaMap } from './map';
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
-  NUKETOWN2_CENTRAL_BUS,
+  NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_GROUND_DRESSING,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_SECTION,
   NUKETOWN2_SPAWN_LAYOUT,
-  NUKETOWN2_STREET_HALF_WIDTH,
+  NUKETOWN2_STREET_COACH,
+  NUKETOWN2_STREET_LENGTH,
   buildNuketown2,
 } from './nuketown2-arena';
 import {
@@ -24,23 +25,27 @@ import { CharacterPhysics } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 
 /**
- * NUKE TOWN REBUILD fidelity guard (HF-407).
+ * NUKE TOWN REBUILD fidelity guard (HF-407, re-derived end to end under HF-426).
  *
- * Copied in shape from `src/nuketown-fidelity.test.ts` and re-derived in every
- * number, because the shipped map's bands encode the shipped map's history and
- * this arena has none. The authority every band below is derived from is
- * `docs/NUKETOWN_REBUILD_2026-09-02.md`, which was written BEFORE any geometry
- * and records what published sources actually say about the reference map and
- * what this lane derived from them.
+ * THE AUTHORITY CHANGED, AND THAT IS THE POINT. Every band in the previous
+ * version of this file was derived from `docs/NUKETOWN_REBUILD_2026-09-02.md`,
+ * which took ONE published area scalar for the reference map and then reused
+ * this repository's own 2026-08-29 redesign for the flow. The owner rejected
+ * the arena that came out of it ("its based on an old layout we had here, not
+ * the actual layout of black ops 2 nuketown", 2026-09-03 07:00 BST). The
+ * authority is now `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md`, which is
+ * MEASURED IN PIXELS off the two first-party Treyarch overhead minimaps of
+ * Nuketown 2025 and quotes the segmentation it used.
  *
- * THE RULE FOR EVERY NUMBER IN THIS FILE. A band is either
- *   (a) a REFERENCE ratio from the design doc, with the tolerance stated, or
- *   (b) a value MEASURED on the arena the builder actually emits, pinned with
- *       a stated margin, and with the reason it is allowed to be that value.
- * No band is a feeling, and no band was chosen after seeing a test go red. The
- * measurements were taken by artifacts/nuketown2-measure.mts on the built
- * collider set and are quoted inline so the next person can re-derive rather
- * than re-guess.
+ * THE RULE FOR EVERY NUMBER IN THIS FILE, and it is stricter than last time. A
+ * band is either
+ *   (a) a REFERENCE RATIO from the schematic, converted at the arena's own
+ *       street length and given the lane's 5 %-of-street-length tolerance, or
+ *   (b) a CEILING DERIVED FROM (a) - a value that follows arithmetically from a
+ *       reference ratio plus a stated estimator margin.
+ * Nothing below is "the number the build happens to produce". Where a measured
+ * value is quoted it is quoted as EVIDENCE that the build lands inside a band
+ * that was derived first, and the derivation is written out beside it.
  */
 
 const PLAYER_RADIUS = 0.44;
@@ -51,50 +56,76 @@ const PLAYER_RADIUS = 0.44;
  */
 const UPPER_FLOOR_EYE_Y = 4.96;
 const sprintSpeed = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
-const walkSpeed = movementProfile({ crouched: false, prone: false, ads: false, sprinting: false, grounded: true }).maxSpeed;
 
 const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
 const depth = NUKETOWN2_BOUNDS.maxZ - NUKETOWN2_BOUNDS.minZ;
 
+/** The ratio base. Schematic §3: every reference dimension is a fraction of it. */
+const L = NUKETOWN2_STREET_LENGTH;
+/** The lane's stated tolerance: 5 % of street length, in metres. */
+const TOL = 0.05 * L;
+
 /**
- * The reference's one published hard scalar: minimum playspace 2,972 m2,
- * maximum whole map 4,950 m2 (design doc R1). The rebuild's fenced rectangle is
- * 58 x 52 = 3,016 m2. The band below is +/- 5 % of the published playspace,
- * which is tight enough that a metre off any section band fails it.
+ * THE REFERENCE ASPECT, and the single structural correction this pass makes.
+ * Both first-party minimaps put the playable polygon at 2.36 : 1 with the LONG
+ * axis running ACROSS the street:
+ *   BO2 `Nuketown_2025_Minimap_BOII.png` — 427 x 181 px = 2.359
+ *   BO7 `Nuketown_2025_MiniMap_BO7.png`  — 944 x 400 px = 2.360
+ * The previous cut was 58 x 52 = 0.90 : 1 with the long axis ALONG the street.
  */
-const REFERENCE_PLAYSPACE_M2 = 2_972;
+const REFERENCE_ASPECT = 2.36;
+
+/**
+ * The absolute scale is ANCHORED, not published. The previous cut's authored
+ * playable rectangle was 58 x 52 = 3,016 m², and that number survives this pass
+ * deliberately: the reference's overheads give SHAPE reliably and absolute SIZE
+ * not at all, and the previous cut's one published area scalar is exactly what
+ * the owner rejected. So the map is re-proportioned at constant area, and this
+ * band pins that promise.
+ */
+const ANCHOR_PLAYSPACE_M2 = 3_016;
 const PLAYSPACE_TOLERANCE = 0.05;
 
 /**
- * Longest clear STANDING eye-line over the whole map, measured by the estimator
- * below on the built colliders: 56.57 m, [28, -23] -> [-28, -15].
+ * Longest clear STANDING eye-line over the whole map. TWO-SIDED, and both sides
+ * are derived before the build is measured.
  *
- * THIS PIN WAS TIGHTENED, 66 -> 59, and the reason is worth keeping. It used to
- * be 63.53 m along [28, -15] -> [-28, 15], a lane that runs through the world
- * origin - which is to say through the BUS's own window band, between its
- * mullions, because the bus is authored OPEN and an open bus is see-through at
- * standing eye height by design. The roof-access treads added against the bus's
- * west flank (`BUS_ROOF_STEPS`) stand in exactly that diagonal and broke it, so
- * the worst lane on the map is now a border-path run that never crosses the
- * vehicle. 59 m is the new measurement plus 2.5 m for the estimator's 2 m
- * sample step and nothing more: any new body that opens a lane wider than the
- * current worst one fails here. This ceiling remains an anti-creep pin on the
- * map's overall openness, not the instrument for "does the bus break the
- * street"; that is measured directly by the street-centre-line test below.
+ *  - CEILING. The reference's playable polygon is a stepped hexagon, not a
+ *    rectangle, and its own minimap draws hatched props along BOTH long
+ *    boundaries; no lane on it runs the full diagonal. This arena is a
+ *    rectangle, so the props have to do that work alone, and the ceiling is set
+ *    at 55 % of the playable diagonal — 0.55 x 91.39 = 50.3 m. That number is a
+ *    RATIO decision, not a measurement: at 55 % the worst lane is shorter than
+ *    the shorter side of the map (84 m long axis, 36 m short axis: 50.3 m is
+ *    1.40 x the short side), which is the property "you cannot see spawn to
+ *    spawn down a flank" expressed without reference to any particular prop.
+ *  - FLOOR. A map with no long view is a corridor, and the reference's three
+ *    lanes each run most of the long axis. 30 m, which is 0.36 of the diagonal.
+ *
+ * EVIDENCE the build lands inside: 46.0 m, [17, -35] -> [17, 11]. It was 82.0 m
+ * before the yard-fence gaps were taken off-axis from their own rotational
+ * partners and 70.0 m before the two flank props were moved onto the perimeter
+ * wall's inner face; both fixes are written up in `yard()`.
  */
-const MAX_STANDING_EYE_LINE_METRES = 59;
+const MAX_STANDING_EYE_LINE_METRES = 50.3;
+const MIN_STANDING_EYE_LINE_METRES = 30;
 
 /**
- * Longest clear run ALONG the street centre-line at standing eye height,
- * measured at 0.5 m resolution: 15.0 m, from x = -20.5 to x = -5.5, i.e. from
- * the WEST TRUCK'S REAR to the bus's west end. (Not "from the cul-de-sac": the
- * cul-de-sac is at x = -29, 8.5 m further west, and it is the truck that stops
- * the run.) This is the reference property the
- * bus exists for, and the number that would move if the bus were removed,
- * shortened, or pushed off centre: without it the run is the full 58 m street.
- * 17 m is the measurement plus two sample steps.
+ * Longest clear run ALONG the street centre-line at standing eye height.
+ *
+ * DERIVED, not measured. The road's playable extent is L = 36 m, so the
+ * centre-line samples run from x = -17 to x = +17. The truck straddles the
+ * origin with its cargo-box mouth open at x = -3.25 and its BULKHEAD standing
+ * at x = +3.17, so a line along z = 0 starting at the west sample enters the
+ * open box and is stopped by the bulkhead: 17 + 3.17 = 20.17 m. Plus two 0.5 m
+ * sample steps = 21.2 m.
+ *
+ * This is the number that would move if the truck were removed, shortened, or
+ * pushed off the centre-line. It is also why the truck is the OPEN body: the
+ * coach is closed and sits 4 m off the centre-line, so it does not enter this
+ * measurement at all.
  */
-const MAX_STREET_CENTRE_RUN_METRES = 17;
+const MAX_STREET_CENTRE_RUN_METRES = 21.2;
 
 function clearLine(map: ArenaMap, from: readonly [number, number], to: readonly [number, number], eyeHeight: number): boolean {
   const dx = to[0] - from[0];
@@ -140,84 +171,142 @@ function longestClearEyeLine(map: ArenaMap, eyeHeight: number): {
   return best;
 }
 
-describe('Nuke Town Rebuild fidelity', () => {
-  it('matches the reference footprint: 58 x 52 m of playspace, and the published 0.60 play-to-map ratio', () => {
-    const playspace = width * depth;
-    expect(playspace).toBeGreaterThan(REFERENCE_PLAYSPACE_M2 * (1 - PLAYSPACE_TOLERANCE));
-    expect(playspace).toBeLessThan(REFERENCE_PLAYSPACE_M2 * (1 + PLAYSPACE_TOLERANCE));
+/** Every solid box mesh the builder emitted, presentation decals excluded. */
+function solidMeshes(map: ArenaMap): THREE.Mesh[] {
+  return map.root.children.filter((node): node is THREE.Mesh => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.isMesh !== true) return false;
+    if (mesh.userData.presentationOnly === true) return false;
+    return (mesh.geometry as THREE.BoxGeometry).parameters !== undefined;
+  });
+}
 
-    // Design doc 2.2: the whole authored map is the playable rectangle plus an
-    // 8 m out-of-bounds verge on every side, and the reference's published
-    // playspace : whole-map ratio is 0.60. Deriving the verge from the same
-    // numbers the arena uses means the ratio cannot drift without the
-    // footprint drifting.
-    const wholeMap = (width + 16) * (depth + 16);
-    expect(playspace / wholeMap).toBeCloseTo(0.6, 2);
-    expect(wholeMap).toBeGreaterThan(4_950 * (1 - PLAYSPACE_TOLERANCE));
-    expect(wholeMap).toBeLessThan(4_950 * (1 + PLAYSPACE_TOLERANCE));
+function planFootprint(mesh: THREE.Mesh): { x0: number; x1: number; z0: number; z1: number } {
+  const p = (mesh.geometry as THREE.BoxGeometry).parameters as { width: number; height: number; depth: number };
+  return {
+    x0: mesh.position.x - p.width / 2,
+    x1: mesh.position.x + p.width / 2,
+    z0: mesh.position.z - p.depth / 2,
+    z1: mesh.position.z + p.depth / 2,
+  };
+}
+
+describe('Nuke Town Rebuild fidelity', () => {
+  it('has the reference SHAPE, at the previous cut\'s area: 36 m of street by 84 m across it', () => {
+    // (1) Area is the anchor, and it is held.
+    const playspace = width * depth;
+    expect(playspace).toBeGreaterThan(ANCHOR_PLAYSPACE_M2 * (1 - PLAYSPACE_TOLERANCE));
+    expect(playspace).toBeLessThan(ANCHOR_PLAYSPACE_M2 * (1 + PLAYSPACE_TOLERANCE));
+
+    // (2) Shape is the reference's, and this is THE assertion the previous cut
+    // could not have passed: its long axis was the street (58 along, 52 across,
+    // 0.90 : 1). On both first-party minimaps the long axis runs ACROSS the
+    // road - yard, house, road, house, yard - at 2.36 : 1.
+    expect(depth, 'the long axis runs ACROSS the street, not along it').toBeGreaterThan(width);
+    const aspect = depth / width;
+    expect(aspect).toBeGreaterThan(REFERENCE_ASPECT * 0.95);
+    expect(aspect).toBeLessThan(REFERENCE_ASPECT * 1.05);
+
+    // (3) The street's own length is the ratio base the schematic is written in,
+    // and it must BE the short axis rather than merely be called it.
+    expect(NUKETOWN2_STREET_LENGTH).toBe(width);
+
+    // (4) Diagonal and perimeter follow from (1) and (2) with no further
+    // freedom: sides sqrt(A / r) and sqrt(A * r) for A = 3,016 and r = 2.36 are
+    // 35.75 and 84.38 m, so the diagonal is 91.64 m and the lap 240.3 m.
+    const referenceShort = Math.sqrt(ANCHOR_PLAYSPACE_M2 / REFERENCE_ASPECT);
+    const referenceLong = Math.sqrt(ANCHOR_PLAYSPACE_M2 * REFERENCE_ASPECT);
+    expect(Math.hypot(width, depth)).toBeCloseTo(Math.hypot(referenceShort, referenceLong), 0);
+    expect(2 * (width + depth)).toBeCloseTo(2 * (referenceShort + referenceLong), -0.5);
   });
 
-  it('adds up: the cross-street section is exactly the fenced depth, with every reference band present', () => {
-    // Design doc 2.2. Half the section, road centre-line outward: street
-    // half-width + house + back yard + border path. If this stops summing, one
-    // of those bands has been silently eaten and the arena is no longer the map
-    // the footprint band above claims it is.
+  it('adds up: the cross-street section is exactly the fenced depth, at the reference\'s own ratios', () => {
+    // Half the section, road centre-line outward: carriageway half-width, front
+    // verge, house, back yard, border path. If this stops summing, one of those
+    // bands has been silently eaten and the arena is no longer the map the
+    // footprint band above claims it is.
     const half = NUKETOWN2_SECTION.streetHalfWidth
+      + NUKETOWN2_SECTION.frontVergeDepth
       + NUKETOWN2_SECTION.houseDepth
       + NUKETOWN2_SECTION.yardDepth
       + NUKETOWN2_SECTION.sidePathDepth;
     expect(half * 2).toBeCloseTo(depth, 10);
+
+    // Every band below is a MEASURED reference ratio (schematic §3) converted at
+    // this arena's street length, with the lane's 5 %-of-L tolerance.
+    // Front wall to road centre-line: the two house fronts stand 0.553 L apart
+    // (BO7 minimap, 221 px of 400), so each is 0.2765 L off the centre-line.
+    expect(NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth)
+      .toBeCloseTo(0.2765 * L, 0);
+    expect(Math.abs((NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth) - 0.2765 * L))
+      .toBeLessThan(TOL);
+    // Carriageway width = the width of the tongue the road leaves the polygon
+    // through: 0.328 L (BO7 131 px of 400; BO2 60 px of 181 = 0.331).
+    expect(Math.abs(NUKETOWN2_SECTION.streetHalfWidth * 2 - 0.328 * L)).toBeLessThan(TOL);
+    // House depth 0.363 L (145 px), frontage 0.303 L (121 px).
+    expect(Math.abs(NUKETOWN2_SECTION.houseDepth - 0.363 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_SECTION.houseWidth - 0.303 * L)).toBeLessThan(TOL);
+    // Garage frontage 0.125-0.145 L (50-58 px), depth-setback 0.168 L (67 px).
+    expect(Math.abs(NUKETOWN2_SECTION.garageWidth - 0.135 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_SECTION.garageSetback - 0.168 * L)).toBeLessThan(TOL);
+    // Back lot, house back wall to the playable boundary: 0.503 L on one side
+    // of the reference and 0.583 L on the other, so 0.543 L is the midpoint.
+    expect(Math.abs((NUKETOWN2_SECTION.yardDepth + NUKETOWN2_SECTION.sidePathDepth) - 0.543 * L))
+      .toBeLessThan(TOL);
+    // THE OFFSET THE PREVIOUS CUT INVENTED. It set the along-street offset
+    // between the two house centres to half a house width (7 m of its own 58 m
+    // street, 0.121 L) on the theory that each front window should look
+    // diagonally at the other house's driveway. The reference offsets them by
+    // 26 px of 400 = 0.065 L; the houses very nearly face each other and the
+    // diagonal comes from the GARAGES being at opposite ends.
+    expect(Math.abs(NUKETOWN2_SECTION.houseOffsetAlongStreet - 0.065 * L)).toBeLessThan(TOL);
+    expect(NUKETOWN2_SECTION.houseOffsetAlongStreet)
+      .toBeLessThan(NUKETOWN2_SECTION.houseWidth / 2);
+
     // Every band has to be genuinely playable, not a millimetre of bookkeeping.
     expect(NUKETOWN2_SECTION.sidePathDepth).toBeGreaterThanOrEqual(3.5);
     expect(NUKETOWN2_SECTION.yardDepth).toBeGreaterThanOrEqual(6);
     expect(NUKETOWN2_SECTION.houseDepth).toBeGreaterThanOrEqual(9);
-    // Design doc 2.3: the houses are offset along the street by half a house
-    // width, which is what makes each front window look at the OTHER house's
-    // driveway instead of into its own mirror image.
-    expect(NUKETOWN2_SECTION.houseOffsetAlongStreet).toBeCloseTo(NUKETOWN2_SECTION.houseWidth / 2, 10);
   });
 
-  it('stays small: the map is crossed in about nine seconds at real sprint speed', () => {
-    // MEASURED on the built bounds: diagonal 77.90 m, 8.95 s sprint,
-    // 12.67 s walk, 25.29 s perimeter lap. The reference is described as one of
-    // the smallest maps in the series (design doc R12), and the shipped Nuke
-    // Town crosses in 10.95 s - so this arena being FASTER to cross is the
-    // point, not an accident. The bands are two-sided: creeping back out to the
-    // shipped map's size fails, and shrinking into a corridor fails too.
-    const diagonal = Math.hypot(width, depth);
-    expect(diagonal / sprintSpeed).toBeGreaterThan(8.5);
-    expect(diagonal / sprintSpeed).toBeLessThan(9.4);
-    expect(diagonal / walkSpeed).toBeLessThan(13.2);
-    const lap = (2 * (width + depth)) / sprintSpeed;
-    expect(lap).toBeGreaterThan(24);
-    expect(lap).toBeLessThan(27);
+  it('stays small where the reference is small: the road is crossed in two and a half seconds', () => {
+    // THE BAND THAT MATTERS ON THIS MAP IS THE CROSSING, NOT THE DIAGONAL, and
+    // that is the whole point of the re-proportioning. The previous cut pinned a
+    // corner-to-corner diagonal, which on a map whose long axis was the street
+    // rewarded exactly the shape the owner rejected. On the reference the two
+    // front doors are 0.553 L apart and you cross that in one sprint; the long
+    // axis is a spawn-to-spawn distance nobody runs in a straight line.
+    const crossing = 2 * (NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth);
+    expect(Math.abs(crossing - 0.553 * L)).toBeLessThan(TOL);
+    expect(crossing / sprintSpeed).toBeLessThan(2.6);
+    expect(crossing / sprintSpeed).toBeGreaterThan(1.9);
   });
 
-  it('puts the bus in the middle of the road and shortens the street with it', () => {
+  it('puts the moving truck in the cul-de-sac and shortens the street with it', () => {
     const map = buildNuketown2(new THREE.Scene());
-    const bus = map.physicalCover.find((cover) => cover.id === 'nuketown2-central-bus');
-    expect(bus, 'exactly one central bus owns the middle of the road').toBeDefined();
-    expect(map.physicalCover.filter((cover) => cover.id.includes('bus'))).toHaveLength(1);
-    // Centred on the world origin, which is load-bearing: the global
-    // OVERDRIVE_POSITION {0, 3.75, 0} has to land on this roof.
-    expect((bus!.bounds.minX + bus!.bounds.maxX) / 2).toBeCloseTo(0, 10);
-    expect((bus!.bounds.minZ + bus!.bounds.maxZ) / 2).toBeCloseTo(0, 10);
-    expect(bus!.bounds.minZ).toBeGreaterThan(-NUKETOWN2_STREET_HALF_WIDTH);
-    expect(bus!.bounds.maxZ).toBeLessThan(NUKETOWN2_STREET_HALF_WIDTH);
-    expect(bus!.blocksShots).toBe(true);
-    expect(bus!.blocksMovement).toBe(true);
-    // Design doc 2.6: an 11 m body is what actually breaks a 58 m street.
-    expect(NUKETOWN2_CENTRAL_BUS.length).toBeGreaterThanOrEqual(10);
-    // The 2x-damage core floats 0.60 m over the roof, inside the pickup window.
-    expect(NUKETOWN2_CENTRAL_BUS.roofY).toBeCloseTo(3.15, 10);
-    // And the aisle is a LOW floor, which is the other half of the same rule -
-    // see the overdrive block below, which measures the consequence rather than
-    // restating the arithmetic.
-    expect(NUKETOWN2_CENTRAL_BUS.floorY).toBeCloseTo(0.05, 10);
+    const truck = map.physicalCover.find((cover) => cover.id === 'nuketown2-central-truck');
+    expect(truck, 'exactly one moving truck owns the turning head').toBeDefined();
+    expect(map.physicalCover.filter((cover) => cover.id.includes('truck'))).toHaveLength(1);
+    // The cargo box is centred on the world origin, which is load-bearing: the
+    // global OVERDRIVE_POSITION {0, 3.75, 0} has to land on its roof.
+    expect(truck!.bounds.minX).toBeCloseTo(-NUKETOWN2_CENTRAL_TRUCK.boxLength / 2, 10);
+    expect((truck!.bounds.minZ + truck!.bounds.maxZ) / 2).toBeCloseTo(0, 10);
+    expect(truck!.blocksShots).toBe(true);
+    expect(truck!.blocksMovement).toBe(true);
+    // Schematic §3: the truck is 0.325 L end to end, split 0.180 L of hollow
+    // cargo box and 0.145 L of solid cab.
+    const total = NUKETOWN2_CENTRAL_TRUCK.boxLength + NUKETOWN2_CENTRAL_TRUCK.cabLength;
+    expect(Math.abs(total - 0.325 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.boxLength - 0.180 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.cabLength - 0.145 * L)).toBeLessThan(TOL);
+    // The 2x-damage core floats 0.60 m over the box roof, inside the pickup
+    // window, and the box deck is LOW so the interior cannot claim through it.
+    expect(NUKETOWN2_CENTRAL_TRUCK.roofY).toBeCloseTo(3.15, 10);
+    expect(NUKETOWN2_CENTRAL_TRUCK.deckY).toBeCloseTo(0.05, 10);
 
     // The property, measured rather than assumed: no clear standing run along
-    // the street centre-line longer than the band. Without the bus this is the
-    // whole 58 m street.
+    // the street centre-line longer than the derived band. Without the truck
+    // this is the whole 36 m street.
     let longestRun = 0;
     for (let ax = NUKETOWN2_BOUNDS.minX + 1; ax <= NUKETOWN2_BOUNDS.maxX - 1; ax += 0.5) {
       for (let bx = ax + 0.5; bx <= NUKETOWN2_BOUNDS.maxX - 1; bx += 0.5) {
@@ -229,36 +318,58 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(longestRun, 'clear run along the street centre-line').toBeLessThanOrEqual(MAX_STREET_CENTRE_RUN_METRES);
   });
 
-  it('treats the vehicles the way the reference does: the bus and the trucks are cover, the cars are solid', () => {
+  it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // Design doc 2.5 / R9: a bus, a truck in each cul-de-sac, and two cars.
-    const truckIds = map.physicalCover.filter((cover) => cover.id.includes('truck')).map((cover) => cover.id);
-    expect(truckIds).toHaveLength(2);
-    // One truck at each END of the street, not two at the same end.
-    const trucks = map.physicalCover.filter((cover) => truckIds.includes(cover.id));
-    const centresX = trucks.map((truck) => (truck.bounds.minX + truck.bounds.maxX) / 2);
-    expect(Math.min(...centresX)).toBeLessThan(-15);
-    expect(Math.max(...centresX)).toBeGreaterThan(15);
+    const meshNames = map.root.children.map((node) => node.name);
+
+    // THE CORRECTION. The previous two cuts made the BUS the enterable body.
+    // On the reference's own minimap the coach is drawn hatched end to end and
+    // the moving truck's cargo box is drawn hollow with a solid cab, and
+    // Activision's map guide says the truck is an island of cover in the
+    // cul-de-sac with room INSIDE it. So: truck open, coach closed.
+    for (const part of ['truck deck', 'truck box roof', 'truck box bulkhead', 'truck cab']) {
+      expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
+    }
+    // The truck's interior is a real room: a standing eye at the origin, on the
+    // deck, is under a roof and inside two flanks, and it is NOT blocked.
+    expect(isBlocked({ x: 0, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
+    // ...and its mouth is at the -x end, so it is enterable from the road.
+    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS),
+      'truck cargo box mouth').toBe(false);
+
+    // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
+    // between, and a standing eye at its centre IS blocked.
+    expect(meshNames.some((name) => name.includes('coach body'))).toBe(true);
+    expect(meshNames.some((name) => name.includes('coach floor'))).toBe(false);
+    expect(meshNames.some((name) => name.includes('coach deck'))).toBe(false);
+    expect(isBlocked({ x: NUKETOWN2_STREET_COACH.x, y: 1.7, z: NUKETOWN2_STREET_COACH.z }, map.colliders, PLAYER_RADIUS),
+      'the coach must be solid, not a room').toBe(true);
+    const coach = map.physicalCover.find((cover) => cover.id === 'nuketown2-street-coach');
+    expect(coach, 'exactly one coach').toBeDefined();
+    expect(map.physicalCover.filter((cover) => cover.id.includes('coach'))).toHaveLength(1);
+
+    // Coach size and placement, schematic §3: 0.253 L long, and offset from the
+    // truck's cargo box by 0.178 L along the street and 0.150 L across it.
+    expect(Math.abs(NUKETOWN2_STREET_COACH.length - 0.253 * L)).toBeLessThan(TOL);
+    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.x) - 0.178 * L)).toBeLessThan(TOL);
+    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.z) - 0.150 * L)).toBeLessThan(TOL);
+    // Both street bodies stay on the carriageway.
+    expect(NUKETOWN2_STREET_COACH.z - NUKETOWN2_STREET_COACH.width / 2)
+      .toBeGreaterThan(-NUKETOWN2_SECTION.streetHalfWidth);
+
     // Every declared vehicle body is real cover in both authorities. A body the
     // player can see and shoot but walk through is the failure this pins.
     for (const cover of map.physicalCover) {
       expect(cover.blocksMovement, cover.id).toBe(true);
       expect(cover.blocksShots, cover.id).toBe(true);
     }
-    // The bus is OPEN: its floor is standable and its roof is over your head,
-    // so the interior is a room. Both are solid bodies in the built set.
-    const meshNames = map.root.children.map((node) => node.name);
-    expect(meshNames.some((name) => name.includes('bus floor'))).toBe(true);
-    expect(meshNames.some((name) => name.includes('bus roof'))).toBe(true);
     // The cars are CLOSED: solid, and not declared as enterable cover volumes.
     expect(map.physicalCover.some((cover) => cover.id.includes('car'))).toBe(false);
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
   });
 
-  it('builds two two-storey houses facing each other over the road, each with a garage', () => {
+  it('builds two two-storey houses facing each other over the road, each with a garage it opens into', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // Design doc R3/R4/R6: two houses, two ground rooms and two upper rooms
-    // each, a front and a back door each, and windows that are real openings.
     expect(map.houseTelemetry.houses).toBe(2);
     expect(map.houseTelemetry.groundRooms).toBe(4);
     expect(map.houseTelemetry.upperRooms).toBe(4);
@@ -268,46 +379,63 @@ describe('Nuke Town Rebuild fidelity', () => {
     const [north, south] = NUKETOWN2_HOUSE_LAYOUT;
     expect(north!.facing).toBe(1);
     expect(south!.facing).toBe(-1);
-    expect(north!.z).toBeLessThan(-NUKETOWN2_STREET_HALF_WIDTH);
-    expect(south!.z).toBeGreaterThan(NUKETOWN2_STREET_HALF_WIDTH);
-    // The garages are real rooms, one per house, on the outboard ends.
+    const frontLine = NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth;
+    expect(north!.z).toBeLessThan(-frontLine);
+    expect(south!.z).toBeGreaterThan(frontLine);
+    // The garages are real rooms, one per house, at opposite ends under the
+    // rotation, and SET BACK from the street frontage the way the reference
+    // draws them rather than opening straight onto the kerb.
     const names = map.root.children.map((node) => node.name);
     expect(names.filter((name) => name.includes('garage floor'))).toHaveLength(2);
     expect(names.some((name) => name.includes('garage door head'))).toBe(true);
+    expect(NUKETOWN2_SECTION.garageSetback).toBeGreaterThan(0);
+
+    // THE DOORWAY THAT WAS A WALL. The previous cut cut a link door in the
+    // garage's shared leaf and left the house's own east wall solid behind it,
+    // so the garage's "route into the house" opened onto siding. Both leaves are
+    // cut now, and this probe stands in the doorway itself: house-side, garage
+    // side, and the threshold between them.
+    for (const x of [3.6, 4.35, 5.1]) {
+      expect(isBlocked({ x, y: 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
+    }
   });
 
   it('keeps the power position real: the upper front window is an opening, and the rare gun lives there', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // Design doc R5: the upstairs front window is the strongest position on
-    // the reference map, and it is only one if it is a hole rather than a
-    // painting. Stand at each upper window seat and look across the road: the
-    // seat must be unobstructed at eye height.
+    // Activision's own Nuketown 2025 guide calls the front-facing windows of
+    // both homes the biggest power positions on the map, and they only are that
+    // if they are holes rather than paintings. Stand at each upper window seat
+    // and look across the road: the seat must be unobstructed at eye height.
     // `isBlocked` models the point as an EYE with 1.65 m of body hanging below
-    // it, so an upper-floor seat is probed at slab + 1.66 = 4.96 m: any lower
-    // and the capsule reaches through the floor the player is standing on and
-    // every interior position reads as blocked.
+    // it, so an upper-floor seat is probed at slab + 1.66 = 4.96 m.
     for (const house of NUKETOWN2_HOUSE_LAYOUT) {
       const seat = { x: house.x, y: UPPER_FLOOR_EYE_Y, z: house.z + house.facing * 3.9 };
       expect(isBlocked(seat, map.colliders, PLAYER_RADIUS), `${house.id} upper window seat`).toBe(false);
     }
     // The rare-gun sites are DERIVED from the house layout, never hand-written:
     // the shipped map's equivalent list outlived a layout move and put the
-    // weapon outside the map (src/railgun-authority.ts header).
+    // weapon outside the map (src/railgun-authority.ts header). This arena has
+    // just moved every house, so that is not a hypothetical.
     expect(NUKETOWN2_RARE_GUN_SITES).toHaveLength(2);
     for (const [index, site] of NUKETOWN2_RARE_GUN_SITES.entries()) {
       const house = NUKETOWN2_HOUSE_LAYOUT[index]!;
       expect(site.position[0]).toBeCloseTo(house.x, 10);
       // In the FRONT upper room, toward the street: the house mid-line is where
-      // the internal partition stands, and this assertion is the one that
-      // caught the first cut of these sites sitting inside that wall.
+      // the internal partition stands.
       expect(Math.sign(site.position[2] - house.z)).toBe(house.facing);
+      expect(Math.abs(site.position[2] - house.z)).toBeLessThan(NUKETOWN2_SECTION.houseDepth / 2);
       // Above the upper floor slab and inside the building, not on the roof.
       expect(site.position[1]).toBeGreaterThan(3.3);
       expect(site.position[1]).toBeLessThan(6.2);
-      // A player can actually stand where the weapon is. This is the whole
-      // point of deriving the sites instead of hand-writing them.
+      // A player can actually stand where the weapon is.
       expect(isBlocked({ x: site.position[0], y: UPPER_FLOOR_EYE_Y, z: site.position[2] }, map.colliders, PLAYER_RADIUS),
         `${site.id} must stand in open floor`).toBe(false);
+      // And every site is inside the map. The band is the fenced rectangle less
+      // the player radius; the failure it guards is the one in the header above.
+      expect(site.position[0]).toBeGreaterThan(NUKETOWN2_BOUNDS.minX + PLAYER_RADIUS);
+      expect(site.position[0]).toBeLessThan(NUKETOWN2_BOUNDS.maxX - PLAYER_RADIUS);
+      expect(site.position[2]).toBeGreaterThan(NUKETOWN2_BOUNDS.minZ + PLAYER_RADIUS);
+      expect(site.position[2]).toBeLessThan(NUKETOWN2_BOUNDS.maxZ - PLAYER_RADIUS);
     }
   });
 
@@ -330,26 +458,33 @@ describe('Nuke Town Rebuild fidelity', () => {
         expect(isBlocked({ x: spawn.x, y: 1.7, z: spawn.z }, map.colliders, PLAYER_RADIUS), label).toBe(false);
       }
     }
-    // THE SINGLE BIGGEST FLOW CORRECTION IN THIS ARENA (design doc R8). Teams
-    // own the two SIDES of the road, behind their own house, not the two ENDS
-    // of the street. End spawns make the street a corridor you run along;
-    // back-yard spawns make it a road you cross. The house back walls sit at
-    // |z| = 14.5, so every spawn being past them is "behind your own house"
-    // measured rather than asserted.
-    expect(NUKETOWN2_SPAWN_LAYOUT[0]!.every(([, z]) => z < -14.5)).toBe(true);
-    expect(NUKETOWN2_SPAWN_LAYOUT[1]!.every(([, z]) => z > 14.5)).toBe(true);
+    // Teams own the two SIDES of the road, behind their own house. The house
+    // back walls sit at |z| = 23, so every spawn being past them is "behind your
+    // own house" measured rather than asserted.
+    const backWall = NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth + NUKETOWN2_SECTION.houseDepth;
+    expect(NUKETOWN2_SPAWN_LAYOUT[0]!.every(([, z]) => z < -backWall)).toBe(true);
+    expect(NUKETOWN2_SPAWN_LAYOUT[1]!.every(([, z]) => z > backWall)).toBe(true);
+    // ...and inside the FENCED yard, not out on the border path, which is the
+    // flank route rather than a spawn room.
+    const fence = backWall + NUKETOWN2_SECTION.yardDepth;
+    expect(NUKETOWN2_SPAWN_LAYOUT[0]!.every(([, z]) => z > -fence)).toBe(true);
     // Team 1's table is the exact 180-degree negation of team 0's, in order.
     for (const [index, [x, z]] of NUKETOWN2_SPAWN_LAYOUT[0]!.entries()) {
       const [px, pz] = NUKETOWN2_SPAWN_LAYOUT[1]![index]!;
       expect(px).toBeCloseTo(-x, 10);
       expect(pz).toBeCloseTo(-z, 10);
     }
-    // Every spawn is a short sprint from the contested centre, which is what
-    // makes the reference relentless rather than a walk simulator. MEASURED
-    // worst case 2.71 s.
+    // DERIVED CEILING on spawn-to-centre distance. A back-yard spawn is by
+    // definition between the house back wall (|z| = 23) and the yard fence
+    // (|z| = 36), inside |x| <= 18, so the furthest one that can exist is the
+    // far corner of the yard: hypot(18, 36) = 40.25 m. Anything past that is
+    // not in a back yard any more, and this band says so in metres rather than
+    // trusting the |z| bands above to notice.
+    const furthestLegalYardCorner = Math.hypot(width / 2, fence);
     for (const team of [0, 1] as const) {
       for (const [x, z] of NUKETOWN2_SPAWN_LAYOUT[team]!) {
-        expect(Math.hypot(x, z) / sprintSpeed, `spawn (${x}, ${z}) to centre`).toBeLessThan(3.2);
+        expect(Math.hypot(x, z), `spawn (${x}, ${z}) to centre`).toBeLessThan(furthestLegalYardCorner);
+        expect(Math.hypot(x, z), `spawn (${x}, ${z}) to centre`).toBeGreaterThan(backWall);
       }
     }
   });
@@ -363,21 +498,73 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(Math.sign(sheds[0]!.position.z)).toBe(-Math.sign(sheds[1]!.position.z));
     expect(sheds[1]!.position.x).toBeCloseTo(-sheds[0]!.position.x, 10);
     expect(sheds[1]!.position.z).toBeCloseTo(-sheds[0]!.position.z, 10);
+    // And they are in the yards this arena actually has now. The previous
+    // placements were at x = +/-24 on a map that is now 36 m wide: they would
+    // have stood outside the fence, which is the exact class of failure
+    // src/railgun-authority.ts' header records against the shipped map.
+    const backWall = NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth + NUKETOWN2_SECTION.houseDepth;
+    for (const shed of sheds) {
+      expect(Math.abs(shed.position.x)).toBeLessThan(width / 2 - 2.5);
+      expect(Math.abs(shed.position.z)).toBeGreaterThan(backWall);
+      expect(Math.abs(shed.position.z)).toBeLessThan(backWall + NUKETOWN2_SECTION.yardDepth);
+    }
   });
 
-  it('gives both teams the same map: every solid body has an exact 180-degree partner', () => {
+  it('gives both teams the same map: every solid has a 180-degree partner except the enumerated street vehicles', () => {
     const map = buildNuketown2(new THREE.Scene());
-    // This arena has no mirrored house generator and nothing is yawed, so the
-    // symmetry claim can be exact rather than allowanced: every solid mesh must
-    // have a partner of the same size at the negated position. Unlike the
-    // shipped map's version of this test there is NO lane-identity escape
-    // hatch, because there is nothing on this map that earns one.
-    const solids = map.root.children.filter((node): node is THREE.Mesh => {
-      const mesh = node as THREE.Mesh;
-      if (mesh.isMesh !== true) return false;
-      if (mesh.userData.presentationOnly === true) return false;
-      return (mesh.geometry as THREE.BoxGeometry).parameters !== undefined;
-    });
+    // THE EXCEPTION IS ENUMERATED, NOT FILTERED, and the difference matters.
+    // The previous cut added `.filter((mesh) => !mesh.name.startsWith('truck'))`
+    // to this test - a name filter, which silently excuses any future body that
+    // happens to be called truck-something and which had removed the test's own
+    // stated "NO lane-identity escape hatch" property. Here the asymmetric set
+    // is compared for EXACT EQUALITY against a written-out list, so adding an
+    // asymmetric body, moving one, or deleting one all fail until the list is
+    // updated deliberately.
+    //
+    // Why there is an exception at all: the lane brief says "180-degree symmetry
+    // only where the reference is symmetric (it is not exactly - record where
+    // not)". The reference's houses, garages, driveways, yards, fences and
+    // sheds ARE an exact rotational pair. Its street vehicles are not: there is
+    // one coach and one moving truck, they are different objects, and no
+    // rotation maps one onto the other.
+    const EXPECTED_ASYMMETRIC = [
+      'nuketown2 street-vehicle coach body',
+      'nuketown2 street-vehicle coach roof cap',
+      'nuketown2 street-vehicle coach wheel 0',
+      'nuketown2 street-vehicle coach wheel 1',
+      // HF-426 JOB 3, 2026-09-03 - DELIBERATE ADDITION, with the reason.
+      // The one-flank `coach window band` became four flank decals: a red
+      // WAIST STRIPE and a glazing BAND on each side. Why the list grows: the
+      // coach is now cream (the reference's cream/red streamlined body,
+      // schematic 5.2) and is the only saturated body left on the map now the
+      // truck is a plain box van, so it has to read as a coach from BOTH
+      // halves - a cream box banded down one side only reads as a crate to
+      // whichever team cannot see that side. All four are presentation decals
+      // (solid: false, shots: false, cast: false) on the coach's own solid
+      // body, so no cover, collider or ballistic surface moved; the exception's
+      // plan-area cap and the per-half cover floors below both still measure
+      // the same solids they did before.
+      'nuketown2 street-vehicle coach waist stripe 0',
+      'nuketown2 street-vehicle coach waist stripe 1',
+      'nuketown2 street-vehicle coach window band 0',
+      'nuketown2 street-vehicle coach window band 1',
+      'nuketown2 street-vehicle head car body',
+      'nuketown2 street-vehicle head car cabin',
+      'nuketown2 street-vehicle head car wheel 00',
+      'nuketown2 street-vehicle head car wheel 01',
+      'nuketown2 street-vehicle head car wheel 10',
+      'nuketown2 street-vehicle head car wheel 11',
+      'nuketown2 street-vehicle truck box bulkhead',
+      'nuketown2 street-vehicle truck cab',
+      'nuketown2 street-vehicle truck roof step 0',
+      'nuketown2 street-vehicle truck roof step 1',
+      'nuketown2 street-vehicle truck roof step 2',
+      'nuketown2 street-vehicle truck wheel 0',
+      'nuketown2 street-vehicle truck wheel 1',
+      'nuketown2 street-vehicle truck wheel 2',
+    ];
+
+    const solids = solidMeshes(map);
     expect(solids.length).toBeGreaterThan(120);
     const size = (mesh: THREE.Mesh) => {
       const p = (mesh.geometry as THREE.BoxGeometry).parameters as { width: number; height: number; depth: number };
@@ -388,9 +575,44 @@ describe('Nuke Town Rebuild fidelity', () => {
     );
     const present = new Set(solids.map((mesh) => `${size(mesh)}|${at(mesh.position.x, mesh.position.y, mesh.position.z)}`));
     const asymmetric = solids
-      .filter((mesh) => !present.has(`${size(mesh)}|${at(-mesh.position.x, mesh.position.y, -mesh.position.z)}`))
-      .map((mesh) => `${mesh.name} @(${mesh.position.x}, ${mesh.position.z})`);
-    expect(asymmetric).toEqual([]);
+      .filter((mesh) => !present.has(`${size(mesh)}|${at(-mesh.position.x, mesh.position.y, -mesh.position.z)}`));
+    expect(asymmetric.map((mesh) => mesh.name).sort()).toEqual([...EXPECTED_ASYMMETRIC].sort());
+    // Every one of them is a street vehicle by NAME as well as by list, so the
+    // list cannot be grown with a wall by renaming it.
+    for (const mesh of asymmetric) {
+      expect(mesh.name.startsWith('nuketown2 street-vehicle '), mesh.name).toBe(true);
+    }
+
+    // AND THE EXCEPTION IS PAID FOR. Two properties the old exact-symmetry test
+    // got for free and a name filter would have thrown away:
+    //
+    // (a) The exception cannot GROW into structure. Total plan area of every
+    //     asymmetric body is capped at 6 % of the playspace - 181 m² on 3,024.
+    //     Measured 89.3 m², 2.95 %. One house footprint alone is 143 m², so no
+    //     building can ever join this list without failing here.
+    let asymArea = 0;
+    const half = { xNeg: 0, xPos: 0, zNeg: 0, zPos: 0 };
+    for (const mesh of asymmetric) {
+      const f = planFootprint(mesh);
+      asymArea += (f.x1 - f.x0) * (f.z1 - f.z0);
+      half.xNeg += Math.max(0, Math.min(f.x1, 0) - f.x0) * (f.z1 - f.z0);
+      half.xPos += Math.max(0, f.x1 - Math.max(f.x0, 0)) * (f.z1 - f.z0);
+      half.zNeg += Math.max(0, Math.min(f.z1, 0) - f.z0) * (f.x1 - f.x0);
+      half.zPos += Math.max(0, f.z1 - Math.max(f.z0, 0)) * (f.x1 - f.x0);
+    }
+    expect(asymArea).toBeLessThan(0.06 * width * depth);
+
+    // (b) Neither team's HALF may be bare. The teams are separated across z, so
+    //     the z halves are the ones that decide who owns the turning head: each
+    //     must carry at least 20 m² of street-vehicle plan area, which is one
+    //     substantial body (the coach alone is 23.7 m², the head car plus the
+    //     truck's own south-side treads and half its box make the other half).
+    //     This is the assertion the coach's counterweight exists to satisfy -
+    //     see `coach()` - and it fails if the head car is deleted.
+    expect(half.zNeg, 'north half street-vehicle cover').toBeGreaterThan(20);
+    expect(half.zPos, 'south half street-vehicle cover').toBeGreaterThan(20);
+    expect(half.xNeg, 'west half street-vehicle cover').toBeGreaterThan(20);
+    expect(half.xPos, 'east half street-vehicle cover').toBeGreaterThan(20);
   });
 
   it('leaves no floating solid geometry over the playable yards', () => {
@@ -400,8 +622,8 @@ describe('Nuke Town Rebuild fidelity', () => {
     // of a vehicle body sitting on its wheels. Anything else floating over a
     // yard is an orphan slab the player can neither see the support of nor
     // reach, which is the class this test exists to catch.
-    const structural = /roof|floor|upper|stair|lintel|head|sill|rail|cant|deck|end|wheel|sign|window|door|porch|butt|pier|partition/i;
-    const vehicle = /bus|truck|car/i;
+    const structural = /roof|floor|upper|stair|lintel|head|sill|rail|cant|deck|end|wheel|sign|window|door|porch|butt|pier|partition|mailbox|bulkhead|cap|cabin/i;
+    const vehicle = /bus|coach|truck|car/i;
     const floating = map.colliders.filter((bounds) => (
       (bounds.minY ?? 0) > 0.4
       && bounds.minX > NUKETOWN2_BOUNDS.minX && bounds.maxX < NUKETOWN2_BOUNDS.maxX
@@ -419,62 +641,68 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
-  it('keeps every standing eye-line inside the measured ceiling', () => {
+  it('keeps every standing eye-line inside the derived ceiling, and still has a lane', () => {
     const map = buildNuketown2(new THREE.Scene());
     const longest = longestClearEyeLine(map, 1.65);
-    expect(
-      longest.metres,
-      `clear lane ${JSON.stringify(longest.from)} -> ${JSON.stringify(longest.to)}`,
-    ).toBeLessThanOrEqual(MAX_STANDING_EYE_LINE_METRES);
+    const label = `clear lane ${JSON.stringify(longest.from)} -> ${JSON.stringify(longest.to)}`;
+    expect(longest.metres, label).toBeLessThanOrEqual(MAX_STANDING_EYE_LINE_METRES);
+    expect(longest.metres, label).toBeGreaterThanOrEqual(MIN_STANDING_EYE_LINE_METRES);
+    // And stated as the ratio it was derived as, so the ceiling scales with the
+    // map instead of becoming a stale absolute.
+    expect(longest.metres / Math.hypot(width, depth)).toBeLessThanOrEqual(0.55);
   });
 
-  it('gives the 2x-damage core to the roof and to nobody else', () => {
+  it('gives the 2x-damage core to the truck roof and to nobody else', () => {
     // THE OWNER'S FIRST KEPT FEATURE, measured against the REAL rule rather than
-    // against the geometry the rule is supposed to imply. The first cut asserted
-    // only "roofY is 3.15 and the bus is centred" and shipped a core that could
-    // be taken by standing INSIDE the bus - which is exactly the case
-    // src/overdrive.ts' v6 height-window tightening exists to prevent, and which
-    // no assertion in this file could see.
+    // against the geometry the rule is supposed to imply. An early cut asserted
+    // only "roofY is 3.15 and the body is centred" and shipped a core that could
+    // be taken from INSIDE the vehicle - which is exactly the case
+    // src/overdrive.ts' v6 height-window tightening exists to prevent.
     const EYE = 1.7; // movementProfile(standing).eyeHeight
     const claimFrom = (feetY: number, x: number, z: number): boolean => (
       claimOverdrive(createOverdriveState(0), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
     );
 
     expect(OVERDRIVE_POSITION.y).toBe(3.75);
-    // Standing on the roof, at the core: CLAIMED. dy 1.10.
-    expect(claimFrom(NUKETOWN2_CENTRAL_BUS.roofY, 0, 0), 'roof').toBe(true);
-    // Standing in the aisle directly beneath it: REJECTED. dy 2.00.
-    expect(claimFrom(NUKETOWN2_CENTRAL_BUS.floorY, 0, 0), 'aisle').toBe(false);
-    // Standing on the road beside the bus: REJECTED. dy 2.05.
+    // Standing on the cargo-box roof, at the core: CLAIMED. dy 1.10.
+    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.roofY, 0, 0), 'box roof').toBe(true);
+    // Standing on the deck directly beneath it: REJECTED. dy 2.00.
+    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.deckY, 0, 0), 'cargo box interior').toBe(false);
+    // Standing on the road beside the truck: REJECTED. dy 2.05.
     expect(claimFrom(0, 1.2, 3.0), 'road').toBe(false);
+    // Standing on the CAB roof: REJECTED by radius. The cab roof is a real
+    // walkable surface on the climb route, and it is 0.25 m below the box roof,
+    // so height alone would admit it.
+    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.cabRoofY, NUKETOWN2_CENTRAL_TRUCK.cabX, 0), 'cab roof').toBe(false);
     // Standing on any roof-access tread: REJECTED - not by height (the top tread
     // is well inside the height window) but by RADIUS, because every tread
     // footprint is more than 1.65 m from the origin in plan. Climbing half way
     // must not be a way to take the core out of a covered position.
-    for (const [top, x0, x1] of [[0.80, -2.6, -1.4], [1.75, -3.8, -2.6], [2.60, -5.0, -3.8]] as const) {
+    for (const [top, x0, x1] of [[0.80, 7.0, 8.2], [1.75, 5.8, 7.0], [2.60, 4.6, 5.8]] as const) {
       for (const x of [x0, x1, (x0 + x1) / 2]) {
-        for (const z of [1.25, 1.85, 2.45]) {
+        for (const z of [1.35, 1.9, 2.4]) {
           expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
-          expect(claimFrom(top, -x, -z), `tread partner top ${top} at (${-x}, ${-z})`).toBe(false);
         }
       }
     }
   });
 
-  it('lets a player actually climb onto the bus roof', async () => {
+  it('lets a player actually climb onto the truck roof', async () => {
     // The other half of the same defect: a core on a roof nobody can reach is
     // not a feature. Simulated on the REAL CharacterPhysics against the REAL
     // built colliders - jump apex from flat ground is 6.35^2 / (2 x 24.5) =
     // 0.82 m and autostep is 0.42 m, so a 3.15 m roof with nothing beside it is
-    // unreachable, and the first cut had nothing beside it.
+    // unreachable.
     const map = buildNuketown2(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
     try {
       const dt = 1 / 120;
-      // Approach the treads from the road, climb them, step onto the roof, walk
-      // to the core. A continuous hop, which is how a player climbs.
-      const route: Array<[number, number]> = [[-2.0, 1.85], [-3.2, 1.85], [-4.4, 1.85], [-4.4, 0.4], [0, 0]];
-      physics.teleportEye({ x: -2.0, y: 1.9, z: 3.8 });
+      // Approach the treads from the road, climb them, step onto the cab roof,
+      // then onto the cargo-box roof and walk to the core.
+      const route: Array<[number, number]> = [
+        [7.6, 1.9], [6.4, 1.9], [5.2, 1.9], [NUKETOWN2_CENTRAL_TRUCK.cabX, 0], [0, 0],
+      ];
+      physics.teleportEye({ x: 9.6, y: 1.9, z: 1.9 });
       let vy = 0;
       for (const waypoint of route) {
         for (let step = 0; step < 420; step += 1) {
@@ -495,8 +723,8 @@ describe('Nuke Town Rebuild fidelity', () => {
       }
       const end = physics.eyePosition();
       // Standing (or mid-hop) on the roof over the core, not on the road.
-      expect(Math.hypot(end.x, end.z), 'reached the core in plan').toBeLessThan(1.0);
-      expect(end.y, 'eye height on the bus roof').toBeGreaterThan(NUKETOWN2_CENTRAL_BUS.roofY + 1.5);
+      expect(Math.hypot(end.x, end.z), 'reached the core in plan').toBeLessThan(1.2);
+      expect(end.y, 'eye height on the truck roof').toBeGreaterThan(NUKETOWN2_CENTRAL_TRUCK.roofY + 1.5);
     } finally {
       physics.dispose();
     }
@@ -505,7 +733,7 @@ describe('Nuke Town Rebuild fidelity', () => {
   it('keeps the ground dressing out of the buildings', () => {
     // The gate NOTHING else can be: asphalt, aprons and lawns are
     // presentation-only decals, so no collider or collider/visual parity gate
-    // ever looks at them. The first cut ran the front lawn from x = -4 and laid
+    // ever looks at them. An early cut ran the front lawn from x = -4 and laid
     // 38.4 m2 of green lawn inside each house's front room, 20 mm proud of the
     // interior floor, with every gate in the repository green.
     const overlap = (a: { x0: number; x1: number; z0: number; z1: number },
@@ -538,14 +766,14 @@ describe('Nuke Town Rebuild fidelity', () => {
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
       const runs: Array<{ from: [number, number]; direction: [number, number] }> = [
-        { from: [0, -18], direction: [0, -1] },
-        { from: [0, 18], direction: [0, 1] },
-        { from: [-20, 0], direction: [-1, 0] },
-        { from: [20, 0], direction: [1, 0] },
-        { from: [-20, -18], direction: [-1, -1] },
-        { from: [20, 18], direction: [1, 1] },
-        { from: [20, -18], direction: [1, -1] },
-        { from: [-20, 18], direction: [-1, 1] },
+        { from: [0, -30], direction: [0, -1] },
+        { from: [0, 30], direction: [0, 1] },
+        { from: [-14, 0], direction: [-1, 0] },
+        { from: [14, 0], direction: [1, 0] },
+        { from: [-15, -28], direction: [-1, -1] },
+        { from: [15, 28], direction: [1, 1] },
+        { from: [15, -28], direction: [1, -1] },
+        { from: [-15, 28], direction: [-1, 1] },
       ];
       for (const run of runs) {
         physics.teleportEye({ x: run.from[0], y: 1.7, z: run.from[1] });
