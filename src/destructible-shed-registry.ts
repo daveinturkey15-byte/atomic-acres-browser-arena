@@ -54,11 +54,11 @@ export const PASS65_SHED_PLACEMENTS: readonly ShedPlacement[] = Object.freeze([
   // asymmetric thing on a map whose whole fairness argument is that rotation.
   Object.freeze({
     id: 'nuketown2-shed-north-yard', definitionId: FIELD_SHED_DEFINITION.id,
-    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: -24, y: 0, z: -18.5 }, yaw: Math.PI / 2,
+    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: -14, y: 0, z: -24.5 }, yaw: Math.PI / 2,
   }),
   Object.freeze({
     id: 'nuketown2-shed-south-yard', definitionId: FIELD_SHED_DEFINITION.id,
-    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: 24, y: 0, z: 18.5 }, yaw: -Math.PI / 2,
+    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: 14, y: 0, z: 24.5 }, yaw: -Math.PI / 2,
   }),
 ]);
 

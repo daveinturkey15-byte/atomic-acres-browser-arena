@@ -48,13 +48,15 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // square and large. 176 x 176 at mapSize 2048 is 86 mm per texel, which is
   // where arenas/map3.ts derives its 0.085 normal bias from.
   'map3': Object.freeze({ halfWidth: 88, halfHeight: 88, near: 4, far: 300 }),
-  // NUKETOWN2 (PREVIEW, HF-407): playable rectangle 58 x 52 m. 33 x 30
-  // half-extents cover 66 x 60, i.e. the bounds plus the same 4 m margin
-  // Test2's pin uses. `far` follows the standing rule - the volume's own
-  // diagonal (89.2 m) plus the shared non-Atomic sun standoff (|[-62, 25, 38]|
-  // = 76.9 m) = 166 m, rounded up to 170. The tallest authored mass is the
-  // 6.5 m house roof deck, so nothing needs more depth than that.
-  'nuketown2': Object.freeze({ halfWidth: 33, halfHeight: 30, near: 4, far: 170 }),
+  // NUKETOWN2 (PREVIEW, HF-407; RE-PROPORTIONED HF-426): playable rectangle
+  // 36 x 84 m - the reference's own 2.36 : 1 with the long axis ACROSS the
+  // street, not the 58 x 52 the first cut assumed. 22 x 46 half-extents cover
+  // 44 x 92, i.e. the bounds plus the same 4 m margin Test2's pin uses. `far`
+  // follows the standing rule - the volume's own diagonal (102.0 m) plus the
+  // shared non-Atomic sun standoff (|[-62, 25, 38]| = 76.9 m) = 178.9 m,
+  // rounded up to 180. The tallest authored mass is still the 6.5 m house roof
+  // deck, so nothing needs more depth than that.
+  'nuketown2': Object.freeze({ halfWidth: 22, halfHeight: 46, near: 4, far: 180 }),
   // RAID2 (PREVIEW, HF-408): RAID2_BOUNDS is 100 x 76 m, the same box test2
   // was re-pinned to on 2026-08-31, so the volume is pinned by the same rule
   // and for the same reason: 54 x 42 half-extents cover 108 x 84, the bounds
