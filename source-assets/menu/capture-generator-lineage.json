@@ -3,13 +3,27 @@
   "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
   "note": "Every version of the shared menu-preview capture generator, newest first. `sha256` is the LF-normalised digest (checkout-independent); `crlfSha256` is what the same content hashes to on a CRLF checkout, because two family provenance records were written that way. Regenerate with `node scripts/assets/write-capture-generator-lineage.mjs`. Never edit a recorded digest in place: a family provenance record is history.",
   "current": {
-    "sha256": "317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b",
-    "crlfSha256": "0ee1002642f51a55bcf20b2dab70d9938edf5391a1272ec788809fedc2b995dd",
-    "commit": "a4b56ec7",
-    "date": "2026-09-02",
-    "subject": "feat(nuketown2): the rebuild's own captured menu flyover and loading backdrop, so no selectable arena ships a blank card (HF-407)"
+    "sha256": "dd7714cae50184f859b1eb24a8429bfaf02c105b09a928b65fd9305b79e730f9",
+    "crlfSha256": "eee50679b5b1ac34c28bb28d567af71659f6ba74cbecc65cdd9ba11fc83c13ee",
+    "commit": "a617fdf8",
+    "date": "2026-09-03",
+    "subject": "merge: PASS 87 raid integration - Lane AQ Raid Rebuild onto the PASS 86 head"
   },
   "retired": [
+    {
+      "sha256": "169ad102d3b656f29054fcc7a2a668b159350ae528fb0ce2ee32c8dc01813cf9",
+      "crlfSha256": "fabec21db8a3ea520ddb386ed599cd2cd058767af561b1c5fc7462621b782773",
+      "commit": "c1e31bb8",
+      "date": "2026-09-03",
+      "subject": "feat(raid2): a REAL menu preview and loading backdrop - PREVIEW STANDBY is gone"
+    },
+    {
+      "sha256": "317469cb997aae817982827bc075641e6ce2de838e20a2d88346a216faae186b",
+      "crlfSha256": "0ee1002642f51a55bcf20b2dab70d9938edf5391a1272ec788809fedc2b995dd",
+      "commit": "a4b56ec7",
+      "date": "2026-09-02",
+      "subject": "feat(nuketown2): the rebuild's own captured menu flyover and loading backdrop, so no selectable arena ships a blank card (HF-407)"
+    },
     {
       "sha256": "89fffa1c039894029619367042227b4165038ed1ece308d62852b180bddf4509",
       "crlfSha256": "e89fb93409891d3c2830b42997bf56c63402c57a6381c3fc991b1c70142b1c83",

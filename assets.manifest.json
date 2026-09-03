@@ -1135,20 +1135,20 @@
       "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
       "creator": "Atomic Acres project",
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "generatedAsOf": "2026-09-02",
+      "generatedAsOf": "2026-09-03",
       "license": "Original project work",
       "files": [
         {
           "path": "public/assets/original/menu-previews/nuketown2.mp4",
-          "sha256": "6bf1a5f343094229cd91642e868a7a92a3b95f6b0d0d0216e98f330edefe5a52"
+          "sha256": "88ab344dad32add5c015a630e1b90e7166931679a11f2553c47804c01fdae42e"
         },
         {
           "path": "public/assets/original/menu-previews/nuketown2.webm",
-          "sha256": "720037396ddb2b4060efd5e9dfef8c3ef97feb694fd23167a082cdf0425a7d4a"
+          "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
         },
         {
           "path": "public/assets/original/menu-previews/nuketown2.webp",
-          "sha256": "524e3fd351231fbf85538ca395e0c47e3741b39e355962b50e98832fd5a03390"
+          "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
         }
       ],
       "contactSheet": [
@@ -1166,22 +1166,22 @@
       "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
       "creator": "Atomic Acres project",
       "source": "Offline WebGPU capture of the Nuke Town Rebuild authoritative runtime arena",
-      "generatedAsOf": "2026-09-02",
+      "generatedAsOf": "2026-09-03",
       "license": "Original project work",
       "attributionRequired": false,
       "sourceProvenance": "source-assets/loading/pass85-nuketown2-loading/provenance.json",
-      "sourceProvenanceSha256": "1c508ecf2ecb20291df3f1363181fad4239bb1d5ef5e829ca9f143a1c519a1b5",
+      "sourceProvenanceSha256": "1a26299ebd6c7654db7d0bb0dbeda16f2fb88a5a06ef5238bf38a76675d39a06",
       "sourceScript": "scripts/assets/finalize_pass85_nuketown2_loading_backdrop.py",
       "sourceScriptSha256": "028b11e1c1100c315523a739ae5e4cd3eb50a90d86153cb6426d2f615d561b11",
       "files": [
         {
           "path": "public/assets/original/loading/nuketown2-loading.webp",
-          "sha256": "c5efefe10dd1acbf5592e2db8360075e82e6c72ed96093d409af90c21f93e7d1"
+          "sha256": "131d939356bd66592e0e2d4f47786628034d57a5bad0238bb198acb3dceedf6c"
         }
       ],
       "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
       "placeholderStatus": "production",
-      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the nine shipped backdrops in format, resampler, output size and payload budget. Measured 42.28 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass85-nuketown2-loading/",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the nine shipped backdrops in format, resampler, output size and payload budget. Measured 40.36 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass85-nuketown2-loading/",
       "modifications": "Captured offline at native 1440p from the actual authoritative Nuke Town Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
     },
     {
