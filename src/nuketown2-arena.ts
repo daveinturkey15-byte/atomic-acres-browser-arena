@@ -560,6 +560,10 @@ type Nuketown2Materials = Readonly<{
   asphalt: THREE.MeshStandardMaterial;
   kerb: THREE.MeshStandardMaterial;
   drive: THREE.MeshStandardMaterial;
+  /** HF-434: the driveway/border-path DECALS - polygonOffset tier -1. */
+  driveDecal: THREE.MeshStandardMaterial;
+  /** HF-434: the garage floor - drive's paint at the -1 decal tier. */
+  garageFloor: THREE.MeshStandardMaterial;
   /** North house board siding - the reference's BLUE house. */
   sidingA: THREE.MeshStandardMaterial;
   /** South house board siding - the reference's YELLOW house. */
@@ -569,8 +573,12 @@ type Nuketown2Materials = Readonly<{
   /** The up-and-over garage door leaf parked in its head. */
   garageDoor: THREE.MeshStandardMaterial;
   trim: THREE.MeshStandardMaterial;
+  /** HF-434: the road DASHES - polygonOffset tier -2, over the -1 road. */
+  trimDecal: THREE.MeshStandardMaterial;
   roof: THREE.MeshStandardMaterial;
   interior: THREE.MeshStandardMaterial;
+  /** HF-434: the interior floor - interior's paint at the -1 decal tier. */
+  interiorFloor: THREE.MeshStandardMaterial;
   fence: THREE.MeshStandardMaterial;
   block: THREE.MeshStandardMaterial;
   busShell: THREE.MeshStandardMaterial;
@@ -579,6 +587,8 @@ type Nuketown2Materials = Readonly<{
   truckBox: THREE.MeshStandardMaterial;
   carA: THREE.MeshStandardMaterial;
   carGlass: THREE.MeshStandardMaterial;
+  /** HF-434: the coach window BANDS - polygonOffset tier -1 over the body. */
+  coachGlass: THREE.MeshStandardMaterial;
   rubber: THREE.MeshStandardMaterial;
   sign: THREE.MeshStandardMaterial;
   planter: THREE.MeshStandardMaterial;
@@ -628,6 +638,34 @@ type Nuketown2Materials = Readonly<{
  * (0.18) is that same shipped chrome and adds two more.
  */
 function nuketown2Materials(): Nuketown2Materials {
+  // HF-434 Z-FIGHTING TIER. The measured coplanar set (see
+  // scripts/qa/find-coplanar-pairs.ts and docs/evidence/pass92/nuketown2/) is
+  // decal-over-solid: the road runs and turning head sit exactly on the ground
+  // slab's top face, the dressing decals 0.02 m over it, the dashes 0.03 m
+  // over the road - all far inside the ~1 cm depth precision the 0.02 m near
+  // plane leaves at 60 m, so they raced the surfaces under them for the same
+  // depth samples and flickered all over the map. A polygonOffset tier pins
+  // every race deterministically at every range on both backends, the same
+  // tiering HF-346 shipped on the Skyline apron: -1 for a decal over a solid,
+  // -2 where a decal overlaps another -1 decal (the lawn crosses the turning
+  // head, the dashes cross the road). The THREE base materials that also dress
+  // SOLID bodies (drive: the porch; trim: the door cases; carGlass: the car
+  // cabins) stay clean; the decal-only clones carry the offsets.
+  const withOffset = (material: THREE.MeshStandardMaterial, name: string, factor: number): THREE.MeshStandardMaterial => {
+    material.name = name;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = factor;
+    material.polygonOffsetUnits = factor;
+    return material;
+  };
+  const lawn = withOffset(standard(0x496438, 1, 0), 'nuketown2-lawn-decal', -2);
+  const asphalt = withOffset(standard(0x41464a, 0.98, 0.02), 'nuketown2-asphalt-road', -1);
+  const driveDecal = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-drive-decal', -1);
+  const trimDecal = withOffset(standard(0xf0e4c9, 0.68, 0.03), 'nuketown2-trim-decal', -2);
+  const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
+  const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
+  const interiorFloor = withOffset(standard(0xdbd1ba, 0.92, 0.01), 'nuketown2-house-floor', -1);
+  const garageFloor = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-garage-floor', -1);
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
@@ -643,7 +681,7 @@ function nuketown2Materials(): Nuketown2Materials {
     ground: standard(0x515642, 1, 0),
     // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
     // this, and that field's blade green (0x5e9e41) was keyed against it.
-    lawn: standard(0x496438, 1, 0),
+    lawn,
     // asphalt-aged's mean is 0x252a2c, and that is the value a TEXTURED road
     // wants: the shipped map's road carries a normal map and an aggregate
     // pattern, so half its pixels catch a highlight and the mean is what is
@@ -654,11 +692,13 @@ function nuketown2Materials(): Nuketown2Materials {
     // in the street-centre and into-sun frames, with the kerb line floating on
     // black. Lifted to the value that puts an unlit, unbroken box at the
     // rendered luminance the shipped map's textured road actually reaches.
-    asphalt: standard(0x41464a, 0.98, 0.02),
+    asphalt,
     // concrete-poured, fresh at the kerb and weathered on the apron - the
     // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
     kerb: standard(0xa9a697, 0.94, 0.02),
-    drive: standard(0x8b8879, 0.94, 0.02),
+    drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
+    driveDecal,
+    garageFloor,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
     // with the hue carried to the reference's blue (measured 117.9).
     sidingA: standard(0x46809f, 0.76, 0),
@@ -672,10 +712,12 @@ function nuketown2Materials(): Nuketown2Materials {
     // door leaf parked in its head, which is what you see from the street.
     garageDoor: standard(0xaebdc1, 0.18, 0.76),
     // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
-    trim: standard(0xf0e4c9, 0.68, 0.03),
+    trim: standard(0xf0e4c9, 0.68, 0.03),            // SOLID users: sills, heads, lintels
+    trimDecal,
     roof: standard(0x444c4d, 0.86, 0.03),
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
     interior: standard(0xdbd1ba, 0.92, 0.01),
+    interiorFloor,
     // wood-deck: the plank fence, the same timber the shipped map decks with.
     fence: standard(0x673b24, 0.92, 0.02),
     block: standard(0x9d9a8c, 0.94, 0.01),
@@ -683,7 +725,7 @@ function nuketown2Materials(): Nuketown2Materials {
     // paint spec, with a red waistline - the reference's cream/red streamlined
     // body - as the one saturated thing on the map.
     busShell: standard(0xe7dbc1, 0.48, 0.25),
-    busTrim: standard(0xa8382c, 0.48, 0.25),
+    busTrim,
     // THE MOVING TRUCK: a plain box van. Painted cab, matte panel box, no
     // livery, because the reference's is a hire truck and because the eye is
     // meant to go to the coach beside it.
@@ -701,7 +743,8 @@ function nuketown2Materials(): Nuketown2Materials {
     // Job 3 re-keys the HUE into the shipped map's own aqua family and leaves
     // the two numbers the preset classifies on exactly where they were.
     carA: standard(0x3d6f80, 0.2, 0.62),
-    carGlass: standard(0x2b3d47, 0.14, 0.5),
+    carGlass: standard(0x2b3d47, 0.14, 0.5),         // SOLID users: the car cabins
+    coachGlass,
     // art-kit `MAT.rubber`, verbatim.
     rubber: standard(0x202628, 0.9, 0.02),
     sign: standard(0xdbd1ba, 0.78, 0.06),
@@ -738,7 +781,11 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const cx = NUKETOWN2_HOUSE_LAYOUT[0]!.x;           // -1.25
 
   // Ground slab and roof deck.
-  pair(builder, 'house floor', [cx, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interior, { cast: false });
+  // HF-434: the floor top is EXACTLY coplanar with the ground slab's top face
+  // (143 m2 of interior floor racing the world slab every frame). The floor
+  // stays where every interior eye-probe expects it and draws on the -1
+  // interiorFloor tier, which pins the race at every range.
+  pair(builder, 'house floor', [cx, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interiorFloor, { cast: false });
   pair(builder, 'house roof deck', [cx, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH], m.roof);
 
   // West side wall, full height both storeys.
@@ -882,7 +929,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // the "landing and upper hallway" this pass owes, and it is why the
     // stairwell no longer has to be crossed to use the upper floor.
     const x0 = storey === 'upper' ? STAIR_X1 : HOUSE_X0;
-    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1]].forEach((run, index) => {
+    // HF-434: the east run stops at the east wall's INNER face. It used to run
+    // to HOUSE_X1, laying the partition's plaster top face exactly coplanar
+    // with the east wall's siding top face over the 0.3 x 0.3 m corner - a
+    // different-material depth race the coplanar instrument measured as a
+    // FINDING. The wall hides the trimmed 0.3 m, so nothing visible moves.
+    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
       if (run[1]! - run[0]! <= 0.05) return;
       pair(builder, `house ${storey} partition ${index}`,
         [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
@@ -920,7 +972,9 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   const zMid = (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2;
   const cx = (GARAGE_X0 + GARAGE_X1) / 2;
 
-  pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.drive, { cast: false });
+  // HF-434: exactly coplanar with the ground slab like the house floor, so it
+  // draws on the -1 garageFloor tier for the same reason.
+  pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.garageFloor, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, GARAGE_DEPTH], m.roof);
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
 
@@ -1019,21 +1073,21 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // reference's coach is a cream body with a RED WAISTLINE and a continuous
   // window band, and it is the only saturated body left on this map now the
   // truck is a plain van. Four decals replace the one previous band; all four
-  // are named `nuketown2 street-vehicle ...` and all four are added to the
-  // enumerated asymmetric list in nuketown2-fidelity.test.ts with this reason.
   // Presentation only: no collider, no shot surface, no shadow - the coach's
   // solid body underneath is unchanged, so cover and ballistics do not move.
   for (const [index, side] of [-1, 1].entries()) {
     streetVehicle(builder, `coach waist stripe ${index}`, [c.x, 1.35, c.z + side * c.width / 2],
       [c.length - 0.6, 0.5, 0.08], m.busTrim, { solid: false, shots: false, cast: false });
     streetVehicle(builder, `coach window band ${index}`, [c.x, 2.25, c.z + side * c.width / 2],
-      [c.length - 1.6, 0.8, 0.08], m.carGlass, { solid: false, shots: false, cast: false });
+      // HF-434: the band is a decal 0.04 m proud of the body face - the
+      // window-band class the owner named - so it draws on the -1 coachGlass
+      // tier instead of the body-clean carGlass.
+      [c.length - 1.6, 0.8, 0.08], m.coachGlass, { solid: false, shots: false, cast: false });
   }
   for (const [index, x] of [-2.9, 2.9].entries()) {
     streetVehicle(builder, `coach wheel ${index}`, [c.x + x, 0.42, c.z], [1.0, 0.84, c.width + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
   }
-
   // THE HEAD CAR, and why it exists. The reference's aerial of the turning head
   // shows the truck, the coach AND a couple of civilian cars standing in it, so
   // this body is the reference's own. It is authored here rather than in
@@ -1155,11 +1209,15 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   }
   // Centre line, as dash runs on the approach either side of the head.
   for (let i = 0; i < 3; i += 1) {
-    pair(builder, `street dash ${i}`, [-(TURNING_HEAD_HALF + 1.6 + i * 3.2), 0.01, 0], [2.0, 0.04, 0.16], m.trim, decal);
+    // HF-434: the dash is a 0.03 m decal over the -1 road and the ground, so
+    // it takes the -2 tier and wins both races deterministically.
+    pair(builder, `street dash ${i}`, [-(TURNING_HEAD_HALF + 1.6 + i * 3.2), 0.01, 0], [2.0, 0.04, 0.16], m.trimDecal, decal);
   }
   for (const piece of NUKETOWN2_GROUND_DRESSING) {
     pair(builder, piece.id, [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2],
-      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], m[piece.material], decal);
+      // HF-434: lawn IS the -2 decal tier (it crosses the -1 turning head);
+      // drive has solid users, so its dressing pieces take the -1 clone.
+      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], piece.material === 'lawn' ? m.lawn : m.driveDecal, decal);
   }
 }
 
