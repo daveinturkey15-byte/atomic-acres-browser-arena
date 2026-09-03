@@ -14,11 +14,13 @@ import {
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_SECTION,
   NUKETOWN2_SPAWN_LAYOUT,
+  NUKETOWN2_STAIRWELL,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_WINDOWS,
   buildNuketown2,
 } from './nuketown2-arena';
-import { NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
+import { NUKETOWN2_GROUND_STOREY_H, NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
@@ -300,8 +302,15 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(Math.abs((NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth) - 0.2765 * L))
       .toBeLessThan(TOL);
     // Carriageway width = the width of the tongue the road leaves the polygon
-    // through: 0.328 L (BO7 131 px of 400; BO2 60 px of 181 = 0.331).
+    // through: DRAWN 0.328 L (BO7 131 px of 400; BO2 60 px of 181 = 0.331).
+    // HF-437 re-derived: the schematic's own stroke correction (section 3
+    // caveat 1 - drawn outlines are ~0.038 L too fat) brings the road to
+    // 0.290 L, authored 2 x 5.3 = 10.6 m = 0.294 L, so the kerb-side strips
+    // widen to 0.131 L each (4.7 m) while the house fronts keep the measured
+    // 0.2765 L offset. The drawn band still holds; the corrected band pins it.
     expect(Math.abs(NUKETOWN2_SECTION.streetHalfWidth * 2 - 0.328 * L)).toBeLessThan(TOL);
+    expect(Math.abs(NUKETOWN2_SECTION.streetHalfWidth * 2 - 0.294 * L), 'stroke-corrected carriageway')
+      .toBeLessThan(0.01 * L);
     // House depth 0.363 L (145 px), frontage 0.303 L (121 px).
     expect(Math.abs(NUKETOWN2_SECTION.houseDepth - 0.363 * L)).toBeLessThan(TOL);
     expect(Math.abs(NUKETOWN2_SECTION.houseWidth - 0.303 * L)).toBeLessThan(TOL);
@@ -385,7 +394,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(longestRun, 'clear run along the street centre-line').toBeLessThanOrEqual(MAX_STREET_CENTRE_RUN_METRES);
   });
 
-  it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', () => {
+  it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', async () => {
     const map = buildNuketown2(new THREE.Scene());
     const meshNames = map.root.children.map((node) => node.name);
 
@@ -397,12 +406,55 @@ describe('Nuke Town Rebuild fidelity', () => {
     for (const part of ['truck deck', 'truck box roof', 'truck box bulkhead', 'truck cab']) {
       expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
     }
+    // ...and each flank opening is a NAMED hole: two piers and a header per
+    // flank, so a future full-width flank restores the sealed box and fails
+    // here (HF-436).
+    for (const part of ['truck box flank 0 pier 0', 'truck box flank 0 header', 'truck box flank 1 pier 1']) {
+      expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
+    }
     // The truck's interior is a real room: a standing eye at the origin, on the
-    // deck, is under a roof and inside two flanks, and it is NOT blocked.
+    // deck, is under a roof and inside the walls, and it is NOT blocked.
     expect(isBlocked({ x: 0, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
-    // ...and its mouth is at the -x end, so it is enterable from the road.
-    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS),
-      'truck cargo box mouth').toBe(false);
+    // HF-436: the room is enterable from THREE mouths - the -x rear end and a
+    // 1.6 x 1.9 m opening in EACH flank. Each mouth is clear just outside it
+    // AND in the wall plane at standing eye height.
+    const t = NUKETOWN2_CENTRAL_TRUCK;
+    const mouths: Array<{ id: string; x: number; z: number; plane: { x: number; z: number } }> = [
+      { id: 'rear end', x: -t.boxLength / 2 - 0.6, z: t.z, plane: { x: -t.boxLength / 2 + 0.075, z: t.z } },
+      { id: 'left flank', x: 0, z: t.z - t.width / 2 - 0.6, plane: { x: 0, z: t.z - (t.width / 2 - 0.075) } },
+      { id: 'right flank', x: 0, z: t.z + t.width / 2 + 0.6, plane: { x: 0, z: t.z + (t.width / 2 - 0.075) } },
+    ];
+    for (const mouth of mouths) {
+      expect(isBlocked({ x: mouth.x, y: 1.7, z: mouth.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} mouth outside`).toBe(false);
+      expect(isBlocked({ x: mouth.plane.x, y: 1.7, z: mouth.plane.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} opening clear`).toBe(false);
+    }
+    // ...and a standing player WALKS in through the left mouth and out the
+    // right one, on the real physics, no jump.
+    const through = await walkStanding(map, [0, 1.7, t.z - t.width / 2 - 1.8], [[0, t.z + t.width / 2 + 1.8]]);
+    expect(Math.abs(through[0]!.z - (t.z + t.width / 2 + 1.8)), `side-to-side walk ended at ${JSON.stringify(through[0])}`).toBeLessThan(0.45);
+
+    // REVIEW ADDITION (Opus, PASS 92). The walk above proves the openings work
+    // TODAY; these are the DERIVED numbers behind it, MEASURED on the built
+    // bodies, so a later flank edit that narrows or lowers a mouth fails here
+    // with the number instead of only stalling a probe. Clear height is the
+    // deck top to the header's underside, clear width is the gap between the
+    // two piers, and the step up from the road onto the deck must be inside
+    // the controller's own autostep.
+    const worldBox = (needle: string): THREE.Box3 => {
+      const mesh = map.root.children.find((node) => node.name.endsWith(needle)) as THREE.Mesh | undefined;
+      expect(mesh, `truck body "${needle}"`).toBeDefined();
+      return new THREE.Box3().setFromObject(mesh!);
+    };
+    for (const flank of [0, 1]) {
+      const header = worldBox(`truck box flank ${flank} header`);
+      const pierLow = worldBox(`truck box flank ${flank} pier 0`);
+      const pierHigh = worldBox(`truck box flank ${flank} pier 1`);
+      expect(header.min.y - t.deckY, `flank ${flank} opening clear height`).toBeGreaterThanOrEqual(STANDING_CAPSULE_M);
+      expect(pierHigh.min.x - pierLow.max.x, `flank ${flank} opening clear width`)
+        .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
+    }
+    expect(t.deckY, 'step from the road onto the cargo deck, against the autostep')
+      .toBeLessThanOrEqual(CHARACTER_PHYSICS_CONFIG.autostepHeight);
 
     // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
     // between, and a standing eye at its centre IS blocked.
@@ -446,7 +498,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // The cars are CLOSED: solid, and not declared as enterable cover volumes.
     expect(map.physicalCover.some((cover) => cover.id.includes('car'))).toBe(false);
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
-  });
+  }, 60_000);
 
   it('builds two two-storey houses facing each other over the road, each with a garage it opens into', () => {
     const map = buildNuketown2(new THREE.Scene());
@@ -527,6 +579,163 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(trace[5]!.y, label(5)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
       expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
       expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
+
+      // HF-435: ...and DOWN again. The owner: "being able to walk up and down
+      // stairs". The up-route above proves the climb; this one starts in the
+      // FRONT upper room, takes the landing, and descends the whole flight
+      // walking (no jump), ending on the back-room ground floor.
+      const down = await walkStanding(map, [s * cx, NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
+        at(cx, -14.8),          // out of the front upper room toward the landing
+        at(cx, -17.0),          // onto the landing, turned down the flight
+        at(cx, -21.5),          // down the flight, treads 0.30 m each
+        at(cx + 2.4, -22.3),    // off the bottom tread into the BACK room
+      ]);
+      const downLabel = (index: number) => `${house.id} down waypoint ${index} at ${JSON.stringify(down[index])}`;
+      // REVIEW TIGHTENING (Opus, PASS 92). The original pair of assertions only
+      // said "ended up low", which a capsule that fell through a hole in the
+      // upper floor at waypoint 0 also satisfies. Waypoints 0 and 1 are now
+      // asserted at STANDING UPPER-FLOOR height, so the probe proves the walker
+      // crossed the upper storey and reached the landing on its feet before it
+      // descended, and the descent is asserted MONOTONE so a single drop
+      // cannot be read as a flight.
+      expect(down[0]!.y, downLabel(0)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(down[1]!.y, downLabel(1)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      // Waypoint 2 stands on the bottom treads (feet 0.3-0.6 m), well below
+      // the landing; waypoint 3 is the back-room ground floor itself.
+      expect(down[2]!.y, downLabel(2)).toBeLessThan(4.0);
+      expect(down[3]!.y, downLabel(3)).toBeLessThan(2.0);
+      expect(down[1]!.y, `${downLabel(1)} above ${downLabel(2)}`).toBeGreaterThan(down[2]!.y);
+      expect(down[2]!.y, `${downLabel(2)} above ${downLabel(3)}`).toBeGreaterThan(down[3]!.y);
+    }
+
+    // HF-435: the derived numbers, not the vibes - tread rise inside the
+    // autostep (asserted above), headroom over EVERY tread at least the
+    // standing capsule, and a landing at least a capsule diameter deep, all
+    // computed from the same NUKETOWN2_STAIRWELL numbers the build used.
+    const well = NUKETOWN2_STAIRWELL;
+    const deckUnderside = NUKETOWN2_WINDOWS.find((entry) => entry.id === 'upper front')!.headY;
+    for (let i = 0; i < NUKETOWN2_HOUSE_STAIR.risers - 1; i += 1) {
+      const top = NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
+      const centreZ = well.footZ + NUKETOWN2_HOUSE_STAIR.going * (i + 0.5);
+      const ceiling = centreZ < well.wellZ0 ? NUKETOWN2_GROUND_STOREY_H : deckUnderside;
+      // REVIEW TIGHTENING (Opus, PASS 92). The rule this arena DERIVED is
+      // `feet + capsule + autostep <= ceiling` (see STAIR_MAX_FEET_UNDER_CEILING
+      // in nuketown2-arena.ts): Rapier casts the capsule UP by autostepHeight
+      // BEFORE it casts forward, so a ceiling that merely clears the capsule
+      // still wedges the walker on a tread nosing - the exact failure the
+      // arena header records the probe catching. Asserting only the capsule
+      // let a future 2.0 m ceiling over a tread pass a gate the geometry
+      // cannot actually satisfy.
+      expect(ceiling - top, `tread ${i} headroom (capsule + autostep up-cast)`)
+        .toBeGreaterThanOrEqual(STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    }
+    expect(NUKETOWN2_HOUSE_STAIR.landingDepth, 'landing depth vs capsule diameter')
+      .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
+  }, 120_000);
+
+  it('puts glass in the ground windows and makes both upstairs windows exits', async () => {
+    // HF-435, owner after PASS 91: "go out of windows and putting glass on the
+    // windows."
+    //
+    // GROUND floor: the pane is a real collider (a shoulder does not cross it)
+    // and a real glass ballistic surface (a bullet pays the glass entry cost
+    // and crosses). UPSTAIRS: no collider across the opening, sill at or below
+    // 1.1 m over the floor, and a standing capsule that hops the sill crosses
+    // the wall plane and DROPS outside - probed on the real physics.
+    const map = buildNuketown2(new THREE.Scene());
+    const names = map.root.children.map((node) => node.name);
+
+    for (const [index, win] of NUKETOWN2_WINDOWS.entries()) {
+      const width = win.x1 - win.x0;
+      expect(width, `${win.id} opening width`).toBeGreaterThanOrEqual(1.0);
+      const wx = (win.x0 + win.x1) / 2;
+      if (win.pane) {
+        // The pane: present, a movement collider spanning sill to head, and
+        // glass for gunfire - in BOTH houses (the partner is the exact
+        // 180-degree image).
+        const paneName = `house front window glass ${index}`;
+        expect(names.filter((name) => name.endsWith(paneName)), paneName).toHaveLength(2);
+        const collider = map.colliders.find((bounds) => (
+          Math.abs((bounds.maxX - bounds.minX) - width) < 0.01
+          && Math.abs((bounds.minY ?? 0) - win.sillTop) < 0.01
+          && Math.abs((bounds.maxY ?? 0) - win.headY) < 0.01
+        ));
+        expect(collider, `${win.id} pane movement collider`).toBeDefined();
+        const surface = map.shotSurfaces.find((entry) => entry.id.includes(paneName));
+        expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
+        expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
+        // NOT walk-through, in both houses.
+        for (const sign of [1, -1] as const) {
+          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, map.colliders, PLAYER_RADIUS),
+            `${win.id} pane blocks a standing capsule`).toBe(true);
+        }
+      } else {
+        // Upstairs: sill height at or below the brief's 1.1 m, and NOTHING
+        // across the opening - a capsule standing on the sill (eye sill + 1.7)
+        // is unobstructed at the wall plane.
+        expect(win.sillTop - NUKETOWN2_UPPER_Y0, `${win.id} sill height over the floor`)
+          .toBeLessThanOrEqual(1.1);
+        expect(isBlocked({ x: wx, y: win.sillTop + 1.7, z: win.wallZ }, map.colliders, PLAYER_RADIUS),
+          `${win.id} opening is clear`).toBe(false);
+      }
+    }
+
+    // THE EXIT PROBE. Both houses, both upstairs windows: hop the sill,
+    // cross the wall plane, drop, and land standing OUTSIDE on the ground.
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      const dt = 1 / 120;
+      for (const house of NUKETOWN2_HOUSE_LAYOUT) {
+        const s = house.facing;   // north +1, south is its exact negation
+        for (const win of NUKETOWN2_WINDOWS.filter((entry) => !entry.pane)) {
+          const wx = s * (win.x0 + win.x1) / 2;
+          const wallZ = s * win.wallZ;
+          // OUTWARD is the direction off the wall away from the room: +s for
+          // the front wall (toward the road), -s for the back wall (into the
+          // yard). The probe starts 2.5 m INSIDE, crosses the plane over the
+          // sill, and drops 2.6 m outside.
+          const outward = win.id === 'upper front' ? s : -s;
+          const start = { x: wx, y: NUKETOWN2_UPPER_Y0 + 1.7, z: wallZ - outward * 2.5 };
+          const route = [
+            { x: wx, z: wallZ },                    // the wall plane, over the sill
+            { x: wx, z: wallZ + outward * 2.6 },    // out into the open air
+          ];
+          physics.teleportEye(start);
+          let vy = 0;
+          for (const waypoint of route) {
+            for (let step = 0; step < 900; step += 1) {
+              const eye = physics.eyePosition();
+              const dx = waypoint.x - eye.x;
+              const dz = waypoint.z - eye.z;
+              const distance = Math.hypot(dx, dz);
+              if (distance < 0.15) break;
+              const advance = Math.min(distance, 4.2 * dt);
+              vy += -24.5 * dt;
+              const result = physics.move({
+                x: distance > 1e-4 ? (dx / distance) * advance : 0,
+                y: vy * dt,
+                z: distance > 1e-4 ? (dz / distance) * advance : 0,
+              }, dt);
+              if (result.grounded) vy = 6.35;
+              else if (result.blockedY && vy > 0) vy = 0;
+            }
+          }
+          for (let step = 0; step < 400; step += 1) {
+            vy += -24.5 * dt;
+            if (physics.move({ x: 0, y: vy * dt, z: 0 }, dt).grounded) break;
+          }
+          const end = physics.eyePosition();
+          const label = `${house.id} ${win.id} exit ended at ${JSON.stringify(end)}`;
+          // A window drop is nearly straight down under its own eave: the
+          // capsule must be GROUNDED (eye 1.7 m, i.e. fell the 4.2 m from the
+          // sill - impossible anywhere inside the house, whose floor is at
+          // 3.3) and at least a foot outside the wall plane.
+          expect((end.z - wallZ) * outward, `${label} - clear of the wall`).toBeGreaterThan(0.2);
+          expect(end.y, `${label} - landed outside`).toBeLessThan(1.9);
+        }
+      }
+    } finally {
+      physics.dispose();
     }
   }, 120_000);
 
@@ -868,8 +1077,21 @@ describe('Nuke Town Rebuild fidelity', () => {
       // against a 20 m2 floor, which is BETTER balanced than the 89.3 m2 the
       // centred truck produced.
       'nuketown2 street-vehicle truck box bulkhead',
-      'nuketown2 street-vehicle truck box flank 0',
-      'nuketown2 street-vehicle truck box flank 1',
+      // HF-436 - DELIBERATE ADDITION, with the reason. Each cargo-box flank
+      // became two full-height piers and a header, cutting a 1.6 x 1.9 m
+      // walk-through opening so the box is enterable from the left side, the
+      // right side AND the rear end (the owner's "more similar to the actual
+      // Nuketown map"). Six named bodies replace the two sealed flanks; the
+      // deck, roof, bulkhead, cab and roof-climb treads are untouched, and so
+      // is the 2x core seat above the roof. The two new headers top out at the
+      // roof plane - a same-material construction contact the coplanar
+      // instrument classes benign (identical fragments cannot visibly fight).
+      'nuketown2 street-vehicle truck box flank 0 header',
+      'nuketown2 street-vehicle truck box flank 0 pier 0',
+      'nuketown2 street-vehicle truck box flank 0 pier 1',
+      'nuketown2 street-vehicle truck box flank 1 header',
+      'nuketown2 street-vehicle truck box flank 1 pier 0',
+      'nuketown2 street-vehicle truck box flank 1 pier 1',
       'nuketown2 street-vehicle truck box roof',
       'nuketown2 street-vehicle truck cab',
       'nuketown2 street-vehicle truck deck',

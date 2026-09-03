@@ -372,7 +372,21 @@ export function buildNuketownForestSurround(
   // reason the owner's frames show: a trunk that meets the ground on a hard
   // silhouette edge reads as a sticker, and 769 of them read as a plate.
   const skirtGeometry = contactSkirt(1.15, 9, envelope.seed ^ 0x00c0_ffee);
+  // HF-434 (review, PASS 92): the skirt is a FLAT DISC lying 0.015 m over the
+  // ground it is planted on - and on the Nuke Town Rebuild that ground is a
+  // dead-flat slab, so 769 litter fillets sit 15 mm over a coplanar surface.
+  // The depth quantum at this build's 0.02 m near plane and 180 m far plane is
+  // ~2.98e-6 * z^2 m, i.e. 15 mm is spent by ~71 m - inside the forest ring
+  // (max radial 62 m) seen from the far side of an 84 m map. Tier -3 puts the
+  // litter over the ground (0), the border path decal (-1) and the lawn (-2)
+  // deterministically, on both backends. This material is created per call and
+  // used by `forest-contact-skirts` ALONE (disposed with the group), so no
+  // tier-0 body shares it. Integer units, matching the arena tier scheme.
   const skirtMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.99, metalness: 0, flatShading: true });
+  skirtMaterial.name = "nuketown-forest-contact-skirt";
+  skirtMaterial.polygonOffset = true;
+  skirtMaterial.polygonOffsetFactor = -3;
+  skirtMaterial.polygonOffsetUnits = -3;
   disposables.push(skirtGeometry, skirtMaterial);
   const skirtSlots = [...coniferSlots, ...broadleafSlots];
   const skirts = new THREE.InstancedMesh(skirtGeometry, skirtMaterial, skirtSlots.length);

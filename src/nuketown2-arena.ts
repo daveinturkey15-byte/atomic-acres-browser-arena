@@ -303,6 +303,17 @@ const STAIRWELL_Z0 = STAIR_FOOT_Z
   - STANDING_RADIUS_M - 0.12;
 
 /**
+ * HF-435: the derived stair-well geometry, EXPORTED so the fidelity gate can
+ * assert headroom over every tread from the numbers the build itself used -
+ * the same builder-and-gate-read-one-table rule as NUKETOWN2_DOORWAYS.
+ */
+export const NUKETOWN2_STAIRWELL = Object.freeze({
+  footZ: STAIR_FOOT_Z,
+  headZ: STAIR_HEAD_Z,
+  wellZ0: STAIRWELL_Z0,
+});
+
+/**
  * DOORWAYS - HF-432 item 4, owner after PASS 90: "Doors are too small
  * shouldn't have to crouch."
  *
@@ -363,6 +374,27 @@ function doorRun(id: string): [number, number] {
   const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
   return [door.centre - door.width / 2, door.centre + door.width / 2];
 }
+
+/**
+ * HF-435: EVERY window, ONCE - spans, sill tops and whether it carries a
+ * ground-floor glass pane - so the builder and the gate cannot describe
+ * different windows. Spans run along x; both houses use them (the south house
+ * is `pair()`'s exact 180-degree image).
+ *
+ * Upper openings: sill top at floor + 0.9 (the reference's sill, S7) and NO
+ * head band - the roof deck closes the head, so the opening is 2.0 m tall and
+ * a standing capsule that hops the sill can cross and drop outside.
+ */
+const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
+const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
+const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
+const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
+export const NUKETOWN2_WINDOWS = Object.freeze([
+  Object.freeze({ id: 'ground front west', pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'ground front east', pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'upper front', pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'upper back', pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+]);
 
 /** Radius of the cul-de-sac turning head at the middle of the road. */
 const TURNING_HEAD_HALF = 8;
@@ -560,6 +592,10 @@ type Nuketown2Materials = Readonly<{
   asphalt: THREE.MeshStandardMaterial;
   kerb: THREE.MeshStandardMaterial;
   drive: THREE.MeshStandardMaterial;
+  /** HF-434: the driveway/border-path DECALS - polygonOffset tier -1. */
+  driveDecal: THREE.MeshStandardMaterial;
+  /** HF-434: the garage floor - drive's paint at the -1 decal tier. */
+  garageFloor: THREE.MeshStandardMaterial;
   /** North house board siding - the reference's BLUE house. */
   sidingA: THREE.MeshStandardMaterial;
   /** South house board siding - the reference's YELLOW house. */
@@ -569,8 +605,12 @@ type Nuketown2Materials = Readonly<{
   /** The up-and-over garage door leaf parked in its head. */
   garageDoor: THREE.MeshStandardMaterial;
   trim: THREE.MeshStandardMaterial;
+  /** HF-434: the road DASHES - polygonOffset tier -2, over the -1 road. */
+  trimDecal: THREE.MeshStandardMaterial;
   roof: THREE.MeshStandardMaterial;
   interior: THREE.MeshStandardMaterial;
+  /** HF-434: the interior floor - interior's paint at the -1 decal tier. */
+  interiorFloor: THREE.MeshStandardMaterial;
   fence: THREE.MeshStandardMaterial;
   block: THREE.MeshStandardMaterial;
   busShell: THREE.MeshStandardMaterial;
@@ -579,6 +619,10 @@ type Nuketown2Materials = Readonly<{
   truckBox: THREE.MeshStandardMaterial;
   carA: THREE.MeshStandardMaterial;
   carGlass: THREE.MeshStandardMaterial;
+  /** HF-434: the coach window BANDS - polygonOffset tier -1 over the body. */
+  coachGlass: THREE.MeshStandardMaterial;
+  /** HF-435: the ground-floor window panes - real glass, visible and pale. */
+  windowGlass: THREE.MeshStandardMaterial;
   rubber: THREE.MeshStandardMaterial;
   sign: THREE.MeshStandardMaterial;
   planter: THREE.MeshStandardMaterial;
@@ -628,6 +672,41 @@ type Nuketown2Materials = Readonly<{
  * (0.18) is that same shipped chrome and adds two more.
  */
 function nuketown2Materials(): Nuketown2Materials {
+  // HF-434 Z-FIGHTING TIER. The measured coplanar set (see
+  // scripts/qa/find-coplanar-pairs.ts and docs/evidence/pass92/nuketown2/) is
+  // decal-over-solid: the road runs and turning head sit exactly on the ground
+  // slab's top face, the dressing decals 0.02 m over it, the dashes 0.03 m
+  // over the road - all far inside the ~1 cm depth precision the 0.02 m near
+  // plane leaves at 60 m, so they raced the surfaces under them for the same
+  // depth samples and flickered all over the map. A polygonOffset tier pins
+  // every race deterministically at every range on both backends, the same
+  // tiering HF-346 shipped on the Skyline apron: -1 for a decal over a solid,
+  // -2 where a decal overlaps another -1 decal (the lawn crosses the turning
+  // head, the dashes cross the road). The THREE base materials that also dress
+  // SOLID bodies (drive: the porch; trim: the door cases; carGlass: the car
+  // cabins) stay clean; the decal-only clones carry the offsets.
+  const withOffset = (material: THREE.MeshStandardMaterial, name: string, factor: number): THREE.MeshStandardMaterial => {
+    material.name = name;
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = factor;
+    material.polygonOffsetUnits = factor;
+    return material;
+  };
+  const lawn = withOffset(standard(0x496438, 1, 0), 'nuketown2-lawn-decal', -2);
+  const asphalt = withOffset(standard(0x41464a, 0.98, 0.02), 'nuketown2-asphalt-road', -1);
+  const driveDecal = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-drive-decal', -1);
+  const trimDecal = withOffset(standard(0xf0e4c9, 0.68, 0.03), 'nuketown2-trim-decal', -2);
+  const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
+  // HF-435: the house window panes. Visible from the street (pale, slightly
+  // transparent - the gun-range control room's glazing idiom), not a batched
+  // decal: the pane is a collider and a ballistic surface.
+  const windowGlass = standard(0x9fb6bd, 0.18, 0.08);
+  windowGlass.name = 'nuketown2-window-glass';
+  windowGlass.transparent = true;
+  windowGlass.opacity = 0.38;
+  const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
+  const interiorFloor = withOffset(standard(0xdbd1ba, 0.92, 0.01), 'nuketown2-house-floor', -1);
+  const garageFloor = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-garage-floor', -1);
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
@@ -643,7 +722,7 @@ function nuketown2Materials(): Nuketown2Materials {
     ground: standard(0x515642, 1, 0),
     // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
     // this, and that field's blade green (0x5e9e41) was keyed against it.
-    lawn: standard(0x496438, 1, 0),
+    lawn,
     // asphalt-aged's mean is 0x252a2c, and that is the value a TEXTURED road
     // wants: the shipped map's road carries a normal map and an aggregate
     // pattern, so half its pixels catch a highlight and the mean is what is
@@ -654,11 +733,13 @@ function nuketown2Materials(): Nuketown2Materials {
     // in the street-centre and into-sun frames, with the kerb line floating on
     // black. Lifted to the value that puts an unlit, unbroken box at the
     // rendered luminance the shipped map's textured road actually reaches.
-    asphalt: standard(0x41464a, 0.98, 0.02),
+    asphalt,
     // concrete-poured, fresh at the kerb and weathered on the apron - the
     // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
     kerb: standard(0xa9a697, 0.94, 0.02),
-    drive: standard(0x8b8879, 0.94, 0.02),
+    drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
+    driveDecal,
+    garageFloor,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
     // with the hue carried to the reference's blue (measured 117.9).
     sidingA: standard(0x46809f, 0.76, 0),
@@ -672,10 +753,12 @@ function nuketown2Materials(): Nuketown2Materials {
     // door leaf parked in its head, which is what you see from the street.
     garageDoor: standard(0xaebdc1, 0.18, 0.76),
     // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
-    trim: standard(0xf0e4c9, 0.68, 0.03),
+    trim: standard(0xf0e4c9, 0.68, 0.03),            // SOLID users: sills, heads, lintels
+    trimDecal,
     roof: standard(0x444c4d, 0.86, 0.03),
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
     interior: standard(0xdbd1ba, 0.92, 0.01),
+    interiorFloor,
     // wood-deck: the plank fence, the same timber the shipped map decks with.
     fence: standard(0x673b24, 0.92, 0.02),
     block: standard(0x9d9a8c, 0.94, 0.01),
@@ -683,7 +766,7 @@ function nuketown2Materials(): Nuketown2Materials {
     // paint spec, with a red waistline - the reference's cream/red streamlined
     // body - as the one saturated thing on the map.
     busShell: standard(0xe7dbc1, 0.48, 0.25),
-    busTrim: standard(0xa8382c, 0.48, 0.25),
+    busTrim,
     // THE MOVING TRUCK: a plain box van. Painted cab, matte panel box, no
     // livery, because the reference's is a hire truck and because the eye is
     // meant to go to the coach beside it.
@@ -701,7 +784,9 @@ function nuketown2Materials(): Nuketown2Materials {
     // Job 3 re-keys the HUE into the shipped map's own aqua family and leaves
     // the two numbers the preset classifies on exactly where they were.
     carA: standard(0x3d6f80, 0.2, 0.62),
-    carGlass: standard(0x2b3d47, 0.14, 0.5),
+    carGlass: standard(0x2b3d47, 0.14, 0.5),         // SOLID users: the car cabins
+    coachGlass,
+    windowGlass,
     // art-kit `MAT.rubber`, verbatim.
     rubber: standard(0x202628, 0.9, 0.02),
     sign: standard(0xdbd1ba, 0.78, 0.06),
@@ -738,7 +823,11 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const cx = NUKETOWN2_HOUSE_LAYOUT[0]!.x;           // -1.25
 
   // Ground slab and roof deck.
-  pair(builder, 'house floor', [cx, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interior, { cast: false });
+  // HF-434: the floor top is EXACTLY coplanar with the ground slab's top face
+  // (143 m2 of interior floor racing the world slab every frame). The floor
+  // stays where every interior eye-probe expects it and draws on the -1
+  // interiorFloor tier, which pins the race at every range.
+  pair(builder, 'house floor', [cx, -0.1, zMid], [HOUSE_WIDTH, 0.2, HOUSE_DEPTH], m.interiorFloor, { cast: false });
   pair(builder, 'house roof deck', [cx, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH], m.roof);
 
   // West side wall, full height both storeys.
@@ -766,8 +855,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // openings, which is the whole point — a window you cannot shoot through is
   // a painting.
   const FRONT_DOOR = doorRun('house front door');
-  const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
-  const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
   const groundFrontRuns: [number, number][] = [
     [HOUSE_X0, FRONT_WINDOW_A[0]],
     [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
@@ -780,10 +867,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   });
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
+  // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
+  // REAL collider (not walk-through) and a REAL ballistic surface
+  // (ballisticMaterial 'glass' - the shipped arenas' glazing class,
+  // entryCost 0.08), so bullets cross but shoulders do not.
   for (const [index, window] of [FRONT_WINDOW_A, FRONT_WINDOW_B].entries()) {
     const width = window[1] - window[0];
     const wx = (window[0] + window[1]) / 2;
     pair(builder, `house front window sill ${index}`, [wx, 0.5, zFront], [width, 1.0, WALL_T], m.trim);
+    pair(builder, `house front window glass ${index}`, [wx, 1.55, zFront], [width, 1.1, 0.06], m.windowGlass,
+      { ballisticMaterial: 'glass', cast: false });
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
   }
   pair(builder, 'house front door lintel',
@@ -791,7 +884,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [FRONT_DOOR[1] - FRONT_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
 
   // --- front wall, upper floor: the power window ---------------------------
-  const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0, UPPER_WINDOW[0]],
     [UPPER_WINDOW[1], HOUSE_X1],
@@ -803,9 +895,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   {
     const width = UPPER_WINDOW[1] - UPPER_WINDOW[0];
     const wx = (UPPER_WINDOW[0] + UPPER_WINDOW[1]) / 2;
-    // 0.9 m sill: you can stand at it, and you can crouch behind it.
+    // 0.9 m sill: you can stand at it, and you can crouch behind it. The old
+    // 0.9 m head band (top 0.45 m under the roof) is GONE under HF-435: with
+    // it, the opening stood 1.1 m tall and no capsule the game ships - standing
+    // 1.82, crouched 1.16 - could ever cross the wall plane, so "go out of
+    // windows" was impossible no matter how wide the opening was. The opening
+    // now runs sill top (UPPER_Y0 + 0.9) to the roof deck's underside at
+    // ROOF_Y0: 2.0 m tall, so a standing capsule that hops the 0.9 m sill
+    // (apex 0.82 + the 0.42 m autostep up-cast = 1.24) walks out and drops to
+    // the verge. The roof deck itself closes the head, exactly like an eave.
     pair(builder, 'house upper window sill', [wx, UPPER_Y0 + 0.45, zFront], [width, 0.9, WALL_T], m.trim);
-    pair(builder, 'house upper window head', [wx, UPPER_Y0 + UPPER_H - 0.45, zFront], [width, 0.9, WALL_T], m.trim);
   }
 
   // --- back wall: back door and one upper window ---------------------------
@@ -821,16 +920,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
     [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
-  const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
   });
+  // HF-435: sill stays at 0.9 m, the old head band goes - same reason as the
+  // upper front window: the opening has to be tall enough for a capsule to
+  // cross, and the roof deck is the head.
   pair(builder, 'house upper back sill',
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + 0.45, zBack],
-    [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
-  pair(builder, 'house upper back head',
-    [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + UPPER_H - 0.45, zBack],
     [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
 
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
@@ -882,7 +980,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // the "landing and upper hallway" this pass owes, and it is why the
     // stairwell no longer has to be crossed to use the upper floor.
     const x0 = storey === 'upper' ? STAIR_X1 : HOUSE_X0;
-    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1]].forEach((run, index) => {
+    // HF-434: the east run stops at the east wall's INNER face. It used to run
+    // to HOUSE_X1, laying the partition's plaster top face exactly coplanar
+    // with the east wall's siding top face over the 0.3 x 0.3 m corner - a
+    // different-material depth race the coplanar instrument measured as a
+    // FINDING. The wall hides the trimmed 0.3 m, so nothing visible moves.
+    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
       if (run[1]! - run[0]! <= 0.05) return;
       pair(builder, `house ${storey} partition ${index}`,
         [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
@@ -920,7 +1023,9 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   const zMid = (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2;
   const cx = (GARAGE_X0 + GARAGE_X1) / 2;
 
-  pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.drive, { cast: false });
+  // HF-434: exactly coplanar with the ground slab like the house floor, so it
+  // draws on the -1 garageFloor tier for the same reason.
+  pair(builder, 'garage floor', [cx, -0.1, zMid], [GARAGE_WIDTH, 0.2, GARAGE_DEPTH], m.garageFloor, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, GARAGE_DEPTH], m.roof);
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
 
@@ -979,14 +1084,31 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
 
   // Cab, solid closed cover, on the +x end.
   streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, t.z], [t.cabLength, t.cabRoofY, W], m.truckCab);
-  // Cargo box: deck, bulkhead against the cab, two flanks and a roof. The -x
-  // end is OPEN, which is the mouth.
+  // Cargo box: deck, bulkhead against the cab, two flanks with a walk-through
+  // opening each, and a roof. The -x end is OPEN, which is the rear mouth.
   streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
   streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, t.z],
     [T, t.roofY - t.deckY, W], m.truckBox);
+  // HF-436, owner after PASS 91: "one of the trucks in the street needs a side
+  // entrance so you can go in over the left side, right side, or the end, more
+  // similar to the actual Nuketown map." Each flank gets a 1.6 x 1.9 m opening
+  // (both over the briefed 1.0 x 1.9 minimum), floored at the deck and
+  // headed at deckY + 1.9, so a standing capsule walks in from either side.
+  // The rear mouth and the roof deck are untouched, and so are the 2x core
+  // seat above the roof and the north-flank climb treads (they stand at
+  // x >= 4.6, clear of the opening at x [-0.8, 0.8]).
+  const SIDE_OPENING_HALF = 0.8;
+  const HEADER_Y = t.deckY + 1.9;
   for (const [index, side] of [-1, 1].entries()) {
-    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, t.z + side * flank],
-      [t.boxLength, t.roofY - t.deckY, T], m.truckBox);
+    const fz = t.z + side * flank;
+    [[-boxHalf, -SIDE_OPENING_HALF], [SIDE_OPENING_HALF, boxHalf]].forEach((run, pier) => {
+      streetVehicle(builder, `truck box flank ${index} pier ${pier}`,
+        [(run[0] + run[1]) / 2, (t.deckY + t.roofY) / 2, fz],
+        [run[1] - run[0], t.roofY - t.deckY, T], m.truckBox);
+    });
+    streetVehicle(builder, `truck box flank ${index} header`,
+      [0, (HEADER_Y + t.roofY) / 2, fz],
+      [SIDE_OPENING_HALF * 2, t.roofY - HEADER_Y, T], m.truckBox);
   }
   streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
   for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
@@ -1019,21 +1141,21 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // reference's coach is a cream body with a RED WAISTLINE and a continuous
   // window band, and it is the only saturated body left on this map now the
   // truck is a plain van. Four decals replace the one previous band; all four
-  // are named `nuketown2 street-vehicle ...` and all four are added to the
-  // enumerated asymmetric list in nuketown2-fidelity.test.ts with this reason.
   // Presentation only: no collider, no shot surface, no shadow - the coach's
   // solid body underneath is unchanged, so cover and ballistics do not move.
   for (const [index, side] of [-1, 1].entries()) {
     streetVehicle(builder, `coach waist stripe ${index}`, [c.x, 1.35, c.z + side * c.width / 2],
       [c.length - 0.6, 0.5, 0.08], m.busTrim, { solid: false, shots: false, cast: false });
     streetVehicle(builder, `coach window band ${index}`, [c.x, 2.25, c.z + side * c.width / 2],
-      [c.length - 1.6, 0.8, 0.08], m.carGlass, { solid: false, shots: false, cast: false });
+      // HF-434: the band is a decal 0.04 m proud of the body face - the
+      // window-band class the owner named - so it draws on the -1 coachGlass
+      // tier instead of the body-clean carGlass.
+      [c.length - 1.6, 0.8, 0.08], m.coachGlass, { solid: false, shots: false, cast: false });
   }
   for (const [index, x] of [-2.9, 2.9].entries()) {
     streetVehicle(builder, `coach wheel ${index}`, [c.x + x, 0.42, c.z], [1.0, 0.84, c.width + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
   }
-
   // THE HEAD CAR, and why it exists. The reference's aerial of the turning head
   // shows the truck, the coach AND a couple of civilian cars standing in it, so
   // this body is the reference's own. It is authored here rather than in
@@ -1155,11 +1277,15 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   }
   // Centre line, as dash runs on the approach either side of the head.
   for (let i = 0; i < 3; i += 1) {
-    pair(builder, `street dash ${i}`, [-(TURNING_HEAD_HALF + 1.6 + i * 3.2), 0.01, 0], [2.0, 0.04, 0.16], m.trim, decal);
+    // HF-434: the dash is a 0.03 m decal over the -1 road and the ground, so
+    // it takes the -2 tier and wins both races deterministically.
+    pair(builder, `street dash ${i}`, [-(TURNING_HEAD_HALF + 1.6 + i * 3.2), 0.01, 0], [2.0, 0.04, 0.16], m.trimDecal, decal);
   }
   for (const piece of NUKETOWN2_GROUND_DRESSING) {
     pair(builder, piece.id, [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2],
-      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], m[piece.material], decal);
+      // HF-434: lawn IS the -2 decal tier (it crosses the -1 turning head);
+      // drive has solid users, so its dressing pieces take the -1 clone.
+      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], piece.material === 'lawn' ? m.lawn : m.driveDecal, decal);
   }
 }
 
@@ -1185,6 +1311,18 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 1.4], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, KERB_Z - 2.2], [3.6, LOW_COVER, 2.0], m.planter);
+  // HF-437 - THE WIDENED STRIP'S COVER. The strip grew 4.1 -> 4.7 m (see
+  // NUKETOWN2_FRONT_VERGE_DEPTH), and the reference dresses exactly this band:
+  // low garden walls and kerb-side planters (schematic 2, S5 street level).
+  // Both are solid and shot-rated by default - movement AND shot authority.
+  // Low wall on the west verge, hard against the widened band, clear of the
+  // kerb (z ends 0.025 m inboard of it) and of the turning-head decal (x ends
+  // 0.1 m short of it): a vaultable waist wall that breaks the kerb-side run.
+  pair(builder, 'verge low wall', [-9.4, LOW_COVER / 2, KERB_Z - 0.35], [2.6, LOW_COVER, 0.35], m.block);
+  // Kerb-side planter on the east verge, in the widened band between the drive
+  // edging and the outer planter (x [8.8, 11.2] leaves 0.5 m to that planter's
+  // x0 = 11.7).
+  pair(builder, 'verge kerb planter', [10.0, LOW_COVER / 2, KERB_Z - 0.75], [2.4, LOW_COVER, 1.1], m.planter);
   // The town sign at the far end of each verge: two posts and a board, the one
   // authored landmark that tells you which end you are looking at.
   for (const [index, dx] of [-1.4, 1.4].entries()) {
