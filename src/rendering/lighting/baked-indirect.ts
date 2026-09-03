@@ -165,8 +165,8 @@ export type IrradianceProbeVolume = Readonly<{
   digest: string;
   /** World-space position of probe (0,0,0). */
   originM: Vec3;
-  /** Metres between probes on each axis. */
-  spacingM: number;
+  /** Metres between probes, per axis. Non-uniform: arenas are wide and low. */
+  spacingM: Vec3;
   /** Probe counts on x, y, z. */
   dimensions: readonly [number, number, number];
   /**
@@ -211,7 +211,29 @@ export type BakeOptions = Readonly<{
   paddingM?: number;
   /** Overrides the probe cap. Tests only; production uses the constant. */
   maximumProbes?: number;
+  /**
+   * Forces the grid to exactly these probe counts, deriving the spacing from
+   * the arena's size instead of the other way round.
+   *
+   * The RUNTIME path always passes this. Its 3D textures are allocated once at
+   * `BAKED_INDIRECT_RUNTIME_GRID` and re-uploaded in place on every arena
+   * change, because swapping a bound texture for one of different dimensions
+   * means rebuilding the node, which means rebuilding the pipeline, inside the
+   * arena-transition window - a pipeline rebuild this feature has no reason to
+   * cause. The offline CLI leaves it unset and gets the spacing the tier asks
+   * for.
+   */
+  fixedDimensions?: readonly [number, number, number];
 }>;
+
+/**
+ * The probe grid the RUNTIME allocates, once, for every arena. 24 x 12 x 24 is
+ * 6912 probes: 331 KB across the three RGBA float 3D textures, and on the
+ * largest authored arena (~120 m across) it lands the probes about 5 m apart
+ * horizontally and 2 m vertically, which is the right anisotropy for arenas
+ * that are wide and low rather than cubic.
+ */
+export const BAKED_INDIRECT_RUNTIME_GRID: readonly [number, number, number] = Object.freeze([24, 12, 24]) as unknown as readonly [number, number, number];
 
 // ---------------------------------------------------------------------------
 // Spherical harmonics (L1), in the one convention this file uses everywhere
@@ -430,7 +452,8 @@ export function planProbeGrid(
   spacingM: number,
   paddingM: number,
   maximumProbes: number,
-): Readonly<{ originM: Vec3; spacingM: number; dimensions: readonly [number, number, number] }> {
+  fixedDimensions?: readonly [number, number, number],
+): Readonly<{ originM: Vec3; spacingM: Vec3; dimensions: readonly [number, number, number] }> {
   const min = vec3(
     scene.boundsMin[0] - paddingM,
     scene.boundsMin[1] - paddingM,
@@ -441,6 +464,20 @@ export function planProbeGrid(
     Math.max(0, scene.boundsMax[1] - scene.boundsMin[1]) + paddingM * 2,
     Math.max(0, scene.boundsMax[2] - scene.boundsMin[2]) + paddingM * 2,
   );
+  if (fixedDimensions) {
+    // Fixed grid: the arena decides the spacing, per axis, so a wide low arena
+    // does not spend two thirds of its probes on empty sky above the roofline.
+    const dims = fixedDimensions;
+    return Object.freeze({
+      originM: min,
+      spacingM: vec3(
+        Math.max(1e-3, size[0] / Math.max(1, dims[0] - 1)),
+        Math.max(1e-3, size[1] / Math.max(1, dims[1] - 1)),
+        Math.max(1e-3, size[2] / Math.max(1, dims[2] - 1)),
+      ),
+      dimensions: dims,
+    });
+  }
   let spacing = spacingM;
   let dims: [number, number, number] = [2, 2, 2];
   // Grow the spacing until the grid fits the cap. Coarsening is the right
@@ -455,14 +492,52 @@ export function planProbeGrid(
     if (dims[0] * dims[1] * dims[2] <= maximumProbes) break;
     spacing *= 1.25;
   }
-  return Object.freeze({ originM: min, spacingM: spacing, dimensions: Object.freeze(dims) as unknown as readonly [number, number, number] });
+  return Object.freeze({
+    originM: min,
+    spacingM: vec3(spacing, spacing, spacing),
+    dimensions: Object.freeze(dims) as unknown as readonly [number, number, number],
+  });
 }
 
-export function bakeIrradianceVolume(
+/**
+ * A bake in progress, advanced probe by probe under a wall-clock budget.
+ *
+ * WHY THIS IS A STEPPER AND NOT A FUNCTION. At runtime the bake runs on the
+ * main thread of a game whose loading times are already a live owner
+ * complaint (HF-417). A 3 m grid over a 60 x 20 x 60 m arena is ~3500 probes;
+ * at 48 rays and one bounce against ~40 analytic shapes that is several
+ * seconds of straight-line JavaScript, i.e. a hard freeze in exactly the
+ * window a player is watching a loading screen tick.
+ *
+ * So the runtime path takes a few milliseconds per frame instead. The volume
+ * is USABLE from the first step — every probe not yet traced still holds its
+ * sky-only initialisation — so the picture converges rather than popping, and
+ * the offline CLI simply calls `step(Infinity)` in a loop and gets the same
+ * bytes. `bakeIrradianceVolume` is that loop, kept as the reference API.
+ */
+export type IrradianceBakeSession = Readonly<{
+  /** 0..1, probes traced over probes total. */
+  progress(): number;
+  done(): boolean;
+  /**
+   * Traces probes until `budgetMs` of wall clock has elapsed (checked every
+   * 16 probes, so one very expensive probe can overshoot by one probe rather
+   * than by a frame). Returns true when the bake is complete.
+   */
+  step(budgetMs: number): boolean;
+  /**
+   * The volume as it stands. Safe to read and upload at any point; the buried-
+   * probe fill is applied when the last probe lands, so a partially traced
+   * volume is dimmer near walls rather than wrong.
+   */
+  volume(): IrradianceProbeVolume;
+}>;
+
+export function beginIrradianceBake(
   scene: ProxyScene,
   lighting: BakeLighting,
   options: BakeOptions,
-): IrradianceProbeVolume {
+): IrradianceBakeSession {
   const startedAt = Date.now();
   const { tuning } = options;
   if (!tuning.enabled) throw new Error('bakeIrradianceVolume: the OFF tier bakes nothing.');
@@ -472,6 +547,7 @@ export function bakeIrradianceVolume(
     tuning.probeSpacingM,
     options.paddingM ?? tuning.probeSpacingM,
     options.maximumProbes ?? BAKED_INDIRECT_MAXIMUM_PROBES,
+    options.fixedDimensions,
   );
   const [nx, ny, nz] = grid.dimensions;
   const probeCount = nx * ny * nz;
@@ -481,66 +557,100 @@ export function bakeIrradianceVolume(
   const random = makeRandom(Number.parseInt(digest, 16));
   const rays = tuning.raysPerProbe;
   const weight = (4 * Math.PI) / rays;
+  const y00 = SH_Y00 * weight;
+  const y1 = SH_Y1 * weight;
   let filledProbes = 0;
+  let cursor = 0;
+  let elapsedMs = 0;
+  let finished = false;
 
-  for (let z = 0; z < nz; z += 1) {
-    for (let y = 0; y < ny; y += 1) {
-      for (let x = 0; x < nx; x += 1) {
-        const probeIndex = (z * ny + y) * nx + x;
-        const position = vec3(
-          grid.originM[0] + x * grid.spacingM,
-          grid.originM[1] + y * grid.spacingM,
-          grid.originM[2] + z * grid.spacingM,
-        );
-        if (scene.shapes.some((shape) => pointInsideShape(position, shape))) {
-          buried[probeIndex] = 1;
-          filledProbes += 1;
-          continue;
-        }
-        const base = probeIndex * FLOATS_PER_PROBE;
-        const offset = random();
-        for (let ray = 0; ray < rays; ray += 1) {
-          const direction = fibonacciSphereDirection(ray, rays, offset);
-          const hit = intersectScene(position, direction, scene);
-          const radiance = hit.t === Number.POSITIVE_INFINITY
-            ? skyRadiance(direction, lighting)
-            : shadeHit(scene, scene.shapes[hit.shapeIndex], hit.point, hit.normal, lighting, tuning.bounces - 1, random);
-          const y00 = SH_Y00 * weight;
-          const y1 = SH_Y1 * weight;
-          for (let channel = 0; channel < 3; channel += 1) {
-            const value = radiance[channel];
-            const slot = base + channel * SH_L1_COEFFICIENTS;
-            coefficients[slot] += value * y00;
-            coefficients[slot + 1] += value * y1 * direction[1];
-            coefficients[slot + 2] += value * y1 * direction[2];
-            coefficients[slot + 3] += value * y1 * direction[0];
-          }
-        }
+  const traceProbe = (probeIndex: number): void => {
+    const x = probeIndex % nx;
+    const y = Math.floor(probeIndex / nx) % ny;
+    const z = Math.floor(probeIndex / (nx * ny));
+    const position = vec3(
+      grid.originM[0] + x * grid.spacingM[0],
+      grid.originM[1] + y * grid.spacingM[1],
+      grid.originM[2] + z * grid.spacingM[2],
+    );
+    if (scene.shapes.some((shape) => pointInsideShape(position, shape))) {
+      buried[probeIndex] = 1;
+      filledProbes += 1;
+      return;
+    }
+    const base = probeIndex * FLOATS_PER_PROBE;
+    const offset = random();
+    for (let ray = 0; ray < rays; ray += 1) {
+      const direction = fibonacciSphereDirection(ray, rays, offset);
+      const hit = intersectScene(position, direction, scene);
+      const radiance = hit.t === Number.POSITIVE_INFINITY
+        ? skyRadiance(direction, lighting)
+        : shadeHit(scene, scene.shapes[hit.shapeIndex], hit.point, hit.normal, lighting, tuning.bounces - 1, random);
+      for (let channel = 0; channel < 3; channel += 1) {
+        const value = radiance[channel];
+        const slot = base + channel * SH_L1_COEFFICIENTS;
+        coefficients[slot] += value * y00;
+        coefficients[slot + 1] += value * y1 * direction[1];
+        coefficients[slot + 2] += value * y1 * direction[2];
+        coefficients[slot + 3] += value * y1 * direction[0];
       }
     }
-  }
+  };
 
-  // Buried probes are filled from their live neighbours rather than left at
-  // zero: a wall probe reading black bleeds a dark band along every surface
-  // that interpolates through it, which looks exactly like the dirt-shadow
-  // artefact people spend a day chasing in the material graph.
-  fillBuriedProbes(coefficients, buried, nx, ny, nz);
+  const finish = (): void => {
+    if (finished) return;
+    // Buried probes are filled from their live neighbours rather than left at
+    // zero: a wall probe reading black bleeds a dark band along every surface
+    // that interpolates through it, which looks exactly like the dirt-shadow
+    // artefact people spend a day chasing in the material graph.
+    fillBuriedProbes(coefficients, buried, nx, ny, nz);
+    elapsedMs = Date.now() - startedAt;
+    finished = true;
+  };
 
   return Object.freeze({
-    arenaId: options.arenaId,
-    digest,
-    originM: grid.originM,
-    spacingM: grid.spacingM,
-    dimensions: grid.dimensions,
-    coefficients,
-    bake: Object.freeze({
-      raysPerProbe: rays,
-      bounces: tuning.bounces,
-      occluderShapes: scene.shapes.length,
-      filledProbes,
-      elapsedMs: Date.now() - startedAt,
-    }),
+    progress: (): number => (probeCount === 0 ? 1 : cursor / probeCount),
+    done: (): boolean => finished,
+    step(budgetMs: number): boolean {
+      if (finished) return true;
+      const deadline = Date.now() + budgetMs;
+      while (cursor < probeCount) {
+        traceProbe(cursor);
+        cursor += 1;
+        if ((cursor & 15) === 0 && Date.now() >= deadline) break;
+      }
+      if (cursor >= probeCount) finish();
+      return finished;
+    },
+    volume(): IrradianceProbeVolume {
+      return Object.freeze({
+        arenaId: options.arenaId,
+        digest,
+        originM: grid.originM,
+        spacingM: grid.spacingM,
+        dimensions: grid.dimensions,
+        coefficients,
+        bake: Object.freeze({
+          raysPerProbe: rays,
+          bounces: tuning.bounces,
+          occluderShapes: scene.shapes.length,
+          filledProbes,
+          elapsedMs: finished ? elapsedMs : Date.now() - startedAt,
+        }),
+      });
+    },
   });
+}
+
+/** The whole bake in one call. The offline CLI and every test use this. */
+export function bakeIrradianceVolume(
+  scene: ProxyScene,
+  lighting: BakeLighting,
+  options: BakeOptions,
+): IrradianceProbeVolume {
+  const session = beginIrradianceBake(scene, lighting, options);
+  while (!session.step(Number.POSITIVE_INFINITY)) { /* one pass; the budget never expires */ }
+  return session.volume();
 }
 
 function fillBuriedProbes(
@@ -601,9 +711,9 @@ export function sampleIrradianceVolume(
   normal: Vec3,
 ): Vec3 {
   const [nx, ny, nz] = volume.dimensions;
-  const gx = (positionM[0] - volume.originM[0]) / volume.spacingM;
-  const gy = (positionM[1] - volume.originM[1]) / volume.spacingM;
-  const gz = (positionM[2] - volume.originM[2]) / volume.spacingM;
+  const gx = (positionM[0] - volume.originM[0]) / volume.spacingM[0];
+  const gy = (positionM[1] - volume.originM[1]) / volume.spacingM[1];
+  const gz = (positionM[2] - volume.originM[2]) / volume.spacingM[2];
   const clampGrid = (value: number, count: number): number => Math.min(count - 1, Math.max(0, value));
   const x0 = Math.floor(clampGrid(gx, nx));
   const y0 = Math.floor(clampGrid(gy, ny));
@@ -690,7 +800,7 @@ export type SerialisedIrradianceVolume = Readonly<{
   arenaId: string;
   digest: string;
   originM: readonly [number, number, number];
-  spacingM: number;
+  spacingM: readonly [number, number, number];
   dimensions: readonly [number, number, number];
   coefficientsBase64: string;
   bake: IrradianceProbeVolume['bake'];
@@ -704,7 +814,7 @@ export function serialiseIrradianceVolume(volume: IrradianceProbeVolume): Serial
     arenaId: volume.arenaId,
     digest: volume.digest,
     originM: [volume.originM[0], volume.originM[1], volume.originM[2]] as const,
-    spacingM: volume.spacingM,
+    spacingM: [volume.spacingM[0], volume.spacingM[1], volume.spacingM[2]] as const,
     dimensions: volume.dimensions,
     coefficientsBase64: encodeFloat32Base64(volume.coefficients),
     bake: volume.bake,
@@ -725,7 +835,7 @@ export function deserialiseIrradianceVolume(payload: SerialisedIrradianceVolume)
     arenaId: payload.arenaId,
     digest: payload.digest,
     originM: vec3(payload.originM[0], payload.originM[1], payload.originM[2]),
-    spacingM: payload.spacingM,
+    spacingM: vec3(payload.spacingM[0], payload.spacingM[1], payload.spacingM[2]),
     dimensions: payload.dimensions,
     coefficients,
     bake: payload.bake,

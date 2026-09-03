@@ -107,19 +107,15 @@ export type BakedIndirectTextures = Readonly<{
  * trilinear probe interpolation — the CPU reference does the same blend by
  * hand, which is what makes the two comparable.
  */
-export function buildBakedIndirectTextures(volume: IrradianceProbeVolume): BakedIndirectTextures {
-  const [nx, ny, nz] = volume.dimensions;
+export function allocateBakedIndirectTextures(
+  dimensions: readonly [number, number, number],
+  label = 'arena',
+): BakedIndirectTextures {
+  const [nx, ny, nz] = dimensions;
   const probes = nx * ny * nz;
   const channels: THREE.Data3DTexture[] = [];
   for (let channel = 0; channel < 3; channel += 1) {
     const data = new Float32Array(probes * 4);
-    for (let probe = 0; probe < probes; probe += 1) {
-      const source = probe * SH_L1_COEFFICIENTS * 3 + channel * SH_L1_COEFFICIENTS;
-      data[probe * 4] = volume.coefficients[source];
-      data[probe * 4 + 1] = volume.coefficients[source + 1];
-      data[probe * 4 + 2] = volume.coefficients[source + 2];
-      data[probe * 4 + 3] = volume.coefficients[source + 3];
-    }
     const texture = new THREE.Data3DTexture(data, nx, ny, nz);
     texture.format = THREE.RGBAFormat;
     texture.type = THREE.FloatType;
@@ -130,7 +126,7 @@ export function buildBakedIndirectTextures(volume: IrradianceProbeVolume): Baked
     texture.wrapR = THREE.ClampToEdgeWrapping;
     texture.generateMipmaps = false;
     texture.needsUpdate = true;
-    texture.name = `baked-indirect-${volume.arenaId}-${'rgb'[channel]}`;
+    texture.name = `baked-indirect-${label}-${'rgb'[channel]}`;
     channels.push(texture);
   }
   return Object.freeze({
@@ -143,11 +139,57 @@ export function buildBakedIndirectTextures(volume: IrradianceProbeVolume): Baked
   });
 }
 
+/**
+ * Copies a baked volume into already-allocated textures. Separate from the
+ * allocation because the runtime path re-uploads on every arena change into the
+ * SAME texture objects: swapping a bound texture for one of different
+ * dimensions rebuilds the node, which rebuilds the pipeline, inside the
+ * arena-transition window. Re-uploading does neither.
+ */
+export function uploadBakedIndirectVolume(
+  textures: BakedIndirectTextures,
+  volume: IrradianceProbeVolume,
+): void {
+  const [nx, ny, nz] = volume.dimensions;
+  const probes = nx * ny * nz;
+  const targets = [textures.red, textures.green, textures.blue];
+  for (let channel = 0; channel < 3; channel += 1) {
+    const texture = targets[channel];
+    const data = texture.image.data as Float32Array;
+    if (data.length !== probes * 4) {
+      throw new Error(
+        `uploadBakedIndirectVolume: volume is ${nx}x${ny}x${nz} but the texture holds ${data.length / 4} probes.`,
+      );
+    }
+    for (let probe = 0; probe < probes; probe += 1) {
+      const source = probe * SH_L1_COEFFICIENTS * 3 + channel * SH_L1_COEFFICIENTS;
+      data[probe * 4] = volume.coefficients[source];
+      data[probe * 4 + 1] = volume.coefficients[source + 1];
+      data[probe * 4 + 2] = volume.coefficients[source + 2];
+      data[probe * 4 + 3] = volume.coefficients[source + 3];
+    }
+    texture.needsUpdate = true;
+  }
+}
+
+/** Allocation plus one upload. The offline and test path. */
+export function buildBakedIndirectTextures(volume: IrradianceProbeVolume): BakedIndirectTextures {
+  const textures = allocateBakedIndirectTextures(volume.dimensions, volume.arenaId);
+  uploadBakedIndirectVolume(textures, volume);
+  return textures;
+}
+
 export type BakedIndirectGraph = Readonly<{
   /** Additive linear-HDR bounce light, already clamped. */
   light: Node<'vec3'>;
   /** Pushes a new tuning into the live uniforms. Topology unchanged. */
   applyTuning(next: BakedIndirectTuning): void;
+  /**
+   * Re-uploads the probe data and re-points the volume transform. The volume's
+   * dimensions must match the ones the node was built with; that is the whole
+   * reason the runtime grid is fixed.
+   */
+  setVolume(volume: IrradianceProbeVolume): void;
   /** Call once per presented frame, before submission. */
   beforeRender(): void;
   /** What was actually bound, for the runtime receipt and for tests. */
@@ -178,10 +220,11 @@ export function publishBakedIndirectReceipt(
 export function buildBakedIndirectLightNode(
   sources: BakedIndirectSources,
   tuning: BakedIndirectTuning,
-  volume: IrradianceProbeVolume,
-  textures: BakedIndirectTextures = buildBakedIndirectTextures(volume),
+  dimensions: readonly [number, number, number],
+  label = 'arena',
+  textures: BakedIndirectTextures = allocateBakedIndirectTextures(dimensions, label),
 ): BakedIndirectGraph {
-  const [nx, ny, nz] = volume.dimensions;
+  const [nx, ny, nz] = dimensions;
   // Explicit camera uniforms for the same reason the ray-traced node uses them:
   // a full-screen post pass is drawn with a quad camera, so the built-in camera
   // nodes would resolve against that quad rather than the player's view.
@@ -190,12 +233,13 @@ export function buildBakedIndirectLightNode(
   const tanHalfFovY = uniform(0.5);
   const aspectRatio = uniform(16 / 9);
 
-  const volumeOrigin = uniform(new THREE.Vector3(volume.originM[0], volume.originM[1], volume.originM[2]));
-  const volumeSpacing = uniform(volume.spacingM);
+  const volumeOrigin = uniform(new THREE.Vector3(0, 0, 0));
+  const volumeSpacing = uniform(new THREE.Vector3(1, 1, 1));
   const volumeDimensions = uniform(new THREE.Vector3(nx, ny, nz));
   const gain = uniform(tuning.enabled ? tuning.composite : 0);
   const maximumAdditive = uniform(BAKED_INDIRECT_MAXIMUM_ADDITIVE);
   let active = tuning;
+  let bound: IrradianceProbeVolume | null = null;
 
   const light = Fn(() => {
     const sceneColour = nodeObject(sources.sceneColor);
@@ -246,7 +290,19 @@ export function buildBakedIndirectLightNode(
     light: light as unknown as Node<'vec3'>,
     applyTuning(next: BakedIndirectTuning): void {
       active = next;
-      gain.value = next.enabled ? Math.min(next.composite, active.composite) : 0;
+      gain.value = next.enabled ? next.composite : 0;
+    },
+    setVolume(volume: IrradianceProbeVolume): void {
+      const [vx, vy, vz] = volume.dimensions;
+      if (vx !== nx || vy !== ny || vz !== nz) {
+        throw new Error(
+          `setVolume: node is bound to ${nx}x${ny}x${nz}, volume is ${vx}x${vy}x${vz}.`,
+        );
+      }
+      uploadBakedIndirectVolume(textures, volume);
+      volumeOrigin.value.set(volume.originM[0], volume.originM[1], volume.originM[2]);
+      volumeSpacing.value.set(volume.spacingM[0], volume.spacingM[1], volume.spacingM[2]);
+      bound = volume;
     },
     beforeRender(): void {
       const camera = sources.camera as THREE.PerspectiveCamera;
@@ -262,8 +318,8 @@ export function buildBakedIndirectLightNode(
     receipt() {
       return Object.freeze({
         dimensions: `${nx}x${ny}x${nz}`,
-        digest: volume.digest,
-        occluderShapes: volume.bake.occluderShapes,
+        digest: bound?.digest ?? 'unbound',
+        occluderShapes: bound?.bake.occluderShapes ?? -1,
         gain: gain.value,
       });
     },

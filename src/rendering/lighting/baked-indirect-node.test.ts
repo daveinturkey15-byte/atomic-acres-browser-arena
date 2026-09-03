@@ -97,9 +97,9 @@ describe('buildBakedIndirectTextures', () => {
     const x = 2; const y = 1; const z = 1;
     const probe = (z * ny + y) * nx + x;
     const position = vec3(
-      volume.originM[0] + x * volume.spacingM,
-      volume.originM[1] + y * volume.spacingM,
-      volume.originM[2] + z * volume.spacingM,
+      volume.originM[0] + x * volume.spacingM[0],
+      volume.originM[1] + y * volume.spacingM[1],
+      volume.originM[2] + z * volume.spacingM[2],
     );
     const normal = vec3(0, 1, 0);
     const reference = sampleIrradianceVolume(volume, position, normal);
@@ -126,6 +126,7 @@ describe('publishBakedIndirectReceipt', () => {
     const graph: BakedIndirectGraph = {
       light: null as never,
       applyTuning() { /* not exercised here */ },
+      setVolume() { /* not exercised here */ },
       beforeRender() { /* not exercised here */ },
       receipt: () => Object.freeze({
         dimensions: volume.dimensions.join('x'),

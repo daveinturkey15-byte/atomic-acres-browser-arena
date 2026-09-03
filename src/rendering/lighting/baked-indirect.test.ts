@@ -14,6 +14,7 @@ import {
   IRRADIANCE_VOLUME_FORMAT,
   SH_L1_COEFFICIENTS,
   bakeIrradianceVolume,
+  beginIrradianceBake,
   computeBakeDigest,
   decodeFloat32Base64,
   deserialiseIrradianceVolume,
@@ -182,6 +183,46 @@ describe('bakeIrradianceVolume', () => {
     expect(allZero).toBe(0);
   });
 
+  it('a chunked bake produces byte-identical coefficients to a one-shot bake', () => {
+    // The runtime path steps the bake under a per-frame millisecond budget so a
+    // loading screen does not freeze; the offline CLI runs it in one pass. If
+    // those two disagree, the committed cache would be a different volume from
+    // the one a player without the cache sees.
+    const scene = finaliseProxyScene([
+      groundPlaneProxy(0, vec3(0.42, 0.4, 0.38)),
+      box('wall', vec3(0, 3, 6), vec3(9, 3, 0.4), vec3(0.8, 0.12, 0.1)),
+      box('crate', vec3(-4, 1, 1), vec3(1, 1, 1), vec3(0.5, 0.45, 0.3)),
+    ], 3);
+    const options = { arenaId: 'chunked', tuning: resolveBakedIndirectTuning('low') } as const;
+    const oneShot = bakeIrradianceVolume(scene, DAYLIGHT, options);
+    const session = beginIrradianceBake(scene, DAYLIGHT, options);
+    let steps = 0;
+    while (!session.step(0) && steps < 10_000) steps += 1;
+    expect(session.done()).toBe(true);
+    expect(steps).toBeGreaterThan(1);
+    expect(session.progress()).toBe(1);
+    const chunked = session.volume();
+    expect(chunked.digest).toBe(oneShot.digest);
+    expect(Array.from(chunked.coefficients)).toEqual(Array.from(oneShot.coefficients));
+  });
+
+  it('a partially stepped volume is readable and non-negative rather than undefined', () => {
+    const scene = finaliseProxyScene([
+      groundPlaneProxy(0, vec3(0.42, 0.4, 0.38)),
+      box('wall', vec3(0, 3, 6), vec3(9, 3, 0.4), vec3(0.8, 0.12, 0.1)),
+    ], 2);
+    const session = beginIrradianceBake(scene, DAYLIGHT, {
+      arenaId: 'partial', tuning: resolveBakedIndirectTuning('low'),
+    });
+    session.step(0);
+    expect(session.done()).toBe(false);
+    expect(session.progress()).toBeGreaterThan(0);
+    expect(session.progress()).toBeLessThan(1);
+    const partial = session.volume();
+    const sample = sampleIrradianceVolume(partial, vec3(0, 1.5, 0), vec3(0, 1, 0));
+    for (const channel of sample) expect(Number.isFinite(channel) && channel >= 0).toBe(true);
+  });
+
   it('refuses to bake the OFF tier rather than emitting an empty volume', () => {
     expect(() => bakeIrradianceVolume(emptyScene(), DAYLIGHT, {
       arenaId: 'off', tuning: resolveBakedIndirectTuning('off'),
@@ -228,9 +269,9 @@ describe('planProbeGrid', () => {
     const plan = planProbeGrid(huge, 2, 2, BAKED_INDIRECT_MAXIMUM_PROBES);
     expect(plan.dimensions[0] * plan.dimensions[1] * plan.dimensions[2])
       .toBeLessThanOrEqual(BAKED_INDIRECT_MAXIMUM_PROBES);
-    expect(plan.spacingM).toBeGreaterThan(2);
+    expect(plan.spacingM[0]).toBeGreaterThan(2);
     // The grid still spans the whole arena: the far corner is inside it.
-    const spanX = plan.originM[0] + (plan.dimensions[0] - 1) * plan.spacingM;
+    const spanX = plan.originM[0] + (plan.dimensions[0] - 1) * plan.spacingM[0];
     expect(spanX).toBeGreaterThanOrEqual(201);
   });
 });
