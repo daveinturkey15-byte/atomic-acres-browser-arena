@@ -6221,7 +6221,13 @@ function resetWebGpuPresentationEpoch(reason: string, now: number): void {
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
-const MINIMAP_RENDER_HZ = 60;
+// PASS 87 Lane AR item 2 (Lane T's withheld patch, integrator-approved at 30 Hz).
+// The minimap is a full CPU 2D-canvas redraw on the frame loop's own thread and
+// ran once per presented frame. 30 Hz halves that work and is the floor
+// presentationFrameDue clamps to (MIN_GRAPHICS_TARGET_FPS). Cost measured in
+// src/minimap-render-cadence.test.ts: a moved player still reaches the canvas
+// within 2 frames of a 60 fps loop.
+const MINIMAP_RENDER_HZ = 30;
 let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
 let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
 let lastPlayerSpawnIndex = -1;

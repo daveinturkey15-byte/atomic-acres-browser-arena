@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_408;
+const LINE_CEILING = 36_414;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -100,6 +100,14 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'PASS 86 integration: Lane W viewmodel fit (HF-410), Lane Y drop shots (HF-412), '
       + 'Lane U Nuke Town Rebuild registration (HF-407) and Lane V Map 3 explore with the '
       + 'lazy arena registry and explore HUD (HF-409) grew the file; measured at the merged head.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 36_414,
+    note:
+      'PASS 87 Lane AR item 2: +6 lines of comment at MINIMAP_RENDER_HZ recording why the '
+      + 'minimap redraw dropped 60 Hz -> 30 Hz and where the 2-frame responsiveness budget '
+      + 'is measured (src/minimap-render-cadence.test.ts). No executable lines added.',
   },
 ];
 
