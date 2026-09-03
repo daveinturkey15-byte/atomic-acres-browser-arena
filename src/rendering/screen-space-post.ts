@@ -588,8 +588,14 @@ export function buildScreenSpacePostGraph(
       return node as unknown as Node<'vec4'>;
     },
     applyRuntime(next: ScreenSpacePostRuntime): void {
-      bakedIndirectRuntime?.applyTuning(next.bakedIndirect);
+      // THE ASSERT COMES FIRST. It used to run second for the baked layer and
+      // first for everything else, so an over-gain baked tuning reached the
+      // live uniform and the throw happened afterwards: the guard reported a
+      // breach it had already let through. `BakedIndirectGraph.applyTuning`
+      // clamps as well, because a fail-closed value should not depend on the
+      // order two lines happen to be written in.
       assertScreenSpacePostCombatSafety(next);
+      bakedIndirectRuntime?.applyTuning(next.bakedIndirect);
       active = next;
       // Only values behind live uniforms and render-target scales move here.
       // Turning an effect on or off is a graph topology change and belongs to

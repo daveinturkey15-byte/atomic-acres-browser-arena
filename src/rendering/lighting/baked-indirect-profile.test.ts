@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { GRAPHICS_PRESET_VALUES } from '../../graphics-settings-registry';
@@ -15,6 +17,7 @@ import {
   screenSpaceTopologyKey,
 } from '../screen-space-post-profile';
 import { BAKED_INDIRECT_MAXIMUM_GAIN, resolveBakedIndirectTuning } from './baked-indirect';
+import { EXTRACTION_DEBOUNCE_MS, buildBakedIndirectRuntime } from './baked-indirect-runtime';
 
 const SELECTION = {
   bakedIndirect: 'off',
@@ -140,5 +143,41 @@ describe('HF-418 baked indirect: combat safety is asserted, not assumed', () => 
       const tuning = resolveBakedIndirectTuning(preset.bakedIndirect);
       expect(tuning.composite).toBeLessThanOrEqual(BAKED_INDIRECT_MAXIMUM_GAIN);
     }
+  });
+
+  it('the LIVE gain uniform is clamped at its own setter, not only by the resolver (B6)', () => {
+    // THE DEFECT THIS PINS. `BakedIndirectGraph.applyTuning` wrote
+    // `gain.value = next.composite` with no ceiling, so a tuning that had not
+    // come through the resolver reached the live uniform at whatever value it
+    // carried. The envelope assert then threw - AFTERWARDS. A guard that
+    // reports a breach it has already let through is not a guard.
+    const scene = new THREE.Scene();
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(20, 40, 10);
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.02, 400);
+    scene.add(sun, sun.target, camera);
+    const runtime = buildBakedIndirectRuntime(
+      { sceneColor: null as never, sceneNormal: null as never, sceneViewZ: null as never, camera, sun },
+      resolveBakedIndirectTuning('high'), () => null, () => 0,
+    );
+    const overGain = { ...resolveBakedIndirectTuning('high'), composite: BAKED_INDIRECT_MAXIMUM_GAIN + 5 };
+    runtime.applyTuning(overGain);
+    expect(runtime.graph.receipt().gain).toBeLessThanOrEqual(BAKED_INDIRECT_MAXIMUM_GAIN);
+    runtime.dispose();
+    expect(EXTRACTION_DEBOUNCE_MS).toBeGreaterThan(0);
+  });
+
+  it('applies the baked tuning AFTER the family safety assert, not before it (B6)', () => {
+    // A source-order pin, because the ordering is the defect and no unit test
+    // of either function can see it: `applyRuntime` wrote the baked tuning into
+    // the live uniform on its FIRST line and asserted on its second, while every
+    // other value in the same function is applied after the assert.
+    const source = readFileSync('src/rendering/screen-space-post.ts', 'utf8');
+    const body = source.slice(source.indexOf('applyRuntime(next: ScreenSpacePostRuntime)'));
+    const assertAt = body.indexOf('assertScreenSpacePostCombatSafety(next)');
+    const applyAt = body.indexOf('bakedIndirectRuntime?.applyTuning(next.bakedIndirect)');
+    expect(assertAt).toBeGreaterThan(-1);
+    expect(applyAt).toBeGreaterThan(-1);
+    expect(assertAt).toBeLessThan(applyAt);
   });
 });

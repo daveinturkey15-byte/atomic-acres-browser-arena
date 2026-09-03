@@ -64,6 +64,7 @@ import {
 
 import {
   BAKED_INDIRECT_MAXIMUM_ADDITIVE,
+  BAKED_INDIRECT_MAXIMUM_GAIN,
   SH_A0,
   SH_A1,
   SH_L1_COEFFICIENTS,
@@ -290,7 +291,11 @@ export function buildBakedIndirectLightNode(
     light: light as unknown as Node<'vec3'>,
     applyTuning(next: BakedIndirectTuning): void {
       active = next;
-      gain.value = next.enabled ? next.composite : 0;
+      // Clamped HERE, not only in the resolver. The resolver is the normal
+      // route and it clamps; this setter is the one that writes the live
+      // uniform, and a value that reaches a live uniform unclamped is not
+      // "clamped, not assumed" whatever the route upstream promises.
+      gain.value = next.enabled ? Math.min(next.composite, BAKED_INDIRECT_MAXIMUM_GAIN) : 0;
     },
     setVolume(volume: IrradianceProbeVolume): void {
       const [vx, vy, vz] = volume.dimensions;
