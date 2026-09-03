@@ -731,7 +731,7 @@ export const GRAPHICS_CAPABILITY_NOTICES: readonly GraphicsCapabilityNotice[] = 
  * The exact shipped matrix is pinned in graphics-settings-registry.test.ts;
  * changing a value here without changing that table fails the suite.
  */
-export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' | 'high' | 'raytraced' | 'max', AdvancedGraphicsValues>> = Object.freeze({
+export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' | 'high' | 'max', AdvancedGraphicsValues>> = Object.freeze({
   // PERFORMANCE — deliberately untouched. This is the compatibility-forced and
   // low-spec preset; nothing in the screen-space stack runs here at all.
   performance: Object.freeze({
@@ -856,23 +856,38 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
     wetSurfaces: true, ambientLife: 0.8,
   }),
-  // QUALITY — the auto-selected default on 8-core/8 GB machines, so it takes
-  // only the two cheapest additive effects and both at their LOW tier:
+  // QUALITY — the auto-selected default on 8-core/8 GB machines. Since HF-438
+  // it also carries the retired RAY TRACED rung's trace at the LIGHT tier, on
+  // top of the two cheapest additive effects it already took at their LOW tier:
   //   Sun shafts LOW  — 24 raymarch steps at 0.35 scale, gain 0.14 of a ceiling
   //                     of 0.22. No extra MRT attachment; `shadows` is already
   //                     'high' here, which is the effect's one hard dependency.
   //   SSR LOW         — half-resolution march, 6 m reach, intensity 0.5 of a
   //                     ceiling of 0.75. This one DOES add the normal and
-  //                     material MRT attachments, which is the main new cost on
-  //                     this preset; the adaptive valve is the recovery path.
+  //                     material MRT attachments; the adaptive valve is the
+  //                     recovery path.
+  //   Trace REFLECTIONS (HF-438, light tier) — world-space Whitted reflection
+  //                     rays against the arena's analytic proxy set, with hard
+  //                     shadow rays inside the reflected image. The layer is
+  //                     additive and double-clamped (absolute linear-HDR
+  //                     ceiling 0.20, and at most 6% of each pixel's own
+  //                     luminance); players, bots and vehicles are not in the
+  //                     traced set, so no reflection can show an enemy the
+  //                     baseline preset could not. MSAA 4x and SSR LOW are
+  //                     both KEPT: the owner asked for ray tracing baked INTO
+  //                     the profile, not a trade away from it.
+  //   AO HIGH (HF-438, light tier) — GTAO at the lower sample count: 0.5
+  //                     resolution scale, 12 samples, spatial denoise. This is
+  //                     the retired rung's own AO tier and the largest
+  //                     per-frame addition of the fold.
   // SSGI, depth of field and motion blur stay off here: the first is the
   // expensive gather, the other two are the ones that replace pixels. All three
   // belong to a preset the player picks on purpose.
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
-    screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'high',
+    screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
@@ -883,80 +898,12 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
     wetSurfaces: true, ambientLife: 1,
   }),
-  // ===================================================================
-  // RAY TRACED — HF-398. The fourth rung, between Quality and Max.
-  // ===================================================================
-  //
-  // WHY IT IS NOT CALLED "RTX". No shipping browser exposes a hardware
-  // ray-tracing pipeline: there is no ray query, no acceleration-structure API
-  // and no extension a web page can request, so RT cores are not addressable
-  // from a tab on any GPU. A preset named RTX would be a claim the build cannot
-  // back, and every player with a capable card who selected it and saw software
-  // shading would be right to file a bug. What this preset genuinely is, is
-  // classic recursive ray tracing — Whitted (1980) with the Hall shading model
-  // (1983) — so "RAY TRACED" is honest and needs no scare quotes. It claims no
-  // RTX, no RT cores, no hardware acceleration, and no path tracing.
-  //
-  // WHY IT SITS BELOW MAX RATHER THAN ABOVE IT, AND WHY THAT IS THE POINT.
-  // MAX cannot deploy: cold pipeline compile measures 5.17 / 5.59 / 6.48 /
-  // 6.54 s against a 4000 ms admission bound and bounces the player to the
-  // menu. A preset that added a large new fragment shader ON TOP of MAX would
-  // be strictly worse. So this one BUYS its trace by spending less elsewhere,
-  // and each trade is a real one rather than a rounding-down:
-  //
-  //   MSAA 4x -> SMAA        Drops the 4-sample principal HDR target, which
-  //                          multiplies pipeline variants and bandwidth across
-  //                          every material in the arena, for one display-side
-  //                          post stage. This is the single biggest saving.
-  //   SSR OFF                The ray-traced layer supersedes it and reaches
-  //                          off-screen geometry too. Running both would
-  //                          double-count reflected light and pay for it twice.
-  //   SSGI OFF               The expensive gather. Classic ray tracing computes
-  //                          no indirect bounce either, and the honest answer to
-  //                          that is the baked PMREM probe at its highest tier
-  //                          (reflectionQuality ULTRA = 512), which costs load
-  //                          time and no pipelines — never a raised ambient.
-  //   Motion blur OFF        The one effect that removes information, on a
-  //                          preset whose whole proposition is detail.
-  //   Shadows static, AO high  MAX's dynamic shadow update and ultra GTAO are
-  //                          the two remaining per-frame costs that buy least
-  //                          at this tier.
-  //   Render scale 1.00      A 1.15x supersample multiplies every pass in the
-  //                          frame, including the new one.
-  //
-  // WHAT IT ADDS: rayTracing REFLECTIONS. Real world-space rays against the
-  // arena's analytic proxy set, with hard-edged shadow rays inside the
-  // reflected image. REFRACTIONS (glass, water and shadow-ray caustics) is the
-  // same trace plus a transmitted ray and its shadow ray — roughly double the
-  // arithmetic — and it stays a deliberate Custom opt-in until it has a
-  // measured cold-compile figure on every arena, exactly the discipline that
-  // keeps `spatialUpscaling` out of every preset here.
-  //
-  // COMBAT SAFETY: the layer is ADDITIVE and double-clamped — an absolute
-  // linear-HDR ceiling of 0.20, and a ceiling of 6% of each pixel's own
-  // luminance so an enemy silhouette's Weber contrast can fall by at most a
-  // factor of 1.06. Players, bots and vehicles are not in the traced set at
-  // all, so no enemy can be duplicated into a mirror and the preset supplies no
-  // positional information Performance cannot.
-  raytraced: Object.freeze({
-    renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
-    antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'high',
-    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'ultra',
-    environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
-    particleQuality: 'high', anisotropy: 16, decalQuality: 'high', bloomQuality: 'cinematic',
-    exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.36, vignette: 0.17,
-    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
-    // Between Quality's authored 1.0 and Max's 1.35. Wet surfaces are the ones
-    // the coat material was chosen for, so rain is worth more on this preset
-    // than on any other — but the trace is the frame's new cost centre and rain
-    // is pure fill rate, so it does not get Max's ceiling.
-    weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
-    // The trace is what this preset is for and wet surfaces are what it has
-    // most to show, so the air stays at the authored figure rather than
-    // spending the frame on motes.
-    wetSurfaces: true, ambientLife: 1.15,
-  }),
+  // HF-438 (owner 2026-09-03, verbatim: "I don't think we should have a ray
+  // tracing AND an RTX mode"). The RAY TRACED preset is RETIRED as a rung: its
+  // ray-traced reflection stage lives in QUALITY at the light tier and here at
+  // the FULL tier; BALANCED and PERFORMANCE take none of it. The RTX menu entry
+  // remains the native-runtime explainer — it was never a preset and changes no
+  // renderer value. Refractions stay a deliberate Custom opt-in.
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as
     // rock solid as Quality and Performance. Adaptive resolution is a distress
@@ -966,7 +913,14 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     //
     // This is the preset that has to actually LOOK like the top preset, so the
     // whole additive stack runs at its highest tier and both pixel-replacing
-    // effects are on at a bounded value:
+    // effects are on at a bounded value. Since HF-438 it also carries the
+    // ray-traced reflection stage at the FULL tier:
+    //   Trace REFLECTIONS (HF-438, full tier) — the same combat-clamped
+    //                     world-space trace QUALITY carries, riding on top of
+    //                     the full stack (ultra AO, ultra PMREM probes, high
+    //                     SSGI). Its pipelines are compiled with the rest of
+    //                     this preset's at admission; the audit tripwire
+    //                     requires zero pipelines compiled in combat.
     //   Sun shafts HIGH — 48 steps at 0.5 scale, gain 0.22, i.e. exactly the
     //                     GODRAY_MAXIMUM_ADDITIVE_GAIN ceiling.
     //   SSR HIGH        — 0.75-scale march, 12 m reach, binary refine,
@@ -986,7 +940,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
     shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
-    screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'off', reflectionQuality: 'ultra',
+    screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,

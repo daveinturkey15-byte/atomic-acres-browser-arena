@@ -13,7 +13,7 @@ import {
   RAY_TRACED_MIDFIELD_MAXIMUM_BLUR_PX,
   RAY_TRACED_MIDFIELD_NEAR_M,
   RAY_TRACED_MINIMUM_SAFE_BASELINE_CONTRAST,
-  RAY_TRACED_PRESET_COMPILE_TRADES,
+  RAY_TRACED_FOLD_INTEGRATION,
   RAY_TRACED_PRESET_PARITY,
   RAY_TRACED_SHADOW_CASTING_LIGHTS,
   RAY_TRACED_TRANSPARENT_SCREEN_AREA_BUDGET,
@@ -291,42 +291,43 @@ describe('HF-398 traced output, asserted rather than assumed', () => {
   });
 });
 
-describe('HF-398 preset integration', () => {
-  it('ships RAY TRACED between Quality and Max, and leaves the other three untouched', () => {
-    const { performance, high, raytraced, max } = GRAPHICS_PRESET_VALUES;
-    expect(raytraced.rayTracing).toBe('reflections');
-    for (const preset of [performance, high, max]) expect(preset.rayTracing).toBe('off');
-    // Between Quality and Max, and paid for by spending less than Max does.
-    expect(raytraced.renderScale).toBeGreaterThanOrEqual(high.renderScale);
-    expect(raytraced.renderScale).toBeLessThan(max.renderScale);
-    expect(raytraced.reflectionQuality).toBe('ultra');
-    expect(raytraced.ambientOcclusion).toBe('high');
+describe('HF-438 folded preset integration', () => {
+  it('ships the trace inside QUALITY (light) and MAX (full), and leaves the lower two untouched', () => {
+    const { performance, balanced, high, max } = GRAPHICS_PRESET_VALUES;
+    expect(high.rayTracing).toBe('reflections');
+    expect(max.rayTracing).toBe('reflections');
+    for (const preset of [performance, balanced]) expect(preset.rayTracing).toBe('off');
+    // The LIGHT tier on QUALITY: the trace runs at the reflections tier with
+    // AO at the lower sample count, and nothing else about the rung moved.
+    expect(high.antiAliasing).toBe('msaa-4x');
+    expect(high.ambientOcclusion).toBe('high');
+    expect(high.screenSpaceReflections).toBe('low');
+    expect(high.shadowUpdateMode).toBe('static');
+    expect(high.depthOfField).toBe(false);
+    // The FULL tier on MAX: the trace rides on top of the full stack, which
+    // already held every raised tier the retired rung had argued for.
     expect(max.ambientOcclusion).toBe('ultra');
-    expect(raytraced.shadowUpdateMode).toBe('static');
     expect(max.shadowUpdateMode).toBe('dynamic');
-    expect(raytraced.motionBlur).toBe(0);
-    // The trace supersedes screen-space reflections; running both would
-    // double-count reflected light and pay for it twice.
-    expect(raytraced.screenSpaceReflections).toBe('off');
-    expect(raytraced.screenSpaceGi).toBe('off');
+    expect(max.reflectionQuality).toBe('ultra');
+    expect(max.screenSpaceGi).toBe('high');
     // Shadow rays need a shadow-casting sun, so a preset that enables the trace
     // and disables shadows would ship a control that reports itself broken.
-    expect(raytraced.shadows).toBe('high');
-    // MSAA 4x is what pays for the trace, and dropping it is only honest if AA
-    // is still delivered somehow.
-    expect(raytraced.antiAliasing).toBe('smaa');
-    expect(max.antiAliasing).toBe('msaa-4x');
+    expect(high.shadows).toBe('high');
+    expect(max.shadows).toBe('high');
     // Depth of field stays off: the aperture bound above proves the gameplay
     // camera has to be a pinhole, so there is no aperture DoF to spend on.
-    expect(raytraced.depthOfField).toBe(false);
+    expect(high.depthOfField).toBe(false);
+    expect(max.motionBlur).toBeGreaterThan(0);
   });
 
-  it('states the compile trades and the parity decision in writing', () => {
-    expect(RAY_TRACED_PRESET_COMPILE_TRADES.length).toBeGreaterThanOrEqual(5);
-    for (const [trade, why] of RAY_TRACED_PRESET_COMPILE_TRADES) {
+  it('states the fold integration and the parity decision in writing', () => {
+    expect(RAY_TRACED_FOLD_INTEGRATION.length).toBeGreaterThanOrEqual(3);
+    for (const [trade, why] of RAY_TRACED_FOLD_INTEGRATION) {
       expect(trade.length).toBeGreaterThan(0);
       expect(why.length).toBeGreaterThan(40);
     }
+    expect(RAY_TRACED_FOLD_INTEGRATION.some(([tier]) => tier.includes('QUALITY'))).toBe(true);
+    expect(RAY_TRACED_FOLD_INTEGRATION.some(([tier]) => tier.includes('MAX'))).toBe(true);
     // The parity rule is a competitive-integrity decision, so it is recorded as
     // data rather than as a comment somebody can quietly disagree with.
     expect(RAY_TRACED_PRESET_PARITY.dynamicObjectsTraced).toBe(false);

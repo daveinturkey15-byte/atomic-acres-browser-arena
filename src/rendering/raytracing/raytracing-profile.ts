@@ -35,9 +35,10 @@
  *
  * A classic ray tracer has a nastier shape here than a stack of small post
  * passes: the trace is ONE large fragment shader, so its cold compile arrives
- * as a single long stall landing squarely on the admission frame. The preset
- * therefore BUYS its budget rather than borrowing it, by spending less
- * elsewhere than MAX does — see `RAY_TRACED_PRESET_COMPILE_TRADES`.
+ * as a single long stall landing squarely on the admission frame. HF-438 folds
+ * the trace into QUALITY and MAX, so the integration — where the cost is paid
+ * and what stays a Custom opt-in — is stated as data in
+ * `RAY_TRACED_FOLD_INTEGRATION` rather than trusted to a comment.
  */
 
 import {
@@ -596,23 +597,18 @@ export const RAY_TRACED_PRESET_PARITY = Object.freeze({
 });
 
 /**
- * What this preset spends LESS on than MAX, and why, so the cold-compile trade
- * is a stated design rather than a hopeful one. MAX measured 5.17 / 5.59 /
- * 6.48 / 6.54 s against a 4000 ms fence; a preset that simply added a large new
- * fragment shader on top of that would be strictly worse.
+ * Where the ray-traced layer's integration cost is paid, stated as data rather
+ * than as a comment somebody can quietly disagree with. HF-398's retired
+ * preset bought its trace by spending less than MAX; HF-438 folds the trace
+ * into the ladder itself, so the statement is now about QUALITY (light tier)
+ * and MAX (full tier) and about what the fold deliberately does NOT do.
  */
-export const RAY_TRACED_PRESET_COMPILE_TRADES: readonly (readonly [string, string])[] = Object.freeze([
-  Object.freeze(['MSAA 4x -> SMAA', 'Drops the 4-sample principal HDR target, which multiplies pipeline variants and bandwidth across every material in the arena, for one display-side post stage.'] as const),
-  Object.freeze(['Screen-space reflections OFF', 'The ray-traced layer supersedes them and reflects off-screen geometry too; running both would double-count reflected light and pay twice.'] as const),
-  Object.freeze(['Screen-space GI OFF', 'The expensive gather. Classic ray tracing has no indirect bounce either, so the honest fill is the baked PMREM probe at its highest tier, which costs load time and no pipelines.'] as const),
-  Object.freeze(['Motion blur OFF', 'The one effect in the stack that removes information, on a preset whose entire proposition is detail.'] as const),
-  Object.freeze(['Shadow update static, AO high not ultra', "MAX's dynamic shadow update and ultra GTAO are the two remaining per-frame costs that buy least at this tier."] as const),
-  Object.freeze(['Render scale 1.0 not 1.15', 'A 1.15x supersample multiplies every pass in the frame, including the new one.'] as const),
+export const RAY_TRACED_FOLD_INTEGRATION: readonly (readonly [string, string])[] = Object.freeze([
+  Object.freeze(['QUALITY (light tier)', 'Carries the reflection trace with MSAA 4x and its low screen-space reflections kept, AO raised off to HIGH (0.5 resolution scale, 12 samples, denoise): the fold is additive and the rung stays the auto-selected default.'] as const),
+  Object.freeze(['MAX (full tier)', 'Carries the reflection trace on top of the full stack (ultra AO, ultra PMREM probes, high SSGI); the audit counts the added pipelines at admission and the tripwire requires zero pipelines compiled in combat.'] as const),
+  Object.freeze(['Refractions stay Custom', 'The refraction tier (one extra recursion level plus caustics) remains a deliberate Custom opt-in until it has a measured cold-compile figure on every arena, exactly the discipline that keeps spatial upscaling out of every preset.'] as const),
+  Object.freeze(['Admission fence unchanged', 'The cold-compile admission fence is not widened: the menu-time precompile the ladder relies on covers the folded control sets, and no combat-time compile is admitted anywhere.'] as const),
 ]);
-
-// ---------------------------------------------------------------------------
-// The readability gate, run against real traced radiance
-// ---------------------------------------------------------------------------
 
 export type ReadabilityProbe = Readonly<{
   distanceM: number;

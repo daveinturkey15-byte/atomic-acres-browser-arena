@@ -6,7 +6,7 @@ import { RAY_TRACED_MAXIMUM_SHAPES } from './raytracing-profile';
 import { ALL_ARENA_IDS } from '../../../scripts/qa/collider-visual-parity-core';
 
 /**
- * RAY TRACED preset coverage gate.
+ * Ray-traced reflection coverage gate (the trace ships inside QUALITY and MAX).
  *
  * The preset itself has worked for some time. What it did not have was
  * anything to reflect: measured on the pass79 tree, the proxy extractor
@@ -44,7 +44,7 @@ import { ALL_ARENA_IDS } from '../../../scripts/qa/collider-visual-parity-core';
  *      world matrices on moved atomic-acres 7 -> 11 reflective meshes and
  *      farcrysis 3 -> 4 before a single other change.
  *   3. It built arena geometry only. On the WebGPU route - the ONLY route the
- *      RAY TRACED preset exists on - `createPass64TslSceneSystems` adds the
+ *      trace exists on - `createPass64TslSceneSystems` adds the
  *      shared sky, grass and perimeter ocean to the same scene. That ocean,
  *      `Pass 64 TSL perimeter water`, is the single surface class
  *      `arena-proxy-registration.ts` was written for, and it was never once
@@ -296,7 +296,7 @@ beforeAll(async () => {
   }
 }, 600_000);
 
-describe('RAY TRACED arena proxy coverage', () => {
+describe('ray-traced arena proxy coverage', () => {
   it('gives the tracer something to reflect on every arena', () => {
     const empty = ALL_ARENA_IDS.filter((id) => (coverage.get(id)?.reflectiveMeshCount ?? 0) === 0);
     // The exact pass79 defect: five of six arenas at zero, with the preset

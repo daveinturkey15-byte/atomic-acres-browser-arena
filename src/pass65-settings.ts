@@ -38,17 +38,16 @@ export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
  * reason for every entry in it are in graphics-settings-registry.ts, derived
  * from the HF-414 cost audit.
  *
- * `raytraced` is HF-398, and its id says what it does. It is NOT called `rtx`:
- * no shipping browser exposes a hardware ray-tracing pipeline, so RT cores are
- * unreachable from a tab and a preset named after them would be a claim the
- * build cannot back. This id reaches the player directly — the effective-preset
- * badge prints it uppercased — so it has to be true as a label and not merely
- * as an internal token. The word RTX appears in exactly one place in the
- * player-facing build, and it is not a preset: it is the native-runtime
- * EXPLAINER (src/ui/rtx-native-runtime-explainer.ts), which changes no
- * renderer setting at all.
+ * `raytraced` WAS HF-398 and is RETIRED by HF-438 (owner, 2026-09-03:
+ * "I don't think we should have a ray tracing AND an RTX mode"). It is no
+ * longer a member of this union; a stored `raytraced` preference migrates to
+ * `high`, which now carries the trace at its light tier. The word RTX still
+ * appears in exactly one place in the player-facing build, and it is not a
+ * preset: it is the native-runtime EXPLAINER
+ * (src/ui/rtx-native-runtime-explainer.ts), which changes no renderer setting
+ * at all.
  */
-export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom';
+export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';
 
 export type GraphicsSettings = Readonly<AdvancedGraphicsValues & {
@@ -175,7 +174,8 @@ export type CapabilityHints = Readonly<{
 
 export const MIN_GRAPHICS_TARGET_FPS = 30;
 export const MAX_GRAPHICS_TARGET_FPS = 360;
-const PRESETS = new Set<GraphicsPreset>(['performance', 'balanced', 'high', 'raytraced', 'max', 'custom']);
+/** Static membership table for the stored-preset gate (HF-438: no 'raytraced'). */
+const PRESETS: Readonly<Record<string, true>> = Object.freeze({ performance: true, balanced: true, high: true, max: true, custom: true });
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -231,7 +231,17 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   if (!value || typeof value !== 'object') return defaults;
   const raw = value as Partial<Pass65Settings>;
   const rawGraphics = raw.graphics && typeof raw.graphics === 'object' ? raw.graphics as Partial<GraphicsSettings> : {};
-  const preset = PRESETS.has(rawGraphics.preset as GraphicsPreset) ? rawGraphics.preset as GraphicsPreset : defaults.graphics.preset;
+  // HF-438 migration: a stored `raytraced` preference (HF-398, retired) maps
+  // to QUALITY on load — the rung that now carries the trace — regardless of
+  // what this machine's automatic default would have been.
+  const LEGACY_PRESET_ALIASES: Readonly<Record<string, Exclude<GraphicsPreset, 'custom'>>> = Object.freeze({ raytraced: 'high' });
+  const storedPreset = typeof rawGraphics.preset === 'string' ? rawGraphics.preset : null;
+  const requestedPreset = storedPreset !== null && storedPreset in LEGACY_PRESET_ALIASES
+    ? LEGACY_PRESET_ALIASES[storedPreset]
+    : storedPreset;
+  const preset = requestedPreset !== null && requestedPreset in PRESETS
+    ? requestedPreset as GraphicsPreset
+    : defaults.graphics.preset;
   // A named profile is an atomic, canonical choice. Persisted advanced values
   // can only belong to Custom; allowing them to leak into a named profile
   // makes the label lie about the runtime configuration after migrations.
@@ -345,8 +355,9 @@ export type GraphicsRouteCapability = Readonly<{
 }>;
 
 /**
- * Why RAY TRACED was demoted. Printed by the EFFECTIVE badge next to the preset
- * the player actually got, in the same slot the compatibility route uses.
+ * Why the ray-traced controls were switched off. Printed by the EFFECTIVE
+ * badge next to the preset the player kept, in the same slot the
+ * compatibility route uses.
  */
 export const RAY_TRACED_REQUIRES_WEBGPU_REASON =
   'Ray tracing needs the WebGPU renderer; this device fell back to WebGL2.';
@@ -376,28 +387,14 @@ export function resolveGraphicsRuntime(
   forceCompatibility = false,
   capability: GraphicsRouteCapability = {},
 ): GraphicsRuntime {
-  // PASS 81 — the capability gate for the classic ray tracer.
-  //
-  // The trace is built inside the TSL/HDR graph and that graph exists only on
-  // the WebGPU route, so on a WebGL2 fallback RAY TRACED was QUALITY minus MSAA
-  // 4x minus screen-space reflections, with nothing traced in exchange: the one
-  // preset in the ladder that was strictly worse than the preset below it, and
-  // the EFFECTIVE badge still read RAY TRACED.
-  //
-  // The demotion is a real substitution of values, not a relabel. A relabel
-  // would have left the player paying RAY TRACED's costs for QUALITY's picture,
-  // which is the defect rather than the fix. A CUSTOM set is treated
-  // differently on purpose: that player did not ask for QUALITY, they asked for
-  // their own values, exactly one of which this machine cannot draw.
+  // PASS 81 — the capability gate for the classic ray tracer. Since HF-438 the
+  // trace ships inside QUALITY and MAX, so a renderer that cannot trace simply
+  // has that one control switched off, with a reason: the player keeps the
+  // rung they chose and every other value they asked for.
   const traceUnavailable = capability.rayTracingCapable === false && requestedGraphics.rayTracing !== 'off';
-  const demotedFromRayTraced = traceUnavailable && requestedGraphics.preset === 'raytraced';
-  const settings: GraphicsSettings = !traceUnavailable
-    ? requestedGraphics
-    : demotedFromRayTraced
-      // `preset` deliberately stays `raytraced` here so `requestedPreset` still
-      // reports what the player chose; only `effectivePreset` moves.
-      ? Object.freeze({ ...requestedGraphics, ...GRAPHICS_PRESET_VALUES.high })
-      : Object.freeze({ ...requestedGraphics, rayTracing: 'off' as const });
+  const settings: GraphicsSettings = traceUnavailable
+    ? Object.freeze({ ...requestedGraphics, rayTracing: 'off' as const })
+    : requestedGraphics;
   const weather = resolveWeatherPresentation(settings);
   publishWeatherPresentation(weather);
   // Second latch, same contract, same cadence: a pure function of `settings`,
@@ -467,7 +464,7 @@ export function resolveGraphicsRuntime(
   }
   return Object.freeze({
     requestedPreset: requestedGraphics.preset,
-    effectivePreset: demotedFromRayTraced ? 'high' : settings.preset,
+    effectivePreset: settings.preset,
     renderProfile: settings.geometryDetail === 'reduced' ? 'performance' : 'blender',
     renderScale: Math.min(1.25, settings.renderScale),
     adaptive: settings.adaptiveResolution,
@@ -560,24 +557,23 @@ export function resolveActiveGraphicsConfig(
 }
 
 /**
- * Public preset label after an explicit renderer review route AND the renderer
- * route's own capability are applied.
+ * Public preset label after an explicit renderer review route is applied.
  *
- * The capability demotion is LAST because an explicit review route is a
- * stronger statement: `?render=performance` already forced the whole budget
- * down, and reporting a preset the route does not run would be the same lie
- * from the other direction. It mirrors `resolveGraphicsRuntime`'s
- * `effectivePreset` exactly; the reason string that belongs beside it is
- * `RAY_TRACED_REQUIRES_WEBGPU_REASON`, published through `GraphicsRuntime.reason`.
+ * An explicit review route is a stronger statement than any preset:
+ * `?render=performance` already forced the whole budget down, and reporting a
+ * preset the route does not run would be the same lie from the other
+ * direction. It mirrors `resolveGraphicsRuntime`'s `effectivePreset`; the
+ * trace's capability gate lives THERE — since HF-438 it switches the one
+ * control off and keeps the rung — and its reason string is
+ * `RAY_TRACED_REQUIRES_WEBGPU_REASON`, published through
+ * `GraphicsRuntime.reason`.
  */
 export function resolveDisplayedGraphicsPreset(
   requestedPreset: GraphicsPreset,
   queryRenderProfile: RenderProfile | null = null,
-  capability: GraphicsRouteCapability = {},
 ): GraphicsPreset {
   if (queryRenderProfile === 'performance' || queryRenderProfile === 'compat') return 'performance';
   if (queryRenderProfile === 'blender') return 'high';
-  if (capability.rayTracingCapable === false && requestedPreset === 'raytraced') return 'high';
   return requestedPreset;
 }
 

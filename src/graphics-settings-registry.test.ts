@@ -240,35 +240,22 @@ describe('Advanced Graphics canonical registry', () => {
       high: {
         // QUALITY, the auto-selected default. LOW baked bounce: measured at
         // +0.7% median / +0.3% p95 against the layer switched off, and zero
-        // added pipelines at admission.
+        // added pipelines at admission. HF-438 folds the retired RAY TRACED
+        // rung's trace in at the LIGHT tier: the reflections tier on, SSR LOW
+        // and MSAA 4x both kept, AO raised off to HIGH in the AO pin below.
         bakedIndirect: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
-        rayTracing: 'off',
-        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
-      },
-      // HF-398 RAY TRACED. Screen-space reflections are OFF here on purpose:
-      // the trace supersedes them and reaches off-screen geometry too, so
-      // running both would double-count reflected light and pay twice. SSGI is
-      // off for the same reason it is off on Quality — it is the expensive
-      // gather, and classic ray tracing computes no indirect bounce either.
-      // Motion blur stays at zero because it is the one effect that removes
-      // information, on the preset whose whole proposition is detail.
-      raytraced: {
-        // Classic recursive tracing computes NO indirect bounce, so this is the
-        // preset that needs the baked one most; it is what gets raised instead
-        // of a flat ambient constant.
-        bakedIndirect: 'high',
-        volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
         bakedIndirect: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
-        // MAX is untouched by HF-398. It already cannot deploy against the
-        // 4000 ms admission bound; adding a large new fragment shader to it
-        // would make a failing preset fail harder.
-        rayTracing: 'off',
+        // HF-438: MAX carries the trace at the FULL tier, on top of a stack
+        // that already held every raised tier the retired rung had argued for
+        // (ultra AO, ultra PMREM, high SSGI). The audit counts the added
+        // pipelines at admission; the tripwire requires zero in combat.
+        rayTracing: 'reflections',
         depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
       },
     } as const;
@@ -439,10 +426,6 @@ describe('Advanced Graphics weather controls', () => {
         weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1,
       },
-      raytraced: {
-        weatherIntensity: 'storm', rainDensity: 1.15, windStrength: 1, lightning: true,
-        wetSurfaces: true, ambientLife: 1.15,
-      },
       max: {
         weatherIntensity: 'storm', rainDensity: 1.35, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1.5,
@@ -467,12 +450,11 @@ describe('Advanced Graphics weather controls', () => {
     // invisible on the preset most machines land on.
     expect(GRAPHICS_PRESET_VALUES.high.weatherIntensity).toBe('storm');
     // Airborne detail rises monotonically with the preset ladder: a heavier
-    // preset that showed LESS air would be a straight defect.
+    // preset that showed LESS air would be a straight defect. (HF-438: the
+    // RAY TRACED rung was retired; its 1.15 air no longer sits in between.)
     expect(GRAPHICS_PRESET_VALUES.performance.ambientLife)
       .toBeLessThan(GRAPHICS_PRESET_VALUES.high.ambientLife);
     expect(GRAPHICS_PRESET_VALUES.high.ambientLife)
-      .toBeLessThan(GRAPHICS_PRESET_VALUES.raytraced.ambientLife);
-    expect(GRAPHICS_PRESET_VALUES.raytraced.ambientLife)
       .toBeLessThan(GRAPHICS_PRESET_VALUES.max.ambientLife);
     // Wet ground costs two material writes on a 2.5 s scan, so no preset has a
     // performance reason to drop it - it stays a taste control on every rung.
