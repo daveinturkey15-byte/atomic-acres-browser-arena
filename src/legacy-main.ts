@@ -30930,7 +30930,15 @@ function frame(now: number, scheduleNext = true): void {
       // Held for the whole window once armed. Toggling it off the instant the
       // presented estimate wobbles made the one surface that explains the frame
       // rate flicker in and out while the player was trying to read it.
-      refreshWarning.hidden = now >= refreshWarningUntil;
+      //
+      // ...except in CAPTURE mode. A deterministic review frame is a
+      // measurement, and this banner lays an opaque strip across the bottom of
+      // it: the Lane AB time-of-day frames for Terminal both carry a "91 HZ
+      // DISPLAY REFRESH" notice over ~8% of the frame. It is constant across a
+      // pair so it cannot flip the sign of a delta, but it dilutes every
+      // percentage-of-frame metric and it is not a clean review capture. The
+      // same flag that hides the viewmodel for a capture hides it.
+      refreshWarning.hidden = debugCaptureViewmodelHidden || now >= refreshWarningUntil;
       lastFpsHudAt = now;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);

@@ -1,7 +1,7 @@
 import { ARENA_DAYLIGHT_PROFILES, resolveLightingConditions, resolveLightingHour, LIGHTING_CONDITION_BOUNDS } from '../../src/rendering/lighting-conditions.ts';
 import { ARENA_IDS } from '../../src/arena-identity.ts';
 import { ARENA_WEATHER_PROFILES } from '../../src/weather/weather-state.ts';
-const LABEL = { 'atomic-acres':'Nuke Town','skyline-terminal':'Terminal','rustworks-1v1':'RustRig','gun-range':'Gun Range',farcrysis:'Farcrysis','high-seas':'High Seas',test1:'Firing Range',test2:'Raid',map3:'Map 3',nuketown2:'Nuke Town Rebuild' };
+const LABEL = { 'atomic-acres':'Nuke Town','skyline-terminal':'Terminal','rustworks-1v1':'RustRig','gun-range':'Gun Range',farcrysis:'Farcrysis','high-seas':'High Seas',test1:'Firing Range',test2:'Raid',map3:'Map 3',nuketown2:'Nuke Town Rebuild',raid2:'Raid Rebuild' };
 const label = (id) => { if (!LABEL[id]) throw new Error(`no display label for arena '${id}' -- add it to LABEL`); return LABEL[id]; };
 const hm = (h)=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h%1)*60)).padStart(2,'0')}`;
 const f=(n,d=3)=>Number(n).toFixed(d);
