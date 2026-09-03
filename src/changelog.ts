@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass90ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass91ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 90. */
+const pass90ReleasedAt = '2026-09-03T09:30:35+01:00';
 /** gh-pages publish receipt for PASS 89. */
 const pass89ReleasedAt = '2026-09-03T07:25:14+01:00';
 /** gh-pages publish receipt for PASS 88. */
@@ -138,6 +140,22 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass91',
+    pass: 'PASS 91',
+    title: 'Pass 91 · Nuke Town Rebuild Refined & Crouch Speed',
+    releasedAt: pass91ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'MOVEMENT']),
+    summary: "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint.",
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW refined: the stair, landing and upper hallway where the reference has them, cover on the side areas, spawns re-solved, doors a standing player walks through, and the coach, truck and cars placed as in Black Ops 2 with the 2x core riding the truck',
+      'Crouching now moves at its own slower speed, cannot sprint, and cancels a held sprint the way the drop shot does; stand and press Shift again to run',
+      'Pass 90 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -

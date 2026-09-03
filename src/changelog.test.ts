@@ -13,13 +13,13 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 90 candidate first and freezes every published timestamp behind it', () => {
+  it('keeps the pending Pass 91 candidate first and freezes every published timestamp behind it', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass90');
+    expect(latest.id).toBe('pass91');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 90');
-    expect(latest.summary).toContain('Pass 90');
+    expect(latest.title).toContain('Pass 91');
+    expect(latest.summary).toContain('Pass 91');
     // HF-406: Pass 73 stopped being the current entry on 2026-09-02. Its Pages
     // publication receipt is e138853f ("PASS 73 from 506d6142", 2026-08-21T20:27:27Z),
     // so it is history with a real timestamp, not a candidate that never shipped.
@@ -41,8 +41,10 @@ describe('changelog', () => {
     // HF-406: the badge leads with the pass number the build is stamped with. The old
     // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
     // the owner read as "pass 73 HITL".
-    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 90 · RELEASE CANDIDATE');
-    expect(latest.highlights.join('\n')).toContain('NUKE TOWN REBUILD · PREVIEW now follows ');
+    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 91 · RELEASE CANDIDATE');
+    expect(latest.highlights.join('\n')).toContain('NUKE TOWN REBUILD · PREVIEW refined: the');
+    const pass90Highlights = CHANGELOG.find((entry) => entry.id === 'pass90')?.highlights.join('\n') ?? '';
+    expect(pass90Highlights).toContain('NUKE TOWN REBUILD · PREVIEW now follows ');
     const pass89Highlights = CHANGELOG.find((entry) => entry.id === 'pass89')?.highlights.join('\n') ?? '';
     expect(pass89Highlights).toContain('A new BALANCED graphics mode sits between Performance and Quality');
     const pass88Highlights = CHANGELOG.find((entry) => entry.id === 'pass88')?.highlights.join('\n') ?? '';
