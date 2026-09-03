@@ -77,16 +77,26 @@ import {
 export type BakedIndirectTier = 'off' | 'low' | 'high';
 
 /**
- * Largest linear-HDR value the baked bounce may add to a pixel, as a fraction
- * of that pixel's own shaded colour. Bounced light is modulated by the surface
- * it lands on (see `BakedIndirectTuning.composite`), so this is a gain on an
- * already-shaded value rather than an absolute radiance.
+ * Largest multiplier any tier may apply to the reconstructed irradiance before
+ * it is composited. The composite is `albedoProxy * irradiance * gain` — see
+ * `baked-indirect-node.ts` for what the albedo proxy is and why the shaded
+ * colour is not used directly — so this bounds the STRENGTH of the fill.
  *
  * 0.55 was chosen the way GODRAY_MAXIMUM_ADDITIVE_GAIN was: it is the value at
  * which a fully sky-lit interior wall reads as lit rather than as fogged, and
  * above which a bright bounce starts to wash a silhouette standing against it.
  */
 export const BAKED_INDIRECT_MAXIMUM_GAIN = 0.55;
+
+/**
+ * Hard per-channel ceiling on the linear-HDR value this layer may ADD to any
+ * one pixel, applied last in the node and clamped rather than trusted. The gain
+ * above bounds the multiplier; this bounds the result, so neither an unusually
+ * bright bake (a white arena at noon) nor a future gain edit can put a wash
+ * across a sightline. Below the godrays' 0.22 because a bounce covers whole
+ * surfaces rather than a shaft's narrow volume.
+ */
+export const BAKED_INDIRECT_MAXIMUM_ADDITIVE = 0.18;
 
 /**
  * Hard cap on probes in one volume. Every probe is 12 floats in three 3D
