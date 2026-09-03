@@ -162,6 +162,20 @@
       ]
     },
     {
+      "key": "graphics.bakedIndirect",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "baked-indirect",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/lighting/baked-indirect-runtime.ts",
+          "symbol": "buildBakedIndirectRuntime",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.bakedIndirect",
+          "liveObservation": "documentElement.dataset.bakedIndirect (publishBakedIndirectReceipt)"
+        }
+      ]
+    },
+    {
       "key": "graphics.ambientOcclusion",
       "applyMode": "pipeline-rebuild",
       "authorityAffecting": false,
@@ -607,6 +621,7 @@
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
         "indirectLighting": "low",
+        "bakedIndirect": "off",
         "ambientOcclusion": "off",
         "screenSpaceReflections": "off",
         "screenSpaceGi": "off",
@@ -665,6 +680,14 @@
         "reflectionQuality": "low",
         "environmentIntensity": 0.62,
         "screenSpace": {
+          "bakedIndirect": {
+            "tier": "off",
+            "enabled": false,
+            "probeSpacingM": 0,
+            "raysPerProbe": 0,
+            "bounces": 0,
+            "composite": 0
+          },
           "godrays": {
             "quality": "off",
             "enabled": false,
@@ -806,6 +829,7 @@
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
         "indirectLighting": "high",
+        "bakedIndirect": "low",
         "ambientOcclusion": "off",
         "screenSpaceReflections": "low",
         "screenSpaceGi": "off",
@@ -864,6 +888,14 @@
         "reflectionQuality": "high",
         "environmentIntensity": 1,
         "screenSpace": {
+          "bakedIndirect": {
+            "tier": "low",
+            "enabled": true,
+            "probeSpacingM": 3,
+            "raysPerProbe": 48,
+            "bounces": 1,
+            "composite": 0.38
+          },
           "godrays": {
             "quality": "low",
             "enabled": true,
@@ -1005,6 +1037,7 @@
         "shadowUpdateMode": "dynamic",
         "shadowFilter": "auto",
         "indirectLighting": "high",
+        "bakedIndirect": "high",
         "ambientOcclusion": "ultra",
         "screenSpaceReflections": "high",
         "screenSpaceGi": "high",
@@ -1063,6 +1096,14 @@
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
         "screenSpace": {
+          "bakedIndirect": {
+            "tier": "high",
+            "enabled": true,
+            "probeSpacingM": 2,
+            "raysPerProbe": 128,
+            "bounces": 2,
+            "composite": 0.5
+          },
           "godrays": {
             "quality": "high",
             "enabled": true,
@@ -2031,6 +2072,38 @@
       "authorityAffecting": false
     },
     {
+      "id": "baked-indirect-light",
+      "title": "Baked indirect light (offline SH-L1 irradiance probe volume)",
+      "availability": "active",
+      "owner": "src/rendering/lighting/baked-indirect-node.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/lighting/baked-indirect-node.ts",
+          "symbol": "buildBakedIndirectLightNode"
+        },
+        {
+          "path": "src/rendering/lighting/baked-indirect.ts",
+          "symbol": "BAKED_INDIRECT_MAXIMUM_GAIN"
+        },
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "publishBakedIndirectReceipt"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.bakedIndirect"
+        ],
+        "effectiveValue": "Off, Low or High offline-baked bounce light, sampled from an SH-L1 probe volume solved ahead of time by cosine-hemisphere gathering with one or two bounces",
+        "rationale": "LOW and HIGH differ only in BAKE cost - rays per probe and bounces - and never in per-frame cost, which is one probe-volume sample per shaded pixel either way; that is pinned in src/rendering/lighting/baked-indirect.test.ts. The volume is baked from the STATIC arena proxy only, so it can never reveal a dynamic actor, and its composite is clamped to BAKED_INDIRECT_MAXIMUM_GAIN so the layer can only brighten within a bound a player cannot exceed by choosing a preset."
+      },
+      "budget": "Two probe textures uploaded once per digest; the bake itself runs chunked on the main thread under a 3 ms per-frame wall-clock bound checked after every RAY, and re-derives only when the arena fingerprint or the quantised sun key moves.",
+      "verifier": "src/rendering/lighting/baked-indirect.test.ts + src/rendering/lighting/baked-indirect-runtime.test.ts + src/rendering/lighting/baked-indirect-node.test.ts",
+      "authorityAffecting": false
+    },
+    {
       "id": "screen-space-gi",
       "title": "Screen-space global illumination (ray-marched bounce light)",
       "availability": "active",
@@ -2256,11 +2329,11 @@
     }
   ],
   "summary": {
-    "total": 36,
-    "active": 34,
+    "total": 37,
+    "active": 35,
     "unsupported": 2,
-    "adjustable": 27,
+    "adjustable": 28,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "a24a22746b9b826834e27f6590214dc09a0962cc5d6670e27b122e1a3fdab4ba"
+  "inventorySha256": "4562d73023d6aeff6876cf27cfbe0f3f655e4f50f850f0f64b1966ebf23fb607"
 }

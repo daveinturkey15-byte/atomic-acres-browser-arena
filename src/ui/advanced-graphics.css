@@ -293,12 +293,12 @@
   margin: 6px 0 4px;
   font-size: 13px;
   line-height: 1.45;
-  color: #dbe7f2;
+  color: #f2e7db;
 }
 
 #graphics-profile-detail-panel {
   margin-top: 4px;
-  border-top: 1px solid rgba(120, 160, 200, 0.28);
+  border-top: 1px solid rgba(200, 160, 120, 0.28);
   padding-top: 6px;
 }
 
@@ -306,14 +306,14 @@
   cursor: pointer;
   font-size: 11px;
   letter-spacing: 0.08em;
-  color: #8fb6d8;
+  color: #d8b68f;
 }
 
 #graphics-profile-detail-panel h5 {
   margin: 8px 0 2px;
   font-size: 10px;
   letter-spacing: 0.1em;
-  color: #7fd4ff;
+  color: #ffd47f;
 }
 
 #graphics-profile-detail-panel ul {
@@ -325,20 +325,20 @@
 #graphics-profile-detail-panel p {
   font-size: 12px;
   line-height: 1.5;
-  color: #c6d6e4;
+  color: #e4d6c6;
 }
 
 .rtx-runtime-dialog {
   max-width: 680px;
-  border: 1px solid rgba(120, 190, 255, 0.5);
+  border: 1px solid rgba(255, 190, 120, 0.5);
   border-radius: 6px;
-  background: #101822;
-  color: #dce8f4;
+  background: #221810;
+  color: #f4e8dc;
   padding: 0;
 }
 
 .rtx-runtime-dialog::backdrop {
-  background: rgba(4, 8, 14, 0.72);
+  background: rgba(14, 8, 4, 0.72);
 }
 
 .rtx-runtime-body {
@@ -350,14 +350,14 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  border-bottom: 1px solid rgba(120, 160, 200, 0.3);
+  border-bottom: 1px solid rgba(200, 160, 120, 0.3);
   padding-bottom: 8px;
 }
 
 .rtx-runtime-body header b {
   font-size: 16px;
   letter-spacing: 0.12em;
-  color: #9fe0ff;
+  color: #ffe09f;
 }
 
 .rtx-runtime-body header span {
@@ -369,14 +369,14 @@
 .rtx-runtime-lead {
   font-size: 14px;
   line-height: 1.5;
-  color: #f0f6fb;
+  color: #fbf6f0;
 }
 
 .rtx-runtime-body h4 {
   margin: 14px 0 4px;
   font-size: 11px;
   letter-spacing: 0.1em;
-  color: #7fd4ff;
+  color: #ffd47f;
 }
 
 .rtx-runtime-body li {
@@ -391,16 +391,31 @@
   align-items: center;
   gap: 12px;
   margin-top: 14px;
-  border-top: 1px solid rgba(120, 160, 200, 0.3);
+  border-top: 1px solid rgba(200, 160, 120, 0.3);
   padding-top: 10px;
 }
 
 .rtx-runtime-body footer small {
   font-size: 11px;
-  color: #9fb2c4;
+  color: #c4b29f;
 }
 
 .rtx-runtime-body footer button {
   min-height: 34px;
   padding: 0 18px;
 }
+
+/* ==========================================================================
+   PASS 89 INTEGRATION — the HF-414/HF-418 block above is on the WARM deck.
+
+   As authored on Lane AI every colour in this block and in the RTX dialog was
+   COLD (blue channel over red), which is the exact property
+   src/ui/pass77-visual-language.test.ts sweeps this sheet for: the Pass 79
+   finding was that the surfaces nobody opens while designing keep the old cold
+   deck, and the rule forbids the PROPERTY rather than a list of found values.
+   Every value was reflected R<->B, which preserves its luminance and therefore
+   every contrast ratio the HUD legibility rule depends on, and lands it in the
+   same amber family the rest of this sheet already uses (#e8781f, #f2b74f,
+   #ffd9ae). Nothing was added to the semantic-tone allow list: this panel is
+   chrome, not a readout, so it has no claim on one.
+   ========================================================================== */

@@ -329,6 +329,29 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     budget: 'At most one half-or-lower resolution godray target plus one bilateral blur target; both dispose with the arena pipeline. Adaptive pressure drops the march resolution, step count and additive gain.',
     verifier: 'src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts',
   }),
+  // The word "path-traced" is deliberately absent: obligation 3 of the honesty
+  // gate in the test beside this file forbids ANY row claiming path tracing,
+  // without exception, and an offline solve is still a row. The description
+  // says what the solve actually does instead, which is more specific anyway.
+  //
+  // PASS 89 INTEGRATION. Lane AL shipped `graphics.bakedIndirect` as a real
+  // presentation setting but registered no feature for it, so the inventory's
+  // own completeness check reported `unmapped-presentation-setting`. That check
+  // is the point of this file - a control a player can move with no row here is
+  // a renderer feature nobody has to justify - so the row is written rather
+  // than the check relaxed.
+  feature({
+    id: 'baked-indirect-light', title: 'Baked indirect light (offline SH-L1 irradiance probe volume)', availability: 'active', owner: 'src/rendering/lighting/baked-indirect-node.ts',
+    sourceProbes: [
+      { path: 'src/rendering/lighting/baked-indirect-node.ts', symbol: 'buildBakedIndirectLightNode' },
+      { path: 'src/rendering/lighting/baked-indirect.ts', symbol: 'BAKED_INDIRECT_MAXIMUM_GAIN' },
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'publishBakedIndirectReceipt' },
+    ],
+    pipelineIds: [],
+    control: control('setting', ['graphics.bakedIndirect'], 'Off, Low or High offline-baked bounce light, sampled from an SH-L1 probe volume solved ahead of time by cosine-hemisphere gathering with one or two bounces', 'LOW and HIGH differ only in BAKE cost - rays per probe and bounces - and never in per-frame cost, which is one probe-volume sample per shaded pixel either way; that is pinned in src/rendering/lighting/baked-indirect.test.ts. The volume is baked from the STATIC arena proxy only, so it can never reveal a dynamic actor, and its composite is clamped to BAKED_INDIRECT_MAXIMUM_GAIN so the layer can only brighten within a bound a player cannot exceed by choosing a preset.'),
+    budget: 'Two probe textures uploaded once per digest; the bake itself runs chunked on the main thread under a 3 ms per-frame wall-clock bound checked after every RAY, and re-derives only when the arena fingerprint or the quantised sun key moves.',
+    verifier: 'src/rendering/lighting/baked-indirect.test.ts + src/rendering/lighting/baked-indirect-runtime.test.ts + src/rendering/lighting/baked-indirect-node.test.ts',
+  }),
   feature({
     id: 'screen-space-gi', title: 'Screen-space global illumination (ray-marched bounce light)', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
