@@ -47,7 +47,7 @@ import type { GraphicsRuntime } from '../pass65-settings';
 // GPU surface. Arena gating comes from the water-authoring registry, not a
 // hard-coded rustworks check.
 import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
-import { sharedWaterBodyForArena } from '../water/water-authoring';
+import { sharedWaterBodyForArena, waterPoolsForArena } from '../water/water-authoring';
 import {
   applyArenaEnvironmentIbl,
   observeArenaEnvironment,
@@ -770,6 +770,27 @@ function applyArenaSystemLayout(
       water.userData.dryFootprintMask = 'none';
     }
   }
+  // HF-420: pools and ponds follow the same registry-driven swap as the
+  // perimeter ocean. Rebuilt in place when the arena changes, and the retired
+  // group's whole subtree is disposed (each pond owns a PlaneGeometry and a
+  // NodeMaterial) so an arena switch cannot leak one per pond per switch.
+  const existingPools = root.getObjectByName('Pass 64 TSL water pools');
+  if (existingPools && existingPools.userData.waterPoolsArenaId !== definition.id) {
+    existingPools.visible = false;
+    existingPools.removeFromParent();
+    existingPools.traverse((descendant) => {
+      const meshLike = descendant as {
+        geometry?: THREE.BufferGeometry;
+        material?: THREE.Material | THREE.Material[];
+      };
+      meshLike.geometry?.dispose();
+      const materials = Array.isArray(meshLike.material) ? meshLike.material : [meshLike.material];
+      for (const material of materials) {
+        if (material) material.dispose();
+      }
+    });
+    root.add(makeWaterPools(definition.id, graphics.oceanWaveAmplitude));
+  }
   const sky = root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh | undefined;
   const preset = definition.atmosphere.preset;
   let atmosphereSkyOpacity = 0;
@@ -888,6 +909,33 @@ function makeWater(
   return tsl.mesh;
 }
 
+/**
+ * HF-420: the arena's pools and ponds, as a rebuilt-on-swap group beside the
+ * perimeter ocean. Each pond is `createOceanTslWater` over the SAME frozen
+ * spectrum and the SAME water pipeline id, so a pond adds no pipeline, no pass
+ * and no new graph shape - only a different set of uniform values.
+ */
+function makeWaterPools(
+  arenaId: ArenaVisualDefinition['id'],
+  amplitude?: number,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Pass 64 TSL water pools';
+  group.userData.waterPoolsArenaId = arenaId;
+  for (const pool of waterPoolsForArena(arenaId)) {
+    const poolAmplitude = amplitude === undefined
+      ? oceanAmplitudeForBody(pool)
+      : amplitude * pool.amplitudeScale;
+    const tsl = createOceanTslWater(pool, {
+      amplitude: poolAmplitude,
+      pipelineId: PIPELINE.water,
+    });
+    group.add(tsl.mesh);
+  }
+  group.userData.waterPoolCount = group.children.length;
+  return group;
+}
+
 function setAnimationTime(root: THREE.Group, timeMs: number): void {
   for (const name of [
     'Pass 64 TSL mist',
@@ -898,6 +946,13 @@ function setAnimationTime(root: THREE.Group, timeMs: number): void {
   ]) {
     const uniformNode = root.getObjectByName(name)?.userData.animationTimeUniform as { value?: number } | undefined;
     if (uniformNode) uniformNode.value = timeMs / 1_000;
+  }
+  const pools = root.getObjectByName('Pass 64 TSL water pools');
+  if (pools) {
+    for (const pool of pools.children) {
+      const poolUniform = pool.userData.animationTimeUniform as { value?: number } | undefined;
+      if (poolUniform) poolUniform.value = timeMs / 1_000;
+    }
   }
   root.userData.tslReviewTimeMs = timeMs;
 }
@@ -1220,6 +1275,7 @@ export function createPass64TslSceneSystems(
     makeDust(definition),
     makeGrass(definition.id),
     makeWater(definition.id, graphics.oceanWaveAmplitude),
+    makeWaterPools(definition.id, graphics.oceanWaveAmplitude),
   );
   scene.add(root);
   const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics, volumetricLight);

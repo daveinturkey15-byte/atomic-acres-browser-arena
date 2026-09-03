@@ -49,7 +49,7 @@ import {
   oceanSpectrumFingerprint,
 } from './ocean-spectrum';
 import { minimumSurfaceSegments } from './water-quality';
-import type { WaterBodyDefinition } from './water-authoring';
+import { waterBodyId, type WaterBodyDefinition } from './water-authoring';
 
 export type OceanTslWater = Readonly<{
   mesh: THREE.Mesh;
@@ -101,14 +101,28 @@ export function oceanRoughnessFromSlope(slopeMagnitude: number): number {
  */
 export function createOceanTslWater(
   body: WaterBodyDefinition,
-  options?: { amplitude?: number; pipelineId?: string },
+  options?: { amplitude?: number; pipelineId?: string; name?: string },
 ): OceanTslWater {
+  // HF-420: a pool or pond is the SAME module with different data. `shape`
+  // makes the surface a finite, centred rectangle instead of the historical
+  // square near plane at the arena origin; nothing about the shader graph
+  // changes, so every body still compiles into one shared water pipeline.
+  const shape = body.shape ?? null;
+  const sizeX = shape ? shape.sizeX : body.nearSize;
+  const sizeZ = shape ? shape.sizeZ : body.nearSize;
   // Dense cells retain curvature in the shortest band (water-quality rule);
   // the historical 256-segment near plane comfortably exceeds the minimum.
-  const segments = Math.max(256, minimumSurfaceSegments(body.nearSize, 22));
-  const geometry = new THREE.PlaneGeometry(body.nearSize, body.nearSize, segments, segments);
+  // A pond is metres across, not hundreds: tessellating it to 256 would spend
+  // 131k triangles on a surface whose longest displaced wavelength dwarfs it.
+  const segmentsX = shape
+    ? Math.max(8, minimumSurfaceSegments(sizeX, 22))
+    : Math.max(256, minimumSurfaceSegments(body.nearSize, 22));
+  const segmentsZ = shape
+    ? Math.max(8, minimumSurfaceSegments(sizeZ, 22))
+    : segmentsX;
+  const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, segmentsX, segmentsZ);
   geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, body.level, 0);
+  geometry.translate(shape ? shape.centerX : 0, body.level, shape ? shape.centerZ : 0);
   const material = new MeshStandardNodeMaterial({
     transparent: false,
     opacity: 1,
@@ -217,7 +231,8 @@ export function createOceanTslWater(
   if (options?.pipelineId) material.userData.tslPipelineId = options.pipelineId;
 
   const water = new THREE.Mesh(geometry, material);
-  water.name = 'Pass 64 TSL perimeter water';
+  water.name = options?.name
+    ?? (shape ? `Pass 64 TSL water pool ${waterBodyId(body)}` : 'Pass 64 TSL perimeter water');
   water.visible = true;
   water.receiveShadow = true;
   water.renderOrder = -5;
@@ -231,7 +246,10 @@ export function createOceanTslWater(
   water.userData.waveAuthority = OCEAN_SPECTRUM_AUTHORITY_ID;
   water.userData.waveNormalAuthority = OCEAN_SPECTRUM_AUTHORITY_ID;
   water.userData.oceanSpectrumFingerprint = oceanSpectrumFingerprint();
-  water.userData.surfaceSegments = segments;
+  water.userData.surfaceSegments = segmentsX;
+  water.userData.surfaceSegmentsZ = segmentsZ;
+  water.userData.waterBodyId = waterBodyId(body);
+  water.userData.waterShape = shape;
   water.userData.totalSteepness = OCEAN_TOTAL_STEEPNESS;
   water.userData.waterBody = body;
   water.userData.swimmable = body.swimmable;
@@ -242,6 +260,15 @@ export function createOceanTslWater(
 
   // Curved low-cost skirt carrying the sea past the dense displaced square
   // (prevents the plane edge reading as a flat stripe at player eye height).
+  // A pond authors `horizonRadius: 0`: there is no horizon to carry, and a
+  // 3.2 km ring under a 3 m basin would draw through the entire arena.
+  if (body.horizonRadius <= 0) {
+    return Object.freeze({
+      mesh: water,
+      waveAmplitudeUniform: waveAmplitude,
+      animationTimeUniform: animationTime,
+    });
+  }
   const horizonRadius = body.horizonRadius;
   const horizonInnerRadius = 0.1;
   const horizonGeometry = new THREE.RingGeometry(horizonInnerRadius, horizonRadius, 192, 24);
