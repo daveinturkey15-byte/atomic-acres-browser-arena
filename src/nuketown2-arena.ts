@@ -1753,8 +1753,13 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   });
   // Porch step under the back door, so leaving the house is a walk not a drop.
   pair(builder, 'yard porch', [-1.25, 0.1, HOUSE_BACK_Z - 0.9], [2.6, 0.2, 1.8], m.drive, { cast: false });
-  // Cover in the deep yard, between the spawn line and the house.
+  // Cover in the deep yard, between the spawn line and the house:
   pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.4, LOW_COVER, 2.0], m.planter);
+  // Tactical crate lid frame & horizontal strapping bands:
+  pair(builder, 'yard cover crate lid', [-8.5, LOW_COVER + 0.03, HOUSE_BACK_Z - 4.5], [2.48, 0.06, 2.08], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard cover crate strap', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.44, 0.10, 2.04], m.chrome,
+    { solid: false, shots: false, cast: true });
   pair(builder, 'yard cover wall', [5.5, HARD_COVER / 2, HOUSE_BACK_Z - 5.5], [7.0, HARD_COVER, 0.35], m.block);
   // Patio dining set with timber table & outdoor umbrella:
   pair(builder, 'yard patio table', [-14.5, LOW_COVER / 2, -31.5], [2.2, LOW_COVER, 2.2], m.fence);
@@ -1793,6 +1798,10 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // 9 x 13 m of spawn ground. One waist-high body, in reach of the (12, -30)
   // spawn, which measured the yard's longest walk to cover.
   pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter);
+  pair(builder, 'yard far crate lid', [11.5, LOW_COVER + 0.03, -28.0], [2.68, 0.06, 2.28], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard far crate strap', [11.5, LOW_COVER / 2, -28.0], [2.64, 0.10, 2.24], m.chrome,
+    { solid: false, shots: false, cast: true });
   // THE BORDER PATH. The reference's fence holes lead to a path that curves
   // round to the opposite yard, and this arena's border path is the straight
   // 36 x 6 m version of it - which was authored with NO cover at all, so the
