@@ -61,13 +61,13 @@ describe('arena daylight catalog', () => {
 
   it('pins the roofed arena and the PREVIEW maps, and only those', () => {
     // Two reasons to pin, and both are deliberate: gun-range has a roof, and
-    // map3 / nuketown2 are PREVIEW maps whose own lanes own their look while
-    // they are being built — a second lane moving their sun underneath them
-    // would be a merge conflict rendered on screen. This list is asserted
+    // map3 / nuketown2 / raid2 are PREVIEW maps whose own lanes own their look
+    // while they are being built — a second lane moving their sun underneath
+    // them would be a merge conflict rendered on screen. This list is asserted
     // exactly so that promoting a preview out of PREVIEW cannot silently leave
     // it pinned, and so that adding a pin needs a reason written down.
     const pinned = ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned);
-    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2']);
+    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2', 'raid2']);
   });
 
   it('gives rustworks-1v1 the narrowest outdoor band (its night is the safety datum)', () => {

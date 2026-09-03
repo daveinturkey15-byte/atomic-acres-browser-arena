@@ -242,6 +242,21 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   // purpose. That lane fills this row in with a measured band (section 4 of
   // docs/DYNAMIC_LIGHTING_2026-09-03.md is the procedure).
   nuketown2: profile('nuketown2', 'suburban-bleached-noon-preview-pinned', true, 12, [12, 12], [6, 20], [8, 62], 46, 6),
+  // RAID2 (RAID REBUILD, PREVIEW, HF-408). PINNED, and the row exists for the
+  // SAME reason nuketown2's does: this is a `Record<ArenaId, ...>` and a lane
+  // branch typechecks against the roster IT has, so an arena that lands on the
+  // integration line while a lighting branch is open compiles here and then
+  // throws inside the import-time safety sweep at merge. That is exactly what
+  // happened twice now -- nuketown2 at the PASS 86 merge, raid2 at this one --
+  // and the roster-coverage guard in lighting-conditions.test.ts is what turns
+  // the second occurrence into a named sentence instead of five collapsed test
+  // files. Pinned means every choice resolves to the identity, so Lane AQ's
+  // rebuild is untouched by this lane while it is being built. Its authored
+  // hour is its own art direction's brief, 'bleached late-morning estate', a
+  // deliberately different time of day from the shipped Raid's golden hour;
+  // that lane fills this row in with a measured band using the procedure in
+  // section 4 of docs/DYNAMIC_LIGHTING_2026-09-03.md.
+  raid2: profile('raid2', 'estate-bleached-late-morning-preview-pinned', true, 10.5, [10.5, 10.5], [6, 19], [10, 68], 30, 6),
   // MAP3 (PREVIEW). PINNED on purpose: Lane V owns this map's look while it is
   // being built, and a second lane moving its sun underneath it would be a
   // merge conflict rendered on screen. This row is the TEMPLATE that lane fills
