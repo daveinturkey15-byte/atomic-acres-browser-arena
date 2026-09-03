@@ -58,16 +58,19 @@
  *      and the coach is closed. That swap is why the 2x-damage core now rides
  *      the truck's cargo-box roof.
  *
- * WHY THE TRUCK IS CENTRED ON THE WORLD ORIGIN. `OVERDRIVE_POSITION` in
- * `src/overdrive.ts` is a single global `{0, 3.75, 0}`, not a per-arena value.
- * Authoring the cargo-box roof at 3.15 m puts the 2x-damage core 0.60 m above
- * it, inside the 1.9 m pickup window, and the owner's "keep the 2x damage" is
- * carried with zero new runtime code and zero risk to the shipped arena. That
- * one decision then FIXES the box's deck height and forces a climb onto its
- * roof; both are derived at `NUKETOWN2_CENTRAL_TRUCK` and `TRUCK_ROOF_STEPS`
- * below. It is also the one place the reference is knowingly not followed: the
- * reference's truck sits about 0.076 of the street length SOUTH of the road
- * centre-line, and this one sits on it.
+ * WHERE THE TRUCK STANDS, AND WHAT USED TO PIN IT. The reference's truck sits
+ * about 0.076 of the street length SOUTH of the road centre-line, and until
+ * HF-432 this one sat ON the centre-line, because `OVERDRIVE_POSITION` in
+ * `src/overdrive.ts` was a single global `{0, 3.75, 0}` and the 2x-damage core
+ * could only ride a truck standing at the world origin. That was recorded as a
+ * knowingly-taken deviation rather than hidden, and HF-432 item 5 removed the
+ * cause: the core is per-arena (`overdrivePositionForArena`) and this arena's
+ * seat is DERIVED from `NUKETOWN2_CENTRAL_TRUCK`, so the truck is where the
+ * reference has it and the core went with it. The shipped Nuke Town's seat is
+ * unchanged. The core still FIXES the box's deck and roof heights and forces a
+ * climb onto the roof; both are derived at `NUKETOWN2_CENTRAL_TRUCK` (now in
+ * `./nuketown2-layout`, so the weapons layer can read it without closing a
+ * require cycle through `protocol.ts`) and `TRUCK_ROOF_STEPS` below.
  *
  * NOTHING IS YAWED. `box()` records a solid as extents-plus-yaw while the
  * collider/visual parity audit compares a collider rectangle against each mesh's
@@ -957,10 +960,12 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
 }
 
 /**
- * The moving truck, centred on the world origin in the cul-de-sac turning head.
- * OPEN cover in the reference's sense: a deck you can stand on, a roof over
- * you, and one mouth at the -x end you walk in through. The 2x-damage core
- * sits above its cargo-box roof.
+ * The moving truck, in the cul-de-sac turning head: centred on the world origin
+ * ALONG the street, and 0.076 L SOUTH of the road centre-line across it, where
+ * the reference has it (HF-432 item 5). OPEN cover in the reference's sense: a
+ * deck you can stand on, a roof over you, and one mouth at the -x end you walk
+ * in through. The 2x-damage core sits above its cargo-box roof and follows the
+ * truck's own `z`.
  *
  * The cab is CLOSED: a solid body, which is what the reference's minimap draws
  * and what makes the truck cover from one side and a room from the other.
@@ -1174,8 +1179,9 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb, { cast: false });
   // Hedge along the front of each house's lawn: crouch cover for the last
   // stride out of the front door. LOW_COVER rather than HARD_COVER, and stopped
-  // 0.85 m short of the front door reveal, so it never becomes a wall across
-  // either the doorway or the two ground-floor windows above it.
+  // 0.60 m short of the front door reveal (0.85 m before HF-432 item 4 widened
+  // that door from 1.4 m to 1.8 m), so it never becomes a wall across either
+  // the doorway or the two ground-floor windows above it.
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 1.4], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, KERB_Z - 2.2], [3.6, LOW_COVER, 2.0], m.planter);

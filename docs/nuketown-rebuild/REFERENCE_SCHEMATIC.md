@@ -283,9 +283,14 @@ row is inside the lane's 5 %-of-L (1.8 m) tolerance.
 | Coach offset, across street | 0.150 L = 5.40 m | **5.4 m** (HF-432 item 5) | 0.000 L |
 | Truck offset across the street | 0.076 L = 2.74 m | **2.75 m** (HF-432 item 5) | 0.0004 L |
 | Truck: open / coach: closed | truck open | truck open, coach solid | ✔ corrected |
-| Spawns | back yards behind each house | z = ±30 / ±32, inside the fence | ✔ |
+| Spawns | back yards behind each house | six per team at \|z\| = 24-31, inside the fence (HF-432 item 3) | ✔ re-solved: no spawn sees a spawn, worst spawn sightline 31.6 m |
 | Sheds (registry) | — | (±14, ±24.5), inside the yards | ✔ moved from ±24 x, which is now outside the map |
 | Fence holes | both sides, to a path round to the far yard | two gaps per fence, deliberately off-axis from their own rotational partners | ✔ |
+| Flank props | S3 draws hatched props along **both** long boundaries | one side store per flank per half, on the perimeter wall's inner face (HF-432 item 2) | ✔ corrected: one flank per half was bare, carrying the map's worst 46.0 m lane |
+| Border path cover | the path the fence holes lead round on | two hard bodies per path (HF-432 item 2) | ✔ corrected: it was a 36 × 6 m corridor with no cover at all |
+| Bunker / shelter | **not in the reference** — neither minimap draws one, §2's landmark table has none | absent | ✔ deliberately absent |
+| Stair | **not drawn on either minimap** (see `NUKETOWN2_HOUSE_STAIR` for the two fetches) | derived: west (blind) wall, back room, landing at the partition, upper hallway (HF-432 item 1) | — derivation, not a measurement |
+| Doors | no widths measured | 1.8 m clear × 2.4 m head for every person door; 3.5 m garage door (HF-432 item 4) | — derived from the standing capsule (1.82 m + 0.42 m autostep up-cast) |
 
 ### What moved, in the old arena's terms
 
@@ -303,48 +308,60 @@ row is inside the lane's 5 %-of-L (1.8 m) tolerance.
 
 ## 8. Overhead vs schematic
 
-Regenerate with `npx tsx artifacts/nuketown2-overlay.mts` (the reference panel is
-drawn from §3's measured pixel boxes; the built panel from `buildNuketown2()`'s
-own colliders; both in the same world frame at the same metres-per-cell).
+Regenerate the BUILT panel with `npx tsx scripts/qa/nuketown2-overhead-panel.mts`
+(the reference panel is drawn from §3's measured pixel boxes; the built panel
+from `buildNuketown2()`'s own colliders and spawn table; both in the same world
+frame at the same metres-per-cell). **HF-432 moved that generator into the
+repository**: this section used to name `artifacts/nuketown2-overlay.mts`, and
+`artifacts/` is gitignored, so the tool the document gave as its own
+reproduction step was not in the tree.
 
 ```
-H house   G garage   T moving truck (open)   C coach (closed)   = road   o prop   s spawn
+H house   G garage   T moving truck (open)   C coach (closed)   c car
+= road    o prop     s spawn      (the perimeter wall is the frame, not a prop)
 cell = 1.5 m along the street (rows) x 3 m across it (columns)
 
-REFERENCE (measured off the BO7/BO2 minimaps)      BUILT (buildNuketown2 colliders)
+REFERENCE (measured off the BO7/BO2 minimaps)      BUILT (buildNuketown2 colliders, HF-432)
     z -42 ---------------- 42                          z -42 ---------------- 42
-  17|............====............|                   17|..o.........====..o.....oo..|
-  16|............====............|                   16|..o.........====o.o..oo.oo..|
-  14|............====............|                   14|..o.......oo====o.o..oo.oo..|
-  13|............====............|                   13|..o.s.....oo====o.o..oo.oo..|
-  11|............CC==............|                   11|..o.......oo====..o..oo.....|
-  10|............CC==............|                   10|..o...G.Gooo====......oo.o..|
-   8|............CC..............|                    8|..o.o.GGGoo.=TT=......oo.o..|
-   7|............CC..............|                    7|...so.GGGoo.=TT=oHHHHHooso..|
-   5|.......GGG..CCTT.HHHHH......|                    5|....o.GGG...=TT=oHHHHH...o..|
-   4|.......GGG..CCTT.HHHHH......|                    4|..o.o.HHHHH.=TT=oHHHHH...o..|
-   2|.......GGG..CCTT.HHHHH......|                    2|..o.o.HHHHH.=TT=oHHHHHo..o..|
-   1|......HHHHH...TT.HHHHH......|                    1|..o.s.HHHHH.=TT=.HHHHHo.so..|
-  -1|......HHHHH...TT.HHHHH......|                   -1|..o..oHHHHH.CTT=.HHHHHo..o..|
-  -2|......HHHHH...TT.HHHHH......|                   -2|..o..oHHHHH.CTT=.HHHHH.o.o..|
-  -4|......HHHHH...TT.HHHHH......|                   -4|..o...HHHHH.CTT=.HHHHH.o.o..|
-  -5|......HHHHH...TT.HHHHH......|                   -5|..os..HHHHH.CC==...GGG.os...|
-  -7|......HHHHH......HHHHH......|                   -7|..o.ooHHHHH.CC==.ooGGG.o.o..|
-  -8|......HHHHH......HHHHH......|                   -8|..o.oo......CC==.ooGGG.o.o..|
- -10|......HHHHH......HHHHH......|                  -10|..o.oo......C===oooGGG...o..|
- -11|............................|                  -11|....s...oo..====........so..|
- -13|............................|                  -13|..o..oo.oo.o====o........o..|
- -14|............................|                  -14|..oo.oo.oo.o====o........o..|
- -16|............................|                  -16|..oo.oo.oo.o====o........o..|
- -17|............................|                  -17|..oo....oo..====.........o..|
+  17|............====............|                17|.........o..====..o.....oo..|
+  16|............====............|                16|.........o.o====..o.....oo..|
+  14|............====............|                14|...s.....o.o====..o.....oo..|
+  13|............====............|                13|....os...o.o====..o.........|
+  11|............CC==............|                11|o...o....o.o====..o.........|
+  10|............CC==............|                10|o...o.......====.......o....|
+   8|............CC..............|                8|o.....GGGoo.==TT......oo....|
+   7|............CC..............|                7|.....sGGGoo.=cTToHHHHH......|
+   5|.......GGG..CCTT.HHHHH......|                5|......GGG...=cTToHHHHHs.....|
+   4|.......GGG..CCTT.HHHHH......|                4|......HHHHH.=cTToHHHHH.....o|
+   2|.......GGG..CCTT.HHHHH......|                2|......HHHHH.=cTT.HHHHH.....o|
+   1|......HHHHH...TT.HHHHH......|                1|.....sHHHHH.==TT.HHHHH......|
+  -1|......HHHHH...TT.HHHHH......|                -1|......HHHHH.==TT.HHHHHs.....|
+  -2|......HHHHH...TT.HHHHH......|                -2|o.....HHHHH.CCTT.HHHHH......|
+  -4|......HHHHH...TT.HHHHH......|                -4|o.....HHHHHoCC==.HHHHH......|
+  -5|......HHHHH...TT.HHHHH......|                -5|.....sHHHHHoCC==...GGG......|
+  -7|......HHHHH......HHHHH......|                -7|......HHHHHoCC==.ooGGGs.....|
+  -8|......HHHHH......HHHHH......|                -8|....oo......CC==.ooGGG.....o|
+ -10|......HHHHH......HHHHH......|                -10|....o.......CC==.......o...o|
+ -11|............................|                -11|.........o..CC==o.o....o...o|
+ -13|............................|                -13|.........o..====o.o..s.o....|
+ -14|............................|                -14|..oo.....o..====o.o.....s...|
+ -16|............................|                -16|..oo.....o..====o.o.........|
+ -17|............................|                -17|..oo.....o..====..o.........|
 ```
 
-Reading the difference honestly: the two house bands, the two garages at
-opposite ends, the truck on the centre-line and the coach beside it all land in
-the same cells. The reference panel's houses sit about two rows lower — the
-0.08 L set-back toward the road's closed end, §5.5 — and the reference panel
-carries no props because only building and vehicle fills were segmented, not the
-outer-lot clutter. The rendered overhead from the review camera is at
+Reading the difference honestly. The two house bands, the two garages at
+opposite ends, the truck in the head and the coach beside it all land in the
+same cells. **HF-432 closed the one structural difference this panel used to
+show**: the truck now sits 0.076 L across the centre-line, on the far side of
+it from the coach, exactly as the reference draws them - it was on the
+centre-line because the 2x core could not follow it, and the core is per-arena
+now. The reference panel's houses still sit about two rows lower (the 0.08 L
+set-back toward the road's closed end, §5.5), and it still carries no props,
+because only building and vehicle fills were segmented, not the outer-lot
+clutter. What the built panel now shows that it did not before are props on
+BOTH flanks of both halves and on both border paths (§7, HF-432 item 2), and
+six spawns per team instead of five. The rendered overhead from the review
+camera is at
 `artifacts/viewpoint-regression/hf426-candidate/nuketown2/nuketown2-overhead.png`.
 
 ---

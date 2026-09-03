@@ -148,10 +148,14 @@ const PLAYSPACE_TOLERANCE = 0.05;
  *  - FLOOR. A map with no long view is a corridor, and the reference's three
  *    lanes each run most of the long axis. 30 m, which is 0.36 of the diagonal.
  *
- * EVIDENCE the build lands inside: 46.0 m, [17, -35] -> [17, 11]. It was 82.0 m
- * before the yard-fence gaps were taken off-axis from their own rotational
- * partners and 70.0 m before the two flank props were moved onto the perimeter
- * wall's inner face; both fixes are written up in `yard()`.
+ * EVIDENCE the build lands inside: 39.4 m, [-17, -39] -> [17, -19]. It was
+ * 82.0 m before the yard-fence gaps were taken off-axis from their own
+ * rotational partners, 70.0 m before the two flank props were moved onto the
+ * perimeter wall's inner face, and 46.0 m ([17, -35] -> [17, 11]) before
+ * HF-432 item 2 dressed the FAR flank of each half - `pair()` negates x and z
+ * together, so one authored side store gives each team a dressed flank and a
+ * bare one, and the bare one carried this lane. All three fixes are written up
+ * in `yard()`.
  */
 const MAX_STANDING_EYE_LINE_METRES = 50.3;
 const MIN_STANDING_EYE_LINE_METRES = 30;
@@ -159,17 +163,26 @@ const MIN_STANDING_EYE_LINE_METRES = 30;
 /**
  * Longest clear run ALONG the street centre-line at standing eye height.
  *
- * DERIVED, not measured. The road's playable extent is L = 36 m, so the
- * centre-line samples run from x = -17 to x = +17. The truck straddles the
- * origin with its cargo-box mouth open at x = -3.25 and its BULKHEAD standing
- * at x = +3.17, so a line along z = 0 starting at the west sample enters the
- * open box and is stopped by the bulkhead: 17 + 3.17 = 20.17 m. Plus two 0.5 m
- * sample steps = 21.2 m.
+ * DERIVED, not measured, and RE-DERIVED under HF-432 item 5 at the same value.
  *
- * This is the number that would move if the truck were removed, shortened, or
- * pushed off the centre-line. It is also why the truck is the OPEN body: the
- * coach is closed and sits 4 m off the centre-line, so it does not enter this
- * measurement at all.
+ * The band was originally justified by the truck: it straddled the origin, so a
+ * line along z = 0 from the west sample entered the open cargo box and stopped
+ * at the bulkhead, 17 + 3.17 + two 0.5 m sample steps = 21.2 m. That derivation
+ * is GONE, because the truck now stands 0.076 L south of the centre-line where
+ * the reference has it, and the reference's own offsets leave 2.8 m of open
+ * carriageway between the truck and the coach - straight down z = 0. Left
+ * alone, the road became a 34 m clear lane.
+ *
+ * The band is re-derived from the body that stops it now: the head car, the
+ * arena's own authored counterweight (see `coach()`), parked ACROSS the
+ * centre-line at x [2.3, 6.7]. The run from the west sample is 17 + 2.3 =
+ * 19.3 m, plus one 0.5 m sample step. Measured: 20.0 m, from x = -17 to x = 3.
+ *
+ * THE VALUE IS UNCHANGED AT 21.2, deliberately: a band re-derived at a NEW
+ * number would not be the same promise, and this one is still "the street is
+ * not a shooting gallery". It is the number that moves if the head car is
+ * deleted, shortened or pushed off the line - which is now the property that
+ * carries it, and which is also why `coach()` says so in its own comment.
  */
 const MAX_STREET_CENTRE_RUN_METRES = 21.2;
 
