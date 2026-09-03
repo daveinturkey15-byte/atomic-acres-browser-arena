@@ -1,0 +1,1 @@
+var e=`viewmodel-body-fit-inside-capsule-v1`,t=.13,n=.02,r=.08;function i(e){return e/t}function a(e){return e*t}function o(e){return e*t}function s(e){return e*t*t}export{o as a,i as c,t as i,n,s as o,e as r,a as s,r as t};
