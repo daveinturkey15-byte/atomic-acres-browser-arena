@@ -1088,3 +1088,26 @@ assets and textures and lighting need to be tip top, raid can come next"
   on the shelf - H2 shipped the first-load fix in PASS 88; the remaining levers
   (switch median +0.5 s, deploy 14-20 s attribution) are a day's work each, so
   they are not in tonight's build.
+
+## HF-442 — orchestration 2026-09-03 18:25 (PASS 92 build-up)
+
+- **Deploy-phase attribution measured (HF-441 follow-up):** the Gemini-via-OMP
+  investigation (branch `deploy-attribution`, merged 612a4a83) measured match
+  admission at 12.8–17.8 s across four arenas. Two steps dominate:
+  `weapon-switch-rehearsal` (~5.1 s median) and `stable-cadence-wait` (a constant
+  ~5.2 s on every arena) — together 60–79 % of admission; bots add 2.4–4.0 s on
+  bot arenas. Report: `docs/evidence/pass92/deploy-attribution/REPORT.md`.
+- **Quick-win candidate (NOT for PASS 92):** make `stable-cadence-wait` adaptive —
+  exit as soon as the presented cadence has been stable for N frames, keep 5 s as
+  the ceiling, never remove the settle (PASS 82/83 freeze fixes). A Gemini-via-OMP
+  worker is preparing the candidate on branch `admission-cadence-wait` (base
+  612a4a83); it ships only after an Opus review and the tripwire (in-combat
+  pipeline creations 0) and 12 s WebGPU fence stay untouched.
+- **Nuke Town geometry (HF-434..436):** GLM landed three commits (5b4f3c1e
+  z-fighting tiers, 9f6011d8 stairs/windows/glass, d1a0cf58 truck openings) and
+  is finishing HF-437 (wider street sides with cover). An Opus skeptic+repair
+  review runs on `nuketown2-geometry-review` (checked out at d1a0cf58) in
+  parallel; PASS 92 = PASS 91 + skills-study docs + Map 3 street-cell relocation
+  + profile fold (HF-438) + deploy attribution docs + the reviewed Nuke Town
+  geometry. Target cut 20:30, no later than 21:00, as a PREVIEW for owner
+  feedback (mechanical gates; full play verification overnight).
