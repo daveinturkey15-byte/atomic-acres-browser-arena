@@ -1,6 +1,6 @@
 {
   "verdict": "FAIL",
-  "measuredAt": "2026-09-03T01:19:03.390Z",
+  "measuredAt": "2026-09-03T02:09:17.473Z",
   "devices": [
     {
       "id": "phone-portrait",
@@ -44,7 +44,8 @@
       "viewport": "393x852",
       "deviceScaleFactor": 3,
       "failures": [],
-      "bootMs": 12244,
+      "screenshots": [],
+      "bootMs": 11394,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -282,16 +283,22 @@
       "play": {
         "ammoBeforeFire": 30,
         "fireTapAttempts": 1,
-        "ammoAfterFire": 24,
+        "ammoAfterFire": 26,
         "reloadStarted": true,
         "adsHeldWhileDown": true,
         "adsHeldAfterRelease": false,
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
-        "jumpRiseMetres": 0.648,
+        "jumpRiseMetres": 0.384,
         "moveMetres": 6.674,
-        "lookRadians": 2.8005,
-        "sprintButtonPresent": true
+        "lookRadians": 3.2134,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 6,
+        "sprintSamplesTaken": 6,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 7.984,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -300,10 +307,10 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 237,
-        "windowMs": 4034,
-        "meanFrameMs": 17.02,
-        "approxFps": 58.8
+        "presentedFrames": 231,
+        "windowMs": 4020,
+        "meanFrameMs": 17.4,
+        "approxFps": 57.5
       },
       "pause": {
         "opened": true,
@@ -399,7 +406,8 @@
       "viewport": "393x852",
       "deviceScaleFactor": 3,
       "failures": [],
-      "bootMs": 2428,
+      "screenshots": [],
+      "bootMs": 1398,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -595,7 +603,7 @@
             "present": true,
             "visible": true,
             "x": 8,
-            "y": 6,
+            "y": 7,
             "width": 317,
             "height": 71,
             "offscreen": false
@@ -605,7 +613,7 @@
             "present": true,
             "visible": true,
             "x": 120,
-            "y": 98,
+            "y": 99,
             "width": 126,
             "height": 85,
             "offscreen": false
@@ -615,7 +623,7 @@
             "present": true,
             "visible": true,
             "x": 259,
-            "y": 98,
+            "y": 99,
             "width": 126,
             "height": 91,
             "offscreen": false
@@ -625,7 +633,7 @@
             "present": true,
             "visible": true,
             "x": 8,
-            "y": 98,
+            "y": 99,
             "width": 106,
             "height": 150,
             "offscreen": false
@@ -637,16 +645,22 @@
       "play": {
         "ammoBeforeFire": 30,
         "fireTapAttempts": 1,
-        "ammoAfterFire": 25,
+        "ammoAfterFire": 26,
         "reloadStarted": true,
         "adsHeldWhileDown": true,
         "adsHeldAfterRelease": false,
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
-        "jumpRiseMetres": 0.673,
-        "moveMetres": 7.705,
-        "lookRadians": 3.3253,
-        "sprintButtonPresent": true
+        "jumpRiseMetres": 0.592,
+        "moveMetres": 5.195,
+        "lookRadians": 3.6546,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 6,
+        "sprintSamplesTaken": 6,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 9.219,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -655,10 +669,10 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 263,
-        "windowMs": 4083,
-        "meanFrameMs": 15.52,
-        "approxFps": 64.4
+        "presentedFrames": 232,
+        "windowMs": 4038,
+        "meanFrameMs": 17.41,
+        "approxFps": 57.5
       },
       "pause": {
         "opened": true,
@@ -753,8 +767,11 @@
       "arena": "atomic-acres",
       "viewport": "852x393",
       "deviceScaleFactor": 3,
-      "failures": [],
-      "bootMs": 1612,
+      "failures": [
+        "pause-controls-not-tappable:room-input<section#menu.panel,join<section#menu.panel"
+      ],
+      "screenshots": [],
+      "bootMs": 7269,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -950,7 +967,7 @@
             "present": true,
             "visible": true,
             "x": 266,
-            "y": 5,
+            "y": 6,
             "width": 320,
             "height": 71,
             "offscreen": false
@@ -960,7 +977,7 @@
             "present": true,
             "visible": true,
             "x": 116,
-            "y": 77,
+            "y": 78,
             "width": 136,
             "height": 85,
             "offscreen": false
@@ -970,7 +987,7 @@
             "present": true,
             "visible": true,
             "x": 600,
-            "y": 77,
+            "y": 78,
             "width": 136,
             "height": 91,
             "offscreen": false
@@ -980,7 +997,7 @@
             "present": true,
             "visible": true,
             "x": 8,
-            "y": 5,
+            "y": 6,
             "width": 102,
             "height": 146,
             "offscreen": false
@@ -998,10 +1015,16 @@
         "adsHeldAfterRelease": false,
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
-        "jumpRiseMetres": 0.064,
+        "jumpRiseMetres": 0.592,
         "moveMetres": 6.674,
-        "lookRadians": 2.4038,
-        "sprintButtonPresent": true
+        "lookRadians": 3.054,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 6,
+        "sprintSamplesTaken": 6,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 7.009,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -1010,10 +1033,10 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 204,
-        "windowMs": 4027,
-        "meanFrameMs": 19.74,
-        "approxFps": 50.7
+        "presentedFrames": 250,
+        "windowMs": 4036,
+        "meanFrameMs": 16.14,
+        "approxFps": 61.9
       },
       "pause": {
         "opened": true,
@@ -1023,7 +1046,20 @@
         "controlsOffscreen": [],
         "controlsBelowTargetHeight": [],
         "controlsBelowFontFloor": [],
-        "controlsNotTappable": [],
+        "controlsNotTappable": [
+          {
+            "id": "room-input",
+            "blockedBy": "section#menu.panel",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": true
+          },
+          {
+            "id": "join",
+            "blockedBy": "section#menu.panel",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": true
+          }
+        ],
         "controlsBelowTheFold": 11,
         "resumeTapped": true,
         "overlayRestoredAfterResume": true
@@ -1100,7 +1136,7 @@
         "controlsBelowTheFold": 100
       },
       "pageErrors": [],
-      "verdict": "pass"
+      "verdict": "fail"
     },
     {
       "device": "phone-landscape",
@@ -1111,7 +1147,8 @@
       "failures": [
         "pause-controls-not-tappable:room-input<section#menu.panel,join<section#menu.panel"
       ],
-      "bootMs": 6289,
+      "screenshots": [],
+      "bootMs": 4166,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -1356,9 +1393,15 @@
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
         "jumpRiseMetres": 0.621,
-        "moveMetres": 5.195,
-        "lookRadians": 3.4024,
-        "sprintButtonPresent": true
+        "moveMetres": 8.444,
+        "lookRadians": 3.307,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 4,
+        "sprintSamplesTaken": 5,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 7.078,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -1367,9 +1410,9 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 240,
-        "windowMs": 4055,
-        "meanFrameMs": 16.9,
+        "presentedFrames": 238,
+        "windowMs": 4017,
+        "meanFrameMs": 16.88,
         "approxFps": 59.2
       },
       "pause": {
@@ -1383,11 +1426,15 @@
         "controlsNotTappable": [
           {
             "id": "room-input",
-            "blockedBy": "section#menu.panel"
+            "blockedBy": "section#menu.panel",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           },
           {
             "id": "join",
-            "blockedBy": "section#menu.panel"
+            "blockedBy": "section#menu.panel",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           }
         ],
         "controlsBelowTheFold": 11,
@@ -1477,7 +1524,8 @@
       "failures": [
         "settings-controls-not-tappable:graphics-render-scale<section#audio-settings.settings-section,graphics-adaptive<input#audio-master-gain"
       ],
-      "bootMs": 4988,
+      "screenshots": [],
+      "bootMs": 3056,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -1721,10 +1769,16 @@
         "adsHeldAfterRelease": false,
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
-        "jumpRiseMetres": 0.064,
-        "moveMetres": 6.674,
-        "lookRadians": 2.6742,
-        "sprintButtonPresent": true
+        "jumpRiseMetres": 0.529,
+        "moveMetres": 10.422,
+        "lookRadians": 3.2348,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 6,
+        "sprintSamplesTaken": 6,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 9.969,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -1733,10 +1787,10 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 190,
-        "windowMs": 4036,
-        "meanFrameMs": 21.24,
-        "approxFps": 47.1
+        "presentedFrames": 197,
+        "windowMs": 4031,
+        "meanFrameMs": 20.46,
+        "approxFps": 48.9
       },
       "pause": {
         "opened": true,
@@ -1822,11 +1876,15 @@
         "controlsNotTappable": [
           {
             "id": "graphics-render-scale",
-            "blockedBy": "section#audio-settings.settings-section"
+            "blockedBy": "section#audio-settings.settings-section",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           },
           {
             "id": "graphics-adaptive",
-            "blockedBy": "input#audio-master-gain"
+            "blockedBy": "input#audio-master-gain",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           }
         ],
         "controlsBelowTheFold": 90
@@ -1843,7 +1901,8 @@
       "failures": [
         "settings-controls-not-tappable:graphics-render-scale<section#audio-settings.settings-section,graphics-adaptive<input#audio-master-gain"
       ],
-      "bootMs": 5782,
+      "screenshots": [],
+      "bootMs": 3056,
       "lobby": {
         "failures": [],
         "interactiveCount": 23,
@@ -2087,10 +2146,16 @@
         "adsHeldAfterRelease": false,
         "weaponBefore": "carbine",
         "weaponAfter": "pistol",
-        "jumpRiseMetres": 0.697,
-        "moveMetres": 5.195,
-        "lookRadians": 3.2031,
-        "sprintButtonPresent": true
+        "jumpRiseMetres": 0.343,
+        "moveMetres": 8.31,
+        "lookRadians": 2.5381,
+        "sprintButtonPresent": true,
+        "sprintingWhileHeld": true,
+        "sprintingSamples": 6,
+        "sprintSamplesTaken": 6,
+        "sprintingAfterRelease": false,
+        "sprintMetres": 6.508,
+        "stanceWhileSprinting": "stand"
       },
       "aimAssist": {
         "tierAfterTouch": "touch",
@@ -2099,10 +2164,10 @@
         "overlayRestoredAfterPadDisconnect": true
       },
       "frame": {
-        "presentedFrames": 259,
-        "windowMs": 4123,
-        "meanFrameMs": 15.92,
-        "approxFps": 62.8
+        "presentedFrames": 190,
+        "windowMs": 4017,
+        "meanFrameMs": 21.14,
+        "approxFps": 47.3
       },
       "pause": {
         "opened": true,
@@ -2188,11 +2253,15 @@
         "controlsNotTappable": [
           {
             "id": "graphics-render-scale",
-            "blockedBy": "section#audio-settings.settings-section"
+            "blockedBy": "section#audio-settings.settings-section",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           },
           {
             "id": "graphics-adaptive",
-            "blockedBy": "input#audio-master-gain"
+            "blockedBy": "input#audio-master-gain",
+            "inCarousel": false,
+            "becameBlockedAfterSettle": false
           }
         ],
         "controlsBelowTheFold": 90

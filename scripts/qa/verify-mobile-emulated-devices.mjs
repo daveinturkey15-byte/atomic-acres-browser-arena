@@ -123,9 +123,15 @@ export const MIN_TOUCH_TARGET_PX = 44;
 /** AGENTS.md: "menu labels and critical HUD status text are at least 9px". */
 export const MIN_HUD_FONT_PX = 9;
 
-/** The controls a phone player cannot play without. Missing = fail, not warn. */
+/**
+ * The controls a phone player cannot play without. Missing = fail, not warn.
+ *
+ * `sprint` is on this list because the sweep now MEASURES it (see
+ * `sprintWhileMoving`). It was absent while the sweep only tapped the button,
+ * which meant a sprint control that vanished from the overlay failed nothing.
+ */
 export const REQUIRED_TOUCH_CONTROLS = Object.freeze([
-  'stick-move', 'stick-look', 'fire', 'ads', 'reload', 'switch-weapon', 'jump', 'pause',
+  'stick-move', 'stick-look', 'fire', 'ads', 'reload', 'switch-weapon', 'jump', 'sprint', 'pause',
 ]);
 
 /**
@@ -330,6 +336,11 @@ const readMenuTargets = (page) => page.evaluate(() => {
         // another room mid-match; failing that would be failing the design.
         unavailable: Boolean(element.disabled) || element.getAttribute('aria-disabled') === 'true'
           || Boolean(element.closest('[inert]')),
+        // The arena picker is a deliberate horizontal carousel: its
+        // off-carousel siblings are legitimately painted over, and the menu
+        // audit excludes THEM by this predicate rather than by "has no id",
+        // which used to excuse every unnamed covered control in the menu.
+        inCarousel: Boolean(element.closest('.map-card-grid')),
         inViewport,
         reachable,
         blockedBy: reachable !== false || !top ? null : describe(top),
@@ -339,14 +350,20 @@ const readMenuTargets = (page) => page.evaluate(() => {
 });
 
 /**
- * `readMenuTargets` twice, `settleMs` apart, keeping a control's `reachable`
- * as false only when BOTH reads agree.
+ * `readMenuTargets` twice, `settleMs` apart, and the SECOND read is the verdict.
  *
  * Menu surfaces animate in. A single read taken mid-transition catches controls
  * still behind a scrim that is on its way out, which reported the paused deck's
- * join row as untappable on one arena and not the other, run to run. A control
- * that is genuinely covered is covered in both reads, so this removes the
- * flake without softening the check.
+ * join row as untappable on one arena and not the other, run to run. Waiting
+ * `settleMs` and believing the later read removes that flake on its own: once
+ * the scrim has finished leaving, the second read says reachable.
+ *
+ * The first read is kept only to LABEL the transition, never to overrule the
+ * second. An earlier version of this function cleared `reachable === false`
+ * whenever the two reads disagreed in EITHER direction, which forgave exactly
+ * the case that is a real defect: a control tappable at first that then
+ * disappears under a surface animating IN over it. That direction is now
+ * reported as `becameBlockedAfterSettle` and still fails.
  */
 async function readMenuTargetsStable(page, settleMs = 500) {
   const first = await readMenuTargets(page);
@@ -356,8 +373,16 @@ async function readMenuTargetsStable(page, settleMs = 500) {
   const firstById = new Map(first.interactive.map((entry, index) => [entry.id ?? `#${index}`, entry]));
   second.interactive = second.interactive.map((entry, index) => {
     const before = firstById.get(entry.id ?? `#${index}`);
-    if (entry.reachable === false && before && before.reachable !== false) {
-      return { ...entry, reachable: true, blockedBy: null, transientlyBlockedBy: entry.blockedBy };
+    if (!before) return entry;
+    // Blocked, then clear: the scrim was on its way out. The second read
+    // already says reachable; the tag is disclosure, not a verdict change.
+    if (before.reachable === false && entry.reachable !== false) {
+      return { ...entry, transientlyBlockedBy: before.blockedBy };
+    }
+    // Clear, then blocked: something arrived ON TOP of a live control. That is
+    // a defect, so the second read stands and the transition is named.
+    if (before.reachable !== false && entry.reachable === false) {
+      return { ...entry, becameBlockedAfterSettle: true };
     }
     return entry;
   });
@@ -408,6 +433,62 @@ async function dragStick(page, box, dx, dy, holdMs) {
     await page.waitForTimeout(holdMs);
     await send('touchEnd', [{ x: startX + dx, y: startY + dy, id: 1 }]);
   });
+}
+
+/**
+ * Hold the move stick forward AND the sprint button at the same time, sampling
+ * `player.sprinting` while both fingers are down.
+ *
+ * Sprint cannot be measured by tapping the button on its own. legacy-main
+ * computes `currentSprinting` as the sprint request AND `input.lengthSq() > 0`
+ * AND grounded AND a valid sprint direction, so a stationary player holding RUN
+ * is CORRECTLY not sprinting. The first version of this sweep tapped SPRINT,
+ * recorded `sprintButtonPresent: true` and asserted nothing - which is how a
+ * lane can report "sprint works" without ever reading the state the game keeps
+ * two lines away. Two touch points, both held, and the state read while they
+ * are down; the release is then asserted too, so a stuck point cannot pass.
+ */
+async function sprintWhileMoving(page, moveBox, sprintBox, holdMs = 1_200) {
+  const moveX = moveBox.x + moveBox.width / 2;
+  const moveY = moveBox.y + moveBox.height / 2;
+  const pushY = moveY - Math.min(60, moveBox.height / 2);
+  const sprintPoint = { x: sprintBox.x + sprintBox.width / 2, y: sprintBox.y + sprintBox.height / 2, id: 2 };
+  const samples = [];
+  let start = null;
+  await withTouch(page, async (send) => {
+    await send('touchStart', [{ x: moveX, y: moveY, id: 1 }]);
+    for (let step = 1; step <= 6; step += 1) {
+      await send('touchMove', [{ x: moveX, y: moveY + ((pushY - moveY) * step) / 6, id: 1 }]);
+      await page.waitForTimeout(25);
+    }
+    const stick = { x: moveX, y: pushY, id: 1 };
+    start = await playerState(page);
+    await send('touchStart', [stick, sprintPoint]);
+    const until = Date.now() + holdMs;
+    while (Date.now() < until) {
+      await page.waitForTimeout(120);
+      // The stick is re-sent every sample so a long hold is not mistaken for a
+      // finger that stopped touching the screen.
+      await send('touchMove', [stick, sprintPoint]);
+      samples.push(await playerState(page));
+    }
+    await send('touchEnd', [stick, sprintPoint]);
+  });
+  await page.waitForTimeout(400);
+  const released = await playerState(page);
+  const sprintingSamples = samples.filter((sample) => sample?.sprinting === true).length;
+  const end = samples.at(-1) ?? start;
+  const metres = start?.position && end?.position
+    ? Number(Math.hypot(end.position[0] - start.position[0], end.position[2] - start.position[2]).toFixed(3))
+    : null;
+  return {
+    sprintingWhileHeld: sprintingSamples > 0,
+    sprintingSamples,
+    sprintSamplesTaken: samples.length,
+    sprintingAfterRelease: released?.sprinting ?? null,
+    sprintMetres: metres,
+    stanceWhileSprinting: samples.find((sample) => sample?.sprinting === true)?.stance ?? end?.stance ?? null,
+  };
 }
 
 async function tapBox(page, box, holdMs = 120) {
@@ -578,13 +659,16 @@ export function auditMenuSurface(menu, profile, minTargetPx, minFontPx, label) {
     failures.push(`${label}-controls-offscreen:${offscreen.map((entry) => entry.id ?? entry.text).join(',')}`);
   }
   // A control something else is painted over is untappable no matter how well
-  // it measures. Only ID'd controls are failed: the arena cards are a deliberate
+  // it measures. The single exclusion is the arena picker: a deliberate
   // horizontal carousel whose off-carousel siblings are legitimately covered,
-  // and they are reported below rather than failed.
+  // excluded by its own container (`.map-card-grid`, carried as `inCarousel`).
+  // Excluding by "has no id" instead - which is what this did - excused every
+  // unnamed covered control in the menu, the same blind spot the clip-aware hit
+  // test was written to close.
   const blocked = menu.interactive.filter((entry) => entry.reachable === false && !entry.unavailable);
-  const blockedNamed = blocked.filter((entry) => entry.id);
-  if (blockedNamed.length > 0) {
-    failures.push(`${label}-controls-not-tappable:${blockedNamed.map((entry) => `${entry.id}<${entry.blockedBy}`).join(',')}`);
+  const blockedFailing = blocked.filter((entry) => !entry.inCarousel);
+  if (blockedFailing.length > 0) {
+    failures.push(`${label}-controls-not-tappable:${blockedFailing.map((entry) => `${entry.id ?? entry.text}<${entry.blockedBy}`).join(',')}`);
   }
   const tooSmall = menu.interactive.filter((entry) => entry.height < minTargetPx);
   const tinyText = menu.interactive.filter((entry) => entry.fontPx < minFontPx);
@@ -599,7 +683,12 @@ export function auditMenuSurface(menu, profile, minTargetPx, minFontPx, label) {
     // costs a life - is where the 44px floor is enforced hard.
     controlsBelowTargetHeight: tooSmall.map((entry) => ({ id: entry.id ?? entry.text, height: entry.height })),
     controlsBelowFontFloor: tinyText.map((entry) => ({ id: entry.id ?? entry.text, fontPx: entry.fontPx })),
-    controlsNotTappable: blocked.map((entry) => ({ id: entry.id ?? entry.text, blockedBy: entry.blockedBy })),
+    controlsNotTappable: blocked.map((entry) => ({
+      id: entry.id ?? entry.text,
+      blockedBy: entry.blockedBy,
+      inCarousel: Boolean(entry.inCarousel),
+      becameBlockedAfterSettle: Boolean(entry.becameBlockedAfterSettle),
+    })),
     // Reported, never failed: a long options list legitimately scrolls.
     controlsBelowTheFold: menu.interactive.filter((entry) => !entry.inViewport).length,
   };
@@ -875,14 +964,19 @@ async function runCell({ browser, proxy, profile, arena, options }) {
       }
     }
 
-    if (byId.sprint) {
-      await withTouch(page, async (send) => {
-        const point = [{ x: byId.sprint.x + byId.sprint.width / 2, y: byId.sprint.y + byId.sprint.height / 2, id: 1 }];
-        await send('touchStart', point);
-        await page.waitForTimeout(400);
-        await send('touchEnd', point);
-      });
+    if (byId.sprint && byId['stick-move']) {
       play.sprintButtonPresent = true;
+      const sprint = await sprintWhileMoving(page, byId['stick-move'], byId.sprint, 1_200);
+      Object.assign(play, sprint);
+      if (sprint.sprintingWhileHeld !== true) {
+        failures.push(`sprint-button-did-not-sprint(${sprint.sprintingSamples}/${sprint.sprintSamplesTaken} samples,`
+          + `${sprint.sprintMetres}m,stance=${sprint.stanceWhileSprinting})`);
+      }
+      if (sprint.sprintingAfterRelease === true) failures.push('sprint-stuck-on-after-release');
+      await page.waitForTimeout(400);
+    } else if (byId.sprint) {
+      play.sprintButtonPresent = true;
+      failures.push('sprint-UNMEASURED(no-move-stick-to-hold-with-it)');
     }
     record.play = play;
 

@@ -126,7 +126,7 @@ test('the floors are the documented ones and cannot be lowered here', () => {
 });
 
 test('every control a phone player cannot play without is required', () => {
-  for (const control of ['stick-move', 'stick-look', 'fire', 'ads', 'reload', 'switch-weapon', 'jump', 'pause']) {
+  for (const control of ['stick-move', 'stick-look', 'fire', 'ads', 'reload', 'switch-weapon', 'jump', 'sprint', 'pause']) {
     assert.ok(REQUIRED_TOUCH_CONTROLS.includes(control), `${control} must be required of every device`);
   }
   // The required set must be a real subset of what the overlay actually
@@ -138,6 +138,21 @@ test('every control a phone player cannot play without is required', () => {
   for (const control of REQUIRED_TOUCH_CONTROLS) {
     assert.ok(authored.has(control), `${control} is required but the overlay does not author it`);
   }
+});
+
+test('sprint is measured against player state, not merely tapped', () => {
+  // The first version of the sweep tapped SPRINT and recorded
+  // `sprintButtonPresent: true`. That is a presence check wearing a behaviour
+  // check's clothes, and the lane report described it as a measured action.
+  // These assertions exist so that cannot come back.
+  assert.ok(REQUIRED_TOUCH_CONTROLS.includes('sprint'));
+  assert.match(code, /sprintWhileMoving\(/u, 'sprint must be exercised by the two-finger gesture');
+  assert.match(code, /sample\?\.sprinting === true/u, 'the sweep must read player.sprinting, not just dispatch a tap');
+  assert.match(code, /sprint-button-did-not-sprint/u, 'a sprint that never engages must FAIL the cell');
+  assert.match(code, /sprint-stuck-on-after-release/u, 'a sprint stuck on after release must FAIL the cell');
+  // Sprint is gated on movement input in legacy-main, so the gesture must hold
+  // the move stick at the same time or the measurement is guaranteed false.
+  assert.match(code, /sprintWhileMoving\(page, byId\['stick-move'\], byId\.sprint/u);
 });
 
 test('the sweep is headless-only and never asks for a window', () => {
@@ -247,6 +262,27 @@ test('the menu audit fails a control something is painted over, and never a scro
   assert.ok(blocked.failures.some((entry) => entry.startsWith('pause-controls-not-tappable:resume<li.project-boundaries')),
     'a control under a modal is untappable no matter how well it measures');
 
+  // An UNNAMED covered control fails too. The exclusion is the arena carousel,
+  // identified by its own container, not by the absence of an id: excusing
+  // every id-less control was a far broader hole than the rationale claimed.
+  const unnamed = {
+    visible: true,
+    overflowX: 0,
+    interactive: [{
+      id: null, text: 'JOIN LOBBY', x: 40, y: 300, width: 200, height: 44, fontPx: 14,
+      offscreen: false, inViewport: true, inCarousel: false, reachable: false, blockedBy: 'div.scrim',
+    }],
+  };
+  assert.ok(auditMenuSurface(unnamed, profile, 44, 9, 'lobby').failures
+    .some((entry) => entry.startsWith('lobby-controls-not-tappable:JOIN LOBBY<div.scrim')));
+
+  const carousel = structuredClone(unnamed);
+  carousel.interactive[0].inCarousel = true;
+  const carouselAudit = auditMenuSurface(carousel, profile, 44, 9, 'lobby');
+  assert.deepEqual(carouselAudit.failures, [], 'an off-carousel arena card is covered by design');
+  assert.equal(carouselAudit.controlsNotTappable.length, 1, 'and is still reported, never dropped');
+  assert.equal(carouselAudit.controlsNotTappable[0].inCarousel, true);
+
   // A control scrolled out of the viewport is BELOW THE FOLD, not blocked. The
   // options panel is a long list; failing it would make the audit meaningless.
   const scrolled = {
@@ -260,6 +296,27 @@ test('the menu audit fails a control something is painted over, and never a scro
   const audit = auditMenuSurface(scrolled, profile, 44, 9, 'settings');
   assert.deepEqual(audit.failures, []);
   assert.equal(audit.controlsBelowTheFold, 1, 'below-the-fold controls are reported, not failed');
+});
+
+test('a control that becomes blocked after the settle still fails', () => {
+  // The stability filter forgives a scrim on its way OUT. A surface animating
+  // IN over a live control is a defect, and an earlier version of the filter
+  // cleared both directions - which softened exactly the case worth catching.
+  assert.match(code, /becameBlockedAfterSettle/u);
+  assert.ok(!/reachable: true, blockedBy: null, transientlyBlockedBy/u.test(code),
+    'the filter must not rewrite a second-read blockage into reachable');
+  const arrived = {
+    visible: true,
+    overflowX: 0,
+    interactive: [{
+      id: 'resume', text: 'RESUME', x: 40, y: 600, width: 300, height: 44, fontPx: 14,
+      offscreen: false, inViewport: true, inCarousel: false,
+      reachable: false, blockedBy: 'div.project-map-panel', becameBlockedAfterSettle: true,
+    }],
+  };
+  const audit = auditMenuSurface(arrived, profile, 44, 9, 'pause');
+  assert.ok(audit.failures.some((entry) => entry.startsWith('pause-controls-not-tappable:resume')));
+  assert.equal(audit.controlsNotTappable[0].becameBlockedAfterSettle, true);
 });
 
 test('the receipt says out loud what emulation cannot tell you', () => {
