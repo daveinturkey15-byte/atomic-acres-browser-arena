@@ -97,30 +97,33 @@ await context.addInitScript(() => {
 // the rows of an A/B. Driving the Options surface would be more faithful, but
 // it also changes a dozen controls at once when a preset is selected, which is
 // precisely what an A/B must not do.
-const seeded = { graphics: { preset: 'custom', bakedIndirect: TIER } };
-if (AO) seeded.graphics.ambientOcclusion = AO;
-await context.addInitScript(([key, payload, preset]) => {
-  try {
-    const existing = JSON.parse(window.localStorage.getItem(key) ?? '{}');
-    const merged = {
-      ...existing,
-      graphics: { ...(existing.graphics ?? {}), ...preset, ...payload.graphics },
-    };
-    window.localStorage.setItem(key, JSON.stringify(merged));
-  } catch { /* a browser with storage disabled measures the defaults; the row says so */ }
-}, [SETTINGS_KEY, seeded, {}]);
-
-const page = await context.newPage();
-const errors = [];
-page.on('pageerror', (error) => errors.push(String(error).slice(0, 300)));
-
 const row = {
   arena: ARENA, tier: TIER, ambientOcclusion: AO, viewport: '2560x1440',
   comfyQueueBefore: queueBefore, at: new Date().toISOString(),
 };
+
+// The BASE is the full QUALITY control set, imported from the registry rather
+// than retyped, so an A/B row differs from QUALITY in exactly the controls
+// named on the command line and in nothing else. Selecting a preset through
+// the Options surface would change a dozen controls at once, which is
+// precisely what an A/B must not do.
+const { GRAPHICS_PRESET_VALUES } = await import('../../src/graphics-settings-registry.ts');
+const seeded = { preset: 'custom', ...GRAPHICS_PRESET_VALUES.high, bakedIndirect: TIER };
+if (AO) seeded.ambientOcclusion = AO;
+row.baseProfile = 'high (QUALITY) control set, one control overridden';
+await context.addInitScript(([key, graphics]) => {
+  try {
+    const existing = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+    window.localStorage.setItem(key, JSON.stringify({ ...existing, graphics }));
+  } catch { /* a browser with storage disabled measures the defaults; the row says so */ }
+}, [SETTINGS_KEY, seeded]);
+
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', (error) => errors.push(String(error).slice(0, 300)));
 try {
   const startedAt = Date.now();
-  await page.goto(`${BASE}/?release=latest&renderer=webgpu&render=quality&seed=lightq&previewTime=0`, {
+  await page.goto(`${BASE}/?release=latest&renderer=webgpu&seed=lightq&previewTime=0`, {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: TIMEOUT });
