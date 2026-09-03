@@ -461,6 +461,29 @@ async function main(): Promise<void> {
   let lastDraws = 0;
   let lastTris = 0;
 
+  // --- frame-time telemetry (HF-419) -----------------------------------
+  // The HUD's `fps` is an integer averaged over a 0.5 s window. It cannot
+  // resolve a 5% frame-time change, and under a compositor vsync it reads a
+  // flat 60 on both sides of a real regression - so a before/after claim built
+  // on it is not a measurement. These two rings are:
+  //   dtMs      - the wall-clock frame interval. p50 is vsync-pinned when the
+  //               scene is comfortably inside budget; p95 still catches hitches.
+  //   encodeMs  - CPU time inside renderer.render(): scene walk, culling,
+  //               uniform upload and command encoding. This one moves when a
+  //               pass adds draw calls or per-frame CPU work, vsync or not.
+  // Neither is a GPU timestamp; a purely GPU-bound cost under vsync is invisible
+  // to both, and any claim made from them says so.
+  const RING = 900;
+  const dtRing = new Float64Array(RING);
+  const encRing = new Float64Array(RING);
+  let ringCount = 0;
+  let ringHead = 0;
+  const percentile = (src: Float64Array, n: number, q: number): number | null => {
+    if (n === 0) return null;
+    const v = Array.from(src.subarray(0, n)).sort((a, b) => a - b);
+    return v[Math.min(v.length - 1, Math.max(0, Math.round(q * (v.length - 1))))];
+  };
+
   function tick(): void {
     const dt = Math.min(clock.getDelta(), 0.05);
     const elapsed = clock.elapsedTime;
@@ -505,7 +528,14 @@ async function main(): Promise<void> {
 
     corridors.forEach((c) => c.update(elapsed, dt, camera.position, playerVel));
 
+    const t0 = performance.now();
     renderer.render(scene, camera);
+    const encodeMs = performance.now() - t0;
+
+    dtRing[ringHead] = dt * 1000;
+    encRing[ringHead] = encodeMs;
+    ringHead = (ringHead + 1) % RING;
+    if (ringCount < RING) ringCount++;
 
     const info = renderer.info?.render as { drawCalls?: number; calls?: number; triangles?: number } | undefined;
     if (info) {
@@ -551,6 +581,24 @@ async function main(): Promise<void> {
       yaw = ry; pitch = rx;
     },
     fps: () => fps,
+    /** Drop every buffered frame sample; call after a pose change has settled. */
+    resetFrameStats() { ringCount = 0; ringHead = 0; },
+    /**
+     * p50/p95 of the wall-clock frame interval and of the CPU render-encode
+     * time, in ms, over the frames since the last reset. `n` is the sample
+     * count - a claim made on fewer than a few hundred frames is not a claim.
+     */
+    frameStats() {
+      return {
+        n: ringCount,
+        dtP50: percentile(dtRing, ringCount, 0.5),
+        dtP95: percentile(dtRing, ringCount, 0.95),
+        encodeP50: percentile(encRing, ringCount, 0.5),
+        encodeP95: percentile(encRing, ringCount, 0.95),
+        draws: lastDraws,
+        tris: lastTris,
+      };
+    },
   };
 }
 

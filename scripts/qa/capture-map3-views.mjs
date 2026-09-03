@@ -63,6 +63,12 @@ const VIEWS = [
   { name: 'corridor-1-truck-seq', ...local(A(0), 3.1, -2.2, 3.2, 0.24, -0.20), frames: 14, intervalMs: 1100 },
   { name: 'corridor-2-maths', ...pose(A(1), 20, 1.7, -0.05) },
   { name: 'corridor-3-grammar', ...pose(A(2), 20, 1.7, -0.05) },
+  // HF-419 street cell, at the far end of the grammar corridor (local z -52..-74).
+  // Both poses stand ON the cell, because that is the camera the technique is
+  // for: a 1.7 m eye at the kerb, not a 20 m establishing shot. They are added
+  // BEFORE the cell is built so the baseline is the same pose over bare ground.
+  { name: 'corridor-3-street-cell', ...local(A(2), -5.2, -53.5, 1.87, 0, -0.045) },
+  { name: 'corridor-3-street-kerbside', ...local(A(2), -2.4, -62.0, 1.42, -0.62, -0.10) },
   { name: 'corridor-4-water-mouth', ...pose(A(3), 16, 1.7, -0.05) },
   { name: 'corridor-4-water-shore', ...pose(A(3), 28, 1.7, -0.08) },
   { name: 'corridor-4-water-low', ...pose(A(3), 34, 1.1, -0.02) },
@@ -150,6 +156,12 @@ async function main() {
       await page.evaluate(({ x, y, z, ry, rx }) => { window.__MAP3.setPose(x, y, z, ry, rx); }, { x: v.x, y: v.y, z: v.z, ry: v.yaw, rx: v.pitch });
       // 2.5 s: two HUD windows (0.5 s each) after pipelines settle for the new view.
       await page.waitForTimeout(2500);
+      // Frame-time distribution over a fixed 3 s window AFTER the pose has
+      // settled, so first-sight pipeline compiles are not counted as frame cost.
+      // Optional: older builds have no frameStats and simply record null.
+      await page.evaluate(() => { window.__MAP3.resetFrameStats?.(); });
+      await page.waitForTimeout(3000);
+      const frameStats = await page.evaluate(() => window.__MAP3.frameStats?.() ?? null);
       const frames = v.frames ?? 1;
       const samples = [];
       for (let f = 0; f < frames; f++) {
@@ -161,7 +173,7 @@ async function main() {
         if (f < frames - 1) await page.waitForTimeout(v.intervalMs ?? 500);
       }
       const fpsValues = samples.map((s) => Number.parseInt(s ?? '', 10)).filter((n) => Number.isFinite(n));
-      hudLog[v.name] = { pose: { x: v.x, y: v.y, z: v.z, yaw: v.yaw, pitch: v.pitch }, samples, fpsMin: Math.min(...fpsValues), fpsMax: Math.max(...fpsValues) };
+      hudLog[v.name] = { pose: { x: v.x, y: v.y, z: v.z, yaw: v.yaw, pitch: v.pitch }, samples, fpsMin: Math.min(...fpsValues), fpsMax: Math.max(...fpsValues), frameStats };
       console.log(`[capture] ${v.name}: ${samples[samples.length - 1]}`);
     }
     hudLog.__pageErrors = errors;
