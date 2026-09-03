@@ -16,7 +16,7 @@
  * trunks come out of a Poisson scatter, the colonnade's columns out of a bay
  * loop, the ruin's walls out of a shape grammar; all of that is generated, and
  * none of it is recoverable from the merged mesh afterwards (a corridor's
- * "wood" is ONE merged mesh spanning 60 m, so its bounding box is the corridor,
+ * "wood" is ONE merged mesh spanning 54 m, so its bounding box is the corridor,
  * not a tree). So each corridor declares its solids AT THE POINT IT PLACES
  * THEM, in its own local frame, and the arena transforms them into world
  * colliders and shot surfaces.
