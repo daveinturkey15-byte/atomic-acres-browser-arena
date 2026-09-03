@@ -154,11 +154,16 @@ if (process.argv[1]?.endsWith('verify-two-channel-policy.mjs')) {
     ? null
     : readLivePagesChannels(repositoryRoot);
   if (livePagesChannels === null && process.env.TWO_CHANNEL_POLICY_SKIP_GIT !== '1') {
-    // Skipped, not passed. A verifier that could not run must never be mistaken for one
-    // that ran green - the same rule verify-release-topology.mjs already states for its
-    // dropped-channel check.
-    console.warn('[two-channel-policy] origin/gh-pages is unreachable; the live-tree half of '
-      + 'this guard did NOT run. Fetch gh-pages to enable it.');
+    // Skipped is not passed. REPAIR (skeptic, PASS 87): this used to warn and carry on, so a
+    // run in a checkout without an origin/gh-pages ref printed {"twoChannelPolicy":"ok"} at
+    // exit 0 having never looked at the live branch - the half of the guard that would have
+    // caught the six-tree gh-pages state this lane exists for. Not running is now a failure,
+    // and skipping is opt-in only (TWO_CHANNEL_POLICY_SKIP_GIT=1, which the config-vs-publish
+    // half still fully exercises).
+    console.error('[two-channel-policy] origin/gh-pages is unreachable, so the live-tree half '
+      + 'of this guard did NOT run. Fetch gh-pages (git fetch origin gh-pages) to enable it, '
+      + 'or set TWO_CHANNEL_POLICY_SKIP_GIT=1 to run the config-vs-publish half alone.');
+    process.exit(1);
   }
   const result = evaluateTwoChannelPolicy({ config, publishSource, publishScriptName, livePagesChannels });
   const jsonFlag = process.argv.indexOf('--json');
