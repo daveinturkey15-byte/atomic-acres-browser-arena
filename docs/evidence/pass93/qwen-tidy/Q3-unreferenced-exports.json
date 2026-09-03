@@ -1,0 +1,6308 @@
+{
+  "root": "C:\\Users\\david\\projects\\aa-claude-qwen",
+  "definitionFileCount": 444,
+  "exportSymbolCount": 5073,
+  "searchFileCount": 1463,
+  "items": [
+    {
+      "file": "src/adaptive-quality.ts",
+      "name": "AdaptiveQualityTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/adaptive-quality.ts",
+      "name": "WebGpuPresentationIdleState",
+      "kind": "type"
+    },
+    {
+      "file": "src/additional-maps.ts",
+      "name": "GunRangeTestBayDoorFrame",
+      "kind": "type"
+    },
+    {
+      "file": "src/ads-sight-profile.ts",
+      "name": "ADS_IRON_SIGHT_FOV_REDUCTION_DEGREES",
+      "kind": "const"
+    },
+    {
+      "file": "src/ads-sight-profile.ts",
+      "name": "AdsSightMarker",
+      "kind": "type"
+    },
+    {
+      "file": "src/ads-sight-profile.ts",
+      "name": "AdsSightProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-additive-pose.ts",
+      "name": "AimJointRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-additive-pose.ts",
+      "name": "AimPitchLimits",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-blend-graph.ts",
+      "name": "BlendTransitionTable",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-locomotion.ts",
+      "name": "LocomotionAxis",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-locomotion.ts",
+      "name": "LocomotionClipCalibration",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-locomotion.ts",
+      "name": "LocomotionClipWeight",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation-locomotion.ts",
+      "name": "LocomotionSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation/kimodo-operator-retarget.ts",
+      "name": "KimodoSkeleton",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation/kimodo-operator-retarget.ts",
+      "name": "KimodoSkeletonId",
+      "kind": "type"
+    },
+    {
+      "file": "src/animation/motionbricks-g1-retarget.ts",
+      "name": "G1RetargetTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-ambient-events.ts",
+      "name": "ArenaAmbientProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-contrast-lighting.ts",
+      "name": "ArenaAuthoredLightTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-contrast-lighting.ts",
+      "name": "ArenaContrastLightingTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-contrast-lighting.ts",
+      "name": "ArenaPracticalLightSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-factory-registry.ts",
+      "name": "ArenaFactoryEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-factory-registry.ts",
+      "name": "ArenaFactoryRegistry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-factory-registry.ts",
+      "name": "ArenaFactoryRegistryTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-frame-animation.ts",
+      "name": "ArenaFrameAnimator",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-frame-animation.ts",
+      "name": "ArenaFrameAnimatorTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-transition-profile.ts",
+      "name": "ArenaTransitionPhaseSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/arena-transition-profile.ts",
+      "name": "ArenaTransitionProfileSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/art-kit.ts",
+      "name": "buildRetroShuttleBus",
+      "kind": "function"
+    },
+    {
+      "file": "src/art-kit.ts",
+      "name": "StaticBatchMaterialMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/art-kit.ts",
+      "name": "StaticBatchStats",
+      "kind": "type"
+    },
+    {
+      "file": "src/atmosphere-system.ts",
+      "name": "AtmosphereTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/atomic-profile-authority-parity.ts",
+      "name": "AtomicHouseAuthorityBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/atomic-profile-authority-parity.ts",
+      "name": "AtomicHouseAuthorityParityEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/atomic-profile-authority-parity.ts",
+      "name": "AtomicPresentationProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/atomic-signal.ts",
+      "name": "AtomicSignalConfig",
+      "kind": "type"
+    },
+    {
+      "file": "src/atomic-signal.ts",
+      "name": "AtomicSignalTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-immersion.ts",
+      "name": "AcousticProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-immersion.ts",
+      "name": "OcclusionResponse",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-immersion.ts",
+      "name": "REPORT_TAIL_FULL_RANGE_METRES",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio-immersion.ts",
+      "name": "SPEED_OF_SOUND_METRES_PER_SECOND",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio-immersion.ts",
+      "name": "WeaponReportLayering",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-synthesis.ts",
+      "name": "EnvelopeRamp",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-synthesis.ts",
+      "name": "FrequencyStage",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio-synthesis.ts",
+      "name": "TransientEnvelopeSpec",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AMBIENCE_EXPLOSION_DUCK_GAIN",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AMBIENCE_EXPLOSION_DUCK_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AMBIENCE_EXPLOSION_DUCK_TIME_CONSTANT_S",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AMBIENCE_INCOMMENSURATE_PERIODS_SECONDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AudioListenerPoseMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "AudioOutputProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "BrowserAudioContextResolution",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "EXPLOSION_SPATIAL_PROFILES",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "ExplosionAudioGate",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "ExplosionSpatialFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "FlashbangAudioEnvelope",
+      "kind": "type"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "NEAR_BLAST_TINNITUS_DISTANCE",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "NEAR_BLAST_TINNITUS_PROFILE",
+      "kind": "const"
+    },
+    {
+      "file": "src/audio.ts",
+      "name": "NEAR_BLAST_TINNITUS_TAIL_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/authoritative-death-outcome.ts",
+      "name": "AuthoritativeDeathOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/authoritative-death-outcome.ts",
+      "name": "AuthoritativeDeathOutcomePorts",
+      "kind": "type"
+    },
+    {
+      "file": "src/authoritative-shot.ts",
+      "name": "AuthoritativeShotAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/ballistics.ts",
+      "name": "BallisticHitscanResolution",
+      "kind": "type"
+    },
+    {
+      "file": "src/ballistics.ts",
+      "name": "BallisticSurfaceEvidence",
+      "kind": "type"
+    },
+    {
+      "file": "src/ballistics.ts",
+      "name": "BallisticSurfaceImpact",
+      "kind": "type"
+    },
+    {
+      "file": "src/ballistics.ts",
+      "name": "isBallisticMaterialId",
+      "kind": "function"
+    },
+    {
+      "file": "src/ballistics.ts",
+      "name": "pointAlongBallisticPath",
+      "kind": "function"
+    },
+    {
+      "file": "src/banner-arbiter.ts",
+      "name": "BannerDisplay",
+      "kind": "type"
+    },
+    {
+      "file": "src/blender-environment.ts",
+      "name": "BlenderArenaTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "BotGrenadeSense",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "BotIntent",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "BotMovement",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "BotSpawnScore",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "SpawnSidePressure",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-ai.ts",
+      "name": "TacticalWaypointCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-arsenal.ts",
+      "name": "BotSupportedFireKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-arsenal.ts",
+      "name": "BotWeaponFireAdapter",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_FLASH_MAX_BLIND_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_FLASH_RECOVERY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_MAX_REMEMBERED_FLASH_RESULTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_SMOKE_BLOCKING_DENSITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_SMOKE_DEGRADED_DENSITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BOT_SMOKE_FIRE_BLOCK_DENSITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-perception-authority.ts",
+      "name": "BotPerceptionProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-stance.ts",
+      "name": "BotStanceContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-stance.ts",
+      "name": "BotStanceDecision",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-weapon-gpu-vocabulary.ts",
+      "name": "BotWeaponCpuYield",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-weapon-gpu-vocabulary.ts",
+      "name": "BotWeaponGpuVocabularyTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-weapon-presentation.ts",
+      "name": "BOT_WEAPON_PRESENTATION_REPLAY_CAPACITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/bot-weapon-presentation.ts",
+      "name": "BotWeaponPresentationAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-weapon-presentation.ts",
+      "name": "BotWeaponPresentationAdmissionReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/bot-weapon-presentation.ts",
+      "name": "MAX_BOT_WEAPON_PRESENTATION_MESSAGE_BYTES",
+      "kind": "const"
+    },
+    {
+      "file": "src/browser-preparation-scheduler.ts",
+      "name": "browserCpuTaskLaneTelemetry",
+      "kind": "function"
+    },
+    {
+      "file": "src/browser-preparation-scheduler.ts",
+      "name": "BrowserCpuTaskLaneTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-eye-clearance.ts",
+      "name": "EYE_DEPENETRATION_LIMIT_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/camera-eye-clearance.ts",
+      "name": "EyeClearanceHit",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-eye-clearance.ts",
+      "name": "EyeClearanceProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-eye-clearance.ts",
+      "name": "EyeClearanceResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CAMERA_SHAKE_MAX_GAP_SECONDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CAMERA_SHAKE_MIN_IMPULSE",
+      "kind": "const"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeAxisAmplitudes",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeImpulseInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeMotionPreferences",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeRotationAmplitudes",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeSourcePreset",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeTraumaInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/camera-shake.ts",
+      "name": "CameraShakeTraumaState",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-capture-client.ts",
+      "name": "CareCaptureClientState",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-capture-client.ts",
+      "name": "CareCaptureClientTransition",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-capture-client.ts",
+      "name": "CareCaptureClientUpdate",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-capture-client.ts",
+      "name": "CareCaptureResultProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-capture-client.ts",
+      "name": "CareCaptureStateProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-package-weapon-reward.ts",
+      "name": "CARE_PACKAGE_FLAMETHROWER_PROBABILITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/care-package-weapon-reward.ts",
+      "name": "CARE_PACKAGE_WEAPON_REWARD_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/care-package-weapon-reward.ts",
+      "name": "carePackageLayeredTotalUnits",
+      "kind": "function"
+    },
+    {
+      "file": "src/care-package-weapon-reward.ts",
+      "name": "CarePackageRewardRoll",
+      "kind": "type"
+    },
+    {
+      "file": "src/care-package-weapon-reward.ts",
+      "name": "carePackageWeaponBandEndExclusive",
+      "kind": "function"
+    },
+    {
+      "file": "src/carpet-corridor-targeting.ts",
+      "name": "CarpetCorridorBounds",
+      "kind": "type"
+    },
+    {
+      "file": "src/carpet-corridor-targeting.ts",
+      "name": "CarpetCorridorIntent",
+      "kind": "type"
+    },
+    {
+      "file": "src/carpet-corridor-targeting.ts",
+      "name": "CarpetCorridorPoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/carpet-corridor-targeting.ts",
+      "name": "CarpetCorridorRun",
+      "kind": "type"
+    },
+    {
+      "file": "src/carpet-corridor-targeting.ts",
+      "name": "CarpetCorridorStage",
+      "kind": "type"
+    },
+    {
+      "file": "src/carpet-ground-fire-multiplayer.ts",
+      "name": "CarpetGroundFireStateChunk",
+      "kind": "type"
+    },
+    {
+      "file": "src/changelog.ts",
+      "name": "pass84ReleaseCopy",
+      "kind": "function"
+    },
+    {
+      "file": "src/character-presentation-contract.ts",
+      "name": "CharacterActionState",
+      "kind": "type"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "ChiptuneBar",
+      "kind": "type"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "ChiptuneChannel",
+      "kind": "type"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "ChiptuneTrack",
+      "kind": "type"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "degreeToMidi",
+      "kind": "function"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "DORIAN_SEMITONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "MINOR_PENTATONIC_SEMITONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "MIXOLYDIAN_SEMITONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "MultiTrackScheduleState",
+      "kind": "type"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "NATURAL_MINOR_SEMITONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/chiptune-music.ts",
+      "name": "PHRYGIAN_SEMITONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/chopper-exterior-review-camera.ts",
+      "name": "ChopperExteriorReviewCameraInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/chopper-exterior-review-camera.ts",
+      "name": "ChopperExteriorReviewCameraPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/client-runtime-log.ts",
+      "name": "ClientRuntimeLogInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/client-world-repair-admission.ts",
+      "name": "ClientWorldRepairDeadlineInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/client-world-repair-admission.ts",
+      "name": "ClientWorldRepairDeadlineVerdict",
+      "kind": "type"
+    },
+    {
+      "file": "src/client-world-repair-admission.ts",
+      "name": "ClientWorldRepairIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/clipboard.ts",
+      "name": "ClipboardCopyResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/collision.ts",
+      "name": "HitscanResolution",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat-feedback.ts",
+      "name": "CombatConfirmEnvelope",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat-feedback.ts",
+      "name": "CombatConfirmKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat-feedback.ts",
+      "name": "SurfaceEvidence",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/grenade-catalog.ts",
+      "name": "GRENADE_AVAILABILITIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/grenade-catalog.ts",
+      "name": "GRENADE_RUNTIME_KINDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/grenade-catalog.ts",
+      "name": "GrenadeRuntimeKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/grenade-catalog.ts",
+      "name": "isGrenadeId",
+      "kind": "function"
+    },
+    {
+      "file": "src/combat/legacy-weapon-adapter.ts",
+      "name": "LegacyWeaponRegistry",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "ExplosiveBoltAttachment",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "ExplosiveBoltState",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "FlashExposure",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "FlashOwnerKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "FlashSimulationRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "GRENADE_SPAWN_COUNT",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "GrenadeInventory",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/ordnance.ts",
+      "name": "GrenadeInventoryResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/pass65-ordnance-contract.ts",
+      "name": "FlashbangPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-catalog.ts",
+      "name": "MINIGUN_PASS65_DAMAGE_MULTIPLIER",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-catalog.ts",
+      "name": "MINIGUN_PRE_PASS65_BASE_DAMAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-catalog.ts",
+      "name": "MINIGUN_PRE_PASS65_MINIMUM_DAMAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-catalog.ts",
+      "name": "SustainedRecoilRank",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-role-distance.ts",
+      "name": "WeaponRoleDistance",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "ProjectileDefinitionId",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "SpecialAuthorityWeaponOptic",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "StandardWeaponOptic",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "ThermalSmokeOnlyWeaponOptic",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WEAPON_FIRE_KINDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WEAPON_FIRE_MODES",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WEAPON_MATERIAL_POLICY_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WEAPON_SLOTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponAmmoProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponAuthorityPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponDamagePolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponDamageProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponDropPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponFireMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponLoadoutPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponPolicies",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponRangePolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponRecoilProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponReplayPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponSchemaIssue",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponSlot",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponSpreadProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponStanceAvailability",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponStancePolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/combat/weapon-schema.ts",
+      "name": "WeaponTelemetryPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/crossbow-glass-authority.ts",
+      "name": "CanonicalCrossbowGlassAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/crossbow-glass-authority.ts",
+      "name": "CanonicalCrossbowGlassAdmissionReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/crossbow-glass-authority.ts",
+      "name": "CrossbowGlassMutationAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/crossbow-glass-authority.ts",
+      "name": "RetainableCrossbowGlassAction",
+      "kind": "type"
+    },
+    {
+      "file": "src/death-drop-presentation.ts",
+      "name": "DeathDropPresentationTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/death-drops.ts",
+      "name": "DeathDropInventory",
+      "kind": "type"
+    },
+    {
+      "file": "src/death-drops.ts",
+      "name": "DropPoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/death-drops.ts",
+      "name": "ScavengeInventory",
+      "kind": "type"
+    },
+    {
+      "file": "src/deployment-loading-progress.ts",
+      "name": "DeploymentLoadingProgress",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-shed-presentation.ts",
+      "name": "ShedPresentationTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "DamageableSheetRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "DoorInteractionRequest",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "MajorDebrisState",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "QuantizedPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "SHED_EXPLOSION_DENT_MAX_RADIUS_Q",
+      "kind": "const"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "SHED_EXPLOSION_DENT_MIN_RADIUS_Q",
+      "kind": "const"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "SHED_MAX_INTERACTION_ACTORS",
+      "kind": "const"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "ShedDoorBlockerKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "ShedDoorState",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "ShedMajorChunkExtents",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "ShedRegionalDamage",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "SheetDent",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "SheetImpactRequest",
+      "kind": "type"
+    },
+    {
+      "file": "src/destructible-world.ts",
+      "name": "WorldCollisionConsumer",
+      "kind": "type"
+    },
+    {
+      "file": "src/directional-hud.ts",
+      "name": "PlanarPoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/dmr-thermal-presentation.ts",
+      "name": "DMR_THERMAL_FOV_TOLERANCE_DEGREES",
+      "kind": "const"
+    },
+    {
+      "file": "src/dmr-thermal-presentation.ts",
+      "name": "DMR_THERMAL_SETTLED_ADS_PROGRESS",
+      "kind": "const"
+    },
+    {
+      "file": "src/dmr-thermal-presentation.ts",
+      "name": "DmrThermalRelation",
+      "kind": "type"
+    },
+    {
+      "file": "src/dmr-thermal-presentation.ts",
+      "name": "DmrThermalRevealInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/dmr-thermal-prewarm-lifecycle.ts",
+      "name": "StagedDmrThermalPrewarmLifecycle",
+      "kind": "type"
+    },
+    {
+      "file": "src/domination-capture-prompt.ts",
+      "name": "DOMINATION_CAPTURE_PROMPT_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/domination-capture-prompt.ts",
+      "name": "DominationCapturePrompt",
+      "kind": "type"
+    },
+    {
+      "file": "src/domination-capture-prompt.ts",
+      "name": "DominationCapturePromptState",
+      "kind": "type"
+    },
+    {
+      "file": "src/domination-mode.ts",
+      "name": "DOMINATION_TICK_POINTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/domination-mode.ts",
+      "name": "DominationEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/domination-mode.ts",
+      "name": "DominationZone",
+      "kind": "type"
+    },
+    {
+      "file": "src/domination-mode.ts",
+      "name": "DominationZoneSeed",
+      "kind": "type"
+    },
+    {
+      "file": "src/environment-assets.ts",
+      "name": "ArenaArtResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-art.ts",
+      "name": "addFallenCoconuts",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-grass-field.ts",
+      "name": "farcrysisGrassFieldStats",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-ground-materials.ts",
+      "name": "FARCRYSIS_GROUND_REPEAT",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-ground-materials.ts",
+      "name": "FarcrysisGroundSurface",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-ground-materials.ts",
+      "name": "farcrysisGroundTextures",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-ground-materials.ts",
+      "name": "FarcrysisGroundTextureSet",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-ground-materials.ts",
+      "name": "GROUND_TILE_METRES",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-ground-textures.ts",
+      "name": "FARCRYSIS_GROUND_TEXTURE_STATS",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-ground-textures.ts",
+      "name": "FarcrysisGroundTextures",
+      "kind": "interface"
+    },
+    {
+      "file": "src/farcrysis-ground-textures.ts",
+      "name": "generateSandTextures",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "CratePlacement",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LANDMARK_CRATE_OUTWARD",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LANDMARK_HEDGE_OUTWARD",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LANDMARK_PICKET_BARREL_DIAMETER_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LANDMARK_WALL_OUTWARD",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LandmarkFrame",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LandmarkInteractableKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LandmarkInteractableSpec",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "LandmarkTag",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "WallSegmentSpec",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-midmap-landmarks.ts",
+      "name": "WordmarkAnchor",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-physics.ts",
+      "name": "FuelDrumSpec",
+      "kind": "interface"
+    },
+    {
+      "file": "src/farcrysis-terrain-authority.ts",
+      "name": "BotGroundPlatform",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-terrain-authority.ts",
+      "name": "TERRAIN_PROXY_CHUNKS_PER_AXIS",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-terrain-authority.ts",
+      "name": "TERRAIN_PROXY_SEGMENTS_PER_CHUNK",
+      "kind": "const"
+    },
+    {
+      "file": "src/farcrysis-terrain-authority.ts",
+      "name": "TerrainPlate",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-terrain-authority.ts",
+      "name": "TerrainProxyChunk",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-textures.ts",
+      "name": "buildProceduralPBRMaps",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-textures.ts",
+      "name": "FARCRYSIS_TEXTURE_STATS",
+      "kind": "function"
+    },
+    {
+      "file": "src/farcrysis-tsl-foliage.ts",
+      "name": "TslGrassOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/farcrysis-water-ripples.ts",
+      "name": "WaterRippleTexture",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis-water-surface.ts",
+      "name": "FarcrysisSeaSurfaceParams",
+      "kind": "type"
+    },
+    {
+      "file": "src/farcrysis.ts",
+      "name": "FarcrysisHitlState",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "FIELD_SUPPORT_IDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "FieldSupportActorProjectionSource",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "FieldSupportDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "FieldSupportProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "HunterTargetCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "REMOTE_EXPLOSIVE_HIT_MARGIN",
+      "kind": "const"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "TriPassBounds",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "TriPassContactCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/field-support.ts",
+      "name": "TriPassPoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/flame-damage-contract.ts",
+      "name": "FlameDamageSource",
+      "kind": "type"
+    },
+    {
+      "file": "src/flame-damage-contract.ts",
+      "name": "flameTargetRelation",
+      "kind": "function"
+    },
+    {
+      "file": "src/flame-damage-contract.ts",
+      "name": "FlameTargetRelation",
+      "kind": "type"
+    },
+    {
+      "file": "src/flamethrower-residual-authority.ts",
+      "name": "FlamethrowerResidualRemoteAuthority",
+      "kind": "type"
+    },
+    {
+      "file": "src/flamethrower-stream-system.ts",
+      "name": "FLAMETHROWER_GROUND_FIRE_MERGE_RADIUS_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/flare-authority-checkpoint.ts",
+      "name": "AdvancedFlareAuthorityCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/flare-authority-checkpoint.ts",
+      "name": "FLARE_SHOOTER_FEEDBACK_MAX_REMAINING_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/flare-authority-checkpoint.ts",
+      "name": "isFlareAuthorityContinuationEntity",
+      "kind": "function"
+    },
+    {
+      "file": "src/flare-authority-checkpoint.ts",
+      "name": "isFlareShooterFeedbackCheckpoint",
+      "kind": "function"
+    },
+    {
+      "file": "src/flare-presentation-protocol.ts",
+      "name": "FlarePresentationPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/flare-projectile-system.ts",
+      "name": "FlareActiveReplicaInspection",
+      "kind": "type"
+    },
+    {
+      "file": "src/flare-projectile-system.ts",
+      "name": "FlareAuthorityRestoreResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/flare-projectile-system.ts",
+      "name": "FlareProjectileExpiry",
+      "kind": "type"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FLASH_INTENSITY_QUANTA",
+      "kind": "const"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FLASH_MAX_REMEMBERED_RESULTS_PER_LIFE",
+      "kind": "const"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FLASH_MAX_RESULTS_PER_DETONATION",
+      "kind": "const"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FlashAuthorityRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FlashDetonationResolution",
+      "kind": "type"
+    },
+    {
+      "file": "src/flash-authority.ts",
+      "name": "FlashResultAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay-replay.ts",
+      "name": "GameplayReplayResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay-replay.ts",
+      "name": "GameplayReplayState",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay-replay.ts",
+      "name": "ReplayTickHash",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "FALL_DAMAGE_LETHAL_SPEED",
+      "kind": "const"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "FALL_DAMAGE_MULTIPLIER",
+      "kind": "const"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "FALL_DAMAGE_SAFE_SPEED",
+      "kind": "const"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "GamepadLookRate",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "HorizontalVelocity",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "MATCH_SCORE_LIMIT",
+      "kind": "const"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "MovementContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "MovementProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "RecoilContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "SpreadContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "StanceAction",
+      "kind": "type"
+    },
+    {
+      "file": "src/gameplay.ts",
+      "name": "WeaponSpec",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GLASS_AUTHORITY_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GLASS_BREACH_DAMAGE_Q",
+      "kind": "const"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GLASS_CRACK_DAMAGE_Q",
+      "kind": "const"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GLASS_DETACH_DAMAGE_Q",
+      "kind": "const"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GLASS_MAX_REMEMBERED_IMPACTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GlassAuthorityProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GlassImpactAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GlassPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-authority.ts",
+      "name": "GlassProjectileAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-collider-bounds.ts",
+      "name": "GlassAuthoredBoundsResolver",
+      "kind": "type"
+    },
+    {
+      "file": "src/glass-collider-bounds.ts",
+      "name": "GlassPaneSource",
+      "kind": "type"
+    },
+    {
+      "file": "src/global-leaderboard.ts",
+      "name": "GLOBAL_LEADERBOARD_TIMEOUT_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/global-leaderboard.ts",
+      "name": "GlobalStreakSubmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/gpu-resource-ownership.ts",
+      "name": "GPU_GEOMETRY_OWNER_KEY",
+      "kind": "const"
+    },
+    {
+      "file": "src/gpu-retirement-scheduler.ts",
+      "name": "DeferredGpuRetirementScheduler",
+      "kind": "type"
+    },
+    {
+      "file": "src/gpu-retirement-scheduler.ts",
+      "name": "GpuRetirementSchedulerDeps",
+      "kind": "type"
+    },
+    {
+      "file": "src/gpu-retirement-scheduler.ts",
+      "name": "GpuRetirementTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-refinement.ts",
+      "name": "ArenaShadowVolume",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-refinement.ts",
+      "name": "GraphicsRefinementTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "AmbientOcclusionQuality",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "AntiAliasingMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "BloomQuality",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "GeometryDetail",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "GraphicsCapabilityNotice",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "GraphicsRuntimeConsumer",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "GraphicsSelectOption",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "QualityTier",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "ShadowResolution",
+      "kind": "type"
+    },
+    {
+      "file": "src/graphics-settings-registry.ts",
+      "name": "ShadowUpdateMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/grass-placement.ts",
+      "name": "GrassGroundRegion",
+      "kind": "type"
+    },
+    {
+      "file": "src/grass-placement.ts",
+      "name": "GrassInteractionSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/grass-placement.ts",
+      "name": "GrassPlacementResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/grass-placement.ts",
+      "name": "KERB_DEPTH_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/grass-placement.ts",
+      "name": "SIDEWALK_DEPTH_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/grass-system.ts",
+      "name": "GrassProfileConfig",
+      "kind": "type"
+    },
+    {
+      "file": "src/grass-system.ts",
+      "name": "GrassTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/grenade-explosion-presentation.ts",
+      "name": "GRENADE_EXPLOSION_CORE_START_SCALE",
+      "kind": "const"
+    },
+    {
+      "file": "src/grenade-explosion-presentation.ts",
+      "name": "GRENADE_EXPLOSION_FRAME_GATE_HOLD_PROGRESS",
+      "kind": "const"
+    },
+    {
+      "file": "src/grenade-explosion-presentation.ts",
+      "name": "GRENADE_EXPLOSION_RING_END_SCALE",
+      "kind": "const"
+    },
+    {
+      "file": "src/grenade-explosion-presentation.ts",
+      "name": "GrenadeExplosionTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/grenade-presentation.ts",
+      "name": "GrenadePresentationFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-combat-inventory-authority.ts",
+      "name": "GuestCombatInventoryProjectionAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-rejoin-affordance.ts",
+      "name": "GuestRejoinAffordance",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-reload-authority.ts",
+      "name": "GuestReloadAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-reload-authority.ts",
+      "name": "GuestReloadAdvance",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-reload-authority.ts",
+      "name": "GuestReloadPending",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-reload-authority.ts",
+      "name": "GuestReloadReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "GuestResumeAckContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "GuestResumeAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "GuestResumeAdmissionReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "GuestResumeAuthorityContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "GuestResumeProjection",
+      "kind": "type"
+    },
+    {
+      "file": "src/guest-resume-authority.ts",
+      "name": "MAX_GUEST_RESUME_RETRIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-cat-choreography.ts",
+      "name": "FlyingCatPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "GUN_RANGE_SCORE_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "GUN_RANGE_SCORE_STORAGE_KEY",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "GunRangeScoreDocument",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "MAX_GUN_RANGE_HITS",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "MAX_GUN_RANGE_SCORE",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "MAX_GUN_RANGE_SCORE_ENTRIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-leaderboard.ts",
+      "name": "MAX_GUN_RANGE_SHOTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-match-clock-authority.ts",
+      "name": "GUN_RANGE_MATCH_CLOCK_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-match-clock-authority.ts",
+      "name": "GunRangeMatchClockStep",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-rack-presentation.ts",
+      "name": "GunRangeRackAsset",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-rack-presentation.ts",
+      "name": "GunRangeRackLoadOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-rack-presentation.ts",
+      "name": "GunRangeRackPresentationReceipt",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-rules.ts",
+      "name": "UNLIMITED_AMMO_SYMBOL",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GUN_RANGE_TEST_BAY_DOOR_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GUN_RANGE_TEST_BAY_DOOR_RELEASE_RADIUS_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GUN_RANGE_TEST_BAY_DOOR_TRIGGER_RADIUS_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GUN_RANGE_TEST_BAY_STATION_INTERACTION_RANGE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeDummyDamageResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayDoorPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayDoorStep",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayFrozenTimer",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayStation",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayStationProximity",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayStructureDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/gun-range-test-bay.ts",
+      "name": "GunRangeTestBayStructureMaterial",
+      "kind": "type"
+    },
+    {
+      "file": "src/high-scores.ts",
+      "name": "compareHighScores",
+      "kind": "function"
+    },
+    {
+      "file": "src/high-scores.ts",
+      "name": "HighScoreDocument",
+      "kind": "type"
+    },
+    {
+      "file": "src/high-seas.ts",
+      "name": "HighSeasArenaMap",
+      "kind": "type"
+    },
+    {
+      "file": "src/high-seas.ts",
+      "name": "HighSeasMaterialInventoryEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/high-seas.ts",
+      "name": "HighSeasTextureFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/hit-proxies.ts",
+      "name": "HitProxyDef",
+      "kind": "type"
+    },
+    {
+      "file": "src/hit-proxies.ts",
+      "name": "HitProxyRootTransform",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-authority-mirror.ts",
+      "name": "HostAuthorityMirrorInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-authority-mirror.ts",
+      "name": "HostAuthorityMirrorResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-authority-mirror.ts",
+      "name": "MirrorClockRebaseResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-authority-mirror.ts",
+      "name": "MirrorClockSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-authority-mirror.ts",
+      "name": "MirrorDroppedSection",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-canonical-hit-admission.ts",
+      "name": "HostCanonicalHitAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-lobby-admission-generation.ts",
+      "name": "HostLobbyAdmissionScope",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "HostedBotCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "HostSuccessionCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "RailgunCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "RestoredGuestAuthority",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "TimedMapWeaponCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-match-checkpoint.ts",
+      "name": "TimedMapWeaponCheckpoints",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "ElectionRefusal",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "HostLossActionKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "HostLossPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "HostSuccessorElection",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "MintMandateInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "RoomClaimOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "SelfPromotionDecision",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-migration.ts",
+      "name": "SuccessionMember",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "FollowerAcceptResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MandateAcceptRefusal",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MandateAcceptResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MandatePublishInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MandatePublishReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MandatePublishResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorAcceptInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorAcceptRefusal",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorAcceptResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorSendInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorSendPlan",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "MirrorSendReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "SelfPromotionInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "WirePromotionDecision",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-succession-wire.ts",
+      "name": "WirePromotionRefusal",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-time.ts",
+      "name": "HostClockObservation",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-time.ts",
+      "name": "HostClockProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-time.ts",
+      "name": "HostClockSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-trigger-authority.ts",
+      "name": "HostTriggerAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-trigger-authority.ts",
+      "name": "HostTriggerAdmissionReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/host-trigger-authority.ts",
+      "name": "HostTriggerResetReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/hosted-bot-damage-admission.ts",
+      "name": "HostedBotDamageAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/hosted-bots.ts",
+      "name": "HOSTED_BOT_COUNTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/house-destruction-presentation.ts",
+      "name": "HouseDestructionPresentationTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "HOUSE_DESTRUCTION_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "HOUSE_MAX_FRAGMENT_DEFINITIONS",
+      "kind": "const"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "houseFragmentDefinitionHash",
+      "kind": "function"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "HouseFragmentRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "HouseFragmentSourceKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/house-destruction.ts",
+      "name": "HouseFragmentState",
+      "kind": "type"
+    },
+    {
+      "file": "src/house-navigation.ts",
+      "name": "houseCollisionSolids",
+      "kind": "function"
+    },
+    {
+      "file": "src/house-navigation.ts",
+      "name": "HouseRoom",
+      "kind": "type"
+    },
+    {
+      "file": "src/house-navigation.ts",
+      "name": "HouseRouteAnchor",
+      "kind": "type"
+    },
+    {
+      "file": "src/hud-feed.ts",
+      "name": "DamageFeedDetails",
+      "kind": "type"
+    },
+    {
+      "file": "src/hud-feed.ts",
+      "name": "FeedDestination",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/aim-assist.ts",
+      "name": "AimAssistProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/aim-assist.ts",
+      "name": "STRAFE_ACTIVE_MIN_MPS",
+      "kind": "const"
+    },
+    {
+      "file": "src/input/gamepad/aim-assist.ts",
+      "name": "TriggerSnapInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/aim-assist.ts",
+      "name": "TriggerSnapResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/aim-assist.ts",
+      "name": "wrapRadians",
+      "kind": "function"
+    },
+    {
+      "file": "src/input/gamepad/curves.ts",
+      "name": "BUTTON_PRESS_THRESHOLD",
+      "kind": "const"
+    },
+    {
+      "file": "src/input/gamepad/curves.ts",
+      "name": "normalizeStickCurve",
+      "kind": "function"
+    },
+    {
+      "file": "src/input/gamepad/curves.ts",
+      "name": "StickCurve",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/gamepad-input.ts",
+      "name": "GamepadButtonLike",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/gamepad-input.ts",
+      "name": "GamepadFrame",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/gamepad-input.ts",
+      "name": "GamepadRuntimeDeps",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/gamepad-input.ts",
+      "name": "GamepadTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/glyphs.ts",
+      "name": "PromptGlyph",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/hotplug.ts",
+      "name": "HotplugEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/hud-glyphs.ts",
+      "name": "currentHudGlyphState",
+      "kind": "function"
+    },
+    {
+      "file": "src/input/gamepad/hud-glyphs.ts",
+      "name": "HUD_GLYPH_TARGETS",
+      "kind": "const"
+    },
+    {
+      "file": "src/input/gamepad/hud-glyphs.ts",
+      "name": "HudGlyphState",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/hud-glyphs.ts",
+      "name": "HudGlyphTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/hud-glyphs.ts",
+      "name": "SUPPORT_HELP_SELECTOR",
+      "kind": "const"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadAxes",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadBindingOverrides",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadFaceFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadLayoutId",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "PadModel",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/mapping.ts",
+      "name": "SHARED_PAD_ACTION_PAIRS",
+      "kind": "const"
+    },
+    {
+      "file": "src/input/gamepad/rumble.ts",
+      "name": "HapticActuatorLike",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/rumble.ts",
+      "name": "RumbleEffect",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/rumble.ts",
+      "name": "RumblePlan",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/rumble.ts",
+      "name": "RumbleState",
+      "kind": "type"
+    },
+    {
+      "file": "src/input/gamepad/settings-panel.ts",
+      "name": "GamepadSettingsPanelOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-arbitration.ts",
+      "name": "HoldInteractionKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-arbitration.ts",
+      "name": "InteractionKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-arbitration.ts",
+      "name": "isTapInteraction",
+      "kind": "function"
+    },
+    {
+      "file": "src/interaction-arbitration.ts",
+      "name": "TapInteractionKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-press-lifecycle.ts",
+      "name": "FInteractionCommit",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-press-lifecycle.ts",
+      "name": "FInteractionPressEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/interaction-press-lifecycle.ts",
+      "name": "FInteractionPressTransition",
+      "kind": "type"
+    },
+    {
+      "file": "src/interactive-world-protocol.ts",
+      "name": "MAX_INTERACTIVE_WORLD_MESSAGE_BYTES",
+      "kind": "const"
+    },
+    {
+      "file": "src/interactive-world-runtime.ts",
+      "name": "InteractiveWorldCollisionSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/interactive-world-runtime.ts",
+      "name": "InteractiveWorldCollisionView",
+      "kind": "type"
+    },
+    {
+      "file": "src/interactive-world-runtime.ts",
+      "name": "InteractiveWorldDoorCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/interactive-world-runtime.ts",
+      "name": "InteractiveWorldDoorCollisionState",
+      "kind": "type"
+    },
+    {
+      "file": "src/interactive-world-runtime.ts",
+      "name": "InteractiveWorldRuntimeTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/invisible-wall-runtime-gap.ts",
+      "name": "InvisibleWallRuntimeGapInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/key-bindings.ts",
+      "name": "actionKeyCodes",
+      "kind": "function"
+    },
+    {
+      "file": "src/key-bindings.ts",
+      "name": "keyCodesAction",
+      "kind": "function"
+    },
+    {
+      "file": "src/kill-confirm-pulse.ts",
+      "name": "KILL_CONFIRM_PULSE_MAX_INTENSITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/kill-confirm-pulse.ts",
+      "name": "KillConfirmPulsePresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-activation-gate.ts",
+      "name": "KillstreakActivationEvaluation",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "CARE_PACKAGE_FIXED_PERCENTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "CARE_PACKAGE_KILLSTREAK_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "CARE_PACKAGE_NON_NUKE_SCALE",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "CarePackagePoolEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakActivation",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakAvailability",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakLoadoutValidation",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakSlotDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "KillstreakTier",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-catalog.ts",
+      "name": "NUKE_KILLSTREAK_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KILLSTREAK_DEMO_CAPTURE_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KILLSTREAK_DEMO_MAXIMUM_P95_PRESENTED_GAP_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KILLSTREAK_DEMO_MAXIMUM_PRESENTED_GAP_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KILLSTREAK_DEMO_MINIMUM_PRESENTED_FPS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoCameraPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoCameraStrategy",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoCaptureEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoProjectedSubject",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoProofKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoRuntimeCadence",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoRuntimeCadenceSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoVisualProofKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-demo-capture-contract.ts",
+      "name": "KillstreakDemoWorldPoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-drone-formation.ts",
+      "name": "DroneFormationVec3",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-drone-input.ts",
+      "name": "PilotedDroneControlAxes",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-drone-input.ts",
+      "name": "PilotedDroneLook",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-drone-input.ts",
+      "name": "PilotedDroneWorldVelocity",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-flight-navigation.ts",
+      "name": "SupportFlightStep",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-flight-navigation.ts",
+      "name": "SupportFlightStepInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-loadout.ts",
+      "name": "KillstreakLoadoutControllerOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-loadout.ts",
+      "name": "KillstreakLoadoutReadResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-loadout.ts",
+      "name": "KillstreakLoadoutStorage",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-loadout.ts",
+      "name": "KillstreakSlotSelectionResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-loadout.ts",
+      "name": "persistKillstreakLoadout",
+      "kind": "function"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "AuthoredSupportStaticBatchBudget",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "KillstreakCarpetWorkflowTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "KillstreakPlacementMarkerTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "KillstreakPresentationRetireRoot",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "KillstreakPresentationTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "SUPPORT_SHADOW_SILHOUETTE_NODE_NAME",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "SupportVehicleAssetFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-presentation.ts",
+      "name": "SupportVehicleTextureDedupTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-protocol.ts",
+      "name": "KillstreakCareCaptureIntentMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-protocol.ts",
+      "name": "KillstreakCareCaptureResultAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-protocol.ts",
+      "name": "KillstreakCareCaptureResultReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-protocol.ts",
+      "name": "KillstreakStateAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CARE_AIRCRAFT_DROP_DELAY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CARE_CRATE_DESCENT_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CarePackageWeaponGrantPort",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CareWeaponGrantEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CARPET_BOMBER_ROUTE_CLEARANCE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CARPET_BOMBER_ROUTE_TRAVERSE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CHOPPER_MISSILE_MAX_RANGE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "CHOPPER_MISSILE_SOCKET_LOCAL_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "ChopperRoutePose",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "DRONE_MAGAZINE_SIZE",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "DroneCentreSpawnPlan",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "HostSupportEntity",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "KillstreakActorSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "KillstreakAdvanceResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "KillstreakTrainingGrant",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "KillstreakTrainingGrantContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "MAX_KILLSTREAK_CHECKPOINT_ACTORS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "MAX_KILLSTREAK_CHECKPOINT_SEEN_ACTIVATIONS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-runtime.ts",
+      "name": "PILOTED_DRONE_DURATION_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-slot-possession.ts",
+      "name": "ControllableKillstreakId",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-support-catalog.ts",
+      "name": "DRONE_GUN_PROFILE_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/killstreak-support-catalog.ts",
+      "name": "DroneSupportDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-support-catalog.ts",
+      "name": "DroneSupportMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-support-catalog.ts",
+      "name": "StandaloneDroneController",
+      "kind": "type"
+    },
+    {
+      "file": "src/killstreak-support-catalog.ts",
+      "name": "SupportGunDamageProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/lag-compensation.ts",
+      "name": "COMBATANT_HISTORY_RETENTION_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/lag-compensation.ts",
+      "name": "CombatantPoseRewind",
+      "kind": "type"
+    },
+    {
+      "file": "src/last-multiplayer-diagnostic.ts",
+      "name": "LAST_MULTIPLAYER_DIAGNOSTIC_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/last-multiplayer-diagnostic.ts",
+      "name": "LastMultiplayerDiagnostic",
+      "kind": "type"
+    },
+    {
+      "file": "src/last-multiplayer-diagnostic.ts",
+      "name": "LastMultiplayerDiagnosticInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/last-multiplayer-diagnostic.ts",
+      "name": "SanitizedDamageEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "CustomPresetTile",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "DeploymentSelection",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LegacyCleanupStatus",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LegacyFieldKitSelectionResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LOADOUT_DECISION_RECEIPT_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutDecodeFailureReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutDecodeResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutLoadResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutMigrationResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutSchemaDefinitionV2",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutSchemaIssue",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutSchemaIssueCode",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutSecondRowTile",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutWriteFailureCode",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutWriteOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutWritePhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "LoadoutWriteResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "ManageRenameTile",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout-preset-schema.ts",
+      "name": "MAX_SERIALIZED_LOADOUT_LENGTH",
+      "kind": "const"
+    },
+    {
+      "file": "src/loadout.ts",
+      "name": "FieldKit",
+      "kind": "type"
+    },
+    {
+      "file": "src/loadout.ts",
+      "name": "MARKSMAN_AUTO_PISTOL",
+      "kind": "const"
+    },
+    {
+      "file": "src/loadout.ts",
+      "name": "SERVICE_PISTOL",
+      "kind": "const"
+    },
+    {
+      "file": "src/loadout.ts",
+      "name": "sidearmForPrimary",
+      "kind": "function"
+    },
+    {
+      "file": "src/local-reload-authority.ts",
+      "name": "LocalReloadResultAction",
+      "kind": "type"
+    },
+    {
+      "file": "src/local-reload-authority.ts",
+      "name": "LocalReloadResultOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/local-reload-authority.ts",
+      "name": "ReloadActionSequenceAllocator",
+      "kind": "type"
+    },
+    {
+      "file": "src/major-debris-budget.ts",
+      "name": "MajorDebrisCounts",
+      "kind": "type"
+    },
+    {
+      "file": "src/major-debris-budget.ts",
+      "name": "MajorDebrisSource",
+      "kind": "type"
+    },
+    {
+      "file": "src/map.ts",
+      "name": "AuthoredLargeCoverId",
+      "kind": "type"
+    },
+    {
+      "file": "src/map3-arena.ts",
+      "name": "Map3LaneSpec",
+      "kind": "type"
+    },
+    {
+      "file": "src/map3/corridor-colosseum.ts",
+      "name": "COLOSSEUM_VIEWPOINT",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/corridor-colosseum.ts",
+      "name": "ColosseumOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/corridor-solids.ts",
+      "name": "CorridorSolidMaterial",
+      "kind": "type"
+    },
+    {
+      "file": "src/map3/corridor-water.ts",
+      "name": "GERSTNER_BANDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/corridor-water.ts",
+      "name": "sampleWaterHeight",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/corridor-water.ts",
+      "name": "SLOPE_MAX",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/corridor-water.ts",
+      "name": "WATER_BASE_Y",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/corridor-water.ts",
+      "name": "WAVE_AMPLITUDE",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/foliage-material.ts",
+      "name": "FoliagePalette",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/foliage-material.ts",
+      "name": "setEnhance",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/foliage-material.ts",
+      "name": "setWind",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/foliage-material.ts",
+      "name": "updateFoliageTime",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/leaf-geometry.ts",
+      "name": "createFlatLeafGeometry",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/leaf-geometry.ts",
+      "name": "createLeafGeometry",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/leaf-geometry.ts",
+      "name": "SprayOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/noise.ts",
+      "name": "cellular2",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/plants.ts",
+      "name": "TreeOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/plants.ts",
+      "name": "TreeParts",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "applySkyPalette",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "createSkyUniforms",
+      "kind": "function"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "DAY_SKY",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "GOLDEN_SKY",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "ORBIT_PERIOD_SECONDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "OVERCAST_SKY",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "PLANET_ORBIT_RADIUS",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "SKY_DOME_RADIUS",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "SkyOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "SkyPalette",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "SkyUniforms",
+      "kind": "interface"
+    },
+    {
+      "file": "src/map3/sky.ts",
+      "name": "SUN_ORBIT_RADIUS",
+      "kind": "const"
+    },
+    {
+      "file": "src/map3/street-cell.ts",
+      "name": "StreetCell",
+      "kind": "interface"
+    },
+    {
+      "file": "src/match-admission-transaction.ts",
+      "name": "MatchAdmissionBegin",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-admission-transaction.ts",
+      "name": "MatchAdmissionLobbyPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-admission-transaction.ts",
+      "name": "MatchAdmissionMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-admission-transaction.ts",
+      "name": "MatchAdmissionRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-countdown-audio.ts",
+      "name": "MatchCountdownAudioBus",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-countdown-audio.ts",
+      "name": "MatchCountdownAudioVoice",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-countdown-audio.ts",
+      "name": "MatchCountdownAudioWaveform",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-diagnostics-upload.ts",
+      "name": "MatchDiagnosticUploadTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-diagnostics.ts",
+      "name": "DiagnosticRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-diagnostics.ts",
+      "name": "MatchDiagnosticContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-diagnostics.ts",
+      "name": "RemoteMatchDiagnosticCompletion",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-presentation.ts",
+      "name": "MatchPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/match-report.ts",
+      "name": "MATCH_REPORT_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/match-report.ts",
+      "name": "MatchReportInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/minigun-spool.ts",
+      "name": "MINIGUN_MAX_BARREL_RADIANS_PER_SECOND",
+      "kind": "const"
+    },
+    {
+      "file": "src/minimap.ts",
+      "name": "FacingGeometry",
+      "kind": "type"
+    },
+    {
+      "file": "src/minimap.ts",
+      "name": "MinimapBounds",
+      "kind": "type"
+    },
+    {
+      "file": "src/minimap.ts",
+      "name": "MinimapLandmarkFootprint",
+      "kind": "type"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "integrateMobileLookRate",
+      "kind": "function"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "isTouchCapableDevice",
+      "kind": "function"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "MOBILE_LOOK_FULL_RATE_RAD_PER_SEC",
+      "kind": "const"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "MobileLookRate",
+      "kind": "type"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "MobileTouchCallbacks",
+      "kind": "type"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "MobileTouchState",
+      "kind": "type"
+    },
+    {
+      "file": "src/mobile-touch-controls.ts",
+      "name": "TouchStickBounds",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-chaos.ts",
+      "name": "NetworkDelivery",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-chaos.ts",
+      "name": "NetworkImpairmentProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-fairness.ts",
+      "name": "CombatTimingAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-fairness.ts",
+      "name": "MAX_COMBAT_EVENT_AGE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-fairness.ts",
+      "name": "MAX_COMBAT_EVENT_FUTURE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-fairness.ts",
+      "name": "MAX_COMBAT_SEQUENCE_GAP",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "DEFAULT_SNAPSHOT_RATE_HZ",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "DEMOTION_PRESSURE_SAMPLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "InterpolatedSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "INTERPOLATION_DELAY_BANDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "INTERPOLATION_DELAY_UPDATE_INTERVAL_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "INTERPOLATION_STABLE_SAMPLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "INTERPOLATION_UNDERRUN_SAMPLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "InterpolationDelayPressure",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "MAX_SNAPSHOT_INTERPOLATION_DELAY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "MIN_RATE_RESIDENCY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "MIN_SNAPSHOT_INTERPOLATION_DELAY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "PROMOTION_RESIDENCY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "PROMOTION_STABLE_SAMPLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "ReplicationPressure",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "SNAPSHOT_INTERPOLATION_DELAY_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "SNAPSHOT_RATES",
+      "kind": "const"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "SnapshotBufferStats",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "SnapshotRateHz",
+      "kind": "type"
+    },
+    {
+      "file": "src/network-sync.ts",
+      "name": "TimestampedSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "ClientHostLivenessDecision",
+      "kind": "type"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "ClientHostLivenessDecisionSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "ClientHostLivenessSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "HOST_ROOM_RECLAIM_WINDOW_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "NetworkConnectionAttempt",
+      "kind": "type"
+    },
+    {
+      "file": "src/network.ts",
+      "name": "NetworkRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NUKETOWN_FOREST_ENVELOPE",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NUKETOWN_INFENCE_PLANTING_MAX_HEIGHT_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NUKETOWN_YARD_TREE_POSITIONS",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NUKETOWN2_FOREST_GROUND_Y",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NuketownForestEnvelope",
+      "kind": "type"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NuketownForestStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NuketownForestSurround",
+      "kind": "interface"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NuketownYardVegetation",
+      "kind": "interface"
+    },
+    {
+      "file": "src/nuketown-forest-surround.ts",
+      "name": "NuketownYardVegetationStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/nuketown-lawn-field.ts",
+      "name": "NUKETOWN_LAWN_KEEPOUT_MARGIN_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-lawn-field.ts",
+      "name": "NUKETOWN_LAWN_KEEPOUTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-lawn-field.ts",
+      "name": "NUKETOWN_LAWN_SEED",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-lawn-field.ts",
+      "name": "NuketownGroundDressingPiece",
+      "kind": "type"
+    },
+    {
+      "file": "src/nuketown-lawn-field.ts",
+      "name": "nuketownRebuildLawnRegions",
+      "kind": "function"
+    },
+    {
+      "file": "src/nuketown-mountain-backdrop.ts",
+      "name": "NUKETOWN_BACKDROP_ENVELOPE",
+      "kind": "const"
+    },
+    {
+      "file": "src/nuketown-mountain-backdrop.ts",
+      "name": "NuketownBackdropEnvelope",
+      "kind": "type"
+    },
+    {
+      "file": "src/nuketown-mountain-backdrop.ts",
+      "name": "NuketownBackdropStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/nuketown-mountain-backdrop.ts",
+      "name": "NuketownMountainBackdrop",
+      "kind": "interface"
+    },
+    {
+      "file": "src/operator-appearance-catalog.ts",
+      "name": "OperatorEmoteDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-appearance-catalog.ts",
+      "name": "OperatorStanceDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FIRST_PERSON_ARM_ALBEDO_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FIRST_PERSON_ARM_BASE_ACTION_NAMES",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FIRST_PERSON_ARM_CHROMA_GAIN",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FIRST_PERSON_ARM_GIRTH_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FIRST_PERSON_ARM_HAND_TINT_BLEND",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmAuthoredChannel",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmAuthoredClipPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmAuthoredPoseLayer",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmBaseAction",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmHandedness",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonArmMaterialRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "FirstPersonRiggedArms",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "RenderedVertexInfluenceMeshTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "riggedOperatorAvailableClips",
+      "kind": "function"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "RiggedOperatorCanonicalBoneIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "RiggedOperatorCanonicalSkinIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "RiggedOperatorInstance",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-model.ts",
+      "name": "RiggedOperatorMotion",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OPERATOR_TEAM_IDENTITY_BLEND",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OPERATOR_TEAM_UNDERSUIT_BLEND",
+      "kind": "const"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinArmPalette",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinAvailability",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinBodyPalette",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinBotIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinBotMaterialIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinBotRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinCardPalette",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinPalette",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-skin-catalog.ts",
+      "name": "OperatorSkinRigContract",
+      "kind": "type"
+    },
+    {
+      "file": "src/operator-stance-runtime.ts",
+      "name": "firstPersonStancePresentation",
+      "kind": "function"
+    },
+    {
+      "file": "src/operator-stance-runtime.ts",
+      "name": "FirstPersonStancePresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/overdrive.ts",
+      "name": "OVERDRIVE_ARENA_POSITIONS",
+      "kind": "const"
+    },
+    {
+      "file": "src/overdrive.ts",
+      "name": "OverdriveClaimSight",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/ambient-life-settings.ts",
+      "name": "AmbientLifeSettings",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/combat-readability.ts",
+      "name": "CombatSafetyProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/combat-readability.ts",
+      "name": "CombatSafetyVerdict",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/combat-readability.ts",
+      "name": "FamilyOpacityClaim",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/index.ts",
+      "name": "ParticleRuntimeOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/index.ts",
+      "name": "ParticleRuntimeTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/index.ts",
+      "name": "ParticleUpdateOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/light-shaft-registry.ts",
+      "name": "PublishedLightShafts",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "ArenaParticleCoverage",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "ArenaParticleProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "DriftKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "DriftProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "IMPACT_DUST_RESPONSE",
+      "kind": "const"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "ImpactProjectionAudit",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-catalog.ts",
+      "name": "MoteProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-field.ts",
+      "name": "ParticleVolume",
+      "kind": "type"
+    },
+    {
+      "file": "src/particles/particle-field.ts",
+      "name": "RAIN_AMBIENT_SINK_MPS2",
+      "kind": "const"
+    },
+    {
+      "file": "src/pass64-diagnostics-analyzer.ts",
+      "name": "DiagnosticAnalysisFlag",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass64-diagnostics-analyzer.ts",
+      "name": "DiagnosticAnalysisReport",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass64-diagnostics-analyzer.ts",
+      "name": "DiagnosticFlagSeverity",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass64-diagnostics-analyzer.ts",
+      "name": "DiagnosticGroupAnalysis",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass64-diagnostics-analyzer.ts",
+      "name": "DiagnosticMatchAnalysis",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-frame-pacing-gate.ts",
+      "name": "FramePacingThresholds",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-frame-pacing-gate.ts",
+      "name": "FrameTailCounts",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-frame-pacing-gate.ts",
+      "name": "FrameTailRates",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-frame-pacing-gate.ts",
+      "name": "PresentationCadenceSummary",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-hardware-webgl2-admission-gate.ts",
+      "name": "HardwareWebGl2AdmissionTiming",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-hardware-webgl2-admission-gate.ts",
+      "name": "HardwareWebGl2RuntimeAudit",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-renderer-feature-inventory.ts",
+      "name": "RendererFeatureControl",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-renderer-feature-inventory.ts",
+      "name": "RendererFeatureControlKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-renderer-feature-inventory.ts",
+      "name": "RendererFeatureSourceProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings-inventory.ts",
+      "name": "SettingApplyMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings-inventory.ts",
+      "name": "SettingDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "AccessibilityRuntime",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "AccessibilitySettings",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "GraphicsRouteCapability",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "MAX_GRAPHICS_TARGET_FPS",
+      "kind": "const"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "PrivacySettings",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass65-settings.ts",
+      "name": "ShadowQuality",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass66-pass63-multiplayer-comparator-contract.ts",
+      "name": "Pass66ComparatorCapabilities",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass66-pass63-multiplayer-comparator-contract.ts",
+      "name": "Pass66ComparatorChannel",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-ads-reveal-readback.ts",
+      "name": "Pass73AdsRevealReadbackRegion",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-ads-reveal-readback.ts",
+      "name": "Pass73QuantizedReadback",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "PASS73_COLLISION_ROUTE_AXES",
+      "kind": "const"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "PASS73_COLLISION_ROUTE_SCHEMA",
+      "kind": "const"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "PASS73_COLLISION_VISUAL_ROLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73BoundsTuple",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73CollisionRouteBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73CollisionRouteEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73CollisionRouteProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73CollisionRouteRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/pass73-collision-route-authority.ts",
+      "name": "Pass73RouteClearanceEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/physics.ts",
+      "name": "CharacterMoveResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/physics.ts",
+      "name": "MajorDebrisBodyPrewarmDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/physics.ts",
+      "name": "WORLD_BOUNDARY_THICKNESS",
+      "kind": "const"
+    },
+    {
+      "file": "src/player-feedback.ts",
+      "name": "DamageNumberPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-feedback.ts",
+      "name": "RoundStatInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-feedback.ts",
+      "name": "RoundStatSummary",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "createDefaultPlayerControls",
+      "kind": "function"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "MAX_SERIALIZED_PLAYER_PROFILE_LENGTH",
+      "kind": "const"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "parsePlayerProfile",
+      "kind": "function"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PLAYER_PROFILE_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileCleanup",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileDecodeResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileLoadResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfilePatch",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileUpdateResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileV1",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileWriteCheckpoint",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileWriteFailureReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileWriteOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/player-profile.ts",
+      "name": "PlayerProfileWriteResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/presentation-scheduling-lifecycle.ts",
+      "name": "PresentationSchedulingMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/priority-preparation-coordinator.ts",
+      "name": "PreparationContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/priority-preparation-coordinator.ts",
+      "name": "PreparationSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "DominationLobbyState",
+      "kind": "type"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "DominationZoneSnapshotEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "GunRangeDummySnapshotEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "isDominationLobbyState",
+      "kind": "function"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "isLobbyKillLimit",
+      "kind": "function"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "isLobbyTimeLimitMs",
+      "kind": "function"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "isMatchMode",
+      "kind": "function"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "isRoomCapacity",
+      "kind": "function"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "MAX_CLOCK_RTT_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "MAX_PRIVATE_MATCH_DURATION_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "MultiplayerArenaId",
+      "kind": "type"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "ROOM_CAPACITIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/private-match.ts",
+      "name": "RoomCapacity",
+      "kind": "type"
+    },
+    {
+      "file": "src/project-map.ts",
+      "name": "PROJECT_OPERATING_BOUNDARIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/prone-clearance.ts",
+      "name": "ProneStanceAdjustment",
+      "kind": "type"
+    },
+    {
+      "file": "src/prone-transition.ts",
+      "name": "CrouchHoldOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "ClockPingMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "ClockPongMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "GuestResumeNackReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "HighScoreMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "HostWindowBreakAuthority",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "isGuestCombatInventoryProjection",
+      "kind": "function"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "JoinMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "LobbyBalanceMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "LobbyConfigMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "LobbyRejectMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "LobbyStartMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "MAX_MATCH_SCORE_ENTRIES",
+      "kind": "const"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "PickupResultReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "ReloadResultReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "StateFeedbackMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "StickyAttachedMessage",
+      "kind": "type"
+    },
+    {
+      "file": "src/protocol.ts",
+      "name": "TeamPingKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/raid2-arena.ts",
+      "name": "RAID2_DOMINATION_ZONES",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RAILGUN_ARENA_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RAILGUN_PROCESSED_SHOT_LIMIT",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RAILGUN_SPAWN_SITES_BY_ARENA",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RAILGUN_WEAPON_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunAdvanceResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunShotOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunShotResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunSpawnSite",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunTargetAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunTargetAdmissionResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-authority.ts",
+      "name": "RailgunTargetCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/railgun-scope-state.ts",
+      "name": "RAILGUN_SCOPE_FOV_TOLERANCE_DEGREES",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-scope-state.ts",
+      "name": "RAILGUN_SCOPE_SETTLED_ADS_PROGRESS",
+      "kind": "const"
+    },
+    {
+      "file": "src/railgun-scope-state.ts",
+      "name": "RailgunScopePresentationInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/rare-weapon-announcement.ts",
+      "name": "RareWeaponAnnouncementPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/rare-weapon-announcement.ts",
+      "name": "RareWeaponBanner",
+      "kind": "type"
+    },
+    {
+      "file": "src/release-channel.ts",
+      "name": "ReleaseChannelDecision",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-grenade-admission.ts",
+      "name": "REMOTE_GRENADE_MAX_FUSE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-grenade-admission.ts",
+      "name": "REMOTE_GRENADE_MAX_TRAVEL",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-grenade-admission.ts",
+      "name": "REMOTE_SEMTEX_MAX_FUSE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-health-authority.ts",
+      "name": "RemoteDamageResolver",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-hit-admission.ts",
+      "name": "AuthoritativeShotTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-hit-admission.ts",
+      "name": "DerivedRemoteShotOutcome",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-hit-admission.ts",
+      "name": "deriveRemoteShotOutcome",
+      "kind": "function"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "REMOTE_CLAIM_MAX_SNAPSHOT_AGE_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "REMOTE_MAX_HORIZONTAL_SPEED",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "REMOTE_MAX_VERTICAL_SPEED",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "REMOTE_RESYNC_AFTER_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "REMOTE_SNAPSHOT_JITTER_RADIUS",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-movement-admission.ts",
+      "name": "RemoteMovementAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-player-readability.ts",
+      "name": "RemoteHumanReadabilityTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-shot-admission.ts",
+      "name": "RemoteShotAdmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-sticky-attachment-authority.ts",
+      "name": "RemoteStickyAttachmentAuthorityState",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-sticky-attachment-authority.ts",
+      "name": "STICKY_DETONATION_ORIGIN_TOLERANCE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/remote-sticky-attachment-authority.ts",
+      "name": "StickyAttachmentMutationResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/remote-sticky-attachment-authority.ts",
+      "name": "StickyAttachmentVerification",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-environment-ibl.ts",
+      "name": "generateArenaEnvironmentMap",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/arena-environment-ibl.ts",
+      "name": "IblReflectionQuality",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-environment-ibl.ts",
+      "name": "PmremResolutionTier",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-render-watchdog.ts",
+      "name": "ArenaRenderLivenessAudit",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-render-watchdog.ts",
+      "name": "ArenaRenderWatchdogTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-visual-definition.ts",
+      "name": "ArenaVisualLoadContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-visual-stream.ts",
+      "name": "ArenaVisualImporter",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arena-visual-stream.ts",
+      "name": "ArenaVisualModule",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/arenas/gun-range.ts",
+      "name": "GUN_RANGE_INTERIOR_VOLUME",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/arenas/gun-range.ts",
+      "name": "GUN_RANGE_TEST_BAY_DOOR_APPROACH_VOLUME",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/arenas/gun-range.ts",
+      "name": "GUN_RANGE_TEST_BAY_DOOR_PORTAL_VOLUME",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/arenas/gun-range.ts",
+      "name": "GUN_RANGE_TEST_BAY_INTERIOR_VOLUME",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/arenas/high-seas.ts",
+      "name": "HIGH_SEAS_SERVICE_DECK_CEILING_BELOW_MAIN_DECK",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "DEFAULT_VEGETATION_PALETTE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "EnvironmentBuildOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "EnvironmentStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "LodTier",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "RidgeRingOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "RidgeRingResult",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "RidgeRingStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "ScatterArea",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "VegetationLodSpec",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "VegetationPalette",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/environment-kit.ts",
+      "name": "VegetationScatterResult",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/filmic-grade-chain.ts",
+      "name": "FilmicGradeChainBuild",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/filmic-grade-chain.ts",
+      "name": "FilmicGradeUniforms",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/filmic-grade-chain.ts",
+      "name": "SPATIAL_UPSCALING_OFF",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/filmic-grade-chain.ts",
+      "name": "SPLIT_TONE_MAXIMUM_WEIGHT",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/grade-profile.ts",
+      "name": "OPTIONAL_POST_DISPLAY_STAGES",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/instanced-grass-field.ts",
+      "name": "createGrassTuftGeometry",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/instanced-grass-field.ts",
+      "name": "GRASS_BLADE_TRIANGLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/instanced-grass-field.ts",
+      "name": "GrassFieldMaterialOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/instanced-grass-field.ts",
+      "name": "InstancedGrassFieldOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/instanced-grass-field.ts",
+      "name": "InstancedGrassFieldStats",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/lighting-conditions.ts",
+      "name": "ArenaDaylightProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/lighting-conditions.ts",
+      "name": "LightingConditionsInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect-node.ts",
+      "name": "allocateBakedIndirectTextures",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect-node.ts",
+      "name": "BakedIndirectTextures",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect-node.ts",
+      "name": "uploadBakedIndirectVolume",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect-runtime.ts",
+      "name": "BakedIndirectVolumeCache",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect-runtime.ts",
+      "name": "UPLOAD_EVERY_STEPS",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect.ts",
+      "name": "BakeOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/lighting/baked-indirect.ts",
+      "name": "SerialisedIrradianceVolume",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/pass64-tsl-scene.ts",
+      "name": "RuntimeTslTraversal",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/analytic-proxy-scene.ts",
+      "name": "intersectPlane",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/raytracing/analytic-proxy-scene.ts",
+      "name": "ProxyShapeKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/analytic-proxy-scene.ts",
+      "name": "RayHit",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/raytraced-light-node.ts",
+      "name": "RayTracedLightSources",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "MaterialClassAudit",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_CAUSTIC_LIGHTS_PER_VIEW",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_CAUSTIC_OBJECTS_PER_VIEW",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_DEFAULT_FOCAL_DISTANCE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_FOCAL_DISTANCE_MAXIMUM_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_FOCAL_DISTANCE_MINIMUM_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RAY_TRACED_PRESENTATION_APERTURE_RADIUS_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "RayTracingCapability",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "ReadabilityProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/raytracing-profile.ts",
+      "name": "ReadabilityVerdict",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "clearCoatMaterial",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "COMBAT_EYE_LINE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "CONDUCTOR_METALNESS_FLOOR",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "LARGE_SURFACE_SCREEN_FRACTION",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "metalMaterial",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "phongMaterial",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "SurfaceClassification",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "transparentMaterial",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-materials.ts",
+      "name": "WATER_INDEX_OF_REFRACTION",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/raytracing/whitted-tracer.ts",
+      "name": "materialAt",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "LivePresentationStall",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "PresentationCounters",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "PresentationFreshnessTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "PresentationProgressTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "probeRequiredWebGpuCandidate",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "RenderBackendId",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "RenderRuntimeHealthTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "RenderRuntimeRequest",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "RenderRuntimeTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "ShadowRuntimeState",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/render-runtime.ts",
+      "name": "TslNodeBuildDiagnostics",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/resident-memory.ts",
+      "name": "ResidentObjectMemoryEstimate",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "DepthOfFieldTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "GODRAYS_SHADOWS_DISABLED_REASON",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "GodraysTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "MOTION_BLUR_KNEE_NDC",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "MotionBlurTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "ScreenSpaceGiTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "ScreenSpacePostSelection",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "ScreenSpaceReflectionTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post-profile.ts",
+      "name": "SpatialUpscalingTuning",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "DEPTH_OF_FIELD_STAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "GODRAYS_NO_SHAFT_LIGHT_REASON",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "GODRAYS_STAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "MOTION_BLUR_STAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "rayTracedLightActive",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ReceiptTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ScenePassTextureNode",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ScenePassViewZNode",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ScreenSpaceMrtRequirement",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ScreenSpacePostSources",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "shaftLightReadiness",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "ShaftLightReadiness",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "SSGI_STAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/screen-space-post.ts",
+      "name": "SSR_STAGE",
+      "kind": "const"
+    },
+    {
+      "file": "src/rendering/sky-backdrop.ts",
+      "name": "SkyBackdropAureole",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/sky-backdrop.ts",
+      "name": "SkyBackdropPreset",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/sky-backdrop.ts",
+      "name": "SkyBackdropStatus",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "MicroDetailOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "SharedSurfaceMaps",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "SurfaceForgeOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "SurfaceMaterialOptions",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "SurfaceNoise",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/surface-forge.ts",
+      "name": "SurfaceRaster",
+      "kind": "interface"
+    },
+    {
+      "file": "src/rendering/tsl-migration-inventory.ts",
+      "name": "TslMigrationEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/tsl-migration-inventory.ts",
+      "name": "TslMigrationStatus",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/tsl-migration-inventory.ts",
+      "name": "TslPipelineDescriptor",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/webgpu-adapter-diagnostics.ts",
+      "name": "AdapterHint",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/webgpu-adapter-diagnostics.ts",
+      "name": "AdapterProbe",
+      "kind": "type"
+    },
+    {
+      "file": "src/rendering/webgpu-adapter-diagnostics.ts",
+      "name": "browserDiagnosticsEnvironment",
+      "kind": "function"
+    },
+    {
+      "file": "src/rendering/webgpu-adapter-diagnostics.ts",
+      "name": "WebGl2Observation",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-bot-visual-evidence-contract.ts",
+      "name": "AtomicPlayerConvergence",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-bot-visual-evidence-contract.ts",
+      "name": "AtomicPlayerSettlementSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-bot-visual-evidence-contract.ts",
+      "name": "RiggedEvidenceCamera",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RIGGED_EVIDENCE_OCCLUDER_MINIMUM_OPACITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RIGGED_EVIDENCE_PRINCIPAL_WRITE_CONTROL_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RIGGED_EVIDENCE_RASTER_ROI_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceCaptureTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceHandDrawAdmissionReceipt",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceHandDrawBoneReceipt",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceMainCameraDrawStamp",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "riggedEvidenceMainCameraMeshDrawComplete",
+      "kind": "function"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceMainCameraMeshDrawReceipt",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidencePrincipalWriteManifestEntry",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-evidence-occlusion.ts",
+      "name": "RiggedEvidenceTerminalDrawBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-hand-evidence.ts",
+      "name": "RiggedHandSourceSentinel",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-director.ts",
+      "name": "OperatorAnimationLayer",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-director.ts",
+      "name": "OperatorAnimationStateName",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "MixerActionResolver",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "OperatorAdditivePoseApplication",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "OperatorMixerApplication",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "OperatorMixerCommand",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "OperatorMixerPlan",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "OperatorMixerRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/rigged-operator-animation-runtime.ts",
+      "name": "PoseBoneLike",
+      "kind": "type"
+    },
+    {
+      "file": "src/room-chat-presentation.ts",
+      "name": "RoomChatPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/room-rejoin-identity.ts",
+      "name": "RoomRejoinIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/rustworks-blender.ts",
+      "name": "markRustworksBlenderFallback",
+      "kind": "function"
+    },
+    {
+      "file": "src/rustworks-blender.ts",
+      "name": "RUSTWORKS_BLENDER_ASSET",
+      "kind": "const"
+    },
+    {
+      "file": "src/rustworks-blender.ts",
+      "name": "rustworksBlenderRoot",
+      "kind": "function"
+    },
+    {
+      "file": "src/rustworks-quality.ts",
+      "name": "RustworksQualityTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/sensory-feedback.ts",
+      "name": "DIRECTIONAL_DAMAGE_SECTORS",
+      "kind": "const"
+    },
+    {
+      "file": "src/sensory-feedback.ts",
+      "name": "DirectionalDamagePresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/sensory-feedback.ts",
+      "name": "DirectionalDamagePulse",
+      "kind": "type"
+    },
+    {
+      "file": "src/shot-timing-telemetry.ts",
+      "name": "ShotTimingTelemetrySnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/shot-timing-telemetry.ts",
+      "name": "SpacingSummary",
+      "kind": "type"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "MAX_REMEMBERED_SMOKE_SHOTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "MAX_SMOKE_SHOT_SEGMENTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "SMOKE_SHOT_REPLAY_WINDOW_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "SMOKE_VOLUME_RADIUS_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "SmokeAuthorityResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "SmokeAuthorityRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/smoke-authority.ts",
+      "name": "SmokeAuthorityTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/smoke-protocol.ts",
+      "name": "isSmokeAuthoritySnapshot",
+      "kind": "function"
+    },
+    {
+      "file": "src/smoke-protocol.ts",
+      "name": "MAX_SMOKE_STATE_MESSAGE_BYTES",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-volume-presentation.ts",
+      "name": "SMOKE_PRESENTATION_GROW_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/smoke-volume-presentation.ts",
+      "name": "SmokePresentationEnvelope",
+      "kind": "type"
+    },
+    {
+      "file": "src/smoke-volume-presentation.ts",
+      "name": "SmokeVolumePresentation",
+      "kind": "class"
+    },
+    {
+      "file": "src/social-ping.ts",
+      "name": "MAX_ACTIVE_TEAM_PINGS",
+      "kind": "const"
+    },
+    {
+      "file": "src/social-ping.ts",
+      "name": "TEAM_PING_LIFETIME_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/social-ping.ts",
+      "name": "TeamPingAdmissionState",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "PASS65_PLANNED_WEAPON_AUDIO_ROLES",
+      "kind": "const"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SOUND_EVENT_INVENTORY_DOCUMENT",
+      "kind": "const"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SOUND_EVENT_INVENTORY_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundAggregateVoicePoolId",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundConcurrencyOverflowPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundConcurrencyScope",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundDeliveryPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundEventCoverageStatus",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundEventFamily",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundEventInventoryVerificationOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundLifecycleOwner",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundProvenanceDigestAuthority",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundProvenancePolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundProvenanceStatus",
+      "kind": "type"
+    },
+    {
+      "file": "src/sound-event-inventory.ts",
+      "name": "SoundVariantMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/spatial-audio.ts",
+      "name": "ArenaAudioDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/spatial-audio.ts",
+      "name": "FootstepEmission",
+      "kind": "type"
+    },
+    {
+      "file": "src/spatial-audio.ts",
+      "name": "FootstepSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/spatial-audio.ts",
+      "name": "VoiceCandidate",
+      "kind": "type"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "enemySpawnsVisibleFrom",
+      "kind": "function"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "FloorSource",
+      "kind": "type"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "measureSpawnPoint",
+      "kind": "function"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "MOUNT_LOW_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "nearestCoverDistance",
+      "kind": "function"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "nearestVisibleEnemySpawn",
+      "kind": "function"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "SPAWN_RADIUS",
+      "kind": "const"
+    },
+    {
+      "file": "src/spawn-layout-constraints.ts",
+      "name": "SpawnPointReport",
+      "kind": "type"
+    },
+    {
+      "file": "src/spawn-safety.ts",
+      "name": "SpawnCandidateScore",
+      "kind": "type"
+    },
+    {
+      "file": "src/spawn-safety.ts",
+      "name": "SpawnSelection",
+      "kind": "type"
+    },
+    {
+      "file": "src/spawn-safety.ts",
+      "name": "SpawnSelectionContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/special-weapon-effects.ts",
+      "name": "FlareProjectileKinematics",
+      "kind": "type"
+    },
+    {
+      "file": "src/squad-presentation.ts",
+      "name": "DEFAULT_SQUAD_PRESENTATION",
+      "kind": "const"
+    },
+    {
+      "file": "src/sticky-victim-feedback.ts",
+      "name": "StickyVictimUrgentAlert",
+      "kind": "type"
+    },
+    {
+      "file": "src/sticky-victim-receipts.ts",
+      "name": "MAX_STICKY_VICTIM_RECEIPT_BYTES",
+      "kind": "const"
+    },
+    {
+      "file": "src/sticky-victim-receipts.ts",
+      "name": "MAX_STICKY_VICTIM_RECEIPTS",
+      "kind": "const"
+    },
+    {
+      "file": "src/sticky-victim-receipts.ts",
+      "name": "STICKY_VICTIM_RECEIPT_SCHEMA_VERSION",
+      "kind": "const"
+    },
+    {
+      "file": "src/support-aircraft-collision.ts",
+      "name": "SupportAircraftEnvelopeStep",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-aircraft-collision.ts",
+      "name": "SupportAircraftRootClearance",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-combat-presentation.ts",
+      "name": "SUPPORT_SHOT_REPLAY_CAPACITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/support-combat-presentation.ts",
+      "name": "SupportCombatListener",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-combat-presentation.ts",
+      "name": "SupportGunAudioKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-combat-presentation.ts",
+      "name": "SupportGunPositionalCallback",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-combat-presentation.ts",
+      "name": "supportShotReplayKey",
+      "kind": "function"
+    },
+    {
+      "file": "src/support-damage-feedback.ts",
+      "name": "SupportDamageFeedbackSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-damage-feedback.ts",
+      "name": "SupportDamageFeedbackTelemetrySnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/support-explosion-presentation.ts",
+      "name": "SupportExplosionTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/surface-impact-registry.ts",
+      "name": "SurfaceImpactCoverage",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/support-flight-world.ts",
+      "name": "SupportFlightWorld",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/support-flight-world.ts",
+      "name": "SupportFlightWorldInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/thermal-reveal-selection.ts",
+      "name": "ThermalRevealMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/thermal-reveal-selection.ts",
+      "name": "ThermalRevealPrewarmCorpse",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/viewmodel-contact-probe.ts",
+      "name": "ViewmodelContactProbeInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/viewmodel-contact-probe.ts",
+      "name": "ViewmodelContactProbeSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/viewmodel-contact-probe.ts",
+      "name": "ViewmodelContactProbeSweep",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/viewmodel-contact-probe.ts",
+      "name": "ViewmodelCutProbeSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/systems/viewmodel-surface-clip.ts",
+      "name": "VIEWMODEL_SURFACE_CLIP_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/team-prescription.ts",
+      "name": "SquadIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/team-prescription.ts",
+      "name": "TeamSwapRefusalReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/team-prescription.ts",
+      "name": "TeamSwapResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/test-maps-art.ts",
+      "name": "mirroredX",
+      "kind": "function"
+    },
+    {
+      "file": "src/test-maps-art.ts",
+      "name": "Test1Materials",
+      "kind": "type"
+    },
+    {
+      "file": "src/test-maps-art.ts",
+      "name": "Test2Materials",
+      "kind": "type"
+    },
+    {
+      "file": "src/text-chat-controller.ts",
+      "name": "TextChatController",
+      "kind": "interface"
+    },
+    {
+      "file": "src/text-chat-controller.ts",
+      "name": "TextChatHostContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/text-chat-controller.ts",
+      "name": "TextChatNetwork",
+      "kind": "type"
+    },
+    {
+      "file": "src/text-chat.ts",
+      "name": "CHAT_RATE_WINDOW_MS",
+      "kind": "const"
+    },
+    {
+      "file": "src/text-chat.ts",
+      "name": "CHAT_SENDER_NAME_MAX_CHARS",
+      "kind": "const"
+    },
+    {
+      "file": "src/thermal-ghost-presentation.ts",
+      "name": "ThermalGhostTargetTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/timed-map-weapon-authority.ts",
+      "name": "TimedMapWeaponAdvance",
+      "kind": "type"
+    },
+    {
+      "file": "src/timed-map-weapon-authority.ts",
+      "name": "TimedMapWeaponDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/timed-map-weapon-authority.ts",
+      "name": "TimedMapWeaponShotConsumption",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/advanced-graphics-controls.ts",
+      "name": "AdvancedGraphicsBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/compact-optic-sight.ts",
+      "name": "COMPACT_OPTIC_ACTIVE_CLASS",
+      "kind": "const"
+    },
+    {
+      "file": "src/ui/compact-optic-sight.ts",
+      "name": "ensureCompactOpticOverlay",
+      "kind": "function"
+    },
+    {
+      "file": "src/ui/dialog-controller.ts",
+      "name": "DialogBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/field-kit-weapon-presentation.ts",
+      "name": "WeaponMenuDps",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/field-kit-weapon-presentation.ts",
+      "name": "WeaponMenuMetric",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/field-kit-weapon-presentation.ts",
+      "name": "WeaponMenuMetricId",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/field-kit-weapon-presentation.ts",
+      "name": "WeaponMenuPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/graphics-profile-descriptions.ts",
+      "name": "GraphicsProfileCostClass",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/graphics-profile-descriptions.ts",
+      "name": "GraphicsProfileDescription",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/graphics-profile-descriptions.ts",
+      "name": "GraphicsProfilePresentationId",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/hud-impact-response.ts",
+      "name": "HudImpactEvent",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/hud-impact-response.ts",
+      "name": "HudImpactKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/hud-impact-response.ts",
+      "name": "HudImpactTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/hud-mode-banner.ts",
+      "name": "HudModeBanner",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/hud-mode-banner.ts",
+      "name": "HudModeInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/killstreak-demo-presentation.ts",
+      "name": "KillstreakDemoDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/killstreak-demo-presentation.ts",
+      "name": "KillstreakDemoKind",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/killstreak-demo-presentation.ts",
+      "name": "KillstreakDemoMedia",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/killstreak-demo-presentation.ts",
+      "name": "KillstreakDemoRailBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-lifecycle.ts",
+      "name": "MenuLifecycleReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-lifecycle.ts",
+      "name": "MenuLifecycleState",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-lifecycle.ts",
+      "name": "MenuSurface",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-lifecycle.ts",
+      "name": "PointerLockPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-preview-camera.ts",
+      "name": "MenuPreviewDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-preview-camera.ts",
+      "name": "MenuPreviewPose",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-preview-camera.ts",
+      "name": "MenuPreviewVariance",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-preview-video.ts",
+      "name": "MenuPreviewVideoDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/menu-preview-video.ts",
+      "name": "MenuPreviewVideoSnapshot",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/operator-preview.ts",
+      "name": "OPERATOR_PREVIEW_FACING_OFFSET_RADIANS",
+      "kind": "const"
+    },
+    {
+      "file": "src/ui/operator-preview.ts",
+      "name": "OPERATOR_PREVIEW_PANEL_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/ui/operator-preview.ts",
+      "name": "OperatorPreviewHandle",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/pass64-shell.ts",
+      "name": "operatorPreview",
+      "kind": "function"
+    },
+    {
+      "file": "src/ui/pass64-shell.ts",
+      "name": "Pass64ShellViewModel",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/pass77-hud-sway.ts",
+      "name": "HudSwayOutput",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/pass77-hud-sway.ts",
+      "name": "HudSwaySample",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/pass77-hud-sway.ts",
+      "name": "HudSwayTarget",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/project-map-dialog.ts",
+      "name": "ProjectMapDialogController",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/rtx-native-runtime-explainer.ts",
+      "name": "RTX_EXPLAINER_CLOSE_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/ui/rtx-native-runtime-explainer.ts",
+      "name": "RTX_EXPLAINER_DIALOG_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/ui/rtx-native-runtime-explainer.ts",
+      "name": "RtxExplainerBinding",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/rtx-native-runtime-explainer.ts",
+      "name": "RtxNativeRuntimeCopy",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/surface-registry.ts",
+      "name": "UiRenderer",
+      "kind": "type"
+    },
+    {
+      "file": "src/ui/surface-registry.ts",
+      "name": "UiSurfaceDefinition",
+      "kind": "type"
+    },
+    {
+      "file": "src/vertical-navigation.ts",
+      "name": "VerticalPlatform",
+      "kind": "type"
+    },
+    {
+      "file": "src/vertical-navigation.ts",
+      "name": "VerticalRamp",
+      "kind": "type"
+    },
+    {
+      "file": "src/vertical-navigation.ts",
+      "name": "VerticalRoute",
+      "kind": "type"
+    },
+    {
+      "file": "src/viewmodel-near-plane-framing.ts",
+      "name": "ViewmodelFramingTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/water-system.ts",
+      "name": "WaterTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/ocean-spectrum.ts",
+      "name": "OCEAN_GRAVITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/water/ocean-spectrum.ts",
+      "name": "OCEAN_MAX_TOTAL_STEEPNESS",
+      "kind": "const"
+    },
+    {
+      "file": "src/water/ocean-spectrum.ts",
+      "name": "OceanBand",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/ocean-spectrum.ts",
+      "name": "OceanSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/ocean-tsl.ts",
+      "name": "OceanTslWater",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/swim-state.ts",
+      "name": "FloatZoneInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/swim-state.ts",
+      "name": "SwimInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/swim-state.ts",
+      "name": "SwimMovementModifiers",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/swim-state.ts",
+      "name": "WaterPhysicsSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/water-authoring.ts",
+      "name": "WaterArenaId",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/water-quality.ts",
+      "name": "SEGMENTS_PER_SHORTEST_WAVELENGTH",
+      "kind": "const"
+    },
+    {
+      "file": "src/water/water-quality.ts",
+      "name": "WATER_QUALITY",
+      "kind": "const"
+    },
+    {
+      "file": "src/water/water-quality.ts",
+      "name": "WaterQualityBudget",
+      "kind": "type"
+    },
+    {
+      "file": "src/water/water-quality.ts",
+      "name": "waterQualityForProfile",
+      "kind": "function"
+    },
+    {
+      "file": "src/weapon-actions.ts",
+      "name": "ViewmodelReloadStage",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-audio-profiles.ts",
+      "name": "WeaponAudioProfileAudit",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-family-presentation.ts",
+      "name": "WeaponFamilyPresentation",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-finish.ts",
+      "name": "WeaponFinishProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-model.ts",
+      "name": "carvePass70RailgunHipOpticBacker",
+      "kind": "function"
+    },
+    {
+      "file": "src/weapon-model.ts",
+      "name": "Hf405CompactOpticBoreState",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-model.ts",
+      "name": "Pass65CrossbowVariant",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-model.ts",
+      "name": "Pass65WeaponVariant",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-model.ts",
+      "name": "Pass70FirstPersonMaterialState",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation-pose-profiles.ts",
+      "name": "FIRST_PERSON_FIRING_WRIST_ROLL_RADIANS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-pose-profiles.ts",
+      "name": "MELEE_SUPPORT_POSE_MAX_SHOULDER_DRIFT_METERS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "ADS_IN_RESPONSE_PER_SECOND",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "ADS_OUT_RESPONSE_PER_SECOND",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "FireCycleState",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "VIEWMODEL_CONTACT_POSE_LIFT_CAP_METERS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "VIEWMODEL_ENVELOPE_PROBE_LEAD_METERS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation-state.ts",
+      "name": "ViewmodelFireBlockReason",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "ArmFillEmissiveRole",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "COMPACT_OPTIC_ADS_PRESENTATION_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FIRST_PERSON_ARM_LAND_DIP_RADIANS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FIRST_PERSON_ARM_RECOIL_MAX_POLE_RADIANS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FIRST_PERSON_ARM_RECOIL_POLE_GAIN",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FIRST_PERSON_SUPPORT_GRIP_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FirstPersonArmMotionInput",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FirstPersonArmMotionSample",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "FirstPersonHandPolicy",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "VIEWMODEL_ARM_EVIDENCE_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "VIEWMODEL_CONTACT_CLIP_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "VIEWMODEL_CONTACT_FOLD_CONTRACT",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "VIEWMODEL_CONTACT_FOLD_MARGIN_METERS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "VIEWMODEL_CONTACT_FOLD_MINIMUM_SCALE",
+      "kind": "const"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "ViewmodelArmEvidenceCaptureMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "ViewmodelContactFold",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "WeaponPresentationLoadOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-presentation.ts",
+      "name": "WeaponViewmodelGpuPrewarmContext",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-rail-alignment-contract.ts",
+      "name": "ProbeVerdict",
+      "kind": "type"
+    },
+    {
+      "file": "src/weapon-rail-alignment-contract.ts",
+      "name": "verticalOccupancy",
+      "kind": "function"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RAIN_SPLASH",
+      "kind": "const"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RAIN_STREAK",
+      "kind": "const"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RainBudget",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RainPresentationOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RainTelemetry",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "RainUpdateOptions",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "WETNESS_SCAN_FLOOR",
+      "kind": "const"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "WETNESS_SCAN_SECONDS",
+      "kind": "const"
+    },
+    {
+      "file": "src/weather/rain-presentation.ts",
+      "name": "WetSurfaceResponse",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/weather-settings.ts",
+      "name": "WeatherPresentationSettings",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/weather-state.ts",
+      "name": "ArenaWeatherProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/weather-state.ts",
+      "name": "WeatherPhase",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/weather-state.ts",
+      "name": "WeatherStateRow",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/wind-field.ts",
+      "name": "WIND_REFERENCE_GUST_SCALE_M",
+      "kind": "const"
+    },
+    {
+      "file": "src/weather/wind-field.ts",
+      "name": "WindField",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/wind-field.ts",
+      "name": "WindGustBand",
+      "kind": "type"
+    },
+    {
+      "file": "src/weather/wind-field.ts",
+      "name": "WindProfile",
+      "kind": "type"
+    },
+    {
+      "file": "src/webgl-shadow-compatibility.ts",
+      "name": "WebGlShadowSamplerMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/webgpu-pipeline-repair.ts",
+      "name": "PipelineRepairResult",
+      "kind": "type"
+    },
+    {
+      "file": "src/webgpu-pipeline-repair.ts",
+      "name": "TINT_PIPELINE_ERROR_PATTERN",
+      "kind": "const"
+    },
+    {
+      "file": "src/webgpu-tint-swizzle-shim.ts",
+      "name": "TINT_CHAINED_SWIZZLE_PATTERN",
+      "kind": "const"
+    },
+    {
+      "file": "src/window-glass-debris-presentation.ts",
+      "name": "WindowGlassDebrisSettleMode",
+      "kind": "type"
+    },
+    {
+      "file": "src/world-identity.ts",
+      "name": "ArenaRouteIdentity",
+      "kind": "type"
+    },
+    {
+      "file": "src/zero-hit-feedback.ts",
+      "name": "ZERO_HIT_ELEMENT_ID",
+      "kind": "const"
+    },
+    {
+      "file": "src/zero-hit-feedback.ts",
+      "name": "ZeroHitRowPlan",
+      "kind": "type"
+    }
+  ]
+}
