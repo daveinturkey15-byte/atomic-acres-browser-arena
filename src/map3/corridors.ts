@@ -25,6 +25,7 @@ import {
   createTree, createShrub, createConifer, createFallenLog, createGrassTuft, poissonScatter,
 } from './plants';
 import { createLitterSkirt, hash11, mergeGeometries } from './leaf-geometry';
+import { createStreetCell } from './street-cell';
 import {
   AUTUMN_PALETTE, SPRING_PALETTE, SUMMER_PALETTE, createBarkMaterial, createFlatFoliageMaterial,
   createFoliageMaterial, createFoliageUniforms, createForestFloorMaterial,
@@ -1100,10 +1101,24 @@ export function createGrammarCorridor(seed = 11): Corridor {
   emit(buildRuin(seed * 43, 5, 7), stoneMat, 3.9, -42.5, Math.PI / 2);
   emit(buildRuin(seed * 47, 9, 5), stoneMat, 0, -47, 0);
 
+  // Station D (HF-419) - RULE SET 4, a street cell: the same footprint -> mass
+  // -> banded storeys -> facade modules -> terminal pipeline at street scale,
+  // with the two terminals a street has and a tower does not (a shopfront
+  // ground floor and a parapet), plus the carriageway, kerbs, pavements,
+  // furniture and parked scenery that make a frontage read as a street.
+  //
+  // It carries its OWN seed stream (street-cell.ts, mulberry32) rather than
+  // consuming this function's `hash11` sequence, so adding it did not move a
+  // single tower, cottage or ruin block - which is the only reason the
+  // before/after captures for this trial are comparable at all.
+  const streetCell = createStreetCell(seed * 38 + 5);
+  group.add(streetCell.group);
+  disposables.push(streetCell);
+
   return {
     group,
     length: LEN,
-    title: 'Shape grammar — three rule sets, one pipeline',
+    title: 'Shape grammar — four rule sets, one pipeline',
     skill: 'atomic-acres-procedural-art-authoring',
     update() { /* static exhibit */ },
     dispose() {
