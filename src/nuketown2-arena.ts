@@ -303,6 +303,17 @@ const STAIRWELL_Z0 = STAIR_FOOT_Z
   - STANDING_RADIUS_M - 0.12;
 
 /**
+ * HF-435: the derived stair-well geometry, EXPORTED so the fidelity gate can
+ * assert headroom over every tread from the numbers the build itself used -
+ * the same builder-and-gate-read-one-table rule as NUKETOWN2_DOORWAYS.
+ */
+export const NUKETOWN2_STAIRWELL = Object.freeze({
+  footZ: STAIR_FOOT_Z,
+  headZ: STAIR_HEAD_Z,
+  wellZ0: STAIRWELL_Z0,
+});
+
+/**
  * DOORWAYS - HF-432 item 4, owner after PASS 90: "Doors are too small
  * shouldn't have to crouch."
  *
@@ -363,6 +374,27 @@ function doorRun(id: string): [number, number] {
   const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
   return [door.centre - door.width / 2, door.centre + door.width / 2];
 }
+
+/**
+ * HF-435: EVERY window, ONCE - spans, sill tops and whether it carries a
+ * ground-floor glass pane - so the builder and the gate cannot describe
+ * different windows. Spans run along x; both houses use them (the south house
+ * is `pair()`'s exact 180-degree image).
+ *
+ * Upper openings: sill top at floor + 0.9 (the reference's sill, S7) and NO
+ * head band - the roof deck closes the head, so the opening is 2.0 m tall and
+ * a standing capsule that hops the sill can cross and drop outside.
+ */
+const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
+const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
+const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
+const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
+export const NUKETOWN2_WINDOWS = Object.freeze([
+  Object.freeze({ id: 'ground front west', pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'ground front east', pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'upper front', pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'upper back', pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+]);
 
 /** Radius of the cul-de-sac turning head at the middle of the road. */
 const TURNING_HEAD_HALF = 8;
@@ -589,6 +621,8 @@ type Nuketown2Materials = Readonly<{
   carGlass: THREE.MeshStandardMaterial;
   /** HF-434: the coach window BANDS - polygonOffset tier -1 over the body. */
   coachGlass: THREE.MeshStandardMaterial;
+  /** HF-435: the ground-floor window panes - real glass, visible and pale. */
+  windowGlass: THREE.MeshStandardMaterial;
   rubber: THREE.MeshStandardMaterial;
   sign: THREE.MeshStandardMaterial;
   planter: THREE.MeshStandardMaterial;
@@ -663,6 +697,13 @@ function nuketown2Materials(): Nuketown2Materials {
   const driveDecal = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-drive-decal', -1);
   const trimDecal = withOffset(standard(0xf0e4c9, 0.68, 0.03), 'nuketown2-trim-decal', -2);
   const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
+  // HF-435: the house window panes. Visible from the street (pale, slightly
+  // transparent - the gun-range control room's glazing idiom), not a batched
+  // decal: the pane is a collider and a ballistic surface.
+  const windowGlass = standard(0x9fb6bd, 0.18, 0.08);
+  windowGlass.name = 'nuketown2-window-glass';
+  windowGlass.transparent = true;
+  windowGlass.opacity = 0.38;
   const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
   const interiorFloor = withOffset(standard(0xdbd1ba, 0.92, 0.01), 'nuketown2-house-floor', -1);
   const garageFloor = withOffset(standard(0x8b8879, 0.94, 0.02), 'nuketown2-garage-floor', -1);
@@ -745,6 +786,7 @@ function nuketown2Materials(): Nuketown2Materials {
     carA: standard(0x3d6f80, 0.2, 0.62),
     carGlass: standard(0x2b3d47, 0.14, 0.5),         // SOLID users: the car cabins
     coachGlass,
+    windowGlass,
     // art-kit `MAT.rubber`, verbatim.
     rubber: standard(0x202628, 0.9, 0.02),
     sign: standard(0xdbd1ba, 0.78, 0.06),
@@ -813,8 +855,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // openings, which is the whole point — a window you cannot shoot through is
   // a painting.
   const FRONT_DOOR = doorRun('house front door');
-  const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
-  const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
   const groundFrontRuns: [number, number][] = [
     [HOUSE_X0, FRONT_WINDOW_A[0]],
     [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
@@ -827,10 +867,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   });
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
+  // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
+  // REAL collider (not walk-through) and a REAL ballistic surface
+  // (ballisticMaterial 'glass' - the shipped arenas' glazing class,
+  // entryCost 0.08), so bullets cross but shoulders do not.
   for (const [index, window] of [FRONT_WINDOW_A, FRONT_WINDOW_B].entries()) {
     const width = window[1] - window[0];
     const wx = (window[0] + window[1]) / 2;
     pair(builder, `house front window sill ${index}`, [wx, 0.5, zFront], [width, 1.0, WALL_T], m.trim);
+    pair(builder, `house front window glass ${index}`, [wx, 1.55, zFront], [width, 1.1, 0.06], m.windowGlass,
+      { ballisticMaterial: 'glass', cast: false });
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
   }
   pair(builder, 'house front door lintel',
@@ -838,7 +884,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [FRONT_DOOR[1] - FRONT_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
 
   // --- front wall, upper floor: the power window ---------------------------
-  const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0, UPPER_WINDOW[0]],
     [UPPER_WINDOW[1], HOUSE_X1],
@@ -850,9 +895,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   {
     const width = UPPER_WINDOW[1] - UPPER_WINDOW[0];
     const wx = (UPPER_WINDOW[0] + UPPER_WINDOW[1]) / 2;
-    // 0.9 m sill: you can stand at it, and you can crouch behind it.
+    // 0.9 m sill: you can stand at it, and you can crouch behind it. The old
+    // 0.9 m head band (top 0.45 m under the roof) is GONE under HF-435: with
+    // it, the opening stood 1.1 m tall and no capsule the game ships - standing
+    // 1.82, crouched 1.16 - could ever cross the wall plane, so "go out of
+    // windows" was impossible no matter how wide the opening was. The opening
+    // now runs sill top (UPPER_Y0 + 0.9) to the roof deck's underside at
+    // ROOF_Y0: 2.0 m tall, so a standing capsule that hops the 0.9 m sill
+    // (apex 0.82 + the 0.42 m autostep up-cast = 1.24) walks out and drops to
+    // the verge. The roof deck itself closes the head, exactly like an eave.
     pair(builder, 'house upper window sill', [wx, UPPER_Y0 + 0.45, zFront], [width, 0.9, WALL_T], m.trim);
-    pair(builder, 'house upper window head', [wx, UPPER_Y0 + UPPER_H - 0.45, zFront], [width, 0.9, WALL_T], m.trim);
   }
 
   // --- back wall: back door and one upper window ---------------------------
@@ -868,16 +920,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
     [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
-  const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
   });
+  // HF-435: sill stays at 0.9 m, the old head band goes - same reason as the
+  // upper front window: the opening has to be tall enough for a capsule to
+  // cross, and the roof deck is the head.
   pair(builder, 'house upper back sill',
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + 0.45, zBack],
-    [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
-  pair(builder, 'house upper back head',
-    [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + UPPER_H - 0.45, zBack],
     [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
 
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------

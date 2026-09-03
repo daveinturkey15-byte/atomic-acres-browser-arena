@@ -14,11 +14,13 @@ import {
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_SECTION,
   NUKETOWN2_SPAWN_LAYOUT,
+  NUKETOWN2_STAIRWELL,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_WINDOWS,
   buildNuketown2,
 } from './nuketown2-arena';
-import { NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
+import { NUKETOWN2_GROUND_STOREY_H, NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
@@ -527,6 +529,143 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(trace[5]!.y, label(5)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
       expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
       expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
+
+      // HF-435: ...and DOWN again. The owner: "being able to walk up and down
+      // stairs". The up-route above proves the climb; this one starts in the
+      // FRONT upper room, takes the landing, and descends the whole flight
+      // walking (no jump), ending on the back-room ground floor.
+      const down = await walkStanding(map, [s * cx, NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
+        at(cx, -14.8),          // out of the front upper room toward the landing
+        at(cx, -17.0),          // onto the landing, turned down the flight
+        at(cx, -21.5),          // down the flight, treads 0.30 m each
+        at(cx + 2.4, -22.3),    // off the bottom tread into the BACK room
+      ]);
+      const downLabel = (index: number) => `${house.id} down waypoint ${index} at ${JSON.stringify(down[index])}`;
+      // Waypoint 2 stands on the bottom treads (feet 0.3-0.6 m), well below
+      // the landing; waypoint 3 is the back-room ground floor itself.
+      expect(down[2]!.y, downLabel(2)).toBeLessThan(4.0);
+      expect(down[3]!.y, downLabel(3)).toBeLessThan(2.0);
+    }
+
+    // HF-435: the derived numbers, not the vibes - tread rise inside the
+    // autostep (asserted above), headroom over EVERY tread at least the
+    // standing capsule, and a landing at least a capsule diameter deep, all
+    // computed from the same NUKETOWN2_STAIRWELL numbers the build used.
+    const well = NUKETOWN2_STAIRWELL;
+    const deckUnderside = NUKETOWN2_WINDOWS.find((entry) => entry.id === 'upper front')!.headY;
+    for (let i = 0; i < NUKETOWN2_HOUSE_STAIR.risers - 1; i += 1) {
+      const top = NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
+      const centreZ = well.footZ + NUKETOWN2_HOUSE_STAIR.going * (i + 0.5);
+      const ceiling = centreZ < well.wellZ0 ? NUKETOWN2_GROUND_STOREY_H : deckUnderside;
+      expect(ceiling - top, `tread ${i} headroom`).toBeGreaterThanOrEqual(STANDING_CAPSULE_M);
+    }
+    expect(NUKETOWN2_HOUSE_STAIR.landingDepth, 'landing depth vs capsule diameter')
+      .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
+  }, 120_000);
+
+  it('puts glass in the ground windows and makes both upstairs windows exits', async () => {
+    // HF-435, owner after PASS 91: "go out of windows and putting glass on the
+    // windows."
+    //
+    // GROUND floor: the pane is a real collider (a shoulder does not cross it)
+    // and a real glass ballistic surface (a bullet pays the glass entry cost
+    // and crosses). UPSTAIRS: no collider across the opening, sill at or below
+    // 1.1 m over the floor, and a standing capsule that hops the sill crosses
+    // the wall plane and DROPS outside - probed on the real physics.
+    const map = buildNuketown2(new THREE.Scene());
+    const names = map.root.children.map((node) => node.name);
+
+    for (const [index, win] of NUKETOWN2_WINDOWS.entries()) {
+      const width = win.x1 - win.x0;
+      expect(width, `${win.id} opening width`).toBeGreaterThanOrEqual(1.0);
+      const wx = (win.x0 + win.x1) / 2;
+      if (win.pane) {
+        // The pane: present, a movement collider spanning sill to head, and
+        // glass for gunfire - in BOTH houses (the partner is the exact
+        // 180-degree image).
+        const paneName = `house front window glass ${index}`;
+        expect(names.filter((name) => name.endsWith(paneName)), paneName).toHaveLength(2);
+        const collider = map.colliders.find((bounds) => (
+          Math.abs((bounds.maxX - bounds.minX) - width) < 0.01
+          && Math.abs((bounds.minY ?? 0) - win.sillTop) < 0.01
+          && Math.abs((bounds.maxY ?? 0) - win.headY) < 0.01
+        ));
+        expect(collider, `${win.id} pane movement collider`).toBeDefined();
+        const surface = map.shotSurfaces.find((entry) => entry.id.includes(paneName));
+        expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
+        expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
+        // NOT walk-through, in both houses.
+        for (const sign of [1, -1] as const) {
+          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, map.colliders, PLAYER_RADIUS),
+            `${win.id} pane blocks a standing capsule`).toBe(true);
+        }
+      } else {
+        // Upstairs: sill height at or below the brief's 1.1 m, and NOTHING
+        // across the opening - a capsule standing on the sill (eye sill + 1.7)
+        // is unobstructed at the wall plane.
+        expect(win.sillTop - NUKETOWN2_UPPER_Y0, `${win.id} sill height over the floor`)
+          .toBeLessThanOrEqual(1.1);
+        expect(isBlocked({ x: wx, y: win.sillTop + 1.7, z: win.wallZ }, map.colliders, PLAYER_RADIUS),
+          `${win.id} opening is clear`).toBe(false);
+      }
+    }
+
+    // THE EXIT PROBE. Both houses, both upstairs windows: hop the sill,
+    // cross the wall plane, drop, and land standing OUTSIDE on the ground.
+    const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+    try {
+      const dt = 1 / 120;
+      for (const house of NUKETOWN2_HOUSE_LAYOUT) {
+        const s = house.facing;   // north +1, south is its exact negation
+        for (const win of NUKETOWN2_WINDOWS.filter((entry) => !entry.pane)) {
+          const wx = s * (win.x0 + win.x1) / 2;
+          const wallZ = s * win.wallZ;
+          // OUTWARD is the direction off the wall away from the room: +s for
+          // the front wall (toward the road), -s for the back wall (into the
+          // yard). The probe starts 2.5 m INSIDE, crosses the plane over the
+          // sill, and drops 2.6 m outside.
+          const outward = win.id === 'upper front' ? s : -s;
+          const start = { x: wx, y: NUKETOWN2_UPPER_Y0 + 1.7, z: wallZ - outward * 2.5 };
+          const route = [
+            { x: wx, z: wallZ },                    // the wall plane, over the sill
+            { x: wx, z: wallZ + outward * 2.6 },    // out into the open air
+          ];
+          physics.teleportEye(start);
+          let vy = 0;
+          for (const waypoint of route) {
+            for (let step = 0; step < 900; step += 1) {
+              const eye = physics.eyePosition();
+              const dx = waypoint.x - eye.x;
+              const dz = waypoint.z - eye.z;
+              const distance = Math.hypot(dx, dz);
+              if (distance < 0.15) break;
+              const advance = Math.min(distance, 4.2 * dt);
+              vy += -24.5 * dt;
+              const result = physics.move({
+                x: distance > 1e-4 ? (dx / distance) * advance : 0,
+                y: vy * dt,
+                z: distance > 1e-4 ? (dz / distance) * advance : 0,
+              }, dt);
+              if (result.grounded) vy = 6.35;
+              else if (result.blockedY && vy > 0) vy = 0;
+            }
+          }
+          for (let step = 0; step < 400; step += 1) {
+            vy += -24.5 * dt;
+            if (physics.move({ x: 0, y: vy * dt, z: 0 }, dt).grounded) break;
+          }
+          const end = physics.eyePosition();
+          const label = `${house.id} ${win.id} exit ended at ${JSON.stringify(end)}`;
+          // A window drop is nearly straight down under its own eave: the
+          // capsule must be GROUNDED (eye 1.7 m, i.e. fell the 4.2 m from the
+          // sill - impossible anywhere inside the house, whose floor is at
+          // 3.3) and at least a foot outside the wall plane.
+          expect((end.z - wallZ) * outward, `${label} - clear of the wall`).toBeGreaterThan(0.2);
+          expect(end.y, `${label} - landed outside`).toBeLessThan(1.9);
+        }
+      }
+    } finally {
+      physics.dispose();
     }
   }, 120_000);
 
