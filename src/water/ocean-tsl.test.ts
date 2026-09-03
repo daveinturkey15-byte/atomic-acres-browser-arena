@@ -14,12 +14,17 @@ import {
   oceanPathLength,
   oceanRoughnessFromSlope,
   oceanDeepScatterColor,
-  oceanHorizonColor,
   oceanScatteredRadiance,
   oceanTransmission,
 } from './ocean-tsl';
 import { OCEAN_BANDS, OCEAN_REFERENCE_AMPLITUDE } from './ocean-spectrum';
-import { WATER_POOLS, WATER_TYPES, waterBodyForArena } from './water-authoring';
+import {
+  WATER_BODIES,
+  WATER_POOLS,
+  WATER_TYPES,
+  waterBodyForArena,
+  waterBodyId,
+} from './water-authoring';
 // HF-362 grade-chain reference: profile bloom thresholds live here and are
 // fail-closed asserted > 1.0 linear (true emitters only).
 import { GRADE_PROFILES } from '../rendering/grade-profile';
@@ -179,7 +184,10 @@ describe('HF-420 broadband bubble backscatter', () => {
     const storm = waterBodyForArena('rustworks-1v1')!;
     const stormSlope = peakSlope(OCEAN_REFERENCE_AMPLITUDE * storm.amplitudeScale);
     expect(stormSlope).toBeGreaterThan(OCEAN_FOAM_SLOPE_LOW);
-    const optics = WATER_TYPES[storm.waterType!];
+    // The water TYPE by name, not through the body: no ocean opts in today
+    // (see water-authoring.ts), and this test is about the term's behaviour on
+    // a storm spectrum, not about which arenas are enrolled.
+    const optics = WATER_TYPES['storm-ocean'];
     // At the whitecap itself.
     expect(oceanBackscatterDensity(1.2, stormSlope, optics)).toBeGreaterThan(0);
     // BELOW the foam threshold the bubbles are still there: the cloud outlives
@@ -278,77 +286,41 @@ describe('HF-420 deep-water scattering closure', () => {
 
 
 /**
- * HF-420 regression fix: the horizon skirt and the near plane must agree on
- * what deep water is.
+ * HF-420: the horizon skirt is NOT on the physical colour model, and the
+ * constraint that keeps that consistent is enforced here rather than trusted.
  *
- * The skirt is an unlit ring that carries the sea past the displaced near
- * plane. It painted `palette.deep` while the near plane's deep endpoint was
- * also `palette.deep`; the extinction commit moved the near plane's endpoint to
- * the water type's scattering colour and, until this fix, left the skirt on the
- * old palette - a hard full-width hue break where the two surfaces meet.
+ * The skirt is an unlit MeshBasicMaterial ring; the near plane is a lit
+ * MeshStandardNodeMaterial. Measured (skirt-hidden capture probe, RustRig):
+ * the skirt owns 1.54% of the worst frame - a thin horizon line and the hole
+ * in the near plane's rectangular dry footprint under the rig - and painting it
+ * the optically-deep limit of the body's own optics renders about 4x the
+ * luminance of the accepted palette because it is unlit, turning the horizon
+ * line into a bright green stripe and the shadowed water under the rig into a
+ * glowing green pad. There is no weight that is both principled and correct,
+ * because the quantity to match is the near plane's LIT output.
  *
- * These tests pin the endpoint AGREEMENT, not a colour, so a future change to
- * either side that breaks the seam again goes red.
+ * So: a body that owns a skirt may not author a water type. One assertion,
+ * and it is the reason two shipped oceans are not enrolled today.
  */
-describe('HF-420 horizon skirt endpoint', () => {
-  // The two shipped ocean bodies that own a horizon skirt, read through the
-  // public accessor rather than by importing private module constants.
-  const RUSTWORKS = waterBodyForArena('rustworks-1v1')!;
-  const HIGH_SEAS = waterBodyForArena('high-seas')!;
-
-  it('paints the optically-deep limit of the body OWN optics, not a second palette', () => {
-    for (const body of [RUSTWORKS, HIGH_SEAS]) {
-      const optics = oceanOpticsForBody(body);
-      expect(optics).not.toBeNull();
-      expect(oceanHorizonColor(body)).toBe(optics!.scatter);
-      // ...and that endpoint is genuinely different from the palette it
-      // replaced, which is exactly why the un-migrated skirt broke the seam.
-      expect(oceanHorizonColor(body)).not.toBe(body.palette.deep);
-    }
+describe('HF-420 skirted bodies may not author a water type', () => {
+  it('holds for every authored body, sea and pond alike', () => {
+    const bodies = [
+      ...Object.values(WATER_BODIES),
+      ...Object.values(WATER_POOLS).flatMap((pools) => pools ?? []),
+    ].filter((body): body is NonNullable<typeof body> => Boolean(body));
+    expect(bodies.length).toBeGreaterThan(0);
+    const skirted = bodies.filter((body) => body.horizonRadius > 0);
+    // The rule is only meaningful while skirted bodies actually exist.
+    expect(skirted.length).toBeGreaterThan(0);
+    expect(skirted.filter((body) => body.waterType).map(waterBodyId)).toEqual([]);
   });
 
-  it('agrees with what the near plane renders where the skirt actually meets it', () => {
-    // The skirt is only ever seen at a grazing angle, where the view cosine
-    // floors at OCEAN_MIN_VIEW_COSINE and the column is optically deep. There
-    // the closure L = L_floor*T + L_scatter*(1 - T) collapses onto L_scatter,
-    // so the skirt's flat colour IS the near plane's colour at the seam rather
-    // than an approximation of it.
-    for (const body of [RUSTWORKS, HIGH_SEAS]) {
-      const optics = oceanOpticsForBody(body)!;
-      const grazingPath = oceanPathLength(oceanColumnDepth(body), OCEAN_MIN_VIEW_COSINE);
-      const transmission = oceanTransmission(optics, grazingPath);
-      // Every channel is effectively extinguished over that path. The slowest
-      // one in the whole roster is High Seas blue, e^-4.33 = 1.3%; RustRig is
-      // e^-23.9 and below double precision's interest.
-      for (const channel of [transmission.r, transmission.g, transmission.b]) {
-        expect(channel).toBeLessThan(0.02);
-      }
-      // ...so the near plane converges on the colour the skirt paints. The
-      // bound is analytic rather than a hand-tuned tolerance: with
-      // L = L_floor*T + L_scatter*(1 - T) and L_floor in [0, 1], the near
-      // plane can differ from L_scatter by AT MOST T per channel, whatever the
-      // floor radiance is. Testing against the brightest possible floor
-      // (white) exercises that worst case.
-      const nearPlane = oceanScatteredRadiance({ r: 1, g: 1, b: 1 }, 0, optics, grazingPath);
-      const skirt = oceanDeepScatterColor(optics);
-      expect(oceanHorizonColor(body)).toBe(optics.scatter);
-      expect(Math.abs(nearPlane.r - skirt.r)).toBeLessThanOrEqual(transmission.r + 1e-9);
-      expect(Math.abs(nearPlane.g - skirt.g)).toBeLessThanOrEqual(transmission.g + 1e-9);
-      expect(Math.abs(nearPlane.b - skirt.b)).toBeLessThanOrEqual(transmission.b + 1e-9);
-      // And the worst case is small in absolute terms, so "they agree at the
-      // seam" is a measurement and not a re-statement of the algebra.
-      expect(Math.max(
-        Math.abs(nearPlane.r - skirt.r),
-        Math.abs(nearPlane.g - skirt.g),
-        Math.abs(nearPlane.b - skirt.b),
-      )).toBeLessThan(0.02);
-    }
-  });
-
-  it('reverts with the body: no water type means the skirt keeps palette.deep', () => {
-    // The one-line revert path (delete `waterType`) must take the skirt back
-    // too, or a reverted body would be left half-migrated.
-    const reverted = { ...RUSTWORKS, waterType: undefined };
-    expect(oceanHorizonColor(reverted)).toBe(RUSTWORKS.palette.deep);
+  it('is not vacuous: the bodies that DO carry optics are the skirtless ones', () => {
+    const withOptics = [
+      ...Object.values(WATER_BODIES),
+      ...Object.values(WATER_POOLS).flatMap((pools) => pools ?? []),
+    ].filter((body) => body && body.waterType);
+    expect(withOptics.length).toBeGreaterThan(0);
+    for (const body of withOptics) expect(body!.horizonRadius).toBe(0);
   });
 });

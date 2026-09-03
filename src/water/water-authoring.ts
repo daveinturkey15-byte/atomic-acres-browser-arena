@@ -190,7 +190,20 @@ const RUSTWORKS_WATER: WaterBodyDefinition = Object.freeze({
   legacyPalette: Object.freeze({ deep: 0x020814, shallow: 0x0a2a44, foam: 0x7ec8e8 }),
   // Turbid coastal water under a night sky; the storm spectrum is the only
   // body in the game whose slope reaches the foam/backscatter gate.
-  waterType: 'storm-ocean',
+  // NOT OPTED IN. The physical colour model is built, tested and measured, and
+  // this body is the one it was measured ON - but enabling it here is an
+  // undisclosed ART change to a SHIPPED arena, and the captures say so:
+  // beyond the shore ramp the slanted column saturates, so the whole sea
+  // becomes ONE flat scattering colour with no distance falloff at all, and it
+  // meets the fog-washed distance at a hard horizontal boundary. On a night
+  // arena that reads as a flat bright green sheet. It is also the case that
+  // this body owns a horizon skirt, which is unlit and cannot follow (see the
+  // skirt note in ocean-tsl.ts) - a constraint now enforced by a test.
+  //
+  // Opting an ocean in is one line, and the numbers to justify it are in
+  // docs/evidence/pass86/am-realtime-water-surfaces. It needs an owner art call
+  // and a Fresnel/sky-reflection term first, not a lane's own judgement.
+  // waterType: 'storm-ocean',
   opticalDepth: 14,
 });
 
@@ -238,7 +251,14 @@ export const FARCRYSIS_WATER: WaterBodyDefinition = Object.freeze({
   legacyPalette: Object.freeze({ deep: 0x0d4a5c, shallow: 0x19a3a8, foam: 0xfffef9 }),
   // Tropical lagoon over pale sand: red is gone within ~2 m, so the shelf
   // reads shallow from the depth ramp instead of from a second palette.
-  waterType: 'clear-lagoon',
+  //
+  // NOT OPTED IN, and here the field was INERT anyway: this arena's water is
+  // presented by its own retained builder (presentationOwner 'arena-builder',
+  // src/farcrysis-water-surface.ts), so it never reached the shared graph. An
+  // inert field that claims a grade is worse than no field - it would have
+  // taken effect silently the moment the arena is re-pointed at the shared
+  // module, with none of the art review the other two now require.
+  // waterType: 'clear-lagoon',
   opticalDepth: 5,
 });
 
@@ -260,7 +280,20 @@ const HIGH_SEAS_WATER: WaterBodyDefinition = Object.freeze({
   night: false,
   palette: Object.freeze({ deep: 0x063650, shallow: 0x177d95, foam: 0xe7fbff }),
   legacyPalette: Object.freeze({ deep: 0x063650, shallow: 0x177d95, foam: 0xe7fbff }),
-  waterType: 'open-ocean',
+  // NOT OPTED IN. The physical colour model is built, tested and measured, and
+  // this body is the one it was measured ON - but enabling it here is an
+  // undisclosed ART change to a SHIPPED arena, and the captures say so:
+  // beyond the shore ramp the slanted column saturates, so the whole sea
+  // becomes ONE flat scattering colour with no distance falloff at all, and it
+  // meets the fog-washed distance at a hard horizontal boundary. On a night
+  // arena that reads as a flat bright green sheet. It is also the case that
+  // this body owns a horizon skirt, which is unlit and cannot follow (see the
+  // skirt note in ocean-tsl.ts) - a constraint now enforced by a test.
+  //
+  // Opting an ocean in is one line, and the numbers to justify it are in
+  // docs/evidence/pass86/am-realtime-water-surfaces. It needs an owner art call
+  // and a Fresnel/sky-reflection term first, not a lane's own judgement.
+  // waterType: 'open-ocean',
   opticalDepth: 12,
 });
 
