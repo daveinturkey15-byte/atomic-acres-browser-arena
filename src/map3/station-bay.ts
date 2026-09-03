@@ -2,8 +2,12 @@
  * map3/station-bay.ts — HF-421: the dark-interior lighting look, as a kit.
  *
  * WHAT THIS IS. The owner asked for "that subway lighting" after seeing a
- * browser subway FPS. The technique study (`docs/technique-studies/
- * subway-scene-lighting-look.md`) established by three falsifiers that the
+ * browser subway FPS. The technique study lives in THIS repository on the
+ * sibling study branch - `docs/technique-studies/subway-scene-lighting-look.md`
+ * on `contrib/dave-gaming-pc/claude/technique-study-subway-lighting`, commit
+ * 2a7ddff1; it is not on this branch, so the path only resolves after
+ * `git show 2a7ddff1:docs/technique-studies/subway-scene-lighting-look.md`.
+ * It established by three falsifiers that the
  * reference buys none of it with lighting technology: no sampling noise (not
  * path traced), no colour bleed off saturated props (no real-time GI), and no
  * cast shadows at all under a lit fixture (no baked GI either). The look is
@@ -13,7 +17,8 @@
  * So this module adds NO renderer feature. It is an additive dressing kit for
  * ONE corridor — corridor 6, the god-ray colonnade, which is already the
  * closest thing Map 3 has to an underground station bay — built from boxes,
- * planes, four NodeMaterials and eight real lights.
+ * planes, four NodeMaterials and six real lights (no shadow casters; see
+ * `shadowedSpots`).
  *
  * FOUR MATERIALS, ALL BUILT AT CONSTRUCTION. The pipeline tripwire
  * (`scripts/qa/probe-pipeline-compile-stalls-cdp.mjs`) must read 0 in-combat
@@ -73,6 +78,14 @@ export interface StationBayOptions {
   numColumns: number;
   /** Inner face of the closed (+x) wall. */
   wallInnerX: number;
+  /**
+   * Width of the sun-wall aperture at the centre of each bay. The dressing
+   * course is broken into per-pier panels that clear it, so the trim never
+   * crosses a slit. Default 0.7 - corridor 6's `SLIT_W`.
+   */
+  apertureWidth?: number;
+  /** Clearance the trim keeps either side of an aperture. Default 0.12 m. */
+  apertureClearance?: number;
   /** Per-surface grime seed. */
   seed?: number;
   /**
@@ -101,13 +114,14 @@ export interface StationBayOptions {
    * same run and the same pose - `?probe=1&bay=0` against `?probe=1` - rather
    * than a comparison across two builds captured minutes apart with the sun,
    * the motes and two rolling spheres all in different places. It is a
-   * measurement flag, reachable only by a query string no player types.
+   * measurement flag. It is not read from the URL here: the showcase entry
+   * decides, and the arena never passes anything but the default.
    */
   dressing?: boolean;
   /**
    * Build the readability probes. Opt-in, because they are measurement
-   * furniture and must never ship into a match: the caller passes
-   * `probeMode()` which is false unless the page URL carries `probe=1`.
+   * furniture and must never ship into a match. Only the standalone showcase
+   * entry ever passes `true`; the arena builder passes nothing.
    */
   probes?: boolean;
 }
@@ -115,7 +129,7 @@ export interface StationBayOptions {
 export interface StationBayStats {
   /** Materials this kit creates. The budget is 4 (probe material excluded). */
   materials: number;
-  /** Draw-call families this kit adds. The budget is +12. */
+  /** Draw-call families this kit adds. The budget is +12 draws. */
   meshes: number;
   shadowedLights: number;
   unshadowedLights: number;
@@ -125,16 +139,25 @@ export interface StationBayStats {
 export interface StationBay {
   group: THREE.Group;
   stats: StationBayStats;
-  update(elapsed: number, dt: number): void;
+  update(elapsed: number): void;
   dispose(): void;
 }
 
 /**
  * True when the page asked for the readability probes.
  *
- * Deliberately a URL flag and not a build flag: the capture harness can turn
- * the probes on for one run without a rebuild, and a real player never can,
- * because nothing in the game navigates with this query.
+ * SHOWCASE ENTRY ONLY. `src/map3/main.ts` - the standalone `map3.html` page
+ * the capture harnesses drive - is the ONLY caller, and it passes the result
+ * into `createVolumeCorridor({ probes, dressing })`. The playable arena
+ * (`src/map3-arena.ts`) calls that builder with no options and therefore never
+ * reads the URL at all.
+ *
+ * That separation is the point. An earlier build called these helpers inside
+ * the corridor builder itself, which the arena also builds - so `?probe=1`
+ * would have spawned three grey test bodies in a live match and `?bay=0` would
+ * have deleted the kit and its six point lights for whoever typed it. "No
+ * player types that query" is a claim, not a property; this file no longer
+ * needs it to be true.
  */
 export function probeMode(): boolean {
   try {
@@ -149,7 +172,8 @@ export function probeMode(): boolean {
  * False when the page asked for the kit to be left out (`bay=0`).
  *
  * The other half of the same-build A/B: `?probe=1&bay=0` is the before,
- * `?probe=1` is the after, and nothing else about the run differs.
+ * `?probe=1` is the after, and nothing else about the run differs. Showcase
+ * entry only - see `probeMode()`.
  */
 export function stationBayDressing(): boolean {
   try {
@@ -268,6 +292,7 @@ export function createStationBay(opts: StationBayOptions): StationBay {
     width: W, length: LEN, roofY: ROOF_Y, baySpacing: BAY, firstColumnZ: FIRST_Z,
     numColumns: NCOL, wallInnerX: WALL_IN, seed = 41, probes = false,
     shadowedSpots = 0, dressing = true,
+    apertureWidth: APERTURE_W = 0.7, apertureClearance: APERTURE_CLEAR = 0.12,
   } = opts;
 
   const group = new THREE.Group();
@@ -281,6 +306,12 @@ export function createStationBay(opts: StationBayOptions): StationBay {
 
   const HALF = W / 2;
   const NBAY = Math.max(1, NCOL - 1);
+  /**
+   * The platform: a raised strip along the open colonnade side (-x). See the
+   * note by the overlay mesh for why this is a strip and not the whole floor.
+   */
+  const PLAT_OUT = -(HALF - 0.2);
+  const PLAT_IN = -1.9;
   /** Centre z of bay i. */
   const bayZ = (i: number): number => FIRST_Z - i * BAY - BAY / 2;
 
@@ -324,8 +355,12 @@ export function createStationBay(opts: StationBayOptions): StationBay {
     const r = uv().sub(vec2(0.5, 0.5)).length().mul(2.0);
     const radial = smoothstep(float(1.0), float(0.0), clamp(r, float(0), float(1)));
     // Squared falloff reads as a light pool rather than a painted disc.
-    glowMat.colorNode = rgb(0xffd79a).mul(radial.mul(radial)).mul(attribute('aGain', 'float')).mul(0.55);
-    glowMat.opacityNode = radial.mul(radial).mul(attribute('aGain', 'float')).mul(0.85);
+    const shape = radial.mul(radial);
+    glowMat.colorNode = rgb(0xffd79a).mul(shape).mul(attribute('aGain', 'float')).mul(0.55);
+    // Brightness lives in colourNode; opacity is COVERAGE and must stay in
+    // [0,1]. Left unclamped, the tram halo (aGain 2.6) asked for opacity 2.2
+    // and `aGain` was silently doing two jobs at once.
+    glowMat.opacityNode = clamp(shape.mul(attribute('aGain', 'float')).mul(0.85), float(0), float(1));
   }
   disposables.push(glowMat);
 
@@ -361,7 +396,7 @@ export function createStationBay(opts: StationBayOptions): StationBay {
     // ONE saturated accent: the platform edge stripe on the open colonnade
     // side. Amber, and deliberately not any colour the HUD uses for a hostile
     // or an objective — a grime accent must never read as a gameplay signal.
-    const edge = smoothstep(float(0.10), float(0.02), abs(positionLocal.x.add(float(HALF - 0.75))));
+    const edge = smoothstep(float(0.10), float(0.02), abs(positionLocal.x.sub(float(PLAT_IN - 0.18))));
     const stripe = mix(wet, vec3(0.62, 0.45, 0.10), edge);
     floorMat.colorNode = stripe.mul(depthBand());
   }
@@ -396,20 +431,29 @@ export function createStationBay(opts: StationBayOptions): StationBay {
     m.receiveShadow = false;
   }
 
-  // Halo cards under each tube, and the floor light pool beneath it. Both are
-  // the same additive material; neither is a light.
-  {
+  // Halo cards under each tube, and the floor light pools beneath them. Both
+  // are the same additive material; neither is a light.
+  //
+  // TWO MESHES, NOT ONE, AND THE REASON IS A GATE. The first build merged the
+  // ceiling cards (y = ROOF_Y - 0.72) with the floor pools (y = 0.03) into a
+  // single draw. That gave the one mesh an AABB 6.45 m tall spanning the whole
+  // combat volume, and `src/collider-visual-parity-gate.test.ts` read it - on
+  // the ARENA scene, correctly - as a 36.8 x 6.45 x 3.2 m visible solid
+  // standing in the aisle with no movement collider (Direction B) and no
+  // ballistic rating (Direction C). Split, each mesh is a flat horizontal
+  // sheet whose AABB is ~0 m tall, well under WALKTHROUGH_MIN_HEIGHT_M and
+  // BALLISTIC_MIN_HEIGHT_M (both 0.9 m), so both audits skip them honestly.
+  // Cost: one extra draw. NO gate rule, ledger row, threshold or name pattern
+  // was touched to get here - the geometry was fixed, not the audit.
+  const haloBand = (y: number, w: number, d: number, gain: number, name: string): void => {
     const items: Array<{ geo: THREE.BufferGeometry; gain: number }> = [];
-    for (let i = 0; i < NBAY; i++) {
-      const z = bayZ(i);
-      items.push({ geo: quadXZ(2.4, 1.3, 0, ROOF_Y - 0.72, z), gain: 1.0 });
-      items.push({ geo: quadXZ(3.2, 3.2, 0, 0.03, z), gain: 0.55 });
-    }
+    for (let i = 0; i < NBAY; i++) items.push({ geo: quadXZ(w, d, 0, y, bayZ(i)), gain });
     const geo = mergeWithGain(items);
     items.forEach((it) => it.geo.dispose());
-    const m = addMesh(geo, glowMat, 'map3-station-bay-halos');
-    m.renderOrder = 4;
-  }
+    addMesh(geo, glowMat, name).renderOrder = 4;
+  };
+  haloBand(ROOF_Y - 0.72, 2.4, 1.3, 1.0, 'map3-station-bay-ceiling-halos');
+  haloBand(0.03, 3.2, 3.2, 0.55, 'map3-station-bay-floor-pools');
 
   // Wall dressing: dado, frieze, plinth on the closed side; a low parapet on
   // the open colonnade side; a duct run and a service pipe under the roof.
@@ -418,8 +462,25 @@ export function createStationBay(opts: StationBayOptions): StationBay {
     const midZ = -LEN / 2 + 0.5;
     const run = LEN - 1.2;
     const xIn = WALL_IN - 0.06;
-    items.push({ geo: box(0.10, 0.55, run, xIn, 1.05, midZ), gain: 0 });        // dado band
-    items.push({ geo: box(0.07, 0.13, run, xIn + 0.01, 2.42, midZ), gain: 0 }); // frieze line
+    // DADO AND FRIEZE ARE PER-PIER PANELS, NOT CONTINUOUS BARS. The sun wall
+    // is pierced by one tall slit per bay (centred on `bayZ(i)`, `apertureWidth`
+    // wide, running from y 1.0 to y 5.6). A single 43 m band at x just inboard
+    // of that wall's inner face crosses EVERY one of those apertures: the dado
+    // (y 0.775-1.325) covers the foot of each slit and the frieze (y
+    // 2.355-2.485) puts a pale bar across its middle. Corridor 6 is the god-ray
+    // exhibit and the slits are its subject, so that is a regression on the one
+    // thing the corridor exists to show. Each band is therefore broken into one
+    // panel per column line, `pierRun` long, which clears every aperture by
+    // `APERTURE_CLEAR` on both sides - and is also what a real tiled station
+    // does, since the trim stops at each opening.
+    const pierRun = Math.max(0.2, BAY - APERTURE_W - 2 * APERTURE_CLEAR);
+    for (let i = 0; i < NCOL; i++) {
+      const z = FIRST_Z - i * BAY;
+      items.push({ geo: box(0.10, 0.55, pierRun, xIn, 1.05, z), gain: 0 });        // dado panel
+      items.push({ geo: box(0.07, 0.13, pierRun, xIn + 0.01, 2.42, z), gain: 0 }); // frieze panel
+    }
+    // The skirting stays continuous: its top is y 0.34, far below the slit
+    // sill at y 1.0, so it never crosses an aperture.
     items.push({ geo: box(0.14, 0.34, run, xIn - 0.02, 0.17, midZ), gain: 0 }); // skirting
     items.push({ geo: box(0.18, 0.44, run, -(HALF - 0.28), 0.22, midZ), gain: 0 }); // parapet
     items.push({ geo: box(0.36, 0.24, run, 1.62, ROOF_Y - 0.58, midZ), gain: 0 });  // duct
@@ -442,8 +503,22 @@ export function createStationBay(opts: StationBayOptions): StationBay {
   }
 
   // Platform floor overlay: two triangles, carrying the grime and the stripe.
+  //
+  // A STRIP, NOT THE WHOLE FLOOR. The first build laid this over the full
+  // 8.5 m width. The sun enters through the slit wall at +x and its shafts
+  // land right across the floor, so a dark 43 x 8.5 m slab over all of it
+  // swallowed most of the colonnade's cast-shadow banding - again, the thing
+  // corridor 6 exists to show - and put a 14 mm-offset coplanar sheet over the
+  // entire hall, which is a z-fighting risk on hardware with less depth
+  // precision than the machine it was captured on. It is now what a platform
+  // actually is: a raised strip along the open colonnade side, from PLAT_OUT
+  // to PLAT_IN, with the parapet as its outer kerb. The aisle and the sun-side
+  // floor keep their light stone and their shadow bands.
   {
-    const geo = mergeWithGain([{ geo: quadXZ(W - 0.5, LEN - 1.0, 0, 0.014, -LEN / 2 + 0.4), gain: 0 }]);
+    const geo = mergeWithGain([{
+      geo: quadXZ(PLAT_IN - PLAT_OUT, LEN - 1.0, (PLAT_IN + PLAT_OUT) / 2, 0.035, -LEN / 2 + 0.4),
+      gain: 0,
+    }]);
     const m = addMesh(geo, floorMat, 'map3-station-bay-platform');
     m.receiveShadow = true;
   }
@@ -545,8 +620,10 @@ export function createStationBay(opts: StationBayOptions): StationBay {
 
   const stats: StationBayStats = {
     materials: 4,
-    // Draw families: tubes, halos, dressing, platform, tram lamp, tram halo.
-    meshes: 6 + (probes ? 3 : 0),
+    // Draw families: tubes, ceiling halos, floor pools, dressing, platform,
+    // tram lamp, tram halo. Seven, not six: the halo band and the floor pools
+    // are deliberately separate meshes - see the note where they are built.
+    meshes: 7 + (probes ? 3 : 0),
     shadowedLights: spots.length,
     unshadowedLights: points.length,
     triangles: Math.round(triangles),

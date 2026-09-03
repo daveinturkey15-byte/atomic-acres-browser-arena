@@ -33,6 +33,11 @@ import { createSky } from './sky';
 import { createPhysicsCorridor, type PhysicsCorridor } from './corridor-physics';
 import { createColosseumCorridor } from './corridor-colosseum';
 import { setSun } from './foliage-material';
+// HF-421: the showcase page is the ONLY place the station-bay URL flags are
+// read. `?probe=1` builds the readability probes and `?probe=1&bay=0` is the
+// "before" half of the same-build A/B the readability harness measures. The
+// playable arena builds the same corridor with neither flag.
+import { probeMode, stationBayDressing } from './station-bay';
 
 /* ---------------------------------------------------------------- */
 /* Signage — canvas to CanvasTexture on a world plane.               */
@@ -323,7 +328,7 @@ async function main(): Promise<void> {
     createGrammarCorridor(11),
     createWaterCorridor(),
     createWeatherCorridor(21),
-    createVolumeCorridor(),
+    createVolumeCorridor({ probes: probeMode(), dressing: stationBayDressing() }),
     physics,
     createColosseumCorridor(),
   ];

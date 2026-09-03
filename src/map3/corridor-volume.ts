@@ -41,7 +41,11 @@ import { rgb } from './foliage-material';
 import { hash11 } from './leaf-geometry';
 // HF-421: the dark-interior lighting kit. Additive; this corridor is the only
 // caller, and nothing outside this file reaches into it. See station-bay.ts.
-import { createStationBay, probeMode, stationBayDressing, type StationBay } from './station-bay';
+// NOTE the URL sniffs (`probeMode`, `stationBayDressing`) are deliberately NOT
+// imported here: this builder is what the PLAYABLE arena builds, so reading
+// `window.location.search` in it would put a debug backdoor in a live match.
+// The showcase entry reads the URL and passes the answers in.
+import { createStationBay, type StationBay } from './station-bay';
 
 const W = 9;
 const CORRIDOR_LEN = 44;
@@ -95,7 +99,23 @@ function box(w: number, h: number, d: number, x: number, y: number, z: number): 
   return g;
 }
 
-export function createVolumeCorridor(): Corridor {
+export interface VolumeCorridorOptions {
+  /**
+   * Build the HF-421 station-bay dressing. Default TRUE, which is what both
+   * the arena and the showcase page want; the readability A/B passes false for
+   * the "before" half of a same-build comparison.
+   */
+  dressing?: boolean;
+  /**
+   * Build the three readability probes. Default FALSE, and the default is the
+   * shipping value: only the standalone showcase page ever passes true, and
+   * only when its own URL asks for it.
+   */
+  probes?: boolean;
+}
+
+export function createVolumeCorridor(opts: VolumeCorridorOptions = {}): Corridor {
+  const { dressing = true, probes = false } = opts;
   const group = new THREE.Group();
   const disposables: Array<{ dispose(): void }> = [];
   const LEN = CORRIDOR_LEN;
@@ -473,8 +493,10 @@ export function createVolumeCorridor(): Corridor {
    * a clerestory run - the archetype the technique wants - so the kit supplies
    * what it lacks: fluorescent tubes above the aisle, halo cards and floor
    * light pools under them, a dado/frieze/duct dressing course, one grime mask
-   * stack over wall and floor, two shadowed spots, six short-range unshadowed
-   * points, and exactly one exposure moment (a service tram running the bay).
+   * stack over wall and floor, NO shadowed spots (measured: two cost +45 draws
+   * and +93k triangles, both budgets blown, so they were cut - and the studied
+   * reference has no cast shadows either), six short-range unshadowed points,
+   * and exactly one exposure moment (a service tram running the bay).
    *
    * The shafts stay the sun's. Nothing here touches the raymarcher, the
    * aperture gate or any solid the corridor publishes.
@@ -488,8 +510,9 @@ export function createVolumeCorridor(): Corridor {
     numColumns: NUM_COLUMNS,
     wallInnerX: WALL_X - WALL_T / 2,
     seed: 41,
-    probes: probeMode(),
-    dressing: stationBayDressing(),
+    apertureWidth: SLIT_W,
+    probes,
+    dressing,
   });
   group.add(stationBay.group);
   disposables.push(stationBay);
@@ -506,7 +529,7 @@ export function createVolumeCorridor(): Corridor {
     update(elapsed, dt, playerPos, playerVel) {
       (time as unknown as { value: number }).value = elapsed;
       const delta = Math.min(Math.max(dt, 0), 0.05);
-      stationBay.update(elapsed, delta);
+      stationBay.update(elapsed);
 
       group.updateWorldMatrix(true, false);
       _inv.copy(group.matrixWorld).invert();
