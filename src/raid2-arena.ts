@@ -729,7 +729,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // S2/S3 the circular drive and its island. FIVE discrete pieces, never a
   // solid block: the island must be circumnavigable or the drive lane becomes a
   // pure crossfire with nowhere to break the line.
-  rect('raid2 drive island kerb', -7, 3, 0, 0.3, 10, 20, m.stone, { cast: false });
+  rect('raid2 drive island kerb', -6, 6, 0, 0.3, 8, 20, m.stone, { cast: false });
   rect('raid2 drive fountain plinth', -2, 2, 0, HARD_COVER, 12, 16, m.stone);
   // The four planters ABUT the plinth, so the island is one mass you walk
   // around rather than five obstacles you thread between. Circumnavigable is
