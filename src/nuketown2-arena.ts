@@ -84,7 +84,15 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import {
+  NUKETOWN2_FOREST_ENVELOPE,
+  buildNuketownForestSurround,
+} from './nuketown-forest-surround';
 import { buildNuketownRebuildLawnField } from './nuketown-lawn-field';
+import {
+  NUKETOWN2_BACKDROP_ENVELOPE,
+  buildNuketownMountainBackdrop,
+} from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_FLOOR_T,
@@ -1046,7 +1054,14 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
 
   // Ground runs well past the fence so the horizon is continuous scrub rather
   // than an 84 m slab in a void. One draw call either way.
-  centred(builder, 'ground', [0, -0.7, 0], [220, 1.4, 220], m.ground, { cast: false });
+  //
+  // HF-426 Job 3: 220 -> 270 m. The mountain ring's outer radius is 132 m, and
+  // at 220 the slab stopped at 110 - INSIDE the main ridge's own 100..132 band,
+  // so the massif would have stood half on the plain and half on nothing. 270
+  // puts the plain's edge 3 m past the ridge's outer foot, where the massif
+  // itself hides it. This slab is also why the rebuild takes the backdrop's
+  // rings WITHOUT its rolling ground skirt: it already has ground out there.
+  centred(builder, 'ground', [0, -0.7, 0], [270, 1.4, 270], m.ground, { cast: false });
   // Everything after this index is a real solid on the map. The ground slab is
   // a 220 x 220 m collider - the world floor - and any keep-out set that
   // includes it rejects the entire arena, which is exactly what a first cut of
@@ -1083,6 +1098,21 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   builder.root.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
   // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
   builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
+
+  // ---- ...and the FOREST RING and MOUNTAIN RING behind it -----------------
+  // The same two modules the shipped map uses, re-fitted to this footprint
+  // through their own envelopes (see NUKETOWN2_FOREST_ENVELOPE and
+  // NUKETOWN2_BACKDROP_ENVELOPE). Art-only by construction on both counts: no
+  // candidate is planted inside the bounds inflated by 3.2 m, and no ridge
+  // vertex comes closer than 66 m to the origin against a 45.7 m map corner.
+  // Dropping the shipped envelopes on this map unchanged would have put the
+  // forest's inner radius (36.5 m) INSIDE the map along z and the foothill
+  // feet 18 m off the long fence while leaving 46 m of bare plain on the short
+  // one - a backdrop that is a wall on one axis and absent on the other.
+  const forest = buildNuketownForestSurround(builder.root, NUKETOWN2_FOREST_ENVELOPE);
+  const backdrop = buildNuketownMountainBackdrop(builder.root, NUKETOWN2_BACKDROP_ENVELOPE);
+  builder.root.userData.nuketown2ForestStats = forest.stats;
+  builder.root.userData.nuketown2BackdropStats = backdrop.stats;
 
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const c = NUKETOWN2_STREET_COACH;
