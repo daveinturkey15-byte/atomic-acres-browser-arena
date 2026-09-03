@@ -16954,6 +16954,8 @@ async function startGame(
   matchStartPreparing = true;
   matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration = token.generation;
+  beginMatchAdmissionProfile();
+  markMatchAdmission('admission-open');
   lastGameplayPresentedFrame = 0;
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
@@ -17219,6 +17221,7 @@ async function startGame(
     endsAt: Number.POSITIVE_INFINITY,
     winner: null,
   };
+  markMatchAdmission('bot-spawn');
   if (mode === 'solo') {
     await spawnBots();
     assertMatchAdmissionCurrent(token);
@@ -17226,8 +17229,10 @@ async function startGame(
     await spawnBots(privateMatchConfig.hostedBotCount);
     assertMatchAdmissionCurrent(token);
   }
+  markMatchAdmission('corpse-pool');
   await ensureCorpsePresentationPool();
   assertMatchAdmissionCurrent(token);
+  markMatchAdmission('bot-presentations');
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   try {
     await prewarmBotPresentations();
@@ -17264,12 +17269,16 @@ async function startGame(
       // deployments to the menu. Compile the exact rest composition once here,
       // behind compileAndRender's own 12s cold-generation fence, so every
       // guarded admission flush below only ever measures warm frames.
+      markMatchAdmission('rest-composition-compile');
       await renderRuntime.compileAndRender(scene, camera, scene);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('weapon-switch-rehearsal');
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('initial-match-settle');
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -17278,22 +17287,27 @@ async function startGame(
       // surface in control until the browser has delivered a full hitch-free
       // second; deferred driver work or a major collection must never spill
       // into the first controllable frame.
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       // Restore and compile the ordinary rest frame after the staged fire
       // compositions so the first controllable frame starts from exact state.
+      markMatchAdmission('webgl-rest-composition');
       await prewarmExactWebGlMatchComposition();
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     }
   } finally {
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
+    finalizeMatchAdmissionProfile(mode);
   }
   // Admission can legitimately span several seconds of cold renderer work.
   // None of that scheduler time may enter the first live simulation delta.
@@ -33141,6 +33155,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+      matchAdmissionProfile: lastMatchAdmissionProfile,
       botWeaponVocabulary: botWeaponGpuVocabulary.telemetry(),
     },
     gameStarted,
@@ -36236,6 +36251,59 @@ let lastArenaEffectPrewarmProfile: Readonly<{
   durationMs: number;
   groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
 }> | null = null;
+
+// LOAD-CUT (pass 85, lane H2): MATCH ADMISSION IS THE LARGEST UNMEASURED BLOCK.
+// The arena transition has had a phase profiler since pass 79 and every cut this
+// repo has made to load time was aimed by it. Admission - everything between
+// `startSolo()` and the first live frame - has only ever produced ONE number,
+// and it is 14.4-20.4 s per arena, roughly 30-40% of the wall time between
+// pressing deploy and playing (lane H first-load rows, 2026-09-02). "Attribute
+// it" cannot be done from one number, so this records the same shape the
+// transition profiler records.
+//
+// It is MARKERS ONLY. Every call in the admission block is pinned by exact
+// source string in `src/presentation-prewarm-contract.test.ts`, so nothing here
+// wraps, reorders, adds or removes a step: `markMatchAdmission` stamps
+// performance.now() BETWEEN the existing statements, exactly as
+// `profileArenaTransition` does inside the transition. A mark costs one array
+// push; the block it measures costs seconds.
+let matchAdmissionMarks: { name: string; at: number }[] = [];
+let lastMatchAdmissionProfile: Readonly<{
+  arenaId: string;
+  mode: string;
+  durationMs: number;
+  steps: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+function beginMatchAdmissionProfile(): void {
+  matchAdmissionMarks = [];
+}
+
+function markMatchAdmission(name: string): void {
+  matchAdmissionMarks.push({ name, at: performance.now() });
+}
+
+/**
+ * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ * the LAST mark's duration runs to this call - which is why `finalize` is stamped
+ * at the end of both backend branches rather than inferred.
+ */
+function finalizeMatchAdmissionProfile(mode: string): void {
+  const marks = matchAdmissionMarks;
+  matchAdmissionMarks = [];
+  if (marks.length === 0) return;
+  const completedAt = performance.now();
+  const steps = marks.map((mark, index) => Object.freeze({
+    name: mark.name,
+    durationMs: Number(((index + 1 < marks.length ? marks[index + 1].at : completedAt) - mark.at).toFixed(3)),
+  }));
+  lastMatchAdmissionProfile = Object.freeze({
+    arenaId: selectedArena.id,
+    mode,
+    durationMs: Number((completedAt - marks[0].at).toFixed(3)),
+    steps: Object.freeze(steps),
+  });
+}
 
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
   await yieldBrowserPreparationFrame();
