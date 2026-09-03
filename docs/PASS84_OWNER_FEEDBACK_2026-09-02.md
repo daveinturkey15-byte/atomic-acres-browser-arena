@@ -1135,3 +1135,36 @@ assets and textures and lighting need to be tip top, raid can come next"
   overnight/tomorrow item; (c) undressed ground patch 1.25 × 2.7 m between the
   turning head and the east street lawn; (d) a magenta marker near the south
   driveway in two captures — being identified before the cut.
+
+## PASS 92 publish record — 2026-09-03 19:14 BST
+
+- **Published** by `scripts/orchestration/publish_pass92.py` (exit 0) from head
+  `ce1c8f76` (roll `cb3c5619` + changelog areas labels). gh-pages `8bab9796`;
+  channels exactly `['pass91', 'pass92']` (pass90 retired per HF-400); root
+  chooser generation `f45765ee9b4f`; Pages build `built` at 19:17.
+- **Live checks (19:22):** channel root 200, `map3.html` 200, retired pass90
+  404, `release-index.json` generation `f45765ee9b4f`, identity chunk
+  `release-identity-BwaHgmvg.js` names PASS 92 (plus the historical PASS 64
+  evidence record, byte-identical to PASS 91's chunk), changelog areas
+  `ARENAS · GRAPHICS · PERFORMANCE`.
+- **Gates at the cut (Opus release engineer):** tsc 0; release tests 83/83;
+  plan test 9/9; full suite 578 files / 5659 tests; identity guard OK; freshness
+  guard clean; boot smoke 13/13 on native WebGPU (first run 12/13 — the
+  skyline-terminal MENU boot exceeded its 90 s wait after twelve prior boots,
+  passed standalone in 38 s and 13/13 on re-run: WATCH ITEM, not a Terminal
+  fault). Two content fixes, no gate touched: the changelog title/summary must
+  name the pass (HF-406), and a pre-existing weapon-name regex hit on a QA
+  comment in `src/map3/street-cell.ts`.
+- **Content:** PASS 91 + Nuke Town geometry from owner play (HF-434..437, Opus
+  review HF-443) + HF-438 profile fold + Map 3 street cell + deploy attribution
+  (HF-442) + skills-study docs (HF-439). PREVIEW for owner feedback; the
+  overnight Lane BA loop and the morning Opus verification follow.
+- **Overnight blocker (19:16):** the Lane BA chain launched and failed on every
+  step in 33 s: OMP 18.1.1's main-profile credential store (`agent.db`) is
+  empty (0 credentials, 0 settings), wiped some time after 18:33 when the last
+  GLM job still ran. Owner must `/login` zai and google-antigravity in OMP
+  again; the chain relaunches unchanged afterwards. Cause unknown — gotcha to
+  follow once it is.
+- **Owner 18:58:** "glm usage is at 80% of 5hr window, gemini looks better
+  though" → Lane BA rebalanced: Gemini builds cycles 1–2, GLM cycle 3 + final;
+  automatic fallback between the two; critics stay Gemini.
