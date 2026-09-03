@@ -164,7 +164,7 @@ describe('Pass 86 release topology', () => {
   it('moves the candidate under experimental and requires timestamped retained-source rebuilds in production', () => {
     expect(staging).toContain('process.env.RELEASE_DIST_ROOT');
     expect(staging).toContain('process.env.RELEASE_TOPOLOGY_RECEIPT_PATH');
-    expect(staging).toContain("renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
+    expect(staging).toContain("cpSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'))");
     expect(staging).toContain('process.env.RELEASE_STABLE_DIST');
     expect(staging).toContain('process.env.REQUIRE_STABLE_RELEASE_TIMESTAMP');
     expect(staging).toContain("stageRebuilt('recent-stable', config.stable");
@@ -200,12 +200,12 @@ describe('Pass 86 release topology', () => {
   // served 200 with all nine of its chunks 404, stuck on "Starting Map 3...".
   it('stages the Map 3 showcase page into the same channel as the assets it links', () => {
     expect(staging).toContain("existsSync(join(distRoot, 'map3.html'))");
-    expect(staging).toContain("renameSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'))");
+    expect(staging).toContain("cpSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'))");
 
     // It must travel WITH index.html, not to the dist root or a channel of its
     // own: its asset links are relative to its own document.
-    const map3Move = staging.indexOf("renameSync(join(distRoot, 'map3.html')");
-    const assetsMove = staging.indexOf("renameSync(join(distRoot, 'assets')");
+    const map3Move = staging.indexOf("cpSync(join(distRoot, 'map3.html')");
+    const assetsMove = staging.indexOf("cpSync(join(distRoot, 'assets')");
     expect(assetsMove).toBeGreaterThan(-1);
     expect(map3Move).toBeGreaterThan(assetsMove);
 
@@ -221,7 +221,9 @@ describe('Pass 86 release topology', () => {
   // failure on every retry, recoverable only by a full rebuild.
   it('validates the candidate pass identity before it moves anything out of the dist root', () => {
     const validation = staging.indexOf('Experimental candidate does not contain');
-    const firstMove = staging.indexOf("renameSync(join(distRoot, 'index.html')");
+    // Lane AR (PASS 87): the moves became copy-then-remove so a throw cannot empty the dist root;
+    // the first COPY is the first thing that touches the channel.
+    const firstMove = staging.indexOf("cpSync(join(distRoot, 'index.html')");
     expect(validation).toBeGreaterThan(-1);
     expect(firstMove).toBeGreaterThan(-1);
     expect(validation).toBeLessThan(firstMove);
