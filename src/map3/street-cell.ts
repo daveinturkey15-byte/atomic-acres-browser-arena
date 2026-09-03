@@ -55,7 +55,7 @@ import { fbm2, ridgedFbm2, valueNoise2, xz } from './noise';
 /** One cast boundary; see the note in foliage-material.ts. */
 const {
   abs, attribute, cameraPosition, clamp, float, floor, fract, length, max, min, mix,
-  positionWorld, smoothstep, vec2, vec3,
+  positionLocal, positionWorld, smoothstep, vec2, vec3,
 } = TSL as unknown as Record<string, any>;
 
 /* ------------------------------------------------------------------ */
@@ -239,8 +239,15 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
   mat.metalness = 0;
 
   const part = attribute('cellPart', 'float');
-  const p = positionWorld;
-  const dist = length(p.sub(cameraPosition));
+  // STREET-FRAME, not world frame. Corridor 3's pivot is rotated 90 degrees
+  // about Y, so world x runs ALONG this street and world z runs across it.
+  // Patterning on positionWorld put the lane paint 52 m outside the cell, made
+  // the "longitudinal" tar seams transverse, and left the whole carriageway
+  // inside the damp band and the kerb channel at once. Every directional
+  // feature here is authored in the cell's own frame; only the camera-distance
+  // term uses world space, because the camera is a world thing.
+  const p = positionLocal;
+  const dist = length(positionWorld.sub(cameraPosition));
   // 1 near, 0 beyond ~46 m. Multiplies the fine terms only; the silhouette-
   // scale terms (kerb value split, slab grid) stay on at every distance so the
   // street does not dissolve into a tone at the far end of the cell.
@@ -248,7 +255,7 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
 
   /* --- carriageway ------------------------------------------------- */
   // Aggregate: high-frequency fBM standing in for the chip in the asphalt.
-  const aggregate = fbm2(xz(p, 5.5), 3).sub(0.5).mul(0.085).mul(detail);
+  const aggregate = fbm2(xz(p, 8.0), 3).sub(0.5).mul(0.026).mul(detail);
   // Cold-patch repairs: low-frequency blobs thresholded HARD, because the thing
   // that reads as a repair is the EDGE, not the tone. A soft blend reads as
   // dirt; a sharp boundary reads as a trench that was dug and filled.
@@ -268,30 +275,31 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
   );
   // Crack network: ridged fBM is the difference between rolling hills and
   // knife ridges, and a crack is a ridge.
-  const crack = smoothstep(float(0.80), float(0.94), ridgedFbm2(xz(p, 1.35), 3)).mul(detail);
+  const crack = smoothstep(float(0.920), float(0.992), ridgedFbm2(xz(p, 3.0), 3)).mul(detail);
   // Kerb-side staining: the channel is where the water and the grit sit.
   const channel = smoothstep(float(ROAD_HALF - 1.15), float(ROAD_HALF), abs(p.x)).mul(0.55);
 
-  const asphalt = vec3(0.052, 0.053, 0.056)
+  const asphalt = vec3(0.054, 0.055, 0.059)
     .add(aggregate)
-    .add(patch.mul(vec3(0.016, 0.013, 0.010)))
-    .sub(seam.mul(vec3(0.026, 0.026, 0.028)))
-    .sub(crack.mul(vec3(0.030, 0.030, 0.032)))
+    .sub(patch.mul(vec3(0.019, 0.019, 0.018)))
+    .sub(seam.mul(vec3(0.034, 0.034, 0.036)))
+    .sub(crack.mul(vec3(0.026, 0.026, 0.028)))
     .sub(channel.mul(vec3(0.014, 0.014, 0.013)));
 
   // Lane paint. Crisp paint reads as a racing game (skill §4.1), so the centre
   // line is dashed, its position drifts, its edge is eaten by the aggregate,
   // and the asphalt shows through wherever the wear field says so.
-  const paintDrift = fbm2(xz(p, 0.11).add(vec2(7.1, 2.9)), 2).sub(0.5).mul(0.13);
+  const paintDrift = fbm2(xz(p, 0.11).add(vec2(7.1, 2.9)), 2).sub(0.5).mul(0.09);
   const centre = abs(p.x.add(paintDrift));
   const dash = smoothstep(float(0.34), float(0.30), abs(fract(p.z.div(4.0)).sub(0.5)));
-  const centreLine = smoothstep(float(0.085), float(0.055), centre).mul(dash);
+  const centreLine = smoothstep(float(0.135), float(0.095), centre).mul(dash);
   const edgeX = abs(abs(p.x.add(paintDrift.mul(0.6))).sub(float(ROAD_HALF - 0.42)));
-  const edgeLine = smoothstep(float(0.075), float(0.048), edgeX);
-  const wear = clamp(fbm2(xz(p, 2.3), 3).mul(1.55).sub(0.30), 0, 1);
-  const paint = max(centreLine, edgeLine).mul(wear).mul(float(0.85));
+  const edgeLine = smoothstep(float(0.105), float(0.070), edgeX);
+  const wear = clamp(fbm2(xz(p, 1.6), 3).mul(2.05).sub(0.62), 0, 1)
+    .mul(clamp(fbm2(xz(p, 9.5).add(vec2(3.3, 8.8)), 2).mul(1.9).sub(0.42), 0, 1));
+  const paint = max(centreLine, edgeLine).mul(wear).mul(float(0.95));
   // Dirty white, never 1.0 white: road paint is grey by its second winter.
-  const paintCol = vec3(0.34, 0.335, 0.30).sub(aggregate.mul(1.4));
+  const paintCol = vec3(0.58, 0.565, 0.505).sub(aggregate.mul(2.5));
   const road = mix(asphalt, paintCol, paint);
 
   /* --- kerb --------------------------------------------------------- */
@@ -301,12 +309,12 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
   // Vertical staining down the face, heavier at the bottom where the channel is.
   const streak = valueNoise2(vec2(p.z.mul(3.1), float(0))).mul(0.55).add(0.45);
   const faceLow = smoothstep(float(PAVE_Y), float(ROAD_Y - CAMBER), p.y);
-  const kerbFace = vec3(0.108, 0.107, 0.101)
+  const kerbFace = vec3(0.082, 0.081, 0.076)
     .add(kerbGrit)
     .sub(faceLow.mul(streak).mul(vec3(0.030, 0.030, 0.028)));
   // Chipped nose: the top course of a kerb is never a clean line.
   const chip = smoothstep(float(0.62), float(0.86), fbm2(xz(p, 3.4), 2)).mul(detail);
-  const kerbTop = vec3(0.128, 0.127, 0.120).add(kerbGrit).sub(chip.mul(vec3(0.020, 0.020, 0.019)));
+  const kerbTop = vec3(0.178, 0.176, 0.166).add(kerbGrit).sub(chip.mul(vec3(0.020, 0.020, 0.019)));
 
   /* --- pavement ------------------------------------------------------ */
   // Slab grid: 0.90 x 0.60 flags, laid to the street. The joint is a
@@ -324,7 +332,7 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
   // it, and almost no procedural street does — it is a third of what sells the
   // pavement, and it costs one smoothstep.
   const damp = smoothstep(float(BUILDING_X - 1.5), float(BUILDING_X), abs(p.x)).mul(0.45);
-  const pavement = vec3(0.121, 0.120, 0.114)
+  const pavement = vec3(0.138, 0.137, 0.130)
     .add(slabTone)
     .add(paveGrit)
     .sub(damp.mul(vec3(0.030, 0.030, 0.026)))
@@ -395,68 +403,86 @@ function buildStreetFrontage(
   const DEPTH = 5.2;
   const GROUND_H = 3.35;
   const STOREY_H = 2.85;
+  // The facade LAYER. The mass stops 0.34 m behind the building line and the
+  // front 0.34 m is built out of piers and bands, so the windows are genuine
+  // HOLES. The first version of this function put a recessed pane behind a
+  // solid wall, which is invisible and is the single most common way a
+  // procedural facade fails row 4 of the bar: it looks like a bay in the code
+  // and like a flat plane on the capture.
+  const FACADE_T = 0.34;
+  const SILL_BAND = 0.85;
+  const HEAD_BAND = 0.55;
+  const WIN_H = STOREY_H - SILL_BAND - HEAD_BAND;
   const bayW = width / bays;
+  const pierW = Math.max(0.30, bayW * 0.27);
+  const winW = bayW - pierW;
   const total = GROUND_H + storeys * STOREY_H;
 
   const box = (w: number, h: number, d: number, x: number, y: number, z: number, part: number) => {
+    if (w <= 0 || h <= 0 || d <= 0) return;
     const g = new THREE.BoxGeometry(w, h, d);
     g.translate(x, y, z);
     parts.push(tag(g, part));
   };
 
-  // Stage 2 — MASS. The block itself, set back so the facade plane is at z = 0.
-  box(width, total, DEPTH, 0, total / 2, -DEPTH / 2 - 0.02, F_WALL);
+  // Stage 2 - MASS, set back behind the facade layer.
+  box(width, total, DEPTH - FACADE_T, 0, total / 2, -FACADE_T - (DEPTH - FACADE_T) / 2, F_WALL);
 
-  // Terminal A — PARAPET with a coping course that oversails. The oversail is
-  // the whole point: a parapet flush with the wall is invisible, a parapet that
-  // steps out 60 mm throws a line of shadow and reads from the far kerb.
+  // Terminal A - PARAPET with a coping course that OVERSAILS. The oversail is
+  // the whole point: a parapet flush with the wall is invisible; one that steps
+  // out 110 mm throws a line of shadow and reads from the far kerb.
   const parapetH = 0.55 + rnd() * 0.35;
-  box(width + 0.10, parapetH, DEPTH * 0.5, 0, total + parapetH / 2, -DEPTH * 0.25, F_WALL);
-  box(width + 0.22, 0.10, DEPTH * 0.5 + 0.12, 0, total + parapetH + 0.05, -DEPTH * 0.25, F_TRIM);
+  box(width, parapetH, DEPTH * 0.55, 0, total + parapetH / 2, -DEPTH * 0.275, F_WALL);
+  box(width + 0.22, 0.11, DEPTH * 0.55 + 0.16, 0, total + parapetH + 0.055, -DEPTH * 0.275, F_TRIM);
 
+  /* --- Terminal B: the SHOPFRONT ground floor ----------------------- */
+  // Pilaster, stallriser, deep-set glazing, fascia. The set-back glazing is
+  // what gives a parade its dark band at eye height.
+  const SHOP_GLASS_Z = -FACADE_T + 0.04;
+  const fasciaH = 0.62;
+  const riserH = 0.45;
+  for (let b = 0; b <= bays; b++) {
+    const px = -width / 2 + bayW * b;
+    box(pierW, GROUND_H, FACADE_T + 0.06, px, GROUND_H / 2, -FACADE_T / 2 + 0.03, F_TRIM);
+  }
+  box(width, fasciaH, FACADE_T + 0.12, 0, GROUND_H - fasciaH / 2, -FACADE_T / 2 + 0.06, F_SHOP);
   for (let b = 0; b < bays; b++) {
     const cx = -width / 2 + bayW * (b + 0.5);
-
-    /* --- ground floor: the SHOPFRONT terminal --------------------- */
-    // Stallriser, glazing set back 0.18 m, fascia over. The set-back is what
-    // gives the shopfront its dark reveal at eye height.
-    const glazW = bayW - 0.42;
-    box(glazW, 0.42, 0.16, cx, 0.21, 0.06, F_TRIM);                       // stallriser
-    box(glazW, GROUND_H - 1.30, 0.06, cx, 0.42 + (GROUND_H - 1.30) / 2, -0.16, F_GLASS);
-    box(bayW, 0.62, 0.30, cx, GROUND_H - 0.31, 0.10, F_SHOP);             // fascia
-    // Pilasters between shops — the vertical rhythm of a real parade.
-    box(0.30, GROUND_H, 0.34, cx - bayW / 2, GROUND_H / 2, 0.11, F_TRIM);
-    if (b === bays - 1) box(0.30, GROUND_H, 0.34, cx + bayW / 2, GROUND_H / 2, 0.11, F_TRIM);
-    // A recessed doorway on roughly every third bay, seeded not alternating.
+    box(winW, riserH, FACADE_T + 0.02, cx, riserH / 2, -FACADE_T / 2 + 0.01, F_TRIM);
+    const glazH = GROUND_H - fasciaH - riserH;
+    box(winW, glazH, 0.05, cx, riserH + glazH / 2, SHOP_GLASS_Z, F_GLASS);
+    // A recessed doorway on roughly a third of the bays, seeded not alternating.
     if (rnd() < 0.34) {
-      box(0.95, GROUND_H - 1.05, 0.10, cx + bayW * 0.28, (GROUND_H - 1.05) / 2, -0.22, F_GLASS);
-    }
-
-    /* --- upper storeys: the BAY, repeated ------------------------- */
-    for (let s = 0; s < storeys; s++) {
-      const y0 = GROUND_H + s * STOREY_H;
-      const winW = bayW * 0.46;
-      const winH = STOREY_H * 0.55;
-      const wy = y0 + STOREY_H * 0.46;
-      // REVEAL: the opening is a real recess, 0.22 m back, with the glass at
-      // the back of it. This is the row-4 test and the reason for the depth.
-      box(winW, winH, 0.05, cx, wy, -0.24, F_GLASS);
-      box(0.09, winH + 0.28, 0.26, cx - winW / 2 - 0.045, wy, -0.13, F_WALL);   // jamb L
-      box(0.09, winH + 0.28, 0.26, cx + winW / 2 + 0.045, wy, -0.13, F_WALL);   // jamb R
-      box(winW + 0.34, 0.13, 0.30, cx, wy + winH / 2 + 0.065, -0.11, F_TRIM);   // lintel
-      box(winW + 0.42, 0.09, 0.36, cx, wy - winH / 2 - 0.045, -0.08, F_TRIM);   // sill, oversailing
-      // SPANDREL: the panel between this window head and the sill above. Set
-      // proud rather than flush so the storey band is readable in silhouette.
-      box(winW + 0.10, STOREY_H - winH - 0.40, 0.07, cx, y0 + STOREY_H * 0.94, 0.035, F_WALL);
+      box(0.95, glazH + riserH - 0.10, 0.06, cx + bayW * 0.26, (glazH + riserH - 0.10) / 2, SHOP_GLASS_Z - 0.10, F_GLASS);
     }
   }
 
-  // STRING COURSE at every storey line, full width. Two of the cheapest boxes
-  // in the file and they do more for "this is a street" than any of the noise.
-  for (let s = 0; s <= storeys; s++) {
-    const y = GROUND_H + s * STOREY_H;
-    if (s === storeys) continue;
-    parts.push(tag(new THREE.BoxGeometry(width + 0.14, 0.10, 0.26).translate(0, y, 0.08), F_TRIM));
+  /* --- the BAY, repeated up the elevation --------------------------- */
+  for (let s = 0; s < storeys; s++) {
+    const y0 = GROUND_H + s * STOREY_H;
+    // Spandrel band under the openings and head band over them: these two are
+    // the wall, and everything between them and between the piers is void.
+    box(width, SILL_BAND, FACADE_T, 0, y0 + SILL_BAND / 2, -FACADE_T / 2, F_WALL);
+    box(width, HEAD_BAND, FACADE_T, 0, y0 + SILL_BAND + WIN_H + HEAD_BAND / 2, -FACADE_T / 2, F_WALL);
+    const wy = y0 + SILL_BAND + WIN_H / 2;
+    for (let b = 0; b <= bays; b++) {
+      const px = -width / 2 + bayW * b;
+      box(pierW, WIN_H, FACADE_T, px, wy, -FACADE_T / 2, F_WALL);
+    }
+    for (let b = 0; b < bays; b++) {
+      const cx = -width / 2 + bayW * (b + 0.5);
+      // Glass at the BACK of the 0.34 m reveal, so the opening self-shadows.
+      box(winW - 0.06, WIN_H - 0.06, 0.05, cx, wy, -FACADE_T + 0.035, F_GLASS);
+      // A glazing bar, because a single dark rectangle reads as a hole and a
+      // divided one reads as a window. One box per opening.
+      box(0.05, WIN_H - 0.06, 0.05, cx, wy, -FACADE_T + 0.08, F_TRIM);
+      // Sill, oversailing and proud of the facade plane; lintel over.
+      box(winW + 0.30, 0.10, FACADE_T + 0.14, cx, y0 + SILL_BAND - 0.05, -FACADE_T / 2 + 0.07, F_TRIM);
+      box(winW + 0.22, 0.12, FACADE_T + 0.08, cx, y0 + SILL_BAND + WIN_H + 0.06, -FACADE_T / 2 + 0.04, F_TRIM);
+    }
+    // STRING COURSE at the storey line, full width, proud. Two of the cheapest
+    // boxes in the file and they do more for "this is a street" than the noise.
+    if (s > 0) box(width + 0.14, 0.10, FACADE_T + 0.18, 0, y0, -FACADE_T / 2 + 0.09, F_TRIM);
   }
   return parts;
 }
@@ -473,8 +499,10 @@ function createFrontageMaterial(): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial();
   mat.metalness = 0;
   const part = attribute('facePart', 'float');
-  const p = positionWorld;
-  const dist = length(p.sub(cameraPosition));
+  // Street frame, for the same reason as the ground material: the per-building
+  // and per-bay hashes have to index along the street, not across the map.
+  const p = positionLocal;
+  const dist = length(positionWorld.sub(cameraPosition));
   const detail = smoothstep(float(52), float(24), dist);
 
   // Per-building tone: hashed off a 14 m cell so each frontage is its own stone.
@@ -484,8 +512,8 @@ function createFrontageMaterial(): MeshStandardNodeMaterial {
   const render = fbm2(vec2(p.x.add(p.z).mul(3.1), p.y.mul(3.1)), 3).sub(0.5).mul(0.055).mul(detail);
   // Soot high, rain-washed low. Height is measured from the pavement.
   const soot = smoothstep(float(1.2), float(9.5), p.y).mul(0.42);
-  const wall = vec3(0.175, 0.163, 0.148)
-    .add(buildingTone.mul(vec3(0.055, 0.048, 0.042)))
+  const wall = vec3(0.295, 0.274, 0.248)
+    .add(buildingTone.mul(vec3(0.085, 0.074, 0.062)))
     .add(render)
     .sub(course.mul(vec3(0.020, 0.019, 0.018)))
     .sub(soot.mul(vec3(0.048, 0.044, 0.040)));
@@ -493,16 +521,16 @@ function createFrontageMaterial(): MeshStandardNodeMaterial {
   // Glass is dark, slightly blue, and NOT a mirror: a shopfront full of sky
   // reflection at street level reads as a bug, and a dark reveal reads as depth.
   const glassTone = valueNoise2(vec2(floor(p.y.div(2.85)), floor(p.z.div(1.7)))).mul(0.35);
-  const glass = vec3(0.020, 0.028, 0.036).add(glassTone.mul(vec3(0.030, 0.036, 0.044)));
+  const glass = vec3(0.030, 0.040, 0.051).add(glassTone.mul(vec3(0.042, 0.050, 0.060)));
 
-  const trim = vec3(0.215, 0.208, 0.194).sub(soot.mul(vec3(0.050, 0.048, 0.044))).add(render.mul(0.5));
+  const trim = vec3(0.395, 0.382, 0.356).sub(soot.mul(vec3(0.050, 0.048, 0.044))).add(render.mul(0.5));
   // Shop fascias: a seeded saturated band per bay is where a street parade gets
   // its colour. Never at full saturation — a painted timber fascia is a tint.
   const bayId = floor(p.z.div(3.1)).add(floor(p.x.mul(0.13)));
   const h = valueNoise2(vec2(bayId, float(3.7)));
   const h2 = valueNoise2(vec2(bayId, float(11.3)));
-  const shop = vec3(0.10, 0.09, 0.085)
-    .add(vec3(h.mul(0.20), h2.mul(0.16), h.mul(h2).mul(0.13)))
+  const shop = vec3(0.085, 0.078, 0.072)
+    .add(vec3(h.mul(0.26), h2.mul(0.21), h.mul(h2).mul(0.17)))
     .sub(soot.mul(vec3(0.03, 0.03, 0.03)));
 
   const isWall = smoothstep(float(0.6), float(0.4), part);
@@ -523,7 +551,12 @@ function createFrontageMaterial(): MeshStandardNodeMaterial {
 const U_METAL = 0;
 const U_PAINT = 1;
 const U_GLASS = 2;
+/** Warm emissive: street-lamp luminaires. */
 const U_LAMP = 3;
+/** Red emissive: tail lamps and the signal's stop aspect ONLY. */
+const U_TAIL = 4;
+/** Retroreflective band: bright, NOT emissive. A glowing bollard is a bug. */
+const U_BAND = 5;
 
 /** Merge a list of tagged geometries into one, keeping the part attribute. */
 function mergeTagged(list: THREE.BufferGeometry[], attrName: string): THREE.BufferGeometry {
@@ -587,7 +620,7 @@ function signalPrototype(): THREE.BufferGeometry {
   g.push(tagU(new THREE.BoxGeometry(0.30, 0.86, 0.26).translate(0, 2.95, 0.14), U_METAL));
   for (let i = 0; i < 3; i++) {
     g.push(tagU(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 8)
-      .rotateX(Math.PI / 2).translate(0, 3.27 - i * 0.29, 0.29), i === 2 ? U_LAMP : U_GLASS));
+      .rotateX(Math.PI / 2).translate(0, 3.27 - i * 0.29, 0.29), i === 0 ? U_TAIL : U_GLASS));
   }
   g.push(tagU(new THREE.BoxGeometry(0.26, 0.34, 0.20).translate(0, 1.42, 0.13), U_METAL));
   return mergeTagged(g, 'itemPart');
@@ -598,7 +631,7 @@ function bollardPrototype(): THREE.BufferGeometry {
   const g: THREE.BufferGeometry[] = [];
   g.push(tagU(new THREE.CylinderGeometry(0.075, 0.095, 0.94, 8).translate(0, 0.47, 0), U_METAL));
   g.push(tagU(new THREE.SphereGeometry(0.078, 8, 5).translate(0, 0.95, 0), U_METAL));
-  g.push(tagU(new THREE.CylinderGeometry(0.082, 0.082, 0.055, 8).translate(0, 0.74, 0), U_LAMP));
+  g.push(tagU(new THREE.CylinderGeometry(0.082, 0.082, 0.055, 8).translate(0, 0.74, 0), U_BAND));
   return mergeTagged(g, 'itemPart');
 }
 
@@ -622,28 +655,40 @@ function vehiclePrototype(): THREE.BufferGeometry {
   const g: THREE.BufferGeometry[] = [];
   const L = 4.34;
   const W = 1.79;
-  // Lower body, sills, cabin — a silhouette, not a model. At 5 m the read is
-  // the greenhouse-to-body ratio and the wheel arches, and nothing else.
+  // Lower body and sills. At 5 m the read is the greenhouse-to-body ratio and
+  // the wheel arches, and nothing else - so those are what is built.
   g.push(tagU(new THREE.BoxGeometry(W, 0.52, L).translate(0, 0.62, 0), U_PAINT));
   g.push(tagU(new THREE.BoxGeometry(W * 0.92, 0.28, L * 0.98).translate(0, 0.36, 0), U_PAINT));
-  g.push(tagU(new THREE.BoxGeometry(W * 0.86, 0.50, L * 0.50).translate(0, 1.13, -0.16), U_PAINT));
-  // Greenhouse: dark glass all round, inset so the pillars read.
-  g.push(tagU(new THREE.BoxGeometry(W * 0.80, 0.42, L * 0.47).translate(0, 1.15, -0.16), U_GLASS));
-  g.push(tagU(new THREE.BoxGeometry(W * 0.74, 0.10, L * 0.44).translate(0, 1.40, -0.16), U_PAINT));
-  // Wheels, and the arch shadow they sit in.
+  // THE GREENHOUSE. The glass volume is the OUTER shell and the painted roof
+  // and pillars sit proud of it. The first version had the glass box entirely
+  // inside the painted cabin box, so the car had no windows at all and read as
+  // a solid brick - invisible in code, obvious on the capture.
+  g.push(tagU(new THREE.BoxGeometry(W * 0.86, 0.52, L * 0.50).translate(0, 1.14, -0.16), U_GLASS));
+  g.push(tagU(new THREE.BoxGeometry(W * 0.84, 0.11, L * 0.48).translate(0, 1.42, -0.16), U_PAINT));
+  // A/B/C pillars, proud of the glass so they break the band the way a real
+  // greenhouse does.
+  for (const sx of [-1, 1]) {
+    for (const [pz, pw] of [[L * 0.235, 0.10], [0.02, 0.075], [-L * 0.235, 0.11]] as const) {
+      g.push(tagU(new THREE.BoxGeometry(pw, 0.50, 0.13)
+        .translate(sx * W * 0.435, 1.14, pz - 0.16), U_PAINT));
+    }
+  }
+  // Wheels, and the arch they sit under.
   for (const sx of [-1, 1]) {
     for (const sz of [1.34, -1.34]) {
-      const w = new THREE.CylinderGeometry(0.325, 0.325, 0.22, 12);
+      const w = new THREE.CylinderGeometry(0.325, 0.325, 0.22, 14);
       w.rotateZ(Math.PI / 2);
       w.translate(sx * (W / 2 - 0.06), 0.325, sz);
       g.push(tagU(w, U_METAL));
+      g.push(tagU(new THREE.BoxGeometry(0.10, 0.30, 0.86)
+        .translate(sx * (W / 2 - 0.02), 0.52, sz), U_METAL));
     }
   }
-  // Tail lamps — emissive, and the single detail that says "car" at 30 m in a
-  // dull frame. Head lamps are glass, because a parked car's lights are off.
+  // Tail lamps - emissive, and the one detail that says "car" at 30 m in a dull
+  // frame. Head lamps are glass, because a parked car's lights are off.
   for (const sx of [-1, 1]) {
     g.push(tagU(new THREE.BoxGeometry(0.34, 0.16, 0.06)
-      .translate(sx * W * 0.32, 0.82, L / 2 + 0.01), U_LAMP));
+      .translate(sx * W * 0.32, 0.82, L / 2 + 0.01), U_TAIL));
     g.push(tagU(new THREE.BoxGeometry(0.34, 0.14, 0.06)
       .translate(sx * W * 0.32, 0.80, -L / 2 - 0.01), U_GLASS));
   }
@@ -662,30 +707,46 @@ function createItemMaterial(): MeshStandardNodeMaterial {
   const tint = attribute('instanceTint', 'vec3');
   const p = positionWorld;
 
+  /** Mask for one part id. Flat per vertex, so exactly one is 1 per fragment. */
+  const is = (k: number) => smoothstep(float(k - 0.6), float(k - 0.4), part)
+    .mul(smoothstep(float(k + 0.6), float(k + 0.4), part));
+
   const grime = fbm2(xz(p, 3.0), 2).sub(0.5).mul(0.035);
   // Contact darkening: everything gets dirtier towards the ground. On a parked
   // car this is the sill shadow that stops it floating; on a bollard it is the
-  // splash line. One smoothstep, and it is the difference between placed and
-  // dropped.
+  // splash line. One smoothstep, and it is the difference between an object
+  // placed on the street and one dropped above it.
   const contact = smoothstep(float(0.95), float(0.05), p.y.sub(float(PAVE_Y))).mul(0.55);
 
-  const metal = vec3(0.055, 0.056, 0.058).add(grime);
+  const isMetal = is(U_METAL);
+  const isPaint = is(U_PAINT);
+  const isGlass = is(U_GLASS);
+  const isLamp = is(U_LAMP);
+  const isTail = is(U_TAIL);
+  const isBand = is(U_BAND);
+  const emissiveMask = max(isLamp, isTail);
+
+  const metal = vec3(0.075, 0.076, 0.080).add(grime);
   const paint = tint.add(grime.mul(0.6));
   const glass = vec3(0.014, 0.017, 0.021);
-  const lamp = vec3(0.62, 0.13, 0.09);
+  // Warm sodium-ish luminaire, NOT the tail-lamp red. Using one emissive colour
+  // for both put a red light on top of every lamp column in the cell.
+  const lampCol = vec3(0.92, 0.78, 0.52);
+  const tailCol = vec3(0.68, 0.11, 0.07);
+  const band = vec3(0.62, 0.60, 0.55).add(grime);
 
-  const isMetal = smoothstep(float(0.6), float(0.4), part);
-  const isPaint = smoothstep(float(0.4), float(0.6), part).mul(smoothstep(float(1.6), float(1.4), part));
-  const isGlass = smoothstep(float(1.4), float(1.6), part).mul(smoothstep(float(2.6), float(2.4), part));
-  const isLamp = smoothstep(float(2.4), float(2.6), part);
-
-  const base = metal.mul(isMetal).add(paint.mul(isPaint)).add(glass.mul(isGlass)).add(lamp.mul(isLamp));
-  mat.colorNode = base.mul(float(1).sub(contact.mul(float(1).sub(isLamp))));
-  mat.roughnessNode = float(0.62).sub(isGlass.mul(0.52)).sub(isPaint.mul(0.24));
+  const base = metal.mul(isMetal)
+    .add(paint.mul(isPaint))
+    .add(glass.mul(isGlass))
+    .add(lampCol.mul(isLamp))
+    .add(tailCol.mul(isTail))
+    .add(band.mul(isBand));
+  mat.colorNode = base.mul(float(1).sub(contact.mul(float(1).sub(emissiveMask))));
+  mat.roughnessNode = float(0.62).sub(isGlass.mul(0.52)).sub(isPaint.mul(0.24)).sub(isBand.mul(0.28));
   mat.metalnessNode = isMetal.mul(0.72).add(isPaint.mul(0.28));
-  // Emissive only on the lamp part, so tail lamps and the signal aspect read in
-  // a dull frame without adding a light or touching the grade.
-  mat.emissiveNode = lamp.mul(isLamp).mul(0.85);
+  // Emissive on the two lamp parts only, so tail lamps and the stop aspect read
+  // in a dull frame without adding a light or touching the grade.
+  mat.emissiveNode = lampCol.mul(isLamp).mul(0.85).add(tailCol.mul(isTail).mul(0.9));
   return mat;
 }
 
@@ -729,9 +790,19 @@ function createStreetBlade(name: string): THREE.Mesh | null {
   // the street is named from both approaches for a single draw call. Two
   // meshes would have been the obvious thing and would have cost two, which is
   // 17% of this cell's entire draw budget spent on a sign.
-  const a = new THREE.PlaneGeometry(1.35, 0.253);
+  // PlaneGeometry's front face has u increasing with +x, and the corridor's
+  // yaw puts +x on the viewer's LEFT at both capture poses - so the name read
+  // back to front on the first capture. Flipping u costs nothing and fixes it
+  // for both blades; rotating the quad would only have shown the back face.
+  const flipU = (g: THREE.BufferGeometry) => {
+    const uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i));
+    uv.needsUpdate = true;
+    return g;
+  };
+  const a = flipU(new THREE.PlaneGeometry(1.35, 0.253));
   a.translate(0.62, 0, 0);
-  const b = new THREE.PlaneGeometry(1.35, 0.253);
+  const b = flipU(new THREE.PlaneGeometry(1.35, 0.253));
   b.rotateY(Math.PI / 2);
   b.translate(0, 0, -0.62);
   const geo = mergeSimpleUV([a, b]);
