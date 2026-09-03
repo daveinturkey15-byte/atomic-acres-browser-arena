@@ -84,6 +84,7 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { buildNuketownRebuildLawnField } from './nuketown-lawn-field';
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_FLOOR_T,
@@ -1046,6 +1047,11 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   // Ground runs well past the fence so the horizon is continuous scrub rather
   // than an 84 m slab in a void. One draw call either way.
   centred(builder, 'ground', [0, -0.7, 0], [220, 1.4, 220], m.ground, { cast: false });
+  // Everything after this index is a real solid on the map. The ground slab is
+  // a 220 x 220 m collider - the world floor - and any keep-out set that
+  // includes it rejects the entire arena, which is exactly what a first cut of
+  // the lawn field did (8 regions, 0 blades, no error anywhere).
+  const groundColliderCount = builder.colliders.length;
 
   street(builder, m);
   house(builder, m);
@@ -1058,6 +1064,25 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   cars(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
+
+  // ---- HF-426 JOB 3: the shipped map's LAWN, on this map's own rectangles --
+  // Built HERE, after every prop, because `builder.colliders` is the keep-out
+  // truth and it is complete exactly now. The shipped map's lawn has to carry
+  // a hand-mirrored prop table plus a containment test to stop that table
+  // drifting from map.ts; this one cannot drift, because it reads the colliders
+  // the arena just emitted. Added AFTER the presentation batcher on purpose -
+  // the field is InstancedMesh, which that batcher does not take, and a Group
+  // is not a candidate for it either.
+  const lawn = buildNuketownRebuildLawnField(builder.root, {
+    dressing: NUKETOWN2_GROUND_DRESSING,
+    keepOuts: builder.colliders.slice(groundColliderCount),
+  });
+  builder.root.userData.nuketown2LawnStats = lawn.stats;
+  // legacy-main drives this through `updateArenaArt`, the same one uniform
+  // write per frame the shipped map's lawn takes. The sway itself is GPU-side.
+  builder.root.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
+  // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
+  builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
 
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const c = NUKETOWN2_STREET_COACH;
