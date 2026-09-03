@@ -277,6 +277,26 @@ const readMenuTargets = (page) => page.evaluate(() => {
   }
   const describe = (element) => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}`
     + `${element.className && typeof element.className === 'string' ? `.${element.className.trim().split(/\s+/u)[0]}` : ''}`;
+  /**
+   * Is this point scrolled outside one of the element's own scroll containers?
+   *
+   * Without this the audit reports nonsense: the options panel is a scrolling
+   * column, and a row scrolled past its bottom edge still has a viewport
+   * position, so `elementFromPoint` there returns whatever is painted behind
+   * the panel - the game canvas - and the row reads as "blocked by the canvas".
+   * It is not blocked; it is scrolled away, which is what a scrolling panel is
+   * for. Only a control the finger can already touch is worth hit-testing.
+   */
+  const scrolledOutOfView = (element, x, y) => {
+    for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+      const styles = window.getComputedStyle(node);
+      if (!/auto|scroll|hidden/u.test(`${styles.overflowY} ${styles.overflowX}`)) continue;
+      const box = node.getBoundingClientRect();
+      if (box.width < 1 && box.height < 1) continue;
+      if (x < box.left - 1 || x > box.right + 1 || y < box.top - 1 || y > box.bottom + 1) return true;
+    }
+    return false;
+  };
   const interactive = [...menu.querySelectorAll('button, select, input, [role="tab"]')]
     .filter((element) => {
       const styles = window.getComputedStyle(element);
@@ -294,7 +314,8 @@ const readMenuTargets = (page) => page.evaluate(() => {
       // reaches the rest of it by scrolling. Only a control the finger can
       // already touch is hit-tested, so a scrollable panel is never reported as
       // an obstruction.
-      const inViewport = centreX >= 0 && centreY >= 0 && centreX <= window.innerWidth && centreY <= window.innerHeight;
+      const inViewport = centreX >= 0 && centreY >= 0 && centreX <= window.innerWidth && centreY <= window.innerHeight
+        && !scrolledOutOfView(element, centreX, centreY);
       const top = inViewport ? document.elementFromPoint(centreX, centreY) : null;
       const reachable = inViewport ? (Boolean(top) && (top === element || element.contains(top))) : null;
       return {
@@ -304,6 +325,11 @@ const readMenuTargets = (page) => page.evaluate(() => {
         width: Math.round(rect.width), height: Math.round(rect.height),
         fontPx: Number(Number.parseFloat(styles.fontSize).toFixed(2)),
         offscreen: rect.right > window.innerWidth + 1 || rect.left < -1,
+        // A control the surface has deliberately taken away is not a defect.
+        // The paused deck scrims the lobby's join row, because you cannot join
+        // another room mid-match; failing that would be failing the design.
+        unavailable: Boolean(element.disabled) || element.getAttribute('aria-disabled') === 'true'
+          || Boolean(element.closest('[inert]')),
         inViewport,
         reachable,
         blockedBy: reachable !== false || !top ? null : describe(top),
@@ -311,6 +337,32 @@ const readMenuTargets = (page) => page.evaluate(() => {
     });
   return { visible: true, overflowX, interactive };
 });
+
+/**
+ * `readMenuTargets` twice, `settleMs` apart, keeping a control's `reachable`
+ * as false only when BOTH reads agree.
+ *
+ * Menu surfaces animate in. A single read taken mid-transition catches controls
+ * still behind a scrim that is on its way out, which reported the paused deck's
+ * join row as untappable on one arena and not the other, run to run. A control
+ * that is genuinely covered is covered in both reads, so this removes the
+ * flake without softening the check.
+ */
+async function readMenuTargetsStable(page, settleMs = 500) {
+  const first = await readMenuTargets(page);
+  await page.waitForTimeout(settleMs);
+  const second = await readMenuTargets(page);
+  if (!first.visible || !second.visible) return second;
+  const firstById = new Map(first.interactive.map((entry, index) => [entry.id ?? `#${index}`, entry]));
+  second.interactive = second.interactive.map((entry, index) => {
+    const before = firstById.get(entry.id ?? `#${index}`);
+    if (entry.reachable === false && before && before.reachable !== false) {
+      return { ...entry, reachable: true, blockedBy: null, transientlyBlockedBy: entry.blockedBy };
+    }
+    return entry;
+  });
+  return second;
+}
 
 const playerState = (page) => page.evaluate(() => {
   const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot?.() ?? null;
@@ -367,13 +419,30 @@ async function tapBox(page, box, holdMs = 120) {
   });
 }
 
+/**
+ * Tap a selector, scrolling it into view first because that is what a player
+ * does. Returns false only when the control genuinely is not there.
+ *
+ * The scroll is not a convenience. At 852x393 the lobby's scroll container is
+ * 313 px tall with 2025 px of content, so RESUME and DEPLOY both sit below the
+ * fold; tapping their unscrolled coordinates dispatches a touch outside the
+ * viewport, nothing happens, and the harness reports "resume did not restore
+ * the overlay" about a button that works perfectly once you scroll to it.
+ */
 async function tapSelector(page, selector, holdMs = 120) {
   const box = await page.evaluate((target) => {
     const element = document.querySelector(target);
     if (!element) return null;
-    const rect = element.getBoundingClientRect();
+    let rect = element.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return null;
-    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    const centreY = rect.y + rect.height / 2;
+    const scrolled = centreY < 0 || centreY > window.innerHeight;
+    if (scrolled) {
+      element.scrollIntoView({ block: 'center' });
+      rect = element.getBoundingClientRect();
+    }
+    if (rect.width < 1 || rect.height < 1) return null;
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scrolled };
   }, selector);
   if (!box) return false;
   await tapBox(page, box, holdMs);
@@ -512,7 +581,7 @@ export function auditMenuSurface(menu, profile, minTargetPx, minFontPx, label) {
   // it measures. Only ID'd controls are failed: the arena cards are a deliberate
   // horizontal carousel whose off-carousel siblings are legitimately covered,
   // and they are reported below rather than failed.
-  const blocked = menu.interactive.filter((entry) => entry.reachable === false);
+  const blocked = menu.interactive.filter((entry) => entry.reachable === false && !entry.unavailable);
   const blockedNamed = blocked.filter((entry) => entry.id);
   if (blockedNamed.length > 0) {
     failures.push(`${label}-controls-not-tappable:${blockedNamed.map((entry) => `${entry.id}<${entry.blockedBy}`).join(',')}`);
@@ -594,7 +663,7 @@ async function runCell({ browser, proxy, profile, arena, options }) {
     record.bootMs = Date.now() - bootStart;
 
     // ---- MENU -------------------------------------------------------------
-    const menu = await readMenuTargets(page);
+    const menu = await readMenuTargetsStable(page);
     const menuAudit = auditMenuSurface(menu, profile, options.minTargetPx, options.minFontPx, 'lobby');
     record.lobby = menuAudit;
     failures.push(...menuAudit.failures);
@@ -608,14 +677,39 @@ async function runCell({ browser, proxy, profile, arena, options }) {
     }, arena, { timeout: options.bootTimeoutMs });
     await shot('02-arena-selected');
 
+    // DEPLOY, scrolled into view first, because that is what a player does.
+    //
+    // Measured at 852x393 (the 6.1" phone in landscape): the lobby's scroll
+    // container is 313 px tall with 2025 px of content, and DEPLOY sits at
+    // y=448 - fully below the fold. Tapping its unscrolled coordinates
+    // dispatches a touch outside the viewport and nothing happens, which
+    // reported as a 180 s match-admission timeout and looked like the game
+    // failing to admit. It is not a game defect, but it IS friction worth
+    // recording: `deployBelowTheFold` is reported on every cell so the lobby
+    // pass can see which devices hide the primary action.
     const soloBox = await page.evaluate(() => {
       const button = document.querySelector('#solo');
       if (!button || button.disabled) return null;
+      const before = button.getBoundingClientRect();
+      const belowTheFold = before.y + before.height / 2 > window.innerHeight || before.y < 0;
+      if (belowTheFold) button.scrollIntoView({ block: 'center' });
       const rect = button.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      return {
+        x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        belowTheFold,
+        unscrolledY: Math.round(before.y),
+        viewportHeight: window.innerHeight,
+      };
     });
     if (soloBox) {
-      record.deployButton = { width: Math.round(soloBox.width), height: Math.round(soloBox.height), tappedByTouch: true };
+      record.deployButton = {
+        width: Math.round(soloBox.width),
+        height: Math.round(soloBox.height),
+        tappedByTouch: true,
+        deployBelowTheFold: soloBox.belowTheFold,
+        unscrolledY: soloBox.unscrolledY,
+        viewportHeight: soloBox.viewportHeight,
+      };
       await tapBox(page, soloBox, 140);
     } else {
       // A deploy button a thumb cannot reach is itself the defect; the debug
@@ -653,28 +747,14 @@ async function runCell({ browser, proxy, profile, arena, options }) {
     const byId = Object.fromEntries(overlay.controls.filter((control) => control.visible).map((control) => [control.id, control]));
     const play = {};
 
-    if (byId['stick-move']) {
-      const before = await playerState(page);
-      await dragStick(page, byId['stick-move'], 0, -Math.min(60, byId['stick-move'].height / 2), 1_400);
-      const after = await playerState(page);
-      if (!before?.position || !after?.position) failures.push('move-UNMEASURED(no-player-state)');
-      else {
-        const moved = Math.hypot(after.position[0] - before.position[0], after.position[2] - before.position[2]);
-        play.moveMetres = Number(moved.toFixed(3));
-        if (moved <= 0.25) failures.push(`move-stick-does-not-move-player(${play.moveMetres}m)`);
-      }
-    }
-
-    if (byId['stick-look']) {
-      const before = await playerState(page);
-      await dragStick(page, byId['stick-look'], Math.min(60, byId['stick-look'].width / 2), 0, 1_400);
-      const after = await playerState(page);
-      if (before?.yaw === null || after?.yaw === null || !before || !after) failures.push('look-UNMEASURED(no-player-state)');
-      else {
-        play.lookRadians = Number(Math.abs(after.yaw - before.yaw).toFixed(4));
-        if (play.lookRadians <= 0.05) failures.push(`look-stick-does-not-turn-camera(${play.lookRadians}rad)`);
-      }
-    }
+    // ORDER MATTERS, and it is not the obvious one. The weapon actions run
+    // FIRST, from the pose the match admitted the player into; the sticks run
+    // after. Measured at 852x393 on atomic-acres with the old order: the move
+    // stick drove the player 6.7 m forward into a wall, and every subsequent
+    // shot was refused - the game's own fire-admission diagnostics reported 54
+    // refusals, all `viewmodel-contact-raise`, with lastFiredAtMs 0. That is
+    // the muzzle-against-a-surface rule working correctly, but it reported as
+    // "the mobile FIRE button does not fire" on one device and one arena only.
 
     if (byId.fire) {
       // Three taps, not one. Measured on this machine: a single tap taken a few
@@ -698,6 +778,14 @@ async function runCell({ browser, proxy, profile, arena, options }) {
       play.fireTapAttempts = attempts;
       play.ammoAfterFire = after?.ammo ?? null;
       if (!(Number.isFinite(play.ammoBeforeFire) && Number.isFinite(play.ammoAfterFire) && play.ammoAfterFire < play.ammoBeforeFire)) {
+        // The game already knows WHY it refused a shot. Reading its own fire
+        // admission diagnostics here is the difference between "the mobile FIRE
+        // button is broken" and "the player spawned with the muzzle in a wall" -
+        // one is this lane's defect and the other is the spawn lane's.
+        play.fireBlock = await page.evaluate(() => {
+          const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+          return state?.fireBlock ?? null;
+        }).catch(() => null);
         failures.push(`fire-consumed-no-ammo-in-${attempts}-taps(${play.ammoBeforeFire}->${play.ammoAfterFire})`);
       }
     }
@@ -762,6 +850,29 @@ async function runCell({ browser, proxy, profile, arena, options }) {
         if (play.jumpRiseMetres <= 0.05) failures.push(`jump-no-vertical-response(${play.jumpRiseMetres}m)`);
       }
       await page.waitForTimeout(1_200);
+    }
+
+    if (byId['stick-move']) {
+      const before = await playerState(page);
+      await dragStick(page, byId['stick-move'], 0, -Math.min(60, byId['stick-move'].height / 2), 1_400);
+      const after = await playerState(page);
+      if (!before?.position || !after?.position) failures.push('move-UNMEASURED(no-player-state)');
+      else {
+        const moved = Math.hypot(after.position[0] - before.position[0], after.position[2] - before.position[2]);
+        play.moveMetres = Number(moved.toFixed(3));
+        if (moved <= 0.25) failures.push(`move-stick-does-not-move-player(${play.moveMetres}m)`);
+      }
+    }
+
+    if (byId['stick-look']) {
+      const before = await playerState(page);
+      await dragStick(page, byId['stick-look'], Math.min(60, byId['stick-look'].width / 2), 0, 1_400);
+      const after = await playerState(page);
+      if (before?.yaw === null || after?.yaw === null || !before || !after) failures.push('look-UNMEASURED(no-player-state)');
+      else {
+        play.lookRadians = Number(Math.abs(after.yaw - before.yaw).toFixed(4));
+        if (play.lookRadians <= 0.05) failures.push(`look-stick-does-not-turn-camera(${play.lookRadians}rad)`);
+      }
     }
 
     if (byId.sprint) {
@@ -855,7 +966,7 @@ async function runCell({ browser, proxy, profile, arena, options }) {
         if (strayModals.length > 0) {
           failures.push(`pause-tap-fell-through-and-opened:${strayModals.join(',')}`);
         }
-        const pauseMenu = await readMenuTargets(page);
+        const pauseMenu = await readMenuTargetsStable(page);
         const pauseAudit = auditMenuSurface(pauseMenu, profile, options.minTargetPx, options.minFontPx, 'pause');
         Object.assign(record.pause, pauseAudit);
         delete record.pause.failures;
@@ -873,7 +984,7 @@ async function runCell({ browser, proxy, profile, arena, options }) {
           });
           record.settings.panelVisible = optionsVisible;
           if (!optionsVisible) failures.push('options-panel-did-not-open');
-          const settingsMenu = await readMenuTargets(page);
+          const settingsMenu = await readMenuTargetsStable(page);
           const settingsAudit = auditMenuSurface(settingsMenu, profile, options.minTargetPx, options.minFontPx, 'settings');
           Object.assign(record.settings, settingsAudit);
           delete record.settings.failures;

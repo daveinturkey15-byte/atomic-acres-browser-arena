@@ -1,0 +1,2204 @@
+{
+  "verdict": "FAIL",
+  "measuredAt": "2026-09-03T01:19:03.390Z",
+  "devices": [
+    {
+      "id": "phone-portrait",
+      "label": "6.1-inch phone, portrait",
+      "width": 393,
+      "height": 852,
+      "deviceScaleFactor": 3,
+      "orientation": "portrait"
+    },
+    {
+      "id": "phone-landscape",
+      "label": "6.1-inch phone, landscape",
+      "width": 852,
+      "height": 393,
+      "deviceScaleFactor": 3,
+      "orientation": "landscape"
+    },
+    {
+      "id": "tablet-portrait",
+      "label": "10-inch tablet, portrait",
+      "width": 820,
+      "height": 1180,
+      "deviceScaleFactor": 2,
+      "orientation": "portrait"
+    }
+  ],
+  "arenas": [
+    "atomic-acres",
+    "test2"
+  ],
+  "minTouchTargetPx": 44,
+  "minHudFontPx": 9,
+  "render": "quality",
+  "renderer": "default",
+  "instrumentCaveat": "Chromium device emulation on a desktop GPU, headless. Layout, touch input, reachability, target size and control collision are REAL and transfer to a handset. The frame rate is an UPPER BOUND no physical phone will reach. iOS/Safari is not covered at all (Playwright webkit has no WebGPU), nor is a real Bluetooth pad, thermal throttle, cellular network or notch safe-area inset. Those five rows are docs/MOBILE_PHONE_CHECKLIST.md, for the owner.",
+  "results": [
+    {
+      "device": "phone-portrait",
+      "deviceLabel": "6.1-inch phone, portrait",
+      "arena": "atomic-acres",
+      "viewport": "393x852",
+      "deviceScaleFactor": 3,
+      "failures": [],
+      "bootMs": 12244,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9
+      },
+      "deployButton": {
+        "width": 154,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": false,
+        "unscrolledY": 620,
+        "viewportHeight": 852
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 736,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 277,
+            "y": 736,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 337,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 285,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 285,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 337,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 120,
+            "y": 692,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 172,
+            "y": 692,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 120,
+            "y": 744,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 172,
+            "y": 744,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 120,
+            "y": 796,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 333,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 6,
+            "width": 317,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 120,
+            "y": 98,
+            "width": 126,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 259,
+            "y": 98,
+            "width": 126,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 98,
+            "width": 106,
+            "height": 150,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 24,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.648,
+        "moveMetres": 6.674,
+        "lookRadians": 2.8005,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 237,
+        "windowMs": 4034,
+        "meanFrameMs": 17.02,
+        "approxFps": 58.8
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 96
+      },
+      "pageErrors": [],
+      "verdict": "pass"
+    },
+    {
+      "device": "phone-portrait",
+      "deviceLabel": "6.1-inch phone, portrait",
+      "arena": "test2",
+      "viewport": "393x852",
+      "deviceScaleFactor": 3,
+      "failures": [],
+      "bootMs": 2428,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9
+      },
+      "deployButton": {
+        "width": 154,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": false,
+        "unscrolledY": 620,
+        "viewportHeight": 852
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 736,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 277,
+            "y": 736,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 337,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 285,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 285,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 337,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 120,
+            "y": 692,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 172,
+            "y": 692,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 120,
+            "y": 744,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 172,
+            "y": 744,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 120,
+            "y": 796,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 632,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 684,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 333,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 6,
+            "width": 317,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 120,
+            "y": 98,
+            "width": 126,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 259,
+            "y": 98,
+            "width": 126,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 98,
+            "width": 106,
+            "height": 150,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 25,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.673,
+        "moveMetres": 7.705,
+        "lookRadians": 3.3253,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 263,
+        "windowMs": 4083,
+        "meanFrameMs": 15.52,
+        "approxFps": 64.4
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 96
+      },
+      "pageErrors": [],
+      "verdict": "pass"
+    },
+    {
+      "device": "phone-landscape",
+      "deviceLabel": "6.1-inch phone, landscape",
+      "arena": "atomic-acres",
+      "viewport": "852x393",
+      "deviceScaleFactor": 3,
+      "failures": [],
+      "bootMs": 1612,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 13
+      },
+      "deployButton": {
+        "width": 256,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": true,
+        "unscrolledY": 448,
+        "viewportHeight": 393
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 281,
+            "width": 104,
+            "height": 104,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 740,
+            "y": 281,
+            "width": 104,
+            "height": 104,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 688,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 636,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 636,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 688,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 116,
+            "y": 233,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 168,
+            "y": 233,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 116,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 168,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 116,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 177,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 177,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 229,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 229,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 792,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 266,
+            "y": 5,
+            "width": 320,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 116,
+            "y": 77,
+            "width": 136,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 600,
+            "y": 77,
+            "width": 136,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 5,
+            "width": 102,
+            "height": 146,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 25,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.064,
+        "moveMetres": 6.674,
+        "lookRadians": 2.4038,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 204,
+        "windowMs": 4027,
+        "meanFrameMs": 19.74,
+        "approxFps": 50.7
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 11,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 100
+      },
+      "pageErrors": [],
+      "verdict": "pass"
+    },
+    {
+      "device": "phone-landscape",
+      "deviceLabel": "6.1-inch phone, landscape",
+      "arena": "test2",
+      "viewport": "852x393",
+      "deviceScaleFactor": 3,
+      "failures": [
+        "pause-controls-not-tappable:room-input<section#menu.panel,join<section#menu.panel"
+      ],
+      "bootMs": 6289,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 13
+      },
+      "deployButton": {
+        "width": 256,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": true,
+        "unscrolledY": 448,
+        "viewportHeight": 393
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 281,
+            "width": 104,
+            "height": 104,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 740,
+            "y": 281,
+            "width": 104,
+            "height": 104,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 688,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 636,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 636,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 688,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 116,
+            "y": 233,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 168,
+            "y": 233,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 116,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 168,
+            "y": 285,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 116,
+            "y": 337,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 177,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 177,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 229,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 229,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 792,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 266,
+            "y": 6,
+            "width": 320,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 116,
+            "y": 78,
+            "width": 136,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 600,
+            "y": 78,
+            "width": 136,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 6,
+            "width": 102,
+            "height": 146,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 25,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.621,
+        "moveMetres": 5.195,
+        "lookRadians": 3.4024,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 240,
+        "windowMs": 4055,
+        "meanFrameMs": 16.9,
+        "approxFps": 59.2
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [
+          {
+            "id": "room-input",
+            "blockedBy": "section#menu.panel"
+          },
+          {
+            "id": "join",
+            "blockedBy": "section#menu.panel"
+          }
+        ],
+        "controlsBelowTheFold": 11,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 100
+      },
+      "pageErrors": [],
+      "verdict": "fail"
+    },
+    {
+      "device": "tablet-portrait",
+      "deviceLabel": "10-inch tablet, portrait",
+      "arena": "atomic-acres",
+      "viewport": "820x1180",
+      "deviceScaleFactor": 2,
+      "failures": [
+        "settings-controls-not-tappable:graphics-render-scale<section#audio-settings.settings-section,graphics-adaptive<input#audio-master-gain"
+      ],
+      "bootMs": 4988,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9
+      },
+      "deployButton": {
+        "width": 362,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": false,
+        "unscrolledY": 551,
+        "viewportHeight": 1180
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 1064,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 704,
+            "y": 1064,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 764,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 712,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 712,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 764,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 120,
+            "y": 1020,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 172,
+            "y": 1020,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 120,
+            "y": 1072,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 172,
+            "y": 1072,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 120,
+            "y": 1124,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 760,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 6,
+            "width": 744,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 122,
+            "y": 98,
+            "width": 132,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 680,
+            "y": 98,
+            "width": 132,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 98,
+            "width": 108,
+            "height": 152,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 25,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.064,
+        "moveMetres": 6.674,
+        "lookRadians": 2.6742,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 190,
+        "windowMs": 4036,
+        "meanFrameMs": 21.24,
+        "approxFps": 47.1
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [
+          {
+            "id": "graphics-render-scale",
+            "blockedBy": "section#audio-settings.settings-section"
+          },
+          {
+            "id": "graphics-adaptive",
+            "blockedBy": "input#audio-master-gain"
+          }
+        ],
+        "controlsBelowTheFold": 90
+      },
+      "pageErrors": [],
+      "verdict": "fail"
+    },
+    {
+      "device": "tablet-portrait",
+      "deviceLabel": "10-inch tablet, portrait",
+      "arena": "test2",
+      "viewport": "820x1180",
+      "deviceScaleFactor": 2,
+      "failures": [
+        "settings-controls-not-tappable:graphics-render-scale<section#audio-settings.settings-section,graphics-adaptive<input#audio-master-gain"
+      ],
+      "bootMs": 5782,
+      "lobby": {
+        "failures": [],
+        "interactiveCount": 23,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9
+      },
+      "deployButton": {
+        "width": 362,
+        "height": 44,
+        "tappedByTouch": true,
+        "deployBelowTheFold": false,
+        "unscrolledY": 551,
+        "viewportHeight": 1180
+      },
+      "overlay": {
+        "hidden": false,
+        "bodyLive": true,
+        "documentOverflowX": 0,
+        "controls": [
+          {
+            "id": "stick-move",
+            "label": null,
+            "x": 8,
+            "y": 1064,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "stick-look",
+            "label": null,
+            "x": 704,
+            "y": 1064,
+            "width": 108,
+            "height": 108,
+            "fontPx": 16,
+            "visible": true
+          },
+          {
+            "id": "fire",
+            "label": "Fire weapon",
+            "x": 764,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 14,
+            "visible": true
+          },
+          {
+            "id": "ads",
+            "label": "Aim down sights",
+            "x": 712,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "reload",
+            "label": "Reload weapon",
+            "x": 712,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "switch-weapon",
+            "label": "Switch weapon",
+            "x": 764,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "jump",
+            "label": "Jump",
+            "x": 120,
+            "y": 1020,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "crouch",
+            "label": "Toggle crouch",
+            "x": 172,
+            "y": 1020,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "prone",
+            "label": "Toggle prone",
+            "x": 120,
+            "y": 1072,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "grenade",
+            "label": "Throw grenade",
+            "x": 172,
+            "y": 1072,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "melee",
+            "label": "Melee attack",
+            "x": 120,
+            "y": 1124,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "sprint",
+            "label": "Hold to sprint",
+            "x": 8,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "interact",
+            "label": "Use or interact",
+            "x": 60,
+            "y": 960,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-cycle",
+            "label": "Select next field support",
+            "x": 8,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "support-activate",
+            "label": "Activate selected field support",
+            "x": 60,
+            "y": 1012,
+            "width": 48,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          },
+          {
+            "id": "pause",
+            "label": "Pause match",
+            "x": 760,
+            "y": 8,
+            "width": 52,
+            "height": 48,
+            "fontPx": 11,
+            "visible": true
+          }
+        ]
+      },
+      "controlCount": 16,
+      "controlsOffscreen": [],
+      "controlsBelowMinimum": [],
+      "controlOverlaps": [],
+      "hud": {
+        "roots": [
+          {
+            "selector": ".hud-mission-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 6,
+            "width": 744,
+            "height": 71,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-operator-console",
+            "present": true,
+            "visible": true,
+            "x": 122,
+            "y": 98,
+            "width": 132,
+            "height": 85,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-weapon-console",
+            "present": true,
+            "visible": true,
+            "x": 680,
+            "y": 98,
+            "width": 132,
+            "height": 91,
+            "offscreen": false
+          },
+          {
+            "selector": ".hud-map-console",
+            "present": true,
+            "visible": true,
+            "x": 8,
+            "y": 98,
+            "width": 108,
+            "height": 152,
+            "offscreen": false
+          }
+        ],
+        "hudTextBelowFloor": [],
+        "hudObstructedByControls": []
+      },
+      "play": {
+        "ammoBeforeFire": 30,
+        "fireTapAttempts": 1,
+        "ammoAfterFire": 26,
+        "reloadStarted": true,
+        "adsHeldWhileDown": true,
+        "adsHeldAfterRelease": false,
+        "weaponBefore": "carbine",
+        "weaponAfter": "pistol",
+        "jumpRiseMetres": 0.697,
+        "moveMetres": 5.195,
+        "lookRadians": 3.2031,
+        "sprintButtonPresent": true
+      },
+      "aimAssist": {
+        "tierAfterTouch": "touch",
+        "overlaySuppressedBeforePad": false,
+        "overlayHiddenAfterPadConnect": true,
+        "overlayRestoredAfterPadDisconnect": true
+      },
+      "frame": {
+        "presentedFrames": 259,
+        "windowMs": 4123,
+        "meanFrameMs": 15.92,
+        "approxFps": 62.8
+      },
+      "pause": {
+        "opened": true,
+        "overlayHiddenWhilePaused": true,
+        "straySurfacesOpenedByTheSameTap": [],
+        "interactiveCount": 25,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [],
+        "controlsBelowTheFold": 9,
+        "resumeTapped": true,
+        "overlayRestoredAfterResume": true
+      },
+      "settings": {
+        "tabTapped": true,
+        "panelVisible": true,
+        "interactiveCount": 108,
+        "controlsOffscreen": [],
+        "controlsBelowTargetHeight": [
+          {
+            "id": "audio-master-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-sfx-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-movement-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ui-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-announcements-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-ambience-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-menu-music-mute",
+            "height": 24
+          },
+          {
+            "id": "audio-game-music-mute",
+            "height": 24
+          },
+          {
+            "id": "reduced-motion",
+            "height": 24
+          },
+          {
+            "id": "reduced-damage-flash",
+            "height": 24
+          },
+          {
+            "id": "reduced-sensory-effects",
+            "height": 24
+          },
+          {
+            "id": "mobile-touch-controls-toggle",
+            "height": 24
+          },
+          {
+            "id": "gamepad-invert-y",
+            "height": 24
+          },
+          {
+            "id": "gamepad-rumble",
+            "height": 24
+          },
+          {
+            "id": "share-global-leaderboard",
+            "height": 24
+          }
+        ],
+        "controlsBelowFontFloor": [],
+        "controlsNotTappable": [
+          {
+            "id": "graphics-render-scale",
+            "blockedBy": "section#audio-settings.settings-section"
+          },
+          {
+            "id": "graphics-adaptive",
+            "blockedBy": "input#audio-master-gain"
+          }
+        ],
+        "controlsBelowTheFold": 90
+      },
+      "pageErrors": [],
+      "verdict": "fail"
+    }
+  ]
+}
