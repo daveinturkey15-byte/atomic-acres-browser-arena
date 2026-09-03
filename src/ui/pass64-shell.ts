@@ -250,12 +250,26 @@ function graphicsPresetRowMarkup(): string {
         </div>`).join('');
   const summaries = GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => `
         <p class="graphics-profile-summary" data-graphics-profile="${profile.id}" title="${profile.intendedFor}" hidden>${profile.summary}</p>`).join('');
+  // CUSTOM has no audit row because it has no fixed control set, but it is a
+  // selectable option and the detail panel is keyed by the selected value: with
+  // no `custom` block the panel opened onto nothing at all, under a heading
+  // promising what the mode turns on. It gets a block that says why it is empty
+  // and where the real answer is. `graphics-profile-contract.test.ts` now
+  // asserts a detail block for EVERY selectable option, so a future rung cannot
+  // repeat this.
+  const customDetail = `
+        <div class="graphics-profile-detail" data-graphics-profile="custom" hidden>
+          <p class="graphics-profile-intended">For players who want to set individual controls themselves.</p>
+          <h5>TURNS ON</h5><ul><li>Whatever you set. CUSTOM has no fixed control set of its own: it starts from the last named mode you had selected and keeps every change you make in Advanced Graphics.</li></ul>
+          <h5>LEAVES OFF</h5><ul><li>Whatever you leave off. Because the set is yours, no measured cost line can be quoted for it.</li></ul>
+          <p class="graphics-profile-reference"><small>Open ADVANCED GRAPHICS below to see and change the individual controls. Every named mode above lists its own measured cost at 2560x1440 on an RTX 5080; CUSTOM cannot, because its control set is not fixed.</small></p>
+        </div>`;
   return `<div class="graphics-preset-row">
         <label>GRAPHICS MODE<select id="graphics-profile">${options}<option value="custom">CUSTOM</option><option value="${RTX_NATIVE_RUNTIME_OPTION_VALUE}">RTX — WHAT IS IT?</option></select></label>
         <div id="graphics-profile-copy">${summaries}
         <p class="graphics-profile-summary" data-graphics-profile="custom" hidden>Your own values, started from the last named mode you had selected. Editing any advanced control saves the mode as Custom.</p>
         </div>
-        <details id="graphics-profile-detail-panel"><summary>WHAT THIS MODE TURNS ON, AND WHAT IT COSTS</summary>${detail}</details>
+        <details id="graphics-profile-detail-panel"><summary>WHAT THIS MODE TURNS ON, AND WHAT IT COSTS</summary>${detail}${customDetail}</details>
       </div>
       ${rtxNativeRuntimeExplainerMarkup()}`;
 }

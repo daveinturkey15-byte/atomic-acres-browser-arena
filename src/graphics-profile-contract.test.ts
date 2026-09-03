@@ -87,6 +87,32 @@ describe('HF-418 graphics ladder', () => {
     expect(markup).toContain('data-graphics-profile="custom"');
   });
 
+  it('gives every selectable mode a detail block, including CUSTOM', () => {
+    // MEASURED DEFECT, found in review 2026-09-03. Five detail blocks were
+    // rendered from GRAPHICS_PROFILE_DESCRIPTIONS and CUSTOM got only a
+    // summary paragraph, so selecting CUSTOM left
+    // <details id="graphics-profile-detail-panel"> - the one headed
+    // "WHAT THIS MODE TURNS ON, AND WHAT IT COSTS" - opening onto nothing.
+    // The old assertion above passed on the SUMMARY's attribute and never
+    // looked inside the panel. This one derives the roster from the shipped
+    // <select> instead of a list, so a rung added later cannot slip through.
+    const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
+    const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
+    const selectable = [...presetMarkup.matchAll(/<option value="([^"]+)">/g)]
+      .map((match) => match[1])
+      .filter((value) => value !== RTX_NATIVE_RUNTIME_OPTION_VALUE);
+    expect(selectable).toContain('custom');
+    const panelStart = markup.indexOf('<details id="graphics-profile-detail-panel">');
+    expect(panelStart).toBeGreaterThan(-1);
+    const panel = markup.slice(panelStart, markup.indexOf('</details>', panelStart));
+    for (const value of selectable) {
+      expect(panel, `the detail panel opens onto nothing when ${value} is selected`)
+        .toContain(`class="graphics-profile-detail" data-graphics-profile="${value}"`);
+    }
+    // The explainer is not a mode and must NOT get a block in the panel.
+    expect(panel).not.toContain(`data-graphics-profile="${RTX_NATIVE_RUNTIME_OPTION_VALUE}"`);
+  });
+
   it('states the machine behind every performance word', () => {
     // "Smooth" with no machine attached is what produced the owner's
     // "150 fps -> 40 fps on Quality" report. Every reference note names the
