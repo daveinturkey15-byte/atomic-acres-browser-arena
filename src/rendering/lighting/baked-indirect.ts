@@ -17,8 +17,10 @@
  * failure mode is raising a flat ambient constant until the whole scene is
  * milk. This module is the thing that is supposed to be raised instead.
  *
- * WHAT IT COSTS PER FRAME. Nothing that scales with the scene: four texture
- * fetches and eleven multiply-adds per shaded pixel. The path tracing happens
+ * WHAT IT COSTS PER FRAME. Nothing that scales with the scene: THREE volume
+ * fetches (one 3D texture per colour channel, see `baked-indirect-node.ts`) and
+ * eleven multiply-adds per shaded pixel, on top of the scene colour/normal/
+ * viewZ reads the composite already performs. The path tracing happens
  * once, offline (or once behind the loading screen), and the result is a small
  * 3D grid of spherical-harmonic coefficients.
  *
@@ -520,9 +522,21 @@ export type IrradianceBakeSession = Readonly<{
   progress(): number;
   done(): boolean;
   /**
-   * Traces probes until `budgetMs` of wall clock has elapsed (checked every
-   * 16 probes, so one very expensive probe can overshoot by one probe rather
-   * than by a frame). Returns true when the bake is complete.
+   * Traces until `budgetMs` of wall clock has elapsed. THE UNIT OF WORK IS A
+   * RAY, NOT A PROBE, and that is the whole point: one probe at the HIGH tier
+   * is 128 rays at two bounces against every occluder in the proxy, which on a
+   * real 24-shape arena costs over ten milliseconds on this machine. A stepper
+   * that can only stop between probes therefore cannot honour a 3 ms budget
+   * however often it looks at the clock - the first version of this checked
+   * every 16 probes and overshot by up to 198 ms, which is the freeze class
+   * this project has spent three passes removing. A partially traced probe is
+   * resumed exactly where it stopped, with the same ray offset, so a bake split
+   * across a thousand steps is byte-identical to a one-shot one.
+   *
+   * `step(Infinity)` skips the clock entirely rather than paying a clock read
+   * per ray; that is the offline CLI's path.
+   *
+   * Returns true when the bake is complete.
    */
   step(budgetMs: number): boolean;
   /**
@@ -533,12 +547,27 @@ export type IrradianceBakeSession = Readonly<{
   volume(): IrradianceProbeVolume;
 }>;
 
+/**
+ * A high-resolution clock, because `Date.now()` cannot express this budget.
+ *
+ * MEASURED 2026-09-03: on Windows, Node's `Date.now()` advances in steps of up
+ * to ~15.6 ms unless something on the machine has raised the system timer
+ * resolution. A 3 ms deadline tested against that clock is not a 3 ms deadline
+ * - the first per-ray version of this stepper still spent 31 ms in a single
+ * step because the clock had not ticked yet. `performance.now()` is
+ * sub-millisecond in both Node and every browser this ships to.
+ */
+const nowMs = (): number => {
+  const clock = (globalThis as { performance?: { now(): number } }).performance;
+  return clock ? clock.now() : Date.now();
+};
+
 export function beginIrradianceBake(
   scene: ProxyScene,
   lighting: BakeLighting,
   options: BakeOptions,
 ): IrradianceBakeSession {
-  const startedAt = Date.now();
+  const startedAt = nowMs();
   const { tuning } = options;
   if (!tuning.enabled) throw new Error('bakeIrradianceVolume: the OFF tier bakes nothing.');
   const digest = computeBakeDigest(scene, lighting, tuning);
@@ -563,8 +592,23 @@ export function beginIrradianceBake(
   let cursor = 0;
   let elapsedMs = 0;
   let finished = false;
+  // RESUMABLE PROBE STATE. The budget is enforced per ray, so a step can stop
+  // halfway through a probe and the next one must pick up the same probe, at
+  // the same ray, with the same jitter offset. Redrawing the offset would
+  // change the ray set and a chunked bake would stop matching a one-shot one -
+  // which is the property `baked-indirect.test.ts` pins.
+  let probeStarted = false;
+  let rayCursor = 0;
+  let probeOffset = 0;
+  let probeBase = 0;
+  let probePosition: Vec3 = vec3(0, 0, 0);
 
-  const traceProbe = (probeIndex: number): void => {
+  /**
+   * Positions probe `probeIndex` and decides whether it needs rays at all.
+   * Returns false for a buried probe (which is filled from its neighbours at
+   * the end and consumes no randomness, exactly as before).
+   */
+  const beginProbe = (probeIndex: number): boolean => {
     const x = probeIndex % nx;
     const y = Math.floor(probeIndex / nx) % ny;
     const z = Math.floor(probeIndex / (nx * ny));
@@ -576,24 +620,28 @@ export function beginIrradianceBake(
     if (scene.shapes.some((shape) => pointInsideShape(position, shape))) {
       buried[probeIndex] = 1;
       filledProbes += 1;
-      return;
+      return false;
     }
-    const base = probeIndex * FLOATS_PER_PROBE;
-    const offset = random();
-    for (let ray = 0; ray < rays; ray += 1) {
-      const direction = fibonacciSphereDirection(ray, rays, offset);
-      const hit = intersectScene(position, direction, scene);
-      const radiance = hit.t === Number.POSITIVE_INFINITY
-        ? skyRadiance(direction, lighting)
-        : shadeHit(scene, scene.shapes[hit.shapeIndex], hit.point, hit.normal, lighting, tuning.bounces - 1, random);
-      for (let channel = 0; channel < 3; channel += 1) {
-        const value = radiance[channel];
-        const slot = base + channel * SH_L1_COEFFICIENTS;
-        coefficients[slot] += value * y00;
-        coefficients[slot + 1] += value * y1 * direction[1];
-        coefficients[slot + 2] += value * y1 * direction[2];
-        coefficients[slot + 3] += value * y1 * direction[0];
-      }
+    probePosition = position;
+    probeBase = probeIndex * FLOATS_PER_PROBE;
+    probeOffset = random();
+    rayCursor = 0;
+    return true;
+  };
+
+  const traceRay = (ray: number): void => {
+    const direction = fibonacciSphereDirection(ray, rays, probeOffset);
+    const hit = intersectScene(probePosition, direction, scene);
+    const radiance = hit.t === Number.POSITIVE_INFINITY
+      ? skyRadiance(direction, lighting)
+      : shadeHit(scene, scene.shapes[hit.shapeIndex], hit.point, hit.normal, lighting, tuning.bounces - 1, random);
+    for (let channel = 0; channel < 3; channel += 1) {
+      const value = radiance[channel];
+      const slot = probeBase + channel * SH_L1_COEFFICIENTS;
+      coefficients[slot] += value * y00;
+      coefficients[slot + 1] += value * y1 * direction[1];
+      coefficients[slot + 2] += value * y1 * direction[2];
+      coefficients[slot + 3] += value * y1 * direction[0];
     }
   };
 
@@ -604,20 +652,43 @@ export function beginIrradianceBake(
     // that interpolates through it, which looks exactly like the dirt-shadow
     // artefact people spend a day chasing in the material graph.
     fillBuriedProbes(coefficients, buried, nx, ny, nz);
-    elapsedMs = Date.now() - startedAt;
+    elapsedMs = nowMs() - startedAt;
     finished = true;
   };
 
   return Object.freeze({
-    progress: (): number => (probeCount === 0 ? 1 : cursor / probeCount),
+    // Counts the partially traced probe too, so progress advances after a step
+    // that stopped mid-probe. It always would have mattered; it only became
+    // visible once the budget started stopping inside a probe.
+    progress: (): number => (probeCount === 0
+      ? 1
+      : (cursor + (probeStarted && rays > 0 ? rayCursor / rays : 0)) / probeCount),
     done: (): boolean => finished,
     step(budgetMs: number): boolean {
       if (finished) return true;
-      const deadline = Date.now() + budgetMs;
+      const unbounded = !Number.isFinite(budgetMs);
+      const deadline = nowMs() + budgetMs;
+      const expired = (): boolean => !unbounded && nowMs() >= deadline;
       while (cursor < probeCount) {
-        traceProbe(cursor);
+        if (!probeStarted) {
+          if (!beginProbe(cursor)) {
+            cursor += 1;
+            if (expired()) break;
+            continue;
+          }
+          probeStarted = true;
+        }
+        while (rayCursor < rays) {
+          traceRay(rayCursor);
+          rayCursor += 1;
+          if (expired()) break;
+        }
+        // Out of budget mid-probe: leave `probeStarted` set so the next step
+        // resumes this probe rather than restarting or skipping it.
+        if (rayCursor < rays) break;
+        probeStarted = false;
         cursor += 1;
-        if ((cursor & 15) === 0 && Date.now() >= deadline) break;
+        if (expired()) break;
       }
       if (cursor >= probeCount) finish();
       return finished;
@@ -635,7 +706,7 @@ export function beginIrradianceBake(
           bounces: tuning.bounces,
           occluderShapes: scene.shapes.length,
           filledProbes,
-          elapsedMs: finished ? elapsedMs : Date.now() - startedAt,
+          elapsedMs: finished ? elapsedMs : nowMs() - startedAt,
         }),
       });
     },

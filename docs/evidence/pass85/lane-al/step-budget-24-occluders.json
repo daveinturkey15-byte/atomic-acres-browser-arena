@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-03T02:36:44.659Z",
+  "node": "v24.12.0",
+  "rows": {
+    "low": {
+      "occluderShapes": 24,
+      "grid": "24x12x24",
+      "budgetMs": 3,
+      "steps": 400,
+      "firstStepMs": 3.06,
+      "worstMs": 5.13,
+      "worstAfterFirstMs": 5.13,
+      "meanMs": 3.03,
+      "p95Ms": 3.1,
+      "overTwiceBudget": 0,
+      "progressAfterSteps": 0.88786
+    },
+    "high": {
+      "occluderShapes": 24,
+      "grid": "24x12x24",
+      "budgetMs": 3,
+      "steps": 400,
+      "firstStepMs": 3.02,
+      "worstMs": 3.89,
+      "worstAfterFirstMs": 3.89,
+      "meanMs": 3.02,
+      "p95Ms": 3.07,
+      "overTwiceBudget": 0,
+      "progressAfterSteps": 0.24673
+    }
+  }
+}

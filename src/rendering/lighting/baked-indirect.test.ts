@@ -10,6 +10,7 @@ import {
 import {
   BAKED_INDIRECT_MAXIMUM_GAIN,
   BAKED_INDIRECT_MAXIMUM_PROBES,
+  BAKED_INDIRECT_RUNTIME_GRID,
   FLOATS_PER_PROBE,
   IRRADIANCE_VOLUME_FORMAT,
   SH_L1_COEFFICIENTS,
@@ -57,6 +58,28 @@ function box(name: string, centre: Vec3, halfExtents: Vec3, albedo: Vec3): Proxy
 
 function emptyScene() {
   return finaliseProxyScene([], 0);
+}
+
+/**
+ * A proxy the size the extractor actually produces on a shipped arena: one
+ * ground plane and 23 masses, i.e. the 24 occluder shapes every live receipt
+ * reports. Bake cost is dominated by shape count, so a 6-shape stand-in
+ * understates it by roughly 4x - which is exactly how the published bake table
+ * came to be wrong.
+ */
+function twentyFourOccluderProxy() {
+  const shapes: ProxyShape[] = [groundPlaneProxy(0, vec3(0.42, 0.4, 0.38))];
+  for (let index = 0; index < 23; index += 1) {
+    const angle = (index / 23) * Math.PI * 2;
+    const radius = 8 + (index % 5) * 4;
+    shapes.push(box(
+      `mass-${index}`,
+      vec3(Math.cos(angle) * radius, 1.5 + (index % 4), Math.sin(angle) * radius),
+      vec3(2 + (index % 3), 1.5 + (index % 4), 2 + ((index + 1) % 3)),
+      vec3(0.3 + (index % 7) * 0.08, 0.3 + (index % 5) * 0.1, 0.3 + (index % 3) * 0.12),
+    ));
+  }
+  return finaliseProxyScene(shapes, shapes.length);
 }
 
 describe('SH-L1 reconstruction', () => {
@@ -196,14 +219,84 @@ describe('bakeIrradianceVolume', () => {
     const options = { arenaId: 'chunked', tuning: resolveBakedIndirectTuning('low') } as const;
     const oneShot = bakeIrradianceVolume(scene, DAYLIGHT, options);
     const session = beginIrradianceBake(scene, DAYLIGHT, options);
+    // `step(0)` is the worst chunking there is: the budget is already spent
+    // when the step begins, so it does exactly one unit of work. That unit used
+    // to be sixteen probes and is now ONE RAY (the fix for the 198 ms stall), so
+    // the same bake needs three orders of magnitude more steps - which is the
+    // point of the change, and is why this cap moved. The identity below is the
+    // assertion; the cap is only there so a hang fails instead of hanging.
     let steps = 0;
-    while (!session.step(0) && steps < 10_000) steps += 1;
+    while (!session.step(0) && steps < 20_000_000) steps += 1;
     expect(session.done()).toBe(true);
-    expect(steps).toBeGreaterThan(1);
+    expect(steps).toBeGreaterThan(1_000);
     expect(session.progress()).toBe(1);
     const chunked = session.volume();
     expect(chunked.digest).toBe(oneShot.digest);
     expect(Array.from(chunked.coefficients)).toEqual(Array.from(oneShot.coefficients));
+  });
+
+  it('can stop INSIDE a probe, which is what makes the per-frame budget a bound at all', () => {
+    // THE STRUCTURAL HALF of the 198 ms fix, and the half that cannot flake:
+    // with the budget already spent, one step must do strictly LESS than one
+    // probe of work. The old stepper checked its deadline every sixteen probes,
+    // so the same call advanced by 16 probes however small the budget was, and
+    // no budget could bound it.
+    const scene = twentyFourOccluderProxy();
+    const session = beginIrradianceBake(scene, DAYLIGHT, {
+      arenaId: 'stops-inside-a-probe',
+      tuning: resolveBakedIndirectTuning('high'),
+      fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
+    });
+    const probes = BAKED_INDIRECT_RUNTIME_GRID[0] * BAKED_INDIRECT_RUNTIME_GRID[1] * BAKED_INDIRECT_RUNTIME_GRID[2];
+    session.step(0);
+    expect(session.progress()).toBeGreaterThan(0);
+    expect(session.progress()).toBeLessThan(1 / probes);
+  });
+
+  it('honours the per-frame budget on a REAL-SIZED proxy at both tiers (the 198 ms stall)', () => {
+    // THE DEFECT THIS PINS. The stepper used to check its deadline every 16
+    // probes. One HIGH probe on a 24-occluder proxy is 128 rays at two bounces
+    // against every shape, so sixteen of them is ~200 ms of straight-line
+    // JavaScript on the main thread - measured by a skeptic at 198 ms worst /
+    // 45.9 ms mean against a declared 3 ms budget, on the tier MAX and RAY
+    // TRACED ship. That is the same freeze class as HF-399 and PASS 82-83.
+    //
+    // 24 occluders is not an arbitrary fixture size: it is the count every
+    // shipped arena's own runtime receipt reports (`...:24:...`).
+    //
+    // THE SECOND HALF OF THE FIX WAS THE CLOCK. Checking per ray is not enough
+    // if the clock cannot see 3 ms: `Date.now()` on Windows advances in ~15.6 ms
+    // steps, and the per-ray stepper still spent 31 ms in one step until the
+    // deadline moved to `performance.now()`.
+    //
+    // Quiet-machine distribution over 400 steps, from the committed instrument
+    // `scripts/qa/measure-bake-step-budget.mjs`: mean 3.03 ms, p95 3.10 (LOW) /
+    // 3.07 (HIGH), worst 5.13 / 3.89, ZERO steps over twice the budget. The
+    // bounds below are looser than that because this suite runs eleven files in
+    // parallel on the owner's shared workstation and wall clock there measures
+    // the machine too; they are still far tighter than the old stepper, which
+    // fails both of them on this fixture.
+    const scene = twentyFourOccluderProxy();
+    expect(scene.shapes.length).toBe(24);
+    for (const tier of ['low', 'high'] as const) {
+      const session = beginIrradianceBake(scene, DAYLIGHT, {
+        arenaId: `budget-${tier}`,
+        tuning: resolveBakedIndirectTuning(tier),
+        fixedDimensions: BAKED_INDIRECT_RUNTIME_GRID,
+      });
+      const durations: number[] = [];
+      // A slice of the bake, not the whole thing: the property is a property of
+      // every step, and a full HIGH bake of this volume is ~20 s.
+      while (durations.length < 200 && !session.done()) {
+        const before = performance.now();
+        session.step(3);
+        durations.push(performance.now() - before);
+      }
+      expect(durations.length, `${tier} steps`).toBe(200);
+      const sorted = [...durations].sort((a, b) => a - b);
+      expect(sorted[Math.floor(sorted.length * 0.95)], `${tier} p95 step ms`).toBeLessThanOrEqual(6);
+      expect(sorted[sorted.length - 1], `${tier} worst step ms`).toBeLessThanOrEqual(20);
+    }
   });
 
   it('a partially stepped volume is readable and non-negative rather than undefined', () => {
