@@ -481,11 +481,28 @@ function nuketown2Materials(): Nuketown2Materials {
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
     // so the 220 m slab reads as the same scrubland the forest ring stands on
     // rather than as a different planet starting at the fence.
-    ground: standard(0x3f4a30, 1, 0),
+    // Measured on the first Job 3 capture: at 0x3f4a30 the 270 m plain outside
+    // the fence came back as a near-black field that swallowed the forest's own
+    // trunks and made the map look like a lit island in a void. Keyed instead
+    // between the shipped backdrop skirt's two authored ground colours - damp
+    // forest floor 0x4c5340 and dry scrub 0x5d6047 - which is the ground this
+    // slab is standing in for, so the plain and the tree line now read as the
+    // same land.
+    ground: standard(0x515642, 1, 0),
     // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
     // this, and that field's blade green (0x5e9e41) was keyed against it.
     lawn: standard(0x496438, 1, 0),
-    asphalt: standard(0x252a2c, 0.98, 0.02),
+    // asphalt-aged's mean is 0x252a2c, and that is the value a TEXTURED road
+    // wants: the shipped map's road carries a normal map and an aggregate
+    // pattern, so half its pixels catch a highlight and the mean is what is
+    // left after those highlights are averaged back in. This arena's road is a
+    // flat box with no normal and no breakup, and at 0x252a2c under a low sun
+    // it rendered as a HOLE - measured on the first Job 3 capture, the
+    // carriageway and both aprons came back at essentially 0 in every channel
+    // in the street-centre and into-sun frames, with the kerb line floating on
+    // black. Lifted to the value that puts an unlit, unbroken box at the
+    // rendered luminance the shipped map's textured road actually reaches.
+    asphalt: standard(0x41464a, 0.98, 0.02),
     // concrete-poured, fresh at the kerb and weathered on the apron - the
     // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
     kerb: standard(0xa9a697, 0.94, 0.02),
@@ -1040,8 +1057,14 @@ function perimeter(builder: Builder, m: Nuketown2Materials): void {
   const H = 3.2;
   const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
   const depth = NUKETOWN2_BOUNDS.maxZ - NUKETOWN2_BOUNDS.minZ;
-  pair(builder, 'perimeter wall long', [0, H / 2, NUKETOWN2_BOUNDS.minZ + 0.2], [width, H, 0.4], m.block);
-  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.2, H / 2, 0], [0.4, H, depth], m.block);
+  // HF-426 Job 3: TIMBER, not block. The shipped map closes its lots with a
+  // plank fence and this arena closed them with a 3.2 m concrete compound wall,
+  // which is what the first Job 3 yard captures actually show - a pale slab
+  // running the whole length of both yards, the largest single surface in
+  // either frame and the wrong material in a suburb. Same wall, same cover,
+  // same collider; only the paint moved.
+  pair(builder, 'perimeter wall long', [0, H / 2, NUKETOWN2_BOUNDS.minZ + 0.2], [width, H, 0.4], m.fence);
+  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.2, H / 2, 0], [0.4, H, depth], m.fence);
 }
 
 // ---------------------------------------------------------------------------

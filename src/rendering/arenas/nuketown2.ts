@@ -94,12 +94,21 @@ export const definition = createProceduralArenaVisualDefinition({
   colorPipeline: colorPipeline('pass85.nuketown2.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 420, maximumTriangles: 650_000 }),
   reviewCameras: [
-    // The flow frame. High and back over the north-west corner so the whole
-    // 36 x 84 rectangle is in shot: two houses either side of the turning head,
-    // a garage at opposite ends of each, and both back yards running away to
-    // the fences. This is the frame the layout rejig is actually judged on, and
-    // it is the one that has to sit beside the reference overhead.
-    camera('nuketown2-overhead', [-30, 46, -52], [0, 2, 0], 'overview', 1.08),
+    // The flow frame. High over the north-west quarter so the whole 36 x 84
+    // rectangle is in shot: two houses either side of the turning head, a
+    // garage at opposite ends of each, and both back yards running away to the
+    // fences. This is the frame the layout rejig is judged on, and the one that
+    // sits beside the reference overhead.
+    //
+    // MOVED IN under Job 3, [-30, 46, -52] -> [-15, 46, -30]. The old
+    // station stood at 60 m radial, which is INSIDE the forest ring this pass
+    // plants (44.5..70 m), so the first Job 3 capture reviewed the map through
+    // a screen of conifers - half the frame was tree. 33.5 m radial is inside
+    // the ring's inner edge, so the trees are behind the fence where a player
+    // sees them. It reads through ~98 m of air to the far corner and therefore
+    // through real aerial perspective; that is the approved fog curve doing
+    // its job on a station no player ever stands on, not haze on a sightline.
+    camera('nuketown2-overhead', [-15, 46, -30], [0, 2, 6], 'overview', 1.08),
     // Team 0's spawn yard, stood where a player actually spawns (-12, -30),
     // looking at the back of their own house: porch step, back door, yard cover
     // and the fence behind.
