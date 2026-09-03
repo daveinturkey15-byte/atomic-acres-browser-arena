@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync,
+  copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -127,9 +127,29 @@ if (!candidateJs.some((path) => readFileSync(path).includes(Buffer.from(config.e
   throw new Error(`Experimental candidate does not contain ${config.experimental.pass}`);
 }
 
+// ---------------------------------------------------------------------------
+// PASS 87 Lane AR, item 10: STAGE NON-DESTRUCTIVELY.
+//
+// These three used to be `renameSync`, i.e. moves. Every check between here and
+// the release-shell copy below - the stable channel's env vars and dist
+// completeness, four pinned Pages channels, the rollback rebuild's timestamp
+// and dist - runs AFTER the move and can throw. When one did, index.html and
+// assets/ had already left the dist root, so the run that failed for
+// "RELEASE_STABLE_DIST must be an absolute path" left a dist whose ROOT was
+// empty. The preview then served a 404, and the next run failed at the guard
+// near the top of this script with the unrelated and misleading message
+// `candidate dist is incomplete` - a message about the build, printed because
+// of a staging failure. The only recovery anybody found was a full rebuild.
+//
+// Copying instead of moving makes the whole step idempotent on failure at the
+// cost of one temporary duplicate of the candidate. `removeStagedOriginals()`
+// deletes that duplicate below, AFTER the last thing that can throw, so the
+// successful end state is byte-identical to the move: a chooser-only dist root.
+// (index.html is overwritten by the release shell either way; assets/ and
+// map3.html are the two that had to be removed explicitly.)
 mkdirSync(experimentalRoot, { recursive: true });
-renameSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
-renameSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'));
+cpSync(join(distRoot, 'index.html'), join(experimentalRoot, 'index.html'));
+cpSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'), { recursive: true });
 // MAP3 (HF-409): the Map 3 showcase page is a second build input, so vite emits
 // it beside index.html at the dist root with `./assets/...` links. Those links
 // only resolve inside the candidate channel, which is where index.html and the
@@ -141,7 +161,17 @@ renameSync(join(distRoot, 'assets'), join(experimentalRoot, 'assets'));
 // channels this script also stages were built before map3.html was an input,
 // and a rebuild of one of those must not fail for want of a page it never had.
 if (existsSync(join(distRoot, 'map3.html'))) {
-  renameSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'));
+  cpSync(join(distRoot, 'map3.html'), join(experimentalRoot, 'map3.html'));
+}
+
+/**
+ * Deletes the candidate copies left in the dist root by the staging above.
+ * Called once, after every step that can throw, so a failure anywhere in
+ * staging leaves a re-runnable dist instead of an empty one.
+ */
+function removeStagedOriginals() {
+  rmSync(join(distRoot, 'assets'), { recursive: true, force: true });
+  rmSync(join(distRoot, 'map3.html'), { force: true });
 }
 
 function stagePinned(channelName, channel) {
@@ -331,6 +361,9 @@ if (config.rollback) {
   }
 }
 
+// Every throwing step is above this line, so the candidate duplicates in the
+// dist root have done their job and the root becomes chooser-only.
+removeStagedOriginals();
 for (const file of ['index.html', 'release-shell.css', 'release-shell.js']) {
   copyFileSync(join(repositoryRoot, 'release-shell', file), join(distRoot, file));
 }
