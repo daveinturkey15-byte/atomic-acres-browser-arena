@@ -42,7 +42,7 @@ describe('changelog', () => {
     // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
     // the owner read as "pass 73 HITL".
     expect(lastUpdatedButtonLabel(latest)).toBe('PASS 89 · RELEASE CANDIDATE');
-    expect(latest.highlights.join('\n')).toContain('A new BALANCED graphics profile between ');
+    expect(latest.highlights.join('\n')).toContain('A new BALANCED graphics mode sits between Performance and Quality');
     const pass88Highlights = CHANGELOG.find((entry) => entry.id === 'pass88')?.highlights.join('\n') ?? '';
     expect(pass88Highlights).toContain('Switching arenas mid-session no longer f');
     const pass87Highlights = CHANGELOG.find((entry) => entry.id === 'pass87')?.highlights.join('\n') ?? '';
