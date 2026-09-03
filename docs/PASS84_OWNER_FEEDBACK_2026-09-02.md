@@ -962,3 +962,19 @@ run 99 fps zero errors. Commit f3615486. Job 3 (the shipped Nuke Town's approved
 look: blue/yellow/orange houses, cream/red coach, lawn field, forest surround
 and mountain ring re-fitted to the new footprint, menu preview re-captured) is
 running on Opus now; PASS 90 follows.
+
+## PASS 90 publish record — 09:34 BST 2026-09-03
+Integration 0a1db1b3 -> gh-pages {pass90 live, pass89 backup}; chooser generation
+6267b5120e57. Shipped: HF-426 Nuke Town Rebuild made accurate to Black Ops 2
+Nuketown 2025 (first-party minimaps; across-street long axis, cul-de-sac stub,
+open truck with the 2x core, closed coach, set-back garages, fence gaps) with the
+shipped Nuke Town's approved look (blue/yellow/orange houses, cream-and-red
+coach, lawn field, forest ring and mountains re-fitted, menu preview re-captured;
+shared-generator lineage repaired); HF-430 chiptune at half volume with ten
+~90 s tracks in a no-repeat shuffle; HF-431 drop shot from sprint clears the
+sprint latch. Full suite 5647/0; boot smoke 13/13; identity OK. Rollback:
+`python scripts/orchestration/publish_pass90.py --rollback`. Owner notes: absolute
+scale of the rebuild is an anchor (one constant to rescale); Shift while prone no
+longer stands you into a sprint; menu music was not halved (game music only).
+Next: HF-427 Raid (Lane AV) on Gemini when its quota resets (~11:45) + Opus
+skeptic, then PASS 91.
