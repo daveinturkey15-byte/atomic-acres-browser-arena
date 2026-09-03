@@ -1080,6 +1080,39 @@ covered. That is the run to buy first with the next quiet window.
 
 
 
+## 13b. Boot smoke — RUN, and green
+
+**VERIFIED: 12 of 12 canonical arenas boot a clean visible solo match on this
+branch.** `PASS73_NATIVE_WEBGPU=1 npx playwright test
+tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1
+--retries=0` -> **12 passed (10.9 m), exit 0**, headless installed Chrome with a
+real hardware WebGPU device (the spec's own first test refuses to run without
+one) and its second test asserting the boot roster still names every arena module
+on disk.
+
+Arenas booted: `atomic-acres`, `skyline-terminal`, `rustworks-1v1`, `gun-range`,
+**`farcrysis`**, `high-seas`, `test1`, `test2`, `map3`, **`nuketown2`**.
+
+Two of those matter for this lane specifically:
+- **`farcrysis`** is the arena the cold-session precompile guard reasons about,
+  it is `selectable: false`, and therefore **no switch matrix can ever reach it**.
+  The boot smoke is the only instrument that exercises it, which is exactly why
+  the skeptic asked for this run. It boots.
+- **`nuketown2`** shipped in PASS 86 and its switch coverage is still 2/8 + 4/8
+  (section 13); its cold boot is now verified on this branch.
+
+The spec's web server runs `vite build()` from THIS worktree and previews it, so
+this is this branch's code, not a retained channel: the freshly built game bundle
+is `dist/channels/pass86/assets/legacy-main-DvXBviTB.js`, written at 03:54 by
+this run, and `?release=latest` resolves to it. **Side effect worth knowing:**
+that build replaced the root `dist/assets/legacy-main-BZjJAeqa.js` the
+switch-matrix and A/B receipts name, so re-running those probes needs a fresh
+`npm run build` first.
+
+Receipt: `docs/evidence/pass87/lane-h2/qa/boot-smoke-12of12.txt`.
+Exit-gate criterion "boot smoke 9/9" — **MET, at 12/12.**
+
+
 ## 14. Exit gate, line by line
 
 | gate criterion | state |
