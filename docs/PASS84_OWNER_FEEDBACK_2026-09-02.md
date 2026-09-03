@@ -940,3 +940,7 @@ skeptic/repair ACCEPT_WITH_FIXES (four worker defects fixed: red ratchet, untest
 shipped path, early timbre swap, wrong opening timbre); merged after the cut ->
 next pass. Note for the owner: Shift while PRONE no longer stands you up into a
 sprint (fresh Shift after standing); menu music not halved (game music only).
+- 07:32: the Gemini bridge hit its individual quota ("resets in 4h9m") right as
+  Lane AV (Raid) launched; AV is deferred to ~11:45 on Gemini. Opus continues
+  only on Nuke Town (skeptic on Jobs 1-2, then Job 3 visual style) so priority 1
+  is not delayed; the PASS 90 cut carries Nuke Town + chiptune/drop-shot.
