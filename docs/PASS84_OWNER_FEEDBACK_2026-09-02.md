@@ -1232,3 +1232,27 @@ assets and textures and lighting need to be tip top, raid can come next"
   Q1 rerun with low thinking after its chain. 05:15 wake → morning decision
   with at most one small Opus check; the Opus work moves after the ~11:30
   weekly reset. Nothing merges or publishes overnight.
+
+## HF-448..451 — owner 2026-09-03 22:15 after playing PASS 92
+
+- **HF-448 (P0):** "there is still massive Z fighting on the house ground floor,
+  needs a big fix" → the polygonOffset tiers did not cure the interiors. Fix
+  geometrically: interior slabs +0.06 m above the ground plane, no ground/lawn/
+  dressing drawn under house or garage footprints, a house-interior class in
+  the coplanar instrument that ignores material offsets, a fidelity assertion,
+  and grazing-angle interior captures. Injected into every remaining overnight
+  build step (round 1 FINAL, round 2 cycles 4–6, FINAL).
+- **HF-449 (P1):** "the stairs are still sticky to navigate" → one invisible
+  smooth ramp collider per flight under presentation-only treads; walk probe
+  both ways with a ground-contact and frame-budget assertion; parity gate kept.
+- **HF-450 (P1):** "the fps seemed bad but maybe as my pc is busy with qwen?" →
+  likely partly Qwen (13.8 GB VRAM when awake) and the overnight captures
+  sharing the GPU while the owner played; but the overnight builder must now
+  quote draw calls / frame time before and after each cycle against the
+  PASS 92 baseline, batch static props, LOD vegetation, and cut density if
+  draw calls grow more than 15 %.
+- **HF-451:** "the graphics/assets/textures/threejs techniques i shared need
+  to be used overnight if compute allows as the map looks and feels like basic
+  geometry atm, but nicely playable so thats good" → the ingested skills are
+  already the builder's brief; the prompt now forbids flat single-colour
+  surfaces anywhere a critic camera can see.
