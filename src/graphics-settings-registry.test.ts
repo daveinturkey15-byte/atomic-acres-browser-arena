@@ -8,6 +8,7 @@ import {
   normalizeAdvancedGraphicsValues,
   validateAdvancedGraphicsRegistry,
 } from './graphics-settings-registry';
+import { BAKED_INDIRECT_MAXIMUM_GAIN } from './rendering/lighting/baked-indirect';
 import {
   DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX,
   GODRAY_MAXIMUM_ADDITIVE_GAIN,
@@ -34,6 +35,12 @@ const SCREEN_SPACE_KEYS = [
   // HF-398 joins the family it composites with: the trace adds into the same
   // additive reflection term and is bound by the same envelope.
   'rayTracing',
+  // HF-418 joins for the same reason and because of how it nearly did not: the
+  // control was added to the promise matrix below with a value of 'off' on all
+  // four presets and NEVER COMPARED, because it was missing from this list. A
+  // table that is not read is worse than no table - it told the owner MAX gets
+  // no baked bounce while MAX shipped 'high'.
+  'bakedIndirect',
   'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
 ] as const;
 
@@ -209,7 +216,10 @@ describe('Advanced Graphics canonical registry', () => {
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       high: {
-        bakedIndirect: 'off',
+        // QUALITY, the auto-selected default. LOW baked bounce: measured at
+        // +0.7% median / +0.3% p95 against the layer switched off, and zero
+        // added pipelines at admission.
+        bakedIndirect: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
@@ -222,13 +232,16 @@ describe('Advanced Graphics canonical registry', () => {
       // Motion blur stays at zero because it is the one effect that removes
       // information, on the preset whose whole proposition is detail.
       raytraced: {
-        bakedIndirect: 'off',
+        // Classic recursive tracing computes NO indirect bounce, so this is the
+        // preset that needs the baked one most; it is what gets raised instead
+        // of a flat ambient constant.
+        bakedIndirect: 'high',
         volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
-        bakedIndirect: 'off',
+        bakedIndirect: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
         // MAX is untouched by HF-398. It already cannot deploy against the
         // 4000 ms admission bound; adding a large new fragment shader to it
@@ -265,7 +278,9 @@ describe('Advanced Graphics canonical registry', () => {
       // and throws on a breach, so this is the same fail-closed check the arena
       // build runs — not a restatement of it.
       const runtime = resolveScreenSpacePostRuntime({
-        bakedIndirect: 'off',
+        // preset.X, like every sibling field. Hardcoding 'off' here meant the
+        // shipped presets' baked composite never reached the envelope assert.
+        bakedIndirect: preset.bakedIndirect,
         volumetricLightShafts: preset.volumetricLightShafts,
         screenSpaceReflections: preset.screenSpaceReflections,
         screenSpaceGi: preset.screenSpaceGi,
@@ -279,6 +294,10 @@ describe('Advanced Graphics canonical registry', () => {
       expect(runtime.reflections.intensity, `${name} SSR intensity`).toBeLessThanOrEqual(SSR_MAXIMUM_INTENSITY);
       expect(runtime.globalIllumination.giIntensity, `${name} SSGI gain`).toBeLessThanOrEqual(SSGI_MAXIMUM_GI_INTENSITY);
       expect(runtime.motionBlur.maximumUvOffset, `${name} blur offset`).toBeLessThanOrEqual(MOTION_BLUR_MAXIMUM_UV_OFFSET);
+      expect(runtime.bakedIndirect.composite, `${name} baked indirect gain`)
+        .toBeLessThanOrEqual(BAKED_INDIRECT_MAXIMUM_GAIN);
+      // A preset that asks for the layer must actually get it, not a silent off.
+      expect(runtime.bakedIndirect.enabled, `${name} baked indirect`).toBe(preset.bakedIndirect !== 'off');
       // A preset that enables shafts must actually get them, not a reason string.
       if (preset.volumetricLightShafts !== 'off') {
         expect(runtime.godrays.enabled, `${name} shafts`).toBe(true);
