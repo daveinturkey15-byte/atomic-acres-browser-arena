@@ -306,7 +306,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
     const definition = (await ARENA_VISUAL_REGISTRY.map3()).definition;
     const graphics = {
-      principalSamples: 1,
+      principalSamples: 1 as const,
       volumetricScale: 0.5,
       ambientOcclusion: {
         quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false,
