@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { computeMatrixVerdict } from './cross-browser-gate-contract.mjs';
-import { MINIMUM_EYE_CLEARANCE_ARENAS, eyeClearanceArenaIds } from './eye-clearance-roster.mjs';
+import { MINIMUM_EYE_CLEARANCE_ARENAS, eyeClearanceArenaIds, parkedArenaIds } from './eye-clearance-roster.mjs';
 
 const lane = (name, verdict) => ({ lane: name, verdict });
 
@@ -130,11 +130,17 @@ test('every selectable arena is covered by the derived roster', () => {
   // MAP3 joins the required set with its card: an offered arena that no browser
   // ever loads is exactly the hole this required set exists to catch. FARCRYSIS
   // joins it at HF-423 for the same reason.
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3', 'farcrysis']) {
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
-  // The negative pin that used to stand here - "farcrysis is selectable:false
-  // and must stay out of the required set" - is retired by HF-423. It is not
-  // dropped: farcrysis is now in the REQUIRED list above, the same fact in the
-  // stronger direction. A PREVIEW card is browser-tested like any other.
+  // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the
+  // required set. Its exclusion is ASSERTED, not merely dropped - the parked
+  // set is derived from the same registry scrape as the offered set, so a
+  // parked arena cannot quietly slip out of coverage, and a future park or
+  // un-park needs no edit here at all.
+  const parked = parkedArenaIds();
+  assert.ok(parked.length > 0, 'the parked-arena pin must not be vacuous');
+  for (const id of parked) {
+    assert.ok(!selectable.includes(id), `${id} is parked and must not be in this roster`);
+  }
 });

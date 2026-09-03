@@ -1,0 +1,155 @@
+{
+  "contract": "hf414-graphics-profile-views/1",
+  "capturedAtIso": "2026-09-02T22:04:33.335Z",
+  "arena": "atomic-acres",
+  "cameras": [
+    "nuke-town-overview",
+    "nuke-town-street-axis"
+  ],
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "results": [
+    {
+      "preset": "performance",
+      "arena": "atomic-acres",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-overview.performance.png",
+          "frame": 422,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-street-axis.performance.png",
+          "frame": 528,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        }
+      ],
+      "errors": [],
+      "backend": "webgpu",
+      "appliedPreset": "performance"
+    },
+    {
+      "preset": "balanced",
+      "arena": "atomic-acres",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-overview.balanced.png",
+          "frame": 446,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-street-axis.balanced.png",
+          "frame": 558,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        }
+      ],
+      "errors": [],
+      "backend": "webgpu",
+      "appliedPreset": "balanced"
+    },
+    {
+      "preset": "high",
+      "arena": "atomic-acres",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-overview.high.png",
+          "frame": 426,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-street-axis.high.png",
+          "frame": 522,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        }
+      ],
+      "errors": [],
+      "backend": "webgpu",
+      "appliedPreset": "high"
+    },
+    {
+      "preset": "raytraced",
+      "arena": "atomic-acres",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-overview.raytraced.png",
+          "frame": 401,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-street-axis.raytraced.png",
+          "frame": 493,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        }
+      ],
+      "errors": [],
+      "backend": "webgpu",
+      "appliedPreset": "raytraced"
+    },
+    {
+      "preset": "max",
+      "arena": "atomic-acres",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-overview.max.png",
+          "frame": 260,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        },
+        {
+          "cameraId": "nuke-town-street-axis",
+          "ok": true,
+          "path": "C:/Users/david/projects/aa-claude-graphics/artifacts/graphics-audit/views/atomic-acres/nuke-town-street-axis.max.png",
+          "frame": 312,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08
+        }
+      ],
+      "errors": [],
+      "backend": "webgpu",
+      "appliedPreset": "max"
+    }
+  ]
+}

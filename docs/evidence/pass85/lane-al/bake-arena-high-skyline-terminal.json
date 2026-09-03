@@ -1,0 +1,25 @@
+{
+  "tier": "high",
+  "scene": "skyline-terminal (extracted)",
+  "proxy": "artifacts/proxy/skyline-terminal.json",
+  "digest": "5aaa7d9b",
+  "digestStable": true,
+  "coefficientsIdentical": true,
+  "probes": 6912,
+  "grid": "24x12x24",
+  "repeats": 3,
+  "bakeMs": [
+    2772,
+    2306,
+    2165
+  ],
+  "bakeMsMedian": 2306,
+  "bakeMsMin": 2165,
+  "bakeMsMax": 2772,
+  "cacheDecodeMs": 22.09,
+  "cacheDecodeMatches": true,
+  "occluderShapes": 24,
+  "filledProbes": 1015,
+  "serialisedBytes": 442741,
+  "at": "2026-09-03T02:43:55.967Z"
+}

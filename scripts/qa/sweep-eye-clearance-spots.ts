@@ -210,8 +210,17 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * being un-hidden as a PREVIEW card (2026-09-02, HF-423) made it 10; the Raid
  * Rebuild (HF-408, Lane AQ, 2026-09-03) made it 11. Raise it when an arena is
  * added; never lower it to get a run green.
+ * HF-429 (owner, 2026-09-03) PARKED farcrysis again, so the real
+ * selectable roster is TEN and this floor follows it DOWN. Lowering a floor
+ * is normally the exact move this comment forbids, so read the rule
+ * precisely: the floor is an alarm on the SCRAPE collapsing, and the contract
+ * test asserts it EQUALS the derived roster in both directions. A floor left
+ * at 11 against a real roster of 10 does not gate harder - it reds every run
+ * and gets switched off. Never lower it to get a RUN green; do lower it when
+ * the roster itself legitimately shrinks, in the same commit as the registry
+ * edit that shrank it.
  */
-export const MINIMUM_SWEPT_ARENAS = 11;
+export const MINIMUM_SWEPT_ARENAS = 10;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

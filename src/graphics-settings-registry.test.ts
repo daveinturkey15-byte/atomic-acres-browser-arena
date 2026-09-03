@@ -8,6 +8,7 @@ import {
   normalizeAdvancedGraphicsValues,
   validateAdvancedGraphicsRegistry,
 } from './graphics-settings-registry';
+import { BAKED_INDIRECT_MAXIMUM_GAIN } from './rendering/lighting/baked-indirect';
 import {
   DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX,
   GODRAY_MAXIMUM_ADDITIVE_GAIN,
@@ -34,6 +35,12 @@ const SCREEN_SPACE_KEYS = [
   // HF-398 joins the family it composites with: the trace adds into the same
   // additive reflection term and is bound by the same envelope.
   'rayTracing',
+  // HF-418 joins for the same reason and because of how it nearly did not: the
+  // control was added to the promise matrix below with a value of 'off' on all
+  // four presets and NEVER COMPARED, because it was missing from this list. A
+  // table that is not read is worse than no table - it told the owner MAX gets
+  // no baked bounce while MAX shipped 'high'.
+  'bakedIndirect',
   'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
 ] as const;
 
@@ -203,11 +210,38 @@ describe('Advanced Graphics canonical registry', () => {
     // that the owner can read what Max gets without opening the renderer.
     const matrix = {
       performance: {
+        bakedIndirect: 'off',
+        volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+        rayTracing: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+      },
+      // HF-418 BALANCED. It takes NOTHING from the screen-space stack: every
+      // member of this family is either a new render-target attachment (SSR),
+      // a per-pixel raymarch (shafts), an expensive gather (SSGI) or an effect
+      // that replaces pixels (DoF, motion blur). Its whole proposition is
+      // QUALITY's LOOK - native resolution, shadows, the filmic grade - without
+      // QUALITY's per-frame structures, so this row stays identical to
+      // PERFORMANCE's. If a future edit promotes one of these into Balanced,
+      // this line is where it has to be argued.
+      balanced: {
+        // PASS 89: the ONE exception to "identical to PERFORMANCE's row", and
+        // the reason it is not a promotion of the family above. Lane AL pins
+        // that LOW and HIGH baked indirect differ only in BAKE cost and never
+        // in per-frame cost, and the bake runs chunked under a per-ray 3 ms
+        // wall-clock bound. BALANCED takes QUALITY's tier because a baked
+        // volume is an offline cost that buys bounce light - which is exactly
+        // this profile's proposition - and because leaving it OFF would have
+        // made this rung darker than PERFORMANCE is bright once QUALITY got it.
+        bakedIndirect: 'low',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       high: {
+        // QUALITY, the auto-selected default. LOW baked bounce: measured at
+        // +0.7% median / +0.3% p95 against the layer switched off, and zero
+        // added pipelines at admission.
+        bakedIndirect: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
@@ -220,11 +254,16 @@ describe('Advanced Graphics canonical registry', () => {
       // Motion blur stays at zero because it is the one effect that removes
       // information, on the preset whose whole proposition is detail.
       raytraced: {
+        // Classic recursive tracing computes NO indirect bounce, so this is the
+        // preset that needs the baked one most; it is what gets raised instead
+        // of a flat ambient constant.
+        bakedIndirect: 'high',
         volumetricLightShafts: 'low', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
+        bakedIndirect: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
         // MAX is untouched by HF-398. It already cannot deploy against the
         // 4000 ms admission bound; adding a large new fragment shader to it
@@ -233,6 +272,9 @@ describe('Advanced Graphics canonical registry', () => {
         depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
       },
     } as const;
+    // A preset with no row here would be silently unpinned, which is exactly
+    // how a table stops being "the promise" it says it is.
+    expect(Object.keys(matrix).sort()).toEqual(Object.keys(GRAPHICS_PRESET_VALUES).sort());
     for (const [name, expected] of Object.entries(matrix)) {
       const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
       for (const key of SCREEN_SPACE_KEYS) {
@@ -261,6 +303,9 @@ describe('Advanced Graphics canonical registry', () => {
       // and throws on a breach, so this is the same fail-closed check the arena
       // build runs — not a restatement of it.
       const runtime = resolveScreenSpacePostRuntime({
+        // preset.X, like every sibling field. Hardcoding 'off' here meant the
+        // shipped presets' baked composite never reached the envelope assert.
+        bakedIndirect: preset.bakedIndirect,
         volumetricLightShafts: preset.volumetricLightShafts,
         screenSpaceReflections: preset.screenSpaceReflections,
         screenSpaceGi: preset.screenSpaceGi,
@@ -274,6 +319,10 @@ describe('Advanced Graphics canonical registry', () => {
       expect(runtime.reflections.intensity, `${name} SSR intensity`).toBeLessThanOrEqual(SSR_MAXIMUM_INTENSITY);
       expect(runtime.globalIllumination.giIntensity, `${name} SSGI gain`).toBeLessThanOrEqual(SSGI_MAXIMUM_GI_INTENSITY);
       expect(runtime.motionBlur.maximumUvOffset, `${name} blur offset`).toBeLessThanOrEqual(MOTION_BLUR_MAXIMUM_UV_OFFSET);
+      expect(runtime.bakedIndirect.composite, `${name} baked indirect gain`)
+        .toBeLessThanOrEqual(BAKED_INDIRECT_MAXIMUM_GAIN);
+      // A preset that asks for the layer must actually get it, not a silent off.
+      expect(runtime.bakedIndirect.enabled, `${name} baked indirect`).toBe(preset.bakedIndirect !== 'off');
       // A preset that enables shafts must actually get them, not a reason string.
       if (preset.volumetricLightShafts !== 'off') {
         expect(runtime.godrays.enabled, `${name} shafts`).toBe(true);
@@ -283,6 +332,7 @@ describe('Advanced Graphics canonical registry', () => {
     // Depth of field is the one bound that is a function of a slider rather than
     // a tier, so pin the shipped Max strength against the ceiling directly.
     const maxRuntime = resolveScreenSpacePostRuntime({
+      bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
       depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
       depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,
@@ -376,6 +426,15 @@ describe('Advanced Graphics weather controls', () => {
         weatherIntensity: 'light', rainDensity: 0.5, windStrength: 1, lightning: false,
         wetSurfaces: true, ambientLife: 0.6,
       },
+      // HF-418 BALANCED. Rain and air sit BETWEEN the two neighbouring rungs,
+      // and the storm CEILING is left open rather than capped as PERFORMANCE
+      // caps it: the ceiling is not the cost, the instance count is, so this
+      // profile thins the count instead of hiding a weather state the arenas
+      // were authored to reach.
+      balanced: {
+        weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
+        wetSurfaces: true, ambientLife: 0.8,
+      },
       high: {
         weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
         wetSurfaces: true, ambientLife: 1,
@@ -389,6 +448,9 @@ describe('Advanced Graphics weather controls', () => {
         wetSurfaces: true, ambientLife: 1.5,
       },
     } as const;
+    // A preset with no row here would be silently unpinned, which is exactly
+    // how a table stops being "the promise" it says it is.
+    expect(Object.keys(matrix).sort()).toEqual(Object.keys(GRAPHICS_PRESET_VALUES).sort());
     for (const [name, expected] of Object.entries(matrix)) {
       const preset = GRAPHICS_PRESET_VALUES[name as keyof typeof GRAPHICS_PRESET_VALUES];
       for (const key of WEATHER_KEYS) {

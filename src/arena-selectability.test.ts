@@ -15,13 +15,24 @@ import { ARENA_SELECTIONS, SELECTABLE_ARENAS, decodeArenaId } from './map-select
 // looks identical in the menu and is a data-loss bug everywhere else. The decode half is
 // unchanged by the un-hide, and is asserted below exactly as it was while it was hidden.
 describe('arena selectability', () => {
-  it('offers farcrysis in the menu as a PREVIEW card', () => {
-    const offered = SELECTABLE_ARENAS.find((entry) => entry.id === 'farcrysis');
-    expect(offered, 'farcrysis must be selectable (HF-423)').toBeDefined();
-    // PREVIEW, not a full ship: `prototype: true` is what drives the card's
-    // preview treatment, and it goes out solo-only until it has been played.
-    expect(offered?.prototype).toBe(true);
-    expect(offered?.multiplayer).toBe(false);
+  it('parks farcrysis behind the menu without withdrawing it (HF-429)', () => {
+    // PARKED 2026-09-03 at the owner's decision. Asserted through the FLAG,
+    // never through an id list: the previous version of this test named
+    // farcrysis as offered, and before that as hidden, and each swing needed
+    // the test rewritten. The registry field is the single source; a park or an
+    // un-park is one edit in src/map-selection.ts and nothing here moves.
+    const row = ARENA_SELECTIONS.find((entry) => entry.id === 'farcrysis');
+    expect(row, 'farcrysis must still be a registered arena').toBeDefined();
+    expect(row?.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.some((entry) => entry.id === 'farcrysis')).toBe(false);
+    // Parked, not reverted: everything Lane R landed is still on the row, so
+    // un-parking is one field and not a rebuild.
+    expect(row?.prototype).toBe(true);
+    expect(row?.multiplayer).toBe(false);
+    expect(row?.soloBotCount).toBe(2);
+    // And the card no longer advertises itself as nearly-ready.
+    expect(row?.rulesLabel ?? '').not.toMatch(/PREVIEW/);
+    expect(row?.selectorLabel ?? '').not.toMatch(/PREVIEW/);
   });
 
   it('still carries farcrysis as a real arena', () => {
@@ -51,13 +62,24 @@ describe('arena selectability', () => {
     expect(map3?.maximumSoloBots).toBe(0);
   });
 
-  it('offers every arena in the registry, including high-seas and farcrysis', () => {
+  it('offers exactly the rows the registry flags as selectable, and hides exactly the rest', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
     // The owner asked for Hijacked (high-seas) kept, explicitly.
     expect(offered).toContain('high-seas');
-    // Nothing is hidden any more, so the menu list IS the registry. This is the
-    // stronger form of the previous assertion, which subtracted farcrysis.
-    expect(offered).toEqual(ARENA_SELECTIONS.map((entry) => entry.id));
+    // DERIVED on both sides. This replaces "the menu list IS the registry",
+    // which was only true on the days nothing was parked and had to be
+    // rewritten every time one was. Both partitions are computed from the flag,
+    // so the pair holds whatever is parked.
+    const flaggedOffered = ARENA_SELECTIONS.filter((entry) => entry.selectable !== false).map((entry) => entry.id);
+    const flaggedHidden = ARENA_SELECTIONS.filter((entry) => entry.selectable === false).map((entry) => entry.id);
+    expect(offered).toEqual(flaggedOffered);
+    expect(new Set([...flaggedOffered, ...flaggedHidden]).size).toBe(ARENA_SELECTIONS.length);
+    // Not vacuous: a hidden row is still a registered arena, which is the half
+    // that keeps saved matches and shared invites decoding.
+    for (const id of flaggedHidden) {
+      expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain(id);
+      expect(decodeArenaId(id)).toBe(id);
+    }
   });
 
   it('keeps the menu list a subset of the registry, in registry order, with nothing invented', () => {

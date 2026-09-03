@@ -206,9 +206,15 @@ export function grainSeedFor(profile: FrozenFilmicGradeProfile, timeMs: number):
 
 /** Maps a graphics preset id onto a grade profile id. Fail-closed on unknowns. */
 export function gradeProfileIdForGraphicsPreset(
-  preset: 'performance' | 'high' | 'max' | 'custom' | 'raytraced' | string,
+  preset: 'performance' | 'balanced' | 'high' | 'max' | 'custom' | 'raytraced' | string,
 ): GradeProfileId {
   if (preset === 'performance') return 'performance';
+  // HF-418 BALANCED takes QUALITY's grade rather than PERFORMANCE's. The grade
+  // chain is tunable uniforms over an already-built stage list - it adds no
+  // pass, no target and no pipeline - so it is the cheapest half of "looks
+  // good" there is, and giving Balanced the flat neutral grade would have
+  // reproduced exactly the look the owner called "shit like performance".
+  if (preset === 'balanced') return 'quality';
   if (preset === 'high') return 'quality';
   if (preset === 'max') return 'max';
   // HF-397 sits between Quality and Max in the preset ladder and carries the richest

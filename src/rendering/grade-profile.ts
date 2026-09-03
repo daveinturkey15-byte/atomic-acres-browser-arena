@@ -70,6 +70,14 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
 export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
   'scene-pass-linear-hdr',
   'motion-blur-velocity-smear',
+  // HF-418 - baked indirect light. It sits with SSGI, immediately BEFORE the
+  // contact-occlusion multiply, for the reason the comment above gives for
+  // SSGI: bounced light must be darkened by ambient occlusion exactly as
+  // direct light is, or a corner that GTAO darkens fills straight back in.
+  // Before SSGI rather than after because it is the lower-frequency term and
+  // the two are additive, so the order between them is a convention, not a
+  // result - it is fixed here so the receipt is stable.
+  'baked-indirect-probe-add',
   'ssgi-screen-space-bounce-add',
   'contact-occlusion-multiply',
   'ssr-screen-space-reflection-add',
@@ -89,6 +97,7 @@ export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
 /** The linear-side stages the assembler may omit. Everything else is mandatory. */
 export const OPTIONAL_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze([
   'motion-blur-velocity-smear',
+  'baked-indirect-probe-add',
   'ssgi-screen-space-bounce-add',
   'ssr-screen-space-reflection-add',
   'raytraced-reflection-refraction-add',

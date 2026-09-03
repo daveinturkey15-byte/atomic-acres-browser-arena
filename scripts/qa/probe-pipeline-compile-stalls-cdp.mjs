@@ -76,6 +76,11 @@ const IDLE = flag('--idle');
 const LABEL = arg('--label', 'run');
 const PORT = Number(arg('--port', '4193'));
 const STALL_GAP_MS = Number(arg('--stall-gap-ms', '100'));
+// Lane AB (PASS 87): optional time-of-day mode for the run. Absent leaves the
+// URL exactly as every earlier invocation built it, so no existing baseline
+// moves; `--tod cycle` is the only mode that re-aims the sun during a match and
+// is therefore the worst case this tripwire needs to see.
+const TOD = arg('--tod', null);
 const OUT = resolve(arg('--out', `artifacts/qa/pipeline-compile/${LABEL}.json`));
 // Viewport must match whatever instrument the result is being compared against:
 // render-target size changes the GPU cost per frame and therefore the stall
@@ -113,7 +118,7 @@ const browser = await chromium.launch({
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion'],
 });
 
-const report = { contract: 'pipeline-compile-stall-probe-v1', measuredAt: new Date().toISOString(), label: LABEL, arena: ARENA, idle: IDLE, dist: DIST, seconds: SECONDS };
+const report = { contract: 'pipeline-compile-stall-probe-v1', measuredAt: new Date().toISOString(), label: LABEL, arena: ARENA, idle: IDLE, dist: DIST, seconds: SECONDS, tod: TOD };
 
 try {
   const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } });
@@ -174,6 +179,7 @@ try {
   const url = new URL(`http://127.0.0.1:${PORT}/`);
   url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', 'webgpu');
+  if (TOD) url.searchParams.set('tod', TOD);
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(() => { const s = document.querySelector('#solo'); return s !== null && !s.disabled; }, undefined, { timeout: BOOT_TIMEOUT_MS });

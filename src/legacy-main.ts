@@ -95,6 +95,19 @@ import {
   type WeatherState,
 } from './weather/weather-state';
 import { createWindField, sampleWind } from './weather/wind-field';
+// LIGHTING: time-of-day model. Pure numbers only — see the module header for
+// why it can never return a light (PASS 82 light-set freeze).
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  arenaDaylightProfile,
+  isLightingTimeChoice,
+  lightingConditionsAreIdentity,
+  lightingConditionWritesEqual,
+  activeLightingTimeChoiceFrom,
+  resolveLightingConditions,
+  type LightingConditionWrites,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -264,6 +277,9 @@ import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell
 // current arena's mode IS. See src/ui/hud-mode-banner.ts.
 import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
+// HF-418 — the RTX explainer is information, not a preset. See the change
+// handler on #graphics-profile: it restores the select and opens the dialog.
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, bindRtxNativeRuntimeExplainer } from './ui/rtx-native-runtime-explainer';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
   MobileTouchControls,
@@ -4051,6 +4067,273 @@ let appliedArenaVisualPolicy: Readonly<{
   reviewCameraIds: readonly string[];
 }> | null = null;
 
+// LIGHTING: ==== time-of-day conditions (Lane AB, PASS 87) ====================
+// The light SET is frozen. buildSky() constructs the hemisphere, ambient, sun
+// and fill lights ONCE at module scope and nothing in this region ever adds,
+// removes, replaces or toggles one — that is the PASS 82 root cause and the
+// reason this whole feature is expressed as uniform writes. Everything below
+// writes colour, intensity, direction, fog colour and exposure into lights that
+// already exist. `src/rendering/lighting-conditions-light-set.test.ts` pins that
+// property against this exact source region, so a future edit that constructs a
+// light here fails a test rather than freezing the game.
+type LightingConditionBaseline = Readonly<{
+  arenaId: ArenaId;
+  sunColor: number;
+  sunIntensity: number;
+  ambientColor: number;
+  ambientIntensity: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  fillColor: number;
+  fillIntensity: number;
+  fogColor: number;
+  exposure: number;
+}>;
+
+const LIGHTING_CONDITION_DEG = Math.PI / 180;
+/**
+ * Below this the re-aimed sun is invisible and would still cost a full static
+ * shadow-map refresh, so `cycle` mode quantises to it. `fixed`/`random` resolve
+ * one hour for the whole match and therefore move the sun exactly zero times.
+ */
+const LIGHTING_CONDITION_SUN_STEP_DEGREES = 0.35;
+/** Absolute elevation clamp applied to the re-aimed sun, in degrees. */
+const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 84 });
+
+const lightingQueryParams = new URLSearchParams(window.location.search);
+const lightingQueryChoice = lightingQueryParams.get('tod');
+const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
+/**
+ * `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode.
+ * It is also writable through the QA hook, because the readability question
+ * this lane had to answer -- at which hour of an arena's band does its shadow
+ * mass cross the safety bound -- is a SCAN, and reloading the page per hour
+ * costs a minute of arena construction for a value that is one uniform write.
+ */
+let lightingCaptureFixedHour: number | null = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
+/**
+ * A LOCAL override, set only by `?tod=` or by the QA hook. It is deliberately
+ * NOT the normal path: the hour is host-authoritative, so the live value comes
+ * from the replicated match config below and a local override exists purely for
+ * deterministic captures and solo experimentation.
+ */
+let lightingTimeChoiceOverride: LightingTimeChoice | null = isLightingTimeChoice(lightingQueryChoice)
+  ? lightingQueryChoice
+  : null;
+/**
+ * HOST-AUTHORITATIVE. A guest reads the host's replicated `config.timeOfDay`;
+ * a host and a solo player read their own. Absent (pre-PASS-87 lobbies and
+ * rejoin envelopes) means the default, so no peer is ever left on a different
+ * sun by an old checkpoint.
+ */
+function activeLightingTimeChoice(): LightingTimeChoice {
+  // The precedence itself is pure and tested in lighting-conditions.ts. Inside a
+  // hosted lobby -- host OR guest -- the replicated value wins outright, so a
+  // `?tod=` URL cannot take one peer off the shared sky; the host changes the
+  // mode through the lobby row, which replicates.
+  const snapshot = privateLobbySnapshot;
+  return activeLightingTimeChoiceFrom({
+    localOverride: lightingTimeChoiceOverride,
+    replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay,
+    hosted: Boolean(snapshot),
+  });
+}
+let lightingConditionBaseline: LightingConditionBaseline | null = null;
+let activeLightingConditions: LightingConditionWrites | null = null;
+let lightingConditionsSkyDarken = 0;
+let lightingConditionsElapsedSeconds = 0;
+/**
+ * The writes that are CURRENTLY IN the lights. The gate below compares against
+ * this record rather than against the resolved hour: the hour is one of two
+ * inputs to the model and weather is the other, so an hour comparison silently
+ * discarded every weather-driven write. See `lightingConditionWritesEqual`.
+ */
+let lightingConditionsAppliedWrites: LightingConditionWrites | null = null;
+let lightingConditionsAppliedElevationDegrees = Number.NaN;
+let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+let lightingConditionsSunReaims = 0;
+let lightingConditionsGateChoice: LightingTimeChoice | null = null;
+let lightingConditionsGateSkyStep = Number.NaN;
+let lightingConditionsGateClockStep = Number.NaN;
+let lightingConditionsGateSeed = Number.NaN;
+let lightingConditionsResolves = 0;
+let lightingConditionsUniformWrites = 0;
+
+const lightingConditionScratchColor = new THREE.Color();
+
+/** Multiplies an authored colour by a bounded per-channel tint, in place. */
+function lightingConditionTint(hex: number, tint: readonly [number, number, number]): THREE.Color {
+  lightingConditionScratchColor.setHex(hex);
+  lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * tint[0]);
+  lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * tint[1]);
+  lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * tint[2]);
+  return lightingConditionScratchColor;
+}
+
+/**
+ * The fog colour every consumer should start from. The nuke charge, the flash
+ * and the arena-change restore all rewrite `scene.fog.color` from the authored
+ * value; routing them through here is what stops those three effects snapping
+ * the sky back to its authored hour for the rest of the match.
+ */
+function conditionedFogBaseColorHex(): number {
+  const authored = activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor;
+  const writes = activeLightingConditions;
+  if (!writes || lightingConditionsAreIdentity(writes)) return authored;
+  return lightingConditionTint(authored, writes.fogTint).getHex();
+}
+
+function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
+  lightingConditionBaseline = Object.freeze(baseline);
+  lightingConditionsAppliedWrites = null;
+  lightingConditionsGateChoice = null;
+  lightingConditionsAppliedElevationDegrees = Number.NaN;
+  lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+}
+
+function resolveActiveLightingConditions(): LightingConditionWrites {
+  return resolveLightingConditions({
+    arenaId: selectedArena.id,
+    matchSeed: weatherMatchSeed,
+    elapsedSeconds: lightingConditionsElapsedSeconds,
+    choice: activeLightingTimeChoice(),
+    skyDarkenAmount: lightingConditionsSkyDarken,
+    // `?todhour=` is the same class of local override as `?tod=` and obeys the
+    // same rule: inside a hosted lobby it is ignored, so the scan hour cannot
+    // desync a guest from the host's sky either.
+    ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
+  });
+}
+
+/**
+ * Re-aims the ALREADY-EXISTING key light. `graphicsRefinement.applyArena` owns
+ * the base offset and the shadow camera; this only rotates the same vector about
+ * the same target, and only when the movement is large enough to be seen — a
+ * sun that jitters by hundredths of a degree would refresh the static shadow map
+ * every frame for no visible gain.
+ */
+function reaimConditionedSun(writes: LightingConditionWrites): void {
+  if (!sunLight) return;
+  const base = activeLighting.sunPosition;
+  const radius = Math.hypot(base[0], base[1], base[2]);
+  if (!(radius > 0)) return;
+  const baseElevation = Math.atan2(base[1], Math.hypot(base[0], base[2])) / LIGHTING_CONDITION_DEG;
+  const baseAzimuth = Math.atan2(base[2], base[0]) / LIGHTING_CONDITION_DEG;
+  const elevation = Math.min(
+    LIGHTING_CONDITION_ELEVATION_CLAMP.maximum,
+    Math.max(LIGHTING_CONDITION_ELEVATION_CLAMP.minimum, baseElevation + writes.sunElevationDeltaDegrees),
+  );
+  const azimuth = baseAzimuth + writes.sunAzimuthDeltaDegrees;
+  const movedEnough = !Number.isFinite(lightingConditionsAppliedElevationDegrees)
+    || Math.abs(elevation - lightingConditionsAppliedElevationDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES
+    || Math.abs(azimuth - lightingConditionsAppliedAzimuthDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES;
+  if (!movedEnough) return;
+  lightingConditionsAppliedElevationDegrees = elevation;
+  lightingConditionsAppliedAzimuthDegrees = azimuth;
+  const flat = Math.cos(elevation * LIGHTING_CONDITION_DEG) * radius;
+  // Same composition graphicsRefinement.applyArena uses: horizontal components
+  // are offsets from the arena centre, the vertical component is absolute.
+  sunLight.position.set(
+    sunLight.target.position.x + flat * Math.cos(azimuth * LIGHTING_CONDITION_DEG),
+    Math.sin(elevation * LIGHTING_CONDITION_DEG) * radius,
+    sunLight.target.position.z + flat * Math.sin(azimuth * LIGHTING_CONDITION_DEG),
+  );
+  sunLight.shadow.needsUpdate = true;
+  lightingConditionsSunReaims += 1;
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
+}
+
+/**
+ * The ONE place time of day reaches the renderer. Every statement below is an
+ * assignment into an existing light, an existing fog instance or the exposure
+ * uniform. No light is created, destroyed, parented or unparented.
+ */
+function applyLightingConditionUniforms(force = false): void {
+  const baseline = lightingConditionBaseline;
+  if (!baseline || baseline.arenaId !== selectedArena.id) return;
+  const choice = activeLightingTimeChoice();
+  // GATE BEFORE THE RESOLVE. This runs every frame, and `resolveLightingConditions`
+  // allocates a frozen record with six frozen tints; at 144 Hz that is ~1,000
+  // short-lived objects a second bought for nothing, because in every mode except
+  // `cycle` the hour is CONSTANT for the whole match. Only two inputs can move --
+  // the weather's sky-darken and, in `cycle`, the clock -- so both are quantised
+  // and compared first. In `fixed`/`random` steady state this function costs four
+  // comparisons and returns.
+  const skyStep = Math.round(lightingConditionsSkyDarken * 256);
+  const clockStep = choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0;
+  if (!force
+    && choice === lightingConditionsGateChoice
+    && skyStep === lightingConditionsGateSkyStep
+    && clockStep === lightingConditionsGateClockStep
+    && weatherMatchSeed === lightingConditionsGateSeed) return;
+  lightingConditionsGateChoice = choice;
+  lightingConditionsGateSkyStep = skyStep;
+  lightingConditionsGateClockStep = clockStep;
+  lightingConditionsGateSeed = weatherMatchSeed;
+  lightingConditionsResolves += 1;
+  const writes = resolveActiveLightingConditions();
+  activeLightingConditions = writes;
+  // GATE ON THE WRITES, NOT ON THE HOUR. The hour is one of TWO inputs to
+  // `resolveLightingConditions`; `skyDarkenAmount` is the other and never enters
+  // `hour`. An hour comparison here therefore threw away every weather-driven
+  // write in `fixed`/`random` (the default is `random`), so the documented
+  // weather-neutralisation composition never reached a light in the shipped
+  // game and `conditionedFogBaseColorHex()` restored a tint the lights had not
+  // been given. Comparing what is about to be WRITTEN against what is already
+  // in the lights cannot have that class of bug.
+  if (!force && lightingConditionWritesEqual(writes, lightingConditionsAppliedWrites)) return;
+  lightingConditionsAppliedWrites = writes;
+  lightingConditionsUniformWrites += 1;
+  const indirect = graphicsRuntime.indirectLightScale;
+  if (sunLight) {
+    sunLight.color.copy(lightingConditionTint(baseline.sunColor, writes.sunTint));
+    sunLight.intensity = baseline.sunIntensity * writes.sunIntensityScale;
+    reaimConditionedSun(writes);
+  }
+  if (ambientLight) {
+    ambientLight.color.copy(lightingConditionTint(baseline.ambientColor, writes.ambientTint));
+    ambientLight.intensity = baseline.ambientIntensity * indirect * writes.ambientIntensityScale;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.copy(lightingConditionTint(baseline.hemisphereSky, writes.hemisphereSkyTint));
+    hemisphereLight.groundColor.copy(lightingConditionTint(baseline.hemisphereGround, writes.hemisphereGroundTint));
+    hemisphereLight.intensity = baseline.hemisphereIntensity * indirect * writes.hemisphereIntensityScale;
+  }
+  if (fillLight) {
+    fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
+    fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
+  }
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
+  // A deterministic review camera owns the exposure while it is set -- that is
+  // the capture contract every viewpoint baseline in the repo rests on -- and it
+  // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
+  // would silently discard it the next time weather nudged the gate open, so the
+  // hour's lift composes ON TOP of whichever exposure actually owns the frame.
+  const ownedExposure = activeArenaReviewExposure ?? baseline.exposure;
+  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale));
+}
+
+/** Telemetry for the QA probes and the debug panel. Read-only. */
+function lightingConditionsTelemetry(): Record<string, unknown> {
+  const writes = activeLightingConditions;
+  return {
+    choice: activeLightingTimeChoice(),
+    localOverride: lightingTimeChoiceOverride,
+    hour: writes ? Number(writes.hour.toFixed(3)) : null,
+    deviation: writes ? Number(writes.deviation.toFixed(4)) : null,
+    sunIntensityScale: writes ? Number(writes.sunIntensityScale.toFixed(4)) : null,
+    shadowFloorScale: writes ? Number(writes.shadowFloorScale.toFixed(4)) : null,
+    exposureScale: writes ? Number(writes.exposureScale.toFixed(4)) : null,
+    skyDarkenAmount: Number(lightingConditionsSkyDarken.toFixed(4)),
+    identity: writes ? lightingConditionsAreIdentity(writes) : true,
+    sunReaims: lightingConditionsSunReaims,
+    uniformWrites: lightingConditionsUniformWrites,
+    resolves: lightingConditionsResolves,
+  };
+}
+// LIGHTING: ==== end time-of-day conditions ====================================
+
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
   renderRuntime.setExposure(effectiveGraphicsExposure(definition.colorPipeline.exposure));
@@ -4101,6 +4384,23 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     budgets: definition.budgets,
     reviewCameraIds: Object.freeze(definition.reviewCameras.map((entry) => entry.id)),
   });
+  // LIGHTING: the authored values written above ARE the arena's identity anchor.
+  // Snapshot them, then compose the resolved hour on top as uniform writes.
+  captureLightingConditionBaseline({
+    arenaId: definition.id,
+    sunColor: definition.lighting.sunColor,
+    sunIntensity: definition.lighting.sunIntensity,
+    ambientColor: definition.lighting.ambientColor,
+    ambientIntensity: definition.lighting.ambientIntensity,
+    hemisphereSky: activeLighting.hemisphereSky,
+    hemisphereGround: activeLighting.hemisphereGround,
+    hemisphereIntensity: activeLighting.hemisphereIntensity,
+    fillColor: activeLighting.fillColor,
+    fillIntensity: activeLighting.fillIntensity,
+    fogColor: definition.fog.color,
+    exposure: definition.colorPipeline.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -4570,7 +4870,11 @@ void mistQuery;
 // host identity and the match start stamp - never Math.random or a local clock.
 let weatherMatchSeed = 0;
 let lastRainUpdateAtMs = 0;
-const weatherOverrideState = (() => {
+// LIGHTING: `let`, not `const`, only so the QA hook below can move the weather
+// WITHOUT a reload. The lane needed to prove that a weather change reaches the
+// lights on the ordinary per-frame path (no forced apply), and a URL-only
+// override can only be set before the arena exists.
+let weatherOverrideState = (() => {
   const requested = new URLSearchParams(window.location.search).get('weather');
   return requested && WEATHER_SEVERITY_LADDER.includes(requested as WeatherState)
     ? requested as WeatherState
@@ -8416,9 +8720,13 @@ function initializeFreshHostLobby(): void {
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
+  // LIGHTING: the host's own solo choice seeds the lobby row rather than being
+  // silently reset to the default; from here on the replicated value is the
+  // authority for every peer, this host included.
+  const seedTimeOfDay = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
   privateMatchConfig = selectedArena.id === 'gun-range'
-    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
-    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000, timeOfDay: seedTimeOfDay }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id, timeOfDay: seedTimeOfDay };
   privateMatchMode = privateMatchConfig.mode;
   const squad = sanitizeSquadPresentation(localSquadName, localSquadColor, player.team);
   localSquadName = squad.name;
@@ -10515,6 +10823,17 @@ function renderPrivateLobby(): void {
   killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
   timeLimitInput.disabled = !hostControls || rangeLobby;
   killLimitInput.disabled = !hostControls || rangeLobby;
+  // LIGHTING: the same mirror for the host's TIME OF DAY choice. A guest reads
+  // it and cannot edit it, exactly like the two limits above, because two peers
+  // on different hours are arguing about a different match.
+  const timeOfDayInput = element<HTMLSelectElement>('#lobby-time-of-day');
+  timeOfDayInput.value = (snapshot?.config.timeOfDay ?? privateMatchConfig.timeOfDay) ?? DEFAULT_LIGHTING_TIME_CHOICE;
+  // Gun Range is indoors and Map 3 is preview-pinned: both resolve to the
+  // authored hour whatever is chosen, so the control is disabled rather than
+  // offering a choice that provably does nothing.
+  timeOfDayInput.disabled = !hostControls || arenaDaylightProfile(arenaSelection(
+    (snapshot?.config.arenaId ?? privateMatchConfig.arenaId),
+  ).id).pinned;
   const localMember = members.find((member) => member.id === player.id);
   // HF-328: squad identity is prescribed, so the free name input and colour picker
   // no longer exist in the lobby markup. Project the canonical identity into the
@@ -25168,7 +25487,7 @@ function updateNuke(now: number): void {
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
     const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
     if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0x8c536f), charge * 0.24);
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -25179,14 +25498,14 @@ function updateNuke(now: number): void {
   sequence.shockwave.scale.setScalar(0.1 + blastProgress * 180);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   flash.hidden = true;
   flash.style.opacity = '0';
   nukeSequence = null;
@@ -26255,7 +26574,7 @@ function clearFieldSupport(): void {
   nukeShockwave.visible = false;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   const nukeWarning = element<HTMLElement>('#nuke-warning');
   const nukeFlash = element<HTMLElement>('#nuke-flash');
   nukeWarning.hidden = true;
@@ -28171,6 +28490,7 @@ function flushPendingGraphics(): void {
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
   pendingGraphicsPreset = 'custom';
   graphicsProfileInput.value = 'custom';
+  refreshGraphicsProfileCopy('custom');
   refreshGraphicsPendingBadge();
 });
 document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
@@ -28220,7 +28540,32 @@ hardRefreshButton.addEventListener('click', () => {
     reloadFresh();
   }
 });
+// HF-418 — the RTX row is an EXPLAINER, not a preset. Selecting it must leave
+// the renderer exactly as it was: no staged preset, no advanced-panel refresh,
+// no reload. The select is put back to the mode that is actually active and
+// then the dialog opens. `RTX_NATIVE_RUNTIME_OPTION_VALUE` is deliberately not
+// a member of GraphicsPreset, so even if this branch were ever removed the
+// value could not be persisted - normalizePass65Settings would reject it.
+const rtxNativeRuntimeExplainer = bindRtxNativeRuntimeExplainer(document);
+
+// HF-414/HF-418 — one honest line per mode, plus the expandable detail. Every
+// block is rendered into the shell and all but the active one carry `hidden`,
+// so this only toggles visibility and never composes player-facing copy in the
+// 35k-line module.
+function refreshGraphicsProfileCopy(preset: string): void {
+  for (const node of document.querySelectorAll<HTMLElement>('[data-graphics-profile]')) {
+    node.hidden = node.dataset.graphicsProfile !== preset;
+  }
+}
+refreshGraphicsProfileCopy(displayedGraphicsPreset);
+
 graphicsProfileInput.addEventListener('change', () => {
+  if (graphicsProfileInput.value === RTX_NATIVE_RUNTIME_OPTION_VALUE) {
+    graphicsProfileInput.value = pendingGraphicsPreset ?? displayedGraphicsPreset;
+    refreshGraphicsProfileCopy(graphicsProfileInput.value);
+    rtxNativeRuntimeExplainer.open();
+    return;
+  }
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
   if (preset !== 'custom' && preset in GRAPHICS_PRESET_VALUES) {
@@ -28228,6 +28573,7 @@ graphicsProfileInput.addEventListener('change', () => {
     // can see what they were before deciding to tweak them into a custom set.
     advancedGraphicsBinding.refresh({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset as keyof typeof GRAPHICS_PRESET_VALUES] });
   }
+  refreshGraphicsProfileCopy(preset);
   refreshGraphicsPendingBadge();
 });
 
@@ -29294,6 +29640,26 @@ function applyArenaLightingForSelection(): void {
   }
   arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
+  // LIGHTING: this function is the canonical "write the AUTHORED lighting into
+  // the frozen light set" path (arena selection and every graphics-settings
+  // apply land here). Re-anchor the baseline on the values it just wrote, then
+  // re-compose the resolved hour — otherwise changing a graphics setting mid
+  // match would silently snap the sky back to the arena's authored hour.
+  captureLightingConditionBaseline({
+    arenaId: selectedArena.id,
+    sunColor: definition?.lighting.sunColor ?? lighting.sunColor,
+    sunIntensity: definition?.lighting.sunIntensity ?? lighting.sunIntensity,
+    ambientColor: definition?.lighting.ambientColor ?? lighting.ambientColor,
+    ambientIntensity: definition?.lighting.ambientIntensity ?? lighting.ambientIntensity,
+    hemisphereSky: lighting.hemisphereSky,
+    hemisphereGround: lighting.hemisphereGround,
+    hemisphereIntensity: lighting.hemisphereIntensity,
+    fillColor: lighting.fillColor,
+    fillIntensity: lighting.fillIntensity,
+    fogColor: definition?.fog.color ?? lighting.fogColor,
+    exposure: definition?.colorPipeline.exposure ?? lighting.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -30098,6 +30464,25 @@ operatorSkinSelect.addEventListener('change', () => {
   if (network.role === 'host') updateHostSkin(message);
   else if (network.role === 'client') network.send(message);
 });
+// LIGHTING: the SOLO sky. The lobby row is host-authoritative and only exists
+// once a lobby does; solo has no host to defer to, so this writes the SAME
+// replicated field (`privateMatchConfig.timeOfDay`) and applies immediately.
+// Hosting seeds the lobby from it, after which the lobby row is the authority
+// and `activeLightingTimeChoice()` reads the snapshot instead of this.
+const soloTimeOfDaySelect = element<HTMLSelectElement>('#solo-time-of-day');
+soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+soloTimeOfDaySelect.addEventListener('change', () => {
+  const chosen = soloTimeOfDaySelect.value;
+  if (!isLightingTimeChoice(chosen)) {
+    soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+    return;
+  }
+  privateMatchConfig = { ...privateMatchConfig, timeOfDay: chosen };
+  // A local override from `?tod=` would otherwise shadow the player's own
+  // choice for the rest of the session, which reads as a broken control.
+  lightingTimeChoiceOverride = null;
+  applyLightingConditionUniforms(true);
+});
 // Pass 75: the OPERATOR panel. Skin, idle stance and emote are chosen from
 // cards rather than a buried dropdown, each persists locally, and the skin
 // still replicates through the existing host-authoritative lobby-skin path.
@@ -30215,6 +30600,7 @@ const updateLobbyConfigFromUi = (): void => {
   // so this assignment can never silently no-op.
   const timeLimitSelect = element<HTMLSelectElement>('#lobby-time-limit');
   const killLimitSelect = element<HTMLSelectElement>('#lobby-kill-limit');
+  const timeOfDaySelect = element<HTMLSelectElement>('#lobby-time-of-day');
   if (arenaId !== privateMatchConfig.arenaId) {
     timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
     killLimitSelect.value = '';
@@ -30230,6 +30616,10 @@ const updateLobbyConfigFromUi = (): void => {
     // contract; gun-range keeps its fixed untimed practice round.
     durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
     scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value),
+    // LIGHTING: the host's time-of-day mode joins the replicated match contract.
+    // A value the validator does not know collapses to the default rather than
+    // failing the whole lobby snapshot.
+    timeOfDay: isLightingTimeChoice(timeOfDaySelect.value) ? timeOfDaySelect.value : DEFAULT_LIGHTING_TIME_CHOICE,
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -30239,6 +30629,7 @@ element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobby
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-time-limit').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-kill-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-of-day').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
   const team: Team = teamSelect.value === '1' ? 1 : 0;
@@ -30702,7 +31093,15 @@ function frame(now: number, scheduleNext = true): void {
       // Held for the whole window once armed. Toggling it off the instant the
       // presented estimate wobbles made the one surface that explains the frame
       // rate flicker in and out while the player was trying to read it.
-      refreshWarning.hidden = now >= refreshWarningUntil;
+      //
+      // ...except in CAPTURE mode. A deterministic review frame is a
+      // measurement, and this banner lays an opaque strip across the bottom of
+      // it: the Lane AB time-of-day frames for Terminal both carry a "91 HZ
+      // DISPLAY REFRESH" notice over ~8% of the frame. It is constant across a
+      // pair so it cannot flip the sign of a delta, but it dilutes every
+      // percentage-of-frame metric and it is not a clean review capture. The
+      // same flag that hides the viewmodel for a capture hides it.
+      refreshWarning.hidden = debugCaptureViewmodelHidden || now >= refreshWarningUntil;
       lastFpsHudAt = now;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
@@ -30874,6 +31273,16 @@ function frame(now: number, scheduleNext = true): void {
       : gameStarted
         ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
         : clearWeatherSample(selectedArena.id);
+    // LIGHTING: the hour rides the SAME clock and the SAME match seed the
+    // weather does, so two peers agree on the sun for exactly the reason they
+    // already agree on the sky — and `skyDarkenAmount` pulls the time-of-day
+    // excursion back toward the arena's authored identity as the sky closes in.
+    // This is a uniform write over the frozen light set. `fixed`/`random` write
+    // once per arena apply AND once per weather step that actually changes a
+    // resolved term; `cycle` additionally writes as the clock moves the sun.
+    lightingConditionsElapsedSeconds = weatherElapsedSeconds;
+    lightingConditionsSkyDarken = weatherNow.skyDarkenAmount;
+    applyLightingConditionUniforms();
     const windNow = sampleWind(
       weatherWindField,
       camera.position.x,
@@ -31921,6 +32330,13 @@ const debugWindow = window as Window & {
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
+    // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
+    sampleLightingConditions: () => Record<string, unknown>;
+    setLightingTimeChoice: (choice: string) => Record<string, unknown>;
+    /** LIGHTING: move weather live, unforced, to falsify the uniform-write gate. */
+    setWeatherOverride: (state: string | null) => Record<string, unknown>;
+    /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
+    setLightingFixedHour: (hour: number | null) => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
     sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
@@ -33151,6 +33567,35 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     rain: rainPresentation.telemetry(),
     particles: hfParticleRuntime.telemetry(),
   }),
+  // LIGHTING: read-only time-of-day telemetry. No light is touched by reading.
+  sampleLightingConditions: () => lightingConditionsTelemetry(),
+  // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
+  setLightingTimeChoice: (choice: string) => {
+    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: activeLightingTimeChoice() };
+    lightingTimeChoiceOverride = choice;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: move the weather with NO forced apply, so the next ordinary frame
+  // decides for itself whether a uniform write is owed. This is the falsifier
+  // for the gate defect: before the writes-gate fix, a weather change at a fixed
+  // hour resolved new tints and threw them away, and `uniformWrites` did not
+  // move. It writes one module-scope variable the weather sampler already reads.
+  setWeatherOverride: (state: string | null) => {
+    if (state !== null && !WEATHER_SEVERITY_LADDER.includes(state as WeatherState)) {
+      return { accepted: false, weather: weatherOverrideState };
+    }
+    weatherOverrideState = state as WeatherState | null;
+    return { accepted: true, weather: weatherOverrideState, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: the same hook at hour resolution, for the band scan. Still only
+  // uniform writes over the frozen light set -- an hour is an argument to a pure
+  // function here, not a scene change.
+  setLightingFixedHour: (hour: number | null) => {
+    lightingCaptureFixedHour = typeof hour === 'number' && Number.isFinite(hour) ? hour : null;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, fixedHour: lightingCaptureFixedHour, ...lightingConditionsTelemetry() };
+  },
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because
   // five independent conditions can freeze movement and none of them was

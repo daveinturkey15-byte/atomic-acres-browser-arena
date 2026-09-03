@@ -77,12 +77,15 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/pass65-settings.test.ts + src/adaptive-quality.test.ts',
   }),
   feature({
-    id: 'presentation-profile', title: 'Performance, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
+    id: 'presentation-profile', title: 'Performance, Balanced, Quality, Ray Traced, Max and Custom presentation profiles', availability: 'active', owner: 'src/pass65-settings.ts + src/render-profile.ts',
     sourceProbes: [
-      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'high' | 'raytraced' | 'max' | 'custom'" },
+      { path: 'src/pass65-settings.ts', symbol: "export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'raytraced' | 'max' | 'custom'" },
       { path: 'src/render-profile.ts', symbol: 'renderProfileConfig' },
+      // HF-414/HF-418: the player-facing copy is part of this feature now, and
+      // it is pinned to the measured audit by graphics-profile-contract.test.ts.
+      { path: 'src/ui/graphics-profile-descriptions.ts', symbol: 'GRAPHICS_PROFILE_DESCRIPTIONS' },
     ], pipelineIds: [],
-    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
+    control: control('setting', ['graphics.preset', 'graphics.geometryDetail'], 'Performance uses the lowest gameplay-safe presentation values; Balanced adds native resolution, shadows and the Quality grade without the passes that add a target, an attachment or a raymarch; Quality is the balanced full-geometry profile; Ray Traced sits between Quality and Max, trading MSAA 4x, screen-space reflections, screen-space GI and motion blur for a genuine software ray-traced reflection layer; Max enables the highest supported values; Custom seeds from the last named profile before an explicit save', 'Profiles and geometry detail change presentation roots only. They never change movement, collision, ballistics, visibility authority, invisible blockers, or major debris physics.'),
     budget: 'Performance effective pixel ratio cap 0.75; Quality base scale 1.0; Max and explicit Custom supersampling cap 1.25; compatibility cap 0.2.',
     verifier: 'src/pass65-settings.test.ts + src/render-profile.test.ts',
   }),
@@ -325,6 +328,29 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     control: control('setting', ['graphics.volumetricLightShafts', 'graphics.shadows'], 'Off, Low or High raymarch through the sun shadow map; requires Sun shadows and reports why when they are off', 'The shafts are occluded by the same shadow map the arena already casts, so they agree with the lighting instead of approximating it. The composite is additive and gain-capped at a fifth of the upstream maximum density, and it reuses the bloom path depth-discontinuity guard rather than the upstream flat-colour blend, so a shaft can brighten a silhouette but never replace one.'),
     budget: 'At most one half-or-lower resolution godray target plus one bilateral blur target; both dispose with the arena pipeline. Adaptive pressure drops the march resolution, step count and additive gain.',
     verifier: 'src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts',
+  }),
+  // The word "path-traced" is deliberately absent: obligation 3 of the honesty
+  // gate in the test beside this file forbids ANY row claiming path tracing,
+  // without exception, and an offline solve is still a row. The description
+  // says what the solve actually does instead, which is more specific anyway.
+  //
+  // PASS 89 INTEGRATION. Lane AL shipped `graphics.bakedIndirect` as a real
+  // presentation setting but registered no feature for it, so the inventory's
+  // own completeness check reported `unmapped-presentation-setting`. That check
+  // is the point of this file - a control a player can move with no row here is
+  // a renderer feature nobody has to justify - so the row is written rather
+  // than the check relaxed.
+  feature({
+    id: 'baked-indirect-light', title: 'Baked indirect light (offline SH-L1 irradiance probe volume)', availability: 'active', owner: 'src/rendering/lighting/baked-indirect-node.ts',
+    sourceProbes: [
+      { path: 'src/rendering/lighting/baked-indirect-node.ts', symbol: 'buildBakedIndirectLightNode' },
+      { path: 'src/rendering/lighting/baked-indirect.ts', symbol: 'BAKED_INDIRECT_MAXIMUM_GAIN' },
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'publishBakedIndirectReceipt' },
+    ],
+    pipelineIds: [],
+    control: control('setting', ['graphics.bakedIndirect'], 'Off, Low or High offline-baked bounce light, sampled from an SH-L1 probe volume solved ahead of time by cosine-hemisphere gathering with one or two bounces', 'LOW and HIGH differ only in BAKE cost - rays per probe and bounces - and never in per-frame cost, which is one probe-volume sample per shaded pixel either way; that is pinned in src/rendering/lighting/baked-indirect.test.ts. The volume is baked from the STATIC arena proxy only, so it can never reveal a dynamic actor, and its composite is clamped to BAKED_INDIRECT_MAXIMUM_GAIN so the layer can only brighten within a bound a player cannot exceed by choosing a preset.'),
+    budget: 'Two probe textures uploaded once per digest; the bake itself runs chunked on the main thread under a 3 ms per-frame wall-clock bound checked after every RAY, and re-derives only when the arena fingerprint or the quantised sun key moves.',
+    verifier: 'src/rendering/lighting/baked-indirect.test.ts + src/rendering/lighting/baked-indirect-runtime.test.ts + src/rendering/lighting/baked-indirect-node.test.ts',
   }),
   feature({
     id: 'screen-space-gi', title: 'Screen-space global illumination (ray-marched bounce light)', availability: 'active', owner: 'src/rendering/screen-space-post.ts',

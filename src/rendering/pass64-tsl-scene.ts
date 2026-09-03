@@ -135,9 +135,17 @@ export function pass64LinearSourceStages(
   const optional = builtOptionalStages ?? screenSpacePostStages(screenSpace);
   const stages = ['scene-pass-linear-hdr'];
   if (optional.includes('motion-blur-velocity-smear')) stages.push('motion-blur-velocity-smear');
+  // HF-418. Derived from LINEAR_SOURCE_STAGE_ORDER rather than appended by
+  // hand, because that is how the ray-traced stage came to be missing from this
+  // receipt for three passes: it is in the frozen order and in the graph's own
+  // `stages()`, and this hand-written enumeration simply never learned about
+  // it. Both are restored here; the loop below is the fix that stops the next
+  // one happening.
+  if (optional.includes('baked-indirect-probe-add')) stages.push('baked-indirect-probe-add');
   if (optional.includes('ssgi-screen-space-bounce-add')) stages.push('ssgi-screen-space-bounce-add');
   stages.push('contact-occlusion-multiply');
   if (optional.includes('ssr-screen-space-reflection-add')) stages.push('ssr-screen-space-reflection-add');
+  if (optional.includes('raytraced-reflection-refraction-add')) stages.push('raytraced-reflection-refraction-add');
   stages.push('depth-guarded-bloom-add');
   if (optional.includes('godrays-volumetric-shaft-add')) stages.push('godrays-volumetric-shaft-add');
   if (optional.includes('depth-of-field-bokeh')) stages.push('depth-of-field-bokeh');
@@ -1290,6 +1298,25 @@ export function createPass64TslSceneSystems(
       // cannot be turned on live, so telemetry reports the intersection of the
       // constructed topology and the live request rather than the request.
       screenSpace: Object.freeze({
+        // HF-418: the baked layer's telemetry is the intersection of the
+        // constructed topology and the live request, like every row here. Its
+        // deeper live state - which volume is bound and what the composite
+        // actually received - is the dataset receipt
+        // `documentElement.dataset.bakedIndirect`, because that one is written
+        // per frame by the code that binds and a per-frame republish of this
+        // block would allocate inside the render loop.
+        bakedIndirect: screenSpaceTelemetry(
+          constructedScreenSpace.bakedIndirect,
+          liveScreenSpace().bakedIndirect,
+        ),
+        // HF-398: the trace's row was missing here for the same reason its
+        // stage was missing from the receipt above - a hand-written list that
+        // was never extended. It is a projection of the resolved tuning, and
+        // its own runtime receipt stays `dataset.rayTracedProxy`.
+        rayTracing: screenSpaceTelemetry(
+          constructedScreenSpace.rayTracing,
+          liveScreenSpace().rayTracing,
+        ),
         // HF-401: the shaft stage answers from the BUILT graph, not from the
         // constructed request. It is the one stage whose presence is decided
         // per arena, so `enabled: true` here used to be published on gun-range

@@ -27,6 +27,7 @@ import {
 } from './screen-space-post-profile';
 
 const HIGH_SELECTION = {
+  bakedIndirect: 'off',
   volumetricLightShafts: 'high',
   screenSpaceReflections: 'high',
   screenSpaceGi: 'high',

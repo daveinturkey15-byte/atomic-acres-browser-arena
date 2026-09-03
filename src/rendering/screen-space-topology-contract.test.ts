@@ -45,6 +45,9 @@ const NON_SCREEN_SPACE_TOPOLOGY_OWNERS: Readonly<Record<string, string>> = Objec
 
 /** A value for each control that is the OPPOSITE of presence, and one that is not. */
 const OFF_AND_ON: Readonly<Record<string, readonly [unknown, unknown]>> = Object.freeze({
+  // HF-418. Building the baked layer allocates three 3D textures and adds a
+  // composite stage; removing it takes them away. Topology, like SSR.
+  bakedIndirect: ['off', 'high'],
   screenSpaceReflections: ['off', 'high'],
   screenSpaceGi: ['off', 'high'],
   rayTracing: ['off', 'reflections'],

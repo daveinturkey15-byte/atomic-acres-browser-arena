@@ -33,11 +33,32 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import {
-  arenaSideCeiling, countArenaSideViolations, eyeClearanceArenaIds,
+  arenaSideCeiling, countArenaSideViolations, eyeClearanceArenaIds, parkedArenaIds,
   MINIMUM_EYE_CLEARANCE_ARENAS, UNMEASURED_CEILING, partitionAnnotatedViolations,
 } from './eye-clearance-roster.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The ids a LEDGER row may legitimately name: every selectable arena, plus
+ * every PARKED one.
+ *
+ * HF-429, 2026-09-03. Four assertions below read "a ledger row for an arena
+ * that is not selectable is a failure", which was right while the only way off
+ * the selectable roster was deletion. Parking is the other way off it, and a
+ * parked arena is still a registered arena whose measurements were really
+ * taken - farcrysis's 441 measured rows and its arena-side sub-ceiling are
+ * evidence, not debris. Deleting them to satisfy the equality would throw away
+ * the measurement AND pre-forgive the arena on the day it is un-parked, because
+ * a re-added arena enters the ratchet at the unmeasured sentinel.
+ *
+ * The defect the original rule exists to catch is UNCHANGED: a row naming an id
+ * the registry has never heard of still fails, and every SELECTABLE arena must
+ * still have a row. Only the middle case moved, and it moved to the truth.
+ */
+function ledgerEligibleArenaIds() {
+  return [...selectableArenaIdsFromSource(), ...parkedArenaIds()];
+}
 const REPO_ROOT = resolve(HERE, '../..');
 const SWEEP_SOURCE = readFileSync(new URL('./sweep-eye-clearance-spots.ts', import.meta.url), 'utf8');
 // The sweep documents the bugs it fixed by quoting the old code, so the "must
@@ -92,13 +113,19 @@ test('the selectable roster this test measures against is the real one', () => {
     selectable.length >= 10,
     `expected the real selectable roster, got ${JSON.stringify(selectable)}`,
   );
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3', 'farcrysis']) {
+  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be swept`);
   }
-  // The negative pin that used to stand here - "farcrysis is selectable:false
-  // and must stay out of the required set" - is retired by HF-423, which ships
-  // it as a PREVIEW card. It is not dropped: farcrysis moved into the REQUIRED
-  // list above, which is the same fact asserted in the stronger direction.
+  // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the
+  // required set. Its exclusion is ASSERTED, not merely dropped - the parked
+  // set is derived from the same registry scrape as the offered set, so a
+  // parked arena cannot quietly slip out of coverage, and a future park or
+  // un-park needs no edit here at all.
+  const parked = parkedArenaIds();
+  assert.ok(parked.length > 0, 'the parked-arena pin must not be vacuous');
+  for (const id of parked) {
+    assert.ok(!selectable.includes(id), `${id} is parked and must not be in this roster`);
+  }
 });
 
 test('the sweep derives its roster instead of hardcoding one', () => {
@@ -126,7 +153,11 @@ test('the sweep keeps a floor under the derived roster', () => {
   // was un-hidden as a PREVIEW card, and 11 (HF-408) when the Raid Rebuild
   // shipped. The floor must equal the REAL roster, which the equality assertion
   // below enforces in both directions.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*11/u, 'the roster floor must be pinned at 11');
+  // 10 again at HF-429 (2026-09-03), when farcrysis was parked. The floor
+  // tracks the REAL roster in BOTH directions: it is an alarm on the scrape
+  // collapsing, and one left above the roster reds every run and gets switched
+  // off, which is not a stronger gate.
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*10/u, 'the roster floor must be pinned at 10');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -429,15 +460,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*11/u,
-    'the shared roster floor must be pinned at 11',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*10/u,
+    'the shared roster floor must be pinned at 10',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 11, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 10, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so
@@ -611,9 +642,10 @@ test('a row stage 3 could not measure is ratcheted, not just warned about', () =
   const roster = selectableArenaIdsFromSource();
   const allowances = LEDGER.unverifiedCeiling ?? {};
   const missing = roster.filter((id) => !Object.hasOwn(allowances, id));
-  const extra = Object.keys(allowances).filter((id) => !roster.includes(id));
+  const eligible = ledgerEligibleArenaIds();
+  const extra = Object.keys(allowances).filter((id) => !eligible.includes(id));
   assert.deepEqual(missing, [], `selectable arenas with no unverified allowance: ${missing.join(', ')}`);
-  assert.deepEqual(extra, [], `unverified allowances for arenas that are not selectable: ${extra.join(', ')}`);
+  assert.deepEqual(extra, [], `unverified allowances for arenas the registry does not know: ${extra.join(', ')}`);
   for (const [arena, allowance] of Object.entries(allowances)) {
     assert.ok(
       Number.isInteger(allowance) && allowance >= 0,
@@ -774,9 +806,9 @@ test('the ledger carries exactly one ceiling per selectable arena', () => {
   const roster = selectableArenaIdsFromSource();
   const ceilings = Object.keys(LEDGER.ceilings);
   const missing = roster.filter((id) => !ceilings.includes(id));
-  const extra = ceilings.filter((id) => !roster.includes(id));
+  const extra = ceilings.filter((id) => !ledgerEligibleArenaIds().includes(id));
   assert.deepEqual(missing, [], `selectable arenas with no ceiling: ${missing.join(', ')}`);
-  assert.deepEqual(extra, [], `ceilings for arenas that are not selectable: ${extra.join(', ')}`);
+  assert.deepEqual(extra, [], `ceilings for arenas the registry does not know: ${extra.join(', ')}`);
 });
 
 test('a new arena enters the ratchet unmeasured, never pre-forgiven', () => {
@@ -819,9 +851,9 @@ test('the runtime-resolve record covers the roster too', () => {
   const roster = selectableArenaIdsFromSource();
   const recorded = Object.keys(LEDGER.runtimeResolve.runtimeRemaining);
   const missing = roster.filter((id) => !recorded.includes(id));
-  const extra = recorded.filter((id) => !roster.includes(id));
+  const extra = recorded.filter((id) => !ledgerEligibleArenaIds().includes(id));
   assert.deepEqual(missing, [], `selectable arenas with no runtime-resolve record: ${missing.join(', ')}`);
-  assert.deepEqual(extra, [], `runtime-resolve records for non-selectable arenas: ${extra.join(', ')}`);
+  assert.deepEqual(extra, [], `runtime-resolve records for arenas the registry does not know: ${extra.join(', ')}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -860,7 +892,10 @@ test('every committed sub-ceiling is real: an integer, a non-empty exclusion lis
     'the ledger must say what arenaSideCeilings means and how it is enforced',
   );
   for (const [arena, entry] of Object.entries(subs)) {
-    assert.ok(roster.includes(arena), `${arena} has a sub-ceiling but is not selectable`);
+    assert.ok(
+      ledgerEligibleArenaIds().includes(arena),
+      `${arena} has a sub-ceiling but is not a registered arena`,
+    );
     // Runs the real reader, so a shape that reads fine to the eye but throws in
     // the ratchet fails here instead of at 2 a.m. on cut night.
     const resolved = arenaSideCeiling(arena, LEDGER);
