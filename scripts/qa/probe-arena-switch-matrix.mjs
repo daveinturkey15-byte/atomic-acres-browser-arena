@@ -96,6 +96,12 @@ const MIN_FREE_VRAM_MIB = Number(arg('--min-free-vram', '3000'));
 // can see how loud the room was. It is not a threshold: nothing passes or
 // fails on it.
 const RIVAL_WAIT_ATTEMPTS = Number(arg('--rival-wait-attempts', '20'));
+// Take only the FIRST N ordered pairs of the Eulerian chain. The chain is
+// contiguous by construction, so a bounded prefix walks real switches with no
+// wasted source re-establishment - which is what makes a PAIRED before/after
+// (same prefix, two builds) affordable in a window too short for all 72.
+// It is a coverage bound, never a threshold: every edge it walks still gates.
+const MAX_EDGES = Number(arg('--max-edges', '0')) || null;
 
 if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No build at ${DIST}`);
 
@@ -557,7 +563,10 @@ try {
   let pairs = eulerianPairWalk(roster);
   if (SOURCES) pairs = pairs.filter(([source]) => SOURCES.includes(source));
   if (TARGETS) pairs = pairs.filter(([, target]) => TARGETS.includes(target));
+  if (MAX_EDGES) pairs = pairs.slice(0, MAX_EDGES);
   report.plannedEdges = pairs.length;
+  report.maxEdges = MAX_EDGES;
+  report.coverage = { orderedPairsPossible: roster.length * (roster.length - 1), orderedPairsPlanned: pairs.length };
   console.error(`[switch-matrix] ${roster.length} arenas, ${pairs.length} ordered pairs, ${CHUNK_EDGES} per session`);
 
   for (let offset = 0; offset < pairs.length; offset += CHUNK_EDGES) {
@@ -653,8 +662,12 @@ try {
   report.machine.playwrightChromeProcessSamples = playwrightSamples.length;
   // Never negative, and null when the self baseline could not be taken: a
   // number that cannot be justified is worse than an honest gap.
+  // SKEPTIC FIX (lane H2, 2026-09-03): also null when the room was sampled at
+  // most ONCE. A single at-launch sample reduced to 0 reads as "the room was
+  // quiet for the whole run", which is the exact inversion this lane's own
+  // gotcha warns about; "not sampled" must not be publishable as "zero".
   report.machine.rivalPlaywrightBrowsersMaxDuringRun =
-    maxObserved === null || selfPlaywrightProcesses === null
+    maxObserved === null || selfPlaywrightProcesses === null || playwrightSamples.length <= 1
       ? null : Math.max(0, maxObserved - selfPlaywrightProcesses);
   await browser.close().catch(() => {});
   await new Promise((done) => server.close(done));
