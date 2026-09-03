@@ -98,22 +98,48 @@ for a texture upload would be a real cost paid for nothing.
 **Method (VERIFIED).** `scripts/qa/measure-baked-indirect.mjs`, one fresh
 headless Chrome per row, 2560x1440, real WebGPU backend confirmed per row, the
 owner's ComfyUI queue read before AND after each row (a row taken with work
-queued is voided, not annotated), cold shader cache. Eight rows on the built
-bundle at branch head: five with the profile default, and three that drive the
-real Options surface for the A/B in SS 3.5.
+queued is voided, not annotated), cold shader cache.
+
+**This section was rewritten on 2026-09-03 after a skeptic review.** What changed
+and why is stated inline rather than quietly corrected, because three of the
+numbers that were here were wrong in ways worth remembering:
+
+- the bake-cost table was quoted from a SIX-occluder synthetic scene while every
+  shipped arena has twenty-four (SS 3.4), and its figures matched neither its own
+  cited evidence file nor a re-run;
+- the A/B's sample window opened six seconds after admission, which is inside the
+  bake at BOTH tiers, so the row labelled "HIGH costs +5.8 ms" was a measurement
+  of the loading transient (SS 3.5);
+- the "layer ON" pipeline counts were cited from three rows this document itself
+  annotated as void (SS 3.1).
+
+The current rows are ten on the built bundle at branch head: nine A/B rows (three
+tiers x three repeats, 45 s settle) and one two-arena row that switches map
+inside a single page load.
 
 ### 3.1 The number that matters most: pipelines at admission
 
-| Arena | Pipelines at admission, layer ON (this lane, VERIFIED) | Pipelines at admission, QUALITY before this layer existed (Lane AI, CLAIMED) |
-|---|---|---|
-| `atomic-acres` | **374** | 374 |
-| `skyline-terminal` | **300** | 300 |
-| `high-seas` | **251** | 251 |
+Same build, same arena, minutes apart, three repeats per cell (SS 3.5):
 
-Exact match on three arenas measured independently, at the same resolution, by a
-different harness on a different branch. **The layer adds no pipeline.** That is
-the direct answer to "won't murder FPS", and it is a categorical fact rather
-than a noisy one: pipeline counts do not drift with machine load.
+| `bakedIndirect` | Pipelines at admission | Runs |
+|---|---|---|
+| `off` | **374** | 374 / 374 / 374 |
+| `low` | **371** | 371 / 371 / 371 |
+| `high` | **371** | 371 / 371 / 371 |
+
+**The layer adds no pipeline.** That is the direct answer to "won't murder FPS".
+
+Two honesty notes on this table, both corrections:
+
+- The count is *not* the perfectly deterministic quantity an earlier draft of
+  this section claimed. Turning the layer on moved it DOWN by three, three times
+  out of three, which is admission-ordering rather than a saving. What the
+  measurement supports is "no increase", not "identical".
+- An earlier draft also matched these against Lane AI's independent QUALITY
+  baseline of 374 / 300 / 251 on three arenas and called it an exact match. The
+  layer-ON figures it used came from the three rows SS 3.6 annotates as void as
+  an A/B. The comparison is dropped; the same-build A/B above replaces it and is
+  a stronger measurement anyway, because both cells come from one bundle.
 
 It is also the answer to the cold-compile fence. A layer that compiles nothing
 new cannot push a profile past an admission fence, so every tier admits inside
@@ -121,7 +147,8 @@ the fence for the same reason the profile below it does.
 
 ### 3.2 The tripwire
 
-`pipelinesInCombat = 0` on **all eight rows**. Nothing is compiled while a settled
+`pipelinesInCombat = 0` on **every row taken for this lane**, including all
+nine A/B rows and the two-arena swap row. Nothing is compiled while a settled
 match is being played. **VERIFIED.** This is the measurement that matters most
 for the owner's freeze reports, and it is the one the layer could most easily
 have broken: a naive implementation that rebuilt the node when the arena changed
@@ -138,6 +165,17 @@ binds, read headless with no debug hook:
 | `atomic-acres` | `24x12x24:7536c242:24:0.380` | grid, digest, **24 occluder shapes**, live gain |
 | `skyline-terminal` | `24x12x24:781efe12:24:0.380` | distinct digest — not another arena's volume |
 | `high-seas` | `24x12x24:ff21f3c8:24:0.380` | distinct digest |
+| any, tier `off` | `off` | published even when the layer is not built |
+
+The `off` row was previously VERIFIED as a unit test and CLAIMED in the browser.
+It is now **VERIFIED in the browser**: all three `off` rows of the A/B read `off`
+rather than being absent.
+
+**The digests are cross-checked against the offline bake.** `atomic-acres` LOW
+`7536c242` and HIGH `104e394b`, and `skyline-terminal` LOW `781efe12`, are the
+same digests `scripts/bake/bake-arena-indirect.mjs` produces from the extracted
+proxy of that arena. The runtime and the offline bake key identically. One cell
+does not match and is recorded as such in SS 7.
 
 **All four parts are asserted by the harness, not just the first.** The RTX
 skill records a live harness that read this exact shape of receipt and checked
@@ -147,86 +185,153 @@ binds successfully and is *correctly invisible* — the "correct image of nothin
 state — and that must be distinguishable from a bind failure. **No measured
 arena is at zero. VERIFIED.**
 
-### 3.4 Bake cost
+### 3.4 Bake cost, from real arenas
 
-Measured offline over 6912 probes, twice per tier, byte-identical both times
-(`scripts/bake/bake-arena-indirect.mjs --self-test`):
+**This table used to be wrong, and how it was wrong is the point.** Every figure
+in it came from `syntheticScene()` inside the bake script: SIX occluders,
+`capReason: 'synthetic self-test scene'`. Every shipped arena's own runtime
+receipt reports TWENTY-FOUR (SS 3.3). Nothing in the repository could have
+produced a real number, because `scripts/qa/extract-arena-proxy.mjs` - named in
+the bake script's own header as the stage that feeds it - did not exist. The
+published figures also disagreed with their own cited evidence file (892/971 vs a
+committed 1736/1214) and with a re-run of the identical command (3182/3073), and
+the "cached 0 ms" row had no measurement behind it anywhere.
 
-| Tier | Bake, run 1 | Bake, run 2 | Buried probes filled | Serialised |
+The extraction stage now exists. It reads the ProxyScene, quantised lighting and
+digest that the runtime itself bakes against out of a headless WebGPU page, and
+the digest it pulls matches the live runtime receipt on all three arenas. The
+table below is a bake of those real proxies, **3 repeats per cell**, 6912 probes,
+24 x 12 x 24 grid, quiet machine, ComfyUI queue empty:
+
+| Arena | Occluders | Buried probes | LOW (3 runs, ms) | LOW median | HIGH (3 runs, ms) | HIGH median |
+|---|---|---|---|---|---|---|
+| `atomic-acres` | 24 | 1449 | 709 / 817 / 773 | **773** | 3072 / 2662 / 3007 | **3007** |
+| `skyline-terminal` | 24 | 1015 | 931 / 951 / 1101 | **951** | 2772 / 2306 / 2165 | **2306** |
+| `high-seas` | 24 | 1940 | 1027 / 1140 / 984 | **1027** | 3916 / 4290 / 3902 | **3916** |
+
+Serialised volume 442 KB in every case. The cached path is now measured rather
+than asserted: a serialise/deserialise round trip of the volume is **21-52 ms**,
+against a bake of 0.8-3.9 s. Determinism is unchanged and still checked every
+run: identical digest and byte-identical coefficients across all three repeats of
+every cell.
+
+**A real arena is not slower than the synthetic stand-in, for a reason worth
+knowing.** More shapes cost more per ray, but a real arena buries far more
+probes - 1015 to 1940 of 6912 sit inside geometry and are skipped entirely, then
+filled from their neighbours - and the two effects roughly cancel. A skeptic's
+24-shape *synthetic* proxy measured 5.6 s and 19.8 s because almost none of its
+probes were buried. This is why the fixture has to be an extracted arena and not
+a plausible-looking stand-in of the right shape count.
+
+**Convergence at 3 ms per presented frame**, which is what the runtime spends
+(SS 3.5, and the budget is now enforced - see below):
+
+| Arena | LOW | HIGH |
+|---|---|---|
+| `atomic-acres` | ~258 frames, **~6 s** at 45 Hz | ~1002 frames, **~22 s** |
+| `skyline-terminal` | ~317 frames, ~7 s | ~769 frames, ~17 s |
+| `high-seas` | ~342 frames, ~8 s | ~1305 frames, **~29 s** |
+
+**The 3 ms budget is now a bound, and it was not one before. VERIFIED.** The
+stepper checked its deadline every 16 probes, so one step paid up to sixteen
+probes of straight-line JavaScript however small the budget was: a skeptic
+measured mean 13.1 ms / worst 79 ms at LOW and mean 45.9 / worst 198 at HIGH. A
+198 ms main-thread stall is the freeze class this project spent PASS 82-83
+removing, and HIGH is the default on MAX and RAY TRACED. Two causes, both fixed:
+the unit of work is now a RAY rather than a probe (a probe is resumable, keeping
+its ray cursor and jitter offset, so a chunked bake stays byte-identical to a
+one-shot one), and the deadline is read from `performance.now()` rather than
+`Date.now()`, whose ~15.6 ms granularity on Windows cannot express a 3 ms budget
+at all.
+
+Measured after the fix, 400 steps, 24-occluder proxy, `scripts/qa/measure-bake-step-budget.mjs`:
+
+| Tier | Mean step | p95 | Worst | Steps over 2x budget |
 |---|---|---|---|---|
-| `low` | 892 ms | 971 ms | 109 | 442 KB |
-| `high` | 5001 ms | 5082 ms | 548 | 442 KB |
-| cached | **0 ms** | — | — | — |
+| `low` | 3.03 ms | 3.10 ms | **5.13 ms** | 0 / 400 |
+| `high` | 3.02 ms | 3.07 ms | **3.89 ms** | 0 / 400 |
 
-At runtime that work is spread at **3 ms per presented frame**, so LOW converges
-in roughly 300 frames and HIGH in roughly 1700 — about 5 s and 28 s at 60 Hz,
-starting from a sky-only volume that is already correct-looking rather than
-black. The frame is never stalled. **VERIFIED** (the chunked bake is proven
-byte-identical to the one-shot bake, so the committed cache and the runtime path
-are the same volume).
+### 3.5 The tier A/B, re-taken after convergence
 
-### 3.5 The tier A/B - UNBLOCKED, and what it says
+The harness drives the real Options surface exactly as the owner does: open
+OPTIONS, set `#graphics-baked-indirect`, press SAVE GRAPHICS, ride the
+renderer-reconstruction reload, then deploy. One control moves; nothing else
+about the profile does. (Seeding the persisted settings blob into localStorage
+was tried first and never survives a boot; the harness's own fail-closed receipt
+check caught it rather than letting it be published as an A/B.)
 
-The first attempt at this seeded the persisted settings blob into localStorage
-and did not work: the row requested with `--tier off` came back reporting the
-QUALITY default, and the harness's own fail-closed receipt check caught it
-rather than letting it be published as an A/B. The **only** writer whose value
-survives a boot is the app's own Options transaction, so the harness now drives
-the real Options surface exactly as the owner does: open OPTIONS, set
-`#graphics-baked-indirect`, press SAVE GRAPHICS, ride the renderer-reconstruction
-reload, then deploy. One control moves; nothing else about the profile does.
+**What changed since the first version of this table.** It sampled 6 s after
+admission. The bake is spread at 3 ms per presented frame, so convergence is
+~6 s at LOW and ~22 s at HIGH on this arena (SS 3.4): the old window was inside
+the bake at BOTH tiers, and the row that read "HIGH costs +5.8 ms" was measuring
+the loading transient. The settle is now 45 s and every cell is repeated three
+times.
 
-One build, one arena (`atomic-acres`), one control changed, 2560x1440 headless,
-real WebGPU, ComfyUI quiet, zero page errors on every row. **VERIFIED.**
+One build, one arena (`atomic-acres`), 2560x1440 headless, real WebGPU, ComfyUI
+queue 0 before AND after all nine rows, zero page errors, `pipelinesInCombat = 0`
+in all nine. **VERIFIED.**
 
-| Tier | Median | p95 | Frames/s | >33 ms | Pipelines @admission | Tripwire | Cold deploy | Receipt |
-|---|---|---|---|---|---|---|---|---|
-| `off` | 27.5 ms | 38.9 ms | 35.9 | 87 | **374** | 0 | 80.5 s | absent |
-| `low` | **27.7 ms** | **39.0 ms** | 35.6 | 131 | **371** | 0 | 68.2 s | `24x12x24:7536c242:24:0.380` |
-| `high` | 33.3 ms | 55.3 ms | 29.7 | 229 | **371** | 0 | 63.3 s | `24x12x24:104e394b:24:0.500` |
+| Tier | Median (3 runs) | p95 (3 runs) | Frames/s | >33 ms | Pipelines @admission | Receipt |
+|---|---|---|---|---|---|---|
+| `off` | 16.6 / 22.1 / 16.7 | 22.2 / 27.9 / 22.3 | 67.2 / 48.8 / 54.7 | 2 / 30 / 4 | 374 | `off` |
+| `low` | 16.7 / 22.2 / 22.2 | 27.7 / 27.9 / 27.9 | 52.8 / 45.3 / 45.5 | 12 / 25 / 18 | 371 | `24x12x24:7536c242:24:0.380` |
+| `high` | 22.3 / 22.2 / 22.2 | 33.4 / 27.8 / 28.0 | 40.2 / 45.1 / 44.3 | 47 / 11 / 31 | 371 | `24x12x24:104e394b:24:0.500` |
 
-**Reading 1 - LOW is free, and that is now measured rather than argued.**
-+0.2 ms on the median (+0.7%) and +0.1 ms on p95 (+0.3%) against the layer
-switched off. Both are far inside the ~25% run-to-run noise this same machine
-produces on an identical control set (SS 3.6), so the honest statement is
-**indistinguishable from off**, which is exactly the claim the in-game copy
-makes. This is the row that matters, because LOW is what QUALITY and BALANCED
-ship.
+**Reading 1 - the medians are BIMODAL and that governs how much can be claimed.**
+Every median in the table is either 16.7 ms or 22.2 ms: this machine settles into
+a ~60 Hz or a ~45 Hz bucket and stays there for the whole window. `off` landed in
+the fast bucket twice, `low` once, `high` never. The within-cell spread is
+therefore one whole bucket, which is larger than any difference between `off` and
+`low`. **The honest statement is that no per-cell delta smaller than one bucket
+is readable from three repeats**, and `low` versus `off` is smaller than that.
+The weaker claim that does survive: nothing in the `low` rows looks like a cost,
+and the layer adds no pipeline (SS 3.1).
 
-**Reading 2 - HIGH's +5.8 ms is the BAKE, not the sample, and that is a real
-finding rather than an excuse.** LOW and HIGH do identical per-frame work: the
-same three texture fetches into the same three textures at the same grid, with
-the tier deciding only what was traced into them. So a per-frame difference
-between them cannot come from sampling. It comes from the converging bake: HIGH
-is 5.0 s of tracing spread at 3 ms per presented frame, about 1700 frames, and
-the sample window opens 6 s after admission. **The HIGH row was measured with
-the bake still running**, and ~3 ms of a ~27 ms frame is ~11% of it. Two
-consequences:
+**Reading 2 - HIGH's +5.8 ms does not survive to steady state.** The old table
+had `high` at 33.3 ms median against `off` at 27.5. After convergence `high`
+sits at 22.2-22.3, in the same bucket as `low`, with p95 27.8-33.4 against
+`off`'s 22.2-27.9. So the previous +21% was substantially the converging bake, as
+was argued - **but that argument was claim-stated VERIFIED while its verification
+sat on the same report's OPEN list**, and it did not reconcile either (the bake
+budget is tier-independent, so a 3 ms budget cannot explain a 5.8 ms
+differential). It is now measured. What remains at HIGH after convergence is a
+p95 and a >33 ms count above `off`'s, both inside the machine's own spread.
 
-- The measured HIGH cost is transient, not steady state. A HIGH row sampled
-  after convergence should land on LOW's numbers. **OPEN** - not re-measured,
-  because it needs a settle wait longer than this lane's remaining budget.
-- The convergence should finish behind the loading screen rather than in the
-  first half-minute of play. That is what a committed build-time volume buys
-  (SS 7), and this row is the argument for building the extraction stage.
+**Reading 3 - `>33 ms` is now reported, because it was omitted before.** The
+first table quoted only median and p95 while `>33 ms` rose 87 to 131 (+51%) on
+the row it called indistinguishable from off - and `>33 ms` is a metric this
+repository's own frame-pacing gate uses. Repeated three times per cell it reads
+2/30/4 (off), 12/25/18 (low), 47/11/31 (high): a 15x within-cell spread at `off`
+and a 4x one at `high`. The metric is too noisy on this machine at this sample
+length to separate the cells, which is a statement worth making explicitly rather
+than a number worth leaving out.
 
-**Reading 3 - the tier genuinely reaches the bake.** LOW and HIGH produced
+**Reading 4 - the tier genuinely reaches the bake.** LOW and HIGH produce
 DIFFERENT digests on the same arena (`7536c242` vs `104e394b`) and different live
-gains (0.380 vs 0.500). A tier that was being silently ignored would have
-produced the same digest twice - which is precisely the failure the first attempt
-at this A/B was reporting.
+gains (0.380 vs 0.500), consistently across three repeats each. A tier being
+silently ignored would produce the same digest twice.
 
-**Reading 4 - the pipeline count does not rise.** 374 with the layer off, 371
-with it on, on the same build minutes apart. The layer adds no pipeline; if
-anything the count moved down by three, which is admission-ordering noise.
+**Reading 5 - the arena swap, measured inside ONE page load.** This is the row
+that catches the defect every other row in this document is blind to. The runtime
+never re-derived its digest after the first bind: `maybeStartBake` returned
+before extracting or hashing anything, and the only thing that re-opened it was a
+tier change. Since the post graph is built once per session and an arena change
+does not rebuild it, **the second and every later arena in a session sampled the
+first arena's probe volume, at the first arena's origin** - and a full day of sun
+travel never re-baked either. Every row above is a cold single-arena page load,
+which is the one condition under which that is invisible.
 
-**Defect this A/B found, fixed in the same pass:** with the tier off, the
-receipt was **absent** rather than `off`. Absent is the one value a headless
-check cannot interpret - it means "off", "this build predates the feature", or
-"the publish never ran", which are three different bugs. The receipt is now
-published unconditionally, `off` when the layer is not built. **VERIFIED** as a
-unit; **CLAIMED** in the browser, because the fix landed after this row was taken
-and was not re-measured in a browser.
+Measured after the fix, one page load, main menu, second arena, deploy:
+`24x12x24:104e394b:...` (atomic-acres) -> `24x12x24:058a6ef4:...`
+(skyline-terminal), 0 page errors, 0 in-combat pipelines. **VERIFIED.**
+
+The trigger is `document.documentElement.dataset.arenaId`, which `legacy-main.ts`
+already writes on every selection. A structural fingerprint of the scene root was
+tried first, passed its unit tests, and **did not work in the built bundle**: the
+root's 58-64 direct children churn during a match (pooled groups, prewarmed
+corpses, one `window-debris:*` group per broken pane), so a rule waiting for them
+to hold still never gets its moment. That failure is recorded here because the
+unit test that passed was a real test of the wrong signal.
 
 ### 3.6 The noise floor on this machine
 
@@ -243,8 +348,17 @@ and it is the most useful thing they produce:
 **~25% spread on the median and ~50% on p95, on an identical build with
 identical settings**, with five other PASS 87 lanes sharing the GPU. That
 independently corroborates Lane AI's refusal to read any single-cell comparison
-under about 15%, and it is the yardstick SS 3.5 is read against: LOW's +0.7% is
-noise, HIGH's +21% is not.
+under about 15%.
+
+The re-taken A/B (SS 3.5) sharpens this rather than replacing it. On a quiet
+machine the medians are not noisy-continuous, they are **bimodal**: every one of
+the nine rows landed on either 16.7 ms or 22.2 ms and stayed there. So the
+correct yardstick is not a percentage at all - it is one whole 60-to-45 Hz
+bucket, and a difference smaller than that cannot be read from three repeats
+however quiet the machine is. Anything this lane claims about `low` versus `off`
+per-frame cost is therefore bounded by "no more than one bucket", and the
+categorical measurements - zero added pipelines, zero in-combat compiles - are
+what carry the "won't murder FPS" answer.
 
 ---
 
@@ -266,13 +380,20 @@ baked volume is a function of the sun. So:
    across a full day cycle instead of restarting every frame. Verified that
    0.06° of movement does not move the digest and that noon → dusk does.
    **VERIFIED.**
-3. **The consequence Lane AB should know about, stated plainly.** On an arena
-   with a wide band (High Seas, 40° of elevation travel), a full traverse crosses
-   several quantisation cells, and each crossing starts a fresh converging bake:
-   ~5 s at LOW, ~28 s at HIGH, during which the indirect term is a blend of the
-   previous volume and a re-converging one rather than wrong. **OPEN:** whether
-   that reads as a slow, pleasant warm-shift or as a visible settle has not been
-   captured. It is the first thing to look at if the two features ship together.
+3. **The consequence Lane AB should know about, stated plainly - and note that
+   until 2026-09-03 the opposite was true.** Points 1 and 2 describe what
+   `computeBakeDigest` does, and they are correct about the function. They were
+   not correct about the runtime: it never re-derived the digest after the first
+   bind, so a noon bake WAS served at dusk and no re-bake ever started (SS 3.5,
+   Reading 5). Fixed and confirmed live. The consequence is therefore now real
+   rather than hypothetical: on an arena with a wide band (High Seas, 40° of
+   elevation travel) a full traverse crosses several quantisation cells, and each
+   crossing starts a fresh converging bake - measured on the extracted High Seas
+   proxy at **~8 s at LOW and ~29 s at HIGH** (SS 3.4), during which the indirect
+   term is a blend of the previous volume and a re-converging one rather than
+   wrong. **OPEN:** whether that reads as a slow, pleasant warm-shift or as a
+   visible settle has not been captured. It is the first thing to look at if the
+   two features ship together.
    The cheap mitigation, if it reads badly, is to bake the arena's *anchor* hour
    once and accept a fixed bounce across the band — the bounce is the
    lowest-frequency term in the frame and the least sensitive to the sun's exact
@@ -296,6 +417,13 @@ information must not differ between presets.
   volume. Nothing visible today can be hidden by turning this on.
   **VERIFIED** by the clamp in the node and by a test that constructs an
   over-gain tuning and asserts the family safety check refuses it.
+  **A correction, 2026-09-03:** "clamped, not assumed" was not what the code did.
+  `applyRuntime` wrote the baked tuning into the live gain uniform on its first
+  line and called the safety assert on its second - every other value in that
+  function is applied after the assert - and the graph's `applyTuning` wrote
+  `next.composite` with no ceiling. An over-gain tuning therefore reached the
+  live uniform and the guard threw afterwards. The assert now runs first and the
+  setter clamps, pinned by a live-uniform test and a source-order test.
 - **Every reconstructed irradiance is non-negative.** Checked over 48
   position/normal pairs including a fully enclosed overhang. This is why the
   band is L1 and not L2: an unclamped L2 reconstruction routinely rings negative
@@ -308,9 +436,10 @@ information must not differ between presets.
   future change that adds a dynamic input has to argue with a test.
 - **OPEN — the silhouette-contrast capture.** The measurable version of the
   readability bound (enemy silhouette contrast at engagement distance, from a
-  moving camera, layer on versus off) needs the tier A/B that §3.5 records as
-  blocked. The clamp bounds the effect analytically; the capture is still owed.
-  It is listed in §7 with the exact command.
+  moving camera, layer on versus off) is **no longer blocked** - the
+  Options-driving harness that makes it possible exists and §3.5 is a closed
+  measurement - but it has not been run. The clamp bounds the effect
+  analytically; the capture is still owed. It is listed in §7 with the command.
 
 ---
 
@@ -350,12 +479,28 @@ a separate lane if the owner wants it.**
 
 ## 7. Open items, each with what would close it
 
-- **OPEN — the tier A/B and the readability capture.** §3.5. Needs a harness
-  that drives the real Options surface (select `#graphics-baked-indirect`, leave
-  the panel so `flushPendingGraphics` commits, reload) rather than seeding
-  localStorage. Once it exists:
-  `node scripts/qa/measure-baked-indirect.mjs --url http://127.0.0.1:PORT --arena atomic-acres --tier off|low|high`
-  ×3 repeats per cell on a quiet GPU, reporting the spread, not the mean.
+- **OPEN — the silhouette-contrast readability capture.** §5. No longer blocked:
+  the Options-driving harness exists and the A/B is closed. What is owed is a
+  layer-on versus layer-off capture from a moving camera at engagement distance,
+  against the project's existing readability threshold.
+- **OPEN — one digest cell does not match between the offline bake and the
+  runtime.** `atomic-acres` LOW and HIGH and `skyline-terminal` LOW all match
+  exactly between `scripts/bake/bake-arena-indirect.mjs` and the live receipt.
+  `skyline-terminal` at HIGH does not: offline `5aaa7d9b`, live `058a6ef4`. Both
+  are stable within their own method, so this is a difference in the INPUT - most
+  likely the arena's proxy or sun differs slightly between a cold load and an
+  arrival by in-session transition. It matters because it is exactly the
+  condition under which a committed build-time volume would be rejected as
+  stale and silently re-baked at load. Closing it: extract the proxy on both
+  paths and diff the two ProxyScenes.
+- **OPEN — a committed build-time volume for any arena.** The extraction stage
+  now exists (`scripts/qa/extract-arena-proxy.mjs`) and its output bakes
+  reproducibly, so the remaining work is a build step that runs it per arena and
+  ships the volume, plus a cache implementation on the runtime's
+  `BakedIndirectVolumeCache` seam. Until then every machine bakes at load: 0.8 s
+  (LOW) to 3.9 s (HIGH) of CPU spread at 3 ms per frame, i.e. 6-29 s of
+  converging picture per session (§3.4). Nothing stalls - that is now measured,
+  not asserted - but it is per-session work that a committed volume would remove.
 - **OPEN — BALANCED's default.** BALANCED lives on Lane AI's branch and not on
   this base, so this lane could not set it. The one-line patch, to
   `src/graphics-settings-registry.ts` in `GRAPHICS_PRESET_VALUES.balanced`:
@@ -368,24 +513,31 @@ a separate lane if the owner wants it.**
   and delete the `TODO(HF-418 item 4, Lane AL)` beside it. This changes
   BALANCED's control-set hash, so `GRAPHICS_PROFILES_2026-09-03.md` §2 must be
   re-measured in the same commit — that is exactly what its hash tripwire is for.
-- **OPEN — ambient occlusion is `off` on PERFORMANCE, BALANCED and QUALITY.**
-  Contact shadows are the other half of "beautiful lighting" and only RAY TRACED
-  and MAX have any. This lane deliberately did **not** change that default:
-  GTAO is a real per-frame pass, and adding one to the auto-selected default
-  while HF-399 (150 → 40 fps on QUALITY) is an open owner complaint needs a
-  measurement, not a preference. The measurement is the same blocked A/B; the
-  harness already accepts `--ao low` for exactly this row.
-- **OPEN — a committed build-time volume for any arena.** The offline bake and
-  its digest cache exist and are proven reproducible
-  (`scripts/bake/bake-arena-indirect.mjs`), but no arena has a committed volume,
-  because producing one needs a headless extraction stage
-  (`scripts/qa/extract-arena-proxy.mjs`) that this lane did not build. Until
-  then every machine bakes at load, which works and is measured, but costs the
-  CPU time in §3.4 on every session.
+- **OPEN — ambient occlusion is `off` on PERFORMANCE, BALANCED and QUALITY, and
+  contact-shadow / shadow-filter tiers were not built.** Items 2 and 3 of this
+  lane's brief. Contact shadows are the other half of "beautiful lighting" and
+  only RAY TRACED and MAX have any. This lane deliberately did **not** change
+  that default: GTAO is a real per-frame pass, and adding one to the
+  auto-selected default while HF-399 (150 → 40 fps on QUALITY) is an open owner
+  complaint needs a measurement, not a preference. The harness accepts the row:
+  `node scripts/qa/measure-baked-indirect.mjs --url http://127.0.0.1:PORT --arena atomic-acres --tier low --ao low --label ao1`
+- **OPEN — per-arena cost and VRAM.** §3.4 is per-arena for the bake. The A/B in
+  §3.5 is one arena, and VRAM is not measured anywhere, though the brief names
+  it. The volume itself is 442 KB serialised and three 24x12x24 RGBA-float 3D
+  textures live, which is arithmetically ~1.3 MB; that is a source claim, not a
+  measurement of what the driver allocates.
+- **OPEN — the Lane AB seam on a wide-band arena.** §4 item 3. Now a real
+  question rather than a hypothetical one, because the re-bake actually happens.
 - **OPEN — `screenSpaceGi` and `bakedIndirect` interact and nobody has looked.**
   On MAX both are on and both add bounce light. They answer different questions
   (§2) so double-counting is bounded rather than wrong, but the combined gain has
   not been captured against the readability threshold.
+- **OPEN — graphics settings did not persist to localStorage in a fresh headless
+  profile.** After SAVE GRAPHICS the live session applies the change (the A/B
+  proves it) but the stored blob reads back `null`. `writePass65Settings` round
+  trips correctly in Node, so the defect is not in the normaliser. It may be
+  headless-profile-specific, or it may mean a real player's saved graphics do not
+  survive a restart. Worth one probe by whoever owns settings.
 - **CLOSED, and worth recording — two receipts described a chain the installed
   pipeline did not have.** `pass64LinearSourceStages` is a hand-written
   enumeration of the linear chain and never learned about
@@ -396,3 +548,12 @@ a separate lane if the owner wants it.**
   updated to assert the complete chain. This is the third instance in this
   repository of the same failure shape — a hand-maintained list beside a derived
   one — after the IBL evidence row and the hardcoded gate rosters.
+- **CLOSED — two gates were inert for the control this lane added.** The preset
+  promise matrix in `src/graphics-settings-registry.test.ts` carried
+  `bakedIndirect: 'off'` for all four presets (three of them false) and never
+  compared it, because the key was missing from `SCREEN_SPACE_KEYS`; and the
+  sibling combat-safety-envelope test hardcoded `'off'` where every other field
+  reads `preset.X`. Both repaired, nothing relaxed, and the envelope test now
+  asserts the resolved composite against `BAKED_INDIRECT_MAXIMUM_GAIN` per preset.
+  Same failure shape as the row above: a table nobody reads is worse than no
+  table.
