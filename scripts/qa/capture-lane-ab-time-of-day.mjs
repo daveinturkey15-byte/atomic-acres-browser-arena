@@ -584,8 +584,21 @@ for (const finding of findings) console.error(`[lane-ab] FAIL ${finding}`);
 for (const finding of instrumentFindings) console.error(`[lane-ab] INSTRUMENT ${finding}`);
 for (const note of instrumentNotes) console.error(`[lane-ab] NOTE ${note}`);
 if (instrumentFindings.length) {
-  console.error('[lane-ab] NULL EXPERIMENT FAILED: a pinned arena moved on an identity write, '
-    + 'so no verdict in this run is evidence about any arena');
+  // Two DIFFERENT failures land in this list and they mean different things, so
+  // say which one happened. A pinned arena moving on an identity write is a
+  // global instrument failure: its correct answer is known in advance and the
+  // frames are not comparable. A VOID pair is local: that one excursion was
+  // taken across a scene event, and the other records are unaffected.
+  const nullFailures = instrumentFindings.filter((entry) => entry.includes('PINNED arena moved'));
+  const voids = instrumentFindings.filter((entry) => entry.includes('VOID'));
+  if (nullFailures.length) {
+    console.error('[lane-ab] NULL EXPERIMENT FAILED: a pinned arena moved on an identity write, '
+      + 'so no verdict in this run is evidence about any arena');
+  }
+  if (voids.length) {
+    console.error(`[lane-ab] ${voids.length} pair(s) VOID: the scene moved between the two identity `
+      + 'frames of those excursions. Those states have no verdict; every other record stands.');
+  }
 }
 if (environmentInvalid) {
   console.error(`[lane-ab] ENVIRONMENT INVALID: ${environmentInvalid} — this run is not evidence`);

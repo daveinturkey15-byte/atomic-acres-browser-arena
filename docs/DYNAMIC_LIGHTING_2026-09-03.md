@@ -105,6 +105,32 @@ composing weather can only ever REDUCE the time-of-day deviation. The safety
 envelope proved for clear weather therefore bounds every weather, and at
 `skyDarkenAmount = 1` the writes are exactly the identity again.
 
+**That paragraph was true of the model and false of the shipped runtime for one
+pass, and it is worth writing down how.** `applyLightingConditionUniforms` had a
+second gate under the cheap one: it skipped the uniform write whenever the
+resolved HOUR had not moved. But the hour is one of TWO inputs to this model and
+`skyDarkenAmount` is the other, and it does not enter `hour` at all. So at a
+fixed hour a weather change resolved new tints, a new key scale, a new elevation
+delta and a new shadow floor - and threw all of them away without reaching a
+light, in `fixed` and in `random`, and the default is `random`. Every model test
+still passed, because the model was never wrong. The capture sweep could not see
+it either, because it drives each state through the debug hook with `force =
+true`, a path live play never takes.
+
+Two things fixed it and one thing proves it. The gate now compares the WRITES
+against what is currently in the lights (`lightingConditionWritesEqual`), which
+cannot have that class of bug: a term either reaches a light and is in the
+comparison, or it is not written. And
+`scripts/qa/probe-lane-ab-weather-write.mjs` moves the weather LIVE through an
+unforced hook and asserts, on native WebGPU, that the resolved hour is
+bit-identical across the change (the defect's exact mechanism), that
+`uniformWrites` still increments, that the terms move, and that the FRAME moves
+by more than an identity pair measured in the same run. Measured on the merged
+head: RustRig 22:00 clear -> storm moved the key 0.7152 -> 0.8822 (weather
+pulling the excursion back toward authored, as documented) against an
+identity-pair noise floor of 0.02 luma points; Nuke Town 18:00 0.8719 -> 0.9306;
+High Seas 19:00 0.55 -> 0.8282, a 6.9-point luma move against 0.008 of noise.
+
 ### The hue story
 
 - **Direct sun** warms as it drops (long atmospheric path: red survives, blue
@@ -234,8 +260,9 @@ art direction a lie. Weather sets are the ones the arena already authors in
 | Raid | golden-hour-hillside | 16:00-18:30 | 17:00 | clear | 0.574..1.150 | 1.490 | 1.102 | -16.6..9.2 | -1.9..2.9 |
 | Map 3 | open-scrub-midmorning-preview-pinned **(pinned)** | 10:00-10:00 | 10:00 | clear, overcast | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
 | Nuke Town Rebuild | suburban-bleached-noon-preview-pinned **(pinned)** | 12:00-12:00 | 12:00 | clear | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
+| Raid Rebuild | estate-bleached-late-morning-preview-pinned **(pinned)** | 10:30-10:30 | 10:30 | clear | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
 
-Three arenas are **pinned** to the identity at every choice, so no consumer has
+Four arenas are **pinned** to the identity at every choice, so no consumer has
 to remember they are special:
 
 - **Gun Range** is indoors. Its weather profile is already `clear`-only for the
@@ -243,6 +270,9 @@ to remember they are special:
 - **Map 3** is PREVIEW and Lane V owns its look while it is being built. A second
   lane moving its sun underneath it would be a merge conflict rendered on screen.
   Its row is the template below, filled in with a zero-width band.
+- **Raid Rebuild** (`raid2`, HF-408) is PREVIEW and Lane AQ owns its look. Its
+  anchor is that arena's own art-direction brief, *bleached late-morning
+  estate*, deliberately a different hour from the shipped Raid's golden hour.
 - **Nuke Town Rebuild** is PREVIEW for the same reason and Lane AK owns it. Its
   row exists at all because the table is a `Record<ArenaId, ...>`: a lane branch
   typechecks against the roster IT has, so an arena added on the integration line
@@ -251,7 +281,10 @@ to remember they are special:
   (reading 'hourRange')` out of the import-time safety sweep and took five
   unrelated test files down with it. There is now a test that names a missing row
   instead. Its anchor is its own art direction's *bleached noon*, deliberately a
-  different hour from the shipped Nuke Town's warm sunset.
+  different hour from the shipped Nuke Town's warm sunset. **It has now happened
+  twice** - nuketown2 at the PASS 86 merge, raid2 at the PASS 87 one - and the
+  second time the roster guard named it in a sentence instead of collapsing five
+  test files, which is exactly what that test was written for.
 
 ### Preset template (for Nuke Town Rebuild, Map 3 and any new arena)
 
@@ -430,6 +463,53 @@ anchor 12:00 | band 12:00-12:00 | arc 06:00-20:00 | elev 8-62 deg | az swing 46 
 | late | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
 | late + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
 
+### Raid Rebuild (`raid2`) — estate-bleached-late-morning-preview-pinned — PINNED
+anchor 10:30 | band 10:30-10:30 | arc 06:00-19:00 | elev 10-68 deg | az swing 30 deg | cycle 6 min
+| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
+|---|---|---|---|---|---|---|---|---|
+| authored | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| authored + heavy | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| early | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| early + heavy | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| midday | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| midday + heavy | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| late | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+| late + heavy | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+
+---
+
+## 5b. What a player actually sees, measured
+
+Generated from `docs/evidence/pass87/dynamic-lighting/
+time-of-day-weather-sweep-repair-v5.json`, clear weather, the authored
+review camera of each arena at 1280x720 on native WebGPU. Every cell is a
+delta from an identity frame re-shot about a second earlier on the same
+deploy, in the order early / midday / late.
+
+The last column is COMPUTED, not judged. A state moved the frame's LEVEL if
+mean luma changed by at least 4.0 of 255, and its SHAPE if shadow mass
+changed by at least 3.0 points - the same points the combat-safety threshold
+is stated in, because inventing a second number here would be worse. An arena
+"reads as a time of day" when its strongest state moved both; the other labels
+say which one it managed. Nothing passes or fails on these: they exist so the
+reader is not left converting a key range like 0.574..1.150 into an expectation
+the sky backdrop then refuses to deliver (section 8, item 1).
+
+| Arena | mean luma delta | shadow mass delta (pt) | P05 floor delta | control-pair noise (pt) | reads as |
+| --- | --- | --- | --- | --- | --- |
+| Nuke Town | +3.22 / +2.95 / +1.28 | -4.37 / -3.95 / +2.03 | -2.00 / -1.00 / +2.00 | 0.01 | shadows move, frame level barely does (early) |
+| Terminal | +0.41 / +3.98 / +6.03 | +1.79 / -4.23 / -5.40 | -1.00 / +11.00 / +31.00 | 0 | reads as a time of day (strongest at late) |
+| RustRig | +2.03 / +0.01 / +1.51 | -0.30 / +0.00 / +0.16 | +1.00 / +0.00 / -1.00 | 0.01 | barely visible at any hour |
+| Gun Range | -0.19 / +0.05 / +1.95 | +0.05 / +0.05 / -0.88 | +0.00 / +0.00 / +0.00 | 0.06 | PINNED - identity at every hour, by design |
+| Farcrysis | -0.78 / +0.04 / +2.38 | +0.27 / -0.13 / -0.80 | +0.00 / +0.00 / +1.00 | 0.04 | barely visible at any hour |
+| High Seas | +3.51 / -0.04 / +2.28 | -3.30 / +0.05 / -1.35 | +4.00 / +0.00 / +2.00 | 0.01 | shadows move, frame level barely does (early) |
+| Firing Range | -4.18 / +6.63 / +4.12 | +1.16 / -1.54 / -0.75 | -1.00 / +2.00 / +1.00 | 0.01 | brightness shift, shadows barely move (midday) |
+| Raid | +11.68 / -1.14 / -0.52 | -0.05 / +0.01 / -0.05 | +3.00 / +2.00 / +12.00 | 0 | brightness shift, shadows barely move (early) |
+| Nuke Town Rebuild | +0.00 / +0.00 / +0.02 | +0.01 / +0.00 / +0.00 | +0.00 / +0.00 / +0.00 | 0 | PINNED - identity at every hour, by design |
+| Raid Rebuild | +0.01 / +0.00 / +0.00 | +0.00 / +0.00 / +0.00 | +0.00 / +0.00 / +0.00 | 0 | PINNED - identity at every hour, by design |
+| Map 3 | -0.02 / +0.01 / -0.01 | +0.00 / +0.00 / +0.00 | +0.00 / +0.00 / +0.00 | 0 | PINNED - identity at every hour, by design |
+
+
 ---
 
 ## 6. Replication
@@ -497,14 +577,78 @@ So the harness now:
 - captures a CONTROL PAIR, identity against identity, and reports
   `pairNoisePoints` beside every verdict, so a finding smaller than the arena's
   own noise is labelled instead of believed;
-- treats the two pinned arenas as a NULL EXPERIMENT and fails the whole run if
-  they move, because their correct answer is known in advance.
+- treats the FOUR pinned arenas (Gun Range, Map 3, Nuke Town Rebuild, Raid
+  Rebuild) as a NULL EXPERIMENT and fails the whole run if they move, because
+  their correct answer is known in advance;
+- **v3, after review:** frame-samples the control pair and every interleaved
+  identity, so `frameP50DeltaMs` is a PAIRED number with a measured noise floor
+  (`frameNoiseMs`) and each verdict carries `frameWithinNoise`. v2 fixed the
+  pixel baseline and left the frame-time one exactly as broken - one identity
+  sample per record, never paired - and its evidence then carried +4.5 ms and
+  -18.0 ms swings, which cannot falsify a ~1 ms/frame budget in EITHER
+  direction. A frame-time delta inside the noise floor is now reported as
+  unresolvable rather than quoted;
+- **v3, also:** compares each record's own `pairNoisePoints` to the null
+  tolerance it calls its invalidation threshold. v2 computed that number,
+  printed it and never compared it to anything, so the pre-merge sweep's
+  gun-range record spread 0.87 points against a 0.5 tolerance and still issued
+  verdicts. Neither threshold moved; the guard was added;
+- **v5, the sandwich.** Pairing an excursion with an identity taken a second
+  BEFORE it does not survive a one-off scene event landing between the two
+  shots, and three arenas turned out to have exactly that. On identity frames
+  where nothing whatever was written, the band scan's own identity column shows
+  farcrysis stepping 24.86 -> 28.44 once and staying, raid2 stepping
+  0.11 -> 4.07 once and staying, and high-seas going 4.87 -> 9.1 and back inside
+  one record. Each is 3.5-4.3 points against a 3-point threshold, and each
+  produced a "finding" that thirteen paired scan samples then refuted
+  (farcrysis measured +0.28 where the sweep said +3.96). raid2 is the proof
+  that none of them was lighting: it is PINNED, so every choice on it resolves
+  to the bit-identical identity write, and it moved anyway. Every excursion is
+  now sandwiched - identity, excursion, identity - and a pair whose two
+  identities disagree by more than the null tolerance is VOID: reported as an
+  instrument finding, never laundered into a safety pass OR a safety failure.
+  When they agree the delta is taken against their mean, which also halves the
+  identity's own sampling error.
+
+The re-run on the merged head with the sandwiched instrument reports **zero
+safety findings across 51 states, eleven arenas and seventeen records**, draw-call
+delta exactly zero on every state, and all four pinned arenas at 0.00. The only
+instrument findings are two VOID pairs on Gun Range, whose target carriers
+animate inside its review frame; its identity is proved by the unit tests
+instead, since it is pinned and every choice on it resolves to the identity.
 
 After that fix the same build's findings fell from eight to three, and the three
 were real. Map 3 reads 0.00 on all six of its states. Gun Range still moves about
 0.9 points on its own - its target carriers animate inside the review frame - so
 Gun Range verdicts finer than a point are not claims, and its identity is proved
 by the unit tests rather than by pixels.
+
+### Frame time, stated against a floor this instrument can actually resolve
+
+The first version of this document said the lighting pass costs "well under the
+owner's ~1 ms/frame budget" and marked it VERIFIED. It was not measurable: the
+identity was frame-sampled once per record and never paired, so the number had
+no error bar, and the evidence behind the claim contained +4.5 ms and -18.0 ms
+swings. Paired, over 51 states on the merged head:
+
+| quantity | value |
+| --- | --- |
+| per-record noise floor (identity vs identity, same units) | median 0.5 ms, max 2.2 ms |
+| paired p50 delta, mean over 51 states | -0.006 ms |
+| paired p50 delta, median | 0.000 ms |
+| paired p50 delta, range | -3.0 ms .. +2.9 ms |
+| draw-call delta | exactly 0 on every state |
+
+Read honestly, that says two different things. There is **no systematic frame-time
+regression**: over 51 paired samples the mean and the median are zero to within a
+hundredth of a millisecond, and the signs are evenly split. And this instrument
+**cannot resolve a 1 ms claim about one state**, because its own identity-against-
+identity pair spreads up to 2.2 ms on a busy arena. Anyone who needs the
+per-state number to a millisecond needs a different instrument; what is
+established here is the absence of a systematic cost, which is the question the
+owner's budget was actually asking.
+
+---
 
 ## 7. What this lane deliberately did NOT do
 
@@ -525,10 +669,34 @@ by the unit tests rather than by pixels.
 
 ## 8. Where the next pass should go
 
-1. **Sky backdrop tint.** The strongest remaining lever is the equirectangular
-   backdrop, which does not move with the hour. Tinting it is one uniform if the
-   backdrop is sampled through a TSL node the arena owns - but it is an arena
-   asset, so it needs the arena lanes' agreement, not this lane's.
+1. **Sky backdrop tint - and this is the biggest item, on MOST of the roster,
+   not just on High Seas.** The equirectangular backdrop does not move with the
+   hour, and the first draft of this document scoped that as a High Seas problem
+   because High Seas is where it is most obvious. Looking at the committed
+   frames rather than at the numbers, it is wider than that:
+
+   Section 5b measures it. Of the seven unpinned arenas, exactly ONE - Terminal
+   - moves both the level and the shape of its frame enough to read as a time of
+   day at its strongest hour. Two (Nuke Town, High Seas) move the shadows
+   without moving the frame's overall level. Two (Firing Range, Raid) are a
+   brightness shift with the shadows essentially where they were - Raid moves
+   mean luma by 11.7 of 255 and its shadow mass by 0.05 of a point. And two
+   (RustRig, Farcrysis) are barely visible at any hour, despite nominal key
+   ranges of 0.715..1.150 and 0.575..1.001.
+
+   Looking at the committed frames rather than the numbers says the same thing
+   and adds the reason. Nuke Town authored(17:30) vs late(18:00) has a
+   BIT-IDENTICAL sky, and the late frame reads as *less* dramatic than the
+   authored one. Terminal authored(07:00) vs late(10:30) is the clearly visible
+   ground change the table reports, but it pairs a dawn-coloured sky with
+   mid-morning shadows: internally inconsistent rather than merely muted. On
+   RustRig, Raid and High Seas the sky simply occupies a large fraction of the
+   review frame and does not move.
+
+   The honest summary is that the model is doing what it was designed to do and
+   the SKY is holding most of the result back. Tinting the backdrop is one
+   uniform if it is sampled through a TSL node the arena owns - but it is an
+   arena asset, so it needs the arena lanes' agreement, not this lane's.
 2. **`cycle` as a default.** It is implemented and safe, but it is not the
    default because it re-aims the sun and refreshes the static shadow map; that
    cadence's frame-time cost should be measured on the owner's box first.

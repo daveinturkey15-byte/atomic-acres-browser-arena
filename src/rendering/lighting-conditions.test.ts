@@ -394,23 +394,57 @@ describe('the writes are frozen values, not a mutable handle a caller can poison
  */
 describe('band ends are the measured safe interval, not a chosen one', () => {
   /**
-   * Read straight out of `docs/evidence/pass87/dynamic-lighting/
-   * band-readability-scan.json` (`scans[].safeBand`, clear weather — the rung
-   * that binds, since every weather only pulls the excursion back toward the
-   * identity). Update these ONLY by re-running the scan and copying its output.
+   * Read straight out of the committed scans' own `scans[].safeBand`, clear
+   * weather — the rung that binds, since every weather only pulls the excursion
+   * back toward the identity. Update these ONLY by re-running the scan and
+   * copying its output.
+   *
+   *   band-readability-scan.json              atomic-acres, skyline-terminal, test1, test2
+   *   band-readability-scan-2.json            farcrysis, rustworks-1v1, skyline-terminal (both weathers)
+   *   band-readability-scan-3-high-seas.json  high-seas (both weathers)
+   *
+   * EVERY UNPINNED ARENA IS NOW HERE, which it was not for one pass: three
+   * bands rested on the three-point capture sweep alone, and this lane had
+   * already proved that instrument can be wrong in both directions — it
+   * refuted a Raid finding on a re-run, and it raised a farcrysis finding of
+   * +3.96 points that thirteen paired scan samples then measured at +0.28.
    */
-  const MEASURED_SAFE_BAND: Partial<Record<ArenaId, readonly [number, number]>> = {
+  const MEASURED_SAFE_BAND: Record<ArenaId, readonly [number, number] | null> = {
     'atomic-acres': [15, 18.2],
-    'skyline-terminal': [6.74, 10.5],
+    'skyline-terminal': [6.8, 10.5],
+    'rustworks-1v1': [20, 22],
+    farcrysis: [9, 17],
+    'high-seas': [7.5, 19],
     test1: [9.8, 13],
     test2: [16, 18.5],
+    // PINNED arenas resolve to the identity at every hour, so there is no band
+    // to measure and no scan to run until their lane unpins them. `null` is the
+    // deliberate value; a MISSING key fails the coverage case below, which is
+    // how a newly added arena is forced to declare one or the other.
+    'gun-range': null,
+    map3: null,
+    nuketown2: null,
+    raid2: null,
   };
 
   it('never plays an hour the scan measured as unsafe', () => {
-    for (const [arenaId, safeBand] of Object.entries(MEASURED_SAFE_BAND) as [ArenaId, readonly [number, number]][]) {
+    for (const [arenaId, safeBand] of Object.entries(MEASURED_SAFE_BAND) as [ArenaId, readonly [number, number] | null][]) {
+      if (safeBand === null) continue;
       const { hourRange } = ARENA_DAYLIGHT_PROFILES[arenaId];
       expect(hourRange[0]).toBeGreaterThanOrEqual(safeBand[0]);
       expect(hourRange[1]).toBeLessThanOrEqual(safeBand[1]);
+    }
+  });
+
+  it('has a scanned band for every unpinned arena, and says so for the pinned ones', () => {
+    // The gap this closes: for one pass, rustworks-1v1, farcrysis and high-seas
+    // simply had no row here and nothing said so. A missing row read exactly
+    // like a scanned one.
+    for (const arenaId of ARENA_IDS) {
+      expect(Object.prototype.hasOwnProperty.call(MEASURED_SAFE_BAND, arenaId)).toBe(true);
+      const pinned = ARENA_DAYLIGHT_PROFILES[arenaId].pinned;
+      if (pinned) expect(MEASURED_SAFE_BAND[arenaId]).toBeNull();
+      else expect(MEASURED_SAFE_BAND[arenaId]).not.toBeNull();
     }
   });
 
