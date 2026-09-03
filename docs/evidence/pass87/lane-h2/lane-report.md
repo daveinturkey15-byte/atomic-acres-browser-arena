@@ -1137,6 +1137,19 @@ switch-matrix and A/B receipts name, so re-running those probes needs a fresh
 Receipt: `docs/evidence/pass87/lane-h2/qa/boot-smoke-12of12.txt`.
 Exit-gate criterion "boot smoke 9/9" — **MET, at 12/12.**
 
+**Bundle bookkeeping, VERIFIED and worth stating.** Every switch-matrix, paired
+and first-load receipt in this lane names the candidate bundle
+`legacy-main-BZjJAeqa.js` — the dist built at `89d760ba`, which was never rebuilt
+after the step-3 source commit `2a72720d`. `npm run build` on the final tree
+produces `legacy-main-DvXBviTB.js`, and that is what the boot smoke exercised and
+what `dist/` now holds. The two differ only in the cold-session precompile ROOT
+for an arena the authority names — farcrysis, `selectable: false`, absent from
+every matrix roster and every A/B arena — so for every pair, cold load and switch
+this lane measured, they execute the same code. The boot smoke is the one
+instrument here that ran on `DvXBviTB`, and it is also the only one that boots
+farcrysis: **the arena where the two bundles could differ is the arena the newer
+bundle was tested on.**
+
 
 ## 14. Exit gate, line by line
 
