@@ -180,7 +180,7 @@ def main() -> int:
         out = Path(sys.argv[sys.argv.index('--out') + 1])
     report = {'before': str(before_dir), 'after': str(after_dir), 'shots': {}}
     for png in sorted(before_dir.glob('*.png')):
-        if png.stem.endswith('-nopool'):
+        if png.stem.endswith('-nopool') or png.stem.endswith('-noskirt'):
             continue
         other = after_dir / png.name
         if not other.exists():
@@ -223,7 +223,9 @@ def main() -> int:
     print(text)
     if out:
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(text + '\n', encoding='utf-8')
+        # newline='' so the JSON is LF on Windows too: the repo is LF-only and a
+        # CRLF evidence file is a diff full of nothing.
+        out.write_text(text + '\n', encoding='utf-8', newline='')
     return 0
 
 
