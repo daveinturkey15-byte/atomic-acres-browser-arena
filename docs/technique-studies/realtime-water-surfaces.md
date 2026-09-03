@@ -18,7 +18,10 @@ The post was resolved on the **first route** of the governed no-login chain:
 7,881 bytes of JSON. No login, no paywall, and no web-search substitute for the thread's
 content.
 
-- **Author:** Dan Greenheck (@dangreenheck), verified individual, 9,688 followers.
+- **Author:** Dan Greenheck (@dangreenheck), 9,688 followers at read time. Verified: the JSON
+  carries `author.verification = {"verified": true, "verified_at": null, "type": "individual"}`
+  — cited because the flag is inside the `verification` sub-object, not a top-level `verified`
+  key, and a reviewer looking only at the tweet-level keys will conclude it is unsourced.
 - **Posted:** Wed 02 Sep 2026, 05:56:58 UTC. 414 likes, 13,580 views at read time.
 - **Media:** one 999x750 photo and one **10.046 s, 1920x1080 H.264 before/after video**.
 - **Its entire technical content**, in his words: he had worked on Three.js Water Pro for nine
@@ -187,7 +190,7 @@ Three corollaries:
 | Caustics | from above and below, shadow-occluded | none |
 | Subsurface scattering | yes | none |
 | LOD | camera-tracked geometry clipmap rings | fixed near plane (`nearSize`) plus a far skirt (`horizonRadius`) |
-| Coverage | one system, masked per body | `WATER_BODIES` registers **3 of 9 arenas** — `rustworks-1v1`, `farcrysis`, `high-seas` |
+| Coverage | one system, masked per body | `WATER_BODIES` registers **3 of 9 arena ids — 3 of 6 shippable combat arenas** (`test1`/`test2` are fixtures, `gun-range` is a non-combat range): `rustworks-1v1`, `farcrysis`, `high-seas` |
 
 What we already do well and must not lose: **one spectrum with two consumers** (`OCEAN_BANDS`
 is shared verbatim between `sampleOcean()` on the CPU and the TSL displacement, with the
@@ -213,7 +216,7 @@ new pass or a new compute step and is a **separate budgeted decision**. Do not o
 
 ---
 
-# 8. EXPERIMENT PLAN — Map 3 trial (for the next agent)
+## 8. EXPERIMENT PLAN — Map 3 trial (for the next agent)
 
 **Sized for 2–3 hours of Opus work.** Prove the colour model and the backscatter term on
 **one** Map 3 water body. Do not touch any other arena's water in this pass.
@@ -322,5 +325,40 @@ and the ledger's own falsifier puts the pond roster before wide deployment of an
 | The author publishes no water code | **VERIFIED** | 42 repos enumerated; both water repos 404 |
 | The technique list in section 4 is what the product does | **CLAIMED** | Author's documentation and changelog — his claims about his own product, not measured by us |
 | Backscatter must be injected before absorption | **CLAIMED** | Derived from the stated physics; not yet implemented or measured here |
-| Atomic Acres has no absorption, refraction, SSR, caustics, SSS, backscatter or persistent foam, and 3 of 9 arenas have water | **VERIFIED** | `src/water/*` and `src/water-system.ts` read at PASS 85 HEAD |
+| Atomic Acres has no absorption, refraction, SSR, caustics, SSS, backscatter or persistent foam, and water is registered for 3 of 9 arena ids — 3 of 6 shippable combat arenas | **VERIFIED** | `src/water/*` and `src/water-system.ts` read at PASS 85 HEAD; the 9 ids and the fixture/range classification read from `ARENA_IDS` in `src/arena-identity.ts` |
 | The Map 3 experiment produces the predicted result | **OPEN** | Not run. Section 8 is the plan, not a result. |
+
+## 10. Repair pass, 2026-09-03
+
+An independent skeptic re-executed this lane and returned ACCEPT_WITH_FIXES: it could not refute
+any technique claim (every source re-resolution, licence quote, 404 and repo constant matched
+exactly), but it found two status claims that had gone stale between the study being written and
+being reviewed, plus one thing the study never mentioned. All are now closed.
+
+| Finding | State now | Evidence |
+| --- | --- | --- |
+| Guard accept blocked by **this lane's own** artefact — `[update] threejs-webgpu-water: candidate hash mismatch` | **CLOSED** | `PASS skill-regression-guard skills=162 drift=1 warnings=10`, `PASS accepted skills=threejs-webgpu-water` |
+| `.agents\skills` hub empty; five of seven harness roots reporting `0/162`, read-through probe FAILED | **CLOSED** (not by this lane) | `link_skills.ps1 -VerifyOnly`: `OK 162/162` on all seven roots, junctions intact, read-through probe `OK` |
+| Vault discovery mirror had **no row 46**, breaking the note's own "numbers match" invariant | **CLOSED** | `Dev-Practices/AI 3D Technique Register.md` section added at vault `757deb1` |
+| "3 of 9 arenas" over-stated the gap | **CLOSED** | Corrected here, in AKP register row 46, and already in the skill |
+| Section 8 used a top-level `#` heading | **CLOSED** | Demoted to `## 8.` |
+| "Verified" author described without a cited field | **CLOSED — finding refuted** | The flag exists: `author.verification = {"verified": true, "verified_at": null, "type": "individual"}`. It sits in a `verification` sub-object, not a top-level `verified` key, which is why a review of the tweet-level keys concluded it was unsourced. The study now cites the field rather than dropping the claim. |
+
+**Why the guard failure moved onto this lane.** The evaluation record's original
+`candidate_sha256` (`fa301c1b…`) was *correct when written* — it is the raw-byte CRLF hash of the
+`SKILL.md` committed at vault `a77ea78`. The skill was then edited again (8 insertions,
+4 deletions) and that edit was left **uncommitted**, so the live bytes drifted to `b535720f…`.
+The guard hashes the live file (`hashlib.sha256(path.read_bytes())`), not the git blob, so it
+failed closed — correctly. The pending edit was read in full, judged additive (it *strengthens*
+the roster rule by requiring explicit opt-outs, and rewords the determinism bullet without
+changing its rule), committed at vault `c1a800e`, and the record re-pointed at it.
+
+**A gotcha worth keeping.** The three foreign over-length descriptions this lane originally
+reported as the blocker were real at the time and were fixed by sibling lanes; they now emit
+`WARN`, not problems. Two lessons: a guard verdict is a **timestamped** observation on shared
+state, not a property of your change, so re-run it before quoting it; and an evaluation record
+that hashes a *working-tree* file is stale the moment anyone edits that file, so **commit the
+artefact before writing the hash**, never after.
+
+**Still not run.** No repository source was modified and no rendering was measured. Section 8
+remains a plan, and the implementation evidence stays owed.
