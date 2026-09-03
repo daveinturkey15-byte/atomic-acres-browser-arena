@@ -45,6 +45,12 @@ and that is now pinned twice.
 pass no instrument in the repo could see inside it. It now publishes per-step
 durations, and the first reading already names its two biggest steps.
 
+**PARTIAL — the 72-pair switch gate did not complete.** 37 real ordered pairs
+committed, 0 failed, 0 fence-exceeded; the run aborted when the headless browser
+was closed under 47 rival Chrome processes, and the continuation spent its window
+on `nuketown2` — the arena that shipped hours ago and had never been
+switch-tested (8/8 outgoing, 4 real incoming). 31 pairs are OPEN. See section 13.
+
 **NOT DELIVERED.** The owner's "load every map much faster" is still not
 delivered by this lane. What is delivered is: a correctness fix that survives,
 its cost measured and mostly removed, a gate no other instrument provides, an
@@ -536,7 +542,10 @@ makes that row evidence rather than an anecdote.
    Lane A's shipped-build baseline is 1 (`renderPipeline_MeshBasicMaterial_774`).
    Whatever this pass measures, "0" is not the shipped state and this lane did
    not introduce the 1.
-8. **NOTE — commit trailer conflict, unresolved.** The brief mandates
+8. **OPEN — 31 of the 72 ordered pairs were not walked**, and the probe defect
+   fixed in `e89492af` is not re-run. Both want one quiet-machine sweep; nothing
+   in either is a known failure.
+9. **NOTE — commit trailer conflict, unresolved.** The brief mandates
    `Co-Authored-By: Claude Opus 5.1`; the harness system prompt mandates
    `Claude Fable 5.1`. Every commit in this lane follows the brief.
 
@@ -628,7 +637,11 @@ makes that row evidence rather than an anecdote.
      under every precompile in the game.
 3. **Strike "menu-time prewarm" from the job list** (section 4b) — `AGENTS.md`
    forbids it.
-4. **The boot smoke owes a run before merge** (section 8, item 1).
+4. **The boot smoke** (section 8, item 1). Note the reasoning in section 13: after
+   `2a72720d` the cold-boot path this branch takes is PASS 86's on every arena,
+   so the boot smoke's marginal value against THIS diff is low — but PASS 86's
+   12/12 was taken on `aa9befca`, not on this branch, and running it is cheap
+   next to a publish.
 
 ## 13. Gate results (this pass, final build `89d760ba`)
 
@@ -663,5 +676,92 @@ The roster GREW since the first pass: PASS 86 shipped Nuke Town Rebuild
 56, and **no instrument has ever exercised an in-session switch into or out of
 nuketown2**. That alone is worth the run.
 
-Status and result below.
+**What the run measures, and what it transfers to.** It was launched against the
+dist built from `89d760ba`. The final source commit is `2a72720d`, and the ONLY
+behavioural difference between them is the precompile ROOT on a cold session **of
+an arena the authority names** — i.e. farcrysis, which is `selectable: false` and
+therefore appears in neither the matrix roster nor any of its first loads. For
+every pair and every cold load this run performs, `89d760ba` and `2a72720d`
+execute the same code. The receipt names the bundle it measured (`distBundle`,
+added this pass) so that is checkable rather than asserted.
+
+**Why this is the run worth the remaining window, and not the boot smoke.** After
+`2a72720d` the only path in this branch that differs from PASS 86 at all is the
+in-session switch (unconditional relief). Cold sessions take PASS 86's sequence:
+identical for the named arena, identical-with-no-precompile for every other. The
+boot smoke exercises cold boots — the paths that no longer differ. The switch
+matrix exercises the path that does, and it is the only instrument in the
+repository that performs an in-session map switch.
+
+### Result — PARTIAL, and the reason is the machine, not an edge
+
+**VERIFIED: 25 of 72 ordered pairs walked, 0 failed, 0 fence-exceeded errors, and
+all 4 cold loads reached an active match on the requested arena.** The run then
+aborted with `page.evaluate: Target page, context or browser has been closed` —
+the headless Chrome went away mid-chunk with 47 rival Playwright Chrome processes
+on the GPU (the probe's own 60 s sampler, 29 samples). That is an INSTRUMENT/
+ENVIRONMENT failure, not an arena failure: no edge in the run reports `ok:false`
+and `summary.failedPairs` is empty.
+
+The receipt is `docs/evidence/pass87/lane-h2/qa/switch-matrix-h2-after-partial.json`
+and it names the build it measured on its face (`distBundle:
+legacy-main-BZjJAeqa.js`). **`gitDirty: true` — the source tree carried the
+uncommitted step-3 edit at the time; the DIST is the committed `89d760ba` build,
+and `distBundle` is what proves it.**
+
+Covered by the aborted run: all 8 outgoing edges from atomic-acres, 6 of 8 from
+skyline-terminal, and cold loads into atomic-acres (x2) and skyline-terminal
+(x2). Missing: 47 pairs.
+
+### Continuation — the arena that has never been switch-tested
+
+With the window left, coverage was spent on `nuketown2` rather than on more of
+the same pairs. It shipped as a selectable arena in PASS 86 **hours ago and no
+instrument has ever performed an in-session switch into or out of it** — every
+arena-loading gate in this repository boots straight into an arena, which is
+precisely how Gun Range shipped unreachable-by-switch in PASS 84 with every gate
+green. Result below.
+
+**Result — nuketown2, VERIFIED with one honest subtraction:**
+
+| direction | pairs walked | committed | note |
+|---|---|---|---|
+| `nuketown2 -> *` (8) | 8 | **8** | one chunk, chained correctly, 167-372 pipelines per edge, 21.7-56.0 s |
+| `* -> nuketown2` (8) | 8 | 4 real + **4 VOID** | see below |
+
+**The four void rows are a defect in this lane's own probe, found by reading its
+output rather than its exit code.** With `--targets nuketown2 --session-edges 2`
+every second row reported `ok` with `selectMs` of 1-10 ms, 0 pipelines, and a
+`transitionMs` byte-identical to the row above it. Cause:
+`performArenaSelection` early-returns while `gameStarted` is true, so selecting a
+new SOURCE while the previous edge's match was still live was a no-op; the
+"deploy" that followed was also a no-op, `matchActive` was true, and the probe
+walked `nuketown2 -> nuketown2` and called it `skyline-terminal -> nuketown2`.
+
+**It reported green for a switch it never performed** — which is HF-417's own
+defect class one level up, and it is fixed in `e89492af` with two floors: return
+to the menu and wait for `gameStarted === false` before selecting, and ASSERT
+after the first load that the live match is on the arena that was asked for,
+naming both arenas when it is not. **NOT re-run** — the fix lands after the
+window's last measurement, so it is CLAIMED, not verified.
+
+The four REAL incoming edges all committed: `atomic-acres`, `rustworks-1v1`,
+`high-seas` and `test2` into nuketown2, 157-241 pipelines each, 11.2-19.4 s.
+
+### Switch-matrix coverage, totalled honestly
+
+| | pairs |
+|---|---|
+| ordered pairs in the 9-arena matrix | 72 |
+| walked and committed, real | **37** (25 from the aborted full run + 8 + 4) |
+| walked but VOID (probe defect) | 4 |
+| **not walked** | **31** |
+| failed | **0** |
+
+**CLAIM-STATE: the 72-pair gate did NOT complete and this lane does not claim
+it.** What is VERIFIED is 37 real ordered pairs committed with zero
+fence-exceeded errors on the candidate build, including every outgoing edge from
+the arena that shipped hours ago and had never been switch-tested. The remaining
+31 pairs are OPEN and the run is cheap to repeat on a quiet machine.
+
 
