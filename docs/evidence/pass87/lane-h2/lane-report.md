@@ -203,6 +203,23 @@ the same sequence PASS 86 takes (one extra boolean, one skipped branch), so
 `visual-definition` returns to its baseline and the first-load regression goes to
 zero.** The final measurement is in section 3a.
 
+### Step 3 — and the step-2 code carried a defect of its own (commit `2a72720d`)
+
+Step 2 stopped running the cold-session relief except where the authority names
+an arena. That left step 1's narrowed root (`arena.root`) reachable in exactly
+one case: **the named arena**. In other words the code, as of `89d760ba`, would
+have shipped farcrysis a relief NARROWER than the whole-scene one PASS 86 gives
+it today — on no evidence, in the one place where losing the 12 s fence is
+documented to wedge the queue for the NEXT arena as well.
+
+Caught by re-reading the guard against its own reachability, not by a test.
+Both surviving cases now take the whole scene, exactly as PASS 86 does, and the
+ancestor walk and its fallback go with the narrowed root. **Every arena's relief
+is now either PASS 86's or absent-as-in-PASS-86; none is narrower than what it
+ships with.**
+
+This is the state the branch is merge-ready in.
+
 ## 3a. THE RESULT — the first-load regression is gone
 
 **VERIFIED, interleaved A/B on the final build `89d760ba` against baseline dist
@@ -556,6 +573,9 @@ makes that row evidence rather than an anecdote.
 | `81f6d2c1` | first-load A/B summariser that reads every delta against an internal control |
 | `b4ee52d9` | receipts stamp `distBundle` — the build measured, not the tree the probe ran from |
 | `89d760ba` | cold-session relief asked of an evidenced authority; switch relief unconditional and unchanged |
+| `193138eb`, `44c0a35b`, `b32116f6` | evidence: six interleaved A/B pairs, three tripwires |
+| `8a82ff95`, `1c80b083` | this report |
+| `2a72720d` | both surviving cases take the whole scene — no arena gets a narrower relief than it ships with |
 
 ## 11. Verification
 
