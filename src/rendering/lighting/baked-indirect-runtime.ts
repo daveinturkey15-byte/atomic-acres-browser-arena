@@ -31,6 +31,19 @@
  *    whose digest does not match the current inputs is discarded rather than
  *    used, because a noon bake served at dusk is a lighting bug that looks like
  *    an art bug.
+ *
+ *    RULE 3 WAS A COMMENT AND NOT A BEHAVIOUR UNTIL 2026-09-03. The first
+ *    version returned early on `boundDigest !== null` BEFORE extracting or
+ *    hashing anything, and the only thing that cleared that gate was a tier
+ *    change. So a bound volume was permanent: a full day of sun movement never
+ *    re-baked, and - because `legacy-main.ts` constructs the post graph once per
+ *    session and an arena change only calls `applyDefinition` - the second and
+ *    every later arena in a session sampled the FIRST arena's volume at the
+ *    first arena's origin. Every measurement row was a cold single-arena page
+ *    load, which is the one condition under which that is invisible. The digest
+ *    is now re-derived whenever the scene root's structure settles into a new
+ *    shape or the sun crosses a quantisation cell, and `boundDigest` is what it
+ *    is COMPARED against rather than a reason to skip the comparison.
  */
 
 import * as THREE from 'three';
@@ -159,13 +172,21 @@ export function buildBakedIndirectRuntime(
   let session: IrradianceBakeSession | null = null;
   let boundDigest: string | null = null;
   let stepsSinceUpload = 0;
-  let lastRootSignature = -1;
+  let lastRootSignature = '';
   let signatureStableSince = Number.POSITIVE_INFINITY;
   let state: 'none' | 'cache' | 'baking' | 'baked' = 'none';
   // Set when an input the digest covers has changed under a settled scene, so
   // the next opportunity re-derives the digest instead of trusting the bound
-  // one. A tier change is the case that exists today.
+  // one. A tier change sets it directly; an arena swap and a sun move are
+  // detected by the two keys below.
   let digestDirty = false;
+  // What was true the last time the proxy was actually extracted and hashed.
+  // Re-derivation is gated on THESE changing, not on `boundDigest` being null,
+  // and both are cheap enough to evaluate every frame: a string compare and a
+  // handful of vector operations. Extraction only happens when one of them
+  // moves, so the frame cost of the guard is not the cost of the guard's job.
+  let derivedForSignature: string | null = null;
+  let derivedForLighting: string | null = null;
 
   // The scene-pass assembler hands this module the camera, not the scene, and
   // the camera is parented into the scene. Walking up beats changing an
@@ -205,10 +226,30 @@ export function buildBakedIndirectRuntime(
     graph.setVolume(session.volume());
   };
 
+  /**
+   * A cheap structural fingerprint of the scene root's direct children.
+   *
+   * The count alone is not enough: an arena swap that happens to replace one
+   * set of top-level groups with the same NUMBER of groups reads as unchanged,
+   * and that is the case B1 shipped. `Object3D.id` is a stable per-object
+   * counter, so summing the ids alongside the count distinguishes "the same
+   * children" from "a different set of children" without walking the tree.
+   */
+  const rootSignature = (root: THREE.Object3D): string => {
+    let sum = 0;
+    for (const child of root.children) sum = (sum + child.id) % 0xffffffff;
+    return `${root.children.length}:${sum}`;
+  };
+
+  /** The quantised sun, as a key. Cheap; no allocation beyond the string. */
+  const lightingKey = (lighting: BakeLighting): string => [
+    ...lighting.sunDirection, ...lighting.sunColour,
+  ].join(',');
+
   const maybeStartBake = (): void => {
     const root = sceneRoot();
     if (!root) return;
-    const signature = root.children.length;
+    const signature = rootSignature(root);
     const at = now();
     // SETTLING, not throttling. The arena streams in after the pipeline is
     // assembled, so the test is "the root has stopped changing", not "enough
@@ -220,11 +261,34 @@ export function buildBakedIndirectRuntime(
       return;
     }
     if (at - signatureStableSince < EXTRACTION_DEBOUNCE_MS) return;
-    if (boundDigest !== null && !digestDirty) return;
-    digestDirty = false;
-    const proxy = extractProxyScene(root, THREE, ARENA_PROXY_EXTRACTION);
+    // The lighting is derived BEFORE the guard, because the sun crossing a
+    // quantisation cell is one of the two things that must re-open it. It is a
+    // few vector operations; the expensive half is the extraction below.
     const lighting = bakeLightingFromSun(sources.sun);
+    const lightKey = lightingKey(lighting);
+    // Re-derive when anything the digest covers may have moved: a settled root
+    // whose structure differs from the one we last hashed, a sun that has left
+    // its quantisation cell, or a tier change. Otherwise there is nothing new
+    // to hash and the extraction is skipped - that is the frame-cost guard, and
+    // it is a guard on RE-HASHING, not on ever hashing again.
+    if (!digestDirty
+      && derivedForSignature === signature
+      && derivedForLighting === lightKey) return;
+    digestDirty = false;
+    derivedForSignature = signature;
+    derivedForLighting = lightKey;
+    const proxy = extractProxyScene(root, THREE, ARENA_PROXY_EXTRACTION);
     const digest = computeBakeDigest(proxy, lighting, active);
+    // Publishing the proxy is what makes the BUILD-TIME half of this feature
+    // possible: `scripts/qa/extract-arena-proxy.mjs` reads it out of a headless
+    // page and hands it to `scripts/bake/bake-arena-indirect.mjs`, so the bake
+    // costs quoted in the lighting document come from a real arena rather than
+    // a synthetic stand-in. It is one reference to an object that already
+    // exists; nothing is serialised unless something asks for it.
+    const scope = globalThis as unknown as { __ATOMIC_ACRES_BAKE_PROXY__?: unknown };
+    scope.__ATOMIC_ACRES_BAKE_PROXY__ = {
+      arenaId: root.name || 'arena', digest, tier: active.tier, lighting, scene: proxy,
+    };
     if (digest === boundDigest) return;
     startBake(proxy, lighting, digest, root.name || 'arena');
   };

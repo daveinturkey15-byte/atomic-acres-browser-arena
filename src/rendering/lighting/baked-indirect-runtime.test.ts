@@ -217,6 +217,107 @@ describe('buildBakedIndirectRuntime', () => {
     runtime.dispose();
   });
 
+  it('RE-BAKES when the arena is swapped under a live session (B1)', () => {
+    // THE DEFECT THIS PINS. `maybeStartBake` used to return at
+    // `boundDigest !== null && !digestDirty` BEFORE extracting or hashing, and
+    // `digestDirty` was set only by a tier change. `legacy-main.ts` builds the
+    // post graph once per session and an arena change only calls
+    // `applyDefinition`, so the second and every later arena in a session
+    // sampled the FIRST arena's volume, at the first arena's origin. Every
+    // measurement row taken for this lane was a cold single-arena page load -
+    // the one condition under which that is invisible.
+    const { root, camera, sun } = arenaScene();
+    let clock = 0;
+    const runtime = buildBakedIndirectRuntime(
+      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock,
+    );
+    runtime.beforeRender();
+    clock += EXTRACTION_DEBOUNCE_MS + 1;
+    runtime.beforeRender();
+    for (let frame = 0; frame < 8000 && runtime.source() === 'baking'; frame += 1) runtime.beforeRender();
+    expect(runtime.source()).toBe('baked');
+    const firstArena = runtime.graph.receipt().digest;
+
+    // Swap the arena: every mass out, a different set in, exactly what an arena
+    // transition does to the scene root.
+    for (const child of [...root.children]) {
+      if (child.name.startsWith('wall-') || child.name === 'floor') root.remove(child);
+    }
+    for (let index = 0; index < 5; index += 1) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(20, 8, 3),
+        new THREE.MeshStandardMaterial({ color: 0x2050cc, roughness: 0.7 }),
+      );
+      mesh.name = `tower-${index}`;
+      mesh.position.set(index * 9 - 18, 4, index % 2 === 0 ? 14 : -14);
+      root.add(mesh);
+    }
+    root.updateMatrixWorld(true);
+    clock += 1;
+    runtime.beforeRender();                       // notices the new structure
+    clock += EXTRACTION_DEBOUNCE_MS + 1;
+    runtime.beforeRender();                       // re-derives and restarts
+    expect(runtime.source()).toBe('baking');
+    expect(runtime.graph.receipt().digest).not.toBe(firstArena);
+    runtime.dispose();
+  });
+
+  it('RE-BAKES when the sun leaves its quantisation cell under a live session (B1)', () => {
+    // The other half of the same defect: "a noon bake can never be served at
+    // dusk" was a comment, not a behaviour. A full day of sun travel changed
+    // nothing, because the digest was never re-derived after the first bind.
+    const { camera, sun } = arenaScene();
+    let clock = 0;
+    const runtime = buildBakedIndirectRuntime(
+      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock,
+    );
+    runtime.beforeRender();
+    clock += EXTRACTION_DEBOUNCE_MS + 1;
+    runtime.beforeRender();
+    for (let frame = 0; frame < 8000 && runtime.source() === 'baking'; frame += 1) runtime.beforeRender();
+    expect(runtime.source()).toBe('baked');
+    const noon = runtime.graph.receipt().digest;
+
+    // Far past the 1/12-direction and 1/8-colour quantisers: high white noon to
+    // a low warm-orange sun.
+    sun.position.set(-80, 4, 0);
+    sun.color.setRGB(1, 0.45, 0.2);
+    sun.updateMatrixWorld(true);
+    clock += 1;
+    runtime.beforeRender();
+    expect(runtime.source()).toBe('baking');
+    expect(runtime.graph.receipt().digest).not.toBe(noon);
+    runtime.dispose();
+  });
+
+  it('does NOT re-extract while nothing the digest covers has moved', () => {
+    // The guard the fix must not lose: re-deriving is gated on a changed root
+    // structure or a moved sun, not on a timer, so a settled arena under a
+    // still sun extracts the proxy exactly once however long it is played.
+    const { camera, sun } = arenaScene();
+    let clock = 0;
+    const runtime = buildBakedIndirectRuntime(
+      sourcesFor(camera, sun), resolveBakedIndirectTuning('low'), () => null, () => clock,
+    );
+    runtime.beforeRender();
+    clock += EXTRACTION_DEBOUNCE_MS + 1;
+    runtime.beforeRender();
+    for (let frame = 0; frame < 8000 && runtime.source() === 'baking'; frame += 1) runtime.beforeRender();
+    expect(runtime.source()).toBe('baked');
+    const settled = runtime.graph.receipt().digest;
+    // Ten seconds of gameplay with a tenth of a degree of sun drift, which the
+    // quantiser must absorb.
+    for (let frame = 0; frame < 600; frame += 1) {
+      clock += 16;
+      sun.position.set(30 + frame * 0.0005, 60, 20);
+      sun.updateMatrixWorld(true);
+      runtime.beforeRender();
+    }
+    expect(runtime.source()).toBe('baked');
+    expect(runtime.graph.receipt().digest).toBe(settled);
+    runtime.dispose();
+  });
+
   it('publishes a receipt a headless browser can read without a debug hook', () => {
     const { camera, sun } = arenaScene();
     let clock = 0;
