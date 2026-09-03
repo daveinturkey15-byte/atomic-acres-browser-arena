@@ -34,8 +34,10 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * while its card was withdrawn (HF-409), 8 again when the corridor showcase became
  * the arena, and 9 the same day (HF-407) when the Nuke Town Rebuild shipped: the
  * floor is an alarm on the SCRAPE collapsing, so it has to equal the real roster.
+ * Raised 9 -> 10 on 2026-09-03 (HF-408, Lane AQ) when the Raid Rebuild `raid2`
+ * shipped selectable.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 9;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 10;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

@@ -126,7 +126,7 @@ test('the sweep keeps a floor under the derived roster', () => {
   // while its card was withdrawn, 8 again when the showcase became the arena, and
   // 9 (HF-407) when the Nuke Town Rebuild shipped. The floor must equal the REAL
   // roster, which the equality assertion below enforces in both directions.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*9/u, 'the roster floor must be pinned at 9');
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*10/u, 'the roster floor must be pinned at 10');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -428,7 +428,7 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*9/u,
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*10/u,
     'the shared roster floor must be pinned at 9',
   );
   assert.match(
@@ -436,7 +436,7 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 9, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 10, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so

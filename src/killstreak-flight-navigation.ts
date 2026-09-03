@@ -96,6 +96,13 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'nuketown2-east-street-air-gap', xQ: 0.62, zQ: 0, altitudeM: 7.5 },
     { id: 'nuketown2-central-overflight', xQ: 0, zQ: 0, altitudeM: 18 },
   ]),
+  // RAID2 (PREVIEW, HF-408): the tallest authored mass is the 5.3 m upper wall,
+  // so the ceiling is set by sightline like test2's. The courtyard is the one
+  // portal because it is the only place on the map that is open to the sky with
+  // no roof, slab or upper room over it.
+  'raid2': definition('raid2', 63, [
+    { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
+  ]),
 });
 
 export type SupportFlightStepInput = Readonly<{

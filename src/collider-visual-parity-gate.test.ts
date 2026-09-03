@@ -177,6 +177,10 @@ describe('collider/visual parity gate (all six arenas)', () => {
       map3: 0,
       // NUKETOWN2 (owner 2026-09-02, HF-407): same rule, same floor.
       nuketown2: 0,
+      // RAID2 (owner 2026-09-02, HF-408): enters at the same strictest floor.
+      // The audit measured 0 invisible colliders and 0 walk-through meshes on
+      // this arena, so a row above 0 would forgive something it does not do.
+      raid2: 0,
       'gun-range': 0,
       farcrysis: 0,
     });

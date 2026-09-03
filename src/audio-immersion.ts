@@ -126,6 +126,9 @@ export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = O
   // the open field the shipped Nuke Town uses, and the fight happens between
   // the two facades, not out on the lawn.
   'nuketown2': 'urban-yard',
+  // RAID2 (PREVIEW, HF-408): a walled estate of paved outdoor rooms, the same
+  // reverb family as test2 even though the rebuild is the more open of the two.
+  'raid2': 'urban-yard',
 });
 
 export const DEFAULT_ACOUSTIC_SPACE: AcousticSpace = 'open-field';

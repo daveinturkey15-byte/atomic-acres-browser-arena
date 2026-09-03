@@ -19,6 +19,8 @@ import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/c
 // the day it was authored, and an arena in that list but not in this merge makes
 // the roster assertion reject EVERY capture.
 import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
+// RAID2: HF-408.
+import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
 import { menuPreviewDefinition, menuPreviewPose } from '../../src/ui/menu-preview-camera';
 import type { ArenaId } from '../../src/map-selection';
 import { canonicalPass65PreviewArenaDependencies } from './pass65-menu-preview-arena-dependencies';
@@ -85,6 +87,12 @@ const choreography = {
     // NUKETOWN2 is tenth in ARENA_SELECTIONS and is spread last, so its key
     // lands tenth here too and the roster assertion compares equal.
     ...nuketown2ChoreographyJson.arenas,
+    // RAID2: last in ARENA_SELECTIONS (HF-408, owner 2026-09-02), spread after
+    // nuketown2 so its key lands last here too. Without this line the roster
+    // assertion in runtimeInputReceipt() rejects EVERY capture - including the
+    // nine already-accepted arenas - which is the exact mechanism that made
+    // test1 and test2 ship byte-copied placeholder media on 2026-08-30.
+    ...raid2ChoreographyJson.arenas,
   },
 } as unknown as typeof choreographyJson;
 const generatedAt = choreography.generatedAt;

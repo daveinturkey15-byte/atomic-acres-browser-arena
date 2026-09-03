@@ -1053,6 +1053,10 @@ const events: SoundEventInventoryEntry[] = [
       // transformer hum at the west cul-de-sac and the fence-line wind at the
       // east yard, one at each end of the street.
       'nuketown2.street-hum', 'nuketown2.fence-wind',
+      // RAID2 (owner 2026-09-02, HF-408). Two sources, matching
+      // ARENA_AUDIO_DEFINITIONS.raid2's bed and air placements: the bed over the
+      // circular drive, the air over the pool terrace.
+      'raid2.terrace-breeze', 'raid2.pool-water',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
@@ -1069,6 +1073,8 @@ const events: SoundEventInventoryEntry[] = [
       'map3.stone-gallery',
       // NUKETOWN2 (owner 2026-09-02, HF-407).
       'nuketown2.test-town',
+      // RAID2 (owner 2026-09-02, HF-408).
+      'raid2.open-terrace',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Pass 75: sparse intermittent one-shots layered above the two continuous beds, giving each arena a sense of place rather than a drone. Every event is a repository-procedural recipe (oscillator sweep, or the shared noise buffer through a band-pass) - no sampled audio. Placed on a random bearing at an authored distance around the live listener, scheduled on a randomised per-arena gap so the layer never develops an audible period, and skipped entirely when the shared spatial-voice budget is full so ambience can never crowd out combat.',
@@ -1089,7 +1095,8 @@ const events: SoundEventInventoryEntry[] = [
     // owner 2026-08-30: Test1/Test2 arenas added.
     // owner 2026-09-02 (HF-405): Map 3 added.
     // owner 2026-09-02 (HF-407): Nuke Town Rebuild added.
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2'],
+    // owner 2026-09-03 (HF-408): the Raid rebuild added.
+    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1104,7 +1111,10 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
 // owner 2026-08-30: recomputed again for the Test1/Test2 arena variants
 // (arena-bed, arena-events and game-music rows).
-export const SOUND_EVENT_INVENTORY_SHA256 = '85dd8b4eb53c1a9168c35a41912cf10631716941ea8a35d6f828a736e079bb29';
+// owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
+// neither branch's pin is correct once both the Nuke Town Rebuild's and the
+// Raid Rebuild's bed, event and music rows are present.
+export const SOUND_EVENT_INVENTORY_SHA256 = '6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

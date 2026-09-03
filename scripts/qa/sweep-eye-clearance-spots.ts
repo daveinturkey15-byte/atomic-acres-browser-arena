@@ -27,6 +27,7 @@ import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
 import { buildMap3, prepareMap3 } from '../../src/map3-arena';
 import { buildNuketown2 } from '../../src/nuketown2-arena';
+import { buildRaid2 } from '../../src/raid2-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // `ShedArenaId` is re-declared, not re-exported, by destructible-shed-registry;
@@ -195,6 +196,8 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   map3: buildMap3,
   // NUKETOWN2 (owner 2026-09-02, HF-407).
   nuketown2: buildNuketown2,
+  // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+  raid2: buildRaid2,
 });
 
 /**
@@ -203,9 +206,10 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * would sweep nothing while printing success, so it is asserted rather than
  * assumed. 9 = the ten ids in arena-identity.ts minus hidden farcrysis. map3
  * left the roster for one day (2026-09-02, HF-409) and rejoined it when the
- * corridor showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9.
+ * corridor showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9,
+ * and the Raid Rebuild (HF-408, Lane AQ, 2026-09-03) made it 10.
  */
-export const MINIMUM_SWEPT_ARENAS = 9;
+export const MINIMUM_SWEPT_ARENAS = 10;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

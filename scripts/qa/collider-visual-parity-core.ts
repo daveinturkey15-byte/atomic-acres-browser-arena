@@ -672,7 +672,7 @@ let factoriesPromise: Promise<ArenaFactories> | null = null;
 export async function loadArenaFactories(): Promise<ArenaFactories> {
   if (!factoriesPromise) {
     factoriesPromise = (async () => {
-      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }, { buildNuketown2 }] = await Promise.all([
+      const [{ buildArena }, { buildGunRange, buildRustworks1v1, buildSkylineTerminal }, { buildFarcrysis }, { buildHighSeas }, { addNeighbourhoodLife, loadArenaArt }, { buildTest1, buildTest2 }, { buildMap3 }, { buildNuketown2 }, { buildRaid2 }] = await Promise.all([
         import('../../src/map'),
         import('../../src/additional-maps'),
         import('../../src/farcrysis'),
@@ -682,6 +682,8 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         import('../../src/map3-arena'),
         // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild joins the audit.
         import('../../src/nuketown2-arena'),
+        // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+        import('../../src/raid2-arena'),
       ]);
       // MAP3 (HF-409 finisher 2): map3's builder is synchronous but its eighth
       // corridor needs a wasm module resolved first, so prepare it here - the
@@ -708,6 +710,9 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         map3: { build: buildMap3 },
         // NUKETOWN2 (owner 2026-09-02, HF-407).
         nuketown2: { build: buildNuketown2 },
+        // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink joins the audit
+        // from its first commit, so it can never ship un-audited.
+        raid2: { build: buildRaid2 },
       } satisfies ArenaFactories;
     })();
   }

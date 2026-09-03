@@ -292,7 +292,11 @@ describe('Pass 65 sound-event inventory', () => {
     // over Map 3's bed, event and music variant rows. owner 2026-09-02
     // (HF-407): recomputed again over the Nuke Town Rebuild's bed, event and
     // music variant rows.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('85dd8b4eb53c1a9168c35a41912cf10631716941ea8a35d6f828a736e079bb29');
+    // (HF-408, 2026-09-03): recomputed once more at integration over the MERGED
+    // inventory - the Raid rebuild's two bed sources, its one event source and
+    // its music variant row now sit alongside the Nuke Town Rebuild's, so
+    // neither branch's pin was correct on its own.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

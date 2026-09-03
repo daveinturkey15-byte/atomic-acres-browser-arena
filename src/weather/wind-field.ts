@@ -232,6 +232,10 @@ export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.free
   // between two house rows lets it run. Gust scale 20 m is the spacing of the
   // bodies that break it up: house, garage, bus, garage, house.
   'nuketown2': profile('nuketown2', 'street-channelled-suburban-draught', 0.0, 2.8, 2.4, 20, 0.7, false),
+  // RAID2 (PREVIEW, HF-408): the same hillside breeze as test2, on a longer
+  // gust scale (26 m against 18 m) because what breaks the wind here is a
+  // colonnade on 4 m gaps at the end of a 52 m lane, not a hedge line.
+  'raid2': profile('raid2', 'hillside-terrace-lane-breeze', -1.18, 2.5, 2.1, 26, 1.05, false),
 });
 
 export function windProfile(arenaId: ArenaId): WindProfile {
