@@ -59,7 +59,7 @@
 import { chromium } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 // The roster and the pair walk are pure and unit-tested in
@@ -226,6 +226,19 @@ const report = {
   contract: 'arena-switch-matrix-v1',
   measuredAt: new Date().toISOString(),
   label: LABEL, dist: DIST, gitSha,
+  // `gitSha` is the SOURCE TREE this probe ran FROM, which is NOT necessarily
+  // the tree the measured DIST was built from - a baseline dist served out of a
+  // second worktree is exactly that case, and reading gitSha as the build's
+  // identity is how the first pass of this lane shipped a receipt named for a
+  // commit it did not contain. The content-hashed entry bundle names the BUILD
+  // and cannot be confused with anything else.
+  distBundle: (() => {
+    try {
+      const assets = join(DIST, 'assets');
+      if (!existsSync(assets)) return null;
+      return readdirSync(assets).find((file) => /^legacy-main-[A-Za-z0-9_-]+\.js$/u.test(file)) ?? null;
+    } catch { return null; }
+  })(),
   gitDirty: gitDirtyFiles === null ? null : gitDirtyFiles.length > 0,
   gitDirtyFiles: gitDirtyFiles === null ? null : gitDirtyFiles.slice(0, 40),
   viewport: { width: WIDTH, height: HEIGHT },
