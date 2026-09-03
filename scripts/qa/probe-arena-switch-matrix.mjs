@@ -570,6 +570,20 @@ try {
       for (const [source, target] of chunk) {
         if (current !== source) {
           const firstLoadStartedAt = Date.now();
+          // MEASURED DEFECT (lane H2, 2026-09-03): `performArenaSelection` early-
+          // returns while `gameStarted` is true, so selecting a new source while
+          // the previous edge's match is still live is a NO-OP. The probe then
+          // deployed (also a no-op), saw `matchActive`, recorded a first-load row
+          // and walked an "edge" that never left the arena it was already on -
+          // four of eight rows in the `--targets nuketown2` run had selectMs of
+          // 1-10 ms and 0 pipelines. Return to the menu first, then select.
+          await page.evaluate(async () => {
+            const debug = window.__ATOMIC_ACRES_DEBUG__;
+            if (debug.snapshot().gameStarted === true) debug.returnToMainMenu();
+          });
+          await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === false,
+            undefined, { timeout: SWITCH_TIMEOUT_MS });
+          await page.waitForTimeout(SETTLE_MS);
           await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, source);
           const state = await transitionState(page);
           const beforeAdmission = await counters(page);
@@ -596,6 +610,12 @@ try {
             census,
           });
           if (!deployed.matchActive) throw new Error(`first load into ${source} never reached an active match`);
+          // The floor that would have caught the defect above at once: a first
+          // load that lands on a DIFFERENT arena than the one asked for makes
+          // every edge measured from it a fiction. Fail loud, never record it.
+          if (deployed.matchArenaId !== source) {
+            throw new Error(`first load asked for ${source} but the live match is on ${deployed.matchArenaId}`);
+          }
           current = source;
         }
         const edge = await switchEdge(page, errors, source, target);
