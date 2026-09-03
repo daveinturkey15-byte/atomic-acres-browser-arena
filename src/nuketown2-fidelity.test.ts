@@ -387,7 +387,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(longestRun, 'clear run along the street centre-line').toBeLessThanOrEqual(MAX_STREET_CENTRE_RUN_METRES);
   });
 
-  it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', () => {
+  it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', async () => {
     const map = buildNuketown2(new THREE.Scene());
     const meshNames = map.root.children.map((node) => node.name);
 
@@ -399,12 +399,32 @@ describe('Nuke Town Rebuild fidelity', () => {
     for (const part of ['truck deck', 'truck box roof', 'truck box bulkhead', 'truck cab']) {
       expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
     }
+    // ...and each flank opening is a NAMED hole: two piers and a header per
+    // flank, so a future full-width flank restores the sealed box and fails
+    // here (HF-436).
+    for (const part of ['truck box flank 0 pier 0', 'truck box flank 0 header', 'truck box flank 1 pier 1']) {
+      expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
+    }
     // The truck's interior is a real room: a standing eye at the origin, on the
-    // deck, is under a roof and inside two flanks, and it is NOT blocked.
+    // deck, is under a roof and inside the walls, and it is NOT blocked.
     expect(isBlocked({ x: 0, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
-    // ...and its mouth is at the -x end, so it is enterable from the road.
-    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS),
-      'truck cargo box mouth').toBe(false);
+    // HF-436: the room is enterable from THREE mouths - the -x rear end and a
+    // 1.6 x 1.9 m opening in EACH flank. Each mouth is clear just outside it
+    // AND in the wall plane at standing eye height.
+    const t = NUKETOWN2_CENTRAL_TRUCK;
+    const mouths: Array<{ id: string; x: number; z: number; plane: { x: number; z: number } }> = [
+      { id: 'rear end', x: -t.boxLength / 2 - 0.6, z: t.z, plane: { x: -t.boxLength / 2 + 0.075, z: t.z } },
+      { id: 'left flank', x: 0, z: t.z - t.width / 2 - 0.6, plane: { x: 0, z: t.z - (t.width / 2 - 0.075) } },
+      { id: 'right flank', x: 0, z: t.z + t.width / 2 + 0.6, plane: { x: 0, z: t.z + (t.width / 2 - 0.075) } },
+    ];
+    for (const mouth of mouths) {
+      expect(isBlocked({ x: mouth.x, y: 1.7, z: mouth.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} mouth outside`).toBe(false);
+      expect(isBlocked({ x: mouth.plane.x, y: 1.7, z: mouth.plane.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} opening clear`).toBe(false);
+    }
+    // ...and a standing player WALKS in through the left mouth and out the
+    // right one, on the real physics, no jump.
+    const through = await walkStanding(map, [0, 1.7, t.z - t.width / 2 - 1.8], [[0, t.z + t.width / 2 + 1.8]]);
+    expect(Math.abs(through[0]!.z - (t.z + t.width / 2 + 1.8)), `side-to-side walk ended at ${JSON.stringify(through[0])}`).toBeLessThan(0.45);
 
     // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
     // between, and a standing eye at its centre IS blocked.
@@ -448,7 +468,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // The cars are CLOSED: solid, and not declared as enterable cover volumes.
     expect(map.physicalCover.some((cover) => cover.id.includes('car'))).toBe(false);
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
-  });
+  }, 60_000);
 
   it('builds two two-storey houses facing each other over the road, each with a garage it opens into', () => {
     const map = buildNuketown2(new THREE.Scene());
@@ -1007,8 +1027,21 @@ describe('Nuke Town Rebuild fidelity', () => {
       // against a 20 m2 floor, which is BETTER balanced than the 89.3 m2 the
       // centred truck produced.
       'nuketown2 street-vehicle truck box bulkhead',
-      'nuketown2 street-vehicle truck box flank 0',
-      'nuketown2 street-vehicle truck box flank 1',
+      // HF-436 - DELIBERATE ADDITION, with the reason. Each cargo-box flank
+      // became two full-height piers and a header, cutting a 1.6 x 1.9 m
+      // walk-through opening so the box is enterable from the left side, the
+      // right side AND the rear end (the owner's "more similar to the actual
+      // Nuketown map"). Six named bodies replace the two sealed flanks; the
+      // deck, roof, bulkhead, cab and roof-climb treads are untouched, and so
+      // is the 2x core seat above the roof. The two new headers top out at the
+      // roof plane - a same-material construction contact the coplanar
+      // instrument classes benign (identical fragments cannot visibly fight).
+      'nuketown2 street-vehicle truck box flank 0 header',
+      'nuketown2 street-vehicle truck box flank 0 pier 0',
+      'nuketown2 street-vehicle truck box flank 0 pier 1',
+      'nuketown2 street-vehicle truck box flank 1 header',
+      'nuketown2 street-vehicle truck box flank 1 pier 0',
+      'nuketown2 street-vehicle truck box flank 1 pier 1',
       'nuketown2 street-vehicle truck box roof',
       'nuketown2 street-vehicle truck cab',
       'nuketown2 street-vehicle truck deck',

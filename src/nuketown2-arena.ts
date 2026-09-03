@@ -1084,14 +1084,31 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
 
   // Cab, solid closed cover, on the +x end.
   streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, t.z], [t.cabLength, t.cabRoofY, W], m.truckCab);
-  // Cargo box: deck, bulkhead against the cab, two flanks and a roof. The -x
-  // end is OPEN, which is the mouth.
+  // Cargo box: deck, bulkhead against the cab, two flanks with a walk-through
+  // opening each, and a roof. The -x end is OPEN, which is the rear mouth.
   streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
   streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, t.z],
     [T, t.roofY - t.deckY, W], m.truckBox);
+  // HF-436, owner after PASS 91: "one of the trucks in the street needs a side
+  // entrance so you can go in over the left side, right side, or the end, more
+  // similar to the actual Nuketown map." Each flank gets a 1.6 x 1.9 m opening
+  // (both over the briefed 1.0 x 1.9 minimum), floored at the deck and
+  // headed at deckY + 1.9, so a standing capsule walks in from either side.
+  // The rear mouth and the roof deck are untouched, and so are the 2x core
+  // seat above the roof and the north-flank climb treads (they stand at
+  // x >= 4.6, clear of the opening at x [-0.8, 0.8]).
+  const SIDE_OPENING_HALF = 0.8;
+  const HEADER_Y = t.deckY + 1.9;
   for (const [index, side] of [-1, 1].entries()) {
-    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, t.z + side * flank],
-      [t.boxLength, t.roofY - t.deckY, T], m.truckBox);
+    const fz = t.z + side * flank;
+    [[-boxHalf, -SIDE_OPENING_HALF], [SIDE_OPENING_HALF, boxHalf]].forEach((run, pier) => {
+      streetVehicle(builder, `truck box flank ${index} pier ${pier}`,
+        [(run[0] + run[1]) / 2, (t.deckY + t.roofY) / 2, fz],
+        [run[1] - run[0], t.roofY - t.deckY, T], m.truckBox);
+    });
+    streetVehicle(builder, `truck box flank ${index} header`,
+      [0, (HEADER_Y + t.roofY) / 2, fz],
+      [SIDE_OPENING_HALF * 2, t.roofY - HEADER_Y, T], m.truckBox);
   }
   streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
   for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
