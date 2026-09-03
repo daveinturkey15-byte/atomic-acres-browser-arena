@@ -16,7 +16,9 @@ import {
   DROP_SHOT_TIMING,
   DROP_SHOT_TIMING_BOUNDS,
   IDLE_CROUCH_HOLD,
+  IDLE_SPRINT_LATCH,
   beginStanceTransition,
+  clearSprintLatchOnDropShot,
   crouchHeld,
   crouchPressed,
   crouchReleased,
@@ -24,6 +26,7 @@ import {
   sampleStanceTransition,
   stanceTransitionDurationMs,
   stanceTransitionImpulse,
+  stepSprintLatch,
 } from './prone-transition';
 import { stanceEyeHeight } from './legacy-pure-helpers-2';
 
@@ -275,3 +278,78 @@ describe('HF-412 source contract: the fire path does not gate on the prone trans
     expect(body).not.toMatch(/\bdive\b|\bslide\b/i);
   });
 });
+
+describe('HF-431 drop shot from sprint (Lane AX)', () => {
+  it('sprints when standing and shift is pressed', () => {
+    const state = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'stand');
+    expect(state.latched).toBe(true);
+    expect(state.requiresFreshPress).toBe(false);
+  });
+
+  it('clears sprint latch on drop shot and requires fresh press', () => {
+    const sprinting = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'stand');
+    expect(sprinting.latched).toBe(true);
+
+    const afterDrop = clearSprintLatchOnDropShot(sprinting);
+    expect(afterDrop.latched).toBe(false);
+    expect(afterDrop.requiresFreshPress).toBe(true);
+  });
+
+  it('keeps sprint unlatched while shift is still held in prone and across standing up', () => {
+    let state = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'stand');
+    expect(state.latched).toBe(true);
+
+    // Drop shot occurs
+    state = clearSprintLatchOnDropShot(state);
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(true);
+
+    // Still holding shift while prone
+    state = stepSprintLatch(state, true, 'prone');
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(true);
+
+    // Player stands up, but shift is STILL held
+    state = stepSprintLatch(state, true, 'stand');
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(true);
+  });
+
+  it('re-engages sprint only on a fresh shift press after returning to stand', () => {
+    let state = clearSprintLatchOnDropShot(stepSprintLatch(IDLE_SPRINT_LATCH, true, 'stand'));
+    expect(state.requiresFreshPress).toBe(true);
+
+    // Stance returns to stand while shift is held -> still unlatched
+    state = stepSprintLatch(state, true, 'stand');
+    expect(state.latched).toBe(false);
+
+    // Player releases shift
+    state = stepSprintLatch(state, false, 'stand');
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(false);
+
+    // Fresh shift press while standing -> latched!
+    state = stepSprintLatch(state, true, 'stand');
+    expect(state.latched).toBe(true);
+    expect(state.requiresFreshPress).toBe(false);
+  });
+
+  it('refuses to latch sprint if shift is pressed while prone', () => {
+    // Pressing shift while prone must not latch and must require a fresh press
+    const state = stepSprintLatch(IDLE_SPRINT_LATCH, true, 'prone');
+    expect(state.latched).toBe(false);
+    expect(state.requiresFreshPress).toBe(true);
+
+    // Holding that shift press into stand still does not sprint
+    const stoodUp = stepSprintLatch(state, true, 'stand');
+    expect(stoodUp.latched).toBe(false);
+    expect(stoodUp.requiresFreshPress).toBe(true);
+  });
+
+  it('integrates sprint latch into legacy-main.ts physics and stance request', () => {
+    expect(LEGACY_MAIN).toMatch(/stepSprintLatch\(sprintLatchState,\s*rawSprintInput,\s*player\.stance\)/);
+    expect(LEGACY_MAIN).toMatch(/if\s*\(target\s*===\s*'prone'\)\s*sprintLatchState\s*=\s*clearSprintLatchOnDropShot\(sprintLatchState\);/);
+    expect(LEGACY_MAIN).toMatch(/wantsSprint\s*=\s*sprintLatchState\.latched/);
+  });
+});
+

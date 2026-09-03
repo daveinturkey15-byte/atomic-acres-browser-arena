@@ -20,13 +20,17 @@ import {
 // never takes the trigger away. Every timing constant lives in that module.
 import {
   IDLE_CROUCH_HOLD,
+  IDLE_SPRINT_LATCH,
   beginStanceTransition,
+  clearSprintLatchOnDropShot,
   crouchHeld,
   crouchPressed,
   crouchReleased,
   restingStanceTransitionSample,
   sampleStanceTransition,
+  stepSprintLatch,
   type CrouchHoldState,
+  type SprintLatchState,
   type StanceTransition,
   type StanceTransitionSample,
 } from './prone-transition';
@@ -6167,6 +6171,7 @@ let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
+let sprintLatchState: SprintLatchState = IDLE_SPRINT_LATCH;
 let stanceRecoveryUntil = 0;
 // HF-412: the in-flight stance transition and this frame's sample of it. The
 // CAPSULE commits to the new stance on the press (authority never lags); only
@@ -16796,6 +16801,8 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   // continuous across the drop. `src/prone-transition.test.ts` pins that both
   // prone arms of the old expression stay gone.
   if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
+  // HF-431: clear sprint latch when dropping to prone
+  if (target === 'prone') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
   currentSprinting = false;
   return true;
 }
@@ -16841,6 +16848,7 @@ function respawn(
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   currentSprinting = false;
+  sprintLatchState = IDLE_SPRINT_LATCH;
   playerGrounded = false;
   wasGrounded = false;
   lastGroundedAt = -10_000;
@@ -26375,11 +26383,14 @@ function updatePhysics(dt: number): void {
   }
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
-  const wantsSprint = (
+  // HF-431: sprint latch state machine (Lane AX)
+  const rawSprintInput = (
     actionHeld('sprint', keys, keyProfile)
     || gamepadSprint
     || mobileTouchControls?.state.sprinting === true
-  ) && input.lengthSq() > 0 && playerGrounded;
+  );
+  sprintLatchState = stepSprintLatch(sprintLatchState, rawSprintInput, player.stance);
+  const wantsSprint = sprintLatchState.latched && input.lengthSq() > 0 && playerGrounded;
   const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
   if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
   currentSprinting = wantsSprint

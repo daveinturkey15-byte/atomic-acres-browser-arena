@@ -267,4 +267,82 @@ test.describe('HF-412 drop shot', () => {
     // a peek rather than a drop shot.
     expect(result.afterRelease).toBe('prone');
   });
+
+  test('HF-431: drop shot from sprint clears sprint latch; held shift does not resume sprinting', async ({ page }) => {
+    // Owner HF-431: "if I am sprinting and press Z it should do the drop shot but then not keep sprinting if i am still holding Shift"
+    // Sequence: Shift held + moving forward -> sprinting; press Z -> prone, not sprinting; stand -> still not sprinting until Shift released and pressed again.
+    await ready(page);
+    const result = await page.evaluate(async () => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      const wait = (ms: number): Promise<void> => new Promise((resolve) => { window.setTimeout(resolve, ms); });
+      const stance = (): string => debug.snapshot().player.stance as string;
+      const isSprinting = (): boolean => debug.snapshot().player.sprinting;
+
+      const down = (code: string): void => window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+      const up = (code: string): void => window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+
+      debug.setStanceForQa('stand');
+      await wait(120);
+
+      // Start moving forward + sprint
+      down('KeyW');
+      await wait(60);
+      down('ShiftLeft');
+      await wait(160);
+      const stanceBeforeDrop = stance();
+      const sprintingBeforeDrop = isSprinting();
+
+      // Press Z while still holding ShiftLeft and KeyW -> drop shot
+      down('KeyZ');
+      await wait(60);
+      up('KeyZ');
+      await wait(160);
+      const stanceAfterDrop = stance();
+      const sprintingWhileProne = isSprinting();
+
+      // Stand up by pressing Z again, while ShiftLeft is STILL held
+      down('KeyZ');
+      await wait(60);
+      up('KeyZ');
+      await wait(160);
+      const stanceAfterStand = stance();
+      const sprintingAfterStand = isSprinting();
+
+      // Release ShiftLeft
+      up('ShiftLeft');
+      await wait(100);
+      const sprintingAfterRelease = isSprinting();
+
+      // Fresh press of ShiftLeft while standing
+      down('ShiftLeft');
+      await wait(160);
+      const sprintingAfterFreshPress = isSprinting();
+
+      // Cleanup
+      up('ShiftLeft');
+      up('KeyW');
+      debug.setStanceForQa('stand');
+
+      return {
+        stanceBeforeDrop,
+        sprintingBeforeDrop,
+        stanceAfterDrop,
+        sprintingWhileProne,
+        stanceAfterStand,
+        sprintingAfterStand,
+        sprintingAfterRelease,
+        sprintingAfterFreshPress,
+      };
+    });
+
+    expect(result.stanceBeforeDrop).toBe('stand');
+    expect(result.sprintingBeforeDrop).toBe(true);
+    expect(result.stanceAfterDrop).toBe('prone');
+    expect(result.sprintingWhileProne).toBe(false);
+    expect(result.stanceAfterStand).toBe('stand');
+    expect(result.sprintingAfterStand).toBe(false);
+    expect(result.sprintingAfterRelease).toBe(false);
+    expect(result.sprintingAfterFreshPress).toBe(true);
+  });
 });
+
