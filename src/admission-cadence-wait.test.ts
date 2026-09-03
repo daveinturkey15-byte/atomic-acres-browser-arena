@@ -31,6 +31,19 @@ describe('evaluateAdaptiveCadenceDecision', () => {
     expect(zeroDelta.consecutiveStableFrames).toBe(0);
     expect(zeroDelta.isStableGap).toBe(false);
 
+    for (const recentGapsMs of [[], [16.6]]) {
+      const insufficientHistory = evaluateAdaptiveCadenceDecision({
+        now: 2_016.6,
+        startedAt: 1_000,
+        previousFrameAt: 2_000,
+        consecutiveStableFrames: 29,
+        recentGapsMs,
+        progressReady: true,
+      });
+      expect(insufficientHistory.shouldExit).toBe(false);
+      expect(insufficientHistory.consecutiveStableFrames).toBeLessThan(30);
+    }
+
     const nonFiniteHistory = evaluateAdaptiveCadenceDecision({
       now: 2_016.6,
       startedAt: 1_000,
