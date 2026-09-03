@@ -150,7 +150,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     pass: 'PASS 92',
     title: 'Pass 92 · Nuke Town Geometry From Owner Play & Profile Fold',
     releasedAt: pass92ReleasedAt,
-    areas: Object.freeze(['nuketown2', 'graphics-profiles', 'map3', 'load-time', 'docs']),
+    areas: Object.freeze(['ARENAS', 'GRAPHICS', 'PERFORMANCE']),
     summary: "Pass 92 fixes the Nuke Town Rebuild from the owner's play session: z-fighting removed with authored depth tiers, stairs walk both ways, upstairs windows are drop-out openings, ground-floor glass, the truck opens on three sides, wider kerb-side cover strips; RAY TRACED folded into Quality and Max; Map 3 street cell relocated; deploy-phase load attribution measured.",
     highlights: Object.freeze([
       'Nuke Town: z-fighting removed, stairs walk up and down, upstairs windows drop out, ground-floor glass, truck open on three sides, wider kerb cover',
