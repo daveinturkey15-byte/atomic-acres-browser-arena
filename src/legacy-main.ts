@@ -4034,8 +4034,14 @@ const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 
 const lightingQueryParams = new URLSearchParams(window.location.search);
 const lightingQueryChoice = lightingQueryParams.get('tod');
 const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
-/** `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode. */
-const lightingCaptureFixedHour = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
+/**
+ * `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode.
+ * It is also writable through the QA hook, because the readability question
+ * this lane had to answer -- at which hour of an arena's band does its shadow
+ * mass cross the safety bound -- is a SCAN, and reloading the page per hour
+ * costs a minute of arena construction for a value that is one uniform write.
+ */
+let lightingCaptureFixedHour: number | null = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
 /**
  * A LOCAL override, set only by `?tod=` or by the QA hook. It is deliberately
  * NOT the normal path: the hour is host-authoritative, so the live value comes
@@ -31945,6 +31951,8 @@ const debugWindow = window as Window & {
     // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
     sampleLightingConditions: () => Record<string, unknown>;
     setLightingTimeChoice: (choice: string) => Record<string, unknown>;
+    /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
+    setLightingFixedHour: (hour: number | null) => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
     sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
@@ -33182,6 +33190,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     lightingTimeChoiceOverride = choice;
     applyLightingConditionUniforms(true);
     return { accepted: true, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: the same hook at hour resolution, for the band scan. Still only
+  // uniform writes over the frozen light set -- an hour is an argument to a pure
+  // function here, not a scene change.
+  setLightingFixedHour: (hour: number | null) => {
+    lightingCaptureFixedHour = typeof hour === 'number' && Number.isFinite(hour) ? hour : null;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, fixedHour: lightingCaptureFixedHour, ...lightingConditionsTelemetry() };
   },
   // Which clause of the movement gate is holding the local player still. The
   // owner's "can't move" reports were undiagnosable from screenshots because

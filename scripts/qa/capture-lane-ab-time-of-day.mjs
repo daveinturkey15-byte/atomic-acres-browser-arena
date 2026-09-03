@@ -21,6 +21,24 @@
 // uniform write cannot add a draw; if it did, something built geometry), and the
 // frame time may not regress.
 //
+// INTERLEAVED BASELINE, AND WHY v1 OF THIS SCRIPT WAS NOT EVIDENCE
+// v1 captured `authored` once, then the three excursions after it, and compared
+// each against that single before frame. The 2026-09-03 01:20 sweep proved that
+// instrument wrong using its own null experiment: `gun-range` and `map3` are
+// PINNED in `ARENA_DAYLIGHT_PROFILES`, so every one of their states resolves to
+// the bit-identical identity write (sun 1.000, floor 1.000, tints [1,1,1]) — and
+// gun-range still read shadow mass 37.14% -> 41.15/41.20/41.17%, a +4.0 point
+// swing on frames where NOTHING was written. That is more than the 3-point
+// safety threshold, so every v1 verdict at or under ~4 points measured the
+// scene settling, not the lighting.
+//
+// v2 therefore re-applies `authored` immediately BEFORE each excursion and pairs
+// the two frames ~1 s apart, so the drift that accumulates over a 30 s record
+// cannot land in a verdict. The three identity frames are kept: their spread is
+// the instrument's own noise (`identityDriftPoints`), and on a PINNED arena the
+// excursion deltas must come out at zero. A run whose pinned arenas do not read
+// zero is not evidence about any arena, and this script says so.
+//
 // Runs INSTALLED CHROME HEADLESS over CDP. A run that asked for WebGPU and got
 // anything else, or got the Microsoft software adapter, is INVALIDATED rather
 // than written as evidence.
@@ -60,10 +78,12 @@ const ARENA_CAMERAS = Object.freeze({
 });
 
 /**
- * The three times of day, plus the before. `authored` is the identity, so it is
- * the A of the A/B rather than a fourth state.
+ * The three excursions. `authored` is not in this list because it is not a
+ * fourth state: it is the IDENTITY, and v2 of this instrument re-captures it
+ * immediately before every excursion rather than once at the top (see
+ * INTERLEAVED BASELINE below).
  */
-const TIME_STATES = Object.freeze(['authored', 'early', 'midday', 'late']);
+const TIME_STATES = Object.freeze(['early', 'midday', 'late']);
 
 /**
  * Two weathers per arena: clear, and the heaviest rung the arena AUTHORS.
@@ -81,6 +101,23 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
   test2: null,
   map3: 'overcast',
 });
+
+/**
+ * The NULL EXPERIMENT. These two arenas are `pinned: true` in
+ * `ARENA_DAYLIGHT_PROFILES`, so every choice resolves to the identity write and
+ * their excursion deltas must be zero to within the noise floor. They are the
+ * only rows in this sweep whose correct answer is known in advance, which makes
+ * them the check on the instrument rather than on the lane.
+ */
+const PINNED_ARENAS = new Set(['gun-range', 'map3']);
+
+/**
+ * How far a PINNED arena is allowed to move before this run stops being
+ * evidence. It is not a safety threshold and must never be relaxed to make a
+ * run pass: a pinned arena that moves means the frames are not comparable, and
+ * the only correct response is to fix the instrument.
+ */
+const PINNED_NULL_TOLERANCE_POINTS = 0.5;
 
 const ARENAS = arg('--arenas', Object.keys(ARENA_CAMERAS).join(','))
   .split(',').map((entry) => entry.trim()).filter(Boolean);
@@ -240,51 +277,88 @@ try {
         }
 
         mkdirSync(resolve(OUT, arena), { recursive: true });
-        for (const tod of TIME_STATES) {
+
+        /** One choice applied live, settled, shot and measured. */
+        const captureChoice = async (choice, file, sampleFrames) => {
           // The choice is switched LIVE through the debug hook rather than by
-          // reloading, so every state in this record shares one deploy, one
+          // reloading, so every frame in this record shares one deploy, one
           // arena construction and one set of compiled pipelines. A reload
           // between states would put arena-construction noise in the frame-time
           // delta and make the draw-call comparison meaningless.
-          const telemetry = await page.evaluate((choice) =>
-            window.__ATOMIC_ACRES_DEBUG__.setLightingTimeChoice(choice), tod);
-          await page.waitForTimeout(700);
-          const file = resolve(OUT, arena, `${arena}--${weather}--${tod}.png`);
+          const telemetry = await page.evaluate((value) =>
+            window.__ATOMIC_ACRES_DEBUG__.setLightingTimeChoice(value), choice);
+          // Long enough for the static shadow map to have been refreshed on the
+          // re-aimed sun. The v1 settle (700 ms) was the reason the very first
+          // frame of a record read systematically UNDER-shadowed.
+          await page.waitForTimeout(1_100);
           await page.screenshot({ path: file });
           const budget = await page.evaluate(() => {
             const audit = window.__ATOMIC_ACRES_DEBUG__.snapshot().budgetAudit ?? {};
             return { drawCalls: Number(audit.drawCalls ?? 0), triangles: Number(audit.triangles ?? 0) };
           });
-          // Frame time on the SAME deploy, immediately after the write.
-          const frame = await page.evaluate(async (samples) => {
-            const deltas = [];
-            let previous = performance.now();
-            await new Promise((done) => {
-              const step = () => {
-                const now = performance.now();
-                deltas.push(now - previous);
-                previous = now;
-                if (deltas.length >= samples) { done(); return; }
+          const frame = sampleFrames
+            ? await page.evaluate(async (samples) => {
+              const deltas = [];
+              let previous = performance.now();
+              await new Promise((done) => {
+                const step = () => {
+                  const now = performance.now();
+                  deltas.push(now - previous);
+                  previous = now;
+                  if (deltas.length >= samples) { done(); return; }
+                  requestAnimationFrame(step);
+                };
                 requestAnimationFrame(step);
-              };
-              requestAnimationFrame(step);
-            });
-            deltas.sort((a, b) => a - b);
-            const at = (f) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * f))];
-            return { p50: Number(at(0.5).toFixed(3)), p95: Number(at(0.95).toFixed(3)), frames: deltas.length };
-          }, FRAME_SAMPLES);
-          record.states.push({
-            tod,
-            file,
-            telemetry,
-            budget,
-            frame,
-            stats: await measure(file),
-          });
+              });
+              deltas.sort((a, b) => a - b);
+              const at = (f) => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * f))];
+              return { p50: Number(at(0.5).toFixed(3)), p95: Number(at(0.95).toFixed(3)), frames: deltas.length };
+            }, FRAME_SAMPLES)
+            : null;
+          return { choice, file, telemetry, budget, frame, stats: await measure(file) };
+        };
+
+        // Warm-up: apply the identity once and throw the frame away. Whatever
+        // has not converged by the end of it (shadow map, temporal history,
+        // exposure ramp) converges here rather than inside the first baseline.
+        await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--warmup.png`), false);
+        await page.waitForTimeout(1_500);
+
+        // THE CONTROL PAIR. Identity against identity, captured exactly the way
+        // a verdict pair is captured, so every record carries its own error bar
+        // in the same units as its findings. An arena with animated geometry in
+        // the review frame (Gun Range's target carriers, the Firing Range
+        // silhouettes) moves here on its own, and a verdict smaller than this
+        // number is not a claim about lighting.
+        const controlA = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-a.png`), false);
+        const controlB = await captureChoice('authored', resolve(OUT, arena, `${arena}--${weather}--control-b.png`), false);
+        record.pairNoisePoints = Number(
+          Math.abs(controlB.stats.shadowMassPercent - controlA.stats.shadowMassPercent).toFixed(2),
+        );
+
+        for (const tod of TIME_STATES) {
+          // THE INTERLEAVE. The identity is re-applied and re-shot immediately
+          // before every excursion, so each verdict is a pair of frames about a
+          // second apart on one deploy.
+          const before = await captureChoice(
+            'authored',
+            resolve(OUT, arena, `${arena}--${weather}--authored-for-${tod}.png`),
+            record.states.length === 0,
+          );
+          const state = await captureChoice(tod, resolve(OUT, arena, `${arena}--${weather}--${tod}.png`), true);
+          record.states.push({ tod, ...state, before });
+          const telemetry = state.telemetry;
           console.error(`[lane-ab] ${arena.padEnd(17)} ${weather.padEnd(11)} ${tod.padEnd(9)}`
             + ` hour=${telemetry?.hour ?? '?'} sun=${telemetry?.sunIntensityScale ?? '?'}`
-            + ` floor=${telemetry?.shadowFloorScale ?? '?'} draws=${budget.drawCalls} p50=${frame.p50}ms`);
+            + ` floor=${telemetry?.shadowFloorScale ?? '?'} draws=${state.budget.drawCalls}`
+            + ` p50=${state.frame.p50}ms shadow=${before.stats.shadowMassPercent}->${state.stats.shadowMassPercent}`);
         }
+        // The spread of the three identity frames IS this record's noise floor.
+        const identityMasses = record.states.map((state) => state.before.stats.shadowMassPercent);
+        record.identityDriftPoints = identityMasses.length
+          ? Number((Math.max(...identityMasses) - Math.min(...identityMasses)).toFixed(2))
+          : null;
+        record.pinned = PINNED_ARENAS.has(arena);
         record.ok = record.states.length === TIME_STATES.length;
       } catch (error) {
         record.error = String(error).slice(0, 200);
@@ -302,11 +376,15 @@ try {
 
 // ---- judgement -------------------------------------------------------------
 const findings = [];
+const instrumentFindings = [];
+let frameTimeBaselineMs = null;
 for (const record of runs) {
-  const before = record.states?.find((state) => state.tod === 'authored');
-  if (!before) continue;
+  if (!record.states?.length) continue;
   for (const state of record.states) {
-    if (state.tod === 'authored') continue;
+    // The paired identity frame, taken ~1 s before this one on the same deploy.
+    const before = state.before;
+    if (!before) continue;
+    if (before.frame) frameTimeBaselineMs = before.frame.p50;
     const shadowGrowth = Number((state.stats.shadowMassPercent - before.stats.shadowMassPercent).toFixed(2));
     const floorDrop = before.stats.lumaP05 - state.stats.lumaP05;
     const highlightGrowth = Number((state.stats.highlightMassPercent - before.stats.highlightMassPercent).toFixed(2));
@@ -316,8 +394,18 @@ for (const record of runs) {
       shadowFloorDropSteps: floorDrop,
       highlightMassGrowthPoints: highlightGrowth,
       drawCallDelta: drawDelta,
-      frameP50DeltaMs: Number((state.frame.p50 - before.frame.p50).toFixed(3)),
+      // Frame time is compared against the record's ONE identity sample: the
+      // baseline is only frame-sampled on the first round, because sampling it
+      // three times costs three seconds of drift for a number that does not move.
+      frameP50DeltaMs: frameTimeBaselineMs === null
+        ? null
+        : Number((state.frame.p50 - frameTimeBaselineMs).toFixed(3)),
       meanLumaDelta: Number((state.stats.meanLuma - before.stats.meanLuma).toFixed(2)),
+      // Reported, never subtracted. A verdict inside the record's own control
+      // pair is a number this instrument cannot resolve, and saying so is the
+      // difference between evidence and a decimal place.
+      withinInstrumentNoise: record.pairNoisePoints !== null
+        && Math.abs(shadowGrowth) <= record.pairNoisePoints,
       pass:
         shadowGrowth <= SAFETY.maximumShadowMassGrowthPoints
         && floorDrop <= SAFETY.maximumShadowFloorDropSteps
@@ -330,8 +418,15 @@ for (const record of runs) {
         + `highlight +${highlightGrowth}pt, draws ${drawDelta >= 0 ? '+' : ''}${drawDelta}`);
       exitCode = 1;
     }
+    // THE NULL EXPERIMENT. A pinned arena writes the identity at every choice,
+    // so any movement here is the instrument, not the lane.
+    if (record.pinned && Math.abs(shadowGrowth) > PINNED_NULL_TOLERANCE_POINTS) {
+      instrumentFindings.push(`${record.arena}/${record.weather}/${state.tod}: PINNED arena moved `
+        + `${shadowGrowth >= 0 ? '+' : ''}${shadowGrowth}pt on an identity write`);
+    }
   }
 }
+if (instrumentFindings.length) exitCode = 3;
 
 const report = {
   lane: 'AB',
@@ -340,13 +435,24 @@ const report = {
   viewport: VIEWPORT,
   frameSamples: FRAME_SAMPLES,
   safety: SAFETY,
+  instrument: {
+    version: 'interleaved-identity-baseline-v2',
+    pinnedNullTolerancePoints: PINNED_NULL_TOLERANCE_POINTS,
+    pinnedArenas: [...PINNED_ARENAS],
+  },
   environmentInvalid: environmentInvalid || null,
   runs,
   findings,
+  instrumentFindings,
 };
 writeFileSync(resolve(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.error(`[lane-ab] wrote ${resolve(OUT, 'report.json')}; findings=${findings.length}`);
 for (const finding of findings) console.error(`[lane-ab] FAIL ${finding}`);
+for (const finding of instrumentFindings) console.error(`[lane-ab] INSTRUMENT ${finding}`);
+if (instrumentFindings.length) {
+  console.error('[lane-ab] NULL EXPERIMENT FAILED: a pinned arena moved on an identity write, '
+    + 'so no verdict in this run is evidence about any arena');
+}
 if (environmentInvalid) {
   console.error(`[lane-ab] ENVIRONMENT INVALID: ${environmentInvalid} — this run is not evidence`);
   exitCode = 2;
