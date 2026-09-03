@@ -279,3 +279,62 @@ export function crouchHeld(state: CrouchHoldState, nowMs: number): CrouchHoldOut
 export function crouchReleased(): CrouchHoldOutcome {
   return Object.freeze({ state: IDLE_CROUCH_HOLD, action: null });
 }
+
+/**
+ * HF-431: Sprint latch state machine (Lane AX).
+ *
+ * Tracks whether sprinting is permitted to engage. When a drop shot is performed
+ * while sprinting or holding sprint, the latch is cleared and requires a fresh
+ * press once standing before sprint can re-engage.
+ */
+export type SprintLatchState = Readonly<{
+  latched: boolean;
+  requiresFreshPress: boolean;
+}>;
+
+export const IDLE_SPRINT_LATCH: SprintLatchState = Object.freeze({
+  latched: false,
+  requiresFreshPress: false,
+});
+
+/**
+ * Steps the sprint latch state.
+ *
+ * Rules (HF-431):
+ * - If the sprint input is not held, reset to idle (arms a future fresh press).
+ * - If a fresh press is required (set on drop shot), sprint cannot engage while
+ *   the input remains held, even across standing up.
+ * - If the player is prone, pressing sprint does not engage sprint and sets
+ *   `requiresFreshPress` so simply standing up does not immediately sprint.
+ * - Otherwise (standing/crouched and fresh press available), sprint latches.
+ */
+export function stepSprintLatch(
+  state: SprintLatchState,
+  rawSprintInput: boolean,
+  currentStance: Stance,
+): SprintLatchState {
+  if (!rawSprintInput) {
+    return IDLE_SPRINT_LATCH;
+  }
+  if (state.requiresFreshPress) {
+    return Object.freeze({ latched: false, requiresFreshPress: true });
+  }
+  if (currentStance === 'prone') {
+    return Object.freeze({ latched: false, requiresFreshPress: true });
+  }
+  return Object.freeze({ latched: true, requiresFreshPress: false });
+}
+
+/**
+ * Called when a drop shot occurs (transitioning to prone) while sprinting.
+ * Clears the latch and requires a fresh press after the player stands.
+ */
+export function clearSprintLatchOnDropShot(
+  _state: SprintLatchState,
+): SprintLatchState {
+  return Object.freeze({
+    latched: false,
+    requiresFreshPress: true,
+  });
+}
+

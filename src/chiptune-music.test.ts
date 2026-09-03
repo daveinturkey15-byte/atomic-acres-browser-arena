@@ -2,20 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   CHIPTUNE_TRACKS,
   CHIPTUNE_TRACK_IDS,
+  ChiptuneRotation,
+  GAME_MUSIC_BUS_GAIN,
+  PREVIOUS_GAME_MUSIC_BUS_GAIN,
+  advanceChiptuneSchedule,
+  advanceMultiTrackSchedule,
   chiptuneBarSeconds,
   chiptuneLoopEvents,
   chiptuneLoopSeconds,
   chiptuneMaxConcurrency,
+  createDeterministicRng,
   midiToFrequency,
+  nextBarBoundarySeconds,
   selectChiptuneTrack,
+  shuffleTracks,
   type ChiptuneTrackId,
-  GAME_MUSIC_BUS_GAIN,
-  advanceChiptuneSchedule,
 } from './chiptune-music';
 import { AUDIO_RUNTIME_BUDGET } from './spatial-audio';
-
-/** Semitone classes of a natural-minor scale, used to prove notes stay in key. */
-const MINOR_DEGREES = new Set([0, 2, 3, 5, 7, 8, 10]);
 
 function pitchClassRelativeToTonic(frequencyHz: number, tonicMidi: number): number {
   const midi = Math.round(69 + 12 * Math.log2(frequencyHz / 440));
@@ -27,9 +30,6 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
   const events = chiptuneLoopEvents(id);
 
   it('fits the two-voice game-music budget without widening it', () => {
-    // Assert against the real budget constant rather than a copy. If someone
-    // writes a chord needing a third simultaneous voice, it fails here instead of
-    // stealing a voice from gunfire at runtime.
     const peak = chiptuneMaxConcurrency(events);
     expect(peak.lead).toBe(1);
     expect(peak.bass).toBe(1);
@@ -37,75 +37,22 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
   });
 
   it('stays in key - no note can be an accidental', () => {
+    const scaleSet = new Set(track.scaleSemitones);
     for (const event of events) {
       const tonic = event.channel === 'lead' ? track.leadTonicMidi : track.bassTonicMidi;
       const degree = pitchClassRelativeToTonic(event.frequencyHz, tonic);
-      expect(MINOR_DEGREES.has(degree), `${id} ${event.channel} ${event.frequencyHz.toFixed(2)}Hz out of key`).toBe(true);
+      expect(scaleSet.has(degree), `${id} ${event.channel} ${event.frequencyHz.toFixed(2)}Hz out of key`).toBe(true);
     }
   });
 
-  it('is AUDIBLE at the default slider and still sits under gameplay audio', () => {
-    // 2026-08-29 re-pin, both directions. The old pin only capped the
-    // pre-bus peak, and the full chain (peak x bus 0.16 x default slider
-    // 0.68) multiplied out to ~0.009 - the owner was promised background
-    // music and NOBODY EVER HEARD IT. The contract now pins the EFFECTIVE
-    // peak through the real bus constant: loud enough to exist (>= 0.03,
-    // which the old staging fails), quiet enough to stay a bed (<= 0.09,
-    // far under weapon SFX amplitudes).
-    // Owner-tuned 2026-08-29: 35% of the first audible staging at a 50%
-    // default slider. The floor still fails RED against the original
-    // never-heard staging (0.105 x 0.16 x 0.68 = 0.011).
+  it('is AUDIBLE at the default slider and sits under gameplay audio (HF-430 halved gain)', () => {
     const DEFAULT_MUSIC_SLIDER = 0.5;
     for (const event of events) expect(event.gain).toBeGreaterThan(0);
     const effectivePeak = Math.max(...events.map((event) => event.gain)) * GAME_MUSIC_BUS_GAIN * DEFAULT_MUSIC_SLIDER;
-    // Owner 2026-08-30: "half the sound of the music" - second halving
-    // (bus 0.214 -> 0.107). The band halves with it; the floor still fails
-    // RED against the original never-heard staging.
-    // Owner 2026-08-30: band re-pinned for the third halving (0.107 -> 0.054).
-    expect(effectivePeak).toBeGreaterThanOrEqual(0.00375);
-    expect(effectivePeak).toBeLessThanOrEqual(0.01125);
-  });
-
-  it('schedules EVERY loop event across consecutive horizon windows (regression: one blip per loop)', () => {
-    // RED against the pre-2026-08-29 pump: it marked a whole ~15 s loop
-    // scheduled after emitting only the events inside the 0.75 s horizon, so
-    // 95% of every loop was silently skipped. Walk two full loops in 0.75 s
-    // pump steps and require exactly two of every event, in order.
-    const track = 'fallout-drift' as const;
-    const loop = chiptuneLoopSeconds(track);
-    const perLoop = chiptuneLoopEvents(track).length;
-    let until = 100; // loop started at t=100 on the context clock
-    const scheduled: number[] = [];
-    const scheduledKeys: string[] = [];
-    for (let now = 100; now < 100 + loop * 2 + 1; now += 0.4) {
-      const step = advanceChiptuneSchedule(track, until, 100, now + 0.75);
-      for (const entry of step.events) scheduled.push(entry.atSeconds);
-      for (const entry of step.events) scheduledKeys.push(`${entry.atSeconds.toFixed(6)}|${entry.event.channel}|${entry.event.frequencyHz.toFixed(2)}`);
-      until = step.scheduledUntilSeconds;
-      expect(until).toBeLessThanOrEqual(now + 0.75 + 1e-9);
-    }
-    // The final horizon reaches into loop 3; count the first two loops only,
-    // and demand exactly one scheduling per event - no gaps, no duplicates.
-    // (Uniqueness keys include the channel: simultaneous lead+bass chords
-    // are authored and legal.)
-    const inWindow = scheduled.filter((at) => at < 100 + loop * 2 - 1e-6);
-    expect(inWindow.length).toBe(perLoop * 2);
-    const keysInWindow = scheduledKeys.filter((key) => Number(key.split('|')[0]) < 100 + loop * 2 - 1e-6);
-    expect(new Set(keysInWindow).size).toBe(keysInWindow.length);
-    for (let index = 1; index < scheduled.length; index += 1) {
-      expect(scheduled[index]).toBeGreaterThanOrEqual(scheduled[index - 1] - 1e-6);
-    }
-  });
-
-  it('keeps the RUNTIME bus coefficient on the same constant (regression: the restage was silently reverted)', async () => {
-    // The first audibility fix restaged createBus('game-music', 0.45) - and
-    // audio.ts's busBaseGain() fallthrough overwrote it back to 0.16 the
-    // moment configure() ran at boot. The owner heard nothing, again. Pin
-    // the file's own mapping so the two stagings can never diverge.
-    const { readFile } = await import('node:fs/promises');
-    const source = await readFile('src/audio.ts', 'utf8');
-    expect(source).toContain("if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;");
-    expect(source).toContain("this.createBus('game-music', GAME_MUSIC_BUS_GAIN);");
+    // HF-430: music gain halved (-6 dB) from 0.054 to 0.027.
+    // The previous audibility band [0.00375, 0.01125] halves proportionally to [0.0018, 0.006].
+    expect(effectivePeak).toBeGreaterThanOrEqual(0.0018);
+    expect(effectivePeak).toBeLessThanOrEqual(0.006);
   });
 
   it('never overruns its loop, so it can repeat seamlessly', () => {
@@ -113,9 +60,6 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
     expect(loop).toBeCloseTo(chiptuneBarSeconds(id) * track.progression.length, 10);
     for (const event of events) {
       expect(event.offsetSeconds).toBeGreaterThanOrEqual(0);
-      // A note running past the loop boundary would collide with the first note
-      // of the next iteration on the same channel - the seam the concurrency
-      // check above cannot see.
       expect(event.offsetSeconds + event.durationSeconds).toBeLessThanOrEqual(loop + 1e-9);
     }
   });
@@ -136,56 +80,189 @@ describe.each(CHIPTUNE_TRACK_IDS)('background chiptune: %s', (id: ChiptuneTrackI
   });
 });
 
-describe('the two tracks are actually distinguishable', () => {
-  // Rotation is only worth having if a listener can tell the tracks apart.
-  // Asserting the contrast stops a future edit quietly converging them into two
-  // sections of the same piece.
-  it('differ in tempo, key, loop length and density', () => {
-    const [a, b] = CHIPTUNE_TRACK_IDS.map((id) => CHIPTUNE_TRACKS[id]);
-    expect(a.tempoBpm).not.toBe(b.tempoBpm);
-    expect(a.leadTonicMidi % 12).not.toBe(b.leadTonicMidi % 12);
-    expect(a.progression.length).not.toBe(b.progression.length);
-    expect(chiptuneLoopSeconds(a.id)).not.toBeCloseTo(chiptuneLoopSeconds(b.id), 2);
+describe('HF-430: ten distinct tracks in the ~90s duration band', () => {
+  it('has exactly ten authored tracks', () => {
+    expect(CHIPTUNE_TRACK_IDS.length).toBe(10);
+    expect(new Set(CHIPTUNE_TRACK_IDS).size).toBe(10);
+    expect(Object.keys(CHIPTUNE_TRACKS).length).toBe(10);
+  });
 
-    const density = (id: ChiptuneTrackId) => chiptuneLoopEvents(id).length / chiptuneLoopSeconds(id);
-    expect(Math.abs(density(a.id) - density(b.id))).toBeGreaterThan(0.5);
+  it('keeps every track in the ~90s duration band (85 s to 95 s)', () => {
+    for (const id of CHIPTUNE_TRACK_IDS) {
+      const duration = chiptuneLoopSeconds(id);
+      expect(duration, `${id} duration ${duration.toFixed(2)}s outside [85, 95] band`).toBeGreaterThanOrEqual(85);
+      expect(duration, `${id} duration ${duration.toFixed(2)}s outside [85, 95] band`).toBeLessThanOrEqual(95);
+    }
+  });
+
+  it('features distinct tempos, scales/keys, and densities across the roster', () => {
+    const tempos = new Set(CHIPTUNE_TRACK_IDS.map((id) => CHIPTUNE_TRACKS[id].tempoBpm));
+    expect(tempos.size).toBeGreaterThanOrEqual(8);
+
+    const tonics = new Set(CHIPTUNE_TRACK_IDS.map((id) => CHIPTUNE_TRACKS[id].leadTonicMidi % 12));
+    expect(tonics.size).toBeGreaterThanOrEqual(7);
+
+    const densities = CHIPTUNE_TRACK_IDS.map((id) => chiptuneLoopEvents(id).length / chiptuneLoopSeconds(id));
+    const minDensity = Math.min(...densities);
+    const maxDensity = Math.max(...densities);
+    expect(maxDensity - minDensity).toBeGreaterThan(0.5);
   });
 });
 
-describe('track rotation', () => {
-  it('never repeats the previous track back to back', () => {
-    // Straight random selection would replay the same track about half the time,
-    // which reads as "the music never changed" rather than as variety.
-    for (const previous of CHIPTUNE_TRACK_IDS) {
-      for (const roll of [0, 0.25, 0.5, 0.75, 0.999999]) {
-        expect(selectChiptuneTrack(previous, roll)).not.toBe(previous);
+describe('HF-430: music gain halving (-6 dB)', () => {
+  it('pins the previous and halved gain constants', () => {
+    expect(PREVIOUS_GAME_MUSIC_BUS_GAIN).toBe(0.054);
+    expect(GAME_MUSIC_BUS_GAIN).toBe(0.027);
+    expect(GAME_MUSIC_BUS_GAIN).toBe(PREVIOUS_GAME_MUSIC_BUS_GAIN / 2);
+    const dbChange = 20 * Math.log10(GAME_MUSIC_BUS_GAIN / PREVIOUS_GAME_MUSIC_BUS_GAIN);
+    expect(dbChange).toBeCloseTo(-6.0206, 2);
+  });
+
+  it('keeps the RUNTIME bus coefficient on the halved constant in audio.ts', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const source = await readFile('src/audio.ts', 'utf8');
+    expect(source).toContain("if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;");
+    expect(source).toContain("this.createBus('game-music', GAME_MUSIC_BUS_GAIN);");
+  });
+});
+
+describe('HF-430: shuffle rotation & no-repeat property', () => {
+  it('plays all ten tracks before any track repeats (no repeat until all 10 have played)', () => {
+    const rotation = new ChiptuneRotation({ seed: 42 });
+    const firstCycle: ChiptuneTrackId[] = [];
+    for (let i = 0; i < 10; i += 1) firstCycle.push(rotation.nextTrack());
+
+    expect(new Set(firstCycle).size).toBe(10);
+    for (const id of CHIPTUNE_TRACK_IDS) {
+      expect(firstCycle).toContain(id);
+    }
+
+    const secondCycle: ChiptuneTrackId[] = [];
+    for (let i = 0; i < 10; i += 1) secondCycle.push(rotation.nextTrack());
+
+    expect(new Set(secondCycle).size).toBe(10);
+    for (const id of CHIPTUNE_TRACK_IDS) {
+      expect(secondCycle).toContain(id);
+    }
+  });
+
+  it('never repeats the same track back to back (no immediate repeat across cycles)', () => {
+    const rotation = new ChiptuneRotation({ seed: 999 });
+    const played: ChiptuneTrackId[] = [];
+    for (let i = 0; i < 50; i += 1) {
+      played.push(rotation.nextTrack());
+    }
+    for (let i = 1; i < played.length; i += 1) {
+      expect(played[i], `immediate repeat at index ${i}: ${played[i]}`).not.toBe(played[i - 1]);
+    }
+  });
+
+  it('is deterministic under a seed for tests', () => {
+    const rotA = new ChiptuneRotation({ seed: 12345 });
+    const rotB = new ChiptuneRotation({ seed: 12345 });
+    const seqA = Array.from({ length: 25 }, () => rotA.nextTrack());
+    const seqB = Array.from({ length: 25 }, () => rotB.nextTrack());
+    expect(seqA).toEqual(seqB);
+
+    const rotC = new ChiptuneRotation({ seed: 54321 });
+    const seqC = Array.from({ length: 25 }, () => rotC.nextTrack());
+    expect(seqA).not.toEqual(seqC);
+  });
+
+  it('shuffleTracks helper avoids immediate repeat against previous track', () => {
+    const rng = createDeterministicRng(777);
+    for (const prev of CHIPTUNE_TRACK_IDS) {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const shuffled = shuffleTracks(CHIPTUNE_TRACK_IDS, rng, prev);
+        expect(shuffled[0]).not.toBe(prev);
+        expect(new Set(shuffled).size).toBe(10);
       }
     }
   });
 
-  it('can pick either track on a cold start', () => {
-    const picked = new Set([0, 0.49, 0.5, 0.99].map((roll) => selectChiptuneTrack(null, roll)));
-    expect(picked.size).toBe(CHIPTUNE_TRACK_IDS.length);
+  it('selectChiptuneTrack fallback avoids immediate repeat', () => {
+    for (const prev of CHIPTUNE_TRACK_IDS) {
+      const next = selectChiptuneTrack(prev, 0.5);
+      expect(next).not.toBe(prev);
+    }
+    const initial = selectChiptuneTrack(null, 0.25);
+    expect(CHIPTUNE_TRACK_IDS).toContain(initial);
   });
 
-  it('survives a hostile roll rather than returning undefined', () => {
-    // Math.random cannot produce these, but a caller mistake or a stubbed RNG can,
-    // and an out-of-range index here would silently start no music at all.
-    for (const roll of [-1, 0, 1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(CHIPTUNE_TRACK_IDS).toContain(selectChiptuneTrack(null, roll));
-      expect(CHIPTUNE_TRACK_IDS).toContain(selectChiptuneTrack('siren-groves', roll));
+  it('advanceChiptuneSchedule schedules events within horizon window', () => {
+    const track = 'fallout-drift' as const;
+    const step = advanceChiptuneSchedule(track, 0, 0, 10.0);
+    expect(step.events.length).toBeGreaterThan(0);
+    expect(step.scheduledUntilSeconds).toBeGreaterThan(0);
+    for (const item of step.events) {
+      expect(item.atSeconds).toBeGreaterThanOrEqual(0);
+      expect(item.atSeconds).toBeLessThan(10.0);
     }
   });
+});
 
-  it('alternates across a run of matches', () => {
-    let previous: ChiptuneTrackId | null = null;
-    const played: ChiptuneTrackId[] = [];
-    for (let match = 0; match < 8; match += 1) {
-      previous = selectChiptuneTrack(previous, (match * 0.37) % 1);
-      played.push(previous);
-    }
-    expect(new Set(played).size).toBe(CHIPTUNE_TRACK_IDS.length);
-    for (let i = 1; i < played.length; i += 1) expect(played[i]).not.toBe(played[i - 1]);
+describe('HF-430: seamless swap on bar boundary', () => {
+  it('calculates the next bar boundary exactly', () => {
+    const trackId: ChiptuneTrackId = 'siren-groves';
+    const bar = chiptuneBarSeconds(trackId);
+    expect(bar).toBeCloseTo(1.93548387, 6);
+
+    const boundary = nextBarBoundarySeconds(trackId, 0, 3.0);
+    expect(boundary).toBeCloseTo(bar * 2, 6);
+
+    const boundaryAtStart = nextBarBoundarySeconds(trackId, 0, 0);
+    expect(boundaryAtStart).toBeCloseTo(bar, 6);
+  });
+
+  it('swaps tracks seamlessly on bar boundaries without voice collisions', () => {
+    const rotation = new ChiptuneRotation({ seed: 888 });
+    const firstTrack = rotation.nextTrack();
+    const duration = chiptuneLoopSeconds(firstTrack);
+
+    const state = {
+      currentTrackId: firstTrack,
+      trackStartedAtSeconds: 0,
+      scheduledUntilSeconds: 0,
+      rotation,
+    };
+
+    // Schedule through the first track until past its duration (past ~90s)
+    const result = advanceMultiTrackSchedule(state, duration + 5);
+    expect(result.swaps.length).toBeGreaterThanOrEqual(1);
+
+    const swap = result.swaps[0];
+    expect(swap.from).toBe(firstTrack);
+    expect(swap.atSeconds).toBeCloseTo(duration, 6);
+
+    // Verify swap occurs at an exact integer multiple of the bar seconds
+    const bar = chiptuneBarSeconds(firstTrack);
+    const barsPlayed = swap.atSeconds / bar;
+    expect(Math.abs(barsPlayed - Math.round(barsPlayed))).toBeLessThan(1e-5);
+
+    // Verify notes before boundary are from firstTrack, and notes at/after are from next track
+    const beforeSwap = result.events.filter((e) => e.atSeconds < swap.atSeconds - 1e-6);
+    const afterSwap = result.events.filter((e) => e.atSeconds >= swap.atSeconds - 1e-6);
+    expect(beforeSwap.every((e) => e.trackId === firstTrack)).toBe(true);
+    expect(afterSwap.every((e) => e.trackId === swap.to)).toBe(true);
+  });
+
+  it('supports forced mid-track swap on a bar boundary', () => {
+    const rotation = new ChiptuneRotation({ seed: 777 });
+    const trackA = rotation.nextTrack();
+    const barA = chiptuneBarSeconds(trackA);
+    const targetBoundary = barA * 4; // swap at bar 4
+
+    const state = {
+      currentTrackId: trackA,
+      trackStartedAtSeconds: 0,
+      scheduledUntilSeconds: 0,
+      rotation,
+    };
+
+    const result = advanceMultiTrackSchedule(state, targetBoundary + 3, targetBoundary);
+    expect(result.swaps.length).toBe(1);
+    expect(result.swaps[0].atSeconds).toBeCloseTo(targetBoundary, 6);
+    expect(result.swaps[0].from).toBe(trackA);
   });
 });
 

@@ -923,3 +923,20 @@ the sprint latch is cleared so a still-held Shift does not resume sprinting from
 prone (sprint must be re-pressed after standing); unit test on the stance/sprint
 state machine + a headless keyboard sequence test (Shift held, Z, stays prone and
 not sprinting; stand, Shift again sprints).
+
+## PASS 89 publish record — 07:29 BST 2026-09-03
+Integration 07453942 -> gh-pages {pass89 live, pass88 backup}; chooser generation
+2dade140e0fe. Shipped: Lane AI (BALANCED profile, per-profile copy, RTX explainer,
+ladder doc), Lane AB (time of day on every arena, host TIME OF DAY lobby row),
+Lane AL (baked indirect tiers; two runtime blockers fixed with tests), Lane AO
+(MotionBricks analysis tools, NO-GO on the build), HF-429 Farcrysis PARKED
+(selectable false; Lane R's work and receipts kept). Held: AP GTA-art trial (its
+street cell overruns the Map 3 playfield; relocate then re-measure), AM water
+(its every-arena pond roster test is not shipped as a test), AN subway trial.
+Full suite 5578/0; boot smoke 13/13; all five presets boot; RTX explainer
+falsifier green. Rollback: `python scripts/orchestration/publish_pass89.py --rollback`.
+HF-430/431 (chiptune rotation, drop shot from sprint): Gemini bulk + Opus
+skeptic/repair ACCEPT_WITH_FIXES (four worker defects fixed: red ratchet, untested
+shipped path, early timbre swap, wrong opening timbre); merged after the cut ->
+next pass. Note for the owner: Shift while PRONE no longer stands you up into a
+sprint (fresh Shift after standing); menu music not halved (game music only).
