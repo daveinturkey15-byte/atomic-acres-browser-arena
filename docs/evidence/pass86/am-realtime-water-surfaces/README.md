@@ -235,7 +235,14 @@ with exactly:
 
 5 of 7 shippable arenas covered, `gun-range` a written opt-out, `test1`/`test2` fixtures.
 Not committed as a passing gate because it does not pass; source and red output are here as
-`water-roster.test.ts.txt` and `measurements/water-roster-test-RED.log`.
+`water-roster.test.ts.txt` and `measurements/water-roster-test-RED.log.txt`.
+
+**A committed-evidence defect found while re-running it:** the previous report cited that
+red log as committed. It was not - `.gitignore:8` is `*.log`, so `git add` skipped it
+silently and the file existed only in the working tree. It is now committed under a
+non-ignored extension rather than force-added past the ignore rule, and re-run against this
+HEAD it still fails with the same two assertions (the roster gate is unaffected by the
+un-enrolment in (f), because that removes a colour grade, not a water body).
 
 ### (e) Buoyancy unaffected - PASS by construction
 
@@ -389,4 +396,5 @@ optics are the skirtless ones.
 - `measurements/tripwire-*.json` - pipeline compile-stall probe, baseline and lane.
 - `measurements/frame-time-budgets.json` - every frame-time sample, labelled by stage, with
   the pose caveat recorded in the file itself.
-- `measurements/water-roster-test-RED.log` and `water-roster.test.ts.txt` - the owed gate.
+- `measurements/water-roster-test-RED.log.txt` and `water-roster.test.ts.txt` - the owed
+  gate, its source and its failing output.

@@ -1,0 +1,56 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-water
+
+ ❯ src/water/water-roster.tmp.test.ts (6 tests | 2 failed) 9ms
+     × gives every arena in the roster water or a written-down reason not to 4ms
+     × reports coverage with its fixtures named, not as a bare ratio 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/water/water-roster.tmp.test.ts > water roster (derived from the arena roster) > gives every arena in the roster water or a written-down reason not to
+AssertionError: expected [ 'atomic-acres', 'skyline-terminal' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "atomic-acres",
++   "skyline-terminal",
++ ]
+
+ ❯ src/water/water-roster.tmp.test.ts:39:42
+     37|
+     38|   it('gives every arena in the roster water or a written-down reason n…
+     39|     expect(unwateredArenaIds(ARENA_IDS)).toEqual([]);
+       |                                          ^
+     40|   });
+     41|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/water/water-roster.tmp.test.ts > water roster (derived from the arena roster) > reports coverage with its fixtures named, not as a bare ratio
+AssertionError: expected 5 to be 7 // Object.is equality
+
+- Expected
++ Received
+
+- 7
++ 5
+
+ ❯ src/water/water-roster.tmp.test.ts:89:55
+     87|     expect(shippable.length).toBe(7);
+     88|     expect(watered.length + Object.keys(WATER_ROSTER_OPT_OUTS)
+     89|       .filter((id) => !fixtures.includes(id)).length).toBe(shippable.l…
+       |                                                       ^
+     90|     // Every selectable arena is covered by the same rule.
+     91|     expect(selectable.filter((id) => !arenaHasWater(id) && !(id in WAT…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  04:34:43
+   Duration  996ms (transform 516ms, setup 0ms, import 692ms, tests 9ms, environment 0ms)
+
