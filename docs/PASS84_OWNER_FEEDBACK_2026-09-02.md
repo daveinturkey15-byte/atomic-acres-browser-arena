@@ -1013,3 +1013,17 @@ way?"
   check-and-finish; Gemini's Jobs 1-2 are on the branch, unverified) resumes
   after the reset -> PASS 92. No Gemini bulk work tonight either: every Gemini
   branch needs an Opus check before it ships.
+
+## PASS 91 publish record — 15:51 BST 2026-09-03
+Integration b939766a -> gh-pages {pass91 live, pass90 backup}; chooser generation
+5ab5194ef158. Shipped: HF-432 Nuke Town Rebuild refinement (stair/landing/upper
+hallway per the reference, side-area cover, spawns re-solved with a new gate,
+doors >= 2.1 m clear, coach/truck/cars placed as the reference with a per-arena
+2x core - the shipped Nuke Town's seat unchanged) and HF-433 crouch speed
+(crouch has its own slower speed, cannot sprint, clears the sprint latch). The
+worker was cut off three times by API 529; the orchestrator committed its final
+item-6 edits after tsc 0 and 311 focused tests green. Gates on the cut: full
+suite 5656/0; parity 0/0; walkable 0; boot smoke 13/13; identity OK. Rollback:
+`python scripts/orchestration/publish_pass91.py --rollback`. NOT run: the 60 s
+solo run on the refined arena (compute budget). Next (after the weekly reset,
+~11:30 BST 2026-09-04): Raid Opus verification -> PASS 92.
