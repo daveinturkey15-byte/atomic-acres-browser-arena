@@ -25,3 +25,30 @@ directory rather than a junction.
 
 No game source was touched. No asset was generated, so `assets.manifest.json` and
 `qa:asset-provenance` are unchanged and no provenance row was added.
+
+
+## Session 2 (2026-09-03) — changed artefact
+
+| Artefact | Path | SHA-256 before | SHA-256 after |
+|---|---|---|---|
+| Vault note (register) | `C:\Users\david\Documents\desky-bootstrap-clone\Dev-Practices\AI 3D Technique Register.md` | `2eaa4e789b118d657b4fcbf9c7df0c8c740f86c1ba511eea7289831a9319205e` | `c57edcd92927e10db94457c6c82043e8f76d66dc8ad41a535218e54380eb255a` |
+
+The only change is an inserted `## 2026-09-02 intake (row 47)` section naming the carrying skill
+`open-world-city-art-loop`, which closes REG-9. Written with `newline=''` and asserted free of
+CRLF before and after; the file is LF on disk, 667 -> 709 lines.
+
+**This file is committed nowhere yet, and deliberately so.** `git diff` on it shows **505
+uncommitted insertions across ten `##` sections** dating back to the 2026-08-24 intake — the work
+of many sessions, including this lane's own row 45 section, none of it committed. Committing the
+path would publish nine other owners' prose under this lane's authorship, so it was not done. The
+vault working tree *is* the Obsidian vault every agent reads, so the discovery fix is live
+regardless; only the git history is outstanding, and the vault remote refuses writes anyway
+(HTTP 403, pre-existing). Exact command for whoever owns the reconciliation:
+
+```
+cd C:/Users/david/Documents/desky-bootstrap-clone
+git add "Dev-Practices/AI 3D Technique Register.md"
+git commit -m "Vault register note: intake sections for rows 34-49 (multi-lane, PASS 85-87)"
+```
+
+The two skills and the animation note this lane authored **are** committed, at vault `7508f67`.

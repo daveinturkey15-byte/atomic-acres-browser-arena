@@ -94,3 +94,51 @@ WARN [REG-5] row 31 "Rigged first-person arms, CC0 (para / OpenGameArt)" (line 7
 | REG-6 row 16 | 1 | 0 | Row 16's licence verdict was written `- **Licence: CLEAR - Apache-2.0 ...**` with the colon inside the bold, so the guard's field parser never saw it. Repaired to `- **Licence:** **CLEAR - ...**`. Content byte-identical apart from the two asterisks. |
 | REG-4 for this lane's two skills | n/a | still failing | **Blocked, not skipped** - see the lane report. The scoped accept refuses because three unrelated skills carry descriptions over the 360-char policy ceiling. Raising the ceiling would be weakening the gate and was not done. |
 | Residual REG-4/5/7/8/9 rows | pre-existing | pre-existing + other lanes' | Not this lane's rows. `open-world-city-art-loop`, `threejs-webgpu-water` and `local-video-generation` belong to other owners. |
+
+
+## SESSION 2 (2026-09-03, lane resumed) — the §7 blocker cleared, and one more row closed
+
+Same command, same machine. Between session 1 and session 2 the three over-length skill
+descriptions named in the lane report's §7 were shortened by their owners (the patch this lane
+supplied was applied to `gem-nano-agent-debug`, `wow-spp-local-mod-restore` and
+`game-release-benchmark-guard` in the vault working tree), which unblocked every skill accept on
+this machine. No ceiling was raised; the policy is untouched at 360 chars.
+
+```
+FAIL technique-register-guard machine=dave-gaming-pc rows=49 skills=17 problems=9 warnings=3   <- session 2 start
+FAIL technique-register-guard machine=dave-gaming-pc rows=49 skills=17 problems=8 warnings=3   <- session 2 end
+```
+
+| Item | Session 1 start | Session 1 end | Session 2 start | Session 2 end |
+|---|---|---|---|---|
+| `technique_register_guard` problems | 47 | 14 | 9 | **8** |
+| `link_skills.ps1 -VerifyOnly` | 0/159, probe FAILED | 160/160, probe OK | — | **162/162 on all seven roots, probe OK** |
+
+### Lane AH's two skills are now accepted and frozen — VERIFIED
+
+Both REG-4 rows for this lane's skills are gone from the guard output, and both skills are present
+in `skill-baseline.json` (150 skills) with their description hashes:
+
+- `comfyui-3d-native-pipeline` — `description_sha256 0dd63a136114098d0c52773a15da85be593756222220e4e0d17f303a147debe1`
+- `ai-3d-asset-generation-loop` — `description_sha256 2378ee8b00860fc9159bd8974195ede603b81d233ccf6518fbb72a5376fb3731`
+
+### REG-9 closed by this lane in session 2
+
+`[REG-9] vault note AI 3D Technique Register.md does not name carrying skill 'open-world-city-art-loop'`
+is gone. The vault note now carries a `2026-09-02 intake (row 47)` section that names the skill,
+restated from canonical register row 47 (lines 1105-1167) — no new claims, no content invented.
+This follows the note's own documented rule for REG-9: *"the fix is always to name the skill, never
+to drop the row."* Guard 9 -> 8.
+
+### Residual 8 problems — none belong to Lane AH
+
+`threejs-webgpu-water` (REG-4 x2, REG-7 Qoder mirror) and `local-video-generation` (REG-4 x2) are
+other owners' skills; `open-world-city-art-loop@Qoder` (REG-8) is HF-419's mirror; rows 24 and 32
+(REG-5 commit pins) are older rows. Per the standing rule these were reported, not swept.
+
+### ComfyUI re-checked, still read-only
+
+`GET /queue` -> `{"queue_running": [], "queue_pending": []}` (idle). The Trellis.2 / Pixal3D
+weights are **still absent** from `models/diffusion_models/` and `models/vae/`, so the brief's
+step 5 bounded test remains blocked on a ~9.95 GB download into the owner's install — his call,
+not a lane's. His ComfyUI was not updated, restarted or queued in this session either.
