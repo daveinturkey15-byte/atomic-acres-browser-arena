@@ -1,60 +1,119 @@
 # Morning report — 2026-09-03 (Claude Code, Fable 5.1 orchestrating; every worker Opus 5.1)
 
-DRAFT written 03:10 BST; the PASS 87 section is completed at the cut. Live state
-and every ledger row are in `docs/PASS84_OWNER_FEEDBACK_2026-09-02.md`.
+Written 04:45 BST. Live state and every ledger row are in
+`docs/PASS84_OWNER_FEEDBACK_2026-09-02.md`; cut reports in
+`docs/PASS86_CUT_REPORT_2026-09-02.md` and `docs/PASS87_CUT_REPORT_2026-09-03.md`.
 
-## What is live and what to try first
-- **PASS 86 (live since 00:50)**: NUKE TOWN REBUILD · PREVIEW card (host it with
-  friends; the shipped Nuke Town is untouched), MAP 3 · EXPLORE card (walk eight
-  corridors; the showcase page is at `channels/pass8N/map3.html`, linked from
-  the menu), the first-person rig fitted inside the body, drop shots (hold
-  crouch while firing), the Firing Range netting floor, arms/knife in frame.
-- **PASS 87**: see the section at the end (filled at the cut).
+## Play this first (PASS 87, live since 04:35)
+- **RAID REBUILD · PREVIEW** — the layout answer to "loads of walls": the
+  shipped Raid had the shortest sightlines of any combat arena (mean open line
+  9.97 m) because its cover was 59 small masses; the rebuild has 34 bigger ones,
+  mean open line 13.62 m, a 25.65 m long-axis median, 22% roofed ground instead
+  of 37%, all four upper rooms reachable, and cover you can actually see. Flat
+  first-pass style; the art pass is yours to schedule (Lane L stays shelved).
+- **FARCRYSIS · PREVIEW** — back on the menu: spawns solved on the terrain, a
+  ground you can shoot over (56% of shots used to die at the muzzle), admission
+  measured at 1.3x Nuke Town's. In-combat frame time is 1.3-1.9x Nuke Town's;
+  the lever (224 vs 110 distinct materials) is the next job.
+- **NUKE TOWN REBUILD · PREVIEW** (PASS 86) — built to the Black Ops 2 flow:
+  back-yard spawns, the bus on the origin with the 2x core on its roof (now
+  needs a real line of sight, not a height window), open trucks and closed cars
+  as cover, the sheds, the rare gun in the front upper rooms. Host it with
+  friends.
+- **MAP 3 · EXPLORE** (PASS 86) — eight showcase corridors incl. the Rapier
+  physics playground, an honest HUD (no clock, ESC to menu), and the showcase
+  page inside the channel (`channels/pass87/map3.html`, linked from the menu).
+  A P0 was found and fixed on the way: the arena sat frozen in warmup forever.
+- Also since last night: the first-person rig inside the body (no gun through
+  walls, near plane 0.02 m on measured evidence), drop shots (hold crouch while
+  firing), Firing Range netting floor, arms and knife in frame, the crowded menu
+  fixed for eleven cards, bots that crouch under fire and go prone when hurt,
+  minimap at 30 Hz, the mobile PAUSE tap fixed, the collapsed Advanced Graphics
+  panel no longer laying out over the Options below it.
 
-## The night, honestly
-- Three publishes: PASS 85 20:12, PASS 86 00:50 (the 22:20 job never fired:
-  scheduled jobs do not fire in this session; from then on timers were used),
-  PASS 87 at the end of this file.
-- A usage limit at ~22:05 killed most running agents; everything was relaunched
-  from journals and worktrees after 22:10. Machine care: commit charge hit
-  100 GB at 02:45 (orphaned preview servers and the known service-host leak),
-  cleaned back to 84 GB; your ComfyUI/ollama/llama.cpp were never touched.
+## Three publishes, honestly
+| Pass | Live | Contents | Backup |
+|---|---|---|---|
+| 85 | 20:12 | drop shots, netting floor, arms/knife | 84 |
+| 86 | 00:50 (the 22:20 job never fired; cut by hand) | Nuke Town Rebuild, Map 3 explore, viewmodel fit, eye clearance, QA corpus, IBL | 85 |
+| 87 | 04:35 | Raid Rebuild, Farcrysis, residuals, mobile, release CI | 86 |
+
+Gates on every cut: tsc, the full vitest suite (5405 tests at PASS 87), the
+release contracts, the identity check, a headless Chrome boot smoke of every
+arena (13/13 on PASS 87, eleven arenas), and for Farcrysis a new admission-
+evidence guard the publish script enforces. Not run tonight: the cross-browser
+smoothness gate (the machine carried six lanes all night) and the pipeline
+tripwire on the exact published bundle (measured 0 on the lanes' own runs).
+
+Process: scheduled jobs do not fire in this session (the 19:13 and 22:20 cuts
+were missed), so timers replaced them; a usage limit at ~22:05 killed most
+agents and everything was relaunched from journals; the commit charge hit
+100 GB at 02:45 (orphaned preview servers + the known service-host leak) and
+was cleaned to 84 GB; your ComfyUI/ollama/llama.cpp were never touched.
 
 ## Owner asks from 2026-09-02, by state
 | Row | Ask | State |
 |---|---|---|
-| HF-395/396/397/398/401/402/403/406 | clip residue, rails, pullback, EBR, chopper lag, spawns, lobby, badge | shipped PASS 84 |
-| HF-399 | Quality-profile fps | partial in 84; residual attributed (viewmodel solver, minimap) → Lane T held, AR carries minimap 30 Hz |
+| HF-395..398, 401..403, 406 | clip residue, rails, pullback, EBR, chopper lag, spawns, lobby, badge | shipped PASS 84 |
+| HF-399 | Quality-profile fps | partial in 84; minimap 30 Hz in 87; viewmodel solver cache in 86; the periodic-stall lane held (its threshold moved the permissive way) |
 | HF-404 | smooth in Chrome/Edge/Firefox | headless gate exists; Firefox needs your manual check (`docs/HF404_FIREFOX_MANUAL_CHECK.md`) |
-| HF-405/409 | Map 3 registered / explore showcase | shipped PASS 86 (explore kind, honest HUD, in-channel page, warmup deadlock fixed) |
-| HF-407 | Nuke Town rebuild to the BO2 flow | shipped PASS 86 as PREVIEW (bus on the origin, 2x core on its roof, sheds, rare gun, back-yard spawns) |
-| HF-408 | Raid layout rethink | Lane AQ built `raid2` (measured: sightlines 9.97 → 13.62 m, masses 59 → 34, roofed 36.7% → 21.9%); PASS 87 if integrated green — see below |
-| HF-410 | viewmodel rework | shipped PASS 86 (near plane 0.02 m on measured evidence) |
-| HF-411/412/413 | grating, drop shots, arms | shipped PASS 85 (arms partial: 2 honest left-sleeve reds remain) |
-| HF-414/415/418 | graphics profiles clarity, DLSS research, Balanced + RTX explainer | Lane AI done: Balanced profile, RTX explainer modal, 5×3 ladder measured; PASS 87 if merged |
-| HF-416 | brief-with-rules skill + Map 3 corridor | the GTA-art trial exercised the method in Map 3; the full AJ corridor lane is daytime work |
-| HF-417 | Gun Range unreachable by map switch | root cause found (fence-exceed class on switch); Lane H's fix regressed first loads and was held; Lane H2 running |
-| HF-419..422 | GTA art, water everywhere, subway lighting, Motion bricks | four skills authored in the vault + register rows; Map 3 trials — see below |
-| HF-423 | Farcrysis sorted | merged for PASS 87 as PREVIEW (admission 1.28× the Nuke Town control; combat frame time 1.34–1.89× is the next lever) |
+| HF-405/409 | Map 3 explore showcase | shipped PASS 86 |
+| HF-407 | Nuke Town rebuild to the BO2 flow | shipped PASS 86 as PREVIEW |
+| HF-408 | Raid layout rethink | shipped PASS 87 as PREVIEW |
+| HF-410 | viewmodel rework | shipped PASS 86 |
+| HF-411/412/413 | grating, drop shots, arms | shipped PASS 85 (arms: 2 honest left-sleeve reds remain; cause measured, fix proposed) |
+| HF-414/415/418 | graphics ladder, DLSS research, Balanced + RTX explainer | BUILT (Lane AI: Balanced profile, RTX explainer modal, 5x3 ladder measured on an RTX 5080) — not merged tonight; first thing this morning |
+| HF-416 | brief-with-rules skill + Map 3 corridor | the GTA-art trial exercised the method; the full corridor lane is daytime work |
+| HF-417 | Gun Range unreachable by map switch | root cause: a fence-exceed class on in-session switches (atomic-acres -> high-seas, not Gun Range specifically); Lane H2 fixes it WITHOUT the first-load regression the first pass had — PASS 88 candidate this morning |
+| HF-419..422 | GTA art, water everywhere, subway lighting, Motion bricks | four skills in the vault + register rows; Map 3 trials done or in repair (see below) |
+| HF-423 | Farcrysis sorted | shipped PASS 87 as PREVIEW |
+
+## Skills and techniques (vault store + AKP register, all governed)
+- `open-world-city-art-loop` — GTA-style street art as a street-cell loop with a
+  screen-area ordering (road surface first, then kerbs, then facade bays, then
+  furniture density); the reference itself runs at 18-20 fps, so it is a
+  screenshot bar, not a gameplay target. Map 3 trial: cheap, but it costs
+  readability; three critics' scores are in the trial's evidence.
+- `threejs-webgpu-water` (extended) — multi-cascade FFT waves, Beer-Lambert
+  colour, bubble backscatter, breaking foam, shoreline and swimmable volume,
+  per-arena water rosters. Map 3 trial: a shared water module with a Map 3 pond
+  (partial: accepted with fixes; the every-arena pond rollout is the next step).
+- `threejs-webgpu-interior-lighting-look` — the subway look without GI: emissive
+  fixtures, value composition, fog falloff, grime decals, a filmic post chain,
+  combat readability kept. Map 3 corridor trial repaired after a reject.
+- Motion bricks = `motion-bricks.cpp` (a GGML port of NVIDIA's motion model).
+  The animation trial retargeted its output onto the operator rig and reached a
+  NO-GO for now on measured foot slide versus our Komodo route; the honest
+  finding for skins/bots: the third-person operator rig has NO reload, crouch,
+  prone, ADS or knife clip at all, and four measured Kimodo clips never shipped.
+  That is the real animation job.
+- `comfyui-3d-native-pipeline` — your ComfyUI 0.34.0 already has native
+  Trellis.2/Pixal3D (no update needed; weights ~10-15 GB not installed). Licence
+  findings: the generators are MIT; the Comfy-Org repacks carry no LICENSE file;
+  the image encoder is DINOv3 under Meta's licence; Meta's SAM licence forbids
+  gun-related use, so the video-mocap chain is off the table unless you decide
+  otherwise.
+- Skill discovery was dead machine-wide (0/159 in every harness but Hermes)
+  and was restored (160/160); a gotcha about the two link scripts is in AKP.
 
 ## Decisions that are yours
 1. Promote NUKE TOWN REBUILD, RAID REBUILD and FARCRYSIS out of PREVIEW after you play them.
 2. BALANCED as the auto-selected default on mid-range machines (currently Quality at 8+ cores / 8+ GB).
-3. Chopper ghost-culling gate assertion (activeModelLayers vs submittedModelLayers); HF-334 flamethrower grant.
-4. Meta's SAM licence forbids gun-related use: the ComfyUI video-mocap chain (SAM3D body) is therefore NOT to be used for this game unless you decide otherwise; Trellis.2/Pixal3D themselves are MIT.
-5. Raid Rebuild's art pass (Lane L is shelved at your word; the rebuild is flat untextured albedo).
+3. Chopper ghost-culling gate assertion; HF-334 flamethrower grant.
+4. Raid Rebuild's art pass (Lane L shelved at your word; the rebuild is flat untextured albedo).
+5. The SAM-licence question above.
+6. HF-410 F2: the pass65 arms visual gate's two left-sleeve reds — fix by exempting the arm chains from the contact fold (repaints every contact pose) or a fourth reach arc toward the eye.
 
 ## Your manual checks
 - Firefox: `docs/HF404_FIREFOX_MANUAL_CHECK.md`.
-- Phone: Lane AE's checklist (path filled at the cut).
+- Phone: Lane AE's checklist under `docs/evidence/pass85/lane-ae/`.
 
-## Skills and techniques added tonight (vault store + AKP register)
-- `open-world-city-art-loop` (GTA-style street art: street-cell decomposition, screen-area ordering, originality boundary; the reference itself runs at 18–20 fps).
-- `threejs-webgpu-water` (extended: multi-cascade FFT, Beer-Lambert colour, bubble backscatter, breaking foam, per-arena water rosters).
-- `threejs-webgpu-interior-lighting-look` (subway look without GI: emissive fixtures, value composition, fog falloff, grime decals, filmic post).
-- Motion bricks: `motion-bricks.cpp` (GGML port of NVIDIA's motion model) vs our Komodo route — see the animation trial.
-- `comfyui-3d-native-pipeline` (ComfyUI 0.34.0 already has native Trellis.2/Pixal3D; weights ~10–15 GB not installed; licence findings recorded).
-- Skill discovery had been dead machine-wide (0/159 in every harness but Hermes) and was restored (160/160).
-
-## PASS 87 — filled at the cut
-(merge set, gates, publish receipt, live check, what was held and why, next-work options with ETAs)
+## Next work, in the order I would run it (ETAs are Opus wall-clock on this machine)
+1. **PASS 88 this morning (~1 h):** merge H2 (faster first loads kept, switch fence fixed), AI (Balanced + RTX explainer), AB (time of day), the technique trials that pass audit; roll, gate, publish.
+2. **Farcrysis to a real arena (~4 h):** collapse 224 materials onto the shared vocabulary, the core building's floor/walls and a practical light, the 25 runtime eye rows, your vegetation technique.
+3. **Raid Rebuild art pass (~4 h)** with the brief-driven method and the GTA street-cell skill for the driveway/street.
+4. **Water everywhere (~3 h):** the pond-in-every-level rollout from the Map 3 module, plus re-pointing High Seas/Raid/Nuke Town water.
+5. **Animation (~4 h):** give the third-person operator the missing clips (reload, crouch, prone, ADS, knife) via the Kimodo clips that already measured shippable.
+6. **Lighting tiers (AL)** once its repair lands; the RTX explainer copy in the changelog at the next roll.
+7. **Branch/worktree cleanup (Lane AC)** in daylight with you around (402 worktrees; the plan has two blockers fixed on paper only).
+8. **Hill-climb loop (AG)** after the feature lanes: cheap, rinse-and-repeat, staged until you have read its first receipts.
