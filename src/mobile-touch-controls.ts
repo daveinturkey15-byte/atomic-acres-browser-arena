@@ -361,6 +361,35 @@ export class MobileTouchControls {
   private bind(): void {
     const root = this.root;
     if (!root) return;
+    // PASS 85 Lane AE - THE PAUSE TAP FELL THROUGH ONTO THE MENU IT UNCOVERED.
+    //
+    // Measured on emulated phone/tablet profiles: tapping the overlay's PAUSE
+    // button opened the pause menu AND the project-map modal on top of it, so
+    // the pause surface arrived already unusable - the options tab and the
+    // RESUME button both sat under a full-screen modal (z 28/29 over the menu's
+    // z 20) and could not be tapped at all.
+    //
+    // Cause, isolated: a touch tap is TWO things. The overlay acts on
+    // `pointerdown`, which synchronously hides the overlay and shows the menu;
+    // then, on `touchend`, the browser synthesises a compatibility `click` at
+    // the same coordinates and hit-tests it against the DOM AS IT IS BY THEN -
+    // the overlay is gone, so the click lands on whatever the menu put there.
+    // The mobile PAUSE button sits at the top-right safe-area corner, which is
+    // exactly where the menu header's project-map button is. Proof: dispatching
+    // only `pointerdown` leaves the modal closed; a real touch tap at the same
+    // point opens it.
+    //
+    // `event.preventDefault()` in `onPointerDown` does NOT stop this. Per the
+    // Pointer Events spec, cancelling a pointerdown does not suppress the
+    // compatibility mouse events; only cancelling `touchstart` does. Hence this
+    // listener, which must be non-passive to be allowed to cancel anything.
+    //
+    // Every control is cancelled, not just PAUSE: any control that changes the
+    // surface has the same trap waiting, and the overlay's own handlers are
+    // pointer-based, so nothing here needs the synthesised click.
+    root.addEventListener('touchstart', (event) => {
+      if ((event.target as HTMLElement | null)?.closest('[data-mtc]')) event.preventDefault();
+    }, { passive: false });
     root.addEventListener('pointerdown', (event) => this.onPointerDown(event));
     root.addEventListener('pointermove', (event) => this.onPointerMove(event));
     const release = (event: PointerEvent) => this.onPointerUp(event);
