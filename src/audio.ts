@@ -10,12 +10,10 @@ import { AUDIO_BUS_IDS, type AudioBusId, type AudioSettings } from './pass65-set
 import {
   CHIPTUNE_TRACKS,
   ChiptuneRotation,
-  chiptuneBarSeconds,
-  chiptuneLoopSeconds,
   type ChiptuneEvent,
   type ChiptuneTrackId,
   GAME_MUSIC_BUS_GAIN,
-  advanceChiptuneSchedule,
+  advanceMultiTrackSchedule,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
 // Pass 75: the intermittent "sense of place" layer above the continuous bed.
@@ -658,6 +656,9 @@ export class ArenaAudio {
    */
   private static readonly MUSIC_LOOKAHEAD_SECONDS = 0.75;
 
+  /** How many rotation entries `debugMusicState()` keeps. ~40 per playing hour. */
+  private static readonly MUSIC_HISTORY_LIMIT = 128;
+
   private readonly buses = new Map<AudioBusId, GainNode>();
   // Background chiptune. Exactly TWO long-lived oscillators for the whole track,
   // one per channel, matching AUDIO_RUNTIME_BUDGET.perBus['game-music'] = 2 by
@@ -672,6 +673,8 @@ export class ArenaAudio {
   private musicRotation = new ChiptuneRotation();
   private musicTrack: ChiptuneTrackId | null = null;
   private musicTrackHistory: Array<{ track: ChiptuneTrackId; atSeconds: number }> = [];
+  /** Waveform pair owed to a swap whose bar boundary has not yet been reached. */
+  private pendingMusicWaveform: { atSeconds: number; lead: OscillatorType; bass: OscillatorType } | null = null;
   private readonly busIdentity = new Map<AudioNode, AudioBusId>();
   private audioSettings: AudioSettings | null = null;
   private noiseBuffer: AudioBuffer | null = null;
@@ -1281,11 +1284,16 @@ export class ArenaAudio {
         osc.start();
         return { osc, gain };
       };
-      // Square lead over a square bass, the two-channel palette this loop was
-      // written for. The bass sits two octaves down so they never mask each other.
-      this.musicChannels = Object.freeze({ lead: build('square'), bass: build('square') });
-      // Pick a track for this match from shuffle rotation
+      // Pick this match's track BEFORE the oscillators are built: each track
+      // authors its own lead/bass shapes, and building both channels as squares
+      // first meant the opening track of every session - a third of the roster
+      // is triangle- or sawtooth-led - played on the wrong timbre until the
+      // first swap ~90 s later. The bass still sits two octaves down so the two
+      // channels never mask each other.
       this.musicTrack = this.musicRotation.nextTrack();
+      const waveforms = ArenaAudio.musicWaveforms(this.musicTrack);
+      this.musicChannels = Object.freeze({ lead: build(waveforms.lead), bass: build(waveforms.bass) });
+      this.pendingMusicWaveform = null;
       this.musicRunning = true;
       this.musicLoopStartedAtSeconds = this.context.currentTime + 0.12;
       this.musicScheduledUntilSeconds = this.musicLoopStartedAtSeconds;
@@ -1303,8 +1311,10 @@ export class ArenaAudio {
     this.musicChannels = null;
     this.musicRunning = false;
     this.musicScheduledUntilSeconds = 0;
-    // musicLastTrack deliberately SURVIVES a stop: it is what stops the next
-    // match replaying the track that just finished.
+    this.pendingMusicWaveform = null;
+    // The ROTATION deliberately survives a stop: `musicRotation` carries the
+    // remainder of the current shuffle cycle plus the track that just finished,
+    // so the next match neither replays it nor re-rolls the cycle from nothing.
     this.musicTrack = null;
     if (!channels) return;
     for (const channel of [channels.lead, channels.bass]) {
@@ -1392,59 +1402,71 @@ export class ArenaAudio {
    */
   private pumpGameMusic(): void {
     const channels = this.musicChannels;
-    let track = this.musicTrack;
+    const track = this.musicTrack;
     if (!this.musicRunning || !this.context || !channels || !track) return;
-    const horizon = this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS;
-    let guard = 0;
-    while (this.musicScheduledUntilSeconds < horizon && this.musicRunning && guard < 64) {
-      guard += 1;
-      const trackDuration = chiptuneLoopSeconds(track);
-      const trackEnd = this.musicLoopStartedAtSeconds + trackDuration;
-      const subHorizon = Math.min(horizon, trackEnd);
 
-      const step = advanceChiptuneSchedule(
-        track,
-        this.musicScheduledUntilSeconds,
-        this.musicLoopStartedAtSeconds,
-        subHorizon,
-      );
-      for (const { event, atSeconds } of step.events) {
-        this.scheduleChiptuneNote(channels[event.channel], event, atSeconds);
-      }
-      this.musicScheduledUntilSeconds = step.scheduledUntilSeconds;
+    // A waveform change is committed at the boundary it belongs to, never when
+    // the boundary is SCHEDULED. `OscillatorNode.type` is not an AudioParam, so
+    // it cannot be automated - assigning it takes effect the instant it is
+    // assigned. Doing that inside the scheduling loop set the incoming track's
+    // timbre up to MUSIC_LOOKAHEAD_SECONDS (0.75 s) before the incoming track
+    // was audible, so the outgoing track's last bar played on the wrong
+    // oscillator and, if a note was sounding, the reassignment was a waveform
+    // discontinuity - an audible click on exactly the transition this feature
+    // exists to make seamless. Deferring to `currentTime >= atSeconds` bounds
+    // the error to one frame (<= ~17 ms) and puts it inside the first note's
+    // 6 ms attack ramp instead of across a whole bar.
+    this.applyDueMusicWaveform();
 
-      if (this.musicScheduledUntilSeconds >= trackEnd - 1e-6) {
-        // Track finished on bar boundary — swap seamlessly to next track in rotation
-        const nextTrack = this.musicRotation.nextTrack();
-        this.musicTrack = nextTrack;
-        this.musicLoopStartedAtSeconds = trackEnd;
-        this.musicScheduledUntilSeconds = trackEnd;
-        this.musicTrackHistory.push({ track: nextTrack, atSeconds: trackEnd });
-        track = nextTrack;
-        const leadWave = CHIPTUNE_TRACKS[nextTrack].leadWaveform ?? 'square';
-        const bassWave = CHIPTUNE_TRACKS[nextTrack].bassWaveform ?? 'square';
-        try {
-          if (channels.lead.osc.type !== leadWave) channels.lead.osc.type = leadWave;
-          if (channels.bass.osc.type !== bassWave) channels.bass.osc.type = bassWave;
-        } catch { /* partial browser node */ }
-      } else {
-        break;
-      }
+    const advanced = advanceMultiTrackSchedule(
+      {
+        currentTrackId: track,
+        trackStartedAtSeconds: this.musicLoopStartedAtSeconds,
+        scheduledUntilSeconds: this.musicScheduledUntilSeconds,
+        rotation: this.musicRotation,
+
+      },
+      this.context.currentTime + ArenaAudio.MUSIC_LOOKAHEAD_SECONDS,
+    );
+
+    for (const { event, atSeconds } of advanced.events) {
+      this.scheduleChiptuneNote(channels[event.channel], event, atSeconds);
     }
+    this.musicTrack = advanced.state.currentTrackId;
+    this.musicLoopStartedAtSeconds = advanced.state.trackStartedAtSeconds;
+    this.musicScheduledUntilSeconds = advanced.state.scheduledUntilSeconds;
+
+    for (const swap of advanced.swaps) {
+      this.musicTrackHistory.push({ track: swap.to, atSeconds: swap.atSeconds });
+      this.pendingMusicWaveform = { atSeconds: swap.atSeconds, ...ArenaAudio.musicWaveforms(swap.to) };
+    }
+    // Bounded so a long session cannot grow this without limit; QA reads the
+    // tail (a 5 minute run produces 4 entries, an hour produces ~40).
+    if (this.musicTrackHistory.length > ArenaAudio.MUSIC_HISTORY_LIMIT) {
+      this.musicTrackHistory.splice(0, this.musicTrackHistory.length - ArenaAudio.MUSIC_HISTORY_LIMIT);
+    }
+    this.applyDueMusicWaveform();
   }
 
-  /** Swaps the playing music track to the next rotation track on the upcoming bar boundary. */
-  swapGameMusicOnNextBar(nextTrackId?: ChiptuneTrackId): number | null {
-    if (!this.musicRunning || !this.context || !this.musicTrack) return null;
-    const bar = chiptuneBarSeconds(this.musicTrack);
-    const elapsed = Math.max(0, this.context.currentTime - this.musicLoopStartedAtSeconds);
-    const nextBar = this.musicLoopStartedAtSeconds + (Math.floor(elapsed / bar) + 1) * bar;
-    const nextTrack = nextTrackId ?? this.musicRotation.nextTrack();
-    this.musicTrack = nextTrack;
-    this.musicLoopStartedAtSeconds = nextBar;
-    this.musicScheduledUntilSeconds = nextBar;
-    this.musicTrackHistory.push({ track: nextTrack, atSeconds: nextBar });
-    return nextBar;
+  /** The authored oscillator shapes for a track, with the palette default. */
+  private static musicWaveforms(track: ChiptuneTrackId): { lead: OscillatorType; bass: OscillatorType } {
+    return {
+      lead: CHIPTUNE_TRACKS[track].leadWaveform ?? 'square',
+      bass: CHIPTUNE_TRACKS[track].bassWaveform ?? 'square',
+    };
+  }
+
+  /** Commits a queued waveform change once its bar boundary has actually arrived. */
+  private applyDueMusicWaveform(): void {
+    const pending = this.pendingMusicWaveform;
+    const channels = this.musicChannels;
+    if (!pending || !channels || !this.context) return;
+    if (this.context.currentTime < pending.atSeconds) return;
+    this.pendingMusicWaveform = null;
+    try {
+      if (channels.lead.osc.type !== pending.lead) channels.lead.osc.type = pending.lead;
+      if (channels.bass.osc.type !== pending.bass) channels.bass.osc.type = pending.bass;
+    } catch { /* a partial browser node can reject the assignment */ }
   }
 
   /** Commits one note to a channel's oscillator: pitch, then a short envelope. */

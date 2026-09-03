@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 36_624;
+const LINE_CEILING = 36_635;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -146,6 +146,16 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
     note:
       'PASS 88 candidate: Lane H2 load-time second pass (admission attribution markers, cold-session precompile reach) '
       + 'merged; measured on the merged head.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 36_635,
+    note:
+      'PASS 89 Lane AX (HF-431): +11 lines wiring the sprint latch. The owner reported that a drop shot taken '
+      + 'while sprinting resumed sprinting the moment the player stood, because Shift was still down. The state '
+      + 'machine itself is in src/prone-transition.ts (stepSprintLatch/clearSprintLatchOnDropShot); what lands here '
+      + 'is the module-scope latch field, its reset on respawn, the clear inside requestStance() when the target '
+      + 'stance is prone, and the substitution of the latch for the raw Shift read in updatePhysics.',
   },
 ];
 

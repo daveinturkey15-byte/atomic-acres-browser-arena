@@ -351,5 +351,29 @@ describe('HF-431 drop shot from sprint (Lane AX)', () => {
     expect(LEGACY_MAIN).toMatch(/if\s*\(target\s*===\s*'prone'\)\s*sprintLatchState\s*=\s*clearSprintLatchOnDropShot\(sprintLatchState\);/);
     expect(LEGACY_MAIN).toMatch(/wantsSprint\s*=\s*sprintLatchState\.latched/);
   });
+
+  it('latches EVERY sprint input, so a pad or a thumbstick cannot bypass the fix', () => {
+    // The keyboard is one of three ways to ask for sprint. If a later edit
+    // reads the pad or the touch control straight into `wantsSprint` instead of
+    // through `rawSprintInput`, the drop shot would still cancel sprint on the
+    // keyboard and quietly keep resuming it on a controller - the owner's
+    // report reproduced on the input this test would otherwise never look at.
+    const raw = LEGACY_MAIN.match(/const rawSprintInput = \(([\s\S]{0,320}?)\);/);
+    expect(raw, 'rawSprintInput is no longer a single collected expression').not.toBeNull();
+    expect(raw![1]).toContain("actionHeld('sprint', keys, keyProfile)");
+    expect(raw![1]).toContain('gamepadSprint');
+    expect(raw![1]).toContain('mobileTouchControls?.state.sprinting === true');
+    // ...and nothing may read those sources again on the sprint decision line.
+    const decision = LEGACY_MAIN.match(/const wantsSprint = [\s\S]{0,200}?;/);
+    expect(decision![0]).not.toContain('gamepadSprint');
+    expect(decision![0]).not.toContain("actionHeld('sprint'");
+  });
+
+  it('re-arms the latch on respawn so a new life never inherits a stale one', () => {
+    // The latch is module state, not player state: without this reset a player
+    // who drop-shot and died would spawn unable to sprint until they let go of
+    // a key they may never have released.
+    expect(LEGACY_MAIN).toMatch(/sprintLatchState = IDLE_SPRINT_LATCH;/);
+  });
 });
 
