@@ -102,12 +102,26 @@ describe('MotionBricks G1-34 -> operator correspondence', () => {
     expect(SOMA30_TO_OPERATOR_JOINT.Head).toBe('Head');
   });
 
-  it('does map the toes, which the pre-trial expectation said it could not', () => {
+  it('has a real toe SOURCE, but does not claim the PT.* destinations are toes', () => {
+    // g1skel34 genuinely carries toe-base links, which the technique study's
+    // pre-trial expectation said a robot source would not.
+    expect(G1_34_JOINTS).toContain('left_toe_base');
+    expect(G1_34_JOINTS).toContain('right_toe_base');
+
+    // The DESTINATION is the part an earlier draft got wrong, and the reason
+    // strings are the only place a reader meets it, so they are asserted. In
+    // Swat.gltf PT.L/PT.R are Root-parented, childless, asymmetric helper bones
+    // 0.42-0.63 m off the floor that all 24 authored clips leave static -
+    // measured in docs/evidence/pass86/hf422/foot-contact-analysis.json. If
+    // someone re-words these rows back into a toe mapping, this fails.
     const driven = new Set(g1DrivenOperatorJoints());
     expect(driven.has('PT.L')).toBe(true);
     expect(driven.has('PT.R')).toBe(true);
-    expect(G1_34_JOINTS).toContain('left_toe_base');
-    expect(G1_34_JOINTS).toContain('right_toe_base');
+    for (const joint of ['PT.L', 'PT.R']) {
+      const row = G1_TO_OPERATOR.find((entry) => entry.operatorJoint === joint);
+      expect(row, `${joint} must have a correspondence row`).toBeDefined();
+      expect(row!.reason).toMatch(/NOT a toe|helper bone|inspect before shipping/i);
+    }
   });
 
   it('drives every operator joint the Kimodo route drives, except head and neck', () => {

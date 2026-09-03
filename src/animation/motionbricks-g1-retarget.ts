@@ -174,13 +174,23 @@ export type G1RetargetTarget = Readonly<{
  *    rather than restating. G1 has no fingers whatsoever - not even the two end
  *    markers per hand SOMA-30 carries - so there is nothing to write even if it
  *    were permitted.
- *  - `PT.L` / `PT.R` DO have a source. `left_toe_base` / `right_toe_base` are
- *    present in `g1skel34`, which contradicts the pre-trial expectation
- *    recorded in the technique study (that a robot source has ankle pitch/roll
- *    and no toe base, so the toes would stay at rest and the feet would read as
- *    planks). They are non-actuated extension links rather than driven joints,
- *    so their motion is the ankle's carried forward - but they are real
- *    positions in the data and they are mapped.
+ *  - `PT.L` / `PT.R` ARE NOT TOES, AND DRIVING THEM IS A CHANGE IN KIND FROM
+ *    THE AUTHORED CONVENTION. The source side is real enough - `left_toe_base`
+ *    / `right_toe_base` do exist in `g1skel34` - but the DESTINATION bones are
+ *    not what an earlier draft of this table assumed. In `Swat.gltf` they are
+ *    parented to `Root` (not to the leg chain), have no children, are NOT
+ *    mirrored (rest translations `(0.568, 0.627, 0.227)` and
+ *    `(-0.018, 0.423, 0.659)`) and sit 0.42-0.63 m above the floor. The name
+ *    reads as "pole target"; nothing in the tree states their semantics and
+ *    this lane did not establish them.
+ *    All 24 authored clips leave both bones COMPLETELY STATIC - zero lift, zero
+ *    path, parked at roughly knee height. Driving them from source FK drags
+ *    them to the floor (min world Y -0.0135 / -0.0168 m) over nearly 4 m of
+ *    path. Measured in `docs/evidence/pass86/hf422/foot-contact-analysis.json`.
+ *    The rows are kept below only because they match the pre-existing Kimodo
+ *    route in `kimodo-operator-retarget.ts`, so removing them here would put
+ *    the two tables out of step. THEY MUST BE INSPECTED - most likely dropped -
+ *    before any G1 clip ships. Do not read them as a toe mapping.
  */
 export const G1_TO_OPERATOR: readonly G1RetargetTarget[] = Object.freeze([
   { operatorJoint: 'Hips', rotationFrom: 'pelvis_skel', positionFrom: 'pelvis_skel', reason: 'root of both skeletons; carries the figure over the ground plane' },
@@ -191,7 +201,7 @@ export const G1_TO_OPERATOR: readonly G1RetargetTarget[] = Object.freeze([
   { operatorJoint: 'LowerLeg.L', rotationFrom: 'left_knee_skel', positionFrom: 'left_knee_skel', reason: 'single-axis knee, one-for-one with the operator shin' },
   { operatorJoint: 'Foot.L', rotationFrom: 'left_ankle_roll_skel', positionFrom: 'left_ankle_pitch_skel', reason: 'ankle is pitch then roll; roll carries the composed orientation, pitch is the ankle position' },
   { operatorJoint: null, rotationFrom: 'left_ankle_roll_skel', positionFrom: 'left_ankle_roll_skel', reason: 'consumed as Foot.L rotation source above' },
-  { operatorJoint: 'PT.L', rotationFrom: 'left_toe_base', positionFrom: 'left_toe_base', reason: 'a real toe-base link exists in g1skel34; non-actuated, so it follows the ankle rather than rolling under load' },
+  { operatorJoint: 'PT.L', rotationFrom: 'left_toe_base', positionFrom: 'left_toe_base', reason: 'NOT a toe: PT.L is a Root-parented helper bone that all 24 authored clips leave static. Kept only to match the pre-existing Kimodo route; inspect before shipping - see the block comment above' },
 
   { operatorJoint: 'UpperLeg.R', rotationFrom: 'right_hip_yaw_skel', positionFrom: 'right_hip_pitch_skel', reason: 'mirror of the left hip' },
   { operatorJoint: null, rotationFrom: 'right_hip_roll_skel', positionFrom: 'right_hip_roll_skel', reason: 'mirror of the left hip roll' },
@@ -199,7 +209,7 @@ export const G1_TO_OPERATOR: readonly G1RetargetTarget[] = Object.freeze([
   { operatorJoint: 'LowerLeg.R', rotationFrom: 'right_knee_skel', positionFrom: 'right_knee_skel', reason: 'mirror of the left knee' },
   { operatorJoint: 'Foot.R', rotationFrom: 'right_ankle_roll_skel', positionFrom: 'right_ankle_pitch_skel', reason: 'mirror of the left ankle' },
   { operatorJoint: null, rotationFrom: 'right_ankle_roll_skel', positionFrom: 'right_ankle_roll_skel', reason: 'consumed as Foot.R rotation source above' },
-  { operatorJoint: 'PT.R', rotationFrom: 'right_toe_base', positionFrom: 'right_toe_base', reason: 'mirror of the left toe base' },
+  { operatorJoint: 'PT.R', rotationFrom: 'right_toe_base', positionFrom: 'right_toe_base', reason: 'same as PT.L, and note PT.R is NOT the mirror of PT.L in the rest pose - the two helper bones are asymmetric' },
 
   { operatorJoint: 'Abdomen', rotationFrom: 'waist_yaw_skel', positionFrom: 'waist_yaw_skel', reason: 'lowest waist link; carries only the yaw axis, because G1 has one 3-DoF waist where the operator has a four-segment column' },
   { operatorJoint: 'Torso', rotationFrom: 'waist_roll_skel', positionFrom: 'waist_roll_skel', reason: 'middle waist link; yaw+roll composed' },
