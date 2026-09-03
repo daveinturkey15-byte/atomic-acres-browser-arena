@@ -1,4 +1,31 @@
-name: release-production
+# Release VERIFICATION for the production line. This workflow does NOT publish.
+#
+# It used to. Lane F (PASS 84) found that its staging and publish steps still described the
+# pre-PASS-80 topology - the-big-one, pass72/70/69-retained, recent-stable, pass63-rollback -
+# while every pass since 74 has shipped through scripts/orchestration/publish_pass<N>.py and
+# gh-pages has carried exactly two trees since HF-400 (owner, 2026-09-02 06:58 BST: "when you
+# push the next pass, pin this version and remove all past versions, this can be the safe
+# backup"). Its publish step ran the gh-pages CLI over dist/, which REPLACES the branch, so a
+# single dispatch would have deleted the pinned safe backup and resurrected six retired trees
+# over the live site. It could not have run to completion either: `npm run verify:release-topology`
+# threw `Root chooser is missing live PASS 86` on a correctly staged tree, because it spelled
+# the live channel path as a literal (fixed in the same lane).
+#
+# PUBLISHING LIVES HERE, AND NOWHERE ELSE:
+#     python scripts/orchestration/publish_pass<N>.py            # --dry-run first
+#     python scripts/orchestration/publish_pass<N>.py --rollback # re-point the default
+# That script enumerates the trees actually on gh-pages, retires everything that is not the
+# live pass or its pinned backup, asserts the exact post-state before it commits, and carries
+# the freshness, farcrysis-admission, release-identity, predecessor and in-build-fallback
+# guards with their own red self-tests (scripts/orchestration/publish_pass<N>_plan.test.mjs).
+# Rolling the stamp to the next pass is one command: scripts/orchestration/roll_pass.py.
+#
+# What this workflow is for: proving an exact main SHA is publishable. It reproduces the
+# candidate bytes, revalidates the acceptance manifest, runs the static release gates, stages
+# and verifies the full channel topology locally, checks the HF-400 two-channel policy, and
+# uploads the evidence. A green run is the precondition for the publish command above.
+
+name: release-verification
 
 on:
   workflow_dispatch:
@@ -8,21 +35,23 @@ on:
         required: true
         type: string
       release_pass:
-        description: Exact approved live pass (e.g. PASS 73)
+        description: Exact approved live pass (e.g. PASS 86)
         required: true
         type: string
 
+# contents: read only. This workflow has no write path to any branch by design - the
+# permission itself is the guard, not just the absence of a publish step.
 permissions:
   actions: read
   checks: read
-  contents: write
+  contents: read
 
 concurrency:
-  group: atomic-acres-production-pages
+  group: atomic-acres-production-verification
   cancel-in-progress: false
 
 jobs:
-  promote:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -61,6 +90,14 @@ jobs:
           VITE_MATCH_DIAGNOSTICS_URL: https://atomic-acres-leaderboard.atomic-acres.workers.dev
       - name: Verify exact production bytes
         run: npm run verify:release-tree
+      - name: Verify the HF-400 two-channel release policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
+          node scripts/release/verify-two-channel-policy.mjs --json artifacts/pipeline/two-channel-policy.json
+          node --test scripts/release/release-policy-contract.test.mjs
+          node --test scripts/orchestration/publish-sibling-drift.test.mjs
       - name: Rebuild Pass 67.1 stable with its original Pages publication timestamp
         shell: bash
         run: |
@@ -89,10 +126,9 @@ jobs:
           (cd artifacts/pass63-rollback-src && npm ci --ignore-scripts && VITE_MATCH_BUILD_ID="$rollback_source_sha" VITE_RELEASED_AT="$rollback_released_at" npm run build)
           echo "RELEASE_ROLLBACK_DIST=$(pwd)/artifacts/pass63-rollback-src/dist" >> "$GITHUB_ENV"
           echo "ROLLBACK_RELEASED_AT=$rollback_released_at" >> "$GITHUB_ENV"
-      - name: Stage live Pass 73, exact previous Pass 72, retained Pass 70 and Pass 69, rebuilt Pass 67.1 and Pass 63 rollback
+      - name: Stage the full local channel topology and verify it end to end
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
-          git fetch --no-tags origin gh-pages:refs/remotes/origin/gh-pages
           for channel_key in previous retained historical; do
             pinned_pages_sha="$(node -e "const c=JSON.parse(require('fs').readFileSync('release-channels.json','utf8')); console.log(c[process.argv[1]].pagesSha)" "$channel_key")"
             git cat-file -e "${pinned_pages_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$pinned_pages_sha"
@@ -115,65 +151,16 @@ jobs:
           RELEASE_ROLLBACK_DIST: ${{ env.RELEASE_ROLLBACK_DIST }}
           ROLLBACK_RELEASED_AT: ${{ env.ROLLBACK_RELEASED_AT }}
           REQUIRE_ROLLBACK_RELEASE_TIMESTAMP: '1'
-      - name: Configure release commit identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - name: Configure authenticated Pages remote
-        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Write the release-candidate verification receipt
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Publish complete exact dist snapshot
-        run: npm run deploy:ci -- -m "${{ inputs.release_pass }} from ${{ inputs.source_sha }}"
-      - name: Wait for exact Pages build
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          RELEASE_PASS: ${{ inputs.release_pass }}
-        run: |
-          set -euo pipefail
-          pages_sha="$(git ls-remote origin refs/heads/gh-pages | cut -f1)"
-          status="queued"
-          build='{}'
-          # Pages deployment can sit in GitHub's environment queue for more than
-          # five minutes even after its build succeeds. Keep the exact-SHA guard,
-          # but allow up to 20 minutes for that external queue to drain.
-          for attempt in $(seq 1 120); do
-            build="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest")"
-            build_sha="$(jq -r '.commit // empty' <<<"$build")"
-            status="$(jq -r '.status // "unknown"' <<<"$build")"
-            if [[ "$build_sha" == "$pages_sha" && "$status" == "built" ]]; then break; fi
-            if [[ "$build_sha" == "$pages_sha" && "$status" == "errored" ]]; then exit 1; fi
-            sleep 10
-          done
-          [[ "$(jq -r '.commit // empty' <<<"$build")" == "$pages_sha" && "$status" == "built" ]]
-          mkdir -p artifacts/pipeline
-          jq -n \
-            --arg pagesSha "$pages_sha" \
-            --arg status "$status" \
-            --arg createdAt "$(jq -r '.created_at' <<<"$build")" \
-            --arg updatedAt "$(jq -r '.updated_at' <<<"$build")" \
-            '{schemaVersion:1, pagesSha:$pagesSha, status:$status, createdAt:$createdAt, updatedAt:$updatedAt}' \
-            > artifacts/pipeline/pages-build.json
-      - name: Verify canonical live release
-        env:
-          QA_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-          QA_OUTPUT: artifacts/pipeline/live-release-smoke.json
-          QA_SCREENSHOT_DIR: artifacts/pipeline/live-smoke
           SOURCE_SHA: ${{ inputs.source_sha }}
           RELEASE_PASS: ${{ inputs.release_pass }}
         run: |
           test -n "${RELEASE_BUILT_AT:-}"
-          node scripts/qa/verify-release-topology-browser.mjs
-      - name: Write acceptance-bound production receipt and timings
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          RELEASE_PASS: ${{ inputs.release_pass }}
-        run: node scripts/release/write-production-receipt.mjs
+          node scripts/release/write-verification-receipt.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: production-release-receipt-${{ inputs.source_sha }}
+          name: release-verification-receipt-${{ inputs.source_sha }}
           path: artifacts/pipeline/**
           if-no-files-found: error

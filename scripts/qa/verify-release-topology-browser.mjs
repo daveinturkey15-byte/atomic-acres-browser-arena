@@ -18,6 +18,16 @@ if (expectedRollbackReleasedAt && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.tes
   || Number.isNaN(Date.parse(expectedRollbackReleasedAt)))) {
   throw new Error('ROLLBACK_RELEASED_AT must be one strict UTC ISO-8601 instant');
 }
+// LANE AD (PASS 87): the live channel's directory name, path and changelog id were spelled
+// as the literals `the-big-one`, `channels/the-big-one` and `pass73` below. That channel was
+// retired by the pass80 cut (release-channels.json now stages `channels/pass<N>`), so this
+// verifier asserted a topology that no deploy has produced since. Derived here, once.
+const liveChannelPath = channelConfig.experimental.path;
+if (typeof liveChannelPath !== 'string' || !/^channels\/[a-z0-9-]+$/u.test(liveChannelPath)) {
+  throw new Error('release-channels.json experimental.path must be one channels/<id> path');
+}
+const liveChannelId = liveChannelPath.slice('channels/'.length);
+const liveChangelogId = channelConfig.experimental.pass.toLowerCase().replace(/\s+/gu, '');
 const rootUrl = new URL(baseUrl);
 if (sourceSha) rootUrl.searchParams.set('qa', sourceSha);
 // The production runner is intentionally GPU-less. Route/chooser validation
@@ -65,7 +75,7 @@ async function fetchJson(relativePath) {
 async function verifyPublishedProvenance() {
   const live = await fetchJson(`${channelConfig.experimental.path}/channel-provenance.json`);
   assertEqual(live.schemaVersion, 5, 'Live provenance schema');
-  assertEqual(live.channel, 'the-big-one', 'Live provenance channel');
+  assertEqual(live.channel, liveChannelId, 'Live provenance channel');
   assertEqual(live.releasePass, channelConfig.experimental.pass, 'Live provenance pass');
   assertEqual(live.path, channelConfig.experimental.path, 'Live provenance path');
   assertExactSha(live.sourceSha, 'Live provenance sourceSha');
@@ -338,7 +348,7 @@ async function verifyChoice(choice, expectedPath, expectedPass, expectedChangelo
   }
 }
 
-async function verifyLegacyRoute(name, configure, expectedPath = 'channels/the-big-one', expectedPass = channelConfig.experimental.pass) {
+async function verifyLegacyRoute(name, configure, expectedPath = liveChannelPath, expectedPass = channelConfig.experimental.pass) {
   const observed = await observedPage();
   const { page } = observed;
   try {
@@ -371,22 +381,25 @@ try {
     await chooser.close();
   }
 
-  await verifyChoice('experimental', 'channels/the-big-one', channelConfig.experimental.pass, 'pass73');
-  await verifyChoice('previous', 'channels/pass72-retained', 'PASS 72', 'pass72');
-  await verifyChoice('retained', 'channels/pass70-retained', 'PASS 70', 'pass70');
-  await verifyChoice('historical', 'channels/pass69-retained', 'PASS 69', 'pass69');
+  await verifyChoice('experimental', liveChannelPath, channelConfig.experimental.pass, liveChangelogId);
+  await verifyChoice('previous', channelConfig.previous.path, channelConfig.previous.pass,
+    channelConfig.previous.pass.toLowerCase().replace(/\s+/gu, ''));
+  await verifyChoice('retained', channelConfig.retained.path, channelConfig.retained.pass,
+    channelConfig.retained.pass.toLowerCase().replace(/\s+/gu, ''));
+  await verifyChoice('historical', channelConfig.historical.path, channelConfig.historical.pass,
+    channelConfig.historical.pass.toLowerCase().replace(/\s+/gu, ''));
   if (releasePass && !normalizedPass(routes.experimental.eyebrow).includes(normalizedPass(releasePass))) {
     throw new Error(`Experimental runtime ${routes.experimental.eyebrow} does not match ${releasePass}`);
   }
 
   await verifyLegacyRoute('latest', (params) => params.set('release', 'latest'));
   await verifyLegacyRoute('normal', (params) => params.set('release', 'normal'));
-  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), 'channels/pass70-retained', 'PASS 70');
-  await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), 'channels/pass69-retained', 'PASS 69');
-  await verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), 'channels/pass72-retained', 'PASS 72');
-  await verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), 'channels/pass72-retained', 'PASS 72');
+  await verifyLegacyRoute('previous', (params) => params.set('release', 'previous'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('pass72', (params) => params.set('release', 'pass72'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('pass70', (params) => params.set('release', 'pass70'), channelConfig.retained.path, channelConfig.retained.pass);
+  await verifyLegacyRoute('pass69', (params) => params.set('release', 'pass69'), channelConfig.historical.path, channelConfig.historical.pass);
+  await verifyLegacyRoute('stable', (params) => params.set('release', 'stable'), channelConfig.previous.path, channelConfig.previous.pass);
+  await verifyLegacyRoute('rollback', (params) => params.set('release', 'rollback'), channelConfig.previous.path, channelConfig.previous.pass);
   await verifyLegacyRoute('room', (params) => {
     params.set('room', 'qa-room');
     params.set('autojoin', '1');
