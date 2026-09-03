@@ -1,0 +1,1 @@
+async function e(e,t,n=3,r=450,i=e=>new Promise(t=>{setTimeout(t,e)})){let a;for(let o=1;o<=n;o+=1)try{return await t()}catch(t){if(a=t,o===n)break;console.warn(`[retry-load] ${e} attempt ${o}/${n} failed; retrying`,t),await i(r*o)}throw a}export{e as t};
