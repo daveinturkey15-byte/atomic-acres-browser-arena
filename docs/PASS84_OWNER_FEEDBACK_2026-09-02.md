@@ -899,3 +899,8 @@ nuketown preview first then raid, and like i said be careful with compute"
   for a parked build.
 - Compute: one Opus chain per lane, serial (AU then AV), plus the PASS 89
   integration already running; no waves.
+- **Owner 07:00:** away 90 min, then until ~15:00; "be careful with our 20%
+  remaining compute and use gemini flash 3.8 as support through the bridge".
+  Applied: Gemini 3.8 Flash (agy bridge) does the bulk work of each lane
+  (reference research, schematic, first geometry/props pass); Opus runs one
+  skeptic + one repair per lane; Fable coordinates. Serial: AU then AV.
