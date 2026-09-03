@@ -1429,9 +1429,9 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
     streetVehicle(builder, `coach taillight ${side}`,
       [c.x - c.length / 2 - 0.04, 0.95, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.24, 0.18], m.taillight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
-    // Coach front faces east (toward turning head): illuminated headlights
+    // Coach front faces east (toward turning head): illuminated headlights (y=0.98 clears grille top)
     streetVehicle(builder, `coach headlight ${side}`,
-      [c.x + c.length / 2 + 0.04, 1.05, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.22, 0.20], m.headlight,
+      [c.x + c.length / 2 + 0.04, 0.98, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
   }
   // Wheels: keep the exact 2 expected asymmetric meshes plus decorative hubcaps and arches
@@ -1734,7 +1734,14 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // Cover in the deep yard, between the spawn line and the house.
   pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.4, LOW_COVER, 2.0], m.planter);
   pair(builder, 'yard cover wall', [5.5, HARD_COVER / 2, HOUSE_BACK_Z - 5.5], [7.0, HARD_COVER, 0.35], m.block);
-  pair(builder, 'yard patio table', [-14.5, LOW_COVER / 2, -31.5], [2.2, LOW_COVER, 2.2], m.planter);
+  // Patio dining set with timber table & outdoor umbrella:
+  pair(builder, 'yard patio table', [-14.5, LOW_COVER / 2, -31.5], [2.2, LOW_COVER, 2.2], m.fence);
+  pair(builder, 'yard patio table top', [-14.5, LOW_COVER + 0.02, -31.5], [2.28, 0.04, 2.28], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard patio umbrella pole', [-14.5, 1.45, -31.5], [0.08, 1.90, 0.08], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard patio umbrella canopy', [-14.5, 2.38, -31.5], [1.90, 0.28, 1.90], m.trim,
+    { solid: false, shots: false, cast: true });
   // SIDE-ALLEY BODIES. The reference's outer lots are not empty: its own
   // minimap draws hatched props along both long boundaries, and they are what
   // stops the flank lane being a spawn-to-spawn sniper alley. Without these two
