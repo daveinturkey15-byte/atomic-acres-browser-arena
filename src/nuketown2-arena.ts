@@ -1343,8 +1343,40 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // Letterbox at the end of each drive: the reference's own kerb prop.
   pair(builder, 'verge mailbox post', [GARAGE_X1 + 0.6, 0.6, KERB_Z - 1.2], [0.16, 1.2, 0.16], m.trim);
   pair(builder, 'verge mailbox', [GARAGE_X1 + 0.6, 1.35, KERB_Z - 1.2], [0.32, 0.3, 0.5], m.sign);
-  // Driveway edging, on the OUTBOARD side of the apron: low, so it reads from
-  // above and never stops a stride. Outboard, because x = GARAGE_X0 - 0.4 puts
+  // HF-440 Cycle 1 Priority 4: street furniture density (mailboxes, planters, bins, signs, hydrant)
+  pair(builder, 'verge mailbox flag', [GARAGE_X1 + 0.6 + 0.18, 1.42, KERB_Z - 1.2], [0.04, 0.18, 0.08], m.busTrim,
+    { solid: false, shots: false });
+  // Second residential mailbox on west verge (solid pedestal to ground, non-solid box):
+  pair(builder, 'verge parcel mailbox pedestal', [-6.5, 0.50, KERB_Z - 1.2], [0.32, 1.00, 0.32], m.trim);
+  pair(builder, 'verge parcel mailbox', [-6.5, 1.15, KERB_Z - 1.2], [0.36, 0.30, 0.36], m.sign,
+    { solid: false, shots: true });
+
+  // Curbside wheelie bins waiting for collection at the driveway edge:
+  pair(builder, 'verge wheelie bin 0', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 1.9], [0.52, 1.00, 0.55], m.planter);
+  pair(builder, 'verge wheelie bin 1', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 2.5], [0.52, 1.00, 0.55], m.sign);
+  pair(builder, 'verge wheelie bin lid 0', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 1.9], [0.56, 0.06, 0.59], m.rubber,
+    { solid: false, shots: false });
+  pair(builder, 'verge wheelie bin lid 1', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 2.5], [0.56, 0.06, 0.59], m.rubber,
+    { solid: false, shots: false });
+
+  // Public street waste bin on the west verge:
+  pair(builder, 'verge street bin', [-11.6, 0.45, KERB_Z - 0.45], [0.48, 0.90, 0.48], m.sign);
+  pair(builder, 'verge street bin lid', [-11.6, 0.93, KERB_Z - 0.45], [0.52, 0.06, 0.52], m.rubber,
+    { solid: false, shots: false });
+
+  // Fire hydrant at the turning head kerb line:
+  pair(builder, 'verge hydrant body', [-7.4, 0.42, KERB_Z - 0.45], [0.32, 0.84, 0.32], m.busTrim);
+  pair(builder, 'verge hydrant cap', [-7.4, 0.88, KERB_Z - 0.45], [0.22, 0.12, 0.22], m.trim,
+    { solid: false, shots: false });
+  pair(builder, 'verge hydrant nozzles', [-7.4, 0.55, KERB_Z - 0.45], [0.44, 0.12, 0.12], m.sign,
+    { solid: false, shots: false });
+
+  // Street name blade and speed limit sign post at turning head corner:
+  pair(builder, 'verge street sign post', [7.6, 1.4, KERB_Z - 0.45], [0.12, 2.8, 0.12], m.trim);
+  pair(builder, 'verge street name blade', [7.6, 2.65, KERB_Z - 0.45], [0.90, 0.22, 0.08], m.sign,
+    { solid: false, shots: true });
+  pair(builder, 'verge speed limit sign', [7.6, 2.10, KERB_Z - 0.45], [0.45, 0.60, 0.06], m.trim,
+    { solid: false, shots: true });
   // it inside the house's own east wall run.
   pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb, { cast: false });
   // Hedge along the front of each house's lawn: crouch cover for the last
@@ -1367,6 +1399,14 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // edging and the outer planter (x [8.8, 11.2] leaves 0.5 m to that planter's
   // x0 = 11.7).
   pair(builder, 'verge kerb planter', [10.0, LOW_COVER / 2, KERB_Z - 0.75], [2.4, LOW_COVER, 1.1], m.planter);
+  // Additional landscaped front planter box:
+  pair(builder, 'verge front planter', [1.2, 0.25, HOUSE_FRONT_Z + 1.2], [2.2, 0.50, 0.90], m.block);
+  pair(builder, 'verge front planter soil', [1.2, 0.40, HOUSE_FRONT_Z + 1.2], [2.0, 0.08, 0.74], m.planter,
+    { solid: false, shots: false });
+  // Walkway entrance planter urn:
+  pair(builder, 'verge entry planter urn', [-1.8, 0.30, KERB_Z - 1.2], [0.60, 0.60, 0.60], m.block);
+  pair(builder, 'verge entry planter shrub', [-1.8, 0.70, KERB_Z - 1.2], [0.48, 0.35, 0.48], m.planter,
+    { solid: false, shots: false });
   // The town sign at the far end of each verge: two posts and a board, the one
   // authored landmark that tells you which end you are looking at.
   for (const [index, dx] of [-1.4, 1.4].entries()) {
