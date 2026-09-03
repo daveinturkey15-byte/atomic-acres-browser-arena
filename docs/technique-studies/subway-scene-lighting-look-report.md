@@ -83,6 +83,7 @@ also SAFE. Anyone verifying the skill against the old hash would have concluded 
 | Every repo anchor and art-direction bound the skill cites is exact | VERIFIED | Re-read at `0c7aab53`; `corridors.ts:357` = `headlightMat.emissiveNode = rgb(0xffe899, 2.5);`, `PARTICLE_MAX_LIGHT_SHAFTS = 6`, `bloomThresholdScale [1,1.3]`, `MINIMUM_COMPOSED_BLOOM_THRESHOLD 1.02`, `vignetteBase ≤ 0.24`. No fence weakened; both fences restated as fences |
 | Skill discoverable from every harness | VERIFIED **now**, after a repair | `link_skills.ps1 -VerifyOnly`: OK 162/162 on all seven roots, junction, read-through probe OK. It was **broken** when the skeptic checked (B0) |
 | Skill accepted into the frozen baseline | **VERIFIED — it is accepted** | `skill-baseline.json` carries `threejs-webgpu-interior-lighting-look` at sha256 `f0a9ebbe…`, matching disk; baseline `generated_at 2026-09-02T21:07:00Z`, committed on AKP main at `612b413` |
+| The 360-char description ceiling is a hard guard failure that aborts *any* lane's accept, and the three trims that cleared it are uncommitted | VERIFIED | `skill_regression_guard.py:85` appends a **problem** above `max_chars` 360 (the WARN at :87 is the `elif` for `warn_chars` 220); `accept` returns on a non-zero `run_check` rc before writing the baseline. `HEAD` still holds 367/373/377; the working tree holds 326/330/330, mtimes 22:05-22:06, `git status` ` M`, no commit. See B1 |
 | Any performance number for our repo | **NOT MEASURED** | Study lane; GPU at 14.3/16.3 GiB (owner's own work) all evening; no browser launched. All measurement deferred to §5 |
 
 ---
@@ -108,30 +109,72 @@ still unknown is what emptied the flat view at 22:17 while lanes were running (a
 invoking the linker in a mode that clears then aborts is the obvious suspect). Worth a guard,
 because any lane can silently kill skill discovery for every harness on this machine.
 
-**B1 — RETRACTED. The "three over-length descriptions block four lanes" blocker was false, and
-its prescribed fix was a no-op. Nobody should act on it.** The first draft of this report
-claimed `gem-nano-agent-debug` (367), `wow-spp-local-mod-restore` (373) and
-`game-release-benchmark-guard` (377) exceeded a 360-char ceiling, and that one 37-character trim
-would unblock four lanes. Measured: they are **326 / 330 / 330 — all under 360**, untouched
-since long before this lane, and the ceiling is **WARN-only and never fails the guard** (it
-prints ten such warnings and still reports PASS).
+**B1 — the original blocker was REAL, someone else fixed it mid-sweep, and the fix is
+UNCOMMITTED. This is the one item on this page that still needs an owner.** The status here has
+been wrong twice, so it is written out in full.
 
-The real output of a scoped accept is:
+*What the first draft said:* `skill_regression_guard.py accept` refuses because
+`gem-nano-agent-debug` (367), `wow-spp-local-mod-restore` (373) and
+`game-release-benchmark-guard` (377) exceed the 360-char ceiling; one 37-character trim unblocks
+four lanes. **That was correct when it was written.**
+
+*What the skeptic pass said:* the blocker is false — those descriptions measure 326/330/330, are
+under the ceiling, are untouched since commit `04b1468`, and the ceiling is WARN-only.
+**That refutation was itself wrong, on both halves.**
+
+*What is actually true, measured this pass:*
+
+| Skill | at `HEAD` | in the working tree | trimmed at |
+| --- | --- | --- | --- |
+| `gem-nano-agent-debug` | **367** | 326 | 2026-09-02 22:05 |
+| `wow-spp-local-mod-restore` | **373** | 330 | 2026-09-02 22:05 |
+| `game-release-benchmark-guard` | **377** | 330 | 2026-09-02 22:06 |
+
+- **The ceiling is not WARN-only.** `skill_regression_guard.py` line 85 appends a **problem**
+  when `len(desc) > max_chars` (360); the WARN at line 87 is the *`elif`* branch for
+  `warn_chars` (220) `< len ≤ 360`. The skeptic read the WARN branch and missed the ceiling
+  above it. `description_policy` in `skill-regression-policy.json` is
+  `{"max_chars": 360, "warn_chars": 220}` — two different thresholds.
+- **A problem does abort the accept.** The `accept` path calls `run_check(...)` first and
+  returns immediately on a non-zero rc, *before* it touches `skill-baseline.json`. So at
+  367/373/377 the accept genuinely could not write the baseline, exactly as first reported.
+- **"Untouched since `04b1468`" was an artefact of reading `git log`.** The trims were never
+  committed — they are still uncommitted modifications in the shared vault working tree
+  (`git status` shows ` M` on all three). `git log` cannot see them; only `git diff` and the
+  file mtimes can. They are real edits: `Use when work involves` → `Use for`, and
+  `preserve … compare` → `keep … block`.
+- **Sequence.** The three descriptions were trimmed at 22:05–22:06 local, and
+  `skill-baseline.json` was written at `generated_at 2026-09-02T21:07:00Z` (= 22:07 local) and
+  committed as `612b413`. The blocker was cleared by whoever made those trims — not by this
+  lane, which had explicitly declined to edit another skill's routing metadata — and this
+  lane's skill went into the baseline in the same write.
+
+*Where that leaves the four lanes:* **unblocked and complete.**
+`threejs-webgpu-interior-lighting-look`, `comfyui-3d-native-pipeline` and
+`open-world-city-art-loop` are all in the frozen baseline; a scoped re-accept now correctly
+reports there is nothing to do:
 
 ```
 PASS skill-regression-guard skills=162 drift=0 warnings=10
 FAIL requested skills are not all drifted: ['threejs-webgpu-interior-lighting-look']
 ```
 
-— i.e. **there is nothing to accept, because the skill is already accepted.**
-`skill-baseline.json` carries it at `f0a9ebbe…`, byte-matching disk;
-`comfyui-3d-native-pipeline` and `open-world-city-art-loop` are in the baseline too. All three
-lanes this report called blocked are in fact **complete**. The acceptance was swept in by the
-HF-419 lane's commit `612b413` rather than written by this lane — the same shared-file
-authorship problem as B2, recurring on the baseline instead of the register.
-**Do not trim `gem-nano-agent-debug`, `wow-spp-local-mod-restore` or
-`game-release-benchmark-guard` on this basis** — it would be an unnecessary routing change to
-three unrelated skills, each then needing its own evaluation record.
+*The residual risk, and the actual owner item:* **the fix that unblocked four lanes exists only
+as uncommitted working-tree edits in a store every harness on this machine reads through
+junctions.** Any `git checkout`, `git restore` or `git stash` on the vault silently reverts all
+three descriptions to 367/373/377, and the next skill acceptance — any lane's — fails again with
+`FAIL description policy`, for a reason that will look unrelated to whatever that lane was doing.
+Two things are owed, neither of them this lane's to do (they are other skills' routing metadata,
+and per `skill-regression-policy.json` a description change is a routing change that wants its
+own evaluation record):
+
+1. **Commit the three trims**, with an evaluation record covering the routing change, so the
+   unblock is durable rather than one `git restore` from vanishing.
+2. **Decide whether the ceiling should fail the *accept* at all**, or only the skill being
+   accepted. Today one unrelated over-length description blocks every lane's acceptance
+   machine-wide, which is how a 37-character edit came to gate four lanes overnight. That is a
+   policy question for the owner — **not something to "fix" by widening `max_chars`**, which
+   would be weakening a verifier to get green.
 
 **B2 — the shared AKP files are being committed wholesale by concurrent lanes.** My row 48 was
 written into the working tree and then swept into commit `3776400` by the HF-420 lane, which
