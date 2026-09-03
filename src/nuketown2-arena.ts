@@ -295,6 +295,68 @@ const STAIRWELL_Z0 = STAIR_FOOT_Z
   + NUKETOWN2_HOUSE_STAIR.going * STAIR_FIRST_UNCOVERED_TREAD
   - STANDING_RADIUS_M - 0.12;
 
+/**
+ * DOORWAYS - HF-432 item 4, owner after PASS 90: "Doors are too small
+ * shouldn't have to crouch."
+ *
+ * WHAT WAS ACTUALLY MEASURED, before anything moved, on the built colliders:
+ *
+ *   house front door        clear height 2.20 m   clear width 1.38 m
+ *   house back door         2.20 m                1.58 m
+ *   house internal door     3.00 m                1.58 m
+ *   house/garage link       2.60 m                1.80 m
+ *   garage vehicle door     2.60 m                3.48 m
+ *   garage rear door        2.60 m                1.58 m
+ *
+ * ...and a map-wide sweep of every ground cell at 0.20 m, comparing the
+ * STANDING capsule (1.82 m) against the CROUCHED one (1.16 m) at a single
+ * radius so only height differences count, found 20 crouch-only cells on the
+ * whole arena - all 20 of them under the two verge letterbox heads, which are
+ * 0.32 x 0.50 m lids on 0.16 m posts.
+ *
+ * So NO DOOR ON THIS MAP EVER REQUIRED A CROUCH: the tightest was 2.20 m
+ * against a 1.82 m capsule. The owner's report is real, and it is about WIDTH.
+ * A 1.38 m opening leaves 0.62 m of free width for a 0.76 m-wide capsule
+ * whose controller carries a 0.025 m skin, so the front door caught the
+ * shoulder on almost every entry, and catching on a door frame at a run is
+ * exactly what "too small, shouldn't have to crouch" feels like.
+ *
+ * THE BAND, derived rather than picked. Width 1.8 m = the standing capsule's
+ * own diameter twice over plus a body's width of slack, which is what makes a
+ * doorway a route two players can use rather than a queue. Head 2.4 m = the
+ * capsule (1.82) plus the autostep up-cast (0.42) plus 0.16 m, so that a
+ * player stepping onto the porch, the kerb or a tread IN a doorway still
+ * clears - the same failure mode STAIRWELL_Z0 records. Both are checked, as
+ * measurements on the built colliders, in `nuketown2-fidelity.test.ts`, along
+ * with a standing capsule that WALKS through every one of them.
+ */
+const DOOR_WIDTH = 1.8;
+const DOOR_HEAD_Y = 2.4;
+const HOUSE_CENTRE_X = NUKETOWN2_HOUSE_LAYOUT[0]!.x;
+const GARAGE_CENTRE_X = (GARAGE_X0 + GARAGE_X1) / 2;
+
+/**
+ * Every opening a player walks through, ONCE, so the builder and the gate
+ * cannot describe different doors. `span` is the axis the opening's width is
+ * measured along, `centre` is its middle on that axis, and `at` is the CENTRE
+ * PLANE of the leaf it is cut in - not the room line, because a probe on the
+ * room line stands on the wall's outer face and measures nothing.
+ */
+export const NUKETOWN2_DOORWAYS = Object.freeze([
+  Object.freeze({ id: 'house front door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_FRONT_Z - WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
+  Object.freeze({ id: 'house back door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
+  Object.freeze({ id: 'house internal door', span: 'x' as const, centre: -2.7, at: HOUSE_MID_Z, width: DOOR_WIDTH, headY: GROUND_H }),
+  Object.freeze({ id: 'house garage link', span: 'z' as const, centre: -18.7, at: HOUSE_X1 - WALL_T / 2, width: DOOR_WIDTH, headY: GROUND_H - 0.4 }),
+  Object.freeze({ id: 'garage vehicle door', span: 'x' as const, centre: GARAGE_CENTRE_X, at: GARAGE_FRONT_Z - WALL_T / 2, width: 3.5, headY: 2.6 }),
+  Object.freeze({ id: 'garage rear door', span: 'x' as const, centre: GARAGE_CENTRE_X - 0.55, at: GARAGE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: 2.6 }),
+]);
+
+/** The [low, high] run a doorway occupies on its own span axis. */
+function doorRun(id: string): [number, number] {
+  const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
+  return [door.centre - door.width / 2, door.centre + door.width / 2];
+}
+
 /** Radius of the cul-de-sac turning head at the middle of the road. */
 const TURNING_HEAD_HALF = 8;
 
@@ -728,7 +790,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The previous cut cut a doorway in the garage's shared wall and left the
   // house's own east wall solid behind it, so the garage's "route into the
   // house" opened onto a wall. Both leaves are cut here, at the same z.
-  const LINK_DOOR: [number, number] = [-19.5, -17.9];
+  const LINK_DOOR = doorRun('house garage link');
   [[HOUSE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], HOUSE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `house wall east ${index}`,
       [HOUSE_X1 - WALL_T / 2, GROUND_H / 2, (run[0]! + run[1]!) / 2],
@@ -744,7 +806,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Segments are authored as [x0, x1] runs; the gaps between them ARE the
   // openings, which is the whole point — a window you cannot shoot through is
   // a painting.
-  const FRONT_DOOR: [number, number] = [-1.95, -0.55];
+  const FRONT_DOOR = doorRun('house front door');
   const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
   const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
   const groundFrontRuns: [number, number][] = [
@@ -766,7 +828,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
   }
   pair(builder, 'house front door lintel',
-    [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, 2.6, zFront], [FRONT_DOOR[1] - FRONT_DOOR[0], 0.8, WALL_T], m.trim);
+    [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
+    [FRONT_DOOR[1] - FRONT_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
 
   // --- front wall, upper floor: the power window ---------------------------
   const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
@@ -787,7 +850,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   }
 
   // --- back wall: back door and one upper window ---------------------------
-  const BACK_DOOR: [number, number] = [-2.05, -0.45];
+  const BACK_DOOR = doorRun('house back door');
   const groundBackRuns: [number, number][] = [
     [HOUSE_X0, BACK_DOOR[0]],
     [BACK_DOOR[1], HOUSE_X1],
@@ -797,7 +860,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [(run[0] + run[1]) / 2, GROUND_H / 2, zBack], [run[1] - run[0], GROUND_H, WALL_T], siding);
   });
   pair(builder, 'house back door lintel',
-    [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, 2.6, zBack], [BACK_DOOR[1] - BACK_DOOR[0], 0.8, WALL_T], m.trim);
+    [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
+    [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
   const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
@@ -850,7 +914,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
 
   // --- internal partitions, both storeys, one doorway each -----------------
   const PARTITION_Z = zMid;
-  const INNER_DOOR: [number, number] = [-3.5, -1.9];
+  const INNER_DOOR = doorRun('house internal door');
   for (const [storey, y0, h] of [['ground', 0, GROUND_H], ['upper', UPPER_Y0, UPPER_H]] as const) {
     // The UPPER leaf stops at the flight's inboard edge: that 1.95 m gap is
     // the head of the stair, so the landing opens straight into the front
@@ -904,14 +968,14 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box. Matches the hole cut in
   // the house's own east wall.
-  const LINK_DOOR: [number, number] = [-19.5, -17.9];
+  const LINK_DOOR = doorRun('house garage link');
   [[GARAGE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], GARAGE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `garage link pier ${index}`,
       [GARAGE_X0 + WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.garageSiding);
   });
 
   // Garage door: a 3.5 m opening onto the driveway apron, headed at 3.0 m.
-  const DOOR: [number, number] = [5.0, 8.5];
+  const DOOR = doorRun('garage vehicle door');
   [[GARAGE_X0, DOOR[0]], [DOOR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
@@ -921,7 +985,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.garageDoor);
 
   // Rear door into the back yard.
-  const REAR: [number, number] = [5.4, 7.0];
+  const REAR = doorRun('garage rear door');
   [[GARAGE_X0, REAR[0]], [REAR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
@@ -929,8 +993,11 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage back head', [(REAR[0] + REAR[1]) / 2, H - 0.4, zBack], [REAR[1] - REAR[0], 0.8, WALL_T], m.trim);
 
   // Workbench: the one body that makes the garage a position rather than a
-  // corridor between three doors.
-  pair(builder, 'garage bench', [7.6, LOW_COVER / 2, GARAGE_BACK_Z + 1.4], [2.8, LOW_COVER, 0.9], m.interior);
+  // corridor between three doors. HF-432 item 4 moved it from (7.6, -21.6) -
+  // where it lay ACROSS the rear door's own threshold, so a standing capsule
+  // walking in from the yard hit it inside the doorway - onto the outboard
+  // wall, where a workbench belongs.
+  pair(builder, 'garage bench', [8.1, LOW_COVER / 2, GARAGE_BACK_Z + 3.5], [1.4, LOW_COVER, 4.0], m.interior);
 }
 
 /**
@@ -1033,7 +1100,11 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
  */
 function cars(builder: Builder, m: Nuketown2Materials): void {
   const cx = (GARAGE_X0 + GARAGE_X1) / 2 + 0.5;   // 7.25, centred on the door
-  const cz = GARAGE_FRONT_Z + 3.4;                // 3.4 m out onto the apron
+  // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
+  // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
+  // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
+  // own apron (the dressing runs to z = -8) rather than out on the kerb.
+  const cz = GARAGE_FRONT_Z + 4.6;
   pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA);
   pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass);
   for (const [index, dz] of [-1.5, 1.5].entries()) {

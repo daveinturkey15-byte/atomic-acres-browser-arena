@@ -7,6 +7,7 @@ import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_DOORWAYS,
   NUKETOWN2_HOUSE_STAIR,
   NUKETOWN2_GROUND_DRESSING,
   NUKETOWN2_HOUSE_LAYOUT,
@@ -51,6 +52,8 @@ import { shedPlacementsForArena } from './destructible-shed-registry';
  */
 
 const PLAYER_RADIUS = 0.44;
+/** The CROUCHED capsule, for the "does any route need a crouch" sweep. */
+const CROUCH_CAPSULE_M = 2 * (STANCE_SHAPES.crouch.halfHeight + STANCE_SHAPES.crouch.radius);
 /** The STANDING capsule, from the physics module rather than from memory. */
 const STANDING_CAPSULE_M = 2 * (STANCE_SHAPES.stand.halfHeight + STANCE_SHAPES.stand.radius);
 const STANDING_RADIUS_M = STANCE_SHAPES.stand.radius;
@@ -490,6 +493,138 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
       expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
     }
+  }, 120_000);
+
+  it('gives every door a standing player walks through: 2.4 m of head, 1.8 m of shoulder', async () => {
+    // HF-432 item 4. The owner after PASS 90: "Doors are too small shouldn't
+    // have to crouch."
+    //
+    // The owner's words and the measurement do not agree, and the measurement
+    // wins: NO door on this map ever required a crouch - the tightest was
+    // 2.20 m of head against a 1.82 m capsule. The fault was WIDTH. A 1.38 m
+    // opening leaves 0.62 m of free width for a 0.76 m capsule, which catches
+    // a shoulder on every entry at a run. The before table is in
+    // NUKETOWN2_DOORWAYS; the sweep that proves the crouch half is the test
+    // below this one.
+    const map = buildNuketown2(new THREE.Scene());
+
+    /** Lowest solid overhead at (x, z); 0 if anything stands at floor level. */
+    const clearHeight = (x: number, z: number): number => {
+      let lowest = Number.POSITIVE_INFINITY;
+      for (const bounds of map.colliders) {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        if (x <= bounds.minX || x >= bounds.maxX || z <= bounds.minZ || z >= bounds.maxZ) continue;
+        if (maxY <= 0.25) continue;                 // floor slabs, kerbs, ground decals
+        if (minY < 0.25) return 0;                  // a solid, not an opening
+        if (minY < lowest) lowest = minY;
+      }
+      return lowest;
+    };
+    /** Free width of the opening at chest height, along its own span axis. */
+    const clearWidth = (x: number, z: number, span: 'x' | 'z'): number => {
+      const solid = (px: number, pz: number) => map.colliders.some((bounds) => {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        return px > bounds.minX && px < bounds.maxX && pz > bounds.minZ && pz < bounds.maxZ
+          && minY < 1.0 && maxY > 1.0;
+      });
+      let low = 0;
+      let high = 0;
+      for (let d = 0; d < 4; d += 0.01) { if (solid(span === 'x' ? x - d : x, span === 'x' ? z : z - d)) break; low = d; }
+      for (let d = 0; d < 4; d += 0.01) { if (solid(span === 'x' ? x + d : x, span === 'x' ? z : z + d)) break; high = d; }
+      return low + high;
+    };
+
+    // THE HEAD BAND, DERIVED: the standing capsule, plus the autostep up-cast
+    // the controller performs BEFORE it moves forward (so a player stepping
+    // onto a porch, a kerb or a tread inside a doorway still clears - the same
+    // failure STAIRWELL_Z0 records), plus 0.16 m.
+    const HEAD_FLOOR = STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight + 0.16;
+    expect(HEAD_FLOOR).toBeCloseTo(2.4, 10);
+    // ...and it clears the lane's own stated floor of 2.1 m.
+    expect(HEAD_FLOOR).toBeGreaterThanOrEqual(2.1);
+
+    for (const door of NUKETOWN2_DOORWAYS) {
+      for (const sign of [1, -1] as const) {          // the door AND its 180-degree partner
+        const x = sign * (door.span === 'x' ? door.centre : door.at);
+        const z = sign * (door.span === 'x' ? door.at : door.centre);
+        const label = `${door.id}${sign === 1 ? '' : ' (partner)'}`;
+        expect(clearHeight(x, z), `${label} head`).toBeCloseTo(door.headY, 6);
+        expect(clearHeight(x, z), `${label} head`).toBeGreaterThanOrEqual(HEAD_FLOOR);
+        expect(clearWidth(x, z, door.span), `${label} width`).toBeGreaterThanOrEqual(door.width - 0.03);
+        // Two capsule widths plus a body of slack: a door two players use.
+        expect(door.width, `${label} authored width`).toBeGreaterThanOrEqual(4 * STANDING_RADIUS_M + 0.2);
+      }
+      // ...and a STANDING capsule actually WALKS through it, on the real
+      // physics, with gravity and no jump. A door that measures right and
+      // catches on the frame is exactly the defect being fixed.
+      const through: [number, number] = door.span === 'x' ? [0, 1] : [1, 0];
+      const centreX = door.span === 'x' ? door.centre : door.at;
+      const centreZ = door.span === 'x' ? door.at : door.centre;
+      const near: [number, number] = [centreX - through[0] * 1.6, centreZ - through[1] * 1.6];
+      const far: [number, number] = [centreX + through[0] * 1.6, centreZ + through[1] * 1.6];
+      const trace = await walkStanding(map, [near[0], 1.7, near[1]], [far]);
+      expect(
+        Math.hypot(trace[0]!.x - far[0], trace[0]!.z - far[1]),
+        `${door.id} walk-through ended at ${JSON.stringify(trace[0])}`,
+      ).toBeLessThan(0.45);
+    }
+  }, 120_000);
+
+  it('needs a crouch nowhere on the ground except under the two letterbox lids', () => {
+    // The other half of "shouldn't have to crouch", swept rather than argued.
+    // Every ground cell at 0.25 m is tested with the STANDING capsule height
+    // and with the CROUCHED one AT THE SAME RADIUS, so only genuine height
+    // blockages count and the 0.02 m radius difference between the two stances
+    // cannot manufacture findings. A cell the crouch fits and the stand does
+    // not is a place this map makes a player duck.
+    const map = buildNuketown2(new THREE.Scene());
+    const blocked = (x: number, z: number, floorY: number, height: number): boolean => {
+      const y0 = floorY + 0.06;
+      const y1 = floorY + height;
+      for (const bounds of map.colliders) {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        if (maxY <= y0 || minY >= y1) continue;
+        const dx = Math.max(bounds.minX - x, 0, x - bounds.maxX);
+        const dz = Math.max(bounds.minZ - z, 0, z - bounds.maxZ);
+        if (dx * dx + dz * dz < STANDING_RADIUS_M * STANDING_RADIUS_M) return true;
+      }
+      return false;
+    };
+    const floorAt = (x: number, z: number): number => {
+      let top = 0;
+      for (const bounds of map.colliders) {
+        const maxY = bounds.maxY ?? (bounds.minY ?? 0) + 3;
+        if (maxY > 0.5 || x <= bounds.minX || x >= bounds.maxX || z <= bounds.minZ || z >= bounds.maxZ) continue;
+        if (maxY > top) top = maxY;
+      }
+      return top;
+    };
+    // The two letterboxes: a 0.32 x 0.50 m lid on a 0.16 m post, authored in
+    // `verge()` at (GARAGE_X1 + 0.6, KERB_Z - 1.2) and its rotational partner.
+    // They are the ONE thing on this map you may duck under.
+    const letterbox: [number, number] = [9.85, -7.1];
+    const offenders: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 0.5; x <= NUKETOWN2_BOUNDS.maxX - 0.5; x += 0.25) {
+      for (let z = NUKETOWN2_BOUNDS.minZ + 0.5; z <= NUKETOWN2_BOUNDS.maxZ - 0.5; z += 0.25) {
+        const floorY = floorAt(x, z);
+        if (floorY > 0.45) continue;                                   // ground routes only
+        if (blocked(x, z, floorY, CROUCH_CAPSULE_M)) continue;         // the crouch cannot pass either
+        if (!blocked(x, z, floorY, STANDING_CAPSULE_M)) continue;      // standing passes: fine
+        offenders.push([Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+      }
+    }
+    for (const [x, z] of offenders) {
+      const nearest = Math.min(
+        Math.hypot(x - letterbox[0], z - letterbox[1]),
+        Math.hypot(x + letterbox[0], z + letterbox[1]),
+      );
+      expect(nearest, `crouch-only ground cell at (${x}, ${z})`).toBeLessThan(1.0);
+    }
+    // ...and the two lids account for a handful of cells, never a route.
+    expect(offenders.length, `crouch-only ground cells: ${JSON.stringify(offenders)}`).toBeLessThanOrEqual(24);
   }, 120_000);
 
   it('keeps the power position real: the upper front window is an opening, and the rare gun lives there', () => {
