@@ -585,14 +585,18 @@ makes that row evidence rather than an anecdote.
 | `193138eb`, `44c0a35b`, `b32116f6` | evidence: six interleaved A/B pairs, three tripwires |
 | `8a82ff95`, `1c80b083` | this report |
 | `2a72720d` | both surviving cases take the whole scene — no arena gets a narrower relief than it ships with |
+| `e89492af` | probe floors: no no-op first load, and the live match must be on the arena that was asked for |
+| `5d5517ab`, `6f263a2d` | report and switch-matrix receipts |
 
 ## 11. Verification
 
-- **`npx tsc --noEmit`: exit 0** at the final source commit `89d760ba`. (It was
+- **`npx tsc --noEmit`: exit 0** at both source commits that changed behaviour,
+  `89d760ba` and `2a72720d`. (It was
   NOT clean on the first attempt — `cold-session-precompile-reach.ts` had an
   unsound type predicate, caught and fixed before the build that every
   measurement below used.)
-- **Focused vitest: 7 files / 64 tests pass, 0 fail** —
+- **Focused vitest: 7 files / 64 tests pass at `89d760ba`, and the two pinned
+  files re-run at `2a72720d` (2 files / 26 tests)** —
   `rendering/cold-session-precompile-reach` (new),
   `presentation-prewarm-contract`, `arena-special-weapon-reach`,
   `arena-switch-matrix-roster`, `rendering/arena-coverage-prewarm`,
@@ -765,3 +769,18 @@ the arena that shipped hours ago and had never been switch-tested. The remaining
 31 pairs are OPEN and the run is cheap to repeat on a quiet machine.
 
 
+
+## 14. Exit gate, line by line
+
+| gate criterion | state |
+|---|---|
+| no arena's first load slower than the quiet-GPU baseline | **MET on the two arenas that failed it** (gun-range x1.01 vs control x1.04; high-seas x1.02 vs control x0.99, both inside the baseline's own ±1% run-to-run spread). CLAIMED for the other seven: their cold-session path now takes PASS 86's sequence, so there is no mechanism for a difference, but they were not measured. |
+| no arena's in-session switch slower than baseline | **NOT ESTABLISHED.** A paired 72-pair before/after is two ~70-minute sweeps and the window held one. The 37 committed pairs are timings without a paired baseline; the switch path is unchanged from the first pass, whose paired distribution is in the held report. |
+| tripwire 0 on gun-range AND high-seas AND atomic-acres | **2 of 3 read 0**; high-seas reads 1, identified as the pre-existing `renderPipeline_MeshBasicMaterial_774` that the SHIPPED build also creates. Not introduced here, not met on the shipped build either. |
+| switch matrix 56/56 (now 72/72) | **PARTIAL: 37/72 real pairs committed, 0 failed, 31 not walked.** Aborted by a browser closure under 47 rival Chrome processes. |
+| boot smoke 9/9 | **NOT RUN.** PASS 86's 12/12 was taken on `aa9befca`, the head this branch merges. |
+
+**The lane does not claim a green exit gate.** It claims: the regression that
+caused the hold is measured, attributed to one phase, and removed to within the
+baseline's own spread; the correctness fix it was bought with is unchanged; and
+the three things still owed are named above with the reason each was not done.
