@@ -21,6 +21,7 @@ import {
   identityLightingConditions,
   isLightingTimeChoice,
   lightingConditionsAreIdentity,
+  lightingConditionWritesEqual,
   resolveLightingConditions,
   resolveLightingHour,
   type LightingConditionWrites,
@@ -472,5 +473,78 @@ describe('band ends are the measured safe interval, not a chosen one', () => {
         resolveLightingConditions({ arenaId, fixedHour: hour, skyDarkenAmount: 0.45 }).sunIntensityScale);
       expect(Math.max(...scales) / Math.min(...scales)).toBeGreaterThan(1.02);
     }
+  });
+});
+
+/**
+ * THE GATE THE RUNTIME USES, tested where it is pure.
+ *
+ * The shipped runtime used to skip its uniform write whenever the resolved HOUR
+ * had not moved. `skyDarkenAmount` is the model's second input and never enters
+ * `hour`, so at a fixed hour every weather-driven write was resolved and thrown
+ * away -- in `fixed` and in `random`, and `random` is the default. Every model
+ * test still passed, because the model was never wrong. What follows is the
+ * property the runtime now gates on: two records are the same WRITE only when
+ * every term that reaches a light is the same.
+ */
+describe('the uniform-write gate distinguishes exactly what reaches a light', () => {
+  it('says a weather change at a FIXED HOUR is a different write', () => {
+    // This is the blocker, stated as a test. If it ever passes with equal
+    // records again, the runtime is discarding weather writes once more.
+    for (const arenaId of OUTDOOR) {
+      const fixedHour = ARENA_DAYLIGHT_PROFILES[arenaId].hourRange[1];
+      const clear = resolveLightingConditions({ arenaId, fixedHour, skyDarkenAmount: 0 });
+      for (const skyDarkenAmount of SWEPT_SKY_DARKEN.filter((rung) => rung > 0)) {
+        const wet = resolveLightingConditions({ arenaId, fixedHour, skyDarkenAmount });
+        expect(wet.hour).toBe(clear.hour);
+        expect(lightingConditionWritesEqual(clear, wet)).toBe(false);
+      }
+    }
+  });
+
+  it('says identical inputs are the same write, so a steady frame writes nothing', () => {
+    for (const arenaId of ARENA_IDS) {
+      for (const choice of LIGHTING_TIME_CHOICES) {
+        const a = resolveLightingConditions({ arenaId, matchSeed: 3, elapsedSeconds: 42, choice, skyDarkenAmount: 0.3 });
+        const b = resolveLightingConditions({ arenaId, matchSeed: 3, elapsedSeconds: 42, choice, skyDarkenAmount: 0.3 });
+        expect(lightingConditionWritesEqual(a, b)).toBe(true);
+      }
+    }
+  });
+
+  it('never calls two arenas the same write, so an arena change always re-anchors', () => {
+    const left = resolveLightingConditions({ arenaId: 'atomic-acres', choice: 'authored' });
+    const right = resolveLightingConditions({ arenaId: 'skyline-terminal', choice: 'authored' });
+    // Both are the identity; the arena still differs, and the lights behind them
+    // carry different authored values.
+    expect(lightingConditionsAreIdentity(left) && lightingConditionsAreIdentity(right)).toBe(true);
+    expect(lightingConditionWritesEqual(left, right)).toBe(false);
+  });
+
+  it('treats a missing record as "not equal", so the first write of a match always lands', () => {
+    const writes = resolveLightingConditions({ arenaId: 'high-seas', choice: 'late' });
+    expect(lightingConditionWritesEqual(writes, null)).toBe(false);
+    expect(lightingConditionWritesEqual(null, writes)).toBe(false);
+    expect(lightingConditionWritesEqual(null, null)).toBe(false);
+  });
+
+  it('sees an hour move on a PINNED arena as no write at all', () => {
+    // Pinned arenas resolve to the identity at every hour, so the gate must
+    // suppress the write rather than repaint the same numbers every frame.
+    for (const arenaId of ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned)) {
+      const early = resolveLightingConditions({ arenaId, choice: 'early' });
+      const late = resolveLightingConditions({ arenaId, choice: 'late' });
+      expect(lightingConditionWritesEqual(early, late)).toBe(true);
+    }
+  });
+
+  it('resolves the smallest real weather step to a WRITE, not to float noise', () => {
+    // One 1/256th rung of skyDarkenAmount is the finest step the runtime gate
+    // can be asked about; anything below its own epsilon would be suppressed.
+    const arenaId = 'atomic-acres';
+    const fixedHour = ARENA_DAYLIGHT_PROFILES[arenaId].hourRange[1];
+    const a = resolveLightingConditions({ arenaId, fixedHour, skyDarkenAmount: 0.25 });
+    const b = resolveLightingConditions({ arenaId, fixedHour, skyDarkenAmount: 0.25 + 1 / 256 });
+    expect(lightingConditionWritesEqual(a, b)).toBe(false);
   });
 });

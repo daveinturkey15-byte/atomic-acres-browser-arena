@@ -101,6 +101,8 @@ import {
   arenaDaylightProfile,
   isLightingTimeChoice,
   lightingConditionsAreIdentity,
+  lightingConditionWritesEqual,
+  activeLightingTimeChoiceFrom,
   resolveLightingConditions,
   type LightingConditionWrites,
   type LightingTimeChoice,
@@ -4078,8 +4080,6 @@ const LIGHTING_CONDITION_DEG = Math.PI / 180;
  * one hour for the whole match and therefore move the sun exactly zero times.
  */
 const LIGHTING_CONDITION_SUN_STEP_DEGREES = 0.35;
-/** Hour movement below this writes nothing at all. */
-const LIGHTING_CONDITION_HOUR_EPSILON = 0.004;
 /** Absolute elevation clamp applied to the re-aimed sun, in degrees. */
 const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 84 });
 
@@ -4110,15 +4110,28 @@ let lightingTimeChoiceOverride: LightingTimeChoice | null = isLightingTimeChoice
  * sun by an old checkpoint.
  */
 function activeLightingTimeChoice(): LightingTimeChoice {
-  if (lightingTimeChoiceOverride) return lightingTimeChoiceOverride;
-  const replicated = (privateLobbySnapshot?.config ?? privateMatchConfig).timeOfDay;
-  return isLightingTimeChoice(replicated) ? replicated : DEFAULT_LIGHTING_TIME_CHOICE;
+  // The precedence itself is pure and tested in lighting-conditions.ts. Inside a
+  // hosted lobby -- host OR guest -- the replicated value wins outright, so a
+  // `?tod=` URL cannot take one peer off the shared sky; the host changes the
+  // mode through the lobby row, which replicates.
+  const snapshot = privateLobbySnapshot;
+  return activeLightingTimeChoiceFrom({
+    localOverride: lightingTimeChoiceOverride,
+    replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay,
+    hosted: Boolean(snapshot),
+  });
 }
 let lightingConditionBaseline: LightingConditionBaseline | null = null;
 let activeLightingConditions: LightingConditionWrites | null = null;
 let lightingConditionsSkyDarken = 0;
 let lightingConditionsElapsedSeconds = 0;
-let lightingConditionsAppliedHour = Number.NaN;
+/**
+ * The writes that are CURRENTLY IN the lights. The gate below compares against
+ * this record rather than against the resolved hour: the hour is one of two
+ * inputs to the model and weather is the other, so an hour comparison silently
+ * discarded every weather-driven write. See `lightingConditionWritesEqual`.
+ */
+let lightingConditionsAppliedWrites: LightingConditionWrites | null = null;
 let lightingConditionsAppliedElevationDegrees = Number.NaN;
 let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
 let lightingConditionsSunReaims = 0;
@@ -4155,7 +4168,7 @@ function conditionedFogBaseColorHex(): number {
 
 function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
   lightingConditionBaseline = Object.freeze(baseline);
-  lightingConditionsAppliedHour = Number.NaN;
+  lightingConditionsAppliedWrites = null;
   lightingConditionsGateChoice = null;
   lightingConditionsAppliedElevationDegrees = Number.NaN;
   lightingConditionsAppliedAzimuthDegrees = Number.NaN;
@@ -4168,7 +4181,10 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     elapsedSeconds: lightingConditionsElapsedSeconds,
     choice: activeLightingTimeChoice(),
     skyDarkenAmount: lightingConditionsSkyDarken,
-    ...(lightingCaptureFixedHour === null ? {} : { fixedHour: lightingCaptureFixedHour }),
+    // `?todhour=` is the same class of local override as `?tod=` and obeys the
+    // same rule: inside a hosted lobby it is ignored, so the scan hour cannot
+    // desync a guest from the host's sky either.
+    ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
   });
 }
 
@@ -4240,8 +4256,16 @@ function applyLightingConditionUniforms(force = false): void {
   lightingConditionsResolves += 1;
   const writes = resolveActiveLightingConditions();
   activeLightingConditions = writes;
-  if (!force && Math.abs(writes.hour - lightingConditionsAppliedHour) < LIGHTING_CONDITION_HOUR_EPSILON) return;
-  lightingConditionsAppliedHour = writes.hour;
+  // GATE ON THE WRITES, NOT ON THE HOUR. The hour is one of TWO inputs to
+  // `resolveLightingConditions`; `skyDarkenAmount` is the other and never enters
+  // `hour`. An hour comparison here therefore threw away every weather-driven
+  // write in `fixed`/`random` (the default is `random`), so the documented
+  // weather-neutralisation composition never reached a light in the shipped
+  // game and `conditionedFogBaseColorHex()` restored a tint the lights had not
+  // been given. Comparing what is about to be WRITTEN against what is already
+  // in the lights cannot have that class of bug.
+  if (!force && lightingConditionWritesEqual(writes, lightingConditionsAppliedWrites)) return;
+  lightingConditionsAppliedWrites = writes;
   lightingConditionsUniformWrites += 1;
   const indirect = graphicsRuntime.indirectLightScale;
   if (sunLight) {
@@ -4828,7 +4852,11 @@ void mistQuery;
 // host identity and the match start stamp - never Math.random or a local clock.
 let weatherMatchSeed = 0;
 let lastRainUpdateAtMs = 0;
-const weatherOverrideState = (() => {
+// LIGHTING: `let`, not `const`, only so the QA hook below can move the weather
+// WITHOUT a reload. The lane needed to prove that a weather change reaches the
+// lights on the ordinary per-frame path (no forced apply), and a URL-only
+// override can only be set before the arena exists.
+let weatherOverrideState = (() => {
   const requested = new URLSearchParams(window.location.search).get('weather');
   return requested && WEATHER_SEVERITY_LADDER.includes(requested as WeatherState)
     ? requested as WeatherState
@@ -31048,8 +31076,9 @@ function frame(now: number, scheduleNext = true): void {
     // weather does, so two peers agree on the sun for exactly the reason they
     // already agree on the sky — and `skyDarkenAmount` pulls the time-of-day
     // excursion back toward the arena's authored identity as the sky closes in.
-    // This is a uniform write over the frozen light set; `fixed`/`random` write
-    // once per arena apply and `cycle` writes at most once per 0.004 h step.
+    // This is a uniform write over the frozen light set. `fixed`/`random` write
+    // once per arena apply AND once per weather step that actually changes a
+    // resolved term; `cycle` additionally writes as the clock moves the sun.
     lightingConditionsElapsedSeconds = weatherElapsedSeconds;
     lightingConditionsSkyDarken = weatherNow.skyDarkenAmount;
     applyLightingConditionUniforms();
@@ -32103,6 +32132,8 @@ const debugWindow = window as Window & {
     // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
     sampleLightingConditions: () => Record<string, unknown>;
     setLightingTimeChoice: (choice: string) => Record<string, unknown>;
+    /** LIGHTING: move weather live, unforced, to falsify the uniform-write gate. */
+    setWeatherOverride: (state: string | null) => Record<string, unknown>;
     /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
     setLightingFixedHour: (hour: number | null) => Record<string, unknown>;
     sampleSimulationGate: () => Record<string, unknown>;
@@ -33343,6 +33374,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     lightingTimeChoiceOverride = choice;
     applyLightingConditionUniforms(true);
     return { accepted: true, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: move the weather with NO forced apply, so the next ordinary frame
+  // decides for itself whether a uniform write is owed. This is the falsifier
+  // for the gate defect: before the writes-gate fix, a weather change at a fixed
+  // hour resolved new tints and threw them away, and `uniformWrites` did not
+  // move. It writes one module-scope variable the weather sampler already reads.
+  setWeatherOverride: (state: string | null) => {
+    if (state !== null && !WEATHER_SEVERITY_LADDER.includes(state as WeatherState)) {
+      return { accepted: false, weather: weatherOverrideState };
+    }
+    weatherOverrideState = state as WeatherState | null;
+    return { accepted: true, weather: weatherOverrideState, ...lightingConditionsTelemetry() };
   },
   // LIGHTING: the same hook at hour resolution, for the band scan. Still only
   // uniform writes over the frozen light set -- an hour is an argument to a pure

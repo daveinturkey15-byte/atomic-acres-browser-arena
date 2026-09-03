@@ -95,6 +95,31 @@ export function isLightingTimeChoice(value: unknown): value is LightingTimeChoic
   return typeof value === 'string' && (LIGHTING_TIME_CHOICES as readonly string[]).includes(value);
 }
 
+/**
+ * THE PRECEDENCE RULE for the mode that drives the sun. Pure, so the host/guest
+ * agreement it encodes is a test rather than a comment.
+ *
+ * `?tod=` (and the QA hook that shares its variable) is a LOCAL override. It
+ * exists for deterministic captures and for solo experimentation, and it used
+ * to win unconditionally -- including inside a hosted match, where it let one
+ * guest leave the shared sky the brief requires. Inside a hosted lobby the
+ * replicated `config.timeOfDay` is the ONLY authority; the host changes it
+ * through the lobby row, which replicates, rather than through a URL that does
+ * not.
+ */
+export function activeLightingTimeChoiceFrom(input: Readonly<{
+  /** `?tod=` or the QA hook. Solo and capture only. */
+  localOverride?: LightingTimeChoice | null;
+  /** The replicated `PrivateMatchConfig.timeOfDay`, tolerant of anything. */
+  replicated?: unknown;
+  /** True whenever a private-lobby snapshot exists, for host AND guest. */
+  hosted?: boolean;
+}>): LightingTimeChoice {
+  const replicated = isLightingTimeChoice(input.replicated) ? input.replicated : DEFAULT_LIGHTING_TIME_CHOICE;
+  if (input.hosted === true) return replicated;
+  return input.localOverride ?? replicated;
+}
+
 export type ArenaDaylightProfile = Readonly<{
   arenaId: ArenaId;
   /** Human-readable authoring identity; unique per arena. */
@@ -595,6 +620,15 @@ export function resolveLightingConditions(input: LightingConditionsInput): Light
 /** Tolerance for "this write is the identity" — well under one 8-bit step. */
 const IDENTITY_EPSILON = 1e-9;
 
+/**
+ * Below this a resolved term is the same write. It is FAR under anything a
+ * player can see (a 1e-4 tint step is 1/40th of an 8-bit code value) and far
+ * OVER float noise, so the gate suppresses only genuine no-ops. The smallest
+ * real weather step, one 1/256th rung of `skyDarkenAmount`, moves terms by
+ * ~1e-3 and therefore always writes.
+ */
+const WRITE_EQUALITY_EPSILON = 1e-4;
+
 function isOne(value: number): boolean {
   return Math.abs(value - 1) <= IDENTITY_EPSILON;
 }
@@ -620,6 +654,47 @@ export function lightingConditionsAreIdentity(writes: LightingConditionWrites): 
     && isIdentityTint(writes.hemisphereGroundTint)
     && isIdentityTint(writes.fillTint)
     && isIdentityTint(writes.fogTint);
+}
+
+/**
+ * THE UNIFORM-WRITE GATE. Two resolved records are "the same write" when every
+ * term that reaches a light is the same to within `WRITE_EQUALITY_EPSILON`.
+ *
+ * This exists because the runtime's first gate was wrong in a way no model test
+ * could see. `applyLightingConditionUniforms` used to skip the write whenever
+ * the resolved HOUR had not moved -- but the hour is only ONE of the two inputs
+ * to this model. `skyDarkenAmount` is the other, and it does not enter `hour`
+ * at all, so at a fixed hour a weather change moved `sunTint`,
+ * `sunIntensityScale`, `sunElevationDeltaDegrees` and `shadowFloorScale` while
+ * the hour stayed bit-identical, and the write was thrown away. In every mode
+ * except `cycle` -- and the default mode is `random` -- the documented
+ * "weather shrinks this model" composition therefore never reached a light.
+ *
+ * Comparing the WRITES instead of one of their inputs cannot have that class of
+ * bug: a term that reaches a light is either in this comparison or it is not
+ * written at all.
+ */
+export function lightingConditionWritesEqual(
+  a: LightingConditionWrites | null | undefined,
+  b: LightingConditionWrites | null | undefined,
+): boolean {
+  if (!a || !b) return false;
+  if (a.arenaId !== b.arenaId) return false;
+  const near = (x: number, y: number) => Math.abs(x - y) <= WRITE_EQUALITY_EPSILON;
+  const nearTint = (x: Rgb3, y: Rgb3) => near(x[0], y[0]) && near(x[1], y[1]) && near(x[2], y[2]);
+  return near(a.sunIntensityScale, b.sunIntensityScale)
+    && near(a.ambientIntensityScale, b.ambientIntensityScale)
+    && near(a.hemisphereIntensityScale, b.hemisphereIntensityScale)
+    && near(a.fillIntensityScale, b.fillIntensityScale)
+    && near(a.exposureScale, b.exposureScale)
+    && near(a.sunElevationDeltaDegrees, b.sunElevationDeltaDegrees)
+    && near(a.sunAzimuthDeltaDegrees, b.sunAzimuthDeltaDegrees)
+    && nearTint(a.sunTint, b.sunTint)
+    && nearTint(a.ambientTint, b.ambientTint)
+    && nearTint(a.hemisphereSkyTint, b.hemisphereSkyTint)
+    && nearTint(a.hemisphereGroundTint, b.hemisphereGroundTint)
+    && nearTint(a.fillTint, b.fillTint)
+    && nearTint(a.fogTint, b.fogTint);
 }
 
 /** The writes that change nothing, for callers that need a neutral value. */

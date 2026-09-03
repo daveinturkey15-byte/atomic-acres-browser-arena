@@ -143,3 +143,68 @@ describe('the frame loop drives time of day by uniform write, not by rebuild', (
     expect(source).not.toMatch(/scene\.fog\.color\.set\(activeArenaVisualDefinition\?\.fog\.color/);
   });
 });
+
+/**
+ * SOURCE-PINNED because the defect it guards was invisible to every behaviour
+ * test the lane had. `applyLightingConditionUniforms` used to skip the uniform
+ * write whenever the resolved HOUR had not moved. The hour is one of two inputs
+ * to `resolveLightingConditions`; `skyDarkenAmount` is the other and does not
+ * enter it. So at a fixed hour every weather-driven write was resolved,
+ * allocated and discarded without reaching a light -- in `fixed` and in
+ * `random`, and `random` is the default. The pure model still composed weather
+ * correctly, which is exactly why the model tests all passed.
+ */
+describe('the uniform-write gate compares the writes, not one of their inputs', () => {
+  const source = legacyMainSource();
+  const region = lightingRegion(legacyMainSource());
+
+  it('gates the write with lightingConditionWritesEqual', () => {
+    expect(region).toMatch(/if \(!force && lightingConditionWritesEqual\(writes, lightingConditionsAppliedWrites\)\) return;/);
+  });
+
+  it('keeps no hour-epsilon early return anywhere in the region', () => {
+    expect(region).not.toMatch(/LIGHTING_CONDITION_HOUR_EPSILON/);
+    expect(region).not.toMatch(/writes\.hour - lightingConditionsApplied/);
+    expect(source).not.toMatch(/lightingConditionsAppliedHour/);
+  });
+
+  it('stores the applied WRITES so the comparison has something to compare to', () => {
+    expect(region).toMatch(/let lightingConditionsAppliedWrites: LightingConditionWrites \| null = null;/);
+    expect(region).toMatch(/lightingConditionsAppliedWrites = writes;/);
+    // Re-anchoring the baseline must forget the applied writes, or the first
+    // write after an arena change is compared against another arena's lights.
+    expect(region).toMatch(/lightingConditionsAppliedWrites = null;/);
+  });
+
+  it('exposes an UNFORCED live weather override, so the gate is falsifiable in a browser', () => {
+    // The QA capture path forces the apply; a forced apply cannot show whether
+    // the gate would have let the write through on an ordinary frame.
+    expect(source).toMatch(/setWeatherOverride: \(state: string \| null\) => \{/);
+    const start = source.indexOf('setWeatherOverride: (state: string | null) => {');
+    const hook = source.slice(start, source.indexOf('\n  },', start));
+    expect(hook.length).toBeGreaterThan(80);
+    expect(hook).not.toMatch(/applyLightingConditionUniforms/);
+  });
+});
+
+/**
+ * The brief's multiplayer rule is "friends must share a sky". `?tod=` used to
+ * win over the replicated value unconditionally, so a guest could type one
+ * query parameter and play a different hour to the host.
+ */
+describe('a local time-of-day override never wins inside a hosted lobby', () => {
+  const region = lightingRegion(legacyMainSource());
+
+  it('routes the choice through the pure precedence rule with the hosted flag', () => {
+    expect(region).toMatch(/return activeLightingTimeChoiceFrom\(\{/);
+    expect(region).toMatch(/hosted: Boolean\(snapshot\),/);
+  });
+
+  it('never returns the local override ahead of the replicated value', () => {
+    expect(region).not.toMatch(/if \(lightingTimeChoiceOverride\) return lightingTimeChoiceOverride;/);
+  });
+
+  it('ignores a pinned capture hour inside a hosted lobby too', () => {
+    expect(region).toMatch(/lightingCaptureFixedHour === null \|\| privateLobbySnapshot \? \{\}/);
+  });
+});
