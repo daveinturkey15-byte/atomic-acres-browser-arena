@@ -844,3 +844,17 @@ work on things but using alot of compute, thoughts?" Plan: `docs/DAY_2026-09-03_
 Farcrysis real arena + animation, Raid art + water everywhere, PASS 90 + hill-climb
 receipts). Also 06:12: the source push had been blocked since 03:35 by the
 `workflow` scope; fixed 06:18 after the owner re-authorised (pushed 2c08d0b8..00db4c07).
+
+## HF-425 — owner 2026-09-03 06:40: the SAM-licence decision
+**Statement:** "on the licence we can just not use that technique when guns are
+involved, or create a similar skill that is slightly adapted? bit of both maybe."
+- Rule: the ComfyUI video-mocap chain (SAM3D body) is NEVER used for anything
+  that involves guns or weapons - no gun-holding clips, no reload/ADS/knife
+  captures, no bot combat motion. It MAY be used for unarmed content (idles,
+  emotes, civilian/environment characters, menu characters) with the licence
+  recorded per clip.
+- Adapted skill: author `video-mocap-permissive-pipeline` in the vault store -
+  the same capture-to-clip pipeline on a permissively licensed body tracker (no
+  SAM component), for weapon-involved motion; register row + eval record + guard
+  accept per the technique-register procedure. Owner of the skill: the animation
+  lane (AT) or a follow-up skill lane; not before block 2.
