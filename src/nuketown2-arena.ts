@@ -1166,6 +1166,30 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // up x = -17. The reference draws its own flank props ON the boundary line.
   pair(builder, 'yard side store', [-14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
   pair(builder, 'yard alley planter', [-15.6, HARD_COVER / 2, -33.0], [4.0, HARD_COVER, 2.0], m.planter);
+  // HF-432 item 2 - THE OTHER FLANK. `pair()` negates x AND z, so the store
+  // above and its partner both land on the WEST flank of one half and the EAST
+  // flank of the other: every team had one dressed flank and one bare one, and
+  // the bare one measured 114 m2 of empty ground beside the house carrying the
+  // map's worst standing lane (46.0 m up x = 17, from the border path to the
+  // far verge). The reference draws hatched props along BOTH long boundaries
+  // (schematic 5.4 and the yard note above), so both get one. Authored on the
+  // perimeter wall's inner face for the reason the west store already records:
+  // a prop that stops short of the wall just moves the lane to the wall.
+  pair(builder, 'yard far store', [14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
+  // ...and the same asymmetry inside the yard itself: west of x = 0 the yard
+  // carried the crate, the water butt, the patio table, the alley planter and
+  // the destructible shed; east of x = 9 it carried nothing at all across
+  // 9 x 13 m of spawn ground. One waist-high body, in reach of the (12, -30)
+  // spawn, which measured the yard's longest walk to cover.
+  pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter);
+  // THE BORDER PATH. The reference's fence holes lead to a path that curves
+  // round to the opposite yard, and this arena's border path is the straight
+  // 36 x 6 m version of it - which was authored with NO cover at all, so the
+  // flank route was a 36 m corridor with a spawn at each end of the map behind
+  // it. Two hard bodies per path, off-axis from each other so the two paths do
+  // not line up through the fence gaps.
+  pair(builder, 'path buttress west', [-3.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
+  pair(builder, 'path buttress east', [10.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
   // Water butt beside the shed placement. x = -8.5 is NOT arbitrary: the shed
   // at (-14, -24.5) with yaw pi/2 occupies x [-16.1, -11.9] and z [-26.3,
   // -22.7] (destructible-shed-registry.ts, shedPlacementFootprint), so the butt
