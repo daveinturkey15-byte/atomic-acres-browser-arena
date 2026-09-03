@@ -9,6 +9,7 @@ import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-de
 import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './arena-visual-definition';
 import { ARENA_VISUAL_REGISTRY, ArenaVisualStreamController, type ArenaVisualRegistry } from './arena-visual-stream';
 import { skyBackdropAssetForPreset, skyBackdropPreset } from './sky-backdrop';
+import { FIRST_PERSON_CAMERA_NEAR_METERS, FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS } from '../viewmodel-body-fit';
 
 // owner 2026-08-30: Test1/Test2 arenas added — eight ids; ARENA_VISUAL_REGISTRY
 // entries for them land separately with the arena visual modules.
@@ -31,6 +32,38 @@ describe('Pass 64 arena visual definitions', () => {
       expect(definition.budgets.maximumShadowMapPixels).toBeGreaterThan(0);
       expect(definition.budgets.maximumTransientBytes).toBeGreaterThanOrEqual(256 * 1024 * 1024);
     }
+  });
+
+  /**
+   * PASS 87 Lane AR, item 6. `setArenaReviewCamera` copies `reviewCamera.near`
+   * straight onto the shipped camera, so a review capture is only evidence
+   * about the shipped near plane while the two are the same number. They were
+   * not: the helper in `arenas/shared.ts` froze 0.08, the value the game used
+   * before HF-410, and kept it after HF-410 moved the gameplay plane to 0.02.
+   *
+   * Asserted over the roster rather than over the helper, because an arena
+   * that hand-rolls its own review camera (or a future helper) has to be
+   * caught too - the failure mode is a definition that skips the helper, not
+   * the helper changing.
+   */
+  it('renders every review camera at the shipped first-person near plane', async () => {
+    expect(FIRST_PERSON_CAMERA_NEAR_METERS).not.toBe(FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS);
+    let cameras = 0;
+    for (const id of ARENA_IDS) {
+      const { definition } = await ARENA_VISUAL_REGISTRY[id]();
+      expect(definition.reviewCameras.length, `${id} must define review cameras`).toBeGreaterThan(0);
+      for (const reviewCamera of definition.reviewCameras) {
+        cameras += 1;
+        expect(
+          reviewCamera.near,
+          `${id}/${reviewCamera.id} renders at near ${reviewCamera.near} while the game renders at `
+            + `${FIRST_PERSON_CAMERA_NEAR_METERS}; a near-plane regression would be invisible to the `
+            + 'visual-regression instrument that drives this camera.',
+        ).toBe(FIRST_PERSON_CAMERA_NEAR_METERS);
+        expect(reviewCamera.far).toBeGreaterThan(reviewCamera.near);
+      }
+    }
+    expect(cameras, 'the roster must actually have been walked').toBeGreaterThan(ARENA_IDS.length);
   });
 
   it('requires physical practical lights to carry coherent occlusion policy', async () => {

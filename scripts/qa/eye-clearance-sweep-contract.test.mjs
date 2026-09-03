@@ -505,13 +505,33 @@ test('the gate that names this pipeline actually runs all three of its stages', 
 
   const verify = STAGE_SOURCES['verify-eye-clearance-runtime.mjs'];
   assert.match(verify, /QA_BASE_URL/u, 'stage 3 must follow the server the runner started');
+  // PASS 87 Lane AR item 9. The scrape moved to scripts/qa/lib/camera-near-plane.mjs
+  // so it could be unit-tested - this file launches a browser at module scope,
+  // so nothing could import the function, and the consequence was that its
+  // regex silently stopped matching when HF-410 replaced the near-plane literal
+  // with a named constant, killing stage 3's verdict for two passes.
+  //
+  // The rule is unchanged and now followed through the indirection rather than
+  // satisfied by the word appearing anywhere in stage 3: whichever file owns
+  // the scrape must read the shipped camera and must refuse to guess. The
+  // behavioural half - that the value it produces equals the constant the game
+  // is actually built with, which is the assertion that would have caught the
+  // original defect - lives in scripts/qa/camera-near-plane-contract.test.mjs,
+  // because it needs to call the function rather than read it.
+  const nearPlaneOwner = verify.includes('PerspectiveCamera')
+    ? verify
+    : (assert.match(
+      verify,
+      /import \{ readCameraNearPlaneM \} from '\.\/lib\/camera-near-plane\.mjs';/u,
+      'stage 3 must either read the shipped camera itself or import the shared reader',
+    ), readFileSync(resolve(REPO_ROOT, 'scripts', 'qa', 'lib', 'camera-near-plane.mjs'), 'utf8'));
   assert.match(
-    verify,
+    nearPlaneOwner,
     /PerspectiveCamera/u,
     'the runtime verdict floor must be READ from the shipped camera, never frozen as a literal here',
   );
   assert.match(
-    verify,
+    nearPlaneOwner,
     /Refusing to judge runtime clearance against a guessed threshold/u,
     'a near-plane scrape that stops matching must throw, not fall back to a guess',
   );

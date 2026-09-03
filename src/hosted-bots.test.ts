@@ -29,7 +29,7 @@ describe('hosted lobby bots', () => {
   it('validates bounded authoritative replicated state', () => {
     const bot = {
       id: 'host-bot-0', name: 'RIVET', team: 1, weapon: 'lmg', x: 1, y: 0, z: 2,
-      yaw: 0.4, hp: 70, kills: 2, deaths: 1, alive: true, seq: 9,
+      yaw: 0.4, stance: 'stand', hp: 70, kills: 2, deaths: 1, alive: true, seq: 9,
     } as const;
     expect(isHostedBotSnapshot(bot)).toBe(true);
     expect(isHostedBotSnapshot({ ...bot, weapon: 'mp5' })).toBe(true);
@@ -44,7 +44,7 @@ describe('hosted lobby bots', () => {
   it('interpolates only presentation pose and treats death/respawn as discontinuities', () => {
     const before = {
       id: 'host-bot-0', name: 'RIVET', team: 1, weapon: 'lmg', x: 0, y: 0, z: 0,
-      yaw: Math.PI - 0.1, hp: 100, kills: 1, deaths: 0, alive: true, seq: 10,
+      yaw: Math.PI - 0.1, stance: 'stand', hp: 100, kills: 1, deaths: 0, alive: true, seq: 10,
     } as const;
     const after = {
       ...before,

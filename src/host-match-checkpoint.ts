@@ -316,7 +316,21 @@ function isHostPlayerCheckpoint(value: unknown): value is HostPlayerCheckpoint {
 
 function isExactHostedBotSnapshot(value: unknown): value is HostedBotSnapshot {
   return isRecord(value)
-    && hasExactKeys(value, ['id', 'name', 'team', 'weapon', 'x', 'y', 'z', 'yaw', 'hp', 'kills', 'deaths', 'alive', 'seq'])
+    /*
+     * PASS 87 Lane AR item 3: 'stance' joins the key set with the field itself,
+     * as OPTIONAL. hasExactKeys is why this had to change in lockstep - a
+     * snapshot carrying the new field would otherwise be refused as malformed.
+     *
+     * Optional, not required, because this shape is PERSISTED: the storage key
+     * is still :v3 and HOST_MATCH_CHECKPOINT_SCHEMA_VERSION is still 3, so a
+     * checkpoint written by PASS 86 - one where the host reloads mid-match after
+     * upgrading - is still a valid v3 checkpoint in every other respect.
+     * Requiring the new key would have made isHostMatchCheckpoint return false
+     * and loadHostMatchCheckpoint discard it, silently losing host match
+     * recovery across the pass boundary. A stance-less bot is read as 'stand'
+     * (hostedBotSnapshotStance), which is what those builds simulated.
+     */
+    && hasExactKeys(value, ['id', 'name', 'team', 'weapon', 'x', 'y', 'z', 'yaw', 'hp', 'kills', 'deaths', 'alive', 'seq'], ['stance'])
     && isHostedBotSnapshot(value);
 }
 

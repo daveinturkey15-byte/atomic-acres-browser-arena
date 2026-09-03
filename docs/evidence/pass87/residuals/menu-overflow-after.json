@@ -1,0 +1,204 @@
+[
+  {
+    "viewport": "narrow",
+    "menuClientWidth": 388,
+    "menuScrollWidth": 388,
+    "menuOverflowX": 0,
+    "withoutPseudos": 388,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "388px",
+      "padding": "0px",
+      "width": "390px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-instruments",
+        "offsetLeft": 161,
+        "offsetWidth": 277,
+        "right": 438,
+        "scrollWidth": 277,
+        "clientWidth": 277
+      },
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 161,
+        "offsetWidth": 78,
+        "right": 239,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  },
+  {
+    "viewport": "laptop",
+    "menuClientWidth": 1247,
+    "menuScrollWidth": 1247,
+    "menuOverflowX": 0,
+    "withoutPseudos": 1247,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "1247.28px",
+      "padding": "0px",
+      "width": "1249.28px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 263,
+        "offsetWidth": 78,
+        "right": 341,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  },
+  {
+    "viewport": "review",
+    "menuClientWidth": 1560,
+    "menuScrollWidth": 1560,
+    "menuOverflowX": 0,
+    "withoutPseudos": 1560,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "1559.62px",
+      "padding": "0px",
+      "width": "1561.62px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 408,
+        "offsetWidth": 78,
+        "right": 486,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  },
+  {
+    "viewport": "desktop",
+    "menuClientWidth": 1874,
+    "menuScrollWidth": 1874,
+    "menuOverflowX": 0,
+    "withoutPseudos": 1874,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "1874px",
+      "padding": "0px",
+      "width": "1876px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 516,
+        "offsetWidth": 78,
+        "right": 594,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  },
+  {
+    "viewport": "owner",
+    "menuClientWidth": 2514,
+    "menuScrollWidth": 2514,
+    "menuOverflowX": 0,
+    "withoutPseudos": 2514,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "2514px",
+      "padding": "0px",
+      "width": "2516px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 516,
+        "offsetWidth": 78,
+        "right": 594,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  },
+  {
+    "viewport": "ultrawide",
+    "menuClientWidth": 3394,
+    "menuScrollWidth": 3394,
+    "menuOverflowX": 0,
+    "withoutPseudos": 3394,
+    "perSelector": {},
+    "menuStyle": {
+      "position": "fixed",
+      "overflow": "hidden",
+      "display": "grid",
+      "gridTemplateColumns": "3394px",
+      "padding": "0px",
+      "width": "3396px",
+      "transform": "none",
+      "zoom": "1",
+      "contain": "none"
+    },
+    "cards": 9,
+    "wide": [
+      {
+        "tag": "div",
+        "id": null,
+        "cls": "cockpit-heading",
+        "offsetLeft": 516,
+        "offsetWidth": 78,
+        "right": 594,
+        "scrollWidth": 179,
+        "clientWidth": 78
+      }
+    ]
+  }
+]

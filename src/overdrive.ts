@@ -51,6 +51,34 @@ export const OVERDRIVE_PICKUP_RADIUS = 1.65;
 export const OVERDRIVE_POSITION = Object.freeze({ x: 0, y: 3.75, z: 0 });
 export const OVERDRIVE_PICKUP_HEIGHT_WINDOW_M = 1.9;
 
+/**
+ * PASS 87 Lane AR, item 5. Why the height window above is not enough on its own.
+ *
+ * The window is a SCALAR: it compares |eyeY - coreY| and knows nothing about
+ * what is between them. On both Nuke Towns the core hovers over the bus roof,
+ * and the arena is authored so the two heights land either side of 1.9 m - by
+ * 1.10 m for a player on the roof and 2.00 m for a player standing in the
+ * aisle, i.e. a margin of 0.10 m (src/nuketown2-arena.ts states this
+ * explicitly). 0.10 m is less than a jump. A player who jumps in the aisle
+ * raises their eye through the boundary and takes the core THROUGH THE ROOF
+ * SLAB, from inside cover, without ever being contestable - which is the one
+ * thing this pickup exists to force.
+ *
+ * The durable rule is the one every other pickup in this codebase already uses:
+ * the claimant's eye must SEE the thing it claims. That is geometry, not
+ * arithmetic, so it cannot be defeated by a stance, a jump, a new roof height
+ * or a new arena. The window stays as well - it is cheap, it is a genuine
+ * constraint, and nothing here weakens it.
+ */
+export type OverdriveClaimSight = Readonly<{
+  /**
+   * False when a movement/shot-blocking solid stands between the claimant's eye
+   * and the core. Computed by the caller against the live arena colliders,
+   * because this module is deliberately free of world state.
+   */
+  lineOfSightClear: boolean;
+}>;
+
 export type OverdriveState = Readonly<{
   generation: number;
   available: boolean;
@@ -96,14 +124,22 @@ export function claimOverdrive(
   position: Readonly<{ x: number; y: number; z: number }>,
   alive: boolean,
   now: number,
+  sight?: OverdriveClaimSight,
 ): { state: OverdriveState; claimed: boolean } {
   const advanced = advanceOverdrive(state, now);
   if (!advanced.available || !alive || !playerId || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
     return { state: advanced, claimed: false };
   }
+  // A blocked eye ends the claim before anything else is considered. `sight`
+  // is optional so that callers with no world to trace against (pure state
+  // tests, the offline replay) keep the previous behaviour; the two shipped
+  // call sites in src/legacy-main.ts always pass a computed value, which
+  // src/overdrive-line-of-sight.test.ts asserts against the source.
+  if (sight && !sight.lineOfSightClear) return { state: advanced, claimed: false };
   const distance = Math.hypot(position.x - advanced.position.x, position.z - advanced.position.z);
   // v6: the height window tightens from 2.4 so the aisle below the bus roof
   // cannot claim the core through the slab (roof eye dy 0.95, aisle dy 2.05).
+  // Retained, and no longer load-bearing on its own - see OverdriveClaimSight.
   if (distance > OVERDRIVE_PICKUP_RADIUS || Math.abs(position.y - advanced.position.y) > OVERDRIVE_PICKUP_HEIGHT_WINDOW_M) {
     return { state: advanced, claimed: false };
   }

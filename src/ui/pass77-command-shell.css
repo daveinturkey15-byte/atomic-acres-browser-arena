@@ -210,17 +210,60 @@
 #menu.pass64-command-deck::after {
   content: '';
   position: absolute;
-  inset: -20%;
+  /*
+   * PASS 87 Lane AR, item 1. This was `inset: -20%`, and it was the ENTIRE
+   * deployment-shell overflow: measured headless on installed Chrome, hiding
+   * this one pseudo-element took menuOverflowX from 70/224/279/336/450/608 to
+   * exactly 0 at narrow/laptop/review/desktop/owner/ultrawide. Every other
+   * element in the shell was already inside its container - the card grid
+   * included, which is why the overflow scaled with the VIEWPORT (a flat ~19%
+   * of the shell at every width) and not with the number of arena cards.
+   *
+   * `#menu` clips at its own border (`overflow: hidden`), so nothing of this
+   * layer past the right or bottom edge was ever visible; it only made the
+   * shell report content it could not show, which is what
+   * tests/e2e/pass64-hud-menu.spec.ts fails on and what a reader of that
+   * failure would waste time chasing in the card grid.
+   *
+   * The bleed that does the visual work is top-left - the gradient is anchored
+   * at 22% 12% - so the layer keeps its negative top/left offset and simply
+   * stops extending past the far edges. The budget is arithmetic, not taste:
+   * the box spans [-20%, 80%] and the transform below cannot push it past 87%
+   * of the shell, so it cannot overflow, and the animation stays the same
+   * compositor-only opacity/transform pair.
+   *
+   * SKEPTIC FOLLOW-UP: shrinking the LAYER moves the bloom, because every
+   * percentage in the gradient and in the keyframes is a percentage OF THE
+   * LAYER. At the old 140% box the gradient anchor sat at -20% + 22%x140% =
+   * 10.8% of the shell with a 38%x140% = 53.2% radius; at a bare 100% box that
+   * became 2.0% and 38%. So each of those percentages is re-expressed against
+   * the new box, and the painted result is unchanged at every phase of the
+   * animation:
+   *   anchor x  -20% + 30.8%     = 10.8% of the shell (was -20% + 22%x1.4)
+   *   anchor y  -20% + 16.8%     = -3.2% of the shell (was -20% + 12%x1.4)
+   *   radius    53.2% x 1.0      = 53.2% of the shell (was 38% x 1.4)
+   *   translate -2.1%/2.8% x 1.0 = the old -1.5%/2% x 1.4
+   *   origin    70% 70%          = the OLD box centre (50%/50% of the shell)
+   * so `scale(1.12)` still expands about the same shell-space point it did.
+   * The only pixels that differ are outside `#menu`, which clips at its own
+   * border, so nothing on screen changes. Transformed right edge:
+   * 50% + (80% - 50%)x1.12 + 2.8% = 86.6%; bottom the same.
+   */
+  top: -20%;
+  left: -20%;
+  width: 100%;
+  height: 100%;
+  transform-origin: 70% 70%;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(38% 38% at 22% 12%, rgb(232 120 31 / 0.10), transparent 70%);
+  background: radial-gradient(53.2% 53.2% at 30.8% 16.8%, rgb(232 120 31 / 0.10), transparent 70%);
   opacity: 0.7;
   animation: p77-deck-bloom 18s ease-in-out infinite alternate;
 }
 
 @keyframes p77-deck-bloom {
-  from { opacity: 0.45; transform: translate3d(-1.5%, -1%, 0) scale(1); }
-  to { opacity: 0.85; transform: translate3d(2%, 1.5%, 0) scale(1.12); }
+  from { opacity: 0.45; transform: translate3d(-2.1%, -1.4%, 0) scale(1); }
+  to { opacity: 0.85; transform: translate3d(2.8%, 2.1%, 0) scale(1.12); }
 }
 
 /* Every real child stays above the bloom. */

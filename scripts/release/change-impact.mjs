@@ -87,10 +87,17 @@ export function outputsFor(classification) {
   if (classification.mode === 'smoke') {
     return { ...classification, windows_groups: 'release-shell', linux_groups: 'release-shell' };
   }
+  // PASS 87 Lane AR item 13 (Lane N's withheld patch): `pass84-gamepad` joins
+  // both full-impact lists. tests/e2e/pass84-gamepad.spec.ts shipped with the
+  // gamepad + aim-assist feature the owner asked for on 2026-08-31 and was
+  // executed by NOTHING in CI - the bounded runner has the group, but both CI
+  // jobs pass QA_E2E_GROUPS explicitly, so a `default: true` group never runs
+  // there. scripts/qa/pass84-gamepad-wiring-contract.mjs now fails if this
+  // entry is removed again.
   return {
     ...classification,
-    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-chopper-hud,pass74-selector-layout',
-    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-chopper-hud,pass74-selector-layout',
+    windows_groups: 'release-shell,pass25a-capability-chromium,boot-and-authored,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-chopper-hud,pass74-selector-layout,pass84-gamepad',
+    linux_groups: 'release-shell,pass25a-baseline,pass25a-capability-chromium,pass64-hud-contracts,pass64-renderer-foundation,pass72-corrections,pass73-gameplay-regressions,pass74-chopper-hud,pass74-selector-layout,pass84-gamepad',
   };
 }
 

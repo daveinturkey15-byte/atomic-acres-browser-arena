@@ -236,7 +236,7 @@ describe('network protocol guards', () => {
     const timing = { eventSeq: 7, sentAtHostTimeMs: 1_700 };
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing, nonce: 3 })).toBe(true);
     expect(isGameMessage({ type: 'shot', by: 'a', weapon: 'carbine', origin: [0, 1, 2], direction: [0, 0, -1], pelletDirections: [[0, 0, -1]], timing: { ...timing, eventSeq: -1 }, nonce: 3 })).toBe(false);
-    const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
+    const bot = { id: 'host-bot-0', name: 'Hosted Rival 1', team: 1 as const, weapon: 'lmg' as const, x: 1, y: 0, z: 2, yaw: 0, stance: 'stand' as const, hp: 100, kills: 0, deaths: 0, alive: true, seq: 2 };
     const botState = { type: 'bot-state' as const, by: 'host', seq: 2, bots: [bot], nonce: 20 };
     const botDamage = { type: 'bot-damage' as const, by: 'host', botId: bot.id, target: 'abc', weapon: bot.weapon, origin: [1, 1.4, 2] as [number, number, number], direction: [0, 0, -1] as [number, number, number], damageApplied: 14, healthBefore: 100, healthAfter: 86, nonce: 21 };
     expect(isGameMessage(botState)).toBe(true);

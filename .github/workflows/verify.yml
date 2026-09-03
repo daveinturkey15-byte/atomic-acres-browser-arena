@@ -65,6 +65,8 @@ jobs:
         run: npm run qa:pass73:ci-wiring-contract
       - name: Verify Pass 74 Chopper HUD browser-group wiring
         run: npm run qa:pass74:chopper-hud-wiring-contract
+      - name: Verify Pass 84 gamepad browser-group wiring
+        run: npm run qa:pass84:gamepad-wiring-contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
