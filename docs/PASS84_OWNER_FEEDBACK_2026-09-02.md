@@ -978,3 +978,10 @@ scale of the rebuild is an anchor (one constant to rescale); Shift while prone n
 longer stands you into a sprint; menu music was not halved (game music only).
 Next: HF-427 Raid (Lane AV) on Gemini when its quota resets (~11:45) + Opus
 skeptic, then PASS 91.
+- **Owner 12:55:** "be careful with what you assign gemini i suppose if its
+  fabricating things, maybe there is better suited tasks until the model swaps or
+  a pro one comes". Rule from here: Gemini 3.8 Flash gets bounded mechanical work
+  only (dressing from a verified schematic, instrument runs, guarded refactors,
+  evidence capture); research, reference truth, gates and licences stay on Opus;
+  every Gemini branch is Opus-verified before it ships. The running Raid lane's
+  research (Job 1) will be treated as unverified until the Opus pass re-derives it.
