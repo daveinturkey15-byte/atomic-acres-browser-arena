@@ -39,6 +39,9 @@ import type { Corridor } from './corridors';
 import { uprightSolid, type CorridorSolid } from './corridor-solids';
 import { rgb } from './foliage-material';
 import { hash11 } from './leaf-geometry';
+// HF-421: the dark-interior lighting kit. Additive; this corridor is the only
+// caller, and nothing outside this file reaches into it. See station-bay.ts.
+import { createStationBay, probeMode, stationBayDressing, type StationBay } from './station-bay';
 
 const W = 9;
 const CORRIDOR_LEN = 44;
@@ -460,6 +463,37 @@ export function createVolumeCorridor(): Corridor {
   group.add(motes);
   disposables.push(moteGeo, moteMat);
 
+  /* ---------------------------------------------------------------- */
+  /* 6. HF-421 station-bay dressing: emissive fixtures, grime, lights   */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * The interior-lighting look, added ON TOP of the god-ray exhibit rather
+   * than replacing it. The hall already is a colonnade with a beamed roof and
+   * a clerestory run - the archetype the technique wants - so the kit supplies
+   * what it lacks: fluorescent tubes above the aisle, halo cards and floor
+   * light pools under them, a dado/frieze/duct dressing course, one grime mask
+   * stack over wall and floor, two shadowed spots, six short-range unshadowed
+   * points, and exactly one exposure moment (a service tram running the bay).
+   *
+   * The shafts stay the sun's. Nothing here touches the raymarcher, the
+   * aperture gate or any solid the corridor publishes.
+   */
+  const stationBay: StationBay = createStationBay({
+    width: W,
+    length: LEN,
+    roofY: ROOF_Y,
+    baySpacing: BAY_SPACING,
+    firstColumnZ: FIRST_COLUMN_Z,
+    numColumns: NUM_COLUMNS,
+    wallInnerX: WALL_X - WALL_T / 2,
+    seed: 41,
+    probes: probeMode(),
+    dressing: stationBayDressing(),
+  });
+  group.add(stationBay.group);
+  disposables.push(stationBay);
+
   const _inv = new THREE.Matrix4();
   const _localPlayer = new THREE.Vector3();
 
@@ -472,6 +506,7 @@ export function createVolumeCorridor(): Corridor {
     update(elapsed, dt, playerPos, playerVel) {
       (time as unknown as { value: number }).value = elapsed;
       const delta = Math.min(Math.max(dt, 0), 0.05);
+      stationBay.update(elapsed, delta);
 
       group.updateWorldMatrix(true, false);
       _inv.copy(group.matrixWorld).invert();
