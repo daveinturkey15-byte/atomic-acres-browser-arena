@@ -16,7 +16,7 @@
 | Date | 2 Sep 2026, 16:31:29 UTC |
 | Kind | note-tweet, 266 characters, plus **one 31.19 s video** |
 | Media | 3024x1474 @ 10.37 Mbps master; 1476x720, 738x360, 552x270; one m3u8 |
-| Engagement at read time | 103,757 views, 1,254 likes, 171 replies, 24 quotes |
+| Engagement at read time | 103,757 views, 1,254 likes, 171 replies, 24 quotes **(read 2026-09-02 ~21:30 UTC - these move; re-resolved 2026-09-03 01:05 UTC at 167,813 / 1,610 / 229, so treat them as a timestamped sample, never a stable value)** |
 | Links inside the post | **none** — the only entity is its own video |
 | Resolution route | `api.fxtwitter.com/mattshumer_/status/…` HTTP 200 (full text, author, media list), then `cdn.syndication.twimg.com/tweet-result?id=…` HTTP 200 as an independent confirmation |
 | Login used | none. No search substitute was used for the thread's content. |

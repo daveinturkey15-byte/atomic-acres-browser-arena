@@ -150,7 +150,7 @@ This is a Map-3-only trial. Nothing ships to another arena on the strength of it
 3. Worktree: `git worktree add -b contrib/dave-gaming-pc/claude/hf419-map3-street-cell
    C:/Users/david/projects/aa-claude-hf419-street-cell <integration head>`, plus a
    `node_modules` junction from the main worktree.
-4. **`QA_PREVIEW_PORT=4219`** (lane AK). Preview server, not the dev server — HMR kills long
+4. **`QA_PREVIEW_PORT=4219`** - reserved by **HF-419** itself (4200-4299 range; the earlier "(lane AK)" attribution was wrong and would have invited a real collision if Lane AK ran concurrently). Preview server, not the dev server — HMR kills long
    Playwright contexts (known gotcha). One browser at a time. Headless is not something you
    set: `scripts/qa/capture-map3-views.mjs` launches `headless: true` unconditionally and
    refuses to start below 3000 MiB of free VRAM on its own. Do **not** set
