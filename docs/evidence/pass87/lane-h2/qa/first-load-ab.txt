@@ -1,0 +1,69 @@
+
+## gun-range-PREFIX — base vs candidate (n=1 each, measured back to back)
+
+  base      rivals 26, 5500 MiB free
+  candidate rivals 18, 8180 MiB free
+
+metric                          base      cand     delta   ratio
+first load total               58038     74637     16599   x1.29
+  transition                   37746     52720     14974   x1.40
+  deploy (admission)           19905     20763       858   x1.04
+CONTROL (7 untouched)           3320      4496      1176   x1.35
+  visual-definition             4398     12981      8583   x2.95
+  coverage-submit-fence         6703      8493      1790   x1.27
+  prewarm-batched-effects      15774     20197      4423   x1.28
+  weapon-catalog-prewarm        7404      7716       312   x1.04
+
+  Read every ratio against CONTROL. A total that moved with the control moved with the machine.
+
+## high-seas-PREFIX — base vs candidate (n=1 each, measured back to back)
+
+  base      rivals 18, 5822 MiB free
+  candidate rivals 40, 3996 MiB free
+
+metric                          base      cand     delta   ratio
+first load total               65224     70252      5028   x1.08
+  transition                   39657     45393      5736   x1.14
+  deploy (admission)           24746     24579      -167   x0.99
+CONTROL (7 untouched)           6285      6403       118   x1.02
+  visual-definition             5015      8494      3479   x1.69
+  coverage-submit-fence         4417      4948       531   x1.12
+  prewarm-batched-effects      19725     21074      1349   x1.07
+  weapon-catalog-prewarm        6792      6895       103   x1.02
+
+  Read every ratio against CONTROL. A total that moved with the control moved with the machine.
+
+## gun-range-ARENA-ROOT-SCOPED — base vs candidate (n=1 each, measured back to back)
+
+  base      rivals 17, 7720 MiB free
+  candidate rivals 18, 6061 MiB free
+
+metric                          base      cand     delta   ratio
+first load total               57025     63809      6784   x1.12
+  transition                   36390     41939      5549   x1.15
+  deploy (admission)           20020     20972       952   x1.05
+CONTROL (7 untouched)           3407      3388       -19   x0.99
+  visual-definition             4404     10049      5645   x2.28
+  coverage-submit-fence         7318      7303       -15   x1.00
+  prewarm-batched-effects      14986     15120       134   x1.01
+  weapon-catalog-prewarm        6151      6130       -21   x1.00
+
+  Read every ratio against CONTROL. A total that moved with the control moved with the machine.
+
+## high-seas-ARENA-ROOT-SCOPED — base vs candidate (n=1 each, measured back to back)
+
+  base      rivals 18, 6080 MiB free
+  candidate rivals 27, 4691 MiB free
+
+metric                          base      cand     delta   ratio
+first load total               63881     81327     17446   x1.27
+  transition                   39162     53900     14738   x1.38
+  deploy (admission)           24212     27096      2884   x1.12
+CONTROL (7 untouched)           6133      8738      2605   x1.42
+  visual-definition             5014      8722      3708   x1.74
+  coverage-submit-fence         4309      4797       488   x1.11
+  prewarm-batched-effects      19415     28319      8904   x1.46
+  weapon-catalog-prewarm        6784      8297      1513   x1.22
+
+  Read every ratio against CONTROL. A total that moved with the control moved with the machine.
+
