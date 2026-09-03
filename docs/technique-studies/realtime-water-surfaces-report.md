@@ -189,3 +189,79 @@ absorption, and a roster-derived test that fails when an arena has no water entr
 unmoved. The pass bar requires the still-pond capture to be **byte-comparable** — that is the
 test that the term is wired to turbulence and not applied globally — and requires the effect to
 be **green, not grey**, since grey proves it landed downstream of absorption.
+
+---
+
+# Repair pass, 2026-09-03
+
+An independent skeptic re-executed this lane and returned **ACCEPT_WITH_FIXES**. It could not
+refute a single technique claim — every source re-resolution, licence quote, 404 and repo constant
+matched exactly — but it found two **status** claims that had gone stale between writing and
+review, plus one omission. All are closed.
+
+## Blocker 1 — the guard accept. CLOSED, PASS
+
+The blocker had **moved onto this lane**. The three foreign over-length descriptions originally
+reported were fixed by sibling lanes and now emit `WARN` (326/330/330, limit untouched at 360).
+The sole remaining problem was ours: `[update] threejs-webgpu-water: candidate hash mismatch`.
+
+The guard hashes **live file bytes**, not the git blob. `candidate_sha256 fa301c1b…` was correct
+when written — the CRLF hash of the blob at vault `a77ea78` — but the skill was edited again
+(8 insertions, 4 deletions) and that edit was left **uncommitted**, moving live bytes to
+`b535720f…`. The guard failed closed, correctly.
+
+Repaired in the only safe order: read the pending diff in full, judge it **additive** (it
+*strengthens* the roster rule by demanding explicit opt-outs, and rewords the determinism bullet
+without changing its rule), commit it (vault `c1a800e`), re-point the record, then accept.
+
+```
+PASS skill-regression-guard skills=162 drift=1 warnings=10
+PASS accepted skills=threejs-webgpu-water
+```
+
+The acceptance **applied**: `skill-baseline.json` now records `b535720f…` (was `1adc553a…`).
+`--force` was not used; `skill-regression-policy.json` and the guard script are unmodified.
+
+## Blocker 2 — the empty skill hub. CLOSED (self-healed)
+
+`link_skills.ps1 -VerifyOnly` now reports `OK 162/162` on **all seven** harness roots with
+junctions intact and the read-through probe `OK`; `~/.agents/skills/threejs-webgpu-water/SKILL.md`
+is v1.1.0 and byte-identical to the canonical store. The cause is already documented by a sibling
+lane in `gotchas/skill-relinker-wholesale-rebuild-races-itself.md`: the relinker tears down and
+rebuilds all 162 junctions on every run with no lock, so concurrent lanes abort one another
+mid-rebuild and the flat view is briefly empty before healing unattended. The canonical store is
+never at risk. Not duplicated here.
+
+## Major — the vault register mirror had no row 46. CLOSED
+
+The mirror's own stated invariant is that its numbers match the canonical AKP register so a row
+can be named the same way in either place, and that techniques are **findable from the vault** —
+which is where Dave looks. Row 46 is now written there in the shape of row 48, in numeric order.
+
+Both register commits were staged as a **blob against HEAD**, so each carries only this lane's
+section and leaves concurrent sibling rows uncommitted for their own lanes. That closes the
+previous pass's "mixed attribution" open item rather than merely re-reporting it. **Row 47 is
+still absent** and is flagged for HF-419.
+
+## Minors
+
+`3 of 9 arenas` corrected to `3 of 9 arena ids — 3 of 6 shippable combat arenas` in the AKP
+register and both study tables, verified against `ARENA_IDS`. Section 8 demoted to `## 8.`.
+
+The **"verified author" finding is refuted**: the flag exists as
+`author.verification = {"verified": true, "verified_at": null, "type": "individual"}`. It sits in
+a sub-object, not a top-level `verified` key, which is why a scan of tweet-level keys missed it.
+The study now cites the field rather than dropping the claim.
+
+## New gotcha
+
+`gotchas/skill-eval-hash-tracks-working-tree-not-commit.md` — commit the skill **first**, hash
+**second**, accept **third**; raw-byte hashing means CRLF and LF give different hashes for the
+same content; and a guard verdict is a timestamped observation on shared state, not a property of
+your change.
+
+## Unchanged
+
+Still docs-only. No repository source modified, no rendering measured, no browser launched, no GPU
+work. The Map 3 experiment remains **planned, not run**, and the implementation evidence is still
+owed.
