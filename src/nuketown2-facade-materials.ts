@@ -87,6 +87,7 @@ export function createNuketown2LapSidingMaterial(baseColorHex: number, name: str
   });
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
+  mat.color.setHex(baseColorHex);
 
   const p = positionWorld;
 
@@ -109,7 +110,8 @@ export function createNuketown2LapSidingMaterial(baseColorHex: number, name: str
   const groundGrime = smoothstep(float(0.85), float(0.0), p.y).mul(float(0.18));
 
   const base = vec3(baseColor.r, baseColor.g, baseColor.b).add(boardTone).add(grain);
-  const shadowCol = vec3(baseColor.r * 0.45, baseColor.g * 0.45, baseColor.b * 0.45);
+  // Warm shadow color preserving the base hue rather than desaturating under cool sky ambient
+  const shadowCol = vec3(baseColor.r * 0.55, baseColor.g * 0.52, baseColor.b * 0.40);
 
   const finalColor = mix(base, shadowCol, lapShadow).sub(groundGrime.mul(vec3(0.08, 0.07, 0.05)));
   mat.colorNode = finalColor;

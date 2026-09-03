@@ -764,7 +764,7 @@ function nuketown2Materials(): Nuketown2Materials {
   const coldLight = createNuketown2CeilingLightMaterial(false);
   const roof = createNuketown2RoofMaterial();
   const sidingA = createNuketown2LapSidingMaterial(0x46809f, 'nuketown2-siding-north-blue');
-  const sidingB = createNuketown2LapSidingMaterial(0xd9a43b, 'nuketown2-siding-south-yellow');
+  const sidingB = createNuketown2LapSidingMaterial(0xf4be36, 'nuketown2-siding-south-yellow');
   const fence = createNuketown2FenceMaterial();
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
@@ -1186,6 +1186,18 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
   pair(builder, 'house ground baseboard west wall', [HOUSE_X0 + WALL_T / 2 + 0.015, 0.07, zMid], [0.03, 0.14, HOUSE_DEPTH - WALL_T * 2], m.trim,
     { solid: false, shots: false, cast: false });
+  // HF-440 Cycle 3: Interior drywall lining on ground floor exterior return walls
+  // Prevents exterior board siding from showing inside domestic kitchen/living rooms
+  pair(builder, 'house ground west wall drywall lining',
+    [HOUSE_X0 + WALL_T + 0.01, (GROUND_H - 0.08) / 2, zMid],
+    [0.02, GROUND_H - 0.08, HOUSE_DEPTH - WALL_T * 2], m.interior,
+    { solid: false, shots: false, cast: false });
+  [[HOUSE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], HOUSE_FRONT_Z]].forEach((run, index) => {
+    pair(builder, `house ground east wall drywall lining ${index}`,
+      [HOUSE_X1 - WALL_T - 0.01, (GROUND_H - 0.08) / 2, (run[0]! + run[1]!) / 2],
+      [0.02, GROUND_H - 0.08, run[1]! - run[0]!], m.interior,
+      { solid: false, shots: false, cast: false });
+  });
 
   // Domestic kitchen & living dressing:
   pair(builder, 'house kitchen counter top', [-4.8, LOW_COVER + 0.02, HOUSE_FRONT_Z - 2.8], [3.28, 0.05, 1.08], m.trim,
