@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_087;
+const LINE_CEILING = 37_100;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -202,6 +202,34 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
     lines: 37_087,
     note:
       'PASS 90 candidate: Nuke Town Rebuild accuracy (Lane AU, HF-426) merged on top of the chiptune rotation; measured on the merged head.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_095,
+    note:
+      'PASS 91 Lane AU2 (HF-432 item 5): +8 lines making the 2x-damage core PER ARENA. '
+      + 'The Nuke Town Rebuild moving truck now stands 0.076 of the street length south '
+      + 'of the road centre-line where the reference has it, and until this pass the core '
+      + 'could not follow it because OVERDRIVE_POSITION was a single global - which is the '
+      + 'reason the rebuild recorded that offset as a knowingly-taken deviation. The rule '
+      + 'itself is in src/overdrive.ts (overdrivePositionForArena, plus a `home` seat on '
+      + 'OverdriveState so a death drop still returns to the right place); what lands here '
+      + 'is the seat passed at match start, the seat carried on an accepted client state '
+      + 'message, and the seat the debug harness stages. The SHIPPED map resolves to the '
+      + 'same {0, 3.75, 0} it always had.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_100,
+    note:
+      'PASS 91 Lane AU2 (HF-433): +5 lines net on the crouch sprint rule. The owner reported '
+      + 'that going crouched still moved fast; the cause was in updatePhysics, where holding '
+      + 'sprint while crouched STOOD THE PLAYER UP and sprinted, so the authored crouch speed '
+      + 'applied for one frame. The rule lives in src/prone-transition.ts (stepSprintLatch now '
+      + 'requires the standing stance, exactly as HF-431 already did for prone); what lands '
+      + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
+      + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
+      + 'the auto-stand it fed - so the net is comment, not code.',
   },
 ];
 

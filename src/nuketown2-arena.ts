@@ -58,16 +58,19 @@
  *      and the coach is closed. That swap is why the 2x-damage core now rides
  *      the truck's cargo-box roof.
  *
- * WHY THE TRUCK IS CENTRED ON THE WORLD ORIGIN. `OVERDRIVE_POSITION` in
- * `src/overdrive.ts` is a single global `{0, 3.75, 0}`, not a per-arena value.
- * Authoring the cargo-box roof at 3.15 m puts the 2x-damage core 0.60 m above
- * it, inside the 1.9 m pickup window, and the owner's "keep the 2x damage" is
- * carried with zero new runtime code and zero risk to the shipped arena. That
- * one decision then FIXES the box's deck height and forces a climb onto its
- * roof; both are derived at `NUKETOWN2_CENTRAL_TRUCK` and `TRUCK_ROOF_STEPS`
- * below. It is also the one place the reference is knowingly not followed: the
- * reference's truck sits about 0.076 of the street length SOUTH of the road
- * centre-line, and this one sits on it.
+ * WHERE THE TRUCK STANDS, AND WHAT USED TO PIN IT. The reference's truck sits
+ * about 0.076 of the street length SOUTH of the road centre-line, and until
+ * HF-432 this one sat ON the centre-line, because `OVERDRIVE_POSITION` in
+ * `src/overdrive.ts` was a single global `{0, 3.75, 0}` and the 2x-damage core
+ * could only ride a truck standing at the world origin. That was recorded as a
+ * knowingly-taken deviation rather than hidden, and HF-432 item 5 removed the
+ * cause: the core is per-arena (`overdrivePositionForArena`) and this arena's
+ * seat is DERIVED from `NUKETOWN2_CENTRAL_TRUCK`, so the truck is where the
+ * reference has it and the core went with it. The shipped Nuke Town's seat is
+ * unchanged. The core still FIXES the box's deck and roof heights and forces a
+ * climb onto the roof; both are derived at `NUKETOWN2_CENTRAL_TRUCK` (now in
+ * `./nuketown2-layout`, so the weapons layer can read it without closing a
+ * require cycle through `protocol.ts`) and `TRUCK_ROOF_STEPS` below.
  *
  * NOTHING IS YAWED. `box()` records a solid as extents-plus-yaw while the
  * collider/visual parity audit compares a collider rectangle against each mesh's
@@ -95,12 +98,14 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
   NUKETOWN2_GROUND_STOREY_H,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_UPPER_Y0,
@@ -118,6 +123,8 @@ import {
  */
 export {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_HOUSE_LAYOUT,
@@ -193,6 +200,170 @@ const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
 const GARAGE_BACK_Z = HOUSE_BACK_Z;                               // -23, flush with the house
 const GARAGE_DEPTH = GARAGE_FRONT_Z - GARAGE_BACK_Z;              // 7
 
+/**
+ * Height of the STANDING player capsule, from `STANCE_SHAPES.stand` in
+ * `src/physics.ts`: 2 x (halfHeight 0.53 + radius 0.38). Authored here rather
+ * than imported because this module is the arena and `physics.ts` pulls in the
+ * Rapier adapter; `nuketown2-fidelity.test.ts` imports STANCE_SHAPES and
+ * asserts this number against it, so it cannot drift.
+ */
+const STANDING_CAPSULE_M = 1.82;
+/** Plan radius of that capsule, same source. */
+const STANDING_RADIUS_M = 0.38;
+/** `CHARACTER_PHYSICS_CONFIG.autostepHeight`, same source, same reason. */
+const AUTOSTEP_M = 0.42;
+
+/**
+ * THE STAIR - HF-432 item 1, owner after PASS 90: "still some issues with
+ * where stairs are".
+ *
+ * WHAT THE REFERENCE DOES AND DOES NOT DECIDE, checked rather than assumed.
+ * Both first-party minimaps were re-fetched on 2026-09-03 to read the stair
+ * footprint the lane brief expected to find drawn on them:
+ *   S3 BO7 `Nuketown_2025_MiniMap_BO7.png`  HTTP 200, 2,761,702 bytes, served
+ *      image/webp, 4096 x 4096 - an OVAL-CROPPED, rotated, red-tinted
+ *      presentation. The two house fills resolve as grey blocks with NO
+ *      interior linework inside either of them.
+ *   S2 BO2 `Nuketown_2025_Minimap_BOII.png` HTTP 200, 46,120 bytes, served
+ *      image/webp - the same oval crop, 253 x 498 px of playable art.
+ * NEITHER DRAWS A STAIR. So the stair's position is DERIVED, and the
+ * derivation - not a pixel - is the contract:
+ *
+ *   1. NOT the party wall. The east wall is the one the garage shares, and it
+ *      carries the garage link door; the garage only overlaps 7 m of the
+ *      house's 13 m depth, so a 5.1 m flight on that wall leaves no run of
+ *      wall long enough for a 1.8 m door. The flight stands against the WEST
+ *      wall, which is blind.
+ *   2. IN THE BACK ROOM, climbing toward the street, landing at the internal
+ *      partition. The previous cut ran it out of the FRONT room and put a
+ *      6.05 x 1.95 m hole through the upper FRONT room - the room Activision's
+ *      own guide calls the map's biggest power position and the room this
+ *      arena stands its rare-gun site in. That room now has a complete floor.
+ *      It also ran the flight THROUGH the ground-floor partition: treads 9 and
+ *      10 interpenetrated it.
+ *   3. ENTERED HEAD ON. 0.95 m of ground floor stands behind the bottom tread,
+ *      so a player walks onto the flight facing up it instead of stepping onto
+ *      its flank - which only tread 0 (0.30 m, inside the 0.42 m autostep) is
+ *      low enough to allow.
+ *   4. THE WELL OPENS ONLY WHERE IT MUST, and where it must is not where the
+ *      arithmetic first said - see STAIRWELL_Z0, which is the one number in
+ *      this arena that a probe corrected rather than confirmed.
+ *
+ * The LANDING is a 0.90 m tread at the top, against the partition, and the
+ * upper leaf of that partition stops at the flight's inboard edge, so the head
+ * of the stair opens straight into the front upper room: a landing and an
+ * upper hallway, not a hole to hop out of.
+ */
+export const NUKETOWN2_HOUSE_STAIR = Object.freeze({
+  /** Outboard edge: the inside face of the west wall. */
+  x0: HOUSE_X0 + WALL_T,
+  width: 1.65,
+  riser: 0.3,
+  /** 0.42 m: over the 0.22 m Rapier autostep minimum width, under the 6.05 m the room has. */
+  going: 0.42,
+  /** 11 x 0.30 = 3.30 = NUKETOWN2_UPPER_Y0, so the top tread IS the upper floor. */
+  risers: 11,
+  landingDepth: 0.9,
+});
+
+/** Inboard edge of the flight. */
+const STAIR_X1 = NUKETOWN2_HOUSE_STAIR.x0 + NUKETOWN2_HOUSE_STAIR.width;
+/** House mid-line: where the internal partition stands on both storeys. */
+const HOUSE_MID_Z = (HOUSE_FRONT_Z + HOUSE_BACK_Z) / 2;
+/** Front edge of the landing, flush with the partition's back face. */
+const STAIR_HEAD_Z = HOUSE_MID_Z - WALL_T / 2;
+/** Bottom of the flight. */
+const STAIR_FOOT_Z = STAIR_HEAD_Z
+  - NUKETOWN2_HOUSE_STAIR.landingDepth
+  - NUKETOWN2_HOUSE_STAIR.going * (NUKETOWN2_HOUSE_STAIR.risers - 1);
+/**
+ * Where the upper floor stops and the stairwell opens - MEASURED, and not the
+ * obvious thing.
+ *
+ * The obvious rule is "the slab may cover a tread as long as the standing
+ * capsule fits under it", feet + STANDING_CAPSULE_M <= GROUND_H, which allows
+ * feet up to 1.18 m. That rule is WRONG and the traversal probe in
+ * `nuketown2-fidelity.test.ts` caught it on the first run: Rapier's autostep
+ * casts the capsule UP by `autostepHeight` BEFORE it casts forward, so taking
+ * a step under a ceiling needs
+ *
+ *     feet + STANDING_CAPSULE_M + AUTOSTEP_M <= GROUND_H
+ *
+ * i.e. 0.76 m of feet in a 3.0 m storey. Authored the obvious way the flight
+ * stalled with the player wedged on tread 2's nosing at 0.76 m, grounded and
+ * blocked, for as long as the probe walked it: a staircase that looks right,
+ * measures right and cannot be climbed. Only treads 0 and 1 may keep a ceiling
+ * and the well opens a capsule radius (plus 0.12 m, five times the
+ * controller's own 0.025 m skin) before tread 2's near edge.
+ */
+const STAIR_MAX_FEET_UNDER_CEILING = GROUND_H - STANDING_CAPSULE_M - AUTOSTEP_M;
+const STAIR_FIRST_UNCOVERED_TREAD = Math.floor(STAIR_MAX_FEET_UNDER_CEILING / NUKETOWN2_HOUSE_STAIR.riser);
+const STAIRWELL_Z0 = STAIR_FOOT_Z
+  + NUKETOWN2_HOUSE_STAIR.going * STAIR_FIRST_UNCOVERED_TREAD
+  - STANDING_RADIUS_M - 0.12;
+
+/**
+ * DOORWAYS - HF-432 item 4, owner after PASS 90: "Doors are too small
+ * shouldn't have to crouch."
+ *
+ * WHAT WAS ACTUALLY MEASURED, before anything moved, on the built colliders:
+ *
+ *   house front door        clear height 2.20 m   clear width 1.38 m
+ *   house back door         2.20 m                1.58 m
+ *   house internal door     3.00 m                1.58 m
+ *   house/garage link       2.60 m                1.80 m
+ *   garage vehicle door     2.60 m                3.48 m
+ *   garage rear door        2.60 m                1.58 m
+ *
+ * ...and a map-wide sweep of every ground cell at 0.20 m, comparing the
+ * STANDING capsule (1.82 m) against the CROUCHED one (1.16 m) at a single
+ * radius so only height differences count, found 20 crouch-only cells on the
+ * whole arena - all 20 of them under the two verge letterbox heads, which are
+ * 0.32 x 0.50 m lids on 0.16 m posts.
+ *
+ * So NO DOOR ON THIS MAP EVER REQUIRED A CROUCH: the tightest was 2.20 m
+ * against a 1.82 m capsule. The owner's report is real, and it is about WIDTH.
+ * A 1.38 m opening leaves 0.62 m of free width for a 0.76 m-wide capsule
+ * whose controller carries a 0.025 m skin, so the front door caught the
+ * shoulder on almost every entry, and catching on a door frame at a run is
+ * exactly what "too small, shouldn't have to crouch" feels like.
+ *
+ * THE BAND, derived rather than picked. Width 1.8 m = the standing capsule's
+ * own diameter twice over plus a body's width of slack, which is what makes a
+ * doorway a route two players can use rather than a queue. Head 2.4 m = the
+ * capsule (1.82) plus the autostep up-cast (0.42) plus 0.16 m, so that a
+ * player stepping onto the porch, the kerb or a tread IN a doorway still
+ * clears - the same failure mode STAIRWELL_Z0 records. Both are checked, as
+ * measurements on the built colliders, in `nuketown2-fidelity.test.ts`, along
+ * with a standing capsule that WALKS through every one of them.
+ */
+const DOOR_WIDTH = 1.8;
+const DOOR_HEAD_Y = 2.4;
+const HOUSE_CENTRE_X = NUKETOWN2_HOUSE_LAYOUT[0]!.x;
+const GARAGE_CENTRE_X = (GARAGE_X0 + GARAGE_X1) / 2;
+
+/**
+ * Every opening a player walks through, ONCE, so the builder and the gate
+ * cannot describe different doors. `span` is the axis the opening's width is
+ * measured along, `centre` is its middle on that axis, and `at` is the CENTRE
+ * PLANE of the leaf it is cut in - not the room line, because a probe on the
+ * room line stands on the wall's outer face and measures nothing.
+ */
+export const NUKETOWN2_DOORWAYS = Object.freeze([
+  Object.freeze({ id: 'house front door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_FRONT_Z - WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
+  Object.freeze({ id: 'house back door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
+  Object.freeze({ id: 'house internal door', span: 'x' as const, centre: -2.7, at: HOUSE_MID_Z, width: DOOR_WIDTH, headY: GROUND_H }),
+  Object.freeze({ id: 'house garage link', span: 'z' as const, centre: -18.7, at: HOUSE_X1 - WALL_T / 2, width: DOOR_WIDTH, headY: GROUND_H - 0.4 }),
+  Object.freeze({ id: 'garage vehicle door', span: 'x' as const, centre: GARAGE_CENTRE_X, at: GARAGE_FRONT_Z - WALL_T / 2, width: 3.5, headY: 2.6 }),
+  Object.freeze({ id: 'garage rear door', span: 'x' as const, centre: GARAGE_CENTRE_X - 0.55, at: GARAGE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: 2.6 }),
+]);
+
+/** The [low, high] run a doorway occupies on its own span axis. */
+function doorRun(id: string): [number, number] {
+  const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
+  return [door.centre - door.width / 2, door.centre + door.width / 2];
+}
+
 /** Radius of the cul-de-sac turning head at the middle of the road. */
 const TURNING_HEAD_HALF = 8;
 
@@ -218,61 +389,6 @@ export const NUKETOWN2_SECTION = Object.freeze({
 });
 
 /**
- * The moving truck, centred on the world origin: the reference's "island of
- * cover in the otherwise open cul-de-sac", and the OPEN body of the two.
- *
- * SIZE IS MEASURED. On the BO7 minimap the truck is 130 px of a 400 px street
- * axis = 0.325 L end to end, split into a hollow-drawn cargo box (72 px,
- * 0.180 L) and a solid-drawn cab (58 px, 0.145 L). Here: 6.5 m box + 5.2 m cab
- * = 11.7 m = 0.325 L exactly.
- *
- * `deckY` AND `roofY` ARE BOTH SET BY THE 2x-DAMAGE CORE, not by taste, and the
- * two constraints pull in opposite directions. `OVERDRIVE_POSITION` is a single
- * global {0, 3.75, 0} and `claimOverdrive` is a pure height-and-radius rule, so
- * with a standing eye height of 1.70 m:
- *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - 3.75| <= 1.90
- *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
- *   - a player STANDING IN THE CARGO BOX must NOT claim, because a core you can
- *     take from inside cover is not a contested position at all - and because
- *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
- *     precisely so an interior cannot claim through the roof slab. That needs
- *     3.75 - (deckY + 1.70) > 1.90, i.e. deckY < 0.15. Authored 0.05, dy 2.00.
- * The margin is 0.10 m and `nuketown2-fidelity.test.ts` calls `claimOverdrive`
- * to prove it rather than restating the arithmetic.
- */
-export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
-  boxLength: 6.5,
-  cabLength: 5.2,
-  width: 2.6,
-  deckY: 0.05,
-  roofY: 3.15,
-  cabRoofY: 2.9,
-  /** Cab centre along the street: box half plus cab half. */
-  cabX: 6.5 / 2 + 5.2 / 2,
-});
-
-/**
- * The retro coach parked across the turning head from the truck. CLOSED cover:
- * the reference's minimap draws it hatched end to end, and the first-party
- * preview still of the map shows a sealed streamlined body, not a school bus
- * you walk through. It is a solid 3.3 m body and that is the whole of its job.
- *
- * WHERE IT SITS is measured as an OFFSET FROM THE TRUCK, because the truck's
- * own position is pinned by the core rather than by the reference. On the
- * minimap the coach centre is 0.178 L along the street and 0.150 L across it
- * from the truck's cargo box. Here 5.0 m (0.139 L) and 4.0 m (0.111 L): both
- * inside the lane's 5 %-of-street-length tolerance, and pulled in because the
- * measured pair would put the coach's flank over the kerb.
- */
-export const NUKETOWN2_STREET_COACH = Object.freeze({
-  length: 9.1,
-  width: 2.6,
-  height: 3.3,
-  x: -5,
-  z: -4,
-});
-
-/**
  * The treads that make the truck roof - and therefore the 2x-damage core - a
  * place a player can actually get to. Measured, not assumed: the jump apex from
  * flat ground is 6.35^2 / (2 x 24.5) = 0.823 m and autostep is 0.42 m, so a
@@ -280,10 +396,17 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
  * with nothing beside it is unreachable, which is what the first cut of the old
  * bus shipped.
  *
- * Three treads against the CAB's +z flank, then 0.30 m up onto the cab roof
- * (2.90) and 0.25 m from there onto the cargo-box roof (3.15). Climbing over
- * the cab is both the shortest route and the one that keeps every tread far
- * from the core.
+ * Three treads against the CAB's ROAD-SIDE flank, then 0.30 m up onto the cab
+ * roof (2.90) and 0.25 m from there onto the cargo-box roof (3.15). Climbing
+ * over the cab is both the shortest route and the one that keeps every tread
+ * far from the core.
+ *
+ * HF-432 item 5: the treads are on the truck's NORTH flank, i.e. the middle of
+ * the road, not the kerb side. The truck now stands 0.076 L SOUTH of the road
+ * centre-line where the reference has it, so treads on its south flank would
+ * have handed the south team the shorter climb to the 2x core on a body the
+ * reference put there for cover, not for fairness. Climbing from the middle of
+ * the carriageway is also the only climb both teams contest.
  *
  * WHY THEY SIT WHERE THEY SIT. Every tread footprint is more than
  * `OVERDRIVE_PICKUP_RADIUS` (1.65 m) from the world origin in plan - the
@@ -291,7 +414,7 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
  * claim: the core is taken on the box roof or not at all.
  */
 const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.freeze([
-  // [tread top, x from, x to]
+  // [tread top, x from, x to] - z is derived from the truck's own position
   Object.freeze([0.80, 7.0, 8.2] as const),
   Object.freeze([1.75, 5.8, 7.0] as const),
   Object.freeze([2.60, 4.6, 5.8] as const),
@@ -303,15 +426,44 @@ const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.
  * 180-degree negation of team 0's, so neither team owns a better half by
  * construction.
  *
- * These points are the spawn solver's own validated candidates
- * (`npx tsx scripts/qa/solve-spawn-layouts.ts --arenas nuketown2 --all`), not
- * eyeballed: every one has floor beneath it, an autostep route to the enemy,
- * cover within reach, no enemy spawn in sight, and clears the gate's team
- * separation floor.
+ * These points are validated candidates, not eyeballed: every one has floor
+ * beneath it, an autostep route to the enemy, cover within reach, no enemy
+ * spawn in sight, and clears the gate's team separation floor.
+ *
+ * RE-SOLVED UNDER HF-432 ITEM 3, after the yard cover of item 2. The owner
+ * after PASS 90: "the cover and size/shape of the side areas of the map and
+ * spawns, needs refinement." Two things were measurably wrong and the shipped
+ * spawn gate reported neither, because its bands are floors rather than
+ * targets:
+ *
+ *   EXPOSURE. Four of the ten spawns had a clear standing eye-line 68-71 m
+ *   long - a spawn that sees, and is seen from, the far end of an 84 m map.
+ *   The gate has no ceiling on that at all.
+ *
+ *   ONE SPAWN SAW A SPAWN. t0 (12, -30) held a clear line to t1 (6, 32) at
+ *   62.3 m. The gate's `minimumVisibleEnemySpawnDistanceM` is 30 m, so a
+ *   62.3 m sightline between two spawn points passed it. The lane brief's rule
+ *   is stricter and is the right one: NO spawn sees a spawn.
+ *
+ * The replacement was searched over every cell of the fenced yard that passes
+ * the full `spawnPointFailures` constraint set AND clears both destructible
+ * sheds by more than 5.5 m, scored on: zero spawn-to-spawn sightlines (hard),
+ * at least 24 m of x-spread and 6 m of z-spread so a team is not one
+ * grenade-sized knot (hard), 4.5 m minimum spacing (hard), then lowest worst
+ * exposure, then shallowest mean depth - because the other half of the owner's
+ * complaint is that the spawns sit too FAR back, and the reference's yards are
+ * a place you cross, not a place you start a run-up in.
+ *
+ *   worst clear line from any spawn   71.0 m -> 31.6 m
+ *   spawn-to-spawn sightlines               1 -> 0
+ *   mean distance from the road       31.5 m -> 26.5 m
+ *   points per team                        5 -> 6
+ *
+ * Team 1 stays the exact 180-degree negation of team 0, in order.
  */
 export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
-  Object.freeze([[-12, -30] as const, [-6, -32] as const, [0, -30] as const, [6, -32] as const, [12, -30] as const]),
-  Object.freeze([[12, 30] as const, [6, 32] as const, [0, 30] as const, [-6, 32] as const, [-12, 30] as const]),
+  Object.freeze([[13, -24] as const, [-5, -25] as const, [1, -25] as const, [7, -25] as const, [-10, -29] as const, [14, -31] as const]),
+  Object.freeze([[-13, 24] as const, [5, 25] as const, [-1, 25] as const, [-7, 25] as const, [10, 29] as const, [-14, 31] as const]),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -597,7 +749,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The previous cut cut a doorway in the garage's shared wall and left the
   // house's own east wall solid behind it, so the garage's "route into the
   // house" opened onto a wall. Both leaves are cut here, at the same z.
-  const LINK_DOOR: [number, number] = [-19.5, -17.9];
+  const LINK_DOOR = doorRun('house garage link');
   [[HOUSE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], HOUSE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `house wall east ${index}`,
       [HOUSE_X1 - WALL_T / 2, GROUND_H / 2, (run[0]! + run[1]!) / 2],
@@ -613,7 +765,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Segments are authored as [x0, x1] runs; the gaps between them ARE the
   // openings, which is the whole point — a window you cannot shoot through is
   // a painting.
-  const FRONT_DOOR: [number, number] = [-1.95, -0.55];
+  const FRONT_DOOR = doorRun('house front door');
   const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
   const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
   const groundFrontRuns: [number, number][] = [
@@ -635,7 +787,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
   }
   pair(builder, 'house front door lintel',
-    [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, 2.6, zFront], [FRONT_DOOR[1] - FRONT_DOOR[0], 0.8, WALL_T], m.trim);
+    [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
+    [FRONT_DOOR[1] - FRONT_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
 
   // --- front wall, upper floor: the power window ---------------------------
   const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
@@ -656,7 +809,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   }
 
   // --- back wall: back door and one upper window ---------------------------
-  const BACK_DOOR: [number, number] = [-2.05, -0.45];
+  const BACK_DOOR = doorRun('house back door');
   const groundBackRuns: [number, number][] = [
     [HOUSE_X0, BACK_DOOR[0]],
     [BACK_DOOR[1], HOUSE_X1],
@@ -666,7 +819,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [(run[0] + run[1]) / 2, GROUND_H / 2, zBack], [run[1] - run[0], GROUND_H, WALL_T], siding);
   });
   pair(builder, 'house back door lintel',
-    [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, 2.6, zBack], [BACK_DOOR[1] - BACK_DOOR[0], 0.8, WALL_T], m.trim);
+    [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
+    [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
   const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
   [[HOUSE_X0, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
@@ -679,42 +833,56 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + UPPER_H - 0.45, zBack],
     [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
 
-  // --- stair, hard against the east wall -----------------------------------
-  // 11 risers of 0.30 m. Autostep is 0.42 m, so this walks; it is not a jump
-  // puzzle and it is not a ramp the bots cannot read.
-  const STAIR_X0 = 2.3;
-  const STAIR_X1 = HOUSE_X1 - WALL_T;               // 3.95
-  const STAIR_W = STAIR_X1 - STAIR_X0;
-  const STAIR_CX = (STAIR_X0 + STAIR_X1) / 2;
-  const RISER = 0.3;
-  const GOING = 0.55;
-  const STAIR_TOP_Z = HOUSE_FRONT_Z - 1.0;          // first step just inside the front room
-  const risers = Math.round(UPPER_Y0 / RISER);      // 11
-  for (let i = 0; i < risers; i += 1) {
+  // --- stair: BACK room, hard against the WEST (blind) wall ----------------
+  // Ten 0.30 m risers and a 0.90 m landing, climbing toward the street. The
+  // riser is inside the 0.42 m autostep and the going is over the 0.22 m
+  // Rapier autostep minimum width, so this WALKS: it is not a jump puzzle and
+  // it is not a ramp the bots cannot read. Where it stands, and why it is not
+  // where the previous cut put it, is derived at NUKETOWN2_HOUSE_STAIR.
+  const STAIR_W = NUKETOWN2_HOUSE_STAIR.width;
+  const STAIR_CX = NUKETOWN2_HOUSE_STAIR.x0 + STAIR_W / 2;
+  const RISER = NUKETOWN2_HOUSE_STAIR.riser;
+  const GOING = NUKETOWN2_HOUSE_STAIR.going;
+  const risers = NUKETOWN2_HOUSE_STAIR.risers;
+  for (let i = 0; i < risers - 1; i += 1) {
     const top = RISER * (i + 1);
     pair(builder, `house stair ${i}`,
-      [STAIR_CX, top / 2, STAIR_TOP_Z - GOING * (i + 0.5)], [STAIR_W, top, GOING], m.interior);
+      [STAIR_CX, top / 2, STAIR_FOOT_Z + GOING * (i + 0.5)], [STAIR_W, top, GOING], m.interior);
   }
+  // The landing. Its top IS the upper floor slab's top, so a player walks off
+  // it rather than stepping up onto the floor, and it is deep enough to turn
+  // on rather than being a nosing you arrive at mid-stride.
+  pair(builder, 'house stair landing',
+    [STAIR_CX, UPPER_Y0 / 2, STAIR_HEAD_Z - NUKETOWN2_HOUSE_STAIR.landingDepth / 2],
+    [STAIR_W, UPPER_Y0, NUKETOWN2_HOUSE_STAIR.landingDepth], m.interior);
 
   // --- upper floor slab, with the stairwell left open ----------------------
-  pair(builder, 'house upper floor west',
-    [(HOUSE_X0 + STAIR_X0) / 2, GROUND_H + FLOOR_T / 2, zMid],
-    [STAIR_X0 - HOUSE_X0, FLOOR_T, HOUSE_DEPTH], m.interior);
-  const wellZ0 = STAIR_TOP_Z - GOING * risers;      // deep end of the stair run
-  const wellZ1 = STAIR_TOP_Z;
-  pair(builder, 'house upper floor east front',
-    [(STAIR_X0 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, (wellZ1 + HOUSE_FRONT_Z) / 2],
-    [HOUSE_X1 - STAIR_X0, FLOOR_T, HOUSE_FRONT_Z - wellZ1], m.interior);
-  pair(builder, 'house upper floor east back',
-    [(STAIR_X0 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, (HOUSE_BACK_Z + wellZ0) / 2],
-    [HOUSE_X1 - STAIR_X0, FLOOR_T, wellZ0 - HOUSE_BACK_Z], m.interior);
+  // East of the flight the slab is continuous over the whole house. The west
+  // strip carries the well, which runs from the back wall to the landing and
+  // nowhere else: 4.34 x 1.95 m in the BACK room, against the previous cut's
+  // 6.05 x 1.95 m under the front window.
+  pair(builder, 'house upper floor east',
+    [(STAIR_X1 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, zMid],
+    [HOUSE_X1 - STAIR_X1, FLOOR_T, HOUSE_DEPTH], m.interior);
+  pair(builder, 'house upper floor west back',
+    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (HOUSE_BACK_Z + STAIRWELL_Z0) / 2],
+    [STAIR_X1 - HOUSE_X0, FLOOR_T, STAIRWELL_Z0 - HOUSE_BACK_Z], m.interior);
+  pair(builder, 'house upper floor west front',
+    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (STAIR_HEAD_Z + HOUSE_FRONT_Z) / 2],
+    [STAIR_X1 - HOUSE_X0, FLOOR_T, HOUSE_FRONT_Z - STAIR_HEAD_Z], m.interior);
 
   // --- internal partitions, both storeys, one doorway each -----------------
   const PARTITION_Z = zMid;
-  const INNER_DOOR: [number, number] = [-3.5, -1.9];
+  const INNER_DOOR = doorRun('house internal door');
   for (const [storey, y0, h] of [['ground', 0, GROUND_H], ['upper', UPPER_Y0, UPPER_H]] as const) {
-    const x1 = storey === 'upper' ? STAIR_X0 : HOUSE_X1;
-    [[HOUSE_X0, INNER_DOOR[0]], [INNER_DOOR[1], x1]].forEach((run, index) => {
+    // The UPPER leaf stops at the flight's inboard edge: that 1.95 m gap is
+    // the head of the stair, so the landing opens straight into the front
+    // upper room. The two upper rooms are therefore joined twice - by the
+    // landing on the west and by the internal door in the middle - which is
+    // the "landing and upper hallway" this pass owes, and it is why the
+    // stairwell no longer has to be crossed to use the upper floor.
+    const x0 = storey === 'upper' ? STAIR_X1 : HOUSE_X0;
+    [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1]].forEach((run, index) => {
       if (run[1]! - run[0]! <= 0.05) return;
       pair(builder, `house ${storey} partition ${index}`,
         [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
@@ -727,7 +895,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The upper crate lives in the BACK upper room, deliberately clear of the
   // front window seat that both the rare-gun site and the fidelity gate stand
   // on.
-  pair(builder, 'house upper crate', [-4.5, UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, zMid - 3.0],
+  // HF-432 item 1: this stood at UPPER_Y0 + FLOOR_T / 2 + LOW_COVER / 2, which
+  // put its underside at 3.45 on a slab whose top is 3.30 - a crate floating
+  // 0.15 m in the air, which the forging review forbids. UPPER_Y0 IS the slab
+  // top (GROUND_H + FLOOR_T), so the crate sits on it.
+  // Moved east of the flight (HF-432 item 1): at x = -4.5 it spanned
+  // x [-5.2, -3.8] and the stairwell now opens over x [-6.75, -4.80], so 0.4 m
+  // of it hung over the void.
+  pair(builder, 'house upper crate', [-0.5, UPPER_Y0 + LOW_COVER / 2, zMid - 3.0],
     [1.4, LOW_COVER, 1.4], m.interior);
 }
 
@@ -752,14 +927,14 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box. Matches the hole cut in
   // the house's own east wall.
-  const LINK_DOOR: [number, number] = [-19.5, -17.9];
+  const LINK_DOOR = doorRun('house garage link');
   [[GARAGE_BACK_Z, LINK_DOOR[0]], [LINK_DOOR[1], GARAGE_FRONT_Z]].forEach((run, index) => {
     pair(builder, `garage link pier ${index}`,
       [GARAGE_X0 + WALL_T / 2, H / 2, (run[0]! + run[1]!) / 2], [WALL_T, H, run[1]! - run[0]!], m.garageSiding);
   });
 
   // Garage door: a 3.5 m opening onto the driveway apron, headed at 3.0 m.
-  const DOOR: [number, number] = [5.0, 8.5];
+  const DOOR = doorRun('garage vehicle door');
   [[GARAGE_X0, DOOR[0]], [DOOR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
@@ -769,7 +944,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.garageDoor);
 
   // Rear door into the back yard.
-  const REAR: [number, number] = [5.4, 7.0];
+  const REAR = doorRun('garage rear door');
   [[GARAGE_X0, REAR[0]], [REAR[1], GARAGE_X1]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
@@ -777,15 +952,20 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage back head', [(REAR[0] + REAR[1]) / 2, H - 0.4, zBack], [REAR[1] - REAR[0], 0.8, WALL_T], m.trim);
 
   // Workbench: the one body that makes the garage a position rather than a
-  // corridor between three doors.
-  pair(builder, 'garage bench', [7.6, LOW_COVER / 2, GARAGE_BACK_Z + 1.4], [2.8, LOW_COVER, 0.9], m.interior);
+  // corridor between three doors. HF-432 item 4 moved it from (7.6, -21.6) -
+  // where it lay ACROSS the rear door's own threshold, so a standing capsule
+  // walking in from the yard hit it inside the doorway - onto the outboard
+  // wall, where a workbench belongs.
+  pair(builder, 'garage bench', [8.1, LOW_COVER / 2, GARAGE_BACK_Z + 3.5], [1.4, LOW_COVER, 4.0], m.interior);
 }
 
 /**
- * The moving truck, centred on the world origin in the cul-de-sac turning head.
- * OPEN cover in the reference's sense: a deck you can stand on, a roof over
- * you, and one mouth at the -x end you walk in through. The 2x-damage core
- * sits above its cargo-box roof.
+ * The moving truck, in the cul-de-sac turning head: centred on the world origin
+ * ALONG the street, and 0.076 L SOUTH of the road centre-line across it, where
+ * the reference has it (HF-432 item 5). OPEN cover in the reference's sense: a
+ * deck you can stand on, a roof over you, and one mouth at the -x end you walk
+ * in through. The 2x-damage core sits above its cargo-box roof and follows the
+ * truck's own `z`.
  *
  * The cab is CLOSED: a solid body, which is what the reference's minimap draws
  * and what makes the truck cover from one side and a room from the other.
@@ -798,26 +978,26 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
   const flank = W / 2 - T / 2;
 
   // Cab, solid closed cover, on the +x end.
-  streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, 0], [t.cabLength, t.cabRoofY, W], m.truckCab);
+  streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, t.z], [t.cabLength, t.cabRoofY, W], m.truckCab);
   // Cargo box: deck, bulkhead against the cab, two flanks and a roof. The -x
   // end is OPEN, which is the mouth.
-  streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, 0], [t.boxLength, T, W], m.truckBox, { cast: false });
-  streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, 0],
+  streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
+  streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + t.roofY) / 2, t.z],
     [T, t.roofY - t.deckY, W], m.truckBox);
   for (const [index, side] of [-1, 1].entries()) {
-    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, side * flank],
+    streetVehicle(builder, `truck box flank ${index}`, [0, (t.deckY + t.roofY) / 2, t.z + side * flank],
       [t.boxLength, t.roofY - t.deckY, T], m.truckBox);
   }
-  streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, 0], [t.boxLength, T, W], m.truckBox);
+  streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
   for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
-    streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, 0], [0.9, 0.84, W + 0.2], m.rubber,
+    streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, t.z], [0.9, 0.84, W + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
   }
 
   // ROOF ACCESS. See TRUCK_ROOF_STEPS: the 2x-damage core rides this roof, and
   // a roof nothing can climb is a feature that does not exist.
   for (const [index, [top, x0, x1]] of TRUCK_ROOF_STEPS.entries()) {
-    streetVehicle(builder, `truck roof step ${index}`, [(x0 + x1) / 2, top / 2, (W / 2 + 2.45) / 2],
+    streetVehicle(builder, `truck roof step ${index}`, [(x0 + x1) / 2, top / 2, t.z - (W / 2 + 2.45) / 2],
       [x1 - x0, top, 2.45 - W / 2], m.block);
   }
 }
@@ -863,11 +1043,23 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // pins it there), so without this the south half of the carriageway carries
   // no street body at all and the north team owns the head. Solid, waist-high,
   // parked against the south kerb.
-  streetVehicle(builder, 'head car body', [4.5, 0.72, 4.6], [4.4, 1.0, 1.9], m.carA);
-  streetVehicle(builder, 'head car cabin', [4.3, 1.55, 4.6], [2.2, 0.66, 1.7], m.carGlass);
+  // HF-432 item 5 MOVED IT, and the move is load-bearing twice over. At
+  // (4.5, 4.6) it stood where the truck now does. It goes onto the ROAD
+  // CENTRE-LINE instead, in the gap the reference's own measurements leave
+  // between the two street bodies: the coach is 0.150 L north of the truck and
+  // both are 2.6 m wide, so the reference's pair leaves 2.8 m of open
+  // carriageway straight down z = 0. With the truck no longer straddling that
+  // line, nothing else on this 36 m road breaks it, and the arena's derived
+  // MAX_STREET_CENTRE_RUN_METRES band exists precisely to stop that. Parked
+  // across it, this body keeps the longest clear centre-line run at 19.8 m
+  // inside the 21.2 m band - and it is still the coach's counterweight, which
+  // is the other property nuketown2-fidelity.test.ts measures.
+  const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
+  streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
+  streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
   for (const [index, dx] of [-1.5, 1.5].entries()) {
     for (const [side, dz] of [-1, 1].entries()) {
-      streetVehicle(builder, `head car wheel ${index}${side}`, [4.5 + dx, 0.34, 4.6 + dz * 0.9],
+      streetVehicle(builder, `head car wheel ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 0.9],
         [0.68, 0.68, 0.3], m.rubber, { solid: false, shots: false, cast: false });
     }
   }
@@ -881,7 +1073,11 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
  */
 function cars(builder: Builder, m: Nuketown2Materials): void {
   const cx = (GARAGE_X0 + GARAGE_X1) / 2 + 0.5;   // 7.25, centred on the door
-  const cz = GARAGE_FRONT_Z + 3.4;                // 3.4 m out onto the apron
+  // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
+  // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
+  // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
+  // own apron (the dressing runs to z = -8) rather than out on the kerb.
+  const cz = GARAGE_FRONT_Z + 4.6;
   pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA);
   pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass);
   for (const [index, dz] of [-1.5, 1.5].entries()) {
@@ -983,8 +1179,9 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb, { cast: false });
   // Hedge along the front of each house's lawn: crouch cover for the last
   // stride out of the front door. LOW_COVER rather than HARD_COVER, and stopped
-  // 0.85 m short of the front door reveal, so it never becomes a wall across
-  // either the doorway or the two ground-floor windows above it.
+  // 0.60 m short of the front door reveal (0.85 m before HF-432 item 4 widened
+  // that door from 1.4 m to 1.8 m), so it never becomes a wall across either
+  // the doorway or the two ground-floor windows above it.
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 1.4], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, KERB_Z - 2.2], [3.6, LOW_COVER, 2.0], m.planter);
@@ -1043,6 +1240,30 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // up x = -17. The reference draws its own flank props ON the boundary line.
   pair(builder, 'yard side store', [-14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
   pair(builder, 'yard alley planter', [-15.6, HARD_COVER / 2, -33.0], [4.0, HARD_COVER, 2.0], m.planter);
+  // HF-432 item 2 - THE OTHER FLANK. `pair()` negates x AND z, so the store
+  // above and its partner both land on the WEST flank of one half and the EAST
+  // flank of the other: every team had one dressed flank and one bare one, and
+  // the bare one measured 114 m2 of empty ground beside the house carrying the
+  // map's worst standing lane (46.0 m up x = 17, from the border path to the
+  // far verge). The reference draws hatched props along BOTH long boundaries
+  // (schematic 5.4 and the yard note above), so both get one. Authored on the
+  // perimeter wall's inner face for the reason the west store already records:
+  // a prop that stops short of the wall just moves the lane to the wall.
+  pair(builder, 'yard far store', [14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
+  // ...and the same asymmetry inside the yard itself: west of x = 0 the yard
+  // carried the crate, the water butt, the patio table, the alley planter and
+  // the destructible shed; east of x = 9 it carried nothing at all across
+  // 9 x 13 m of spawn ground. One waist-high body, in reach of the (12, -30)
+  // spawn, which measured the yard's longest walk to cover.
+  pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter);
+  // THE BORDER PATH. The reference's fence holes lead to a path that curves
+  // round to the opposite yard, and this arena's border path is the straight
+  // 36 x 6 m version of it - which was authored with NO cover at all, so the
+  // flank route was a 36 m corridor with a spawn at each end of the map behind
+  // it. Two hard bodies per path, off-axis from each other so the two paths do
+  // not line up through the fence gaps.
+  pair(builder, 'path buttress west', [-3.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
+  pair(builder, 'path buttress east', [10.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
   // Water butt beside the shed placement. x = -8.5 is NOT arbitrary: the shed
   // at (-14, -24.5) with yaw pi/2 occupies x [-16.1, -11.9] and z [-26.3,
   // -22.7] (destructible-shed-registry.ts, shedPlacementFootprint), so the butt
@@ -1173,7 +1394,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
         id: 'nuketown2-central-truck',
         bounds: {
           minX: -t.boxLength / 2, maxX: t.cabX + t.cabLength / 2,
-          minZ: -t.width / 2, maxZ: t.width / 2,
+          minZ: t.z - t.width / 2, maxZ: t.z + t.width / 2,
           minY: 0, maxY: t.roofY,
         },
         blocksMovement: true,

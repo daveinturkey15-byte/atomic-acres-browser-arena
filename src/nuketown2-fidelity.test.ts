@@ -7,6 +7,8 @@ import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_DOORWAYS,
+  NUKETOWN2_HOUSE_STAIR,
   NUKETOWN2_GROUND_DRESSING,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
@@ -16,12 +18,14 @@ import {
   NUKETOWN2_STREET_LENGTH,
   buildNuketown2,
 } from './nuketown2-arena';
+import { NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
 } from './overdrive';
-import { CharacterPhysics } from './physics';
+import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 
 /**
@@ -49,6 +53,48 @@ import { shedPlacementsForArena } from './destructible-shed-registry';
  */
 
 const PLAYER_RADIUS = 0.44;
+/** The CROUCHED capsule, for the "does any route need a crouch" sweep. */
+const CROUCH_CAPSULE_M = 2 * (STANCE_SHAPES.crouch.halfHeight + STANCE_SHAPES.crouch.radius);
+/** The STANDING capsule, from the physics module rather than from memory. */
+const STANDING_CAPSULE_M = 2 * (STANCE_SHAPES.stand.halfHeight + STANCE_SHAPES.stand.radius);
+const STANDING_RADIUS_M = STANCE_SHAPES.stand.radius;
+/**
+ * Walk a STANDING capsule along a waypoint list on the REAL CharacterPhysics
+ * against the REAL built colliders, with gravity and NO JUMP. No jump is the
+ * point: a route a player has to hop up is not a route a player walks, and the
+ * stair, the doors and the landing all have to be walkable standing.
+ */
+async function walkStanding(
+  map: ArenaMap,
+  startEye: readonly [number, number, number],
+  route: ReadonlyArray<readonly [number, number]>,
+): Promise<Array<{ x: number; y: number; z: number }>> {
+  const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
+  try {
+    const dt = 1 / 120;
+    physics.teleportEye({ x: startEye[0], y: startEye[1], z: startEye[2] });
+    const trace: Array<{ x: number; y: number; z: number }> = [];
+    let vy = 0;
+    for (const waypoint of route) {
+      for (let step = 0; step < 1400; step += 1) {
+        const eye = physics.eyePosition();
+        const dx = waypoint[0] - eye.x;
+        const dz = waypoint[1] - eye.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 0.2) break;
+        const advance = Math.min(distance, 3.6 * dt);
+        vy += -24.5 * dt;
+        const result = physics.move({ x: (dx / distance) * advance, y: vy * dt, z: (dz / distance) * advance }, dt);
+        if (result.grounded) vy = 0;
+      }
+      const eye = physics.eyePosition();
+      trace.push({ x: eye.x, y: eye.y, z: eye.z });
+    }
+    return trace;
+  } finally {
+    physics.dispose();
+  }
+}
 /**
  * Eye height for a player standing on the upper floor slab: slab top 3.3 m plus
  * 1.66 m. `isBlocked` excludes a collider only when `eye - 1.65 > collider.maxY`
@@ -102,10 +148,14 @@ const PLAYSPACE_TOLERANCE = 0.05;
  *  - FLOOR. A map with no long view is a corridor, and the reference's three
  *    lanes each run most of the long axis. 30 m, which is 0.36 of the diagonal.
  *
- * EVIDENCE the build lands inside: 46.0 m, [17, -35] -> [17, 11]. It was 82.0 m
- * before the yard-fence gaps were taken off-axis from their own rotational
- * partners and 70.0 m before the two flank props were moved onto the perimeter
- * wall's inner face; both fixes are written up in `yard()`.
+ * EVIDENCE the build lands inside: 39.4 m, [-17, -39] -> [17, -19]. It was
+ * 82.0 m before the yard-fence gaps were taken off-axis from their own
+ * rotational partners, 70.0 m before the two flank props were moved onto the
+ * perimeter wall's inner face, and 46.0 m ([17, -35] -> [17, 11]) before
+ * HF-432 item 2 dressed the FAR flank of each half - `pair()` negates x and z
+ * together, so one authored side store gives each team a dressed flank and a
+ * bare one, and the bare one carried this lane. All three fixes are written up
+ * in `yard()`.
  */
 const MAX_STANDING_EYE_LINE_METRES = 50.3;
 const MIN_STANDING_EYE_LINE_METRES = 30;
@@ -113,17 +163,26 @@ const MIN_STANDING_EYE_LINE_METRES = 30;
 /**
  * Longest clear run ALONG the street centre-line at standing eye height.
  *
- * DERIVED, not measured. The road's playable extent is L = 36 m, so the
- * centre-line samples run from x = -17 to x = +17. The truck straddles the
- * origin with its cargo-box mouth open at x = -3.25 and its BULKHEAD standing
- * at x = +3.17, so a line along z = 0 starting at the west sample enters the
- * open box and is stopped by the bulkhead: 17 + 3.17 = 20.17 m. Plus two 0.5 m
- * sample steps = 21.2 m.
+ * DERIVED, not measured, and RE-DERIVED under HF-432 item 5 at the same value.
  *
- * This is the number that would move if the truck were removed, shortened, or
- * pushed off the centre-line. It is also why the truck is the OPEN body: the
- * coach is closed and sits 4 m off the centre-line, so it does not enter this
- * measurement at all.
+ * The band was originally justified by the truck: it straddled the origin, so a
+ * line along z = 0 from the west sample entered the open cargo box and stopped
+ * at the bulkhead, 17 + 3.17 + two 0.5 m sample steps = 21.2 m. That derivation
+ * is GONE, because the truck now stands 0.076 L south of the centre-line where
+ * the reference has it, and the reference's own offsets leave 2.8 m of open
+ * carriageway between the truck and the coach - straight down z = 0. Left
+ * alone, the road became a 34 m clear lane.
+ *
+ * The band is re-derived from the body that stops it now: the head car, the
+ * arena's own authored counterweight (see `coach()`), parked ACROSS the
+ * centre-line at x [2.3, 6.7]. The run from the west sample is 17 + 2.3 =
+ * 19.3 m, plus one 0.5 m sample step. Measured: 20.0 m, from x = -17 to x = 3.
+ *
+ * THE VALUE IS UNCHANGED AT 21.2, deliberately: a band re-derived at a NEW
+ * number would not be the same promise, and this one is still "the street is
+ * not a shooting gallery". It is the number that moves if the head car is
+ * deleted, shortened or pushed off the line - which is now the property that
+ * carries it, and which is also why `coach()` says so in its own comment.
  */
 const MAX_STREET_CENTRE_RUN_METRES = 21.2;
 
@@ -287,10 +346,18 @@ describe('Nuke Town Rebuild fidelity', () => {
     const truck = map.physicalCover.find((cover) => cover.id === 'nuketown2-central-truck');
     expect(truck, 'exactly one moving truck owns the turning head').toBeDefined();
     expect(map.physicalCover.filter((cover) => cover.id.includes('truck'))).toHaveLength(1);
-    // The cargo box is centred on the world origin, which is load-bearing: the
-    // global OVERDRIVE_POSITION {0, 3.75, 0} has to land on its roof.
+    // The cargo box is centred on the world origin ALONG the street, which is
+    // load-bearing: the core's x is the box's own centre.
     expect(truck!.bounds.minX).toBeCloseTo(-NUKETOWN2_CENTRAL_TRUCK.boxLength / 2, 10);
-    expect((truck!.bounds.minZ + truck!.bounds.maxZ) / 2).toBeCloseTo(0, 10);
+    // HF-432 item 5: the truck stands where the REFERENCE has it, 0.076 L
+    // south of the road centre-line, and the 2x core follows it because
+    // OVERDRIVE_POSITION is per-arena now. HF-426 had to centre it on the
+    // world origin and recorded the difference as a deviation (schematic 5.5).
+    expect((truck!.bounds.minZ + truck!.bounds.maxZ) / 2).toBeCloseTo(NUKETOWN2_CENTRAL_TRUCK.z, 10);
+    expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.z - 0.076 * L)).toBeLessThan(TOL);
+    expect(NUKETOWN2_CENTRAL_TRUCK.z / L, 'truck offset across the street').toBeCloseTo(0.076, 3);
+    // ...and it is still ON the carriageway.
+    expect(truck!.bounds.maxZ).toBeLessThan(NUKETOWN2_SECTION.streetHalfWidth);
     expect(truck!.blocksShots).toBe(true);
     expect(truck!.blocksMovement).toBe(true);
     // Schematic §3: the truck is 0.325 L end to end, split 0.180 L of hollow
@@ -332,9 +399,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     // The truck's interior is a real room: a standing eye at the origin, on the
     // deck, is under a roof and inside two flanks, and it is NOT blocked.
-    expect(isBlocked({ x: 0, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
+    expect(isBlocked({ x: 0, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
     // ...and its mouth is at the -x end, so it is enterable from the road.
-    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: 0 }, map.colliders, PLAYER_RADIUS),
+    expect(isBlocked({ x: -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2 - 0.6, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS),
       'truck cargo box mouth').toBe(false);
 
     // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
@@ -350,12 +417,25 @@ describe('Nuke Town Rebuild fidelity', () => {
 
     // Coach size and placement, schematic §3: 0.253 L long, and offset from the
     // truck's cargo box by 0.178 L along the street and 0.150 L across it.
+    //
+    // HF-432 item 5: those two offsets are now EXACT. HF-426 authored 5.0 and
+    // 4.0 m and recorded the 0.039 L difference, because with the truck pinned
+    // to the world origin the measured pair put the coach's flank over the
+    // kerb. With the truck 0.076 L south where the reference has it, that
+    // reason is gone.
     expect(Math.abs(NUKETOWN2_STREET_COACH.length - 0.253 * L)).toBeLessThan(TOL);
-    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.x) - 0.178 * L)).toBeLessThan(TOL);
-    expect(Math.abs(Math.abs(NUKETOWN2_STREET_COACH.z) - 0.150 * L)).toBeLessThan(TOL);
-    // Both street bodies stay on the carriageway.
+    expect(NUKETOWN2_STREET_COACH.offsetAlong / L, 'coach offset along the street').toBeCloseTo(0.178, 3);
+    expect(NUKETOWN2_STREET_COACH.offsetAcross / L, 'coach offset across the street').toBeCloseTo(0.150, 3);
+    // ...and the offsets are what the placement is actually built from, so the
+    // two can never describe different things.
+    expect(Math.abs(NUKETOWN2_STREET_COACH.x)).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAlong, 10);
+    expect(NUKETOWN2_CENTRAL_TRUCK.z - NUKETOWN2_STREET_COACH.z).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAcross, 10);
+    // Both street bodies stay on the carriageway, on OPPOSITE sides of the
+    // road centre-line - which is what the reference draws and what HF-426
+    // could not do with the truck sitting on it.
     expect(NUKETOWN2_STREET_COACH.z - NUKETOWN2_STREET_COACH.width / 2)
       .toBeGreaterThan(-NUKETOWN2_SECTION.streetHalfWidth);
+    expect(Math.sign(NUKETOWN2_STREET_COACH.z)).toBe(-Math.sign(NUKETOWN2_CENTRAL_TRUCK.z));
 
     // Every declared vehicle body is real cover in both authorities. A body the
     // player can see and shoot but walk through is the failure this pins.
@@ -399,6 +479,188 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(isBlocked({ x, y: 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
     }
   });
+
+  it('walks a STANDING player up each stair, onto the landing and into both upper rooms', async () => {
+    // HF-432 item 1. The owner after PASS 90: "still some issues with where
+    // stairs are". The stair now stands against the WEST (blind) wall of the
+    // BACK room and lands at the internal partition - see NUKETOWN2_HOUSE_STAIR
+    // for why, including what the two first-party minimaps do and do not draw.
+    //
+    // This probe is the whole claim: a STANDING capsule, on the real
+    // CharacterPhysics against the real built colliders, with gravity and NO
+    // JUMP, walks in off the back-room floor, up the flight, onto the landing,
+    // through the head of the stair into the FRONT upper room, and back
+    // through the internal door into the BACK upper room.
+    const map = buildNuketown2(new THREE.Scene());
+    const stair = NUKETOWN2_HOUSE_STAIR;
+    const cx = stair.x0 + stair.width / 2;
+
+    // The authored flight has to be walkable BY THE ENGINE'S OWN NUMBERS, not
+    // by eye: the riser inside autostep, the going wider than the autostep
+    // minimum width, and the capsule the arena assumes equal to the real one.
+    expect(STANDING_CAPSULE_M).toBeCloseTo(1.82, 10);
+    expect(STANDING_RADIUS_M).toBeCloseTo(0.38, 10);
+    expect(stair.riser).toBeLessThan(CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    expect(stair.going).toBeGreaterThan(CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth);
+    expect(stair.riser * stair.risers).toBeCloseTo(3.3, 10);
+
+    for (const house of NUKETOWN2_HOUSE_LAYOUT) {
+      const s = house.facing;   // north house +1, south house is its exact negation
+      const at = (x: number, z: number) => [s * x, s * z] as const;
+      const trace = await walkStanding(map, [s * (cx + 2.6), 1.7, s * -21.0], [
+        at(cx + 2.6, -22.2),    // along the back wall, behind the flight
+        at(cx, -22.2),          // square on to the bottom tread
+        at(cx, -17.0),          // up the flight and onto the landing
+        at(cx, -13.0),          // through the head of the stair into the FRONT upper room
+        at(-2.7, -13.0),        // across to the internal door
+        at(-2.7, -19.5),        // and back into the BACK upper room
+      ]);
+      const label = (index: number) => `${house.id} waypoint ${index} at ${JSON.stringify(trace[index])}`;
+      // Still on the ground floor for the approach.
+      expect(trace[1]!.y, label(1)).toBeLessThan(2.0);
+      // On the landing: feet on the 3.3 m slab, so the eye is 1.70 m above it.
+      expect(trace[2]!.y, label(2)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      // In the FRONT upper room - past the partition, on the street side.
+      expect(trace[3]!.y, label(3)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(Math.sign(trace[3]!.z - house.z), label(3)).toBe(house.facing);
+      // ...and back through the internal door into the BACK upper room.
+      expect(trace[5]!.y, label(5)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
+      expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
+    }
+  }, 120_000);
+
+  it('gives every door a standing player walks through: 2.4 m of head, 1.8 m of shoulder', async () => {
+    // HF-432 item 4. The owner after PASS 90: "Doors are too small shouldn't
+    // have to crouch."
+    //
+    // The owner's words and the measurement do not agree, and the measurement
+    // wins: NO door on this map ever required a crouch - the tightest was
+    // 2.20 m of head against a 1.82 m capsule. The fault was WIDTH. A 1.38 m
+    // opening leaves 0.62 m of free width for a 0.76 m capsule, which catches
+    // a shoulder on every entry at a run. The before table is in
+    // NUKETOWN2_DOORWAYS; the sweep that proves the crouch half is the test
+    // below this one.
+    const map = buildNuketown2(new THREE.Scene());
+
+    /** Lowest solid overhead at (x, z); 0 if anything stands at floor level. */
+    const clearHeight = (x: number, z: number): number => {
+      let lowest = Number.POSITIVE_INFINITY;
+      for (const bounds of map.colliders) {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        if (x <= bounds.minX || x >= bounds.maxX || z <= bounds.minZ || z >= bounds.maxZ) continue;
+        if (maxY <= 0.25) continue;                 // floor slabs, kerbs, ground decals
+        if (minY < 0.25) return 0;                  // a solid, not an opening
+        if (minY < lowest) lowest = minY;
+      }
+      return lowest;
+    };
+    /** Free width of the opening at chest height, along its own span axis. */
+    const clearWidth = (x: number, z: number, span: 'x' | 'z'): number => {
+      const solid = (px: number, pz: number) => map.colliders.some((bounds) => {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        return px > bounds.minX && px < bounds.maxX && pz > bounds.minZ && pz < bounds.maxZ
+          && minY < 1.0 && maxY > 1.0;
+      });
+      let low = 0;
+      let high = 0;
+      for (let d = 0; d < 4; d += 0.01) { if (solid(span === 'x' ? x - d : x, span === 'x' ? z : z - d)) break; low = d; }
+      for (let d = 0; d < 4; d += 0.01) { if (solid(span === 'x' ? x + d : x, span === 'x' ? z : z + d)) break; high = d; }
+      return low + high;
+    };
+
+    // THE HEAD BAND, DERIVED: the standing capsule, plus the autostep up-cast
+    // the controller performs BEFORE it moves forward (so a player stepping
+    // onto a porch, a kerb or a tread inside a doorway still clears - the same
+    // failure STAIRWELL_Z0 records), plus 0.16 m.
+    const HEAD_FLOOR = STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight + 0.16;
+    expect(HEAD_FLOOR).toBeCloseTo(2.4, 10);
+    // ...and it clears the lane's own stated floor of 2.1 m.
+    expect(HEAD_FLOOR).toBeGreaterThanOrEqual(2.1);
+
+    for (const door of NUKETOWN2_DOORWAYS) {
+      for (const sign of [1, -1] as const) {          // the door AND its 180-degree partner
+        const x = sign * (door.span === 'x' ? door.centre : door.at);
+        const z = sign * (door.span === 'x' ? door.at : door.centre);
+        const label = `${door.id}${sign === 1 ? '' : ' (partner)'}`;
+        expect(clearHeight(x, z), `${label} head`).toBeCloseTo(door.headY, 6);
+        expect(clearHeight(x, z), `${label} head`).toBeGreaterThanOrEqual(HEAD_FLOOR);
+        expect(clearWidth(x, z, door.span), `${label} width`).toBeGreaterThanOrEqual(door.width - 0.03);
+        // Two capsule widths plus a body of slack: a door two players use.
+        expect(door.width, `${label} authored width`).toBeGreaterThanOrEqual(4 * STANDING_RADIUS_M + 0.2);
+      }
+      // ...and a STANDING capsule actually WALKS through it, on the real
+      // physics, with gravity and no jump. A door that measures right and
+      // catches on the frame is exactly the defect being fixed.
+      const through: [number, number] = door.span === 'x' ? [0, 1] : [1, 0];
+      const centreX = door.span === 'x' ? door.centre : door.at;
+      const centreZ = door.span === 'x' ? door.at : door.centre;
+      const near: [number, number] = [centreX - through[0] * 1.6, centreZ - through[1] * 1.6];
+      const far: [number, number] = [centreX + through[0] * 1.6, centreZ + through[1] * 1.6];
+      const trace = await walkStanding(map, [near[0], 1.7, near[1]], [far]);
+      expect(
+        Math.hypot(trace[0]!.x - far[0], trace[0]!.z - far[1]),
+        `${door.id} walk-through ended at ${JSON.stringify(trace[0])}`,
+      ).toBeLessThan(0.45);
+    }
+  }, 120_000);
+
+  it('needs a crouch nowhere on the ground except under the two letterbox lids', () => {
+    // The other half of "shouldn't have to crouch", swept rather than argued.
+    // Every ground cell at 0.25 m is tested with the STANDING capsule height
+    // and with the CROUCHED one AT THE SAME RADIUS, so only genuine height
+    // blockages count and the 0.02 m radius difference between the two stances
+    // cannot manufacture findings. A cell the crouch fits and the stand does
+    // not is a place this map makes a player duck.
+    const map = buildNuketown2(new THREE.Scene());
+    const blocked = (x: number, z: number, floorY: number, height: number): boolean => {
+      const y0 = floorY + 0.06;
+      const y1 = floorY + height;
+      for (const bounds of map.colliders) {
+        const minY = bounds.minY ?? 0;
+        const maxY = bounds.maxY ?? minY + 3;
+        if (maxY <= y0 || minY >= y1) continue;
+        const dx = Math.max(bounds.minX - x, 0, x - bounds.maxX);
+        const dz = Math.max(bounds.minZ - z, 0, z - bounds.maxZ);
+        if (dx * dx + dz * dz < STANDING_RADIUS_M * STANDING_RADIUS_M) return true;
+      }
+      return false;
+    };
+    const floorAt = (x: number, z: number): number => {
+      let top = 0;
+      for (const bounds of map.colliders) {
+        const maxY = bounds.maxY ?? (bounds.minY ?? 0) + 3;
+        if (maxY > 0.5 || x <= bounds.minX || x >= bounds.maxX || z <= bounds.minZ || z >= bounds.maxZ) continue;
+        if (maxY > top) top = maxY;
+      }
+      return top;
+    };
+    // The two letterboxes: a 0.32 x 0.50 m lid on a 0.16 m post, authored in
+    // `verge()` at (GARAGE_X1 + 0.6, KERB_Z - 1.2) and its rotational partner.
+    // They are the ONE thing on this map you may duck under.
+    const letterbox: [number, number] = [9.85, -7.1];
+    const offenders: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 0.5; x <= NUKETOWN2_BOUNDS.maxX - 0.5; x += 0.25) {
+      for (let z = NUKETOWN2_BOUNDS.minZ + 0.5; z <= NUKETOWN2_BOUNDS.maxZ - 0.5; z += 0.25) {
+        const floorY = floorAt(x, z);
+        if (floorY > 0.45) continue;                                   // ground routes only
+        if (blocked(x, z, floorY, CROUCH_CAPSULE_M)) continue;         // the crouch cannot pass either
+        if (!blocked(x, z, floorY, STANDING_CAPSULE_M)) continue;      // standing passes: fine
+        offenders.push([Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+      }
+    }
+    for (const [x, z] of offenders) {
+      const nearest = Math.min(
+        Math.hypot(x - letterbox[0], z - letterbox[1]),
+        Math.hypot(x + letterbox[0], z + letterbox[1]),
+      );
+      expect(nearest, `crouch-only ground cell at (${x}, ${z})`).toBeLessThan(1.0);
+    }
+    // ...and the two lids account for a handful of cells, never a route.
+    expect(offenders.length, `crouch-only ground cells: ${JSON.stringify(offenders)}`).toBeLessThanOrEqual(24);
+  }, 120_000);
 
   it('keeps the power position real: the upper front window is an opening, and the rare gun lives there', () => {
     const map = buildNuketown2(new THREE.Scene());
@@ -487,6 +749,46 @@ describe('Nuke Town Rebuild fidelity', () => {
         expect(Math.hypot(x, z), `spawn (${x}, ${z}) to centre`).toBeGreaterThan(backWall);
       }
     }
+
+    // ---- HF-432 item 3: the two properties the shipped spawn gate has not --
+    // Its bands are FLOORS, not targets: `minimumVisibleEnemySpawnDistanceM`
+    // is 30 m, so a 62.3 m clear line between two spawns - which is what this
+    // arena shipped in PASS 90 - passes it, and nothing at all caps how far a
+    // spawn can see. The owner's "spawns ... needs refinement" is exactly
+    // those two holes.
+    //
+    // (a) NO SPAWN SEES A SPAWN. Not "no spawn sees a near one": none at all.
+    for (const team of [0, 1] as const) {
+      for (const [x, z] of NUKETOWN2_SPAWN_LAYOUT[team]!) {
+        for (const [ex, ez] of NUKETOWN2_SPAWN_LAYOUT[1 - team]!) {
+          expect(clearLine(map, [x, z], [ex, ez], 1.65), `spawn (${x}, ${z}) sees enemy spawn (${ex}, ${ez})`).toBe(false);
+        }
+      }
+    }
+    // (b) A CEILING ON SPAWN EXPOSURE, derived rather than measured. The
+    // street's own length L is the longest thing on this map anyone is meant
+    // to shoot down, so no spawn may hold a clear standing line longer than
+    // it. The floor is half of that: a spawn you cannot see half a street from
+    // is a cupboard, not a spawn. Evidence: 31.6 m worst and 22.4 m best,
+    // against 71.0 m worst before this pass.
+    const perimeterSamples: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 1; x <= NUKETOWN2_BOUNDS.maxX - 1; x += 2) {
+      perimeterSamples.push([x, NUKETOWN2_BOUNDS.minZ + 1], [x, NUKETOWN2_BOUNDS.maxZ - 1]);
+    }
+    for (let z = NUKETOWN2_BOUNDS.minZ + 1; z <= NUKETOWN2_BOUNDS.maxZ - 1; z += 2) {
+      perimeterSamples.push([NUKETOWN2_BOUNDS.minX + 1, z], [NUKETOWN2_BOUNDS.maxX - 1, z]);
+    }
+    for (const team of [0, 1] as const) {
+      for (const [x, z] of NUKETOWN2_SPAWN_LAYOUT[team]!) {
+        let longest = 0;
+        for (const sample of perimeterSamples) {
+          const metres = Math.hypot(sample[0] - x, sample[1] - z);
+          if (metres > longest && clearLine(map, [x, z], sample, 1.65)) longest = metres;
+        }
+        expect(longest, `spawn (${x}, ${z}) exposure`).toBeLessThanOrEqual(L);
+        expect(longest, `spawn (${x}, ${z}) exposure`).toBeGreaterThanOrEqual(0.5 * L);
+      }
+    }
   });
 
   it('carries the owner two kept features that live outside the arena file', () => {
@@ -554,8 +856,23 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle head car wheel 01',
       'nuketown2 street-vehicle head car wheel 10',
       'nuketown2 street-vehicle head car wheel 11',
+      // HF-432 ITEM 5 - DELIBERATE ADDITION, with the reason. The truck moved
+      // 0.076 L SOUTH of the road centre-line, where the reference has it, so
+      // the four parts that used to be their own 180-degree partners across
+      // z = 0 (the two cargo-box flanks, the box roof and the deck) no longer
+      // are. Nothing was added to the arena and nothing changed name: the same
+      // bodies stopped being self-symmetric because the body they belong to is
+      // no longer on the axis. The exception's plan-area cap and both per-half
+      // cover floors below are measured on this larger set and still hold -
+      // 127.0 m2 of 181.4, and the four halves at 73.1 / 53.9 / 64.5 / 62.5 m2
+      // against a 20 m2 floor, which is BETTER balanced than the 89.3 m2 the
+      // centred truck produced.
       'nuketown2 street-vehicle truck box bulkhead',
+      'nuketown2 street-vehicle truck box flank 0',
+      'nuketown2 street-vehicle truck box flank 1',
+      'nuketown2 street-vehicle truck box roof',
       'nuketown2 street-vehicle truck cab',
+      'nuketown2 street-vehicle truck deck',
       'nuketown2 street-vehicle truck roof step 0',
       'nuketown2 street-vehicle truck roof step 1',
       'nuketown2 street-vehicle truck roof step 2',
@@ -659,28 +976,42 @@ describe('Nuke Town Rebuild fidelity', () => {
     // be taken from INSIDE the vehicle - which is exactly the case
     // src/overdrive.ts' v6 height-window tightening exists to prevent.
     const EYE = 1.7; // movementProfile(standing).eyeHeight
-    const claimFrom = (feetY: number, x: number, z: number): boolean => (
-      claimOverdrive(createOverdriveState(0), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
-    );
+    const t = NUKETOWN2_CENTRAL_TRUCK;
+    // HF-432 item 5: the core's seat is the ARENA's now, and it is DERIVED
+    // from the truck rather than transcribed - so a truck that moves again
+    // cannot leave the core behind, which is the failure
+    // src/railgun-authority.ts' header records against the shipped map.
+    const SEAT = overdrivePositionForArena('nuketown2');
+    expect(SEAT.x).toBeCloseTo(0, 10);
+    expect(SEAT.z).toBeCloseTo(t.z, 10);
+    expect(SEAT.y).toBeCloseTo(t.roofY + t.coreHeightOverRoof, 10);
+    // THE SHIPPED MAP'S SEAT IS UNTOUCHED, byte for byte, which is the
+    // condition the orchestrator attached to this weapons change.
+    expect(OVERDRIVE_POSITION).toEqual({ x: 0, y: 3.75, z: 0 });
+    expect(overdrivePositionForArena('atomic-acres')).toBe(OVERDRIVE_POSITION);
+    expect(overdrivePositionForArena('some-arena-with-no-core')).toBe(OVERDRIVE_POSITION);
 
-    expect(OVERDRIVE_POSITION.y).toBe(3.75);
+    const claimFrom = (feetY: number, x: number, z: number): boolean => (
+      claimOverdrive(createOverdriveState(0, SEAT), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
+    );
     // Standing on the cargo-box roof, at the core: CLAIMED. dy 1.10.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.roofY, 0, 0), 'box roof').toBe(true);
+    expect(claimFrom(t.roofY, 0, t.z), 'box roof').toBe(true);
     // Standing on the deck directly beneath it: REJECTED. dy 2.00.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.deckY, 0, 0), 'cargo box interior').toBe(false);
+    expect(claimFrom(t.deckY, 0, t.z), 'cargo box interior').toBe(false);
     // Standing on the road beside the truck: REJECTED. dy 2.05.
-    expect(claimFrom(0, 1.2, 3.0), 'road').toBe(false);
+    expect(claimFrom(0, 1.2, t.z + 3.0), 'road').toBe(false);
     // Standing on the CAB roof: REJECTED by radius. The cab roof is a real
     // walkable surface on the climb route, and it is 0.25 m below the box roof,
     // so height alone would admit it.
-    expect(claimFrom(NUKETOWN2_CENTRAL_TRUCK.cabRoofY, NUKETOWN2_CENTRAL_TRUCK.cabX, 0), 'cab roof').toBe(false);
+    expect(claimFrom(t.cabRoofY, t.cabX, t.z), 'cab roof').toBe(false);
     // Standing on any roof-access tread: REJECTED - not by height (the top tread
     // is well inside the height window) but by RADIUS, because every tread
-    // footprint is more than 1.65 m from the origin in plan. Climbing half way
+    // footprint is more than 1.65 m from the core in plan. Climbing half way
     // must not be a way to take the core out of a covered position.
+    const treadZ = t.z - (t.width / 2 + 2.45) / 2;
     for (const [top, x0, x1] of [[0.80, 7.0, 8.2], [1.75, 5.8, 7.0], [2.60, 4.6, 5.8]] as const) {
       for (const x of [x0, x1, (x0 + x1) / 2]) {
-        for (const z of [1.35, 1.9, 2.4]) {
+        for (const z of [treadZ - 0.55, treadZ, treadZ + 0.55]) {
           expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
         }
       }
@@ -699,10 +1030,15 @@ describe('Nuke Town Rebuild fidelity', () => {
       const dt = 1 / 120;
       // Approach the treads from the road, climb them, step onto the cab roof,
       // then onto the cargo-box roof and walk to the core.
+      const t = NUKETOWN2_CENTRAL_TRUCK;
+      // The treads are on the truck's NORTH flank - the middle of the road -
+      // so the climb is contested rather than handed to whichever team the
+      // truck's 0.076 L offset put it nearer.
+      const treadZ = t.z - (t.width / 2 + 2.45) / 2;
       const route: Array<[number, number]> = [
-        [7.6, 1.9], [6.4, 1.9], [5.2, 1.9], [NUKETOWN2_CENTRAL_TRUCK.cabX, 0], [0, 0],
+        [7.6, treadZ], [6.4, treadZ], [5.2, treadZ], [t.cabX, t.z], [0, t.z],
       ];
-      physics.teleportEye({ x: 9.6, y: 1.9, z: 1.9 });
+      physics.teleportEye({ x: 9.6, y: 1.9, z: treadZ });
       let vy = 0;
       for (const waypoint of route) {
         for (let step = 0; step < 420; step += 1) {
@@ -723,7 +1059,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       }
       const end = physics.eyePosition();
       // Standing (or mid-hop) on the roof over the core, not on the road.
-      expect(Math.hypot(end.x, end.z), 'reached the core in plan').toBeLessThan(1.2);
+      expect(Math.hypot(end.x, end.z - NUKETOWN2_CENTRAL_TRUCK.z), 'reached the core in plan').toBeLessThan(1.2);
       expect(end.y, 'eye height on the truck roof').toBeGreaterThan(NUKETOWN2_CENTRAL_TRUCK.roofY + 1.5);
     } finally {
       physics.dispose();

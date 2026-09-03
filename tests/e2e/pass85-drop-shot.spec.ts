@@ -268,6 +268,126 @@ test.describe('HF-412 drop shot', () => {
     expect(result.afterRelease).toBe('prone');
   });
 
+  test('HF-433: crouching cancels sprint, crouch speed is its own, and held shift does not resume sprinting', async ({ page }) => {
+    // Owner after PASS 90: "when I go prone now it dropshots nicely but going
+    // crouched I still move fast, sort it out in the same way?"
+    //
+    // The defect was in `updatePhysics`: holding sprint while crouched STOOD
+    // THE PLAYER UP and sprinted, so the crouch speed the movement profile
+    // authors applied for exactly one frame. This is the browser half of the
+    // fix - the unit tests pin the state machine, and only a real run can show
+    // that the stance survives a held Shift and that the speed drops with it.
+    await ready(page);
+    const result = await page.evaluate(async () => {
+      const debug = window.__ATOMIC_ACRES_DEBUG__;
+      const wait = (ms: number): Promise<void> => new Promise((resolve) => { window.setTimeout(resolve, ms); });
+      const stance = (): string => debug.snapshot().player.stance as string;
+      const isSprinting = (): boolean => debug.snapshot().player.sprinting;
+      const position = (): number[] => debug.snapshot().player.position as number[];
+      const down = (code: string): void => window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+      const up = (code: string): void => window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+
+      /** Fastest ground speed seen over `ms`, from the authoritative position. */
+      const peakSpeed = async (ms: number): Promise<number> => {
+        let peak = 0;
+        let previous = position();
+        let previousAt = performance.now();
+        const until = previousAt + ms;
+        while (performance.now() < until) {
+          await wait(40);
+          const now = performance.now();
+          const current = position();
+          const dt = (now - previousAt) / 1000;
+          if (dt > 0.01) {
+            const speed = Math.hypot(current[0]! - previous[0]!, current[2]! - previous[2]!) / dt;
+            if (speed > peak) peak = speed;
+          }
+          previous = current;
+          previousAt = now;
+        }
+        return peak;
+      };
+
+      debug.setStanceForQa('stand');
+      await wait(150);
+
+      // 1. Sprint, standing.
+      down('KeyW');
+      await wait(60);
+      down('ShiftLeft');
+      await wait(220);
+      const stanceWhileSprinting = stance();
+      const sprintingBeforeCrouch = isSprinting();
+      const sprintPeak = await peakSpeed(420);
+
+      // 2. Tap crouch while STILL holding Shift and W.
+      down('KeyC');
+      await wait(60);
+      up('KeyC');
+      await wait(260);
+      const stanceAfterCrouch = stance();
+      const sprintingWhileCrouched = isSprinting();
+      const crouchPeak = await peakSpeed(420);
+      const stanceAfterCrouchRun = stance();
+
+      // 3. Stand back up, Shift STILL held: no sprint until it is released.
+      down('KeyC');
+      await wait(60);
+      up('KeyC');
+      await wait(260);
+      const stanceAfterStand = stance();
+      const sprintingAfterStand = isSprinting();
+
+      // 4. Release Shift and press it again while standing.
+      up('ShiftLeft');
+      await wait(120);
+      down('ShiftLeft');
+      await wait(240);
+      const sprintingAfterFreshPress = isSprinting();
+
+      up('ShiftLeft');
+      up('KeyW');
+      debug.setStanceForQa('stand');
+
+      return {
+        stanceWhileSprinting,
+        sprintingBeforeCrouch,
+        sprintPeak,
+        stanceAfterCrouch,
+        sprintingWhileCrouched,
+        crouchPeak,
+        stanceAfterCrouchRun,
+        stanceAfterStand,
+        sprintingAfterStand,
+        sprintingAfterFreshPress,
+      };
+    });
+
+    // Sprinting to begin with, or the rest of the test proves nothing.
+    expect(result.stanceWhileSprinting).toBe('stand');
+    expect(result.sprintingBeforeCrouch).toBe(true);
+    expect(result.sprintPeak).toBeGreaterThan(4);
+
+    // THE FIX. Crouching cancels sprint, and the crouch SURVIVES the still-held
+    // Shift - before this, the player was stood back up on the next frame.
+    expect(result.stanceAfterCrouch).toBe('crouch');
+    expect(result.sprintingWhileCrouched).toBe(false);
+    expect(result.stanceAfterCrouchRun).toBe('crouch');
+    // ...and they are actually moving, at crouch speed. Authored 3.15 m/s
+    // against a sprint of 8.7 (a ratio of 0.36); the band is loose because a
+    // solo run on test1 can clip a wall, and the stance assertions above are
+    // the ones that carry the property.
+    expect(result.crouchPeak).toBeGreaterThan(1.2);
+    expect(result.crouchPeak).toBeLessThan(result.sprintPeak * 0.75);
+
+    // Standing back up with Shift still down does NOT resume sprinting - the
+    // same rule HF-431 gave the drop shot.
+    expect(result.stanceAfterStand).toBe('stand');
+    expect(result.sprintingAfterStand).toBe(false);
+    // A fresh press does.
+    expect(result.sprintingAfterFreshPress).toBe(true);
+  });
+
   test('HF-431: drop shot from sprint clears sprint latch; held shift does not resume sprinting', async ({ page }) => {
     // Owner HF-431: "if I am sprinting and press Z it should do the drop shot but then not keep sprinting if i am still holding Shift"
     // Sequence: Shift held + moving forward -> sprinting; press Z -> prone, not sprinting; stand -> still not sprinting until Shift released and pressed again.
