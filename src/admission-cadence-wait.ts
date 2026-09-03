@@ -41,24 +41,41 @@ export interface AdaptiveCadenceDecision {
 }
 
 export function computeMedianGap(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
+  if (values.length === 0 || values.some((value) => !Number.isFinite(value) || value <= 0)) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 export function evaluateAdaptiveCadenceDecision(input: AdaptiveCadenceEvaluationInput): AdaptiveCadenceDecision {
-  const ceilingMs = input.ceilingMs ?? ADMISSION_CADENCE_CEILING_MS;
-  const targetStableFrames = input.targetStableFrames ?? ADMISSION_CADENCE_TARGET_STABLE_FRAMES;
-  const maxLongTaskMs = input.maxLongTaskMs ?? ADMISSION_CADENCE_MAX_LONG_TASK_MS;
-  const tolerance = input.tolerance ?? ADMISSION_CADENCE_MEDIAN_TOLERANCE;
-  const floorMs = input.floorMs ?? 0;
+  const configuredCeilingMs = input.ceilingMs ?? ADMISSION_CADENCE_CEILING_MS;
+  const ceilingMs = Number.isFinite(configuredCeilingMs)
+    ? Math.min(ADMISSION_CADENCE_CEILING_MS, Math.max(0, configuredCeilingMs))
+    : ADMISSION_CADENCE_CEILING_MS;
+  const configuredTargetStableFrames = input.targetStableFrames ?? ADMISSION_CADENCE_TARGET_STABLE_FRAMES;
+  const targetStableFrames = Number.isSafeInteger(configuredTargetStableFrames)
+    ? Math.max(ADMISSION_CADENCE_TARGET_STABLE_FRAMES, configuredTargetStableFrames)
+    : ADMISSION_CADENCE_TARGET_STABLE_FRAMES;
+  const configuredMaxLongTaskMs = input.maxLongTaskMs ?? ADMISSION_CADENCE_MAX_LONG_TASK_MS;
+  const maxLongTaskMs = Number.isFinite(configuredMaxLongTaskMs)
+    ? Math.min(ADMISSION_CADENCE_MAX_LONG_TASK_MS, Math.max(0, configuredMaxLongTaskMs))
+    : ADMISSION_CADENCE_MAX_LONG_TASK_MS;
+  const configuredTolerance = input.tolerance ?? ADMISSION_CADENCE_MEDIAN_TOLERANCE;
+  const tolerance = Number.isFinite(configuredTolerance)
+    ? Math.min(ADMISSION_CADENCE_MEDIAN_TOLERANCE, Math.max(0, configuredTolerance))
+    : ADMISSION_CADENCE_MEDIAN_TOLERANCE;
+  const configuredFloorMs = input.floorMs ?? 0;
+  const floorMs = Number.isFinite(configuredFloorMs) ? Math.max(0, configuredFloorMs) : 0;
 
-  const elapsedMs = Math.max(0, input.now - input.startedAt);
+  const elapsedMs = Number.isFinite(input.now) && Number.isFinite(input.startedAt)
+    ? Math.max(0, input.now - input.startedAt)
+    : ceilingMs;
 
   // Strict upper bound: ceiling timeout always exits degraded.
   if (elapsedMs >= ceilingMs) {
-    const currentGapMs = input.previousFrameAt > 0 ? Math.max(0, input.now - input.previousFrameAt) : 0;
+    const currentGapMs = input.previousFrameAt > 0
+      && Number.isFinite(input.now) && Number.isFinite(input.previousFrameAt)
+      ? Math.max(0, input.now - input.previousFrameAt) : 0;
     return {
       shouldExit: true,
       reason: 'ceiling-timeout',
@@ -70,6 +87,8 @@ export function evaluateAdaptiveCadenceDecision(input: AdaptiveCadenceEvaluation
     };
   }
 
+  const hasInvalidRecentGap = input.recentGapsMs.some((gapMs) => !Number.isFinite(gapMs) || gapMs <= 0);
+
   // First sample establishes the timeline (no interval measured yet).
   if (input.previousFrameAt <= 0) {
     return {
@@ -79,11 +98,25 @@ export function evaluateAdaptiveCadenceDecision(input: AdaptiveCadenceEvaluation
       consecutiveStableFrames: 0,
       currentGapMs: 0,
       medianGapMs: null,
-      isStableGap: true,
+      isStableGap: false,
     };
   }
 
-  const currentGapMs = Math.max(0, input.now - input.previousFrameAt);
+  const rawCurrentGapMs = input.now - input.previousFrameAt;
+  const currentGapMs = Number.isFinite(rawCurrentGapMs) ? Math.max(0, rawCurrentGapMs) : 0;
+
+  // A zero, backwards, or non-finite clock delta is not a presented cadence.
+  if (!Number.isFinite(rawCurrentGapMs) || rawCurrentGapMs <= 0 || hasInvalidRecentGap) {
+    return {
+      shouldExit: false,
+      reason: 'unstable-variance',
+      admittedDegraded: false,
+      consecutiveStableFrames: 0,
+      currentGapMs,
+      medianGapMs: computeMedianGap(input.recentGapsMs),
+      isStableGap: false,
+    };
+  }
 
   // Any frame longer than maxLongTaskMs (50 ms) is a hitch/long task: breaks stability.
   if (currentGapMs > maxLongTaskMs) {
@@ -110,7 +143,27 @@ export function evaluateAdaptiveCadenceDecision(input: AdaptiveCadenceEvaluation
     }
   }
 
-  const consecutiveStableFrames = isStableGap ? input.consecutiveStableFrames + 1 : 0;
+  const priorStableFrames = Number.isSafeInteger(input.consecutiveStableFrames)
+    ? Math.max(0, input.consecutiveStableFrames)
+    : 0;
+  let consecutiveStableFrames = isStableGap
+    ? Math.min(priorStableFrames + 1, input.recentGapsMs.length)
+    : 0;
+
+  // The caller records the current gap before invoking this evaluator. Once a
+  // median exists, derive the stable run from the history tail as well as the
+  // caller counter, so a warm-up outlier cannot remain counted forever.
+  if (isStableGap && medianGapMs !== null && input.recentGapsMs.length >= 5) {
+    const minAcceptable = medianGapMs * (1 - tolerance);
+    const maxAcceptable = Math.min(maxLongTaskMs, medianGapMs * (1 + tolerance));
+    let stableHistoryFrames = 0;
+    for (let index = input.recentGapsMs.length - 1; index >= 0; index -= 1) {
+      const gapMs = input.recentGapsMs[index]!;
+      if (gapMs < minAcceptable || gapMs > maxAcceptable) break;
+      stableHistoryFrames += 1;
+    }
+    consecutiveStableFrames = Math.min(consecutiveStableFrames, stableHistoryFrames);
+  }
 
   // Early exit condition: N consecutive stable frames, presentation progress ready, and past floor.
   if (consecutiveStableFrames >= targetStableFrames && input.progressReady && elapsedMs >= floorMs) {

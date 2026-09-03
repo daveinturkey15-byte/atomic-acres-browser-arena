@@ -3147,7 +3147,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         presentationProgressReady = renderRuntime.backend === 'webgl2';
       }
       const adaptiveDecision = evaluateAdaptiveCadenceDecision({
-        now, startedAt, previousFrameAt: previousAt, consecutiveStableFrames,
+        now, startedAt: foregroundEpochStartedAt, previousFrameAt: previousAt, consecutiveStableFrames,
         recentGapsMs: recentGaps, progressReady: presentationProgressReady,
         ceilingMs: maximumWaitMs, targetStableFrames: ADMISSION_CADENCE_TARGET_STABLE_FRAMES,
         maxLongTaskMs: hitchThresholdMs,

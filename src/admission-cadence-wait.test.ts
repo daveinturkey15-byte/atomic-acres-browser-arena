@@ -14,6 +14,110 @@ describe('evaluateAdaptiveCadenceDecision', () => {
     expect(computeMedianGap([16.0, 16.6, 17.0])).toBe(16.6);
     expect(computeMedianGap([16.0, 16.4, 16.8, 17.2])).toBe(16.6);
     expect(computeMedianGap([33.3, 16.6, 50.0])).toBe(33.3);
+    expect(computeMedianGap([16.6, Number.NaN, 16.6])).toBeNull();
+    expect(computeMedianGap([16.6, Number.POSITIVE_INFINITY])).toBeNull();
+  });
+
+  it('fails closed for zero/non-finite cadence and refuses an invalid or extended ceiling', () => {
+    const zeroDelta = evaluateAdaptiveCadenceDecision({
+      now: 2_000,
+      startedAt: 1_000,
+      previousFrameAt: 2_000,
+      consecutiveStableFrames: 29,
+      recentGapsMs: [0, 0, 0, 0, 0],
+      progressReady: true,
+    });
+    expect(zeroDelta.shouldExit).toBe(false);
+    expect(zeroDelta.consecutiveStableFrames).toBe(0);
+    expect(zeroDelta.isStableGap).toBe(false);
+
+    const nonFiniteHistory = evaluateAdaptiveCadenceDecision({
+      now: 2_016.6,
+      startedAt: 1_000,
+      previousFrameAt: 2_000,
+      consecutiveStableFrames: 29,
+      recentGapsMs: [Number.NaN, Number.NaN, Number.NaN, Number.NaN, Number.NaN],
+      progressReady: true,
+    });
+    expect(nonFiniteHistory.shouldExit).toBe(false);
+    expect(nonFiniteHistory.consecutiveStableFrames).toBe(0);
+    expect(nonFiniteHistory.isStableGap).toBe(false);
+
+    const nonFiniteClock = evaluateAdaptiveCadenceDecision({
+      now: Number.NaN,
+      startedAt: 1_000,
+      previousFrameAt: 1_016.6,
+      consecutiveStableFrames: 29,
+      recentGapsMs: [16.6, 16.6, 16.6, 16.6, 16.6],
+      progressReady: true,
+    });
+    expect(nonFiniteClock.shouldExit).toBe(true);
+    expect(nonFiniteClock.reason).toBe('ceiling-timeout');
+    expect(nonFiniteClock.admittedDegraded).toBe(true);
+    expect(Number.isFinite(nonFiniteClock.currentGapMs)).toBe(true);
+
+    const extendedCeiling = evaluateAdaptiveCadenceDecision({
+      now: 6_999,
+      startedAt: 1_000,
+      previousFrameAt: 6_982,
+      consecutiveStableFrames: 0,
+      recentGapsMs: [17],
+      progressReady: false,
+      ceilingMs: 6_000,
+    });
+    expect(extendedCeiling.shouldExit).toBe(true);
+    expect(extendedCeiling.reason).toBe('ceiling-timeout');
+    expect(extendedCeiling.admittedDegraded).toBe(true);
+  });
+
+  it('does not count a long warm-up frame toward the stable cadence run', () => {
+    const startedAt = 1_000;
+    let now = startedAt + 49;
+    let previousAt = startedAt;
+    let consecutiveStableFrames = 0;
+    const recentGaps: number[] = [49];
+
+    let decision = evaluateAdaptiveCadenceDecision({
+      now,
+      startedAt,
+      previousFrameAt: previousAt,
+      consecutiveStableFrames,
+      recentGapsMs: recentGaps,
+      progressReady: true,
+    });
+    consecutiveStableFrames = decision.consecutiveStableFrames;
+    previousAt = now;
+
+    for (let stableFrame = 1; stableFrame <= 29; stableFrame += 1) {
+      now += 16.6;
+      recentGaps.push(16.6);
+      decision = evaluateAdaptiveCadenceDecision({
+        now,
+        startedAt,
+        previousFrameAt: previousAt,
+        consecutiveStableFrames,
+        recentGapsMs: recentGaps,
+        progressReady: true,
+      });
+      consecutiveStableFrames = decision.consecutiveStableFrames;
+      previousAt = now;
+    }
+
+    expect(decision.shouldExit).toBe(false);
+    expect(decision.consecutiveStableFrames).toBe(29);
+
+    now += 16.6;
+    recentGaps.push(16.6);
+    const finalDecision = evaluateAdaptiveCadenceDecision({
+      now,
+      startedAt,
+      previousFrameAt: previousAt,
+      consecutiveStableFrames,
+      recentGapsMs: recentGaps,
+      progressReady: true,
+    });
+    expect(finalDecision.shouldExit).toBe(true);
+    expect(finalDecision.consecutiveStableFrames).toBe(30);
   });
 
   it('exits early when presented-frame cadence has been stable for 30 consecutive frames', () => {
