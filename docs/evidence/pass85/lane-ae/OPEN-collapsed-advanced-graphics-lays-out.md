@@ -1,6 +1,8 @@
 # OPEN — a collapsed Advanced Graphics still lays out 2,815 px over the Options panel
 
-**Found by:** Lane AE (emulated mobile pass), PASS 87 window, 2026-09-03.
+**Found by:** Lane AE of the PASS 85 lane sweep (emulated mobile pass), worked
+in the PASS 87 window, 2026-09-03. Evidence lives under
+`docs/evidence/pass85/lane-ae/`.
 **Status:** OPEN. Diagnosed and reproduced; **not fixed here** — the file is
 outside this lane's ownership (Lane AE owns the touch overlay, HUD responsive
 CSS, and its own QA script). The exact patch is below for whoever owns
@@ -70,7 +72,7 @@ the user-agent rule that hides a closed disclosure's contents.
 +/* Only when the disclosure is OPEN. An author `display` declaration on a direct
 +   child of a closed <details> outranks the user-agent rule that hides the
 +   contents, so the collapsed catalog was laying out ~2,815 px over every
-+   section below it (measured, Lane AE, PASS 87). */
++   section below it (measured, Lane AE, PASS 85 sweep / PASS 87 window). */
 +#advanced-graphics[open] .advanced-graphics-catalog {
    display: grid;
    gap: 12px;

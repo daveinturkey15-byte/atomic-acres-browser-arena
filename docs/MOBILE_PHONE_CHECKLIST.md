@@ -1,8 +1,8 @@
 # The five-minute phone check — Dave only
 
-Everything on a phone that a machine in this house **can** check is checked by
+Most of what a machine in this house **can** check on a phone is checked by
 `npm run qa:mobile:emulated` (three emulated devices, real touch input, every
-control measured and tapped). This page is the short list of things it
+control measured and driven). This page is the short list of things it
 **cannot** check, because they need a physical handset that only you hold.
 
 Five minutes, two phones, one pad. Tick or write what you saw — a "no" here is
@@ -73,13 +73,22 @@ radio. Pairing, latency and the button map are unproven until you hold one.
 So you do not spend the five minutes on things that are covered:
 
 - **Measured on three emulated devices** (6.1" phone portrait, the same phone in
-  landscape, a 10" tablet), on the arenas the registry offers, headless: every
-  touch control is on screen, at least 44 px, non-overlapping, and actually
-  drives the game — move, look, fire, reload, ADS, weapon switch, jump, pause,
-  settings, resume. HUD text is at or above the 9 px floor and no console sits
-  under a control. A connected pad suppresses the overlay and disconnecting
-  restores it; touch holds the strongest aim-assist tier.
-- **Fixed in PASS 87 by this lane:** tapping PAUSE used to open the pause menu
+  landscape, a 10" tablet), on **Nuke Town and Raid — 2 of the 9 selectable
+  arenas** (the script's default roster is all 9; a ~27-cell run was not
+  attempted in this window), headless: every touch control is on screen, at
+  least 44 px, non-overlapping, and actually drives the game — move, look,
+  fire, reload, ADS, weapon switch, jump, **sprint**, pause, settings, resume.
+  HUD text is at or above the 9 px floor and no console sits under a control.
+  A connected pad suppresses the overlay and disconnecting restores it; touch
+  holds the strongest aim-assist tier.
+- **Not covered even where it was measured:** the 15 checkbox rows in the
+  settings panel (the eight audio mutes, the three accessibility toggles, the
+  touch-controls toggle, invert-Y, rumble, leaderboard sharing) are 24 px tall
+  on every device. The overlay's 44 px floor is enforced hard; menu height is
+  not, so those rows are reported and not failed. If any of them is fiddly on
+  real glass, say so — that turns a soft row into a fix.
+- **Fixed by this lane (Lane AE of the PASS 85 sweep, landing in the PASS 87
+  window):** tapping PAUSE used to open the pause menu
   **and** the project-map panel on top of it, leaving the pause surface
   unusable — the tap's synthesised click landed on the menu button the overlay
   had just stopped covering. Step A8/`only the pause menu` is the row that
