@@ -579,6 +579,46 @@ describe('Nuke Town Rebuild fidelity', () => {
         expect(Math.hypot(x, z), `spawn (${x}, ${z}) to centre`).toBeGreaterThan(backWall);
       }
     }
+
+    // ---- HF-432 item 3: the two properties the shipped spawn gate has not --
+    // Its bands are FLOORS, not targets: `minimumVisibleEnemySpawnDistanceM`
+    // is 30 m, so a 62.3 m clear line between two spawns - which is what this
+    // arena shipped in PASS 90 - passes it, and nothing at all caps how far a
+    // spawn can see. The owner's "spawns ... needs refinement" is exactly
+    // those two holes.
+    //
+    // (a) NO SPAWN SEES A SPAWN. Not "no spawn sees a near one": none at all.
+    for (const team of [0, 1] as const) {
+      for (const [x, z] of NUKETOWN2_SPAWN_LAYOUT[team]!) {
+        for (const [ex, ez] of NUKETOWN2_SPAWN_LAYOUT[1 - team]!) {
+          expect(clearLine(map, [x, z], [ex, ez], 1.65), `spawn (${x}, ${z}) sees enemy spawn (${ex}, ${ez})`).toBe(false);
+        }
+      }
+    }
+    // (b) A CEILING ON SPAWN EXPOSURE, derived rather than measured. The
+    // street's own length L is the longest thing on this map anyone is meant
+    // to shoot down, so no spawn may hold a clear standing line longer than
+    // it. The floor is half of that: a spawn you cannot see half a street from
+    // is a cupboard, not a spawn. Evidence: 31.6 m worst and 22.4 m best,
+    // against 71.0 m worst before this pass.
+    const perimeterSamples: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 1; x <= NUKETOWN2_BOUNDS.maxX - 1; x += 2) {
+      perimeterSamples.push([x, NUKETOWN2_BOUNDS.minZ + 1], [x, NUKETOWN2_BOUNDS.maxZ - 1]);
+    }
+    for (let z = NUKETOWN2_BOUNDS.minZ + 1; z <= NUKETOWN2_BOUNDS.maxZ - 1; z += 2) {
+      perimeterSamples.push([NUKETOWN2_BOUNDS.minX + 1, z], [NUKETOWN2_BOUNDS.maxX - 1, z]);
+    }
+    for (const team of [0, 1] as const) {
+      for (const [x, z] of NUKETOWN2_SPAWN_LAYOUT[team]!) {
+        let longest = 0;
+        for (const sample of perimeterSamples) {
+          const metres = Math.hypot(sample[0] - x, sample[1] - z);
+          if (metres > longest && clearLine(map, [x, z], sample, 1.65)) longest = metres;
+        }
+        expect(longest, `spawn (${x}, ${z}) exposure`).toBeLessThanOrEqual(L);
+        expect(longest, `spawn (${x}, ${z}) exposure`).toBeGreaterThanOrEqual(0.5 * L);
+      }
+    }
   });
 
   it('carries the owner two kept features that live outside the arena file', () => {

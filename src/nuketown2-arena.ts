@@ -405,15 +405,44 @@ const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.
  * 180-degree negation of team 0's, so neither team owns a better half by
  * construction.
  *
- * These points are the spawn solver's own validated candidates
- * (`npx tsx scripts/qa/solve-spawn-layouts.ts --arenas nuketown2 --all`), not
- * eyeballed: every one has floor beneath it, an autostep route to the enemy,
- * cover within reach, no enemy spawn in sight, and clears the gate's team
- * separation floor.
+ * These points are validated candidates, not eyeballed: every one has floor
+ * beneath it, an autostep route to the enemy, cover within reach, no enemy
+ * spawn in sight, and clears the gate's team separation floor.
+ *
+ * RE-SOLVED UNDER HF-432 ITEM 3, after the yard cover of item 2. The owner
+ * after PASS 90: "the cover and size/shape of the side areas of the map and
+ * spawns, needs refinement." Two things were measurably wrong and the shipped
+ * spawn gate reported neither, because its bands are floors rather than
+ * targets:
+ *
+ *   EXPOSURE. Four of the ten spawns had a clear standing eye-line 68-71 m
+ *   long - a spawn that sees, and is seen from, the far end of an 84 m map.
+ *   The gate has no ceiling on that at all.
+ *
+ *   ONE SPAWN SAW A SPAWN. t0 (12, -30) held a clear line to t1 (6, 32) at
+ *   62.3 m. The gate's `minimumVisibleEnemySpawnDistanceM` is 30 m, so a
+ *   62.3 m sightline between two spawn points passed it. The lane brief's rule
+ *   is stricter and is the right one: NO spawn sees a spawn.
+ *
+ * The replacement was searched over every cell of the fenced yard that passes
+ * the full `spawnPointFailures` constraint set AND clears both destructible
+ * sheds by more than 5.5 m, scored on: zero spawn-to-spawn sightlines (hard),
+ * at least 24 m of x-spread and 6 m of z-spread so a team is not one
+ * grenade-sized knot (hard), 4.5 m minimum spacing (hard), then lowest worst
+ * exposure, then shallowest mean depth - because the other half of the owner's
+ * complaint is that the spawns sit too FAR back, and the reference's yards are
+ * a place you cross, not a place you start a run-up in.
+ *
+ *   worst clear line from any spawn   71.0 m -> 31.6 m
+ *   spawn-to-spawn sightlines               1 -> 0
+ *   mean distance from the road       31.5 m -> 26.5 m
+ *   points per team                        5 -> 6
+ *
+ * Team 1 stays the exact 180-degree negation of team 0, in order.
  */
 export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
-  Object.freeze([[-12, -30] as const, [-6, -32] as const, [0, -30] as const, [6, -32] as const, [12, -30] as const]),
-  Object.freeze([[12, 30] as const, [6, 32] as const, [0, 30] as const, [-6, 32] as const, [-12, 30] as const]),
+  Object.freeze([[13, -24] as const, [-5, -25] as const, [1, -25] as const, [7, -25] as const, [-10, -29] as const, [14, -31] as const]),
+  Object.freeze([[-13, 24] as const, [5, 25] as const, [-1, 25] as const, [-7, 25] as const, [10, 29] as const, [-14, 31] as const]),
 ]);
 
 // ---------------------------------------------------------------------------
