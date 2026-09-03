@@ -867,6 +867,13 @@ export function createStreetCell(seed = 419): StreetCell {
   const groundMat = createGroundMaterial();
   const groundGeo = buildCellGround();
   const ground = new THREE.Mesh(groundGeo, groundMat);
+  // SHADOWS OFF, deliberately and measurably. Map 3's sun uses a +-34 m
+  // orthographic shadow camera centred on the hub; this cell sits 70-92 m out
+  // along corridor 3, entirely outside it. castShadow there buys no shadow and
+  // costs a shadow-pass draw call per object - it was 5 of the cell's 13 added
+  // draws at the kerbside pose. receiveShadow stays on: it is free here and
+  // keeps the cell correct if the shadow camera is ever widened by another
+  // lane. This is a cost cut, not a loosened gate: no threshold moved.
   ground.receiveShadow = true;
   group.add(ground);
   disposables.push(groundGeo, groundMat);
@@ -893,7 +900,7 @@ export function createStreetCell(seed = 419): StreetCell {
   }
   const frontageGeo = mergeTagged(frontageParts, 'facePart');
   const frontage = new THREE.Mesh(frontageGeo, frontageMat);
-  frontage.castShadow = true;
+  frontage.castShadow = false;
   frontage.receiveShadow = true;
   group.add(frontage);
   disposables.push(frontageGeo);
@@ -925,7 +932,7 @@ export function createStreetCell(seed = 419): StreetCell {
     });
     mesh.instanceMatrix.needsUpdate = true;
     proto.setAttribute('instanceTint', new THREE.InstancedBufferAttribute(tints, 3));
-    mesh.castShadow = true;
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     // Culling stays ON - a family flagged frustumCulled = false is drawn from
     // every pose in the map and quietly spends the cell's whole draw budget on
