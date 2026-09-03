@@ -41,7 +41,7 @@ either. Against QUALITY it changes **ten** controls, not six. All ten:
 | `antiAliasing` | msaa-4x → smaa | **REDUCTION** — drops the 4-sample HDR target. The single biggest saving. |
 | `screenSpaceReflections` | low → off | **REDUCTION** — the trace supersedes it; running both pays for reflected light twice. |
 | `rayTracing` | off → reflections | addition — the point of the profile. |
-| `ambientOcclusion` | off → high | addition, per-frame. |
+| `ambientOcclusion` | off → high | addition, and the **largest per-frame addition in the delta** — GTAO at 0.5 resolution scale, 12 samples, plus a denoise pass (§2). |
 | `reflectionQuality` | high → ultra | addition; PMREM tier 512 — load time, not per-frame. |
 | `anisotropy` | 8 → 16 | addition; sampler cost only. |
 | `rainDensity` | 1 → 1.15 | addition, and a genuine **per-frame fill-rate increase**. |
@@ -49,25 +49,57 @@ either. Against QUALITY it changes **ten** controls, not six. All ten:
 | `filmGrain` | 0.32 → 0.36 | addition; grade-chain constant, negligible. |
 | `vignette` | 0.16 → 0.17 | addition; grade-chain constant, negligible. |
 
-So: **two reductions and eight additions**, and two of the additions
-(`rainDensity`, `ambientLife`) are real per-frame cost rather than a rounding
-nudge. The honest sentence is that RAY TRACED **mostly** buys the trace — the
-two reductions are the two largest per-frame items in the delta — while still
-stacking a small amount of extra fill rate on top. An earlier draft of this
-document said "six controls, two of them reductions, it buys the trace; it
-does not stack it". That was wrong on the count and too clean on the story.
-**Corrected 2026-09-03 after review.**
+So: **two reductions and eight additions**, and **three** of the additions are
+real per-frame cost rather than a rounding nudge: `ambientOcclusion`
+off → high (a 12-sample gather at 0.5 resolution scale with a denoise pass —
+the biggest of the three), and `rainDensity` and `ambientLife` at 1 → 1.15
+(instance-count fill rate). The other five additions are load-time
+(`reflectionQuality`'s PMREM tier), sampler-only (`anisotropy`) or
+grade-chain constants (`filmGrain`, `vignette`, and the trace itself is the
+point of the profile rather than an extra). The honest sentence is that
+RAY TRACED **mostly** buys the trace — the two reductions are the two largest
+per-frame items in the delta — while still stacking real extra fill rate on
+top. Two drafts of this paragraph were wrong before this one: the first said
+"six controls, two of them reductions, it buys the trace; it does not stack
+it" (wrong count, too clean a story), and the second named only `rainDensity`
+and `ambientLife` as genuine per-frame cost and silently omitted
+`ambientOcclusion`, which is larger than either. **Corrected 2026-09-03 after
+review; the in-game `turnsOn` copy already disclosed the AO and needed no
+change.**
 
 **Q: Does it only work on NVIDIA cards?**
 **A (VERIFIED, measured on this machine's adapter):** no. It requires the
-**WebGPU renderer** and nothing else. There is no vendor check anywhere in the
-gate: `resolveGraphicsRuntime` demotes RAY TRACED to QUALITY on exactly one
-condition — `capability.rayTracingCapable === false`, which is set when the
-renderer fell back to WebGL2, because the trace is built inside the TSL/HDR
-graph that only exists on the WebGPU route. AMD and Intel WebGPU adapters run
-it identically. It also uses **no ray-tracing hardware at all**: no shipping
-browser exposes a ray-query or acceleration-structure API, so RT cores are
-unreachable from a tab on any GPU. See §5 for the measured adapter feature list.
+**WebGPU renderer** and nothing else. There is **no vendor check anywhere** —
+not in `GRAPHICS_PRESET_VALUES`, not in `resolveGraphicsRuntime`, not in
+`resolveDisplayedGraphicsPreset`, not in the renderer bring-up: no
+`adapterInfo.vendor`, no `nvidia`, no `amd`, no `intel` string is read on any
+preset path. AMD and Intel WebGPU adapters run it identically. It also uses
+**no ray-tracing hardware at all**: no shipping browser exposes a ray-query or
+acceleration-structure API, so RT cores are unreachable from a tab on any GPU.
+See §5 for the measured adapter feature list.
+
+**Correction, 2026-09-03 (this claim was refuted in review and is restated
+here honestly).** An earlier draft of this paragraph said the gate "demotes
+RAY TRACED to QUALITY on exactly one condition —
+`capability.rayTracingCapable === false`, which is set when the renderer fell
+back to WebGL2". The **first half is source-true and the second half is
+false.** The demotion branches do exist
+(`src/pass65-settings.ts:392` and `:575`) and the unit suite
+`src/pass65-raytraced-capability.test.ts` exercises them, but **nothing in the
+shipped build ever supplies a capability object.** Every production call site
+— `src/legacy-main.ts:1815`, `:1845`, `:28070`, `:28093` and
+`src/pass65-renderer-feature-inventory.ts:463` — calls the resolvers with the
+third argument omitted, so `capability` defaults to `{}`,
+`rayTracingCapable` is `undefined`, `=== false` is never true, and **neither
+branch can fire at runtime.** The parameter's own JSDoc says "the one caller
+that owns a renderer passes the real backend"; that caller does not exist.
+So the demotion is **OPEN, not VERIFIED**: it is tested code with no
+production wiring. The substance of the owner's answer is unaffected — the
+vendor-independence and the no-RT-hardware findings were traced and measured
+separately — but the mechanism sentence was wrong and the in-game RAY TRACED
+copy that repeated it has been corrected to state only what is true (the trace
+lives in the WebGPU/TSL graph and exists on no other route). Wiring it is a
+runtime change and was out of this lane's scope; see §7.
 
 **And the thing the owner was really pointing at:** hardware RTX rendering
 needs a **native runtime** (Three.js/TSL on top, native Vulkan underneath, no
@@ -377,6 +409,13 @@ presentation loop's own camera-commit receipt re-read immediately before every
 screenshot. 5 profiles x 2 cameras, all OK, zero page errors. Halved PNGs in
 `docs/evidence/pass87/graphics-profiles/views/`; manifest alongside.
 
+**Capture coverage is narrower than measurement coverage, and the brief asked
+for more than this.** Job 1 asked for "the same review camera per arena per
+profile"; what exists is **one arena of the three measured, one of the eight
+selectable**. `skyline-terminal` and `high-seas` have cost rows but no frames.
+Everything in the table below is therefore a statement about `atomic-acres`
+only. Tracked in §7.
+
 | Comparison | What the pixels show | Claim-state |
 |---|---|---|
 | PERFORMANCE vs BALANCED | **The largest visual step in the whole ladder, and it is not close.** PERFORMANCE has no shadows at all, flat untextured surfaces, no road markings or decals, and visibly fewer props (reduced geometry detail drops the roof vehicle, the street lights, the wind turbine). BALANCED restores shadows, brick and asphalt detail, road markings, the full prop set and the storm sky. This is the owner's "doesn't look shit like performance", demonstrated. | VERIFIED |
@@ -495,6 +534,31 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   the tripwire: the moment a lighting default changes,
   `graphics-profile-contract.test.ts` fails until this document is re-measured.
 - **OPEN:** 39 of 40 controls are grep-verified only (§4).
+- **OPEN (capture coverage, narrower than measurement coverage):** the
+  side-by-side review-camera captures in §3 cover **one arena of the three
+  measured, and one of the eight selectable** — `atomic-acres`, 2 authored
+  cameras x 5 profiles = 10 frames. `skyline-terminal` and `high-seas` were
+  measured in all 15 cost rows but never captured, so the visual half of the
+  ladder is demonstrated on a single map. Related and separate: **no captured
+  frame demonstrates a ray-traced reflection**, because both authored cameras
+  are matte outdoor views; the "RAY TRACED is a different trade, not a
+  superset" half of Q1 is argued from the control set, not observed in a
+  pixel. Re-run, one browser at a time on a quiet GPU:
+  `node scripts/qa/capture-graphics-profile-views.mjs --arena skyline-terminal
+  --presets performance,balanced,high,raytraced,max`, and add a wet-surface or
+  interior camera before claiming the reflection visually.
+- **OPEN (dead capability wiring, refuted claim — see §0 Q3):** the RAY TRACED
+  demotion to QUALITY for a non-WebGPU route is **unreachable in the shipped
+  build**. `GraphicsRouteCapability.rayTracingCapable` is supplied only by
+  `src/pass65-raytraced-capability.test.ts`; the five production call sites
+  (`src/legacy-main.ts:1815`, `:1845`, `:28070`, `:28093`,
+  `src/pass65-renderer-feature-inventory.ts:463`) omit the argument. Either
+  wire it — pass `{ rayTracingCapable: renderRuntime.backend === 'webgpu' }`
+  at the four `legacy-main` sites and prove the demotion with a headless run
+  on the non-WebGPU route — or delete the branches and the reason string
+  `RAY_TRACED_REQUIRES_WEBGPU_REASON` as dead code. Both are runtime changes
+  and were outside this lane's boundary; the player-facing copy that depended
+  on the claim has been corrected instead.
 - **OPEN (coverage):** five of the eight selectable arenas were never measured
   — `rustworks-1v1`, `gun-range`, `test1`, `test2`, `map3`. The brief asked
   for the registry roster; this matrix is 3 of 8. `farcrysis` is
@@ -512,18 +576,35 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   2042/2552/2556/28108 with `devicePixelRatio: 1` on every audit row — a
   deterministic display clamp, not the adaptive valve. See §3. Pinned by
   `src/graphics-profile-contract.test.ts`.
-- **CLOSED (was OPEN): `AGENTS.md` graphics-surface sentence.** It said "The
-  top-level graphics surface exposes exactly Performance, Quality, Max and
-  Custom" — stale since RAY TRACED (HF-398) and made triply false by BALANCED
-  and the RTX explainer. Re-worded in this cut to point at
-  `GRAPHICS_PROFILE_DESCRIPTIONS` as the source of the ladder rather than
-  enumerating profiles, because an enumerated contract sentence is what went
-  stale twice. Flagged as outside this lane's ownership in the lane report.
-- **OPEN (HF-418 item 3, changelog):** the RTX-explainer copy is not
-  registered in the changelog / release-identity surfaces. That file carries
-  stamped pass numbers owned by the release lane's `roll_pass.py`, so this
-  lane cannot land the row without inventing a pass number. It is an
-  explicitly OPEN brief item, not a done one.
+- **OPEN (outside this lane's ownership — exact patch is in the lane report):**
+  the `AGENTS.md` graphics-surface sentence says "The top-level graphics
+  surface exposes exactly Performance, Quality, Max and Custom". It went stale
+  when RAY TRACED shipped (HF-398) and is made triply false by BALANCED and the
+  RTX explainer, so it now names a four-entry ladder against a shipped seven
+  entries. This lane wrote a corrected sentence, **committed it, and then
+  reverted it in the repair cut**: `AGENTS.md` is outside the lane's declared
+  ownership and the standing machine rule is stop-and-report, not edit. The
+  replacement text is in the lane report verbatim for whoever owns
+  `AGENTS.md`. Do not leave the enumerated sentence standing — a false contract
+  sentence is read as authority by the next lane.
+- **LANDED, WITH A MERGE HAZARD THE INTEGRATOR MUST CLEAR (HF-418 item 3,
+  changelog):** the BALANCED / per-mode-copy / RTX-explainer highlight is
+  registered in `src/changelog.ts`, in the entry the release stamp names. On
+  this branch that entry is `pass85`, which was the pending top entry at the
+  lane's base `714d4121`. **PASS 86 published at 00:50 BST 2026-09-03 from
+  integration `e1361b0f`**, which froze `pass85ReleasedAt` to a real receipt
+  and put a `pass86` entry above it. A merge probe (`git merge-tree
+  --write-tree HEAD e1361b0f`) merges **cleanly** — so without a guard the
+  highlight would land silently inside an already-published release entry and
+  advertise this work as PASS 85 content. A fail-closed guard was therefore
+  added in the repair cut:
+  `src/graphics-profile-contract.test.ts` → "registers the graphics-ladder
+  highlight only in the unreleased top entry" asserts the highlight
+  sits in `CHANGELOG[0]` **and** that `CHANGELOG[0].releasedAt` is still
+  `PENDING_PRODUCTION`. On the integration line that assertion goes **RED**,
+  which is the point: the integrator moves the one string into the new pending
+  entry (and `'GRAPHICS'` into that entry's `areas`) and the gate goes green.
+  It cannot merge silently any more.
 - **OPEN:** the MAX cold-compile P0 from PASS 78 (5.17-6.54 s against a 4000 ms
   bound) did **not** reproduce here: MAX admitted on all three arenas measured.
   The old figure is not refuted — it was measured differently, on a different

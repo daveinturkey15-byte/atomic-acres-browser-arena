@@ -136,7 +136,7 @@ export const GRAPHICS_PROFILE_DESCRIPTIONS: readonly GraphicsProfileDescription[
       'No indirect bounce (classic recursive ray tracing computes none) and no path tracing.',
       'Players, bots and vehicles are not in the traced set, so no reflection can show you an enemy that PERFORMANCE could not.',
     ]),
-    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame, which is far BELOW MAX (21.0 ms) on every arena measured and sits in the same band as QUALITY. The step up from QUALITY is inside the run-to-run noise on this machine and is not claimed as a number. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer; on a WebGL2 fallback it is demoted to QUALITY and the badge says so.',
+    referenceFrameNote: 'Measured 2026-09-03 at 2560x1440 on an RTX 5080, averaged over three arenas: 13.7 ms median frame, which is far BELOW MAX (21.0 ms) on every arena measured and sits in the same band as QUALITY. The step up from QUALITY is inside the run-to-run noise on this machine and is not claimed as a number. Its real cost is loading, not frame time: cold deploy runs 36-58 s. Needs the WebGPU renderer: the trace is built inside the WebGPU/TSL graph and exists on no other route.',
   }),
   Object.freeze({
     id: 'max',
