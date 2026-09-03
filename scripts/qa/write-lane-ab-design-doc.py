@@ -1,4 +1,23 @@
-# Dynamic, coloured, time-of-day and weather lighting - design and first implementation
+"""Regenerates docs/DYNAMIC_LIGHTING_2026-09-03.md (Lane AB, PASS 87).
+
+Every number in that document comes out of src/rendering/lighting-conditions.ts
+rather than out of a person, which is the only way a nine-arena table stays true
+after a band moves. Run the two table generators first, then this:
+
+    npx tsx scripts/qa/lane-ab-tod-table.mjs   > artifacts/tod-table.md
+    npx tsx scripts/qa/lane-ab-tod-summary.mjs > artifacts/tod-summary.md
+    python scripts/qa/write-lane-ab-design-doc.py
+
+Writes LF endings explicitly: the repo has source-pinned tests that fail on CRLF.
+"""
+import os
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + '/'
+table = open(ROOT + 'artifacts/tod-table.md', 'r', encoding='utf-8', newline='').read()
+summary = open(ROOT + 'artifacts/tod-summary.md', 'r', encoding='utf-8', newline='').read()
+summary_table = summary.split('\nBOUNDS')[0].strip()
+
+HEAD = """# Dynamic, coloured, time-of-day and weather lighting - design and first implementation
 
 Lane AB, PASS 87. Owner direction on record since 2026-08-31 ("dynamic /
 coloured / time-of-day / weather lighting everywhere"), 2026-09-02 17:05
@@ -222,17 +241,9 @@ Bands are chosen to stay inside each arena's authored identity as
 art direction a lie. Weather sets are the ones the arena already authors in
 `ARENA_WEATHER_PROFILES` - this lane adds no weather state to any arena.
 
-| arena | identity | band | anchor | weather set | key x (min..max) | shadow floor x (max) | exposure x (max) | sun elev delta (deg) | sun azim delta (deg) |
-|---|---|---|---|---|---|---|---|---|---|
-| Nuke Town | suburban-afternoon-into-dusk | 15:00-18:00 | 17:30 | clear, overcast, light-rain, heavy-rain | 0.872..1.150 | 1.147 | 1.031 | -5.3..19.9 | -8.2..1.6 |
-| Terminal | apron-dawn-to-midmorning | 06:48-10:30 | 07:00 | clear, overcast, light-rain, heavy-rain | 0.934..1.150 | 1.076 | 1.016 | -2.1..26.0 | -0.6..10.5 |
-| RustRig | north-sea-rig-dusk-into-night | 20:00-22:00 | 21:00 | clear, overcast, light-rain, heavy-rain, storm | 0.715..1.150 | 1.328 | 1.068 | -7.5..7.0 | -1.6..1.6 |
-| Gun Range | indoor-range-no-sky **(pinned)** | 12:00-12:00 | 12:00 | clear | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
-| Farcrysis | tropical-midmorning-to-late-afternoon | 09:00-17:00 | 12:30 | clear, overcast, light-rain, heavy-rain, storm | 0.575..1.001 | 1.488 | 1.102 | -40.3..0.1 | -15.1..19.4 |
-| High Seas | open-ocean-morning-through-dusk | 07:30-19:00 | 13:00 | clear, overcast, light-rain, heavy-rain, storm | 0.550..1.000 | 1.518 | 1.108 | -40.1..0.0 | -21.3..23.2 |
-| Firing Range | dry-range-hard-morning-sun | 10:00-13:00 | 10:30 | clear | 0.956..1.048 | 1.051 | 1.011 | -4.8..6.3 | -1.7..8.5 |
-| Raid | golden-hour-hillside | 16:00-18:30 | 17:00 | clear | 0.574..1.150 | 1.490 | 1.102 | -16.6..9.2 | -1.9..2.9 |
-| Map 3 | open-scrub-midmorning-preview-pinned **(pinned)** | 10:00-10:00 | 10:00 | clear, overcast | 1.000..1.000 | 1.000 | 1.000 | 0.0..0.0 | 0.0..0.0 |
+"""
+
+MID = """
 
 Two arenas are **pinned** to the identity at every choice, so no consumer has to
 remember they are special:
@@ -290,122 +301,9 @@ Generated. `+ heavy` rows show the same hour composed with
 `skyDarkenAmount = 0.45` (the heavy-rain rung) to show weather pulling the
 excursion back toward the authored identity.
 
-### Nuke Town (`atomic-acres`) — suburban-afternoon-into-dusk
-anchor 17:30 | band 15:00-18:00 | arc 06:00-20:00 | elev 8-62 deg | az swing 46 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 17:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 17:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 15:00 | 1.150 | 19.9 | -8.2 | 1.000 | 1.000 | 0.974 1.000 1.050 | 1.030 1.015 0.974 |
-| early + heavy | 15:00 | 1.150 | 11.0 | -4.5 | 1.000 | 1.000 | 0.992 1.000 1.016 | 1.016 1.008 0.986 |
-| midday | 16:30 | 1.150 | 9.5 | -3.3 | 1.000 | 1.000 | 0.987 1.000 1.025 | 1.030 1.015 0.974 |
-| midday + heavy | 16:30 | 1.117 | 5.2 | -1.8 | 1.000 | 1.000 | 0.996 1.000 1.008 | 1.010 1.005 0.991 |
-| late | 18:00 | 0.872 | -5.3 | 1.6 | 1.147 | 1.031 | 1.007 1.000 0.986 | 0.981 0.991 1.017 |
-| late + heavy | 18:00 | 0.931 | -2.9 | 0.9 | 1.080 | 1.017 | 1.002 1.000 0.996 | 0.994 0.997 1.005 |
+"""
 
-### Terminal (`skyline-terminal`) — apron-dawn-to-midmorning
-anchor 07:00 | band 06:48-10:30 | arc 05:00-19:00 | elev 7-58 deg | az swing 42 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 07:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 07:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 06:48 | 0.934 | -2.1 | -0.6 | 1.076 | 1.016 | 1.009 0.993 0.978 | 0.992 0.996 1.006 |
-| early + heavy | 06:48 | 0.964 | -1.1 | -0.3 | 1.042 | 1.009 | 1.003 0.998 0.993 | 0.998 0.999 1.002 |
-| midday | 08:39 | 1.150 | 15.1 | 5.0 | 1.000 | 1.000 | 0.977 1.003 1.048 | 1.056 1.027 0.953 |
-| midday + heavy | 08:39 | 1.150 | 8.3 | 2.7 | 1.000 | 1.000 | 0.992 1.002 1.016 | 1.017 1.008 0.986 |
-| late | 10:30 | 1.150 | 26.0 | 10.5 | 1.000 | 1.000 | 0.962 1.003 1.077 | 1.059 1.029 0.951 |
-| late + heavy | 10:30 | 1.150 | 14.3 | 5.8 | 1.000 | 1.000 | 0.988 1.002 1.025 | 1.029 1.014 0.976 |
-
-### RustRig (`rustworks-1v1`) — north-sea-rig-dusk-into-night
-anchor 21:00 | band 20:00-22:00 | arc 04:30-23:30 | elev 6-54 deg | az swing 30 deg | cycle 8 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 21:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 21:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 20:00 | 1.150 | 7.0 | -1.6 | 1.000 | 1.000 | 0.977 1.016 1.057 | 1.026 1.013 0.979 |
-| early + heavy | 20:00 | 1.139 | 3.8 | -0.9 | 1.000 | 1.000 | 0.991 1.007 1.023 | 1.008 1.004 0.994 |
-| midday | 21:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday + heavy | 21:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late | 22:00 | 0.715 | -7.5 | 1.6 | 1.328 | 1.068 | 1.032 0.975 0.919 | 0.972 0.986 1.023 |
-| late + heavy | 22:00 | 0.845 | -4.1 | 0.9 | 1.178 | 1.037 | 1.010 0.992 0.975 | 0.991 0.996 1.007 |
-
-### Gun Range (`gun-range`) — indoor-range-no-sky — PINNED
-anchor 12:00 | band 12:00-12:00 | arc 06:00-18:00 | elev 40-40 deg | az swing 0 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late + heavy | 12:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-
-### Farcrysis (`farcrysis`) — tropical-midmorning-to-late-afternoon
-anchor 12:30 | band 09:00-17:00 | arc 06:00-18:30 | elev 10-74 deg | az swing 54 deg | cycle 7 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 12:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 12:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 09:00 | 0.840 | -20.1 | -15.1 | 1.184 | 1.038 | 1.013 1.000 0.979 | 1.000 1.000 1.000 |
-| early + heavy | 09:00 | 0.926 | -11.0 | -8.3 | 1.085 | 1.018 | 1.004 1.000 0.994 | 1.000 1.000 1.000 |
-| midday | 13:00 | 0.995 | -1.0 | 2.2 | 1.006 | 1.001 | 1.001 1.000 0.999 | 1.000 1.000 1.000 |
-| midday + heavy | 13:00 | 0.997 | -0.6 | 1.2 | 1.003 | 1.001 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late | 17:00 | 0.575 | -40.3 | 19.4 | 1.488 | 1.102 | 1.042 1.000 0.929 | 0.960 0.980 1.037 |
-| late + heavy | 17:00 | 0.817 | -22.2 | 10.7 | 1.211 | 1.044 | 1.009 1.000 0.986 | 1.000 1.000 1.000 |
-
-### High Seas (`high-seas`) — open-ocean-morning-through-dusk
-anchor 13:00 | band 07:30-19:00 | arc 05:30-20:30 | elev 8-66 deg | az swing 58 deg | cycle 7 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 13:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 13:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 07:30 | 0.573 | -34.4 | -21.3 | 1.491 | 1.102 | 1.040 1.000 0.931 | 0.953 0.977 1.044 |
-| early + heavy | 07:30 | 0.802 | -18.9 | -11.7 | 1.228 | 1.048 | 1.010 1.000 0.983 | 1.000 1.000 1.000 |
-| midday | 13:15 | 0.999 | -0.1 | 1.0 | 1.001 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday + heavy | 13:15 | 1.000 | -0.0 | 0.5 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late | 19:00 | 0.550 | -40.1 | 23.2 | 1.518 | 1.108 | 1.061 0.986 0.888 | 0.933 0.967 1.062 |
-| late + heavy | 19:00 | 0.760 | -22.0 | 12.8 | 1.276 | 1.058 | 1.012 1.000 0.979 | 0.998 0.999 1.002 |
-
-### Firing Range (`test1`) — dry-range-hard-morning-sun
-anchor 10:30 | band 10:00-13:00 | arc 07:00-17:00 | elev 12-70 deg | az swing 34 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 10:30 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 10:00 | 0.956 | -4.8 | -1.7 | 1.051 | 1.011 | 1.003 1.000 0.995 | 1.000 1.000 1.000 |
-| early + heavy | 10:00 | 0.976 | -2.6 | -0.9 | 1.027 | 1.006 | 1.001 1.000 0.999 | 1.000 1.000 1.000 |
-| midday | 11:30 | 1.044 | 5.6 | 3.4 | 1.000 | 1.000 | 0.997 1.000 1.005 | 1.000 1.000 1.000 |
-| midday + heavy | 11:30 | 1.025 | 3.1 | 1.9 | 1.000 | 1.000 | 0.999 1.000 1.002 | 1.000 1.000 1.000 |
-| late | 13:00 | 1.028 | 3.5 | 8.5 | 1.000 | 1.000 | 0.998 1.000 1.003 | 1.000 1.000 1.000 |
-| late + heavy | 13:00 | 1.016 | 1.9 | 4.7 | 1.000 | 1.000 | 0.999 1.000 1.001 | 1.000 1.000 1.000 |
-
-### Raid (`test2`) — golden-hour-hillside
-anchor 17:00 | band 16:00-18:30 | arc 06:00-19:30 | elev 8-60 deg | az swing 26 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 17:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 17:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 16:00 | 1.150 | 9.2 | -1.9 | 1.000 | 1.000 | 0.987 1.000 1.024 | 1.030 1.015 0.973 |
-| early + heavy | 16:00 | 1.116 | 5.1 | -1.1 | 1.000 | 1.000 | 0.996 1.000 1.007 | 1.010 1.005 0.991 |
-| midday | 17:15 | 0.938 | -2.6 | 0.5 | 1.071 | 1.015 | 1.004 1.000 0.993 | 0.991 0.995 1.008 |
-| midday + heavy | 17:15 | 0.966 | -1.4 | 0.3 | 1.039 | 1.008 | 1.001 1.000 0.998 | 0.997 0.999 1.002 |
-| late | 18:30 | 0.574 | -16.6 | 2.9 | 1.490 | 1.102 | 1.053 0.967 0.881 | 0.940 0.971 1.052 |
-| late + heavy | 18:30 | 0.774 | -9.1 | 1.6 | 1.260 | 1.054 | 1.011 0.995 0.976 | 0.982 0.991 1.016 |
-
-### Map 3 (`map3`) — open-scrub-midmorning-preview-pinned — PINNED
-anchor 10:00 | band 10:00-10:00 | arc 06:00-19:00 | elev 12-66 deg | az swing 0 deg | cycle 6 min
-| state | hour | sun x | elev d | azim d | shadow floor x | exposure x | sun tint RGB | sky tint RGB |
-|---|---|---|---|---|---|---|---|---|
-| authored | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| authored + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| early + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| midday + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
-| late + heavy | 10:00 | 1.000 | 0.0 | 0.0 | 1.000 | 1.000 | 1.000 1.000 1.000 | 1.000 1.000 1.000 |
+TAIL = """
 
 ---
 
@@ -514,3 +412,8 @@ by the unit tests rather than by pixels.
    bake has to stay valid, and a wide band (High Seas 11.5 h, Farcrysis 8 h) is a
    reason either to bake more than one hour there or to keep the probe
    contribution low.
+"""
+
+doc = HEAD + summary_table + MID + table.strip() + TAIL
+open(ROOT + 'docs/DYNAMIC_LIGHTING_2026-09-03.md', 'w', encoding='utf-8', newline='').write(doc)
+print('written', len(doc))

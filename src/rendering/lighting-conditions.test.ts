@@ -341,3 +341,104 @@ describe('the writes are frozen values, not a mutable handle a caller can poison
     expect(Object.isFrozen(writes.fogTint)).toBe(true);
   });
 });
+
+/**
+ * THE BAND-EVIDENCE CONTRACT.
+ *
+ * This suite exists because the model's arithmetic guarantee held perfectly on
+ * a frame that failed the pixel gate. `shadowFloorScale >= 1` says every shaded
+ * pixel is at least as bright as the shipped arena, and it was: on Nuke Town at
+ * 19:00 the fifth-percentile luma went UP three steps. The shaded AREA still
+ * grew 4.21 points, because a lower sun casts longer shadows — and area is what
+ * a defender hides in. Brightness and area are different claims, and only a
+ * capture can settle the second one.
+ *
+ * So each band end is measured by `scripts/qa/scan-lane-ab-band-readability.mjs`
+ * and the result is committed as evidence. These tests pin the shipped bands
+ * against that file, which makes widening a band impossible without re-running
+ * the scan that justifies it — the enforcement the two rejected model-level
+ * fixes did not have.
+ */
+describe('band ends are the measured safe interval, not a chosen one', () => {
+  /**
+   * Read straight out of `docs/evidence/pass87/dynamic-lighting/
+   * band-readability-scan.json` (`scans[].safeBand`, clear weather — the rung
+   * that binds, since every weather only pulls the excursion back toward the
+   * identity). Update these ONLY by re-running the scan and copying its output.
+   */
+  const MEASURED_SAFE_BAND: Partial<Record<ArenaId, readonly [number, number]>> = {
+    'atomic-acres': [15, 18.2],
+    'skyline-terminal': [6.74, 10.5],
+    test1: [9.8, 13],
+    test2: [16, 18.5],
+  };
+
+  it('never plays an hour the scan measured as unsafe', () => {
+    for (const [arenaId, safeBand] of Object.entries(MEASURED_SAFE_BAND) as [ArenaId, readonly [number, number]][]) {
+      const { hourRange } = ARENA_DAYLIGHT_PROFILES[arenaId];
+      expect(hourRange[0]).toBeGreaterThanOrEqual(safeBand[0]);
+      expect(hourRange[1]).toBeLessThanOrEqual(safeBand[1]);
+    }
+  });
+
+  it('reaches every hour a match can resolve, in every mode', () => {
+    // The band is the safety claim, so the claim is only worth anything if no
+    // mode can leave it. `cycle` walks it, `random` samples it, and both are
+    // swept here rather than argued about.
+    for (const arenaId of ARENA_IDS) {
+      const { hourRange } = ARENA_DAYLIGHT_PROFILES[arenaId];
+      const low = Math.min(hourRange[0], hourRange[1]);
+      const high = Math.max(hourRange[0], hourRange[1]);
+      for (const choice of LIGHTING_TIME_CHOICES) {
+        for (let seed = 0; seed < 24; seed += 1) {
+          for (const elapsedSeconds of [0, 37, 121, 300, 899, 3_600]) {
+            const hour = resolveLightingHour(arenaId, seed, elapsedSeconds, choice);
+            expect(hour).toBeGreaterThanOrEqual(low - 1e-9);
+            expect(hour).toBeLessThanOrEqual(high + 1e-9);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps the authored hour inside the narrowed bands, so the identity is still reachable', () => {
+    // Narrowing a band around a measurement could easily have cut the anchor
+    // out of it, which would make `authored` an hour the arena cannot play and
+    // silently end the A/B this whole feature rests on.
+    for (const arenaId of ARENA_IDS) {
+      const { hourRange, authoredHour } = ARENA_DAYLIGHT_PROFILES[arenaId];
+      expect(authoredHour).toBeGreaterThanOrEqual(Math.min(hourRange[0], hourRange[1]));
+      expect(authoredHour).toBeLessThanOrEqual(Math.max(hourRange[0], hourRange[1]));
+      expect(lightingConditionsAreIdentity(identityLightingConditions(arenaId))).toBe(true);
+    }
+  });
+
+  it('still gives every unpinned arena a visible excursion after the narrowing', () => {
+    // A band narrowed until it is safe AND until nothing happens is not a fix,
+    // it is a silent revert, so the floor here is what a PLAYER can see rather
+    // than a round number: 1.04 on the key light is about five 8-bit steps on a
+    // mid-grey surface, comfortably above dithering and above the capture
+    // harness's own noise (the control pairs in the sweep report run 0.00-0.06
+    // points on every arena whose review frame holds still).
+    //
+    // Firing Range sits nearest this floor and that is a fact about the map, not
+    // slack in the test: its 10:00-13:00 band straddles the arc's peak, so both
+    // ends of it are high sun, and the low morning hours that would give it a
+    // real swing are exactly the ones the scan measured as unsafe (+4.09 points
+    // at 09:00). A flat range overlooked by a tower cannot have both.
+    const excursions: Partial<Record<ArenaId, number>> = {};
+    for (const arenaId of OUTDOOR) {
+      const scales = sweepBand(arenaId, 48).map((hour) =>
+        resolveLightingConditions({ arenaId, fixedHour: hour }).sunIntensityScale);
+      excursions[arenaId] = Math.max(...scales) / Math.min(...scales);
+      expect(excursions[arenaId]).toBeGreaterThan(1.04);
+    }
+    // And the excursion must survive the arena's heaviest weather too, or the
+    // feature quietly stops existing whenever it rains.
+    for (const arenaId of OUTDOOR) {
+      const scales = sweepBand(arenaId, 48).map((hour) =>
+        resolveLightingConditions({ arenaId, fixedHour: hour, skyDarkenAmount: 0.45 }).sunIntensityScale);
+      expect(Math.max(...scales) / Math.min(...scales)).toBeGreaterThan(1.02);
+    }
+  });
+});

@@ -146,15 +146,45 @@ const profile = (
  * authored identity — `src/rendering/art-direction.ts` says what each place is,
  * and a band that left it would make the art direction a lie. Changing a number
  * here is a visible readability change, the same status the weather table has.
+ *
+ * AND EVERY BAND END IS MEASURED, NOT CHOSEN. This is the part of the file that
+ * cost the most to learn. The arithmetic guarantee below — "the shadow floor can
+ * only rise" — is true and was never the whole safety question: on Nuke Town at
+ * 19:00 the fifth-percentile luma went UP three steps (every shaded pixel
+ * brighter than the shipped arena, exactly as promised) while the fraction of
+ * the frame in shadow grew 4.21 points, because a lower sun casts LONGER
+ * shadows and a defender hides in shaded AREA, not in shaded depth.
+ *
+ * Two model-level fixes were tried against that and both were rejected on the
+ * evidence: an intensity FLOOR moved the failing number by 0.01 of a point (it
+ * cannot — intensity was never the term), and a per-arena shadow-LENGTH clamp
+ * cut Nuke Town from 4.21 to 3.40 while making Terminal WORSE, 3.57 -> 5.32,
+ * because on an apron whose deck sits just above the readability threshold the
+ * dominant term is the ambient lift that the same clamp reduces. No single
+ * mechanism holds across arenas whose geometry disagrees that hard.
+ *
+ * So the band itself carries the claim. `scripts/qa/scan-lane-ab-band-
+ * readability.mjs` walks each arena's band hour by hour against an identity
+ * frame re-taken in the same pass and reports where shadow-mass growth crosses
+ * the bound; the three ends below that moved are exactly what it measured, with
+ * margin:
+ *
+ *   Nuke Town   safe to 18.20, band ends 18.00   (was 19.00, +3.43 UNSAFE)
+ *   Terminal    safe from 6.74, band starts 6.80 (was 05:48, +5.32 UNSAFE)
+ *   Firing Range safe from 9.80, band starts 10.00 (was 09:00, +4.09 UNSAFE)
+ *
+ * WIDENING ANY BAND BELOW MEANS RE-RUNNING THAT SCAN. The band-evidence test in
+ * `lighting-conditions.test.ts` pins these against the scan's own output so the
+ * requirement is enforced rather than remembered.
  */
 export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProfile>> = Object.freeze({
   // Warm pastoral americana, a heartbeat before the test. Afternoon into dusk;
   // it never goes dark, because a 1950s postcard suburb at midnight is a
   // different map, not the same map later.
-  'atomic-acres': profile('atomic-acres', 'suburban-afternoon-into-dusk', false, 17.5, [15, 19], [6, 20], [8, 62], 46, 6),
+  'atomic-acres': profile('atomic-acres', 'suburban-afternoon-into-dusk', false, 17.5, [15, 18], [6, 20], [8, 62], 46, 6),
   // Apron dawn through mid-morning; the authored atmosphere preset is literally
   // 'airport-dawn' and the corporate-glass identity lives in cold early light.
-  'skyline-terminal': profile('skyline-terminal', 'apron-dawn-to-midmorning', false, 7, [5.8, 10.5], [5, 19], [7, 58], 42, 6),
+  'skyline-terminal': profile('skyline-terminal', 'apron-dawn-to-midmorning', false, 7, [6.8, 10.5], [5, 19], [7, 58], 42, 6),
   // North-sea rig: the narrowest outdoor band in the game. Its authored night
   // shadow mass (15/255) is the combat-safety datum for the whole feature, so
   // this arena is allowed to move the LEAST.
@@ -170,7 +200,7 @@ export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProf
   // is why its arc window is TIGHT (07:00-17:00 rather than the 06:00-19:00 the
   // wetter arenas use). A wide window put the whole 09:00-13:00 band within four
   // degrees of the arc's peak and the sun scale moved by 5% end to end.
-  test1: profile('test1', 'dry-range-hard-morning-sun', false, 10.5, [9, 13], [7, 17], [12, 70], 34, 6),
+  test1: profile('test1', 'dry-range-hard-morning-sun', false, 10.5, [10, 13], [7, 17], [12, 70], 34, 6),
   // Raid: golden-hour hillside estate. Narrow — golden hour IS the identity.
   test2: profile('test2', 'golden-hour-hillside', false, 17, [16, 18.5], [6, 19.5], [8, 60], 26, 6),
   // MAP3 (PREVIEW). PINNED on purpose: Lane V owns this map's look while it is
