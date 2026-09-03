@@ -1060,3 +1060,21 @@ music sounds good. the animations feel pretty good."
 - Lanes: AU3 (HF-434..437, GLM first with Opus verification after the reset),
   AI2 (HF-438, GLM then Opus). Compute: 13% left this week; Opus resumes ~11:30
   BST 2026-09-04.
+
+## HF-439 / HF-440 — owner 2026-09-03 17:30
+**Statement (verbatim):** "please ingest these to our skills and use whatever might
+make sense? https://github.com/PhiloLabs/fable51-worlds ; trellis in browser rather
+than local? how many use? https://mesh-baker.needle.tools/ ; Any use or we already
+got this or similar ? https://x.com/philippsieben/status/2095440655170294085 ; you
+can use Opus a little bit as we still have 87% used and 13% remaining; put raid
+rebuild to one side and polish up nuketown, as well as geometry the layout and
+assets and textures and lighting need to be tip top, raid can come next"
+- **HF-439 three sources to ingest** (Lane AZ, Opus, one pass): resolve each
+  (fetch, licence, what it observably is, who uses it), register rows, write or
+  extend skills where they earn it, and answer the owner's three questions
+  (Trellis in the browser vs local; mesh-baker adoption and fit; whether the
+  philippsieben technique is something we already have). Vault + AKP procedure.
+- **HF-440 Nuke Town Rebuild polish first, Raid parked:** after the GLM geometry
+  pass (HF-434..437), an Opus "tip top" pass on layout, assets, textures and
+  lighting with the brief-driven critic loop and the judgeset; Raid (Lane AV
+  check-and-finish) waits behind it. Compute: 13% left; Opus "a little".
