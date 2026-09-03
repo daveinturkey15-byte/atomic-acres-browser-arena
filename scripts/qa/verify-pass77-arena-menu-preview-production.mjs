@@ -36,6 +36,7 @@ import {
   sha256File,
 } from '../assets/pass65-menu-preview-integrity.mjs';
 import { arenaRegistryEntries } from './arena-roster.mjs';
+import { LINEAGE_PATH, liveGeneratorDigests } from '../assets/write-capture-generator-lineage.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const provenancePath = path.join(root, 'source-assets/menu/pass77-arena-previews/provenance.json');
@@ -128,7 +129,53 @@ if (provenance) {
   }
   await pinDigest('scripts/assets/finalize-pass77-arena-menu-previews.mjs', provenance.finalizer?.sha256, 'pass77 finalizer');
   if (slash(path.relative(root, finalizerPath)) !== provenance.finalizer?.path) fail('pass77 provenance finalizer path drifted');
-  await pinDigest('scripts/assets/generate-pass65-runtime-menu-previews.ts', provenance.generator?.sha256, 'pass77 capture generator');
+  /**
+   * PASS 87 Lane AR, item 11. This used to be
+   * `pinDigest(generatorPath, provenance.generator?.sha256, ...)`: re-hash the
+   * LIVE shared capture generator and require it to equal the digest THIS
+   * family recorded when it captured. Two things were wrong with that.
+   *
+   * 1. The generator is SHARED. pass79, pass84 (Map 3, c25f5e32) and pass85
+   *    (Nuke Town Rebuild, a4b56ec7) all edit it, and each edit turned pass77's
+   *    honest capture record into a gate failure. The only ways out were to
+   *    rewrite a historical digest - falsifying provenance - or to leave the
+   *    gate red. It was left red, on the base line, for two passes.
+   * 2. The recorded digest 80194703... is the CRLF hash of the generator at
+   *    5ac48931. It has never equalled the LF bytes git stores, so this pin was
+   *    a line-ending artifact from the day it was written: green on a CRLF
+   *    checkout, red on an LF one, regardless of Map 3.
+   *
+   * A capture record is history and is never rewritten. What this gate needs is
+   * accountability, and it comes in two halves, both stricter than the old
+   * equality check because neither can be satisfied by a stale number:
+   *   - the LIVE generator must be the version the shared lineage says is
+   *     current, graded on LF-normalised bytes so the verdict does not depend
+   *     on anyone's git config;
+   *   - the digest THIS family recorded must be a generator version that
+   *     really existed, matched against the lineage in either line ending.
+   */
+  const live = liveGeneratorDigests();
+  const lineage = await readJson(path.join(root, LINEAGE_PATH), 'shared capture generator lineage');
+  if (lineage) {
+    if (lineage.path !== slash(path.relative(root, generatorPath))) {
+      fail(`capture generator lineage tracks ${lineage.path}, not ${slash(path.relative(root, generatorPath))}`);
+    }
+    if (lineage.current?.sha256 !== live.sha256) {
+      fail(
+        `shared capture generator changed: lineage current is ${lineage.current?.sha256}, live is ${live.sha256}. `
+        + 'Run `node scripts/assets/write-capture-generator-lineage.mjs` - do NOT edit any family provenance.',
+      );
+    }
+    const versions = [lineage.current, ...(lineage.retired ?? [])].filter(Boolean);
+    const recorded = provenance.generator?.sha256;
+    const accounted = versions.find((version) => version.sha256 === recorded || version.crlfSha256 === recorded);
+    if (!accounted) {
+      fail(
+        `pass77 provenance records capture generator ${recorded}, which is not a version the shared `
+        + 'lineage knows about. Either the record is wrong or the lineage is stale.',
+      );
+    }
+  }
   if (slash(path.relative(root, generatorPath)) !== provenance.generator?.path) fail('pass77 provenance generator path drifted');
 }
 
