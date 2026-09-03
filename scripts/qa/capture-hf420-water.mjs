@@ -6,6 +6,12 @@
  * arena, starts a solo match, teleports to a named list of cameras and writes
  * one PNG per camera plus a JSON telemetry sidecar.
  *
+ * Each camera writes up to three frames: the frame itself, the same frame with
+ * the pond group hidden, and the same frame with the horizon skirt hidden.
+ * Differencing a pair says which pixels an object OWNS, which is the only way
+ * to tell "authored and invisible" from "authored and subtle" - and the only
+ * way to measure the skirt/near-plane seam on named pixel sets.
+ *
  * Owner rule: HEADLESS ONLY. There is no headed mode and no flag that adds one.
  * Shared machine: refuses to launch unless the GPU has >= 3000 MiB free.
  *
@@ -191,8 +197,35 @@ for (const shot of set.shots) {
     });
     await new Promise((r) => setTimeout(r, 1200));
   }
-  telemetry.push({ ...shot, poolCoverageProbe: hidden });
-  console.log('[hf420] captured', shot.name, hidden ? '(+ pool-hidden probe)' : '');
+  // Skirt probe: the same frame with the horizon skirt hidden. The skirt is an
+  // unlit ring that carries the sea past the displaced near plane, and the two
+  // surfaces are supposed to agree about the colour of deep water where they
+  // meet. Differencing this pair yields exactly the skirt's pixels, which makes
+  // "the seam does/does not show a hue break" a measurement on named pixel sets
+  // instead of an eyeball verdict on a screenshot.
+  const skirtHidden = await page.evaluate(() => {
+    const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+    const skirts = [];
+    scene.traverse((node) => {
+      if (typeof node.name === 'string' && node.name.includes('ocean horizon')) skirts.push(node);
+    });
+    if (skirts.length === 0) return 0;
+    for (const skirt of skirts) skirt.visible = false;
+    return skirts.length;
+  });
+  if (skirtHidden > 0) {
+    await new Promise((r) => setTimeout(r, 1200));
+    await page.screenshot({ path: `${OUT}/${shot.name}-noskirt.png` });
+    await page.evaluate(() => {
+      const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+      scene.traverse((node) => {
+        if (typeof node.name === 'string' && node.name.includes('ocean horizon')) node.visible = true;
+      });
+    });
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  telemetry.push({ ...shot, poolCoverageProbe: hidden, skirtProbeMeshes: skirtHidden });
+  console.log('[hf420] captured', shot.name, hidden ? '(+ pool-hidden probe)' : '', skirtHidden ? '(+ skirt-hidden probe)' : '');
 }
 // Frame-time budget from the game's own instrument, after the captures, with
 // the camera released back to the player.
