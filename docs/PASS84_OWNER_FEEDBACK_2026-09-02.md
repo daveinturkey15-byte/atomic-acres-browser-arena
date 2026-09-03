@@ -904,3 +904,13 @@ nuketown preview first then raid, and like i said be careful with compute"
   Applied: Gemini 3.8 Flash (agy bridge) does the bulk work of each lane
   (reference research, schematic, first geometry/props pass); Opus runs one
   skeptic + one repair per lane; Fable coordinates. Serial: AU then AV.
+
+## HF-430 — owner 2026-09-03 07:05: chiptune music
+**Statement (verbatim):** "half the chiptune music sound and have it swap between
+about 10 different variations and tracks, each one lasting about 90 seconds and
+being random in order". Lane AW (Gemini bulk, Opus skeptic): music gain halved
+(measured, not eyeballed: -6 dB on the music bus only, SFX untouched), ~10
+distinct procedural variations/tracks of ~90 s each, shuffled order with no
+immediate repeat, seamless swap, persisted volume respected; a unit test pins the
+count, the durations and the no-repeat shuffle; a headless run records which
+tracks played over 5 minutes.
