@@ -433,6 +433,29 @@ describe('Nuke Town Rebuild fidelity', () => {
     const through = await walkStanding(map, [0, 1.7, t.z - t.width / 2 - 1.8], [[0, t.z + t.width / 2 + 1.8]]);
     expect(Math.abs(through[0]!.z - (t.z + t.width / 2 + 1.8)), `side-to-side walk ended at ${JSON.stringify(through[0])}`).toBeLessThan(0.45);
 
+    // REVIEW ADDITION (Opus, PASS 92). The walk above proves the openings work
+    // TODAY; these are the DERIVED numbers behind it, MEASURED on the built
+    // bodies, so a later flank edit that narrows or lowers a mouth fails here
+    // with the number instead of only stalling a probe. Clear height is the
+    // deck top to the header's underside, clear width is the gap between the
+    // two piers, and the step up from the road onto the deck must be inside
+    // the controller's own autostep.
+    const worldBox = (needle: string): THREE.Box3 => {
+      const mesh = map.root.children.find((node) => node.name.endsWith(needle)) as THREE.Mesh | undefined;
+      expect(mesh, `truck body "${needle}"`).toBeDefined();
+      return new THREE.Box3().setFromObject(mesh!);
+    };
+    for (const flank of [0, 1]) {
+      const header = worldBox(`truck box flank ${flank} header`);
+      const pierLow = worldBox(`truck box flank ${flank} pier 0`);
+      const pierHigh = worldBox(`truck box flank ${flank} pier 1`);
+      expect(header.min.y - t.deckY, `flank ${flank} opening clear height`).toBeGreaterThanOrEqual(STANDING_CAPSULE_M);
+      expect(pierHigh.min.x - pierLow.max.x, `flank ${flank} opening clear width`)
+        .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
+    }
+    expect(t.deckY, 'step from the road onto the cargo deck, against the autostep')
+      .toBeLessThanOrEqual(CHARACTER_PHYSICS_CONFIG.autostepHeight);
+
     // The coach is CLOSED: one solid body, no floor and no roof mesh to stand
     // between, and a standing eye at its centre IS blocked.
     expect(meshNames.some((name) => name.includes('coach body'))).toBe(true);
@@ -568,10 +591,21 @@ describe('Nuke Town Rebuild fidelity', () => {
         at(cx + 2.4, -22.3),    // off the bottom tread into the BACK room
       ]);
       const downLabel = (index: number) => `${house.id} down waypoint ${index} at ${JSON.stringify(down[index])}`;
+      // REVIEW TIGHTENING (Opus, PASS 92). The original pair of assertions only
+      // said "ended up low", which a capsule that fell through a hole in the
+      // upper floor at waypoint 0 also satisfies. Waypoints 0 and 1 are now
+      // asserted at STANDING UPPER-FLOOR height, so the probe proves the walker
+      // crossed the upper storey and reached the landing on its feet before it
+      // descended, and the descent is asserted MONOTONE so a single drop
+      // cannot be read as a flight.
+      expect(down[0]!.y, downLabel(0)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      expect(down[1]!.y, downLabel(1)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
       // Waypoint 2 stands on the bottom treads (feet 0.3-0.6 m), well below
       // the landing; waypoint 3 is the back-room ground floor itself.
       expect(down[2]!.y, downLabel(2)).toBeLessThan(4.0);
       expect(down[3]!.y, downLabel(3)).toBeLessThan(2.0);
+      expect(down[1]!.y, `${downLabel(1)} above ${downLabel(2)}`).toBeGreaterThan(down[2]!.y);
+      expect(down[2]!.y, `${downLabel(2)} above ${downLabel(3)}`).toBeGreaterThan(down[3]!.y);
     }
 
     // HF-435: the derived numbers, not the vibes - tread rise inside the
@@ -584,7 +618,16 @@ describe('Nuke Town Rebuild fidelity', () => {
       const top = NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
       const centreZ = well.footZ + NUKETOWN2_HOUSE_STAIR.going * (i + 0.5);
       const ceiling = centreZ < well.wellZ0 ? NUKETOWN2_GROUND_STOREY_H : deckUnderside;
-      expect(ceiling - top, `tread ${i} headroom`).toBeGreaterThanOrEqual(STANDING_CAPSULE_M);
+      // REVIEW TIGHTENING (Opus, PASS 92). The rule this arena DERIVED is
+      // `feet + capsule + autostep <= ceiling` (see STAIR_MAX_FEET_UNDER_CEILING
+      // in nuketown2-arena.ts): Rapier casts the capsule UP by autostepHeight
+      // BEFORE it casts forward, so a ceiling that merely clears the capsule
+      // still wedges the walker on a tread nosing - the exact failure the
+      // arena header records the probe catching. Asserting only the capsule
+      // let a future 2.0 m ceiling over a tread pass a gate the geometry
+      // cannot actually satisfy.
+      expect(ceiling - top, `tread ${i} headroom (capsule + autostep up-cast)`)
+        .toBeGreaterThanOrEqual(STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight);
     }
     expect(NUKETOWN2_HOUSE_STAIR.landingDepth, 'landing depth vs capsule diameter')
       .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
