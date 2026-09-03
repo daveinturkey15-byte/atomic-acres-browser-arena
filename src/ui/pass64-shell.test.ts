@@ -50,6 +50,9 @@ describe('Pass 66 command shell', () => {
       // offered order, labelled PREVIEW. Pinned here as well as against
       // SELECTABLE_ARENAS because the order is what a player sees.
       'nuke-town-rebuild',
+      // RAID2 (owner 2026-09-02, HF-408): the Raid layout rebuild, likewise
+      // selectable and labelled PREVIEW, shipped BESIDE `test2` not instead of it.
+      'raid-rebuild',
     ]);
     // The negative pin that used to read "farcrysis is not offered" is not
     // dropped, it is inverted: the arena must now BE in the menu, and it must be

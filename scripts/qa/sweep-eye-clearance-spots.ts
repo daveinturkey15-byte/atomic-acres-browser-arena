@@ -27,6 +27,7 @@ import { buildFarcrysis } from '../../src/farcrysis';
 import { buildTest1, buildTest2 } from '../../src/test-maps';
 import { buildMap3, prepareMap3 } from '../../src/map3-arena';
 import { buildNuketown2 } from '../../src/nuketown2-arena';
+import { buildRaid2 } from '../../src/raid2-arena';
 import { collidersOverlappingVerticalSpan, isBlocked, type Box2 } from '../../src/collision';
 import { InteractiveWorldRuntime } from '../../src/interactive-world-runtime';
 // `ShedArenaId` is re-declared, not re-exported, by destructible-shed-registry;
@@ -195,19 +196,22 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
   map3: buildMap3,
   // NUKETOWN2 (owner 2026-09-02, HF-407).
   nuketown2: buildNuketown2,
+  // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
+  raid2: buildRaid2,
 });
 
 /**
  * Floor on the derived roster. The derivation cannot silently collapse to an
  * empty list the way a regex-scraped one can, but an empty or truncated roster
  * would sweep nothing while printing success, so it is asserted rather than
- * assumed. 10 = every id in arena-identity.ts, nothing subtracted. map3 left
+ * assumed. 11 = every id in arena-identity.ts, nothing subtracted. map3 left
  * the roster for one day (2026-09-02, HF-409) and rejoined it when the corridor
  * showcase became the arena; the Nuke Town Rebuild (HF-407) made it 9; farcrysis
- * being un-hidden as a PREVIEW card (2026-09-02, HF-423) made it 10. Raise it
- * when an arena is added; never lower it to get a run green.
+ * being un-hidden as a PREVIEW card (2026-09-02, HF-423) made it 10; the Raid
+ * Rebuild (HF-408, Lane AQ, 2026-09-03) made it 11. Raise it when an arena is
+ * added; never lower it to get a run green.
  */
-export const MINIMUM_SWEPT_ARENAS = 10;
+export const MINIMUM_SWEPT_ARENAS = 11;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

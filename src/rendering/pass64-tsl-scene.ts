@@ -304,6 +304,14 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], Atmospher
     [[-20, -21, 2.2, 3.8], [20, 21, 2.2, 3.8]],
     { count: 56, minX: -29, maxX: 29, minZ: -26, maxZ: 26 },
   ),
+  // RAID2 (PREVIEW, HF-408): mirrors ATMOSPHERE_LAYOUTS in atmosphere-system.ts
+  // card for card, and a dust box that covers the three lanes rather than the
+  // whole 100 x 76 box, because the spawn aprons are where nobody lingers.
+  'raid2': atmosphereLayout(
+    [[-27, -28, 13, 3.4], [8, -28, 13, 3.4], [0, -12, 11, 3.0], [0, 12, 12, 3.2]],
+    [[-24, 20, 2.3, 3.9], [24, 20, 2.3, 3.9]],
+    { count: 52, minX: -36, maxX: 36, minZ: -32, maxZ: 30 },
+  ),
 });
 const MAX_MIST_LAYERS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 

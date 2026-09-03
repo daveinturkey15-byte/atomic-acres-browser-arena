@@ -46,6 +46,10 @@ const PASS84_CACHE_KEY = 'pass84-map3-preview-v1';
 // scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs with the Pass 66
 // profiles.
 const PASS85_CACHE_KEY = 'pass85-nuketown2-preview-v1';
+// RAID2 (HF-408): its own family key, same rule again - the bytes under it were
+// encoded by scripts/assets/finalize-pass87-raid2-menu-preview.mjs from raid2's
+// own authoritative runtime capture, and no other arena's key is reused.
+const PASS87_CACHE_KEY = 'pass87-raid2-preview-v1';
 const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
@@ -227,6 +231,31 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
     webm: `${ROOT}/nuketown2.webm?v=${PASS85_CACHE_KEY}`,
     mp4: `${ROOT}/nuketown2.mp4?v=${PASS85_CACHE_KEY}`,
     poster: `${ROOT}/nuketown2.webp?v=${PASS85_CACHE_KEY}`,
+    durationSeconds: 8,
+    width: 2560,
+    height: 1440,
+  }),
+  // RAID2 (PREVIEW, HF-408). This entry shipped `mediaAvailable: false` with
+  // three empty strings for one pass - the honest standby state - and the
+  // repair pass took it off standby the only legitimate way: by capturing
+  // raid2's OWN flyover through the sanctioned generator
+  // (AA_PREVIEW_REVIEW_ONLY=1 AA_PREVIEW_ARENAS=raid2, 240 frames at 2560x1440
+  // on the WebGPU route, hardware adapter, one resident arena root, raid2
+  // constructed first) and encoding it with the Pass 66 profiles through
+  // scripts/assets/finalize-pass87-raid2-menu-preview.mjs, which asserts the
+  // encoded bytes are byte-distinct from all nine other arenas before they are
+  // allowed near public/.
+  'raid2': Object.freeze({
+    arenaId: 'raid2',
+    frame: 'helicopter',
+    label: 'PRERECORDED HELO // RAID REBUILD',
+    motionLabel: 'AUTHORED ESTATE FLYOVER',
+    reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
+    presentationId: 'menu-video-runtime-helo-raid2-v1',
+    mediaAvailable: true,
+    webm: `${ROOT}/raid2.webm?v=${PASS87_CACHE_KEY}`,
+    mp4: `${ROOT}/raid2.mp4?v=${PASS87_CACHE_KEY}`,
+    poster: `${ROOT}/raid2.webp?v=${PASS87_CACHE_KEY}`,
     durationSeconds: 8,
     width: 2560,
     height: 1440,

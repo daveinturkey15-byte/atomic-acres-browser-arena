@@ -5,7 +5,10 @@ import type { ArenaId } from './arena-identity';
 
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild';
+export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild'
+  // RAID2 (HF-408): a descriptive route, not `raid2`, so a shared link says
+  // what it opens. `test2` keeps `test2`; nothing about the shipped Raid moves.
+  | 'raid-rebuild';
 
 export type ArenaSelection = Readonly<{
   id: ArenaId;
@@ -416,6 +419,43 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // HF-407: no Blender bake, no GLB, no imported mesh/image/font/LUT. This is
     // the whole point of the rejig - the shipped Nuke Town is the only
     // `authoring: 'import'` arena in the game.
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // RAID2 (owner 2026-09-02, HF-408): "Raid just feels like loads of walls, need
+  // to ensure the layout and artstyle is more similar to the original."
+  //
+  // This is the LAYOUT rethink, registered as its own arena beside the shipped
+  // Raid rather than replacing it, so the live map is never broken mid-pass and
+  // the owner can compare the two in the menu before anything is swapped.
+  // Labelled PREVIEW because the art is a clean readable first pass and the art
+  // lane comes after.
+  //
+  // `multiplayer: true` follows the lane brief and matches `test2`: this is the
+  // same mode on the same netcode with a different arena id, and the spawn table
+  // is solved for two teams under the HF-402 constraint set. What has NOT been
+  // measured is a two-client mp-lab run against `raid2` specifically - that is
+  // recorded OPEN in docs/raid-rebuild/TASK_STATE.md rather than papered over.
+  Object.freeze({
+    id: 'raid2' as const,
+    routeId: 'raid-rebuild' as const,
+    // RAID2 is a team arena like the shipped Raid; only Map 3 is the explore kind.
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'RAID REBUILD · PREVIEW',
+    displayName: 'Raid Rebuild',
+    titleLead: 'RAID',
+    titleAccent: 'REBUILD',
+    menuLede: 'The hillside mansion rebuilt for its sightlines: three big rooms around an open-to-sky courtyard, the pool terrace holding one unbroken 52 m lane, and the wings joined to the house instead of fenced off it. Layout preview.',
+    summary: 'Hillside mansion · layout rebuild · preview',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    selectable: true,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

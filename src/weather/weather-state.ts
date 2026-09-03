@@ -248,6 +248,22 @@ export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfil
   // the HF-407 lane report rather than fixed here: the gate is not this lane's
   // to change, and pinning clear is the right authoring call regardless.
   'nuketown2': arenaProfile('nuketown2', 'test-town-bleached-noon', false, ['clear']),
+  // RAID2 (PREVIEW, HF-408): CLEAR ONLY, like test2, and the reason is a
+  // measurement rather than a preference. The first draft offered
+  // ['clear', 'overcast'], and `weather never repeats inside a match` went
+  // red: weatherPhaseSequence('raid2', 3, ...) opens with FOUR consecutive
+  // clear phases totalling 370 s, so across the guard's 320 s window the
+  // derived signal never moves. That is a real latent fragility in the
+  // sequencer - any arena whose id hashes into a long single-state opening
+  // can advertise two states and show one for six minutes, and whether it is
+  // caught depends on the id (map3, same two states, alternates from its
+  // first phase) - but the sequencer is shared by every arena and is not
+  // this lane's to change. Recorded in the lane report instead.
+  //
+  // Clear-only is also the honest authoring call: this arena is graded and
+  // lit for a bleached high sun, exactly as the shipped Raid is graded for
+  // golden hour, and an overcast state was never authored or looked at.
+  'raid2': arenaProfile('raid2', 'hillside-terrace-late-morning', false, ['clear']),
 });
 
 export function arenaWeatherProfile(arenaId: ArenaId): ArenaWeatherProfile {

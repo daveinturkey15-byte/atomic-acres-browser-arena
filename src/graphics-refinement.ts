@@ -55,6 +55,12 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
   // = 76.9 m) = 166 m, rounded up to 170. The tallest authored mass is the
   // 6.5 m house roof deck, so nothing needs more depth than that.
   'nuketown2': Object.freeze({ halfWidth: 33, halfHeight: 30, near: 4, far: 170 }),
+  // RAID2 (PREVIEW, HF-408): RAID2_BOUNDS is 100 x 76 m, the same box test2
+  // was re-pinned to on 2026-08-31, so the volume is pinned by the same rule
+  // and for the same reason: 54 x 42 half-extents cover 108 x 84, the bounds
+  // plus the 4 m margin. The tallest authored mass here is the 5.3 m upper
+  // wall, below test2's parapet, so `far` needs no more depth than test2's.
+  'raid2': Object.freeze({ halfWidth: 54, halfHeight: 42, near: 4, far: 196 }),
 });
 
 // RoomEnvironment is deliberately only a reflection/indirect-light accent.
@@ -82,6 +88,9 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // vehicle panels - the same surface mix the shipped Nuke Town was fitted at,
   // so it carries the same 0.24 rather than a value nobody measured.
   'nuketown2': 0.24,
+  // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
+  // texel footprint is the same and the bias that works there works here.
+  'raid2': 0.22,
 });
 
 export function arenaEnvironmentScale(arenaId: ArenaId): number {

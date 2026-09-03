@@ -107,6 +107,9 @@ export const ACCEPTED_SHOOT_THROUGH: Readonly<Record<string, readonly AcceptedSh
   // 186/188 in this comment predated the ground-dressing demotion to decals and
   // never matched a run.)
   nuketown2: [],
+  // RAID2 (owner 2026-09-02, HF-408): same rule. The audit measured 0 ghost
+  // shot surfaces on this arena, so an empty ledger is the measurement.
+  raid2: [],
   'gun-range': [
     // Merged static presentation batch spanning the tall test-bay shell. Every
     // source wall is individually registered with an authored material
@@ -141,6 +144,9 @@ export const BALLISTIC_UNRATED_CEILINGS: Readonly<Record<string, number>> = Obje
   // NUKETOWN2 (HF-407): same rule, same floor. Every ghost shot surface the
   // rebuild has is a failure, from its first commit.
   nuketown2: 0,
+  // RAID2 (HF-408): enters at the strictest possible ceiling, not at whatever
+  // it happens to measure.
+  raid2: 0,
   'gun-range': 0,
   farcrysis: 0,
 });
