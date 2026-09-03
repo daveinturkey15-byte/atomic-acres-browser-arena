@@ -33,7 +33,10 @@ describe('arena switch matrix roster', () => {
     // PASS 87: every registered arena is selectable (farcrysis un-hidden), so the roster may EQUAL the id list;
     // it must never exceed it.
     expect(derived.length).toBeLessThanOrEqual(ARENA_IDS.length);
-    expect(derived).not.toContain('farcrysis');
+    // Nothing is hidden since PASS 87 (farcrysis ships as a PREVIEW card); the roster is
+    // derived, so pin its shape, not a hidden id: no duplicates, every id registered.
+    expect(new Set(derived).size).toBe(derived.length);
+    for (const id of derived) expect(ARENA_IDS).toContain(id);
   });
 
   it('never silently shrinks: a collapsed derivation throws instead of sweeping less', () => {
