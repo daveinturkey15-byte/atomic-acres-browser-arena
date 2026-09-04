@@ -75,6 +75,21 @@ pass74 arena boot smoke -g nuketown2                1 passed (1.5m)
 
 ## OPEN — blocking the candidate-4 visual evidence
 
+0. **ROOT CAUSE, and it links OPEN 1 and OPEN 2.**
+   `configurePlayableArenaVisuals` (`src/legacy-main.ts:4431`) awaits
+   `flushWebGpuFrames()` FIRST and only then sets
+   `activeArenaVisualDefinition = module.definition`. When the 12 s fence
+   rejects, the function throws before the assignment: the gameplay root is
+   already attached so the map still renders, but no visual definition is
+   installed - which is exactly `setArenaReviewCamera returned false - authored
+   camera missing` for all 17 stations, and exactly the boot smoke's
+   `[Nuke Town Rebuild map selection failed] WebGPU queue completion exceeded
+   12000 ms for submission 1 (fenced draws 568)`. One defect, two symptoms. The
+   merged art has pushed nuketown2's cold first submission onto the fence.
+   The fix belongs in the art/compile cost, NOT in the fence: the load-time
+   lane's contract pins `await flushWebGpuFrames(12_000)` verbatim and the
+   relief must never become a fence change.
+
 1. **The 12-station review capture cannot run.**
    `node scripts/qa/capture-arena-viewpoints.mjs --arenas nuketown2` reports
    `0/17 shots` with `setArenaReviewCamera returned false - authored camera
@@ -94,3 +109,19 @@ pass74 arena boot smoke -g nuketown2                1 passed (1.5m)
 3. Carried from the lane reviews: hob<->house colour mapping needs a one-line
    swap plus a gate once siding settles; skin separability at gameplay range is
    an ASSUMPTION until a GPU re-capture is pixel-sampled.
+
+4. **The shared install lost `@playwright/test` mid-session.**
+   `C:/Users/david/projects/aa-shared-install/node_modules` (the junction every
+   worktree here shares) has `playwright` and `playwright-core` but no
+   `@playwright` scope directory as of ~16:50 local. `qa:stock-boot` and the
+   pass74 boot smoke ran and passed BEFORE that, so those receipts stand, but
+   no browser gate or capture can be re-run until it is restored. Not repaired
+   here: this worktree must never run `npm install/ci/rebuild` against the
+   shared install. Reported for the owner/orchestrator.
+
+5. **`nuketown2-bo2-accuracy` and `nuketown2-look` landed AFTER this build.**
+   Both were absent at the 15:53 fetch and present at the 16:38 fetch, after
+   the candidate had been built, gated and pushed. They are NOT in candidate 4.
+   A follow-up merge + rebuild is owed, and it should be sequenced after the
+   fence work above, since more art is what moved the first submission onto the
+   12 s bound in the first place.
