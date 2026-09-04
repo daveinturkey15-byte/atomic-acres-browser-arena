@@ -1,3 +1,8 @@
+// Hunter drone GLB QA audit: loads hunter drone .glb assets and validates container structure, required drone nodes/sockets, animation clips, embedded PBR texture set, and per-LOD triangle/byte budgets.
+// Usage: node scripts/qa/hunter-drone-glb.mjs
+// Flags / environment variables: none — the module reads no process.argv entries and no process.env variables.
+// Writes: nothing — no files or directories are created; GLB inputs are only read from a given path.
+// Exit codes: none — no process.exit calls; audit failures are returned as failure lists or thrown as errors.
 import { readFile } from 'node:fs/promises';
 
 export const REQUIRED_DRONE_NODES = Object.freeze([
