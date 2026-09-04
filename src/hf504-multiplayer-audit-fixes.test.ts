@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const network = readFileSync(new URL('./network.ts', import.meta.url), 'utf8');
+const protocol = readFileSync(new URL('./protocol.ts', import.meta.url), 'utf8');
 
 /** The body of a top-level `function name(` declaration, up to the next one. */
 function functionBody(source: string, declaration: string): string {
@@ -163,6 +164,42 @@ describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () 
   it('carries and presents the host-authored remote reload state', () => {
     expect(main).toContain('reloading: player.reloadState !== null,');
     expect(main).toContain('operator.userData.reloading = renderedSnapshot.reloading === true;');
+  });
+});
+
+describe('HF-504 P-2/P-5 pickup rollback is observable and covers auto-scavenge', () => {
+  it('signals a timed-out optimistic pickup after restoring its prior state', () => {
+    const body = functionBody(main, 'function expirePendingLocalPickup(');
+    const restore = body.indexOf('restorePendingLocalPickup(pending);');
+    const feed = body.indexOf("addFeed('PICKUP TIMED OUT'");
+    expect(restore).toBeGreaterThanOrEqual(0);
+    expect(feed).toBeGreaterThan(restore);
+  });
+
+  it('records auto-scavenge rollback state before sending its guest claim', () => {
+    const body = functionBody(main, 'function autoScavengeDeathDrop(');
+    expect(body).toContain('network.role === \'client\' && pendingLocalPickup');
+    expect(body).toContain('const priorInventory = localGuestCombatInventory();');
+    expect(body).toContain('pendingLocalPickup = Object.freeze({');
+    expect(body.indexOf('pendingLocalPickup = Object.freeze({')).toBeLessThan(body.indexOf('network.send(pickup);'));
+  });
+});
+
+describe('HF-504 P-6/P-8 death drops are host-authored', () => {
+  it('allows a death message to carry the host-canonical drop record', () => {
+    expect(protocol).toContain('drop?: PickupResultDropRecord;');
+    expect(protocol).not.toContain("type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number }");
+  });
+
+  it('creates and broadcasts one canonical host drop before peers process the death', () => {
+    expect(main).toContain('function canonicalDeathMessage(message: DeathMessage): DeathMessage {');
+    const helper = functionBody(main, 'function canonicalDeathMessage(message: DeathMessage): DeathMessage {');
+    expect(helper).toContain('const entity = spawnDeathDrop(message);');
+    expect(main).toContain('const canonicalDeath = canonicalDeathMessage(death);');
+    expect(main).toContain('network.send(canonicalDeath);');
+    const spawn = functionBody(main, 'function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDropEntity | null {');
+    expect(spawn).toContain('const canonical = message.drop;');
+    expect(spawn).toContain('const bounded = canonical ? victim.position : clampPointToBounds');
   });
 });
 

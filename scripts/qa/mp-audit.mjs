@@ -740,7 +740,7 @@ async function scenarioPickup(guest, host, peers, role) {
  *  consumed after respawn; require the claimant and host to converge, while
  *  the other guest sees the same canonical post-transaction drop. */
 async function scenarioPickupAuthority(guest, host, peers, role) {
-  const result = { ok: false };
+  const result = { ok: false, measuredRows: ['P-6', 'P-8'] };
   const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
   const other = peers[otherRole];
   const before = await viewOf(guest.page);

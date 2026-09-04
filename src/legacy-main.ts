@@ -14305,9 +14305,10 @@ function sendAuthoritativeHit(
       cause: killCauseFromHit(authoritativeTimedMessage, attackerWeapon),
       nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    processedNonces.add(canonicalDeath.nonce);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
   }
 }
 
@@ -14826,9 +14827,10 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
           type: 'death', killer: request.by, victim: targetId,
           cause: { kind: 'gun', weapon: request.weapon }, nonce: randomNonce(),
         };
-        processedNonces.add(death.nonce);
-        network.send(death);
-        processDeath(death);
+        const canonicalDeath = canonicalDeathMessage(death);
+        processedNonces.add(canonicalDeath.nonce);
+        network.send(canonicalDeath);
+        processDeath(canonicalDeath);
       }
     }
     if (appliedDamage > 0) outcomes.push({
@@ -15232,8 +15234,9 @@ function applyDamage(
     updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, cause, nonce: randomNonce() };
     if (network.role !== 'client') {
-      network.send(death);
-      processDeath(death);
+      const canonicalDeath = canonicalDeathMessage(death);
+      network.send(canonicalDeath);
+      processDeath(canonicalDeath);
     }
     scheduleLocalRespawn(now);
     document.exitPointerLock();
@@ -15270,9 +15273,12 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
   const id = `death-${message.nonce}`;
   const existing = deathDrops.find((entity) => entity.drop.id === id);
   if (existing) return existing;
-  const victim = deathDropVictim(message);
+  const canonical = message.drop;
+  const victim = canonical
+    ? { weapon: canonical.weapon, position: new THREE.Vector3(...canonical.position) }
+    : deathDropVictim(message);
   if (!victim || !isPrimaryWeaponId(victim.weapon)) return null;
-  const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
+  const bounded = canonical ? victim.position : clampPointToBounds(victim.position, arena.bounds, 0.5);
   victim.position.set(bounded.x, bounded.y, bounded.z);
   const spec = WEAPONS[victim.weapon];
   const drop = createDeathDrop(
@@ -15283,11 +15289,28 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
     Math.max(1, Math.ceil(spec.reserve * 0.25)),
     now,
   );
+  if (canonical) {
+    drop.ammo = canonical.ammo;
+    drop.reserve = canonical.reserve;
+    drop.expiresAt = canonical.expiresAt;
+  }
   if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
   const root = deathDropPresentationPool.acquire(id, spec.color, victim.position, victim.weapon);
   const entity = { drop, root };
   deathDrops.unshift(entity);
   return entity;
+}
+
+/** Construct the one host-authored drop record before a death is broadcast.
+ *  Clients may present the death, but they never derive weapon/position/ammo
+ *  from their own possibly stale view. */
+function canonicalDeathMessage(message: DeathMessage): DeathMessage {
+  if (network.role !== 'host' || message.drop) return message;
+  const entity = spawnDeathDrop(message);
+  const drop = entity?.drop;
+  if (!drop) return message;
+  const canonical = pickupResultDropRecord(drop, performance.now());
+  return canonical === 'removed' ? message : { ...message, drop: canonical };
 }
 
 function removeDeathDrop(entity: DeathDropEntity): void {
@@ -15557,12 +15580,17 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
 }
 
 function autoScavengeDeathDrop(now: number): boolean {
-  if (!player.alive || matchState.phase !== 'active') return false;
+  if (!player.alive || matchState.phase !== 'active' || network.role === 'client' && pendingLocalPickup) return false;
   const drop = nearestScavengeDeathDrop(deathDrops.map((entity) => entity.drop), player.position, now);
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
   const activeWeapon = player.weapon;
+  const priorInventory = localGuestCombatInventory();
+  const priorDrop: DeathDrop = {
+    ...drop,
+    position: { ...drop.position },
+  };
   const result = scavengeDeathDrop(
     drop,
     { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
@@ -15585,6 +15613,18 @@ function autoScavengeDeathDrop(now: number): boolean {
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
+  if (network.role === 'client') {
+    pendingLocalPickup = Object.freeze({
+      nonce: pickup.nonce,
+      dropId: pickup.dropId,
+      priorInventory,
+      priorPrimaryWeapon: player.primaryWeapon,
+      priorWeapon: player.weapon,
+      priorSwitchingUntil: player.switchingUntil,
+      priorDrop,
+      sentAt: now,
+    });
+  }
   network.send(pickup);
   recordMatchDiagnostic('scavenge-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: player.id,
@@ -15787,6 +15827,7 @@ function expirePendingLocalPickup(now: number): void {
     reason: 'pickup-result-timeout',
     modifiers: ['deadline:1500ms'],
   });
+  addFeed('PICKUP TIMED OUT', 'coral');
 }
 
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
@@ -18928,9 +18969,10 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
   recordAuthoritativeDamage(shooterId, target.id, applied.damageApplied);
   if (applied.died) {
     const death: DeathMessage = { type: 'death', killer: shooterId, victim: target.id, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    processedNonces.add(canonicalDeath.nonce);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
   }
   return {
     target: target.id, damageRequested: RAILGUN_DAMAGE, damageApplied: applied.damageApplied,
@@ -20890,9 +20932,10 @@ function applyBotDamage(
   soloBotDeaths += 1;
   const death: DeathMessage = { type: 'death', killer: attackerId, victim: bot.id, cause, nonce: randomNonce() };
   if (network.role === 'host') {
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    processedNonces.add(canonicalDeath.nonce);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
     broadcastHostedBotState();
   } else if (network.role === 'offline'
     && attackerId === MAP_CARPET_BOMBER_KILLER_ID
@@ -21194,9 +21237,10 @@ function applyHostedBotDamageToRemote(
       type: 'death', killer: bot.id, victim: target.id,
       cause: { kind: 'gun', weapon: authoredWeapon }, nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    processedNonces.add(canonicalDeath.nonce);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
   }
   broadcastHostedBotState();
   return result.damageApplied;
@@ -24912,8 +24956,9 @@ function finishDeferredLocalKillstreakDeath(now = performance.now()): void {
   updateFieldSupportHud();
   const death: DeathMessage = { type: 'death', killer: pending.attacker, victim: player.id, cause: pending.cause, nonce: randomNonce() };
   if (network.role !== 'client') {
-    network.send(death);
-    processDeath(death);
+      const canonicalDeath = canonicalDeathMessage(death);
+      network.send(canonicalDeath);
+      processDeath(canonicalDeath);
   }
   scheduleLocalRespawn(now);
   document.exitPointerLock();
@@ -24975,9 +25020,10 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   recordAuthoritativeDamage(attributionId, event.targetId, result.damageApplied);
   if (result.died) {
     const death: DeathMessage = { type: 'death', killer: attributionId, victim: event.targetId, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    processedNonces.add(canonicalDeath.nonce);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
   }
   return { ...event, damage: result.damageApplied };
 }
@@ -36751,8 +36797,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       cause: { kind: 'gun', weapon: player.weapon },
       nonce: randomNonce(),
     };
-    network.send(death);
-    processDeath(death);
+    const canonicalDeath = canonicalDeathMessage(death);
+    network.send(canonicalDeath);
+    processDeath(canonicalDeath);
     persistActiveHostMatchCheckpoint();
     const nextLifeId = killstreakRuntime.actorLifeId(remote.snapshot.id);
     return nextLifeId === null ? null : { targetId: remote.snapshot.id, nextLifeId };
