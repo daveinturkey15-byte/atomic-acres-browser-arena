@@ -13,8 +13,7 @@
  */
 import { MeshStandardNodeMaterial, PhysicalLightingModel } from 'three/webgpu';
 import type { NodeBuilder } from 'three/webgpu';
-import { BRDF_Lambert, normalWorld, positionWorld } from 'three/tsl';
-import { diffuseContribution } from 'three/src/nodes/core/PropertyNode.js';
+import { BRDF_Lambert, diffuseColor, metalness, normalWorld, positionWorld } from 'three/tsl';
 
 import {
   SH_L2_MAXIMUM_STRENGTH,
@@ -73,9 +72,12 @@ class Nuketown2IndirectLightingModel extends PhysicalLightingModel {
   override indirectDiffuse(builder: NodeBuilder): void {
     super.indirectDiffuse(builder);
     const shared = sharedNuketown2IndirectTerm();
-    // The published r185 declarations expose BRDF_Lambert as an untyped
-    // OperatorNode. Cast the two graph operands at this boundary; the runtime
-    // implementation is the same node operation used by PhysicalLightingModel.
+    // The private `diffuseContribution` PropertyNode is not part of the public
+    // TSL export and importing it directly creates a second module instance in
+    // Vite. Reconstruct the exact MeshStandard contribution from public TSL
+    // nodes instead: MeshStandardNodeMaterial assigns this same expression in
+    // setupVariants before the lighting model runs.
+    const diffuseContribution = diffuseColor.rgb.mul(metalness.oneMinus());
     const diffuse = (shared.irradiance as unknown as TslVec3Node).mul(
       BRDF_Lambert({ diffuseColor: diffuseContribution }) as unknown as TslVec3Node,
     );

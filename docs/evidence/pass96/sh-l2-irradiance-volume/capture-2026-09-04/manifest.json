@@ -1,0 +1,1003 @@
+{
+  "contract": "pass96-sh-l2-wiring-capture-v1",
+  "capturedAt": "2026-09-04T22:45:45.626Z",
+  "base": "http://127.0.0.1:4216",
+  "browser": "installed Chrome channel, headless, --mute-audio, stock flags",
+  "env": {
+    "PASS73_NATIVE_WEBGPU": "1"
+  },
+  "fixedTimeMs": 42000,
+  "seed": 83031,
+  "states": {
+    "before": {
+      "tier": "off",
+      "volumeEnabled": false
+    },
+    "after": {
+      "tier": "high",
+      "volumeEnabled": true
+    }
+  },
+  "before": {
+    "state": "before",
+    "tier": "off",
+    "shots": [
+      {
+        "id": "interior-station",
+        "path": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-04\\before-interior-station.png",
+        "telemetry": {
+          "backendDataset": "webgpu",
+          "renderer": {
+            "requestedBackend": "webgpu",
+            "actualBackend": "webgpu",
+            "initialized": true,
+            "failClosed": false,
+            "adapterLabel": "nvidia / blackwell",
+            "adapterClass": "GPUAdapter",
+            "deviceClass": "GPUDevice",
+            "deviceFeatures": [
+              "rg11b10ufloat-renderable",
+              "float32-filterable"
+            ],
+            "softwareAdapter": false,
+            "canvasAlphaMode": "opaque",
+            "canvasAntialias": true,
+            "canvasSamples": 4,
+            "principalHdrSamples": 4,
+            "bloomSamples": 0,
+            "renderPipelineApi": "three-r185-render-pipeline",
+            "deviceLost": false,
+            "uncapturedErrors": 0,
+            "lastUncapturedError": null,
+            "slowNodeBuilds": [],
+            "tslNodeBuild": {
+              "count": 69,
+              "messages": [
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+              ]
+            },
+            "presentation": {
+              "status": "healthy",
+              "submissionMode": "warmed-live",
+              "maximumInFlightSubmissions": 3,
+              "inFlightSubmissions": 2,
+              "completionProbeTargetSequence": 384,
+              "outstandingCompletionProbes": 2,
+              "completionProbeCount": 385,
+              "submissionSequence": 385,
+              "completedSequence": 383,
+              "lastSubmittedAt": 50726.699999928474,
+              "lastCompletedAt": 50727.60000002384,
+              "pendingSince": 50727.60000002384,
+              "pendingForMs": 39.799999952316284,
+              "lastCompletionLatencyMs": 11.800000071525574,
+              "completionFailures": 0,
+              "lastFailure": null,
+              "backpressureActive": false,
+              "skippedSubmissions": 15,
+              "progress": {
+                "windowStartedAt": 43937.699999928474,
+                "elapsedMs": 6829.700000047684,
+                "submissionAdvances": 235,
+                "completionAdvances": 233,
+                "submittedHz": 34.408539174247665,
+                "completedHz": 34.11570054297747,
+                "currentSubmissionGapMs": 40.700000047683716,
+                "currentCompletionGapMs": 39.799999952316284,
+                "maximumSubmissionGapMs": 203.5,
+                "maximumCompletionGapMs": 275.8000000715256,
+                "maximumPendingForMs": 180.89999997615814,
+                "maximumCompletionLatencyMs": 180.89999997615814,
+                "submissionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 62.032601579914164,
+                  "cadenceHz": 60.240964201507595,
+                  "meanMs": 16.12055555515819,
+                  "p05Ms": 10.800000071525574,
+                  "medianMs": 16.59999990463257,
+                  "p95Ms": 22,
+                  "p99Ms": 23.600000023841858,
+                  "maxMs": 68.5,
+                  "longFrames": {
+                    "over20Ms": 18,
+                    "over33Ms": 1,
+                    "over50Ms": 1,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                },
+                "completionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 49.62095106659813,
+                  "cadenceHz": 58.8235294117647,
+                  "meanMs": 20.15277777844005,
+                  "p05Ms": 11.299999952316284,
+                  "medianMs": 17,
+                  "p95Ms": 40.300000071525574,
+                  "p99Ms": 52.5,
+                  "maxMs": 55.5,
+                  "longFrames": {
+                    "over20Ms": 48,
+                    "over33Ms": 33,
+                    "over50Ms": 4,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                }
+              }
+            }
+          },
+          "arena": "nuketown2",
+          "shL2Receipt": "20x4x44:l2:1ca40182:76:0.280",
+          "graphicsTier": "low",
+          "capture": {
+            "cameraId": "pass65-offline-menu-preview-capture",
+            "fixedTimeMs": 42000,
+            "seed": 83031,
+            "exposure": 1.08,
+            "hud": "hidden",
+            "captureCameraActive": true,
+            "captureCameraOrbit": false,
+            "chopperExteriorReviewTracking": false,
+            "chopperExteriorReviewTrackerFrame": null,
+            "captureCameraX": -1.25,
+            "captureCameraY": 4.5,
+            "captureCameraZ": -12.6,
+            "captureCameraYaw": -2.91,
+            "captureCameraRevision": 1,
+            "captureCamera": {
+              "position": [
+                -1.25,
+                4.5,
+                -12.6
+              ],
+              "quaternion": [
+                -0.004651103896955514,
+                -0.9926656814274358,
+                -0.040576919601260204,
+                0.11378367960484012
+              ],
+              "yaw": -2.9133400834134595,
+              "pitch": -0.08170795648885455,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180
+            },
+            "presentedCamera": {
+              "contract": "capture-camera-committed-frame-v1",
+              "renderer": "webgpu",
+              "completionSemantics": "submission-sequence-covered-by-completion-frontier",
+              "arenaId": "nuketown2",
+              "frame": 250,
+              "captureRevision": 1,
+              "committedAtMs": 50726.699999928474,
+              "position": [
+                -1.25,
+                4.5,
+                -12.6
+              ],
+              "quaternion": [
+                -0.004651103896955514,
+                -0.9926656814274358,
+                -0.040576919601260204,
+                0.11378367960484012
+              ],
+              "yaw": -2.9133400834134595,
+              "pitch": -0.08170795648885455,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180,
+              "submissionSequence": 385,
+              "completedSequence": 382,
+              "targetCount": 1,
+              "riggedActorTargetCount": 0,
+              "chopperAutonomousFireHeld": false,
+              "activeChopperTransientActions": [],
+              "chopperReviewTracker": null,
+              "reviewedChopper": null
+            },
+            "presentedCapture": null,
+            "captureOrbitElapsedMs": null,
+            "renderSubmissionPaused": false,
+            "matchAdmissionPresentationPaused": false,
+            "debugRenderPaused": false,
+            "webglContextLost": false
+          }
+        }
+      },
+      {
+        "id": "shadowed-exterior",
+        "path": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-04\\before-shadowed-exterior.png",
+        "telemetry": {
+          "backendDataset": "webgpu",
+          "renderer": {
+            "requestedBackend": "webgpu",
+            "actualBackend": "webgpu",
+            "initialized": true,
+            "failClosed": false,
+            "adapterLabel": "nvidia / blackwell",
+            "adapterClass": "GPUAdapter",
+            "deviceClass": "GPUDevice",
+            "deviceFeatures": [
+              "rg11b10ufloat-renderable",
+              "float32-filterable"
+            ],
+            "softwareAdapter": false,
+            "canvasAlphaMode": "opaque",
+            "canvasAntialias": true,
+            "canvasSamples": 4,
+            "principalHdrSamples": 4,
+            "bloomSamples": 0,
+            "renderPipelineApi": "three-r185-render-pipeline",
+            "deviceLost": false,
+            "uncapturedErrors": 0,
+            "lastUncapturedError": null,
+            "slowNodeBuilds": [],
+            "tslNodeBuild": {
+              "count": 69,
+              "messages": [
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+              ]
+            },
+            "presentation": {
+              "status": "healthy",
+              "submissionMode": "warmed-live",
+              "maximumInFlightSubmissions": 3,
+              "inFlightSubmissions": 2,
+              "completionProbeTargetSequence": 478,
+              "outstandingCompletionProbes": 2,
+              "completionProbeCount": 479,
+              "submissionSequence": 479,
+              "completedSequence": 477,
+              "lastSubmittedAt": 51987.89999997616,
+              "lastCompletedAt": 51988.60000002384,
+              "pendingSince": 51988.60000002384,
+              "pendingForMs": 43.09999990463257,
+              "lastCompletionLatencyMs": 11.600000023841858,
+              "completionFailures": 0,
+              "lastFailure": null,
+              "backpressureActive": false,
+              "skippedSubmissions": 15,
+              "progress": {
+                "windowStartedAt": 43937.699999928474,
+                "elapsedMs": 8094,
+                "submissionAdvances": 329,
+                "completionAdvances": 327,
+                "submittedHz": 40.64739313071411,
+                "completedHz": 40.40029651593773,
+                "currentSubmissionGapMs": 43.799999952316284,
+                "currentCompletionGapMs": 43.09999990463257,
+                "maximumSubmissionGapMs": 203.5,
+                "maximumCompletionGapMs": 275.8000000715256,
+                "maximumPendingForMs": 180.89999997615814,
+                "maximumCompletionLatencyMs": 180.89999997615814,
+                "submissionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 73.52941176470588,
+                  "cadenceHz": 80.64516067008695,
+                  "meanMs": 13.6,
+                  "p05Ms": 10.200000047683716,
+                  "medianMs": 12.400000095367432,
+                  "p95Ms": 17.600000023841858,
+                  "p99Ms": 53.40000009536743,
+                  "maxMs": 68.5,
+                  "longFrames": {
+                    "over20Ms": 7,
+                    "over33Ms": 3,
+                    "over50Ms": 3,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                },
+                "completionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 69.03958269281526,
+                  "cadenceHz": 80.64516144538149,
+                  "meanMs": 14.484444444709354,
+                  "p05Ms": 10.399999976158142,
+                  "medianMs": 12.399999976158142,
+                  "p95Ms": 32.200000047683716,
+                  "p99Ms": 53.799999952316284,
+                  "maxMs": 77.30000007152557,
+                  "longFrames": {
+                    "over20Ms": 13,
+                    "over33Ms": 9,
+                    "over50Ms": 3,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                }
+              }
+            }
+          },
+          "arena": "nuketown2",
+          "shL2Receipt": "20x4x44:l2:1ca40182:76:0.280",
+          "graphicsTier": "low",
+          "capture": {
+            "cameraId": "pass65-offline-menu-preview-capture",
+            "fixedTimeMs": 42000,
+            "seed": 83031,
+            "exposure": 1.08,
+            "hud": "hidden",
+            "captureCameraActive": true,
+            "captureCameraOrbit": false,
+            "chopperExteriorReviewTracking": false,
+            "chopperExteriorReviewTrackerFrame": null,
+            "captureCameraX": -12,
+            "captureCameraY": 1.75,
+            "captureCameraZ": -30,
+            "captureCameraYaw": -2.25,
+            "captureCameraRevision": 2,
+            "captureCamera": {
+              "position": [
+                -12,
+                1.75,
+                -30
+              ],
+              "quaternion": [
+                -0.004227690479413839,
+                -0.9012603119946762,
+                -0.008796237858950841,
+                0.43316809999813943
+              ],
+              "yaw": -2.2455372690184494,
+              "pitch": -0.019519240909647552,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180
+            },
+            "presentedCamera": {
+              "contract": "capture-camera-committed-frame-v1",
+              "renderer": "webgpu",
+              "completionSemantics": "submission-sequence-covered-by-completion-frontier",
+              "arenaId": "nuketown2",
+              "frame": 344,
+              "captureRevision": 2,
+              "committedAtMs": 51988.10000002384,
+              "position": [
+                -12,
+                1.75,
+                -30
+              ],
+              "quaternion": [
+                -0.004227690479413839,
+                -0.9012603119946762,
+                -0.008796237858950841,
+                0.43316809999813943
+              ],
+              "yaw": -2.2455372690184494,
+              "pitch": -0.019519240909647552,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180,
+              "submissionSequence": 479,
+              "completedSequence": 476,
+              "targetCount": 1,
+              "riggedActorTargetCount": 0,
+              "chopperAutonomousFireHeld": false,
+              "activeChopperTransientActions": [],
+              "chopperReviewTracker": null,
+              "reviewedChopper": null
+            },
+            "presentedCapture": null,
+            "captureOrbitElapsedMs": null,
+            "renderSubmissionPaused": false,
+            "matchAdmissionPresentationPaused": false,
+            "debugRenderPaused": false,
+            "webglContextLost": false
+          }
+        }
+      }
+    ]
+  },
+  "after": {
+    "state": "after",
+    "tier": "high",
+    "shots": [
+      {
+        "id": "interior-station",
+        "path": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-04\\after-interior-station.png",
+        "telemetry": {
+          "backendDataset": "webgpu",
+          "renderer": {
+            "requestedBackend": "webgpu",
+            "actualBackend": "webgpu",
+            "initialized": true,
+            "failClosed": false,
+            "adapterLabel": "nvidia / blackwell",
+            "adapterClass": "GPUAdapter",
+            "deviceClass": "GPUDevice",
+            "deviceFeatures": [
+              "rg11b10ufloat-renderable",
+              "float32-filterable"
+            ],
+            "softwareAdapter": false,
+            "canvasAlphaMode": "opaque",
+            "canvasAntialias": true,
+            "canvasSamples": 4,
+            "principalHdrSamples": 4,
+            "bloomSamples": 0,
+            "renderPipelineApi": "three-r185-render-pipeline",
+            "deviceLost": false,
+            "uncapturedErrors": 0,
+            "lastUncapturedError": null,
+            "slowNodeBuilds": [],
+            "tslNodeBuild": {
+              "count": 69,
+              "messages": [
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+              ]
+            },
+            "presentation": {
+              "status": "healthy",
+              "submissionMode": "warmed-live",
+              "maximumInFlightSubmissions": 3,
+              "inFlightSubmissions": 2,
+              "completionProbeTargetSequence": 359,
+              "outstandingCompletionProbes": 2,
+              "completionProbeCount": 360,
+              "submissionSequence": 360,
+              "completedSequence": 358,
+              "lastSubmittedAt": 51877.39999997616,
+              "lastCompletedAt": 51879.09999990463,
+              "pendingSince": 51879.09999990463,
+              "pendingForMs": 65.20000004768372,
+              "lastCompletionLatencyMs": 16.5,
+              "completionFailures": 0,
+              "lastFailure": null,
+              "backpressureActive": false,
+              "skippedSubmissions": 13,
+              "progress": {
+                "windowStartedAt": 44814.199999928474,
+                "elapsedMs": 7130.100000023842,
+                "submissionAdvances": 206,
+                "completionAdvances": 204,
+                "submittedHz": 28.891600398214777,
+                "completedHz": 28.611099423474826,
+                "currentSubmissionGapMs": 66.89999997615814,
+                "currentCompletionGapMs": 65.20000004768372,
+                "maximumSubmissionGapMs": 238.5,
+                "maximumCompletionGapMs": 260.8000000715256,
+                "maximumPendingForMs": 197.5,
+                "maximumCompletionLatencyMs": 197.5,
+                "submissionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 49.208562290159165,
+                  "cadenceHz": 50.251256341612226,
+                  "meanMs": 20.321666666534213,
+                  "p05Ms": 13.700000047683716,
+                  "medianMs": 19.899999976158142,
+                  "p95Ms": 27.299999952316284,
+                  "p99Ms": 32.300000071525574,
+                  "maxMs": 82.10000002384186,
+                  "longFrames": {
+                    "over20Ms": 88,
+                    "over33Ms": 2,
+                    "over50Ms": 1,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                },
+                "completionPacing": {
+                  "ready": true,
+                  "sampleCount": 170,
+                  "rateHz": 24.068070165259655,
+                  "cadenceHz": 44.8430494232414,
+                  "meanMs": 41.548823529832504,
+                  "p05Ms": 14.200000047683716,
+                  "medianMs": 22.299999952316284,
+                  "p95Ms": 203.70000004768372,
+                  "p99Ms": 220.89999997615814,
+                  "maxMs": 260.8000000715256,
+                  "longFrames": {
+                    "over20Ms": 103,
+                    "over33Ms": 50,
+                    "over50Ms": 24,
+                    "over100Ms": 16
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                }
+              }
+            }
+          },
+          "arena": "nuketown2",
+          "shL2Receipt": "20x4x44:l2:1ca40182:76:0.280",
+          "graphicsTier": "low",
+          "capture": {
+            "cameraId": "pass65-offline-menu-preview-capture",
+            "fixedTimeMs": 42000,
+            "seed": 83031,
+            "exposure": 1.08,
+            "hud": "hidden",
+            "captureCameraActive": true,
+            "captureCameraOrbit": false,
+            "chopperExteriorReviewTracking": false,
+            "chopperExteriorReviewTrackerFrame": null,
+            "captureCameraX": -1.25,
+            "captureCameraY": 4.5,
+            "captureCameraZ": -12.6,
+            "captureCameraYaw": -2.91,
+            "captureCameraRevision": 1,
+            "captureCamera": {
+              "position": [
+                -1.25,
+                4.5,
+                -12.6
+              ],
+              "quaternion": [
+                -0.004651103896955514,
+                -0.9926656814274358,
+                -0.040576919601260204,
+                0.11378367960484012
+              ],
+              "yaw": -2.9133400834134595,
+              "pitch": -0.08170795648885455,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180
+            },
+            "presentedCamera": {
+              "contract": "capture-camera-committed-frame-v1",
+              "renderer": "webgpu",
+              "completionSemantics": "submission-sequence-covered-by-completion-frontier",
+              "arenaId": "nuketown2",
+              "frame": 219,
+              "captureRevision": 1,
+              "committedAtMs": 51877.5,
+              "position": [
+                -1.25,
+                4.5,
+                -12.6
+              ],
+              "quaternion": [
+                -0.004651103896955514,
+                -0.9926656814274358,
+                -0.040576919601260204,
+                0.11378367960484012
+              ],
+              "yaw": -2.9133400834134595,
+              "pitch": -0.08170795648885455,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180,
+              "submissionSequence": 360,
+              "completedSequence": 357,
+              "targetCount": 1,
+              "riggedActorTargetCount": 0,
+              "chopperAutonomousFireHeld": false,
+              "activeChopperTransientActions": [],
+              "chopperReviewTracker": null,
+              "reviewedChopper": null
+            },
+            "presentedCapture": null,
+            "captureOrbitElapsedMs": null,
+            "renderSubmissionPaused": false,
+            "matchAdmissionPresentationPaused": false,
+            "debugRenderPaused": false,
+            "webglContextLost": false
+          }
+        }
+      },
+      {
+        "id": "shadowed-exterior",
+        "path": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-04\\after-shadowed-exterior.png",
+        "telemetry": {
+          "backendDataset": "webgpu",
+          "renderer": {
+            "requestedBackend": "webgpu",
+            "actualBackend": "webgpu",
+            "initialized": true,
+            "failClosed": false,
+            "adapterLabel": "nvidia / blackwell",
+            "adapterClass": "GPUAdapter",
+            "deviceClass": "GPUDevice",
+            "deviceFeatures": [
+              "rg11b10ufloat-renderable",
+              "float32-filterable"
+            ],
+            "softwareAdapter": false,
+            "canvasAlphaMode": "opaque",
+            "canvasAntialias": true,
+            "canvasSamples": 4,
+            "principalHdrSamples": 4,
+            "bloomSamples": 0,
+            "renderPipelineApi": "three-r185-render-pipeline",
+            "deviceLost": false,
+            "uncapturedErrors": 0,
+            "lastUncapturedError": null,
+            "slowNodeBuilds": [],
+            "tslNodeBuild": {
+              "count": 69,
+              "messages": [
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+                "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+              ]
+            },
+            "presentation": {
+              "status": "healthy",
+              "submissionMode": "warmed-live",
+              "maximumInFlightSubmissions": 3,
+              "inFlightSubmissions": 2,
+              "completionProbeTargetSequence": 444,
+              "outstandingCompletionProbes": 2,
+              "completionProbeCount": 445,
+              "submissionSequence": 445,
+              "completedSequence": 443,
+              "lastSubmittedAt": 53359.39999997616,
+              "lastCompletedAt": 53360.299999952316,
+              "pendingSince": 53360.299999952316,
+              "pendingForMs": 56.60000002384186,
+              "lastCompletionLatencyMs": 14.299999952316284,
+              "completionFailures": 0,
+              "lastFailure": null,
+              "backpressureActive": false,
+              "skippedSubmissions": 13,
+              "progress": {
+                "windowStartedAt": 44814.199999928474,
+                "elapsedMs": 8602.700000047684,
+                "submissionAdvances": 291,
+                "completionAdvances": 289,
+                "submittedHz": 33.82658932641927,
+                "completedHz": 33.59410417640951,
+                "currentSubmissionGapMs": 57.5,
+                "currentCompletionGapMs": 56.60000002384186,
+                "maximumSubmissionGapMs": 238.5,
+                "maximumCompletionGapMs": 260.8000000715256,
+                "maximumPendingForMs": 197.5,
+                "maximumCompletionLatencyMs": 197.5,
+                "submissionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 56.48121999477442,
+                  "cadenceHz": 62.893081383776625,
+                  "meanMs": 17.704999999867546,
+                  "p05Ms": 12.600000023841858,
+                  "medianMs": 15.900000095367432,
+                  "p95Ms": 23.300000071525574,
+                  "p99Ms": 82.10000002384186,
+                  "maxMs": 89.39999997615814,
+                  "longFrames": {
+                    "over20Ms": 28,
+                    "over33Ms": 3,
+                    "over50Ms": 3,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                },
+                "completionPacing": {
+                  "ready": true,
+                  "sampleCount": 180,
+                  "rateHz": 49.44511592165116,
+                  "cadenceHz": 59.52380969275693,
+                  "meanMs": 20.224444444311988,
+                  "p05Ms": 13,
+                  "medianMs": 16.799999952316284,
+                  "p95Ms": 40.89999997615814,
+                  "p99Ms": 81.70000004768372,
+                  "maxMs": 89.39999997615814,
+                  "longFrames": {
+                    "over20Ms": 48,
+                    "over33Ms": 18,
+                    "over50Ms": 4,
+                    "over100Ms": 0
+                  },
+                  "lastResetReason": "animation frame eligibility · recovery 1"
+                }
+              }
+            }
+          },
+          "arena": "nuketown2",
+          "shL2Receipt": "20x4x44:l2:1ca40182:76:0.280",
+          "graphicsTier": "low",
+          "capture": {
+            "cameraId": "pass65-offline-menu-preview-capture",
+            "fixedTimeMs": 42000,
+            "seed": 83031,
+            "exposure": 1.08,
+            "hud": "hidden",
+            "captureCameraActive": true,
+            "captureCameraOrbit": false,
+            "chopperExteriorReviewTracking": false,
+            "chopperExteriorReviewTrackerFrame": null,
+            "captureCameraX": -12,
+            "captureCameraY": 1.75,
+            "captureCameraZ": -30,
+            "captureCameraYaw": -2.25,
+            "captureCameraRevision": 2,
+            "captureCamera": {
+              "position": [
+                -12,
+                1.75,
+                -30
+              ],
+              "quaternion": [
+                -0.004227690479413839,
+                -0.9012603119946762,
+                -0.008796237858950841,
+                0.43316809999813943
+              ],
+              "yaw": -2.2455372690184494,
+              "pitch": -0.019519240909647552,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180
+            },
+            "presentedCamera": {
+              "contract": "capture-camera-committed-frame-v1",
+              "renderer": "webgpu",
+              "completionSemantics": "submission-sequence-covered-by-completion-frontier",
+              "arenaId": "nuketown2",
+              "frame": 304,
+              "captureRevision": 2,
+              "committedAtMs": 53359.5,
+              "position": [
+                -12,
+                1.75,
+                -30
+              ],
+              "quaternion": [
+                -0.004227690479413839,
+                -0.9012603119946762,
+                -0.008796237858950841,
+                0.43316809999813943
+              ],
+              "yaw": -2.2455372690184494,
+              "pitch": -0.019519240909647552,
+              "fov": 76,
+              "near": 0.02,
+              "far": 180,
+              "submissionSequence": 445,
+              "completedSequence": 442,
+              "targetCount": 1,
+              "riggedActorTargetCount": 0,
+              "chopperAutonomousFireHeld": false,
+              "activeChopperTransientActions": [],
+              "chopperReviewTracker": null,
+              "reviewedChopper": null
+            },
+            "presentedCapture": null,
+            "captureOrbitElapsedMs": null,
+            "renderSubmissionPaused": false,
+            "matchAdmissionPresentationPaused": false,
+            "debugRenderPaused": false,
+            "webglContextLost": false
+          }
+        }
+      }
+    ]
+  },
+  "diffs": {
+    "interior-station": {
+      "meanAbsDiff8BitRgb": 0.4507,
+      "normalized": 0.001767,
+      "width": 1280,
+      "height": 720
+    },
+    "shadowed-exterior": {
+      "meanAbsDiff8BitRgb": 1.1058,
+      "normalized": 0.004337,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "renderer": {
+    "before": {
+      "requestedBackend": "webgpu",
+      "actualBackend": "webgpu",
+      "initialized": true,
+      "failClosed": false,
+      "adapterLabel": "nvidia / blackwell",
+      "adapterClass": "GPUAdapter",
+      "deviceClass": "GPUDevice",
+      "deviceFeatures": [
+        "rg11b10ufloat-renderable",
+        "float32-filterable"
+      ],
+      "softwareAdapter": false,
+      "canvasAlphaMode": "opaque",
+      "canvasAntialias": true,
+      "canvasSamples": 4,
+      "principalHdrSamples": 4,
+      "bloomSamples": 0,
+      "renderPipelineApi": "three-r185-render-pipeline",
+      "deviceLost": false,
+      "uncapturedErrors": 0,
+      "lastUncapturedError": null,
+      "slowNodeBuilds": [],
+      "tslNodeBuild": {
+        "count": 69,
+        "messages": [
+          "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+          "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+        ]
+      },
+      "presentation": {
+        "status": "healthy",
+        "submissionMode": "warmed-live",
+        "maximumInFlightSubmissions": 3,
+        "inFlightSubmissions": 1,
+        "completionProbeTargetSequence": 480,
+        "outstandingCompletionProbes": 1,
+        "completionProbeCount": 480,
+        "submissionSequence": 480,
+        "completedSequence": 479,
+        "lastSubmittedAt": 52043.199999928474,
+        "lastCompletedAt": 52044.39999997616,
+        "pendingSince": 52044.39999997616,
+        "pendingForMs": 43.5,
+        "lastCompletionLatencyMs": 0.20000004768371582,
+        "completionFailures": 0,
+        "lastFailure": null,
+        "backpressureActive": false,
+        "skippedSubmissions": 15,
+        "progress": {
+          "windowStartedAt": 43937.699999928474,
+          "elapsedMs": 8150.200000047684,
+          "submissionAdvances": 330,
+          "completionAdvances": 329,
+          "submittedHz": 40.489803930954984,
+          "completedHz": 40.36710755540663,
+          "currentSubmissionGapMs": 44.700000047683716,
+          "currentCompletionGapMs": 43.5,
+          "maximumSubmissionGapMs": 203.5,
+          "maximumCompletionGapMs": 275.8000000715256,
+          "maximumPendingForMs": 180.89999997615814,
+          "maximumCompletionLatencyMs": 180.89999997615814,
+          "submissionPacing": {
+            "ready": true,
+            "sampleCount": 180,
+            "rateHz": 72.41420927914851,
+            "cadenceHz": 80.64516067008695,
+            "meanMs": 13.809444444047081,
+            "p05Ms": 10.200000047683716,
+            "medianMs": 12.400000095367432,
+            "p95Ms": 17.600000023841858,
+            "p99Ms": 55.299999952316284,
+            "maxMs": 68.5,
+            "longFrames": {
+              "over20Ms": 8,
+              "over33Ms": 4,
+              "over50Ms": 4,
+              "over100Ms": 0
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          },
+          "completionPacing": {
+            "ready": true,
+            "sampleCount": 180,
+            "rateHz": 68.55314773390079,
+            "cadenceHz": 80.64516144538149,
+            "meanMs": 14.587222221824858,
+            "p05Ms": 10.399999976158142,
+            "medianMs": 12.399999976158142,
+            "p95Ms": 32.200000047683716,
+            "p99Ms": 55,
+            "maxMs": 77.30000007152557,
+            "longFrames": {
+              "over20Ms": 13,
+              "over33Ms": 9,
+              "over50Ms": 4,
+              "over100Ms": 0
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          }
+        }
+      }
+    },
+    "after": {
+      "requestedBackend": "webgpu",
+      "actualBackend": "webgpu",
+      "initialized": true,
+      "failClosed": false,
+      "adapterLabel": "nvidia / blackwell",
+      "adapterClass": "GPUAdapter",
+      "deviceClass": "GPUDevice",
+      "deviceFeatures": [
+        "rg11b10ufloat-renderable",
+        "float32-filterable"
+      ],
+      "softwareAdapter": false,
+      "canvasAlphaMode": "opaque",
+      "canvasAntialias": true,
+      "canvasSamples": 4,
+      "principalHdrSamples": 4,
+      "bloomSamples": 0,
+      "renderPipelineApi": "three-r185-render-pipeline",
+      "deviceLost": false,
+      "uncapturedErrors": 0,
+      "lastUncapturedError": null,
+      "slowNodeBuilds": [],
+      "tslNodeBuild": {
+        "count": 69,
+        "messages": [
+          "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"",
+          "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function"
+        ]
+      },
+      "presentation": {
+        "status": "healthy",
+        "submissionMode": "warmed-live",
+        "maximumInFlightSubmissions": 3,
+        "inFlightSubmissions": 2,
+        "completionProbeTargetSequence": 445,
+        "outstandingCompletionProbes": 2,
+        "completionProbeCount": 446,
+        "submissionSequence": 446,
+        "completedSequence": 444,
+        "lastSubmittedAt": 53442.299999952316,
+        "lastCompletedAt": 53444,
+        "pendingSince": 53444,
+        "pendingForMs": 63.59999990463257,
+        "lastCompletionLatencyMs": 83.70000004768372,
+        "completionFailures": 0,
+        "lastFailure": null,
+        "backpressureActive": false,
+        "skippedSubmissions": 13,
+        "progress": {
+          "windowStartedAt": 44814.199999928474,
+          "elapsedMs": 8693.399999976158,
+          "submissionAdvances": 292,
+          "completionAdvances": 290,
+          "submittedHz": 33.588699473255666,
+          "completedHz": 33.358639887822406,
+          "currentSubmissionGapMs": 65.29999995231628,
+          "currentCompletionGapMs": 63.59999990463257,
+          "maximumSubmissionGapMs": 238.5,
+          "maximumCompletionGapMs": 260.8000000715256,
+          "maximumPendingForMs": 197.5,
+          "maximumCompletionLatencyMs": 197.5,
+          "submissionPacing": {
+            "ready": true,
+            "sampleCount": 180,
+            "rateHz": 55.49902876781254,
+            "cadenceHz": 62.893081383776625,
+            "meanMs": 18.018333333068423,
+            "p05Ms": 12.600000023841858,
+            "medianMs": 15.900000095367432,
+            "p95Ms": 23.300000071525574,
+            "p99Ms": 82.89999997615814,
+            "maxMs": 89.39999997615814,
+            "longFrames": {
+              "over20Ms": 28,
+              "over33Ms": 4,
+              "over50Ms": 4,
+              "over100Ms": 0
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          },
+          "completionPacing": {
+            "ready": true,
+            "sampleCount": 180,
+            "rateHz": 48.580373528469046,
+            "cadenceHz": 59.52380969275693,
+            "meanMs": 20.584444444709355,
+            "p05Ms": 13,
+            "medianMs": 16.799999952316284,
+            "p95Ms": 41.300000071525574,
+            "p99Ms": 83.70000004768372,
+            "maxMs": 89.39999997615814,
+            "longFrames": {
+              "over20Ms": 49,
+              "over33Ms": 19,
+              "over50Ms": 5,
+              "over100Ms": 0
+            },
+            "lastResetReason": "animation frame eligibility · recovery 1"
+          }
+        }
+      }
+    }
+  },
+  "pageErrors": [
+    "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function \"three_webgpu.js:15375\"\n    at three_webgpu.js:15375:29\n    at ShaderCallNodeInternal.call (three_webgpu.js:2521:61)\n    at ShaderCallNodeInternal.setupOutput (three_webgpu.js:",
+    "THREE.TSL: TypeError: inputs.diffuseColor.mul is not a function Stack trace not available. Enable \"THREE.Node.captureStackTrace\" to capture stack traces."
+  ]
+}

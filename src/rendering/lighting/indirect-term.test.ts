@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { BRDF_Lambert, diffuseColor, metalness } from 'three/tsl';
 
 import { TSL_SHARED_MATERIAL_INVENTORY } from '../tsl-migration-inventory';
 import {
@@ -73,5 +74,13 @@ describe('Nuke Town SH-L2 ambient choke point', () => {
     expect(source).toContain('reflectedLight.indirectDiffuse.addAssign');
     expect(source).toContain('positionWorld');
     expect(source).toContain('normalWorld');
+    expect(source).not.toContain('three/src/nodes/core/PropertyNode');
+  });
+
+  it('uses r185 public TSL nodes for the standard diffuse contribution', () => {
+    const diffuseContribution = diffuseColor.rgb.mul(metalness.oneMinus());
+    const brdf = BRDF_Lambert({ diffuseColor: diffuseContribution });
+    expect(typeof diffuseContribution.mul).toBe('function');
+    expect(typeof (brdf as unknown as { mul?: unknown }).mul).toBe('function');
   });
 });

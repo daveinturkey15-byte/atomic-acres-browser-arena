@@ -2,8 +2,9 @@
 
 Lane: `contrib/dave-gaming-pc/claude/sh-l2-irradiance-volume`, based on
 `origin/contrib/dave-gaming-pc/claude/nuketown2-lighting` at `7f9b14b6`.
-Harness: Claude Code (Opus), machine `dave-gaming-pc`, 2026-09-04.
-Impact class: **runtime**, but **staged and not installed** - see section 6.
+Provenance: the staged SH-L2 implementation was authored by Claude Code (Opus);
+the wiring pass is Codex (Luna 5.6), machine `dave-gaming-pc`, 2026-09-04.
+Impact class: **runtime, wired in this branch** - see section 6.
 
 ---
 
@@ -84,6 +85,15 @@ had to drop the band.
 | `src/rendering/lighting/sh-l2-irradiance.test.ts` | 26 tests |
 | `src/rendering/lighting/sh-l2-irradiance-node.ts` | 7 x RGBA16F `Data3DTexture`, TSL sampling node, receipt |
 | `src/rendering/lighting/sh-l2-irradiance-node.test.ts` | 15 tests |
+| `src/rendering/lighting/indirect-term.ts` | shared Nuke Town `MeshStandardNodeMaterial` lighting model and CPU reference term |
+| `src/rendering/lighting/indirect-term.test.ts` | 24-factory roster, choke-point math, uniform state and graph-hook tests |
+| `src/rendering/lighting/nuketown2-sh-l2-occluders.ts` | bake-only authored shell, door, window and footprint occluder set |
+| `src/rendering/lighting/sh-l2-irradiance-runtime.ts` | real-sky-lux bake setup, cache/bind lifecycle and live tier control |
+| `src/rendering/lighting/nuketown2-sh-l2-runtime.test.ts` | authored occluder, real-lux and interior/exterior bake-fence tests |
+| `src/rendering/lighting/nuketown2-sh-l2-pipeline-budget.test.ts` | zero-pipeline delta budget test |
+| `src/rendering/tsl-migration-inventory.ts` + `src/rendering/pass64-tsl-scene.ts` | truthful shared-graph inventory and fail-closed traversal wiring |
+| `src/graphics-settings-registry.ts` + `src/pass65-settings.ts` | live `graphics.shL2Irradiance` control and preset contract |
+| `src/legacy-main.ts` + `src/rendering/nuketown2-frame-presentation.ts` | runtime installation and legacy-main ratchet hoist |
 
 ### The packing is ours (HF-472)
 
@@ -107,10 +117,11 @@ L2 band zeroed reconstructs bit-for-bit what `evaluateShL1` reconstructs.
 
 The HF-418 control is `applyMode: 'pipeline-rebuild'` because building its layer
 adds a **composite stage**. This node is a uniform multiply and a texture fetch
-inside a graph that already exists, so `setStrength(0)` leaves the graph, the
-bindings and the pipeline untouched. That makes the control `applyMode: 'live'`
-and safe to move mid-match (tripwire 0). Pinned by *"turns off through a uniform
-without touching the bound textures"*.
+inside a graph that already exists, so `setEnabled(false)` leaves the graph, the
+bindings and the pipeline untouched. Strength remains a separate uniform, and
+the default/unconfigured state is disabled. That makes the control `applyMode:
+'live'` and safe to move mid-match (tripwire 0). Pinned by *"turns off through a
+uniform without touching the bound textures"*.
 
 ---
 
@@ -176,44 +187,64 @@ existing convention and this lane has no business changing it underneath.
 
 ---
 
-## 6. What is NOT done - the staged/installed boundary
+## 6. Wired (claim-state)
 
-**This lane is staged, not installed.** The node is built and tested; it is
-**not** wired into any arena material, and no settings-registry control exists
-yet. Nothing in the running game changes, and the pipeline delta is **0**.
+**[VERIFIED] Choke point.** `src/rendering/lighting/indirect-term.ts` owns one
+shared `MeshStandardNodeMaterial` lighting model. It calls the frozen three.js
+`PhysicalLightingModel` indirect path first, then adds the SH-L2 term at
+`positionWorld` / `normalWorld` behind shared `strength` and `enabled` uniforms.
+When disabled or unbound the added term is exactly zero, so the frozen light set
+and `scene.environment` path remains the fallback.
 
-That boundary is deliberate, and the reason is a finding in its own right:
-**there is no per-material ambient choke point in this codebase.** Arena
-materials get their indirect light from the frozen three.js light set
-(`hemisphereLight` / `ambientLight`) and from `scene.environment`; nothing
-composes an ambient node by hand. Installing this means editing the ~24
-`create*Material()` factories in the four `src/nuketown2-*-materials.ts` files,
-and any new pipeline id must be registered in
-`src/rendering/tsl-migration-inventory.ts` or `assertRuntimeTslTraversal`
-(`pass64-tsl-scene.ts:1505`) **fails closed**. That is a bounded but real piece
-of work and it was not going to be done well in the time left. It is not
-claimed.
+**[VERIFIED] Factory coverage.** The structural test derives the roster from the
+four material modules and finds 24 unique `create*Material()` factories. Every
+factory calls `createNuketown2IndirectMaterial`; no factory constructs a direct
+`MeshStandardNodeMaterial`, and the shared graph is recorded in the traversal
+inventory with zero pipeline IDs.
 
-### Next steps, in order
+**[VERIFIED] Live control.** `graphics.shL2Irradiance` is registered as Off / Low
+/ High with `applyMode: 'live'`, a runtime consumer, runtime evidence and
+Performance / Balanced / High / Max values of Off / Low / Low / High. Changing
+the setting calls `setEnabled` / `setStrength` on uniforms only. The graph node,
+textures and pipeline bindings are unchanged by the off-switch test.
 
-1. **Widen the occluder set for the bake path only.** `extractProxyScene` is
-   capped at `maximumShapes: 24`, tuned for reflections. 24 boxes over Nuke Town
-   will not capture two houses' interior walls, a garage, doorways and windows,
-   so interiors will leak. The authored `NUKETOWN2_SECTION`,
-   `NUKETOWN2_DOORWAYS`, `NUKETOWN2_WINDOWS` and `NUKETOWN2_BUILDING_FOOTPRINTS`
-   are exported and are the right input. **Do not widen the shader-side
-   `RAY_TRACED_MAXIMUM_SHAPES`** - that is a per-frame cost budget.
-   *Also skip the 220 x 220 m ground collider, which encloses the whole arena.*
-2. Add the shared TSL term to the 24 material factories behind one uniform.
-3. Add the settings control (`applyMode: 'live'`, `runtimeConsumer`, runtime
-   evidence row, all four presets, renderer-feature-inventory row).
-4. Bake from `resolveNuketown2Sky()`'s absolute photometry rather than
-   `bakeLightingFromSun`'s quantised reconstruction - Nuke Town is the one arena
-   with a real lux table.
-5. Headless capture pair (interior + shadowed exterior) once it is wired. **Not
-   done in this lane, and no capture diff is claimed**, because with nothing
-   wired the two captures would be identical by construction and reporting them
-   would be theatre.
+**[VERIFIED] Bake occlusion.** The bake-only proxy consumes the exported
+`NUKETOWN2_SECTION`, `NUKETOWN2_DOORWAYS`, `NUKETOWN2_WINDOWS` and
+`NUKETOWN2_BUILDING_FOOTPRINTS` tables. It does not import or widen
+`RAY_TRACED_MAXIMUM_SHAPES`, and it omits the 220 x 220 m ground collider. The
+interior probe is required to be darker than the matched exterior probe by a
+stated ratio: interior mean `< 0.75 x` exterior mean at 256 rays and one bounce.
+
+**[VERIFIED] Real photometry.** `bakeLightingFromNuketown2Sky()` calls
+`resolveNuketown2Sky()` and derives the direct and sky scales from its authored
+lux table, elevation, azimuth and tints. It does not use the quantised
+reconstruction path.
+
+**[VERIFIED] Ratchet hoist.** The touched Nuke Town setup and presentation branch
+were moved into `sh-l2-irradiance-runtime.ts` and
+`nuketown2-frame-presentation.ts`. `src/legacy-main.ts` is now exactly 37,100
+lines; the ceiling remains 37,100 and no behaviour was deleted.
+
+**[VERIFIED] Pipeline budget.** The existing seven TSL pipeline IDs remain seven,
+the SH-L2 shared entry contributes zero IDs, and the Nuke Town feature row also
+contributes zero IDs. The pass64 traversal assertion still fails closed if this
+shared graph ever acquires an unregistered pipeline.
+
+**[OPEN] Browser evidence.** The one permitted capture attempt did reach
+installed Chrome WebGPU, but it is invalid acceptance evidence: the harness
+mutated a named profile without switching it to `custom`, so both states
+resolved to Low (`20x4x44:l2:1ca40182:76:0.280`), and the pre-repair graph
+reported `inputs.diffuseColor.mul is not a function`. The four diagnostic PNGs
+and manifest are retained only as failure evidence under
+`capture-2026-09-04/`; their measured off-to-low deltas are **not claimed**.
+The graph repair now uses the public r185 TSL nodes from the same WebGPU module,
+but a valid on/off capture remains OPEN because the one-pair limit has been
+consumed.
+
+**[OPEN] Adoption preflight.** AKP adoption and receipt checks passed for Codex
+on `dave-gaming-pc`, but the repository preflight's branch-convention check is
+not applicable to this Claude-named feature branch. This remains an explicit
+handoff caveat rather than a claimed preflight pass.
 
 ---
 
@@ -221,21 +252,9 @@ claimed.
 
 | Gate | Result |
 |---|---|
-| `npx tsc --noEmit` | **clean** |
-| `sh-l2-irradiance.test.ts` | **26 passed** |
-| `sh-l2-irradiance-node.test.ts` | **15 passed** |
-| Full run: `src/rendering/lighting/`, `graphics-profile-contract`, `cold-session-precompile-reach`, `pipeline-metrics`, `nuketown2-fidelity`, `screen-space-topology-contract`, `pass65-settings-inventory`, `graphics-settings-registry`, `legacy-main-size-ratchet` | **173 passed, 1 failed** - see 7.1 |
-
-### 7.1 Pre-existing failure on the base branch, not caused by this lane
-
-`src/legacy-main-size-ratchet.test.ts` is **already red at the base commit**:
-`src/legacy-main.ts` is **37,101 lines against a `LINE_CEILING` of 37,100**.
-Verified directly: `git show 7f9b14b6:src/legacy-main.ts | wc -l` returns 37101,
-i.e. before any file in this lane existed. The last ceiling bump was `567b4a31`
-(HF-433 -> 37,100); commit `460f09f2` landed afterwards without raising it.
-
-**This lane does not touch `src/legacy-main.ts` and did not raise the ceiling.**
-Raising a ratchet to mask another lane's breach is exactly the "never weaken a
-verifier to get green" prohibition, so it stays red and stays reported. The
-owning lane should bump the ceiling with a `CEILING_HISTORY` entry, or shrink
-the file by one line.
+| `npx tsc --noEmit` | **[VERIFIED] clean after the r185 public-TSL repair** |
+| `npx vitest run` with the requested lighting/material/profile/precompile/pipeline/fidelity/ratchet paths plus SH-L2 tests | **[VERIFIED] 17 files, 186 passed** |
+| Existing baked-indirect tests | **[VERIFIED] 4 files included, 26 + 15 SH-L2 predecessor node tests also green** |
+| `src/legacy-main-size-ratchet.test.ts` | **[VERIFIED] 5 passed; 37,100 lines against the unchanged 37,100 ceiling** |
+| `git diff --check` | **[VERIFIED] clean before the post-repair commit** |
+| Native capture pair | **[OPEN] the only attempt exposed a harness/profile-state error and a pre-repair TSL graph error; no valid visual delta claimed** |
