@@ -28,7 +28,7 @@ import { selectSpawnCandidates, spawnUseMemoryMs, stableSpawnTieBreakSeed, type 
 
 await prepareMap3();
 
-const BOT_ARENAS = ARENA_SELECTIONS.filter((selection) => arenaFieldsBots(selection.id) && selection.soloBotCount > 0);
+const BOT_ARENAS = ARENA_SELECTIONS.filter((selection) => arenaFieldsBots(selection.id) && initialSoloBotCount(selection) > 0);
 
 /** Deployments are spaced wider than one respawn cycle - the case the flat 12 s window could not see. */
 const RESPAWN_CADENCE_MS = 20_000;
