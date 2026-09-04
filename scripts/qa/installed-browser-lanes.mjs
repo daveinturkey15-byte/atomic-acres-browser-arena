@@ -1,3 +1,12 @@
+// What it does: single description of every installed browser lane (Chrome, Edge, Firefox, Opera) plus the foreground/teardown lifecycle helpers the cross-browser gate and the frame-rate ceiling probe import.
+//
+// Usage: node scripts/qa/installed-browser-lanes.mjs   (no CLI entry point - this is a library module; running it directly evaluates definitions only and exits 0)
+// Flags: none - process.argv is not read; the --* strings in this file are launch arguments passed to the browsers, not script flags.
+// Env: process.env.LOCALAPPDATA - default 'C:/Users/Default/AppData/Local' (Chrome/Opera install candidates).
+// Env: process.env.ProgramFiles - default 'C:/Program Files' (install candidates).
+// Env: process.env['ProgramFiles(x86)'] - default 'C:/Program Files (x86)' (install candidates).
+// Writes: nothing - no files or directories are written; browser detection, foreground and teardown all run through powershell.exe.
+// Exit codes: none - no process.exit calls; the module has no CLI and direct execution exits 0.
 // One description of every installed browser this machine can be asked to run,
 // shared by the cross-browser gate and the frame-rate ceiling probe.
 //
