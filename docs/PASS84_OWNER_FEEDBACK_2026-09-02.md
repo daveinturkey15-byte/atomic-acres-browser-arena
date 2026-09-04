@@ -1487,3 +1487,19 @@ assets and textures and lighting need to be tip top, raid can come next"
   captures, reference-grounded critics (vision models given the reference and
   the capture side by side), fixes in TSL/three.js. That is the asset-forge
   lane's design; Blender stays optional for a later test-map experiment.
+
+## HF-469 — owner 2026-09-04 10:55: "kick off the research before the reset, then go ham"
+
+- Research workflow launched 10:57 (five parallel Opus lanes, research only,
+  outputs under `docs/research/2026-09-04/` on branch `research-2026-09-04`):
+  R1 diner method → skill draft (photoreal-procedural-scene-forge, vehicle-
+  from-code recipe, TSL port table); R2 code-native reference-grounded loop
+  (Astra equivalent: reference sets, reference-comparing critics, runner);
+  R3 material penetration/perforation design (glass, thin metal with holes and
+  collision loss, wood, concrete; host-authority replication; gates); R4 BO2
+  Nuketown accuracy (mirror/garages/colours/balconies with provenance); R5
+  skills and tooling survey (our store, Skills Hub, three.js TSL resources,
+  Blender-AI best practices, licences). Each ends with an ordered
+  implementation plan sized for one post-reset Opus lane.
+- Owner idea logged: Blender experiments, if ever needed, go on a test map
+  ("test map 4"), never on Nuke Town.
