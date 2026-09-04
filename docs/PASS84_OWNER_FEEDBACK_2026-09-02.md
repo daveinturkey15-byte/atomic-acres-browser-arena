@@ -1689,3 +1689,17 @@ assets and textures and lighting need to be tip top, raid can come next"
   (probe-token receipts, journaled scores, plateau rule), local Qwen on
   mechanical tasks with the GPU-yield rule, Opus verification at ~06:00; each
   cycle's candidate is a HITL for the owner in the morning.
+
+## HF-479 — owner 2026-09-04 13:45: apply the shared three.js techniques; animation + skins from image/local video
+
+- "can we be using some of the cool three.js techniques from the threads I
+  shared... get it really nice? and find a way to use image and H3 local video
+  to get better animations too? players and bots, and better skins?"
+- Launched two Opus lanes: **techniques** (register-driven: vegetation LOD +
+  wind, pool water upgrade, hero props via img2threejs from the BO2-2025
+  references — mailboxes, appliance banks, bins, garden pod, sand-pit,
+  shuffleboard, glasshouse/carport — tiered decals/grime, frame-loop audit
+  with a 15 % draw-call ceiling) and **animation + skins** (capability map
+  honouring the SAM/mocap rule — never mocap where guns are involved — with
+  the licence-safe local routes; slice 1: procedural locomotion/aim layer for
+  players and bots and a TSL operator skin system replacing tint-only skins).
