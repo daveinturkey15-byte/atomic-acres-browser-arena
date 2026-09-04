@@ -465,6 +465,29 @@ describe('SH-L2 bake occlusion', () => {
     });
     expect(dusk.digest).not.toBe(bakeShL2Volume(base).digest);
   });
+
+  it('changes its digest when same-count occluder geometry or albedo changes', () => {
+    const grid = deriveShL2Grid(
+      { minM: vec3(-6, 0, -6), maxM: vec3(6, 6, 6) },
+      { spacingM: 3, heightM: 6 },
+    );
+    const base: ShL2BakeOptions = {
+      arenaId: 'geometry-digest', conditionId: 'day', grid, lighting: DAYLIGHT,
+      occluders: scene([shape({ centre: vec3(0, 3, 0), albedo: vec3(0.5, 0.5, 0.5) })]),
+      raysPerProbe: 32, bounces: 1, seed: 1,
+    };
+    const original = bakeShL2Volume(base);
+    const moved = bakeShL2Volume({
+      ...base,
+      occluders: scene([shape({ centre: vec3(0.25, 3, 0), albedo: vec3(0.5, 0.5, 0.5) })]),
+    });
+    const recoloured = bakeShL2Volume({
+      ...base,
+      occluders: scene([shape({ centre: vec3(0, 3, 0), albedo: vec3(0.9, 0.1, 0.1) })]),
+    });
+    expect(moved.digest).not.toBe(original.digest);
+    expect(recoloured.digest).not.toBe(original.digest);
+  });
 });
 
 // ---------------------------------------------------------------------------
