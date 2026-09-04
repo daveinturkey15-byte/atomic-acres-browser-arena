@@ -189,3 +189,126 @@ deployments" per arena and its monotonicity assertion, `nuketown2-fidelity`,
   part of what "the bots not in there" feels like over a five-minute match, but
   raising it touches the Pass 66 catalog contract and four pinned assertions in
   `src/map-selection.test.ts:245-254`, so it is reported, not changed.
+
+## 6. HF-491 follow-on - the escalation ladder and the solo bot count
+
+Owner direction (Fable orchestrator, 2026-09-04), on the finding left OPEN in
+section 5: *the ladder applies to every selectable arena that declares a
+maximum; an arena may declare a starting solo bot count; nuketown2 declares 4,
+capped by its 6; arenas that declare nothing keep the Pass 66 default of 1.*
+
+### 6.1 What was wrong
+
+`activeSoloBotTarget` read an **arena id**:
+
+```ts
+if (selection.id !== 'atomic-acres') return selection.soloBotCount;
+```
+
+HF-466 had already parked `atomic-acres` (`selectable: false`), so the whole
+"+1 / 10 DEFEATS · MAX 6" ladder was dead code for every arena the owner can
+actually pick. Two arenas declare `maximumSoloBots: 6` - `nuketown2` and
+`skyline-terminal` - and neither could ever reach 2. A second id test sat in the
+same file's neighbour, `legacy-main.ts:34489`, gating `nextReinforcementAt` on
+`selection.id === 'atomic-acres'`, so the HUD's next-reinforcement readout was
+dead on every other arena for the same reason. Both are now derived.
+
+### 6.2 What changed
+
+- `src/bot-ai.ts` - `soloBotTargetForDeaths(deaths, initialBots?, maximumBots?)`.
+  Both new parameters **default to the Pass 66 constants**, so the existing
+  `bot-ai.test.ts` ladder pins (`soloBotTargetForDeaths(0..100)` and the NaN
+  guard) hold byte-identical.
+- `src/map-selection.ts` - new optional catalog field `initialSoloBots?: number`
+  and `initialSoloBotCount(selection)`, which clamps a declaration by that
+  arena's own `maximumSoloBots`. `activeSoloBotTarget` now runs the ladder for
+  **every** arena from that start up to that maximum, with no id anywhere.
+  Arenas that declare `max === start` (rustworks-1v1 1, gun-range and map3 0,
+  farcrysis / high-seas / test1 / test2 / raid2 2) are pinned by the clamp, not
+  by a special case - Pass 66's "exactly one enemy bot" still holds wherever the
+  catalog still says so.
+- `nuketown2` declares `initialSoloBots: 4`. `soloLaunchLabel` and `rulesLabel`
+  now state the count the match **opens with** (`4 BOTS SKIRMISH`,
+  `5 MIN · HOST UP TO 6 · 4 BOTS SOLO · +1 / 10 DEFEATS · MAX 6 · PREVIEW`). A
+  card promising 1 while 4 deploy is the same dishonesty as the reverse.
+- `src/legacy-main.ts` - the five runtime reads of `selectedArena.soloBotCount`
+  that mean "how many bots now" (`spawnBots` active count, the dormant-prewarm
+  loop bound, the deploy feed line, the `1V1 BOT` connection pill and the
+  `botEscalation.initialBots` snapshot field) go through
+  `initialSoloBotCount`. **Zero net lines**: the file is still exactly 37371
+  lines, so `legacy-main-size-ratchet.test.ts` holds at its ceiling.
+
+**Nothing was weakened.** No threshold, timeout or safety clause was relaxed, and
+no assertion was deleted. The old test title "and never reinforces sibling
+modes" was a promise the id test made and the catalog now makes; every arena it
+protected is still pinned to its exact count, at 100 defeats, in the same test.
+
+### 6.3 Perf: peak population is unchanged
+
+`spawnBots` prewarms dormant bots from the active count up to
+`maximumSoloBots`, so nuketown2 built **six** operators at match open before
+this change (1 active + 5 dormant) and builds six after it (4 active + 2
+dormant). The ceiling the perf budget was sized for is the maximum, and the
+maximum did not move. There is **no** per-bot per-frame cost test in the suite
+to hold at 6 - `frame-pacing`, `pass65-frame-pacing-gate` and
+`pass69-3-frame-hitch-runner` contain no bot term at all. That is recorded as a
+gap, not claimed as a pass.
+
+### 6.4 New and changed gates
+
+`src/map-selection.test.ts` - the ladder pin is rewritten to the derived rule
+(and now also pins map3 and raid2, which it never covered), plus three new
+tests: nuketown2 opens on 4 and reaches 6 by 20 defeats; every arena that
+declares no `initialSoloBots` opens on its Pass 66 `soloBotCount`; and no arena
+starts above or escalates past its own declared maximum, monotone in defeats,
+swept over `ARENA_SELECTIONS` so a new arena is covered the day it registers.
+
+`src/bot-spawn-presence.test.ts` - two changes, both because the sim was
+measuring a rig that never ships:
+
+- the selector was told `population: 2` on every arena regardless of its bot
+  count. `MAP_TRAP_RADIUS` widens with population, so the coverage and
+  far-extreme floors were being measured at the wrong population. It is now
+  `initialSoloBotCount(selection) + 1`. **Both floors still pass on all nine bot
+  arenas**, nuketown2 now at its real 4-bot population.
+- new: *seats its opening / fully escalated solo squad on distinct authored
+  points*. The whole squad is placed in one match-open pass, each bot with the
+  previous ones already standing as occupants and recorded as recent uses, and
+  every one must land on a distinct point that passes `validArenaSpawnPoint`.
+  Run at both the opening count and the escalated maximum, so nuketown2 is
+  covered at 4 **and** at 6. 18 new cases, all passing.
+
+### 6.5 Gates
+
+```
+npx tsc --noEmit
+npx vitest run src/map-selection*.test.ts src/*bot* src/*spawn* \
+  src/nuketown2-fidelity.test.ts src/legacy-main-size-ratchet.test.ts
+```
+
+`tsc --noEmit` clean. Vitest: **19 files, 412 tests, 412 passed** (383 at
+`d549f60d`; +29 assertions, none removed). `arena-selectability`,
+`presentation-prewarm-contract` and `gameplay-contract` were run separately
+because the rulesLabel and launch-label copy changed - 3 files, 33 passed.
+
+### 6.6 Claim-states
+
+**VERIFIED (mechanical, this worktree)** - the ladder was unreachable for the
+entire selectable roster at `d549f60d` (falsifier: `activeSoloBotTarget` on
+skyline-terminal at 100 defeats returned 1, now 6); nuketown2 opens on 4 and
+reaches 6 at 20 defeats; every arena that declares nothing is unchanged at 0 and
+100 defeats; no arena exceeds its declared maximum; four bots and six bots each
+seat on distinct collider-free authored points on all nine bot arenas; the
+coverage and far-extreme floors hold at the corrected population; `tsc` clean,
+412/412.
+
+**INFERRED (strong, not observed)** - that 4 is the right opening number for
+this street. It is the owner's instruction, and 4 of 16 authored points is a
+quarter of the table, but no live match has been played on it.
+
+**OPEN** - unchanged from section 5: no headless boot is possible on this
+machine (WebGPU fail-closed, no adapter), so bot presence remains asserted
+structurally. `scripts/qa/pass94-bot-presence-probe.mjs` is ready for the
+integrator and now has a sharper expectation to check: nuketown2 Solo should
+report `initialBots: 4`, four alive bots within the deploy window, and a
+non-null `nextReinforcementAt` of 10.

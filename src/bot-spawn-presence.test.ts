@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { ARENA_SELECTIONS, activeSoloBotTarget, type ArenaId } from './map-selection';
+import { ARENA_SELECTIONS, activeSoloBotTarget, initialSoloBotCount, type ArenaId } from './map-selection';
 import { prepareMap3 } from './map3-arena';
 import { ARENA_BUILDERS, arenaFieldsBots } from './spawn-layout-constraints';
 import { validArenaSpawnPoint } from './spawn-safety';
@@ -60,6 +60,12 @@ function simulateBotDeployments(arenaId: ArenaId): Simulation {
   // The player stands on his own first authored spawn. Deterministic, and the
   // exact geometry the owner is in when the match opens.
   const playerPoint = arena.spawns[0][0]!.clone();
+  // HF-491: the population the selector is told about is the population the
+  // match actually opens with - the arena's own declared solo count plus the
+  // player - not a hard-coded 2. `MAP_TRAP_RADIUS` widens with population, so
+  // a 4-bot arena must be scored as a 4-bot arena or this sim is measuring a
+  // rig that never ships.
+  const population = initialSoloBotCount(selection) + 1;
   const recentUses: SpawnUse[] = [];
   const memoryMs = spawnUseMemoryMs(candidates.length);
   const depth = Math.max(0, candidates.length - 1);
@@ -74,7 +80,7 @@ function simulateBotDeployments(arenaId: ArenaId): Simulation {
       arenaId,
       arenaKind: selection.kind,
       mode: 'solo',
-      population: 2,
+      population,
       team: 1,
       candidates,
       threats: [playerPoint],
@@ -110,9 +116,14 @@ describe('solo bot presence and spawn spread', () => {
       // AGENTS.md (Pass 66 routing) fixes this at exactly one enemy bot on every
       // bot-enabled arena; this asserts the catalog and the escalation function
       // agree on it rather than restating the number.
-      expect(activeSoloBotTarget(selection, 0)).toBe(selection.soloBotCount);
-      expect(selection.soloBotCount).toBeGreaterThan(0);
-      expect(selection.maximumSoloBots).toBeGreaterThanOrEqual(selection.soloBotCount);
+      // HF-491 (owner, 2026-09-04): the opening count is the arena's declared
+      // start clamped by its declared maximum, not the Pass 66 default - an
+      // arena may now declare `initialSoloBots` (nuketown2 declares 4). Every
+      // arena that declares nothing still opens on Pass 66's exactly one bot,
+      // which `initialSoloBotCount` returns unchanged.
+      expect(activeSoloBotTarget(selection, 0)).toBe(initialSoloBotCount(selection));
+      expect(initialSoloBotCount(selection)).toBeGreaterThan(0);
+      expect(selection.maximumSoloBots).toBeGreaterThanOrEqual(initialSoloBotCount(selection));
       // A deployable count is worthless if the table it draws from is empty.
       const arena = ARENA_BUILDERS[arenaId](new THREE.Scene());
       expect(arena.spawns[0].length + arena.spawns[1].length).toBeGreaterThan(0);
@@ -160,4 +171,59 @@ describe('solo bot presence and spawn spread', () => {
       ).toBeLessThan(farQuartile);
     },
   );
+
+  // HF-491 (owner, 2026-09-04). Raising an arena's opening count is only honest
+  // if the arena can actually seat that many at once. This deploys the whole
+  // opening squad in one match-open pass - each bot placed with the previous
+  // ones already standing as occupants and already recorded as recent uses,
+  // exactly as `spawnBots` does - and requires every one of them to land on a
+  // distinct, collider-free authored point. It runs on the escalated maximum
+  // too, so nuketown2 is covered at four AND at the six its ladder reaches.
+  it.each(
+    BOT_ARENAS.flatMap((selection) => [
+      [selection.id, 'opening', initialSoloBotCount(selection)] as const,
+      [selection.id, 'fully escalated', activeSoloBotTarget(selection, 10_000)] as const,
+    ]),
+  )('%s: seats its %s solo squad (%i) on distinct authored points', (arenaId, _phase, squad) => {
+    const selection = ARENA_SELECTIONS.find((entry) => entry.id === arenaId)!;
+    const arena = ARENA_BUILDERS[arenaId](new THREE.Scene());
+    const candidates: SpawnCandidate[] = [
+      ...arena.spawns[0].map((point, index) => ({ index, point, side: 0 as const })),
+      ...arena.spawns[1].map((point, index) => ({ index: 100 + index, point, side: 1 as const })),
+    ];
+    const playerPoint = arena.spawns[0][0]!.clone();
+    const memoryMs = spawnUseMemoryMs(candidates.length);
+    const depth = Math.max(0, candidates.length - 1);
+    const recentUses: SpawnUse[] = [];
+    const occupants: SpawnCandidate['point'][] = [playerPoint];
+    const chosen = new Set<number>();
+    for (let index = 0; index < squad; index += 1) {
+      const result = selectSpawnCandidates({
+        arenaId,
+        arenaKind: selection.kind,
+        mode: 'solo',
+        population: squad + 1,
+        team: 1,
+        candidates,
+        threats: [playerPoint],
+        occupants,
+        recentDeaths: [],
+        recentUses,
+        nowMs: 0,
+        recentUseAvoidanceMs: memoryMs,
+        recentUseDepth: depth,
+        colliders: arena.colliders,
+        previousIndex: recentUses.at(-1)?.index ?? -1,
+        tieBreakSeed: stableSpawnTieBreakSeed(`bot-${index}`),
+      });
+      const point = candidates.find((candidate) => candidate.index === result.index)!.point;
+      expect(validArenaSpawnPoint(point, arena.bounds, arena.colliders), `${arenaId} bot-${index} spawned inside geometry`).toBe(true);
+      chosen.add(result.index);
+      recentUses.push({ index: result.index, at: 0 });
+      occupants.push(point);
+    }
+    expect(chosen.size, `${arenaId} seated ${chosen.size} distinct points for a squad of ${squad}`).toBe(squad);
+    // A squad may never be asked to seat more bodies than the arena authors.
+    expect(squad).toBeLessThanOrEqual(candidates.length);
+  });
 });

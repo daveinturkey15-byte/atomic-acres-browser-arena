@@ -477,7 +477,7 @@ import {
   type CrossbowGlassPhase,
 } from './crossbow-glass-authority';
 import {
-  activeSoloBotTarget,
+  activeSoloBotTarget, initialSoloBotCount,
   arenaCanvasLabel,
   arenaSelection,
   hostedArenaDurationMs,
@@ -17764,7 +17764,7 @@ async function startGame(
   });
   element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+    : mode === 'solo' ? (initialSoloBotCount(selectedArena) === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
   element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
   element<HTMLElement>('#timer').hidden = !startBanner.clock;
   element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
@@ -20259,7 +20259,7 @@ function activateDormantBot(index: number): boolean {
 
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
-  const activeCount = hostedCount ?? selectedArena.soloBotCount;
+  const activeCount = hostedCount ?? initialSoloBotCount(selectedArena);
   resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
@@ -20283,7 +20283,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
-  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+  for (let index = activeCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     await prewarmRiggedOperatorActions(bot.root);
@@ -20295,8 +20295,8 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  if (selectedArena.soloBotCount > 0) {
-    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  if (activeCount > 0) {
+    addFeed(`${activeCount} low-damage hostile operator${activeCount === 1 ? '' : 's'} deployed`, 'coral');
   }
 }
 
@@ -34478,14 +34478,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }),
     botEscalation: {
       deaths: soloBotDeaths,
-      initialBots: selectedArena.soloBotCount,
+      initialBots: initialSoloBotCount(selectedArena),
       targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
       dormantBots: dormantBots.size,
       dormantBotsPrewarmed,
       dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
-      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+      nextReinforcementAt: bots.size < selectedArena.maximumSoloBots
         ? (Math.floor(soloBotDeaths / BOT_DEATHS_PER_REINFORCEMENT) + 1) * BOT_DEATHS_PER_REINFORCEMENT
         : null,
       lastEliminationProfile: { ...lastBotEliminationProfile },
