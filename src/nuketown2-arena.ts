@@ -175,6 +175,8 @@ import {
   buildForgedVehicle,
   buildForgedWheelSet,
   createForgeMaterialSet,
+  createForgeSharedMaterials,
+  mergeForgedPlacements,
 } from './vehicle-forge';
 import {
   createNuketown2CarPaintMaterial,
@@ -2433,6 +2435,8 @@ export interface Nuketown2ForgeAudit {
   readonly mismatches: readonly string[];
   readonly drawCalls: number;
   readonly triangles: number;
+  /** Per-vehicle plan centres of the baked skins (HF-473 mirror gate). */
+  readonly skins: readonly Readonly<{ name: string; centre: Readonly<{ x: number; z: number }> }>[];
 }
 
 function retireSupersededPresentation(builder: Builder): { retired: number; mismatches: string[] } {
@@ -2480,15 +2484,19 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
 
   // Cream body, red waistline: the reference's coach, and the only saturated
   // body left on the map now the truck is a plain van.
-  const coachMaterials = createForgeMaterialSet(0xe7dec6, 'nuketown2-forge-coach', 0xa8382c);
-  const truckMaterials = createForgeMaterialSet(0xe2dfd6, 'nuketown2-forge-truck-cab');
+  // PERF (HITL 5, HF-491): one shared set of colourless bucket materials, so
+  // every vehicle's tyres/chrome/glass/lamps merge into one draw each below.
+  const sharedMaterials = createForgeSharedMaterials();
+  const coachMaterials = createForgeMaterialSet(0xe7dec6, 'nuketown2-forge-coach', 0xa8382c, 0.2, sharedMaterials);
+  const truckMaterials = createForgeMaterialSet(0xe2dfd6, 'nuketown2-forge-truck-cab', 0xe2dfd6, 0.2, sharedMaterials);
   // Same aqua the box cars carried, and the same 0.20 base roughness, so the
   // ray-traced preset's reflective-proxy admission is unchanged.
-  const carMaterials = createForgeMaterialSet(0x3d6f80, 'nuketown2-forge-car');
+  const carMaterials = createForgeMaterialSet(0x3d6f80, 'nuketown2-forge-car', 0x3d6f80, 0.2, sharedMaterials);
   // The reference's two street cars keep the hexes their collider boxes wear
-  // (`m.carSaloon` / `m.carClassic`), so skin and body are one colour.
-  const saloonMaterials = createForgeMaterialSet(0x27394f, 'nuketown2-forge-car-saloon');
-  const classicMaterials = createForgeMaterialSet(0x2f8f77, 'nuketown2-forge-car-classic');
+  // (`m.carSaloon` / `m.carClassic`), so skin and body are one colour; they
+  // share the same colourless bucket set as every other forged body.
+  const saloonMaterials = createForgeMaterialSet(0x27394f, 'nuketown2-forge-car-saloon', 0x27394f, 0.2, sharedMaterials);
+  const classicMaterials = createForgeMaterialSet(0x2f8f77, 'nuketown2-forge-car-classic', 0x2f8f77, 0.2, sharedMaterials);
 
   const c = NUKETOWN2_STREET_COACH;
   const t = NUKETOWN2_CENTRAL_TRUCK;
@@ -2579,32 +2587,37 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     yaw: 0,
   });
 
-  let drawCalls = 0;
-  let triangles = 0;
-  for (const { built, x, z, yaw } of placements) {
-    // PASS 94 integration (HF-473 x HF-462). Every placement above is an
-    // AUTHORED coordinate, taken from the same constants the collider boxes
-    // use - and those boxes reach the world through `centred`/`streetVehicle`/
-    // `pair`, which mirror x. The forged skins did not, because this lane
-    // branched before the mirror existed. Left alone, every skin sat on the
-    // opposite side of the street from the body it dresses: five vehicles
-    // floating over empty road with five invisible boxes across from them, and
-    // no collider gate would have said a word, because a skin is presentation.
-    // The mirror is applied HERE, once, at the single place an authored vehicle
-    // number becomes a world object - the same discipline nuketown2-layout.ts
-    // states for solids.
-    //
-    // Reflecting x also reflects heading: a body facing (sin y, cos y) faces
-    // (-sin y, cos y) after the mirror, which is yaw -> -yaw. Position and
-    // heading have to move together or the skins land right and point wrong.
-    built.group.position.set(nuketown2HandedX(x), 0, z);
-    built.group.rotation.y = NUKETOWN2_HANDEDNESS === 1 ? yaw : -yaw;
-    builder.root.add(built.group);
-    drawCalls += built.drawCalls;
-    triangles += built.triangles;
-  }
-
-  return Object.freeze({ retired, mismatches: Object.freeze(mismatches), drawCalls, triangles });
+  // PASS 94 integration (HF-473 x HF-462). Every placement above is an
+  // AUTHORED coordinate, taken from the same constants the collider boxes
+  // use - and those boxes reach the world through `centred`/`streetVehicle`/
+  // `pair`, which mirror x. The forged skins did not, because this lane
+  // branched before the mirror existed. Left alone, every skin sat on the
+  // opposite side of the street from the body it dresses: five vehicles
+  // floating over empty road with five invisible boxes across from them, and
+  // no collider gate would have said a word, because a skin is presentation.
+  // The mirror is applied HERE, once, at the single place an authored vehicle
+  // number becomes a world object - the same discipline nuketown2-layout.ts
+  // states for solids.
+  //
+  // PERF (HITL 5, HF-491): the six placements used to be six groups and ~40
+  // draws. They are static scenery, so their transforms are baked and every
+  // vehicle is folded into one mesh per material (3 paints + accents + 7
+  // shared buckets). The audit's drawCalls is the merged mesh count, which is
+  // what the fidelity gate counts under the 'vehicle-forge ' prefix.
+  //
+  // Reflecting x also reflects heading: a body facing (sin y, cos y) faces
+  // (-sin y, cos y) after the mirror, which is yaw -> -yaw. Position and
+  // heading have to move together or the skins land right and point wrong.
+  const merged = mergeForgedPlacements(placements.map(({ built, x, z, yaw }) => ({
+    built,
+    x: nuketown2HandedX(x),
+    z,
+    yaw: NUKETOWN2_HANDEDNESS === 1 ? yaw : -yaw,
+  })));
+  for (const mesh of merged.meshes) builder.root.add(mesh);
+  return Object.freeze({
+    retired, mismatches: Object.freeze(mismatches), drawCalls: merged.drawCalls, triangles: merged.triangles, skins: merged.skins,
+  });
 }
 
 /**
