@@ -35,3 +35,29 @@ Verdict: **DO-NOT-SHIP**
 
 No product-source fix was made; the larger acceptance gaps are recorded in the
 lane report's Luna review TODOs.
+
+## Review 2
+
+Revision reviewed: `1f19100c0a5162f7e7a766c31a3b19f4d36ab56d`
+Base: `origin/contrib/dave-gaming-pc/claude/pass93-candidate` (`3e2fd273`)
+Status: clean; current head includes the Muse fix/evidence commits.
+
+Verdict: **SHIP-WITH-FIXES**
+
+1. Finding 1 is fixed by evidence: independent `npx --no-install tsc --noEmit
+   --pretty false` exited 0; the named 12-file set plus
+   `src/collider-visual-parity-gate.test.ts` passed 13 files / 176 tests; and
+   the coplanar instrument reported 0 different-material findings with exit 0.
+2. Finding 3 remains coherent on the current head: exactly one new pipeline is
+   ledger-registered and in the cold-session reach, the settings off switch
+   writes visibility/uniform state, per-arena values are uniform data, no test
+   or threshold was weakened, legacy-main remains under its ceiling, and the
+   implementation is an HF-472 reimplementation rather than vendored code.
+3. Finding 2 is still open: no permitted WebGPU review-camera capture or
+   representative frame-cost measurement exists. The lane report now anchors
+   the capture TODO to `src/rendering/arenas/nuketown2.ts:100` and
+   `src/rendering/arenas/skyline-terminal.ts:25`; complete that owner-side
+   evidence before final shipment.
+
+The prior gate blocker is therefore closed, while the visual/cost evidence
+blocker is not. No product code was changed by Luna in Review 2.
