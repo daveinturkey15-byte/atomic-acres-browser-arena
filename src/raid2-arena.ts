@@ -86,9 +86,10 @@ import {
   box,
   emptyTelemetry,
   spawnRecord,
-  standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { worldTiled } from './test-maps-art';
+import { raid2ForgedMaterial, raid2ForgedSurfaces } from './raid2-art';
 import { RAID2_MEASURED } from './raid2-reference';
 import {
   discBands, RAID2_POOL_COPING_DEPTH, RAID2_POOL_WATER, ringSegments, subtractRects,
@@ -222,6 +223,8 @@ type Raid2Materials = Readonly<{
   timber: THREE.MeshStandardMaterial;
   court: THREE.MeshStandardMaterial;
   poolTile: THREE.MeshStandardMaterial;
+  /** The drive island's aggregate bed. */
+  gravel: THREE.MeshStandardMaterial;
   water: THREE.MeshStandardMaterial;
   glass: THREE.MeshStandardMaterial;
   planting: THREE.MeshStandardMaterial;
@@ -266,44 +269,73 @@ export function raid2PaletteLuminance(hex: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/**
+ * EIGHT FORGED SETS, replacing ten flat colours.
+ *
+ * Every material below carries an albedo, a Sobel-derived tangent normal, a
+ * roughness field and an AO field baked from ONE authored height/colour
+ * function (src/raid2-art.ts), plus the forge's shared micro tile at a fixed
+ * 0.25 m physical size. Nothing new was written to do it: the arena shipped
+ * with ten `MeshStandardMaterial`s carrying no map of any kind, on 300-odd
+ * boxes, while the shipped Raid carries six forged sets over the same kind of
+ * geometry. That gap is what the owner called "missing all the nice detail".
+ *
+ * THE TINT IS STILL `RAID2_PALETTE`. The descriptions author modulation about
+ * 1.0 and the family value multiplies it, so fidelity band 22 - the
+ * readability gate that says no cover family may be darker than the floor it
+ * stands on - keeps gating the same constants it always did, and now also
+ * gates the mean of the baked rasters.
+ *
+ * `metresPerTile` is not decoration: a `BoxGeometry` face is 0..1 in UV
+ * whatever it measures, so without it the 100 m paving slab and a 1.2 m kerb
+ * would wear the same tile at a factor of eighty apart. `worldTiled` rescales
+ * each mesh's own UVs from this number, which makes texel density a property
+ * of the mesh, which is what it physically is.
+ */
 function raid2Materials(): Raid2Materials {
+  const forged = raid2ForgedSurfaces();
   return Object.freeze({
-    travertine: standard(RAID2_PALETTE.travertine, 0.93, 0.02),
-    stucco: standard(RAID2_PALETTE.stucco, 0.88, 0.02),
-    // 0xa8a496, not the 0x7b7466 this arena shipped with. That value measured
-    // 0.457 relative luminance against the paving's 0.565, i.e. the arena's
-    // COVER was darker than the floor it stands on, in direct contradiction of
-    // the readability rule stated four lines above. Under this grade (gain
-    // [0.92, 0.86, 1.0] pulls the frame down and green carries 72% of
-    // luminance) the shaded faces of the courtyard piers, the fountain kerb and
-    // the drive island read as silhouettes rather than as cover - visible in
-    // docs/evidence/pass85/lane-aq/judgeset/raid2-courtyard.png at the first
-    // capture. A pale cool limestone at 0.642 sits above the paving and stays
-    // separated from the warm stucco by hue rather than by value.
-    stone: standard(RAID2_PALETTE.stone, 0.9, 0.02),
-    // Likewise lifted from 0x6d4f36 (0.328). Timber is furniture and the two
-    // pergola piers; it stays the darkest family on the map on purpose, but
-    // 0.490 is a wood and 0.328 was a hole in the frame.
-    timber: standard(RAID2_PALETTE.timber, 0.86, 0.02),
-    court: standard(RAID2_PALETTE.court, 0.95, 0.02),
-    poolTile: standard(RAID2_PALETTE.poolTile, 0.6, 0.04),
+    travertine: raid2ForgedMaterial(forged['raid2-travertine'], 'raid2-travertine',
+      { color: RAID2_PALETTE.travertine, roughness: 0.93, metalness: 0.02, normalScale: 0.9, metresPerTile: 3.0 }),
+    stucco: raid2ForgedMaterial(forged['raid2-stucco'], 'raid2-stucco',
+      { color: RAID2_PALETTE.stucco, roughness: 0.88, metalness: 0.02, normalScale: 0.9, metresPerTile: 3.0 }),
+    stone: raid2ForgedMaterial(forged['raid2-limestone'], 'raid2-limestone',
+      { color: RAID2_PALETTE.stone, roughness: 0.9, metalness: 0.02, normalScale: 1.1, metresPerTile: 1.2 }),
+    timber: raid2ForgedMaterial(forged['raid2-timber'], 'raid2-timber',
+      { color: RAID2_PALETTE.timber, roughness: 0.86, metalness: 0.02, normalScale: 1.1, metresPerTile: 1.8 }),
+    court: raid2ForgedMaterial(forged['raid2-court'], 'raid2-court',
+      { color: RAID2_PALETTE.court, roughness: 0.95, metalness: 0.02, normalScale: 0.8, metresPerTile: 4.0 }),
+    poolTile: raid2ForgedMaterial(forged['raid2-pool-mosaic'], 'raid2-pool-mosaic',
+      { color: RAID2_PALETTE.poolTile, roughness: 0.6, metalness: 0.04, normalScale: 0.7, metresPerTile: 1.0 }),
+    // The drive island's aggregate bed, cool river gravel: separated from the
+    // warm travertine by hue rather than by value so it never competes with
+    // the paving for the eye.
+    gravel: raid2ForgedMaterial(forged['raid2-gravel'], 'raid2-gravel',
+      { color: RAID2_PALETTE.stone, roughness: 0.96, normalScale: 1.2, metresPerTile: 1.5 }),
+    planting: raid2ForgedMaterial(forged['raid2-planting'], 'raid2-planting',
+      { color: RAID2_PALETTE.planting, roughness: 0.97, metalness: 0.01, normalScale: 1.4, metresPerTile: 1.2 }),
+    hillside: raid2ForgedMaterial(forged['raid2-gravel'], 'raid2-hillside',
+      { color: RAID2_PALETTE.hillside, roughness: 0.98, normalScale: 1.0, metresPerTile: 6 }),
+    ...legacyFlatMaterials(),
+  });
+}
+
+/**
+ * The two surfaces the forge does not author yet. Water is queued for the
+ * `threejs-webgpu-water` job (Beer-Lambert absorption by depth, not a tinted
+ * box) and glazing is a shot surface whose look is a penetration-class
+ * question, not a texture one. Both are left EXACTLY as they shipped rather
+ * than given a half-authored map.
+ */
+function legacyFlatMaterials(): Pick<Raid2Materials, 'water' | 'glass'> {
+  return {
     water: new THREE.MeshStandardMaterial({
       color: RAID2_PALETTE.water, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.82,
     }),
     glass: new THREE.MeshStandardMaterial({
       color: RAID2_PALETTE.glass, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.4,
     }),
-    // Lifted with the rest of the family (0x3d5535 -> 0x4a6540, 0.304 ->
-    // 0.363): the drive planters are HARD COVER at 1.9 m, so they are a
-    // shooting backdrop, not dressing.
-    planting: standard(RAID2_PALETTE.planting, 0.97, 0.01),
-    // The skirt beyond the boundary read as a flat black slab in the overview
-    // frame: 0x5d6247 measures 0.372 against paving 0.565, and it is the one
-    // surface with no wall bouncing light back into it. 0x79805f measures 0.486,
-    // still clearly BELOW the estate so it never competes with the playfield,
-    // but ground rather than void.
-    hillside: standard(RAID2_PALETTE.hillside, 0.98, 0),
-  });
+  };
 }
 
 function makeBuilder(scene: THREE.Scene, name: string): Builder {
@@ -339,12 +371,29 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
     z0: number, z1: number,
     material: THREE.Material,
     options: RectOptions = {},
-  ): THREE.Mesh => box(
-    builder, name,
+  ): THREE.Mesh => tiled(
+    name,
     [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2],
     [x1 - x0, y1 - y0, z1 - z0],
     material, options,
   );
+
+  /**
+   * `box`, with the mesh's own UVs rescaled to the material's authored world
+   * tile size. Without this every forged map would be stretched to whatever
+   * face it landed on: a BoxGeometry face is 0..1 in UV whatever it measures,
+   * so the 36 x 76 m paving slab and a 1.2 m kerb sharing one material differ
+   * by a factor of thirty in texel density.
+   */
+  function tiled(
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    options: RectOptions = {},
+  ): THREE.Mesh {
+    return worldTiled(box(builder, name, position, size, material, options), size);
+  }
 
   /**
    * A wall running along X at a fixed z band, split around its door mouths.
@@ -580,7 +629,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
     rect(`raid2 plunge basin ${index}`, band[0], band[1], -1.55, POOL_FLOOR_Y, band[2], band[3], m.poolTile, { cast: false });
   }
   for (const [index, seg] of ringSegments(RAID2_MEASURED.plunge.x, RAID2_MEASURED.plunge.z, plungeR - 0.25, 10, 0.5).entries()) {
-    box(builder, `raid2 plunge coping ${index}`, [seg.x, -0.625, seg.z], [seg.size[0], 1.85, seg.size[1]],
+    tiled(`raid2 plunge coping ${index}`, [seg.x, -0.625, seg.z], [seg.size[0], 1.85, seg.size[1]],
       m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
   }
 
@@ -599,7 +648,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
     rect(`raid2 spa basin ${index}`, band[0], band[1], -1.0, -0.45, band[2], band[3], m.poolTile, { cast: false });
   }
   for (const [index, seg] of ringSegments(spaX, spaZ, spaR + 0.25, 8, 0.5).entries()) {
-    box(builder, `raid2 spa coping ${index}`, [seg.x, -0.15, seg.z], [seg.size[0], 1.7, seg.size[1]],
+    tiled(`raid2 spa coping ${index}`, [seg.x, -0.15, seg.z], [seg.size[0], 1.7, seg.size[1]],
       m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
   }
 
@@ -855,7 +904,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // S2/S3 the circular drive and its island. FIVE discrete pieces, never a
   // solid block: the island must be circumnavigable or the drive lane becomes a
   // pure crossfire with nowhere to break the line.
-  rect('raid2 drive island kerb', -7, 3, 0, 0.3, 10, 20, m.stone, { cast: false });
+  rect('raid2 drive island kerb', -7, 3, 0, 0.3, 10, 20, m.gravel, { cast: false });
   // THE PLINTH IS ROUND AND STEPPED, measured at 5.2 m across (the artefact's
   // bright disc at the island's centre, scanned on both axes: 25.5 px against a
   // 0.194 / 0.214 m-per-pixel fit). It shipped as a 4 x 4 m square with a
@@ -879,7 +928,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // cluster and no blocked sightline; its footprint is inside the plinth's, so
   // it adds no wall cell either.
   for (let tier = 0; tier < 4; tier += 1) {
-    box(builder, `raid2 drive ribbon ${tier}`,
+    tiled(`raid2 drive ribbon ${tier}`,
       [0, HARD_COVER + 0.5 + tier * 0.98, 14], [1.05 - tier * 0.14, 0.98, 1.05 - tier * 0.14],
       m.stone, { rotation: [0, (tier * Math.PI) / 7, 0] });
   }
@@ -904,7 +953,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // buildings on that side.
   for (const [index, seg] of ringSegments(-1, 14.5, 11.6, 12, 0.55).entries()) {
     if (index === 7) continue;
-    box(builder, `raid2 drive kerb ring ${index}`, [seg.x, 0.15, seg.z], [seg.size[0], 0.3, seg.size[1]],
+    tiled(`raid2 drive kerb ring ${index}`, [seg.x, 0.15, seg.z], [seg.size[0], 0.3, seg.size[1]],
       m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
   }
   rect('raid2 drive planting west', -19, -15, 0, MOUNT, 27, 30, m.planting);

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { buildRaid2, RAID2_BOUNDS, RAID2_PALETTE, RAID2_UPPER_ROOMS, raid2PaletteLuminance, STAIR_RISERS, STAIR_RUN, STEP, SUNKEN_CUTS } from './raid2-arena';
 import { RAID2_MEASURED, RAID2_MIRROR_RELATIONS } from './raid2-reference';
 import { RAID2_POOL_WATER } from './raid2-shapes';
+import { PERIODS, RAID2_SURFACES, raid2TexelBudget } from './raid2-art';
+import { createSurfaceNoise, DEFAULT_SURFACE_SEED, rasterizeSurface } from './rendering/surface-forge';
 
 import { measureLayout } from '../scripts/qa/raid2-layout-metrics';
 import { AUTOSTEP_M, CELL_M as REACH_CELL_M, measureReachability, STAND_CAPSULE_M } from '../scripts/qa/raid2-reachability';
@@ -474,5 +476,107 @@ describe('raid2 reference accuracy — the corrections this lane measured', () =
       expect(box.max.y, `${name} drop from the deck`).toBeGreaterThanOrEqual(-0.42);
       expect(box.max.y - -0.55, `${name} drop into the basin`).toBeLessThanOrEqual(0.42);
     }
+  });
+});
+
+describe('raid2 surfaces — the forge, and the four ways it silently does nothing', () => {
+  /** One small bake per set, shared across the bands below. */
+  const rasters = RAID2_SURFACES.map(({ id, description, options }) => ({
+    id,
+    raster: rasterizeSurface(description, { ...options, size: 64 }),
+  }));
+
+  const meanChannel = (data: Uint8ClampedArray, offset: number): number => {
+    let sum = 0;
+    for (let index = offset; index < data.length; index += 4) sum += data[index];
+    return sum / (data.length / 4) / 255;
+  };
+  const spread = (data: Uint8ClampedArray, offset: number): number => {
+    let low = 255;
+    let high = 0;
+    for (let index = offset; index < data.length; index += 4) {
+      if (data[index] < low) low = data[index];
+      if (data[index] > high) high = data[index];
+    }
+    return (high - low) / 255;
+  };
+
+  it('29. authors every noise period as a positive integer', () => {
+    // `createSurfaceNoise` ROUNDS a fractional period to a cell count. It does
+    // not throw, so 6.5 bakes a 6- or 7-cell field and every comment in the
+    // file that says "six" becomes false - and the tile stops matching itself
+    // at the seam. This lane has already lost 25 meshes to one silent numeric
+    // failure; it does not get to lose eight surfaces to a second.
+    for (const [name, period] of Object.entries(PERIODS)) {
+      expect(Number.isInteger(period), `${name} = ${period}`).toBe(true);
+      expect(period, `${name}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('30. bakes tiles that actually tile', () => {
+    // Periodicity is the property the whole forge is built on, and it is one
+    // rounded period away from being false. Sampling the SAME description at
+    // u = 0 and u = 1 must return the same texel, on every channel.
+    const noise = createSurfaceNoise(DEFAULT_SURFACE_SEED);
+    for (const { id, description } of RAID2_SURFACES) {
+      for (const v of [0.17, 0.5, 0.83]) {
+        const left = { ...description(0, v, noise), albedo: [...description(0, v, noise).albedo] };
+        const right = description(1, v, noise);
+        expect(right.albedo[0], `${id} albedo seam at v=${v}`).toBeCloseTo(left.albedo[0], 5);
+        expect(right.height, `${id} height seam at v=${v}`).toBeCloseTo(left.height, 5);
+        expect(right.roughness, `${id} roughness seam at v=${v}`).toBeCloseTo(left.roughness, 5);
+      }
+    }
+  });
+
+  it('31. binds four real maps per set, none of them a constant', () => {
+    // The failure this catches is the one the method calls out by name: a
+    // generator that runs, produces a texture, and paints a field with no
+    // variation in it. A constant roughness map or a flat normal map costs the
+    // same fetch as a real one and shows nothing, and the arena that shipped
+    // here had NO maps at all - which is exactly as invisible and much easier
+    // to miss in a diff.
+    for (const { id, raster } of rasters) {
+      expect(spread(raster.albedo, 0), `${id} albedo is a constant`).toBeGreaterThan(0.05);
+      expect(spread(raster.roughness, 0), `${id} roughness map is a constant`).toBeGreaterThan(0.05);
+      expect(spread(raster.ao, 0), `${id} AO map is a constant`).toBeGreaterThan(0.02);
+      // A flat tangent normal is exactly (128, 128, 255); any relief moves R or G.
+      expect(spread(raster.normal, 0) + spread(raster.normal, 1), `${id} normal map is flat`)
+        .toBeGreaterThan(0.05);
+      expect(raster.microTiles, `${id} has no micro tile, so it carries one scale of wear only`)
+        .toBeGreaterThan(0);
+    }
+  });
+
+  it('32. keeps every authored feature above the two-texel floor it recorded', () => {
+    // Author in millimetres, then MEASURE the pixels. A description that
+    // intends a 7 mm bed joint and bakes it at half a texel passes review and
+    // fails the frame.
+    for (const row of raid2TexelBudget()) {
+      expect(row.finestFeatureTexels, `${row.id} finest authored feature`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('22b. readability survives the albedo maps, not just the palette constants', () => {
+    // Band 22 gates the PALETTE. Once a map multiplies that palette, the number
+    // that reaches the screen is palette x raster mean, and a cover family
+    // whose map happens to sit darker than the floor's would invert the gate
+    // without touching a single constant. This measures the product.
+    const byId = new Map(rasters.map(({ id, raster }) => [id, raster]));
+    const effective = (paletteName: keyof typeof RAID2_PALETTE, surface: string): number => {
+      const raster = byId.get(surface as never)!;
+      const mean = 0.2126 * meanChannel(raster.albedo, 0)
+        + 0.7152 * meanChannel(raster.albedo, 1)
+        + 0.0722 * meanChannel(raster.albedo, 2);
+      return raid2PaletteLuminance(RAID2_PALETTE[paletteName]) * mean;
+    };
+    const floor = effective('travertine', 'raid2-travertine');
+    expect(effective('stone', 'raid2-limestone'), 'limestone cover reads above the paving').toBeGreaterThan(floor);
+    expect(effective('stucco', 'raid2-stucco'), 'stucco walls read above the paving').toBeGreaterThan(floor);
+    // Timber is the documented dark family; it may sit below the floor, but it
+    // may not collapse into a hole in the frame.
+    expect(effective('timber', 'raid2-timber')).toBeGreaterThan(floor * 0.6);
+    expect(effective('hillside', 'raid2-gravel'), 'the out-of-bounds skirt stays below the estate')
+      .toBeLessThan(floor);
   });
 });
