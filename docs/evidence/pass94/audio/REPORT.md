@@ -47,7 +47,8 @@ The Pass 93 run did report one failed `resourceType=media` request for `original
 - VERIFIED: Targeted audio tests (`src/audio-output-probe.test.ts`, `src/audio-browser-compatibility.test.ts`, `src/spatial-audio.test.ts`) passed: 24 tests.
 - OPEN: `npx vitest run src/legacy-main-size-ratchet.test.ts` failed its existing ratchet: `src/legacy-main.ts` is 37,372 lines versus the existing 37,371 ceiling. No ratchet or unrelated source file was changed.
 - OPEN: The combined required targeted run completed 24/25 tests; the sole failure is the same existing `legacy-main.ts` ratchet.
-- OPEN: The initial preflight lockfile check passed, then the contribution guard refused the dirty worktree as designed. Final clean-tree preflight is rerun after the explicit commit.
+- VERIFIED: The initial preflight lockfile check passed, then the contribution guard refused the dirty worktree as designed.
+- OPEN: The clean-tree preflight was rerun after commit. The lockfile check passed, but the guard rejected both `--harness Codex` (uppercase is not a lowercase slug) and the accepted `--harness codex` because this repository guard requires branch prefix `contrib/dave-gaming-pc/codex/<short-outcome>`, while the user-mandated branch is `contrib/dave-gaming-pc/claude/audio-regression`. The requested branch was preserved.
 
 ## Probe table: requested events and buffer outcomes
 
