@@ -101,6 +101,23 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
     expect(roofBodies.every((mesh) => mesh.userData.nuketown2RoofSolid === false)).toBe(true);
     expect(roofBodies.every((mesh) => mesh.userData.nuketown2RoofWalkable === false)).toBe(true);
     expect(roofBodies.filter((mesh) => mesh.userData.ballisticSurfaceId !== undefined)).toHaveLength(2);
+    const emittedPlanAreaBySide = Object.fromEntries((['north', 'south'] as const).map((side) => [
+      side,
+      NUKETOWN2_ROOF_BODY_TABLE
+        .filter((body) => body.side === side)
+        .reduce((total, body) => total + body.planArea, 0),
+    ]));
+    expect(emittedPlanAreaBySide.north).toBeCloseTo(188.77, 8);
+    expect(emittedPlanAreaBySide.south).toBeCloseTo(202.0279636, 8);
+    const apexYBySide = Object.fromEntries((['north', 'south'] as const).map((side) => {
+      const bounds = new THREE.Box3();
+      for (const body of NUKETOWN2_ROOF_BODY_TABLE.filter((entry) => entry.side === side)) {
+        bounds.expandByObject(roofMesh(map, `${body.side} ${body.name}`));
+      }
+      return [side, bounds.max.y];
+    }));
+    expect(apexYBySide.north).toBeCloseTo(7.9390542, 7);
+    expect(apexYBySide.south).toBeCloseTo(8.15, 7);
     for (const mesh of roofBodies) {
       const bounds = new THREE.Box3().setFromObject(mesh);
       expect(bounds.min.y, mesh.name).toBeGreaterThanOrEqual(6.5);

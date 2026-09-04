@@ -256,6 +256,14 @@ by renaming a wall into it.
   band or level them), ZERO colliders from either roof, ZERO walkable surface added, and
   no ballistic surface below 6.5 m. Then the asymmetry is identity only and cannot be a
   fairness claim.
+
+TODO (F3 follow-up, larger than a test-only fix): reconcile the emitted projected plan-area
+sum at `src/nuketown2-roofs.ts:69-72` and the north/south apex envelope at
+`src/nuketown2-roofs.ts:80-149` so the two roof forms satisfy the equal-area/equal-apex
+fairness payment. The measured current sums are north `188.77` and south `202.0279636`,
+with apexes `7.9390542` and `8.15`; preserve the existing zero-collider, zero-walkable,
+above-6.5 m constraints when adjusting the geometry, then replace the measured pins in
+`src/nuketown2-roofs.test.ts:105-124` with the approved fairness bounds.
 - **Derive the name list from a table exported by `src/nuketown2-roofs.ts`**, the way the
   carriageway list is derived from `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` and the dressing
   list from `NUKETOWN2_GROUND_DRESSING`. A hand-typed list of about 40 roof body names
