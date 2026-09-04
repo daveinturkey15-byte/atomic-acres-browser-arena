@@ -15,7 +15,7 @@ import * as TSL from 'three/tsl';
 
 import { buildNuketown2 } from './nuketown2-arena';
 import { NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS } from './nuketown2-materials';
-import { createForgeChromeMaterial, createForgePaintMaterial } from './vehicle-forge';
+import { createForgeChromeMaterial, createForgeMaterialSet } from './vehicle-forge';
 
 const NON_SHADER_KEYS: ReadonlySet<string> = new Set([
   'id', 'uuid', '_uuid', '_cacheKey', '_cacheKeyVersion', 'parents', '_beforeNodes', 'stackTrace',
@@ -153,17 +153,25 @@ describe('HF-477 nuketown2 WebGPU pipeline budget', () => {
   });
 
   it('keeps forge paint colours in one uniform-carried graph', () => {
-    const navy = createForgePaintMaterial({ color: 0x173451, name: 'budget-navy' });
-    const cream = createForgePaintMaterial({ color: 0xf4eee0, name: 'budget-cream' });
-    expect(materialGraphKey(navy)).toBe(materialGraphKey(cream));
-    expect(navy.userData.forgePaintUniform).toBe(true);
-    expect(navy.userData.forgeRole).toBe('paint');
-    const expected = new THREE.Color().setHex(0x173451, THREE.SRGBColorSpace);
-    expect(uniformValues(navy)).toEqual([
-      expect.closeTo(expected.r, 12),
-      expect.closeTo(expected.g, 12),
-      expect.closeTo(expected.b, 12),
-    ]);
+    const coach = createForgeMaterialSet(0xe7dec6, 'budget-coach', 0xa8382c);
+    const navy = createForgeMaterialSet(0x173451, 'budget-navy', 0xf4eee0);
+    const navyPaint = navy.paint;
+    const cream = coach.paint;
+    const maroon = coach.accent;
+    expect(materialGraphKey(navyPaint)).toBe(materialGraphKey(cream));
+    expect(materialGraphKey(cream)).toBe(materialGraphKey(maroon));
+    for (const material of [navyPaint, cream, maroon]) {
+      expect(material.userData.forgePaintUniform).toBe(true);
+      expect(material.userData.forgeRole).toBe('paint');
+    }
+    for (const [material, hex] of [[navyPaint, 0x173451], [cream, 0xe7dec6], [maroon, 0xa8382c]] as const) {
+      const expected = new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
+      expect(uniformValues(material)).toEqual([
+        expect.closeTo(expected.r, 12),
+        expect.closeTo(expected.g, 12),
+        expect.closeTo(expected.b, 12),
+      ]);
+    }
   });
 
   it('keeps the chrome role explicit for non-purple bumpers', () => {
