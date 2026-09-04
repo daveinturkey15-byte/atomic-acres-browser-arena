@@ -1647,3 +1647,28 @@ assets and textures and lighting need to be tip top, raid can come next"
   every reference and finding must be labelled with its game version. The
   balcony spec from R4 (inherited from '84/original) must be re-checked
   against BO2 Nuketown 2025 images before it ships.
+
+## HF-477 — BO2 Nuketown 2025 reference facts, 2026-09-04 13:20 (Opus, 20 version-tagged images, `research-2026-09-04` docs/references/nuketown-2025/)
+
+- **Garage RIGHT from each own backyard spawn — VERIFIED (BO2-2025)**, same
+  for both teams (180° pair); a global mirror flips both, so the gate must be
+  the right/left cross-product form, not "towards the cul-de-sac".
+- **House colours — the yellow/blue premise is BO1, not BO2-2025.** In 2025
+  the houses are **terracotta-orange over cream** and **white/cream modernist
+  with pale blue-grey glazing**. Current branch pins blue 0x46809f / yellow
+  0xf4be36 → both wrong; exact hex OPEN (no calibrated source). Chirality
+  anchors: RED three-unit appliance bank on the orange lawn, BLUE on the white
+  lawn; yards differ (glasshouse/carport vs garden-pod/sand-pit/shuffleboard).
+- **Rear deck + wooden exterior stair — VERIFIED on both houses**, at the end
+  OPPOSITE the garage on the yard side, over an undercroft with a circular
+  patio at the stair foot. Porch = a wide cantilevered eave, not a canopy on
+  posts. Under-window front ledge OPEN.
+- **Overhead — VERIFIED:** lollipop cul-de-sac: ONE circular turning head at
+  one end with a stem running off-map (ours has a centred 16 m head and two
+  blank ends); a THIRD house beyond the head with its own drive and a red
+  car; tour coach on the orange house's side, box truck + dark saloon on the
+  white house's side, both nosed down the stem; a green classic car in the
+  stem. No bomb shelter in 2025. Mailboxes OPEN.
+- Next Nuke Town lane (after the PASS 94 candidate HITL): "BO2-2025 accuracy
+  pass 2" — colours, deck/stair placement, eave, lollipop head + stem + third
+  house, vehicle placement, lawn appliance banks, cross-product gate.
