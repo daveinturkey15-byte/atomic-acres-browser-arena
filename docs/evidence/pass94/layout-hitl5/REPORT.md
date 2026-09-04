@@ -471,16 +471,20 @@ was loosened**: they all still demand exact equality, on a number that is now de
 rather than carrying two ulps of reconstruction noise. [MEASURED - both failures reproduced
 and named in the test's own header]
 
-**(c) The ground tiler multiplies, and it cost 46 tiles.** `buildNuketown2Ground()` emits
+**(c) TODO F3 - the ground tiler multiplies, and it cost 46 tiles.** `buildNuketown2Ground()` emits
 one tile per (x-cut, z-cut) cell, so 4 new x-cuts and 2 new z-cuts across a 36 x 84 m grid
 turned 67 ground tiles into 113 and 293 colliders into 347. That is the cost
 `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS`' own header warns about for the bulb's disc, paid here
 for the bays, and it is reported rather than hidden: no draw-call or collider budget in the
 repository moved (`graphics-profile-contract` and `nuketown-lawn-field` both green), the
 tiles are all one material, and merging same-material ground runs is a real optimisation
-that belongs in its own pass. **OPEN.** *Falsifier: a frame-time or draw-call measurement
-on this map showing the ground tiling in the top costs - which needs the GPU this lane was
-told not to touch.* [MEASURED / OPEN]
+that belongs in its own pass. **OPEN.** Exact follow-up: in
+`src/nuketown2-arena.ts:2462-2488`, merge adjacent coplanar `m.ground` cells that share a
+full edge and identical z-span outside the bay/verge bands (or scope the four bay x-cuts
+to those bands), then add a `groundTiles <= 113` ratchet in
+`src/nuketown2-fidelity.test.ts` after measuring the optimized count. **Falsifier:** a
+frame-time or draw-call measurement on this map showing the ground tiling in the top costs
+- which needs the GPU this lane was told not to touch. [MEASURED / OPEN / TODO]
 
 ### The four tests, and what each one ratchets
 
