@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+// HF-399 frame-cost probe: launches installed headless Chrome (real WebGPU device, vsync/frame-rate limits disabled), selects a graphics profile the way a player selects it, and measures per-phase frame cost (frame-time p50/p95/p99/max, fps, draw calls, triangles, render passes, compute dispatches, pipeline/shader creation, viewmodel clip planes, long tasks, JS heap) with one screenshot per phase.
+// Usage: node scripts/qa/hf399-fps-phase-probe-cdp.mjs --dist <build dir> --label <label> [--url <base url>] [--arena atomic-acres] [--seconds 8] [--warmup 8] [--port 41941] [--width 2560] [--height 1440] [--out-dir artifacts/qa/hf399] [--profile high] [--query ''] [--graphics-override '{"key":"off"}']
+// Flags (all read from process.argv; the script reads no environment variables):
+//   --dist <dir>              local build directory to serve over a local HTTP server (default: none; required unless --url is given)
+//   --url <base url>          remote base URL to load instead of serving a local build (default: none; required unless --dist is given)
+//   --arena <slug>            arena to load (default: atomic-acres)
+//   --seconds <n>             measurement window per phase, seconds (default: 8)
+//   --warmup <n>              warmup seconds before each phase (default: 8)
+//   --label <label>           run label used in output file names (default: run)
+//   --port <port>             port for the local static server when --dist is given (default: 41941)
+//   --width <px>              viewport width (default: 2560)
+//   --height <px>             viewport height (default: 1440)
+//   --out-dir <dir>           output directory, created if missing (default: artifacts/qa/hf399)
+//   --profile <id>            graphics profile preset id to select (default: high)
+//   --query <q>               extra URL query string to append (default: empty)
+//   --graphics-override <json>  advanced-graphics keys applied as a CUSTOM preset, e.g. '{"screenSpaceReflections":"off"}' (default: none)
+// Writes (into --out-dir): <label>-<arena>.json (per-phase report) and <label>-<arena>-<phase>.png (one screenshot per phase).
+// Exit codes: no explicit process.exit; 0 on success, non-zero (1) on uncaught exception (missing --dist/--url, browser launch/boot failure, or measurement failure).
+
 // ===========================================================================
 // HF-399 PHASE FPS PROBE. Where does the Quality-mode frame go on atomic-acres?
 //
