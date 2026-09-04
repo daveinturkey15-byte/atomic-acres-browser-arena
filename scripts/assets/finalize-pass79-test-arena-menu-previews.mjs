@@ -65,7 +65,7 @@ const RECEIPT_PATH = path.join(root, process.env.AA_PASS79_RECEIPT
 
 const MASTERS = JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass65-preview-masters/choreography.json'), 'utf8'));
 const EXTENSION = JSON.parse(await readFile(path.join(provenanceRoot, 'choreography.json'), 'utf8'));
-/** Display order, matching ARENA_SELECTIONS: test1 is seventh, test2 eighth. */
+/** Display order, matching ARENA_SELECTIONS: test1 is ninth, test2 tenth. */
 const ARENAS = Object.freeze(['test1', 'test2']);
 const FAMILY_ID = 'pass79-test-arena-menu-previews';
 const CACHE_KEY = 'pass79-test-arena-preview-v1';

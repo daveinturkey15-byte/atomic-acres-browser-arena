@@ -118,11 +118,12 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       id: (element as HTMLElement).dataset.arenaId,
       route: (element as HTMLElement).dataset.arenaRoute,
     })))).toEqual(SELECTABLE_ARENAS.map((arena) => ({ id: arena.id, route: arena.routeId })));
-    // AGENTS.md pins these four display labels; the rest are the registry's.
-    await expect(cards.nth(0)).toContainText(/NUKE TOWN/u);
-    await expect(cards.nth(1)).toContainText(/TERMINAL/u);
-    await expect(cards.nth(2)).toContainText(/RUSTRIG/u);
-    await expect(cards.nth(3)).toContainText(/GUN RANGE/u);
+    // HF-495 (owner, 2026-09-04): Nuke Town Rebuild leads the cards and Raid
+    // Rebuild is second; the following two retained cards stay next.
+    await expect(cards.nth(0)).toContainText(/NUKE TOWN REBUILD/u);
+    await expect(cards.nth(1)).toContainText(/RAID REBUILD/u);
+    await expect(cards.nth(2)).toContainText(/TERMINAL/u);
+    await expect(cards.nth(3)).toContainText(/RUSTRIG/u);
     /**
      * A hidden arena must never reach the deployment shell - asserted as the
      * CONTRACT, naming no arena. The first version of this line named farcrysis,
@@ -143,14 +144,18 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#menu-preview-label')).toContainText('NUKE TOWN');
 
     await cards.nth(1).click();
+    await expect(page.locator('#arena-title')).toHaveText('RAID REBUILD');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
+    await expect(page.locator('#menu-preview-label')).toContainText('RAID REBUILD');
+    await cards.nth(2).click();
     await expect(page.locator('#arena-title')).toHaveText('TERMINAL');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('TERMINAL');
-    await cards.nth(2).click();
+    await cards.nth(3).click();
     await expect(page.locator('#arena-title')).toHaveText('RustRig');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('RUSTRIG');
-    await cards.nth(3).click();
+    await cards.nth(4).click();
     await expect(page.locator('#arena-title')).toHaveText('GUN RANGE');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'cat');
     await expect(page.locator('#menu-preview-label')).toContainText('CAT-CAM');

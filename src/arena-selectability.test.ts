@@ -25,6 +25,14 @@ describe('arena selectability', () => {
     expect(decodeArenaId('atomic-acres')).toBe('atomic-acres');
   });
 
+  it('parks the original Raid by registry flag while retaining its stable id (HF-495)', () => {
+    const row = ARENA_SELECTIONS.find((entry) => entry.id === 'test2');
+    expect(row, 'the original Raid must remain a registered arena').toBeDefined();
+    expect(row?.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.some((entry) => entry.id === 'test2')).toBe(false);
+    expect(decodeArenaId('test2')).toBe('test2');
+  });
+
   it('parks farcrysis behind the menu without withdrawing it (HF-429)', () => {
     // PARKED 2026-09-03 at the owner's decision. Asserted through the FLAG,
     // never through an id list: the previous version of this test named
@@ -108,11 +116,12 @@ describe('arena selectability', () => {
     );
   });
 
-  // owner 2026-08-30: Test1/Test2 arenas added — both ship selectable.
-  it('offers the Test1 and Test2 arenas in the menu', () => {
+  // owner 2026-08-30: Test1/Test2 arenas added. HF-495 (owner, 2026-09-04):
+  // Test1 remains offered while the original Raid/Test2 is parked.
+  it('offers Test1 and parks the original Raid/Test2 arena', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
     expect(offered).toContain('test1');
-    expect(offered).toContain('test2');
+    expect(offered).not.toContain('test2');
   });
 
   it('leaves the first offered arena as the default the menu preselects', () => {

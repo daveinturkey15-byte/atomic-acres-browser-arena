@@ -108,9 +108,14 @@ test('the floors track the real roster and cannot collapse silently', () => {
   );
   // The arenas that were invisible to hardcoded gates, named so a future
   // truncation of the scrape is a failure rather than a shrug.
-  for (const required of ['test1', 'test2', 'map3']) {
+  for (const required of ['test1', 'map3']) {
     assert.ok(selectableArenaIds().includes(required), `${required} is selectable and must be swept`);
   }
+  // HF-495 (owner, 2026-09-04): the original Raid remains registered for
+  // history and in-flight rooms, but its selectable:false row must stay out
+  // of every derived QA roster.
+  assert.ok(hiddenArenaIds().includes('test2'), 'the original Raid is parked, not removed');
+  assert.ok(!selectableArenaIds().includes('test2'), 'the original Raid is not selectable');
   assert.ok(hiddenArenaIds().includes('atomic-acres'), 'the original Nuketown is parked, not removed');
   assert.ok(!selectableArenaIds().includes('farcrysis'), 'farcrysis is selectable:false');
   assert.ok(allArenaIds().includes('farcrysis'), 'farcrysis still exists and boot sweeps must open it');
@@ -177,27 +182,6 @@ const BOUNDED_SUBSET_ALLOWANCES = Object.freeze([
       + 'needs those ceilings re-measured. PASS 85 Lane N fixed the part that was actually '
       + 'broken - the id FILTER now validates against ARENA_IDS, so naming test1/test2/map3 '
       + 'runs them instead of yielding an empty roster that passed.',
-  },
-  {
-    file: 'scripts/qa/cross-browser-gate-contract.test.mjs',
-    kind: 'REQUIRED SET',
-    reason:
-      'The four ids are the REQUIRED set its derivation must contain (atomic-acres plus '
-      + 'the three arenas that shipped after the last hardcoded roster), and the quoted '
-      + "string at line 81 is the forbidden literal it asserts is ABSENT from the two "
-      + 'cross-browser scripts. Both are the mechanism, not the defect: replacing them '
-      + 'with a derived list would make the contract agree with whatever the derivation '
-      + 'currently returns, which is exactly the collapse it exists to catch.',
-  },
-  {
-    file: 'scripts/qa/eye-clearance-sweep-contract.test.mjs',
-    kind: 'REQUIRED SET',
-    reason:
-      'Same shape as the cross-browser contract: the ids are the REQUIRED set the '
-      + "eye-clearance sweep's derived roster must contain, and the floor beside them is "
-      + 'what turns a collapsed scrape into a red test. Lane J owns this file in PASS 85, '
-      + 'so it is listed rather than touched; folding its third copy of the '
-      + 'selectable-arena scrape into scripts/qa/arena-roster.mjs stays PROPOSED.',
   },
   {
     file: 'scripts/qa/pass65-hardware-webgl2-receipt-contract.mjs',
@@ -367,6 +351,52 @@ const BOUNDED_SUBSET_ALLOWANCES = Object.freeze([
       + 'doubles the cold arena compiles inside a 300 s test timeout on a CI runner this '
       + 'lane cannot measure, and gun-range alone currently exceeds 45 s cold on the dev '
       + 'machine (routed to Lane H). Widening it needs a measured CI budget first.',
+  },
+  {
+    file: 'scripts/qa/capture-lane-ab-time-of-day.mjs',
+    kind: 'PINNED SET',
+    reason:
+      'This is a bounded time-of-day capture experiment, not a selectable-arena sweep: '
+      + 'the four ids are the retained Lane AB comparison subjects whose paired daylight '
+      + 'and dusk artifacts are already comparable. Widening it requires recapturing the '
+      + 'full matrix and its receipt, so HF-495 leaves this historical measurement set '
+      + 'fixed while derived QA rosters follow selectability.',
+  },
+  {
+    file: 'scripts/qa/hf410-near-plane-ab-diff.mjs',
+    kind: 'PINNED SET',
+    reason:
+      'This is the HF-410 near-plane A/B comparison set, deliberately limited to the '
+      + 'three arenas with paired baseline and candidate evidence. It is not a coverage '
+      + 'roster and cannot be widened by menu ordering; doing so requires new captures '
+      + 'and a new diff baseline, so HF-495 preserves the measured experiment.',
+  },
+  {
+    file: 'scripts/qa/publish-lane-ab-frames.mjs',
+    kind: 'PINNED SET',
+    reason:
+      'This publish-lane frame comparison intentionally repeats the four retained Lane '
+      + 'AB subjects whose frame artifacts and expected labels are versioned together. It '
+      + 'is not a selectable QA roster; widening it requires a fresh capture family and '
+      + 'receipt review, so HF-495 changes derived coverage without rewriting this baseline.',
+  },
+  {
+    file: 'scripts/qa/raid2-layout-metrics.ts',
+    kind: 'BEHAVIOUR MAP',
+    reason:
+      'The five ids are a layout-metrics comparison map, including the parked original '
+      + 'Raid as the HF-466 compatibility baseline beside the Raid Rebuild. It measures '
+      + 'specific authored geometry relationships rather than selectable coverage; HF-495 '
+      + 'must not erase that historical comparison when the old card leaves the picker.',
+  },
+  {
+    file: 'scripts/qa/scan-lane-ab-band-readability.mjs',
+    kind: 'TIMING BOUNDED',
+    reason:
+      'This scan-lane experiment is capped to three measured arena bands because each '
+      + 'band requires paired A/B readability captures and review. It is not the shared '
+      + 'selectable roster; widening it needs a new timing and evidence budget, so HF-495 '
+      + 'updates the derived QA paths while retaining this bounded lane.',
   },
 ]);
 

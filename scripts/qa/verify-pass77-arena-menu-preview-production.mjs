@@ -51,7 +51,7 @@ const cameraSourcePath = path.join(root, 'src/ui/menu-preview-camera.ts');
 const runtimeRoot = path.join(root, 'public/assets/original/menu-previews');
 const loadingRoot = path.join(root, 'public/assets/original/loading');
 
-/** Display order, matching ARENA_SELECTIONS: farcrysis fifth, high-seas sixth. */
+/** Display order, matching ARENA_SELECTIONS: farcrysis seventh, high-seas eighth. */
 const ARENAS = Object.freeze(['farcrysis', 'high-seas']);
 /** The arenas the retained Pass 66 capture actually covers, in capture order. */
 const RETAINED_ARENAS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range']);

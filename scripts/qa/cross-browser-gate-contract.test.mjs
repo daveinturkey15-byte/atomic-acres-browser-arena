@@ -111,7 +111,9 @@ test('every selectable arena is covered by the derived roster', () => {
   // literal `9` from different arithmetic (nine of ten with farcrysis hidden;
   // nine ids before nuketown2 with it un-hidden). Git merges identical text
   // without conflict, so the union of the two is TEN, not nine.
-  assert.ok(selectable.length >= 9, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  // HF-495 (owner, 2026-09-04): the original Raid is parked; the derived
+  // selectable roster is now eight, and the shared floor below must match it.
+  assert.ok(selectable.length >= 8, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
   // MAP3 (HF-409 repair, 2026-09-02): a bare floor only guards DOWNWARD, so a
   // silently lowered literal would still pass while covering fewer arenas. The
   // sibling eye-clearance contract was given a floor-equals-derived-roster
@@ -130,9 +132,12 @@ test('every selectable arena is covered by the derived roster', () => {
   // MAP3 joins the required set with its card: an offered arena that no browser
   // ever loads is exactly the hole this required set exists to catch. FARCRYSIS
   // joins it at HF-423 for the same reason.
-  for (const required of ['test1', 'test2', 'map3']) {
+  for (const required of ['test1', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
+  // HF-495 (owner, 2026-09-04): the old Raid remains registered for protocol
+  // compatibility, but its parked row must not enter browser coverage.
+  assert.ok(!selectable.includes('test2'), 'the original Raid is parked and not browser-tested');
   // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the
   // required set. Its exclusion is ASSERTED, not merely dropped - the parked
   // set is derived from the same registry scrape as the offered set, so a

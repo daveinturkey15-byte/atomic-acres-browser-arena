@@ -27,17 +27,17 @@ describe('Pass 66 command shell', () => {
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual(
       SELECTABLE_ARENAS.map((entry) => entry.routeId),
     );
-    // Order is still load-bearing, so pin the offered sequence explicitly too.
+    // HF-495 (owner, 2026-09-04): rebuild preview order is load-bearing, so pin
+    // the offered sequence explicitly too.
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'nuke-town-rebuild',
+      'raid-rebuild',
       'terminal',
       'rustrig',
       'gun-range',
       'high-seas',
       'test1',
-      'test2',
       'map3',
-      'nuke-town-rebuild',
-      'raid-rebuild',
     ]);
     // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
     // This pin has now swung three times - absent, present-and-PREVIEW, absent

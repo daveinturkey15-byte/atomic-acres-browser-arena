@@ -1,4 +1,5 @@
 import { chromium, expect, test, type Browser, type Page } from '@playwright/test';
+import { SELECTABLE_ARENAS } from '../../src/map-selection';
 
 // PASS 93 stock-flags boot gate.
 //
@@ -39,15 +40,17 @@ const FORBIDDEN_FLAG_PREFIXES = [
   '--use-angle',
 ] as const;
 
-// The arena the owner could not load, plus another selectable team arena as
-// the control. The original Nuketown remains registered but is parked (HF-466).
-const ARENAS = ['nuketown2', 'skyline-terminal'] as const;
+// The arena the owner could not load, plus the next selectable card as the
+// control. HF-495 (owner, 2026-09-04) moves Raid Rebuild into that second slot;
+// derive it from the same selectable catalog the real menu reads so this gate
+// cannot silently drift to a different card. The original Nuketown and Raid
+// remain registered for compatibility, but are parked (HF-466/HF-495).
+const ARENAS = ['nuketown2', SELECTABLE_ARENAS[1]!.id] as const;
 
-// Deploy -> active phase under stock flags measured 54 s on nuketown2 and
-// ~62 s on skyline-terminal (headless installed Chrome at ~29 FPS: streaming,
-// pipeline compilation, then the authored deployment-sync countdown). The
-// wait matches pass74-arena-boot-smoke.spec.ts's 120 s active-phase patience;
-// what is asserted at the end of it is unchanged.
+// Deploy -> active phase includes streaming, pipeline compilation, and the
+// authored deployment-sync countdown. The wait matches
+// pass74-arena-boot-smoke.spec.ts's 120 s active-phase patience; what is
+// asserted at the end of it is unchanged.
 const LIVE_FRAME_TIMEOUT_MS = 120_000;
 
 type DebugApi = {

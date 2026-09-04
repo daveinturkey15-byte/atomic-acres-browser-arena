@@ -56,8 +56,10 @@ const ARENA_IDENTITY = resolve(HERE, '../../src/arena-identity.ts');
  */
 export const MINIMUM_ARENA_IDS = 11;
 
-/** Every arena the arena picker offers after the two parked registry rows. */
-export const MINIMUM_SELECTABLE_ARENAS = 9;
+/** Every arena the arena picker offers after the three parked registry rows. */
+// HF-495 (owner, 2026-09-04): the original Raid is parked, so the derived
+// selectable roster is eight; keep this floor equal to that real roster.
+export const MINIMUM_SELECTABLE_ARENAS = 8;
 
 function readRegistryBody() {
   const source = readFileSync(MAP_SELECTION, 'utf8');
@@ -92,8 +94,9 @@ export function allArenaIds() {
 
 /**
  * The arenas the picker offers, in registry order. `selectable: false` entries
- * (currently farcrysis, hidden until its load path is fast) are excluded — a
- * hidden arena keeps its id but must not be required of a menu/selection gate.
+ * (currently the original Nuketown, Farcrysis and original Raid) are excluded
+ * — a hidden arena keeps its id but must not be required of a menu/selection
+ * gate.
  */
 export function selectableArenaIds() {
   return arenaRegistryEntries().filter((entry) => entry.selectable).map((entry) => entry.id);

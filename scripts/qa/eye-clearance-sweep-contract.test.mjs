@@ -110,12 +110,17 @@ test('the selectable roster this test measures against is the real one', () => {
   // MAP3 (owner 2026-09-02, HF-409, PASS 86): ratcheted BACK UP 7 -> 8 with the
   // card. The 8 -> 7 drop lasted exactly as long as the withdrawal did.
   assert.ok(
-    selectable.length >= 9,
+    // HF-495 (owner, 2026-09-04): parking the original Raid reduces the
+    // derived selectable roster to eight; this remains a collapse alarm.
+    selectable.length >= 8,
     `expected the real selectable roster, got ${JSON.stringify(selectable)}`,
   );
-  for (const required of ['test1', 'test2', 'map3']) {
+  for (const required of ['test1', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be swept`);
   }
+  // HF-495 (owner, 2026-09-04): retain the old Raid id for compatibility,
+  // while its parked row stays out of the derived eye-clearance sweep.
+  assert.ok(!selectable.includes('test2'), 'the original Raid is parked and not swept');
   // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the
   // required set. Its exclusion is ASSERTED, not merely dropped - the parked
   // set is derived from the same registry scrape as the offered set, so a
@@ -157,7 +162,7 @@ test('the sweep keeps a floor under the derived roster', () => {
   // tracks the REAL roster in BOTH directions: it is an alarm on the scrape
   // collapsing, and one left above the roster reds every run and gets switched
   // off, which is not a stronger gate.
-  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*9/u, 'the roster floor must be pinned at 9');
+  assert.match(SWEEP_CODE, /MINIMUM_SWEPT_ARENAS\s*=\s*8/u, 'the roster floor must be pinned at 8');
   assert.match(SWEEP_CODE, /ids\.length\s*<\s*MINIMUM_SWEPT_ARENAS/u, 'the roster floor must be enforced');
 });
 
@@ -460,15 +465,15 @@ test('the shared roster derivation keeps a floor, so a dead scrape cannot pass',
   );
   assert.match(
     ROSTER_SOURCE,
-    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*9/u,
-    'the shared roster floor must be pinned at 9',
+    /MINIMUM_EYE_CLEARANCE_ARENAS\s*=\s*8/u,
+    'the shared roster floor must be pinned at 8',
   );
   assert.match(
     ROSTER_SOURCE,
     /ids\.length\s*<\s*MINIMUM_EYE_CLEARANCE_ARENAS/u,
     'the shared roster floor must be enforced',
   );
-  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 9, 'the two stages must hold the same floor stage 1 holds');
+  assert.equal(MINIMUM_EYE_CLEARANCE_ARENAS, 8, 'the two stages must hold the same floor stage 1 holds');
 });
 
 // Source text can say the right words and still compute the wrong roster, so

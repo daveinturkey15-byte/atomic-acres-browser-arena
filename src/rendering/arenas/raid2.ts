@@ -26,9 +26,9 @@ import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared
  *      metres long, and the thing this lane has to be judged on - is the ground
  *      open, or is it broken up - is exactly what those shadows hide. At 52
  *      degrees the shadows are short enough that the paving reads as paving.
- *   2. These two arenas sit next to each other in the menu. If they graded
+ *   2. These two arenas remain separately addressable in the menu. If they graded
  *      alike the owner could not tell which one he had loaded, which would
- *      defeat the entire point of shipping the rebuild BESIDE the shipped map
+ *      defeat the entire point of shipping the rebuild alongside the shipped map
  *      rather than in place of it.
  *
  * The grade itself is in src/rendering/art-direction.ts under 'raid2'.

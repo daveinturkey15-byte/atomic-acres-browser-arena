@@ -65,10 +65,16 @@ const PRESENTATION_READY_STATES: Readonly<Record<string, readonly string[]>> = O
 const choreography = {
   ...choreographyJson,
   arenas: {
+    // HF-495 (owner, 2026-09-04): this object is compared against
+    // ARENA_SELECTIONS order by runtimeInputReceipt(). Put the two moved
+    // preview families first, then retain the relative order of every other
+    // family below them.
+    ...nuketown2ChoreographyJson.arenas,
+    ...raid2ChoreographyJson.arenas,
     ...choreographyJson.arenas,
     // Key order is load-bearing: the roster assertion below compares this
-    // against ARENA_SELECTIONS order, where farcrysis is fifth and high-seas
-    // sixth, and test1/test2 are seventh and eighth. `pass79-test-arena-previews`
+    // against ARENA_SELECTIONS order, where farcrysis is seventh and high-seas
+    // eighth, and test1/test2 are ninth and tenth. `pass79-test-arena-previews`
     // declares those two in that order in one file, so spreading it last places
     // both keys correctly.
     //
@@ -80,19 +86,10 @@ const choreography = {
     ...farcrysisChoreographyJson.arenas,
     ...highSeasChoreographyJson.arenas,
     ...testArenaChoreographyJson.arenas,
-    // MAP3 is ninth in ARENA_SELECTIONS and is spread last, so its key lands
-    // ninth here too and the roster assertion in runtimeInputReceipt() compares
+    // MAP3 is eleventh in ARENA_SELECTIONS and is spread last, so its key lands
+    // eleventh here too and the roster assertion in runtimeInputReceipt() compares
     // equal.
     ...map3ChoreographyJson.arenas,
-    // NUKETOWN2 is tenth in ARENA_SELECTIONS and is spread last, so its key
-    // lands tenth here too and the roster assertion compares equal.
-    ...nuketown2ChoreographyJson.arenas,
-    // RAID2: last in ARENA_SELECTIONS (HF-408, owner 2026-09-02), spread after
-    // nuketown2 so its key lands last here too. Without this line the roster
-    // assertion in runtimeInputReceipt() rejects EVERY capture - including the
-    // nine already-accepted arenas - which is the exact mechanism that made
-    // test1 and test2 ship byte-copied placeholder media on 2026-08-30.
-    ...raid2ChoreographyJson.arenas,
   },
 } as unknown as typeof choreographyJson;
 const generatedAt = choreography.generatedAt;

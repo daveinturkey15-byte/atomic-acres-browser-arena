@@ -220,7 +220,9 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * the roster itself legitimately shrinks, in the same commit as the registry
  * edit that shrank it.
  */
-export const MINIMUM_SWEPT_ARENAS = 9;
+// HF-495 (owner, 2026-09-04): the original Raid is parked, so SELECTABLE_ARENAS
+// now derives eight swept arenas. The floor follows that real roster.
+export const MINIMUM_SWEPT_ARENAS = 8;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {

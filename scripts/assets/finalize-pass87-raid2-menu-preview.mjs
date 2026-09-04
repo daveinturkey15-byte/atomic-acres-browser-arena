@@ -83,7 +83,7 @@ const RECEIPT_PATH = path.join(root, process.env.AA_PASS87_RECEIPT
 
 const MASTERS = JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass65-preview-masters/choreography.json'), 'utf8'));
 const EXTENSION = JSON.parse(await readFile(path.join(provenanceRoot, 'choreography.json'), 'utf8'));
-/** Display order, matching ARENA_SELECTIONS: raid2 is tenth and last. */
+/** Display order, matching ARENA_SELECTIONS: raid2 is second. */
 const ARENAS = Object.freeze(['raid2']);
 const FAMILY_ID = 'pass87-raid2-menu-preview';
 const CACHE_KEY = 'pass87-raid2-preview-v1';

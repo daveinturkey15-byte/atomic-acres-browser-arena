@@ -563,9 +563,11 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
   // high late morning (gain b > g > r). Two reasons, and neither of them is the
   // distinctiveness metric. First, the owner asked for something closer to the
   // original, which reads as a bright sunlit estate rather than an amber one.
-  // Second, these two arenas sit beside each other in the menu, so if they
-  // graded alike the owner could not tell which one he had loaded - which is
-  // the entire point of shipping the rebuild beside the shipped map.
+  // Second, these two arenas remain separately addressable even after HF-495
+  // (owner, 2026-09-04) moves the rebuild near the top and parks the shipped
+  // Raid card, so if they graded alike the owner could not tell which one he
+  // had loaded. That is the entire point of retaining the rebuild alongside
+  // the shipped map rather than replacing its stable id.
   //
   // Clearing the distinctiveness floor is a consequence of that choice, not its
   // purpose. Saturation and contrast do not enter that metric, so the whole

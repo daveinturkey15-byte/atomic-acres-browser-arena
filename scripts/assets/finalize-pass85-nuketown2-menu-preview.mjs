@@ -82,7 +82,7 @@ const RECEIPT_PATH = path.join(root, process.env.AA_PASS85_RECEIPT
 
 const MASTERS = JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass65-preview-masters/choreography.json'), 'utf8'));
 const EXTENSION = JSON.parse(await readFile(path.join(provenanceRoot, 'choreography.json'), 'utf8'));
-/** Display order, matching ARENA_SELECTIONS: nuketown2 is tenth and last. */
+/** Display order, matching ARENA_SELECTIONS: nuketown2 is first. */
 const ARENAS = Object.freeze(['nuketown2']);
 const FAMILY_ID = 'pass85-nuketown2-menu-preview';
 const CACHE_KEY = 'pass85-nuketown2-preview-v1';

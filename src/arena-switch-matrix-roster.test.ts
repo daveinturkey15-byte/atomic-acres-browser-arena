@@ -28,13 +28,13 @@ describe('arena switch matrix roster', () => {
   it('derives exactly the arenas the menu offers, from source', () => {
     const derived: string[] = selectableArenaIdsFromSource(mapSelectionSource);
     expect([...derived].sort()).toEqual([...SELECTABLE_ARENAS.map((entry) => entry.id)].sort());
-    // The hidden arena is hidden, not forgotten: it is in the registry and out
-    // of the menu, and that difference is the whole point of the derivation.
-    // PASS 87: every registered arena is selectable (farcrysis un-hidden), so the roster may EQUAL the id list;
-    // it must never exceed it.
+    // Hidden arenas are hidden, not forgotten: they remain in the registry and
+    // out of the menu, and that difference is the whole point of the derivation.
+    // HF-495 (owner, 2026-09-04) parks the original Raid alongside the existing
+    // parked rows; the roster must never exceed the registered id boundary.
     expect(derived.length).toBeLessThanOrEqual(ARENA_IDS.length);
-    // Nothing is hidden since PASS 87 (farcrysis ships as a PREVIEW card); the roster is
-    // derived, so pin its shape, not a hidden id: no duplicates, every id registered.
+    // The roster is derived, so pin its shape, not a hidden id: no duplicates,
+    // every offered id remains registered.
     expect(new Set(derived).size).toBe(derived.length);
     for (const id of derived) expect(ARENA_IDS).toContain(id);
   });

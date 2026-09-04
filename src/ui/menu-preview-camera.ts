@@ -179,7 +179,8 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
     ...RETAINED_CHOREOGRAPHY.arenas,
-    // ARENA_SELECTIONS order: farcrysis is fifth, high-seas sixth. The offline
+    // ARENA_SELECTIONS order: farcrysis is seventh, high-seas eighth after HF-495.
+    // The offline
     // authoring roster check compares against that order, so keep it here too.
     ...FARCRYSIS_CHOREOGRAPHY.arenas,
     ...HIGH_SEAS_CHOREOGRAPHY.arenas,

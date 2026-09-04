@@ -80,7 +80,7 @@ const RECEIPT_PATH = path.join(root, process.env.AA_PASS84_RECEIPT
 
 const MASTERS = JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass65-preview-masters/choreography.json'), 'utf8'));
 const EXTENSION = JSON.parse(await readFile(path.join(provenanceRoot, 'choreography.json'), 'utf8'));
-/** Display order, matching ARENA_SELECTIONS: map3 is ninth and last. */
+/** Display order, matching ARENA_SELECTIONS: map3 is eleventh and last. */
 const ARENAS = Object.freeze(['map3']);
 const FAMILY_ID = 'pass84-map3-menu-preview';
 const CACHE_KEY = 'pass84-map3-preview-v1';

@@ -122,6 +122,64 @@ export type ArenaSelection = Readonly<{
  * replay, storage and asset boundary; route IDs and labels may evolve.
  */
 export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
+  // HF-495 (owner, 2026-09-04): Nuke Town Rebuild is the first selectable
+  // card, followed by the Raid Rebuild preview. Every other row retains its
+  // relative order below these two moved previews.
+  Object.freeze({
+    id: 'nuketown2' as const,
+    routeId: 'nuke-town-rebuild' as const,
+    // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'NUKE TOWN REBUILD · PREVIEW',
+    displayName: 'Nuke Town Rebuild',
+    titleLead: 'NUKE TOWN',
+    titleAccent: 'REBUILD',
+    menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
+    summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 4 BOTS SOLO · +1 / 10 DEFEATS · MAX 6 · PREVIEW',
+    soloBotCount: SOLO_BOT_COUNT,
+    // HF-491 (owner, 2026-09-04): "the bots not in there". The original is a
+    // 6v6 map; one bot on this street is an empty map. Four to open, the shared
+    // ten-defeat ladder to six from there.
+    initialSoloBots: 4,
+    maximumSoloBots: MAX_SOLO_BOTS,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: true,
+    selectable: true,
+    // HF-407: no Blender bake, no GLB, no imported mesh/image/font/LUT. This is
+    // the whole point of the rejig - the shipped Nuke Town is the only
+    // `authoring: 'import'` arena in the game.
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
+  // HF-495 (owner, 2026-09-04): the Raid Rebuild is the second selectable
+  // card and keeps its explicit PREVIEW label.
+  Object.freeze({
+    id: 'raid2' as const,
+    routeId: 'raid-rebuild' as const,
+    // RAID2 is a team arena like the shipped Raid; only Map 3 is the explore kind.
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'RAID REBUILD · PREVIEW',
+    displayName: 'Raid Rebuild',
+    titleLead: 'RAID',
+    titleAccent: 'REBUILD',
+    menuLede: 'The hillside mansion rebuilt for its sightlines: three big rooms around an open-to-sky courtyard, the pool terrace holding one unbroken 52 m lane, and the wings joined to the house instead of fenced off it. Layout preview.',
+    summary: 'Hillside mansion · layout rebuild · preview',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    selectable: true,
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
   Object.freeze({
     id: 'atomic-acres' as const,
     routeId: 'nuke-town' as const,
@@ -214,7 +272,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   // HF-359 (Pass 74): revived Pass 69 hidden-lane arena (branch
   // contrib/dave-gaming-pc/hermes/pass69-hidden-farcrysis @ 83395da4).
-  // Display position: fifth, after Gun Range. Stable id 'farcrysis' is the
+  // Display position: seventh, after Gun Range. Stable id 'farcrysis' is the
   // network/storage boundary; owner codename aliases decode at this boundary
   // only and are never emitted as current UI text.
   Object.freeze({
@@ -352,6 +410,10 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
+    // HF-495 (owner, 2026-09-04): park the original Raid like HF-466 parked
+    // the original Nuketown. Its stable id, route, aliases, links and arena
+    // implementation remain registered for in-flight rooms and history.
+    selectable: false,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
@@ -429,84 +491,6 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     map3 ceiling from the headless sweep, not the unmeasured sentinel.
     selectable: true,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
-    authoring: 'code' as const,
-    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
-    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
-  }),
-  // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town layout rejig, built
-  // entirely in code against the measured reference proportions recorded in
-  // `docs/NUKETOWN_REBUILD_2026-09-02.md`, and registered BESIDE the shipped
-  // `atomic-acres` rather than on top of it. The owner picks the moment the
-  // two swap; that is a later lane and one field, because the id has been the
-  // network/replay/storage boundary since this commit.
-  //
-  // `multiplayer: true`, `fieldSupport: true` and `overdrive: true` match the
-  // shipped Nuke Town deliberately: the owner said he will host this preview
-  // with friends, the 2x-damage core is one of the three features he asked to
-  // keep, and the core's global position lands on this arena's bus roof.
-  Object.freeze({
-    id: 'nuketown2' as const,
-    routeId: 'nuke-town-rebuild' as const,
-    // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
-    kind: 'team' as const,
-    legacyAliases: Object.freeze([]),
-    selectorLabel: 'NUKE TOWN REBUILD · PREVIEW',
-    displayName: 'Nuke Town Rebuild',
-    titleLead: 'NUKE TOWN',
-    titleAccent: 'REBUILD',
-    menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
-    summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 4 BOTS SOLO · +1 / 10 DEFEATS · MAX 6 · PREVIEW',
-    soloBotCount: SOLO_BOT_COUNT,
-    // HF-491 (owner, 2026-09-04): "the bots not in there". The original is a
-    // 6v6 map; one bot on this street is an empty map. Four to open, the shared
-    // ten-defeat ladder to six from there.
-    initialSoloBots: 4,
-    maximumSoloBots: MAX_SOLO_BOTS,
-    multiplayer: true,
-    fieldSupport: true,
-    overdrive: true,
-    selectable: true,
-    // HF-407: no Blender bake, no GLB, no imported mesh/image/font/LUT. This is
-    // the whole point of the rejig - the shipped Nuke Town is the only
-    // `authoring: 'import'` arena in the game.
-    authoring: 'code' as const,
-    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
-    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
-  }),
-  // RAID2 (owner 2026-09-02, HF-408): "Raid just feels like loads of walls, need
-  // to ensure the layout and artstyle is more similar to the original."
-  //
-  // This is the LAYOUT rethink, registered as its own arena beside the shipped
-  // Raid rather than replacing it, so the live map is never broken mid-pass and
-  // the owner can compare the two in the menu before anything is swapped.
-  // Labelled PREVIEW because the art is a clean readable first pass and the art
-  // lane comes after.
-  //
-  // `multiplayer: true` follows the lane brief and matches `test2`: this is the
-  // same mode on the same netcode with a different arena id, and the spawn table
-  // is solved for two teams under the HF-402 constraint set. What has NOT been
-  // measured is a two-client mp-lab run against `raid2` specifically - that is
-  // recorded OPEN in docs/raid-rebuild/TASK_STATE.md rather than papered over.
-  Object.freeze({
-    id: 'raid2' as const,
-    routeId: 'raid-rebuild' as const,
-    // RAID2 is a team arena like the shipped Raid; only Map 3 is the explore kind.
-    kind: 'team' as const,
-    legacyAliases: Object.freeze([]),
-    selectorLabel: 'RAID REBUILD · PREVIEW',
-    displayName: 'Raid Rebuild',
-    titleLead: 'RAID',
-    titleAccent: 'REBUILD',
-    menuLede: 'The hillside mansion rebuilt for its sightlines: three big rooms around an open-to-sky courtyard, the pool terrace holding one unbroken 52 m lane, and the wings joined to the house instead of fenced off it. Layout preview.',
-    summary: 'Hillside mansion · layout rebuild · preview',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
-    soloBotCount: 2,
-    maximumSoloBots: 2,
-    multiplayer: true,
-    fieldSupport: true,
-    overdrive: false,
-    selectable: true,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

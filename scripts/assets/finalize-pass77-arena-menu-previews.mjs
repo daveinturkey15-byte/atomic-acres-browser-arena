@@ -45,7 +45,7 @@ const EXTENSIONS = Object.freeze({
   farcrysis: JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass77-farcrysis-preview/choreography.json'), 'utf8')),
   'high-seas': JSON.parse(await readFile(path.join(root, 'source-assets/menu/pass75-high-seas-preview/choreography.json'), 'utf8')),
 });
-/** Display order, matching ARENA_SELECTIONS: farcrysis is fifth, high-seas sixth. */
+/** Display order, matching ARENA_SELECTIONS: farcrysis is seventh, high-seas eighth. */
 const ARENAS = Object.freeze(['farcrysis', 'high-seas']);
 const CACHE_KEY = 'pass77-arena-preview-v1';
 

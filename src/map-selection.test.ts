@@ -14,6 +14,8 @@ import {
 } from './map-selection';
 
 describe('opening arena selection', () => {
+  // HF-495 (owner, 2026-09-04): Nuke Town Rebuild is first and Raid Rebuild is
+  // second; the full catalog below keeps every other arena in relative order.
   // owner 2026-08-30: Test1/Test2 arenas added. owner 2026-09-02 (HF-405):
   // Map 3 registered as a PREVIEW arena. The count is deliberately not in the
   // title any more - the same reason pass74-arena-boot-smoke.spec.ts stopped
@@ -21,6 +23,8 @@ describe('opening arena selection', () => {
   // silently, and the roster below is the assertion that matters.
   it('publishes a unique, fully described map for every registered arena', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
+      'nuketown2',
+      'raid2',
       'atomic-acres',
       'skyline-terminal',
       'rustworks-1v1',
@@ -30,18 +34,19 @@ describe('opening arena selection', () => {
       'test1',
       'test2',
       'map3',
-      // NUKETOWN2 (HF-407): the Nuke Town rejig, registered beside the shipped
-      // Nuke Town rather than replacing it.
-      'nuketown2',
-      // RAID2 (HF-408, 2026-09-02): the Raid layout rethink, beside the shipped Raid.
-      'raid2',
     ]);
     // HF-405: Map 3 registered as a PREVIEW arena (2026-09-02); Test1/Test2 carry their owner names.
     // HF-407: Nuke Town Rebuild added. Its display name must NOT collide with
-    // 'Nuke Town' - the two arenas sit next to each other in the menu and the
-    // owner has to be able to tell which one he is loading.
+    // 'Nuke Town'; HF-495 now puts the rebuild first while keeping the names
+    // unambiguous when both are resolved from the catalog.
     // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3', 'Nuke Town Rebuild', 'Raid Rebuild']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town Rebuild', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
+    // HF-495 (owner, 2026-09-04): selectability derives the menu order from
+    // this catalog; the retired original Raid is absent without a second list.
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
+      'nuketown2', 'raid2', 'skyline-terminal', 'rustworks-1v1', 'gun-range',
+      'high-seas', 'test1', 'map3',
+    ]);
     expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(11);
     expect(ARENA_SELECTIONS.length).toBe(11);
     for (const entry of ARENA_SELECTIONS) {
@@ -193,8 +198,12 @@ describe('opening arena selection', () => {
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(ARENA_SELECTIONS.map((selection) => hostedArenaDurationMs(selection)))
       // HF-408 (Lane AQ): raid2 is an eleventh entry on MATCH_DURATION_MS, like test2.
-      .toEqual([300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      // HF-495: catalog order is Nuke Town Rebuild, Raid Rebuild, then the
+      // retained rows; the duration values remain bound to each row.
+      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
+      'Nuke Town Rebuild multiplayer arena',
+      'Raid Rebuild multiplayer arena',
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
       'RustRig multiplayer arena',
@@ -205,10 +214,6 @@ describe('opening arena selection', () => {
       'Raid multiplayer arena',
       // MAP3: an explore arena is not a multiplayer arena.
       'Map 3 explore arena',
-      // NUKETOWN2 (HF-407).
-      'Nuke Town Rebuild multiplayer arena',
-      // RAID2 (HF-408).
-      'Raid Rebuild multiplayer arena',
     ]);
   });
 
@@ -322,13 +327,15 @@ describe('opening arena selection', () => {
   it('derives the solo launch label from the canonical arena catalog', () => {
     // HF-359: farcrysis has 2-bot solo skirmish launch label
     expect(ARENA_SELECTIONS.map(soloLaunchLabel)).toEqual([
+      // HF-495: first two cards are the rebuild previews.
+      '4 BOTS SKIRMISH',
+      '2 BOTS SKIRMISH',
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',
       'START RANGE',
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
-      // owner 2026-08-30: Test1/Test2 arenas added.
       '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
       // MAP3 (HF-405, then HF-409): Map 3 fields no bots at all and is not a
@@ -336,14 +343,7 @@ describe('opening arena selection', () => {
       // the Gun Range was the only bot-less arena and the wrong words for the
       // second one.
       'START EXPLORING',
-      // NUKETOWN2 (HF-407), then HF-491 (owner, 2026-09-04): the card states the
-      // count the match opens with. This arena declares `initialSoloBots: 4`
-      // because the original is a 6v6 map and one bot on this street reads as
-      // an empty arena; every other row here declares nothing and keeps the
-      // Pass 66 default.
-      '4 BOTS SKIRMISH',
-      // RAID2 (HF-408): soloBotCount 2.
-      '2 BOTS SKIRMISH',
+      // The remaining rows retain their catalog order and declared bot counts.
     ]);
   });
 
@@ -414,7 +414,7 @@ describe('opening arena selection', () => {
   // that would make the A/B meaningless: the rebuild being registered but not
   // offered ("published but unselectable"), and the two Nuke Towns being
   // indistinguishable in the menu.
-  it('offers the Nuke Town Rebuild as a selectable hosted preview beside the shipped map', () => {
+  it('offers the Nuke Town Rebuild as the first selectable hosted preview', () => {
     const rebuild = arenaSelection('nuketown2');
     expect(rebuild.id).toBe('nuketown2');
     expect(rebuild.selectable).toBe(true);
@@ -428,8 +428,8 @@ describe('opening arena selection', () => {
     expect(rebuild.rulesLabel).toContain('PREVIEW');
     expect(rebuild.displayName).not.toBe(arenaSelection('atomic-acres').displayName);
     expect(rebuild.routeId).not.toBe(arenaSelection('atomic-acres').routeId);
-    // The shipped Nuke Town is untouched by this lane: still there, still the
-    // imported build, still the default the decoder falls back to.
+    // The shipped Nuke Town is untouched by this lane: still there and still
+    // the imported build. HF-495 changes catalog presentation, not its stable id.
     expect(arenaSelection('atomic-acres').authoring).toBe('import');
     expect(decodeArenaId('nuke-town')).toBe('atomic-acres');
     expect(decodeArenaId('nuketown')).toBe('atomic-acres');
@@ -470,7 +470,9 @@ describe('opening arena selection', () => {
   });
 
   it('falls back safely to Nuke Town', () => {
-    expect(arenaSelection('unknown').id).toBe('atomic-acres');
-    expect(arenaSelection(null).id).toBe('atomic-acres');
+    // HF-495: invalid compatibility input follows the first catalog entry,
+    // which is now the first selectable card, Nuke Town Rebuild.
+    expect(arenaSelection('unknown').id).toBe('nuketown2');
+    expect(arenaSelection(null).id).toBe('nuketown2');
   });
 });
