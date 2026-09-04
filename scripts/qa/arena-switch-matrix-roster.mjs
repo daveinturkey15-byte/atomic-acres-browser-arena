@@ -1,3 +1,9 @@
+// What: pure ES module (no CLI) exporting the two arena switch-matrix gate decisions - the selectable arena roster derived from src/map-selection.ts source (selectableArenaIdsFromSource), and the ordered arena-pair walk the browser probe must sweep (eulerianPairWalk).
+// Usage: node scripts/qa/arena-switch-matrix-roster.mjs   (module only; loading it runs no top-level code and exits 0 - import it, e.g. from src/arena-switch-matrix-roster.test.ts, rather than running it)
+// Flags / env: none - reads no process.argv, process.env, or --flags.
+// Writes: nothing - pure functions; no files or directories produced.
+// Exit codes: none - no process.exit(); bad derivations throw Error instead of exiting.
+//
 // The two pure decisions the arena switch-matrix gate rests on: WHICH arenas
 // it must cover, and WHICH ordered pairs it must walk. They live here, apart
 // from the browser probe, so `src/arena-switch-matrix-roster.test.ts` can hold
