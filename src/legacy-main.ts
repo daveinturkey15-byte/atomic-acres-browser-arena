@@ -4225,7 +4225,8 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     elapsedSeconds: lightingConditionsElapsedSeconds,
     choice: activeLightingTimeChoice(),
     skyDarkenAmount: lightingConditionsSkyDarken,
-    // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby.
+    // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby
+    // so guests cannot select a different sky and desync the shared match.
     ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
   });
 }

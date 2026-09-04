@@ -150,3 +150,22 @@ identity, the weather blend, and the fail-closed import-time sweeps.
    needs a decision about who owns `scene.fog.near/far` when weather and time of
    day disagree; that is a contract question, not a patch.
 4. **Base head assumption** - see the deviation note at the top.
+
+## Muse review dispositions
+
+- **F1 [VERIFIED NOT PRESENT at this head]:** `applyLightingConditionUniforms()`
+  already quantises the changing sky/clock inputs and returns before
+  `resolveActiveLightingConditions()` on steady-state frames (lines 4261-4280),
+  then retains `lightingConditionWritesEqual()` as the second gate. No further
+  memoization change is justified by the cited finding.
+- **F2 TODO (larger runtime/precompile and contract decision):** Decide ownership
+  for per-sky fog near/far when weather and time of day disagree; then, if
+  accepted, wire `practicalEmissiveGain` through a `uniform()` into
+  `src/nuketown2-interior-materials.ts`, add the corresponding menu-time
+  precompile entry and source gate, and rerun the affected lighting/material
+  contracts. Do not wire this inside the review-fix pass.
+- **Browser TODO (larger verification):** At the final merge head, run
+  `npm run qa:pass74:arena-boot-smoke` with the `nuketown2` filter, run
+  `npm run qa:stock-boot`, and capture `?todhour=10.5|14|17.6` with zero
+  console errors. This pass remains browser/build-free by instruction, so the
+  existing OPEN status is retained.
