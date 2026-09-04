@@ -40,3 +40,30 @@ Verdict: **DO-NOT-SHIP**
 The material-rule finding and acceptance gaps are also recorded as TODOs in the
 lane report. No product-source fix was made because the correct uniform design
 needs an explicit repository-compatible choice rather than a speculative edit.
+
+## Review 2
+
+Revision reviewed: `a2a9d61f9f7bef563047d3c1829fc714f309e4a1`
+Base: `origin/contrib/dave-gaming-pc/claude/farcrysis-rework` (`d9395579`)
+Status: clean; current head includes the Muse fix/evidence commits.
+
+Verdict: **SHIP-WITH-FIXES**
+
+1. Finding 1 is fixed: the three boulder sets share one geometry and one
+   white material, and their original tints are written with
+   `InstancedMesh.setColorAt`/`instanceColor`; the added square-shore test pins
+   no baked color attribute and shared material/geometry.
+2. Finding 2 is fixed by independent gates: `npx --no-install tsc --noEmit
+   --pretty false` exited 0; the explicitly named 7-file set passed 7 files /
+   50 tests; and `find-coplanar-pairs.ts` reported 0 different-material
+   findings with exit 0. The broader explicit 28-file attempt timed out, so it
+   is not represented as green evidence.
+3. Finding 3 remains open only as the required visual/runtime evidence: no
+   exact-SHA WebGPU boulder parity or frame-cost capture was run under the
+   review's no-browser/no-GPU boundary. The report records this as the
+   remaining blocking TODO; no product-code defect is inferred.
+
+Standing-rule checks: no assertion or threshold was weakened; the material
+ceiling was reduced from 168 to 166 and preserved with history; no new
+pipeline, roster, legacy-main change, per-frame allocation, or vendored HF-472
+implementation was found. No product code was changed by Luna in Review 2.
