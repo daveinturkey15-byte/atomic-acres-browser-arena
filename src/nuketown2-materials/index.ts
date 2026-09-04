@@ -128,18 +128,23 @@ export interface Nuketown2MaterialRegistry {
  * 12,000 ms, so every one of those compiles has to complete inside ONE
  * submission — the same budget HF-374 blew on farcrysis foliage.
  *
- * WHY 54. Measured on this tree by `src/nuketown2-pipeline-budget.test.ts`:
- * the built arena carries 96 node materials over 52 distinct graphs. Before the
- * HF-477 uniform-swatch pass it was 55 for the same 96 materials, because every
- * family factory baked its caller's hex into the graph as a literal `vec3` — so
- * the two sidings, and five of the six painted-metal roles, each compiled their
- * own shader for what is ONE surface with a different colour in a buffer. The
- * ceiling is the measured 52 plus a margin of TWO: room for a couple of
- * genuinely new surfaces from another lane's dressing and nothing more. A third
- * new graph is a review, not a bump — raising this number is a decision about
- * the deploy fence, so it is made here, once, in the open.
+ * WHY 42. Measured on this tree by `src/nuketown2-pipeline-budget.test.ts`:
+ * the built arena carries 68 node materials over 42 distinct graphs. Before
+ * the HF-477 uniform-swatch pass it was 55 for 96 materials, because every
+ * family factory baked its caller's hex into the graph as a literal `vec3`.
+ * The yard-prop / interior sharing pass then moved `nuketown2-yard-props.ts`
+ * and `nuketown2-interior-materials.ts` onto the families with per-instance
+ * colours as uniforms: twelve bespoke graphs (cabinet, hob red, hob blue,
+ * glasshouse glazing, yard timber, sand, wood/tile/garage floors, drywall,
+ * warm/cold lights, window glass) collapsed onto shared family graphs, and
+ * three shared graphs cover what remains outside the families entirely —
+ * timber `deck`, transparent glass, and the single unified ceiling-light
+ * graph (no family emits light). Net 51 -> 42 over the same 68 materials.
+ * The ceiling is the measured 42 with NO margin: a new graph is a review,
+ * not a bump — raising this number is a decision about the deploy fence, so
+ * it is made here, once, in the open.
  */
-export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 54;
+export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 42;
 
 /** Every role name, for the gates that sweep the registry rather than naming rows. */
 export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
