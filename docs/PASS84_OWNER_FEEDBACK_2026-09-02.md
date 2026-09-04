@@ -1916,3 +1916,23 @@ assets and textures and lighting need to be tip top, raid can come next"
   the filled verges; 36 verge bodies deleted (79 → 43), two-sided ratio band
   and a zero-headroom verge ceiling added; roadside bays landing on a follow-on
   lane.
+
+## HF-491 status — 2026-09-04 17:55
+
+- **Bots (d549f60d):** two mechanical causes found and fixed generically —
+  the spawn score's unbounded distance reward always chose the farthest point
+  (one bot hiding behind the far houses), and a flat 12 s use window let it
+  repeat (3 of 16 points used = HF-456's "one or two places"); new
+  roster-derived gate `bot-spawn-presence` 18 failed → 36 passed. Third cause
+  needs an owner-facing decision, taken by the orchestrator under HF-491:
+  Solo fields exactly ONE bot (Pass 66 contract) and the +1/10-defeats ladder
+  only ever applied to the unselectable atomic-acres arena. Follow-on lane:
+  ladder for every selectable arena declaring maximumSoloBots; nuketown2
+  starts at 4, caps at 6; undeclared arenas keep 1. Owner may override.
+- **Sound (246b2fd2):** no mechanical regression — no missing buffers, contexts
+  running, gains identical to PASS 93 (SFX 0.78, movement 0.34, music 0.0135).
+  "Really bad" is the synthesised timbre/mix itself → sound-design lane
+  (Luna xhigh) redesigning every category with OfflineAudioContext peak/RMS
+  gates; needs the owner's ears afterwards.
+- **Layout (7ade1887):** corridor already at the BO2 ratio; clutter cut;
+  roadside bays landing on the follow-on lane.
