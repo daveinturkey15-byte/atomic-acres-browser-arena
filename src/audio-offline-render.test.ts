@@ -27,7 +27,13 @@ describe('procedural audio offline render acceptance', () => {
       expect(measured.rms).toBeGreaterThanOrEqual(target.rmsMin);
       expect(measured.rms).toBeLessThanOrEqual(target.rmsMax);
       return [category, { peak: Number(measured.peak.toFixed(6)), rms: Number(measured.rms.toFixed(6)) }];
-    }));
+    })) as Record<OfflineAudioCategory, { peak: number; rms: number }>;
+    // The target bands must also preserve the combat mix hierarchy; otherwise
+    // a loud UI cue or unducked music bed can pass in isolation.
+    expect(metrics.weapons.peak).toBeGreaterThan(metrics.impacts.peak);
+    expect(metrics.impacts.peak).toBeGreaterThan(metrics.movement.peak);
+    expect(metrics.movement.peak).toBeGreaterThan(metrics.ui.peak);
+    expect(metrics.music.rms * 0.24).toBeLessThan(metrics.movement.rms);
     // Kept as a compact receipt when this focused gate is run by a reviewer.
     console.info(`OFFLINE_AUDIO_METRICS ${JSON.stringify(metrics)}`);
     const baseline = Object.fromEntries(CATEGORIES.map((category) => {

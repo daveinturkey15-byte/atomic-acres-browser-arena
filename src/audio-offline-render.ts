@@ -30,7 +30,7 @@ export const OFFLINE_CATEGORY_TARGETS: Readonly<Record<OfflineAudioCategory, Rea
   weapons: Object.freeze({ peakMin: 0.12, peakMax: 0.78, rmsMin: 0.025, rmsMax: 0.24 }),
   movement: Object.freeze({ peakMin: 0.04, peakMax: 0.46, rmsMin: 0.006, rmsMax: 0.12 }),
   impacts: Object.freeze({ peakMin: 0.05, peakMax: 0.62, rmsMin: 0.006, rmsMax: 0.13 }),
-  ui: Object.freeze({ peakMin: 0.035, peakMax: 0.42, rmsMin: 0.004, rmsMax: 0.09 }),
+  ui: Object.freeze({ peakMin: 0.035, peakMax: 0.20, rmsMin: 0.004, rmsMax: 0.09 }),
   music: Object.freeze({ peakMin: 0.01, peakMax: 0.28, rmsMin: 0.008, rmsMax: 0.08 }),
 });
 
@@ -117,10 +117,12 @@ function renderDesigned(category: OfflineAudioCategory): Float32Array {
     addVoice(output, 3.6, 0.075, 0.16, 1_900, 820, 'triangle', 0.7, 2_020, 0.04);
     addVoice(output, 3.63, 0.22, 0.1, 2_600, 700, 'sawtooth', 0.84, 2_021, 0.12);
   } else if (category === 'ui') {
-    addVoice(output, 0.8, 0.15, 0.18, 660, 880, 'triangle', 0, 3_000, 0.08);
-    addVoice(output, 0.89, 0.17, 0.16, 880, 1_320, 'sine', 0, 3_001, 0.09);
-    addVoice(output, 0.98, 0.24, 0.2, 1_320, 1_760, 'sine', 0.05, 3_002, 0.13);
-    addVoice(output, 1.05, 0.17, 0.05, 2_600, 1_200, 'sawtooth', 0.85, 3_003, 0.08);
+    // Keep confirmation cues readable while leaving the documented combat
+    // hierarchy to weapons, impacts, and footsteps in that order.
+    addVoice(output, 0.8, 0.15, 0.14, 660, 880, 'triangle', 0, 3_000, 0.08);
+    addVoice(output, 0.89, 0.17, 0.125, 880, 1_320, 'sine', 0, 3_001, 0.09);
+    addVoice(output, 0.98, 0.24, 0.16, 1_320, 1_760, 'sine', 0.05, 3_002, 0.13);
+    addVoice(output, 1.05, 0.17, 0.04, 2_600, 1_200, 'sawtooth', 0.85, 3_003, 0.08);
   } else {
     // A quiet tonal bed: two slowly moving partials, the same musical role as
     // the live game-music bus, tested over the full twenty-second window.
