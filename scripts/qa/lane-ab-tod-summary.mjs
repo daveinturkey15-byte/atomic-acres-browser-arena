@@ -1,3 +1,8 @@
+// Per-arena daylight summary: prints a Markdown table of each arena's identity, hour band, anchor hour, weather states, and sampled sun/shadow/exposure/sun-angle extremes, followed by the global lighting bounds.
+// Usage: npx tsx scripts/qa/lane-ab-tod-summary.mjs
+// Flags/env: none (script reads no process.argv entries and no process.env variables).
+// Writes: stdout only (Markdown table plus one "BOUNDS <json>" line); no files or directories.
+// Exit codes: 0 on success; 1 on unhandled error (e.g. arena id missing from LABEL) — no explicit process.exit calls.
 import { ARENA_DAYLIGHT_PROFILES, resolveLightingConditions, resolveLightingHour, LIGHTING_CONDITION_BOUNDS } from '../../src/rendering/lighting-conditions.ts';
 import { ARENA_IDS } from '../../src/arena-identity.ts';
 import { ARENA_WEATHER_PROFILES } from '../../src/weather/weather-state.ts';
