@@ -2097,3 +2097,7 @@ assets and textures and lighting need to be tip top, raid can come next"
 ## HF-500 - owner 2026-09-04 20:07: 'the in-game chat is annoying, move it up a bit so we do not keep hitting it'
 
 - Routed to a small Luna HUD lane; rides with the multiplayer HITL.
+
+## HF-501 - owner 2026-09-04 20:40: 'muse spark contributor 1.3 is so cheap, use a bunch of it, get all the stuff I asked for done for the next pass'
+
+- Muse Spark promoted from reviewer to builder: a second worker pool (3 workers, 75-minute jobs, queue muse-queue-build) running eight bounded PASS 95 lanes on their own branches - breakable upstairs windows, lobby all-players 5-4-3-2-1 countdown, gamepad support, yard-prop/interior graph sharing, ground-projected horizon environment, load-time rehearsal-scope re-land, Raid slice 2, Farcrysis slice 2. Luna reviews Muse output before any merge.
