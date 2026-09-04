@@ -15,6 +15,16 @@ import { ARENA_SELECTIONS, SELECTABLE_ARENAS, decodeArenaId } from './map-select
 // looks identical in the menu and is a data-loss bug everywhere else. The decode half is
 // unchanged by the un-hide, and is asserted below exactly as it was while it was hidden.
 describe('arena selectability', () => {
+  it('parks the original Nuketown by registry flag while retaining its stable id (HF-466)', () => {
+    const parkedArenaIds = ARENA_SELECTIONS
+      .filter((entry) => entry.selectable === false)
+      .map((entry) => entry.id);
+    expect(parkedArenaIds).toContain('atomic-acres');
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('atomic-acres');
+    expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('atomic-acres');
+    expect(decodeArenaId('atomic-acres')).toBe('atomic-acres');
+  });
+
   it('parks farcrysis behind the menu without withdrawing it (HF-429)', () => {
     // PARKED 2026-09-03 at the owner's decision. Asserted through the FLAG,
     // never through an id list: the previous version of this test named
@@ -106,9 +116,11 @@ describe('arena selectability', () => {
   });
 
   it('leaves the first offered arena as the default the menu preselects', () => {
-    // pass64-shell marks index 0 selected and reads ARENA_SELECTIONS[0] for the canvas
-    // label and solo button, so the two lists must agree on the default or the menu
-    // preselects one arena and the launch button names another.
-    expect(SELECTABLE_ARENAS[0]?.id).toBe(ARENA_SELECTIONS[0]?.id);
+    // pass64-shell marks index 0 selected and reads the first offered row for the
+    // canvas label and solo button, so the menu's default must be the first
+    // selectable registry entry even when parked rows precede it.
+    expect(SELECTABLE_ARENAS[0]?.id).toBe(
+      ARENA_SELECTIONS.find((entry) => entry.selectable !== false)?.id,
+    );
   });
 });

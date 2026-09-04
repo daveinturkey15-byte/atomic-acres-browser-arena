@@ -54,10 +54,10 @@ const ARENA_IDENTITY = resolve(HERE, '../../src/arena-identity.ts');
  * registry grows; see the block comment above for why a floor and not a
  * non-empty check.
  */
-export const MINIMUM_ARENA_IDS = 9;
+export const MINIMUM_ARENA_IDS = 11;
 
-/** Every arena the arena picker offers. Currently every id except farcrysis. */
-export const MINIMUM_SELECTABLE_ARENAS = 8;
+/** Every arena the arena picker offers after the two parked registry rows. */
+export const MINIMUM_SELECTABLE_ARENAS = 9;
 
 function readRegistryBody() {
   const source = readFileSync(MAP_SELECTION, 'utf8');

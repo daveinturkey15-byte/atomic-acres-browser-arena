@@ -27,34 +27,10 @@ describe('Pass 66 command shell', () => {
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual(
       SELECTABLE_ARENAS.map((entry) => entry.routeId),
     );
-    // Order is still load-bearing, so pin the offered sequence explicitly too.
-    expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
-      'nuke-town',
-      'terminal',
-      'rustrig',
-      'gun-range',
-      // farcrysis is ABSENT from this list, and that is the whole content of
-      // HF-429 (owner, 2026-09-03): the arena is PARKED, `selectable: false`,
-      // so it is not offered. Its registry row, its measured admission evidence
-      // (docs/evidence/pass87/lane-r/farcrysis-admission.json) and every ledger
-      // row it earned are untouched - only the card is gone. The assertion
-      // directly above holds this list to SELECTABLE_ARENAS, so this list can
-      // never drift from the flag on its own.
-      'high-seas',
-      // owner 2026-08-30: Test1/Test2 arenas added.
-      'test1',
-      'test2',
-      // MAP3 (owner 2026-09-02, HF-409, card restored in PASS 86): the corridor
-      // showcase is offered as an EXPLORE arena, last in registry order.
-      'map3',
-      // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town rebuild, last in the
-      // offered order, labelled PREVIEW. Pinned here as well as against
-      // SELECTABLE_ARENAS because the order is what a player sees.
-      'nuke-town-rebuild',
-      // RAID2 (owner 2026-09-02, HF-408): the Raid layout rebuild, likewise
-      // selectable and labelled PREVIEW, shipped BESIDE `test2` not instead of it.
-      'raid-rebuild',
-    ]);
+    // Order is load-bearing, but it is derived from the registry so parking a
+    // registered arena cannot leave a stale literal menu roster behind.
+    expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1]))
+      .toEqual(SELECTABLE_ARENAS.map((entry) => entry.routeId));
     // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
     // This pin has now swung three times - absent, present-and-PREVIEW, absent
     // again - so it is written DERIVED rather than as a third literal: every

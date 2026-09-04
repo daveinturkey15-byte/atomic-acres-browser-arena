@@ -122,6 +122,10 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: true,
+    // HF-466 (owner, 2026-09-04): park the original Nuketown from the menu.
+    // The stable id remains registered for compatibility and build coverage;
+    // only the player-facing selectable roster changes.
+    selectable: false,
     authoring: 'import' as const,
     authoringNote: 'IMPORTED ASSETS',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),

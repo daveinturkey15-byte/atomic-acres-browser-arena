@@ -220,7 +220,7 @@ export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.fr
  * the roster itself legitimately shrinks, in the same commit as the registry
  * edit that shrank it.
  */
-export const MINIMUM_SWEPT_ARENAS = 10;
+export const MINIMUM_SWEPT_ARENAS = 9;
 
 /** The arenas this sweep must cover: every selectable arena, and nothing invented. */
 export function sweptArenaIds(): ArenaId[] {
