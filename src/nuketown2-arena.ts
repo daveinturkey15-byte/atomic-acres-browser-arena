@@ -282,6 +282,44 @@ const GARAGE_WIDTH = NUKETOWN2_GARAGE_WIDTH;
 const GARAGE_X0 = NUKETOWN2_GARAGE_SPAN.x0;                       // 4.25, flush with HOUSE_X1
 const GARAGE_X1 = NUKETOWN2_GARAGE_SPAN.x1;                       // 9.25
 /** Set-back of the garage front from the house front. Reference 67 px of 400 = 0.168 L. */
+/**
+ * HF-478 - the garage fit-out, in ONE place because five bodies read it.
+ *
+ * The bay is 5.0 x 7.0 m outside and 4.4 x 6.4 m inside its own 0.3 m walls,
+ * and it has three doorways: the 3.5 m vehicle door on the front wall, the
+ * 1.8 m rear door on the back wall at x [5.3, 7.1], and the 1.8 m link door
+ * into the house on the x = 4.25 wall over z [-19.6, -17.8]. Everything below
+ * is placed so the LINK-DOOR SIDE stays one continuous 1.35 m lane from the
+ * vehicle door to the back wall - wider than the 0.76 m a standing capsule
+ * needs - because a garage a player cannot walk through is a cupboard.
+ */
+const GARAGE_BENCH_X = 8.1;
+const GARAGE_BENCH_WIDTH = 1.4;
+const GARAGE_BENCH_DEPTH = 2.4;
+/** Back of the outboard wall: bench span z [-22.6, -20.2], clear of the rear door. */
+const GARAGE_BENCH_Z = -21.4;
+/** Steel racking on the outboard wall, in the run the shortened bench freed. */
+const GARAGE_SHELF_X = 8.6;
+const GARAGE_SHELF_WIDTH = 0.7;
+/**
+ * 2.8 m at z = -18.6, not 3.0 m at -18.0. The doorway sweep in
+ * `nuketown2-interiors.test.ts` measured the first cut's front 0.4 m inside
+ * the 3.5 m vehicle door's own threshold band, at the door's outboard edge -
+ * a rack you clip driving in. It stops 0.29 m clear of that band now, and
+ * 0.20 m clear of the workbench behind it.
+ */
+const GARAGE_SHELF_DEPTH = 2.8;
+const GARAGE_SHELF_Z = -18.6;
+/** Over the 1.82 m standing capsule, so it is hard cover and not a hurdle. */
+const GARAGE_SHELF_H = 1.9;
+/** The parked car: nose to the vehicle door, 1.35 m of lane on the house side. */
+const GARAGE_CAR_X = 6.8;
+const GARAGE_CAR_Z = -18.25;
+const GARAGE_CAR_WIDTH = 1.8;
+const GARAGE_CAR_LENGTH = 3.7;
+/** Body only. The cabin above it is presentation, so there is no walk-under gap. */
+const GARAGE_CAR_BODY_H = 1.45;
+
 const GARAGE_SETBACK = 6;
 const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
 const GARAGE_BACK_Z = HOUSE_BACK_Z;                               // -23, flush with the house
@@ -1821,9 +1859,56 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [ledge.centreX, ledge.top - ledge.thickness / 2, HOUSE_FRONT_Z + ledge.projection / 2],
     [ledge.width, ledge.thickness, ledge.projection], m.trim);
 
-  // One waist-high body per ground room, so a room is a fight and not a box.
-  pair(builder, 'house front room counter', [-4.8, LOW_COVER / 2, HOUSE_FRONT_Z - 2.8], [3.2, LOW_COVER, 1.0], m.interior);
-  pair(builder, 'house back room bench', [1.5, LOW_COVER / 2, HOUSE_BACK_Z + 2.4], [3.0, LOW_COVER, 1.0], m.interior);
+  // ---- HF-478: THE GROUND FLOOR IS A KITCHEN AND A LIVING SPACE ------------
+  // BO2 Nuketown 2025's houses are not two empty shells split by a wall: the
+  // street-side room is a kitchen and the yard-side room a living space, and
+  // both carry furniture a player fights over rather than one lonely counter.
+  //
+  // EVERY solid body below is BALLISTIC-RATED EXPLICITLY. They were not: the
+  // classifier in `ballistics.ts` reads the mesh NAME, and a name that misses
+  // every earlier rule falls through to `/(plaster|partition|house|garage|
+  // hut|kiosk|wall|ceiling)/` - which every body in this function matches,
+  // because they are all called `house ...`. So `house upper crate` was rated
+  // `interior-wall` (entryCost 0.42) by accident of its own prefix rather than
+  // by what it is. `counter` and `bench` happened to hit the wood rule first
+  // and were right for the wrong reason. An explicit id is `classification:
+  // 'explicit'` in the surface, which the ballistic-parity ledger can see;
+  // a rule hit is not, and it moves the day someone renames a body.
+  //
+  // Heights: LOW_COVER 0.95 and below. That is not decoration - the ground
+  // sweep in `nuketown2-fidelity.test.ts` ("needs a crouch nowhere on the
+  // ground") counts any cell a crouch clears and a stand does not, so a body
+  // with a walk-under gap between 1.16 m and 1.82 m would manufacture
+  // crouch-only cells inside a house. Solid furniture is either waist-high
+  // (blocks both stances, so the sweep skips it) or it is presentation.
+  pair(builder, 'house front room counter', [-4.8, LOW_COVER / 2, HOUSE_FRONT_Z - 2.8], [3.2, LOW_COVER, 1.0], m.interior,
+    { ballisticMaterial: 'wood' });
+  // The kitchen island: the second body that turns the front room from a
+  // corridor with a counter down one wall into a place with two sides to it.
+  // Its own clearances, all measured against what is already there: 1.30 m to
+  // the counter, 1.05 m to the west wall lining, 0.95 m to the partition, and
+  // its east face stops at x = -3.4 so the internal doorway's 1.8 m run
+  // ([-3.6, -1.8]) and the straight front-door-to-internal-door walk are clear.
+  pair(builder, 'house kitchen island', [-4.4, LOW_COVER / 2, HOUSE_FRONT_Z - 5.0], [2.0, LOW_COVER, 0.8], m.interior,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house back room bench', [1.5, LOW_COVER / 2, HOUSE_BACK_Z + 2.4], [3.0, LOW_COVER, 1.0], m.interior,
+    { ballisticMaterial: 'wood' });
+  // The living-room couch, set off the wall and facing the stair the way a
+  // couch in a room with a stair in it does. It is NOT against the back wall:
+  // the back door's own 1.8 m run is there ([-2.15, -0.35]) and a couch across
+  // it is the mistake HF-432 item 4 already had to undo in the garage.
+  // Lower than the counters at 0.62 m, so it breaks a prone line and a
+  // crouched one without being a second waist-high wall.
+  //
+  // x = -2.0 and not -3.5, and the 1.5 m is a GATE'S number. The first cut put
+  // the couch's authored run at [-4.6, -2.4]; handedness is -1 on this map, so
+  // that is WORLD [2.4, 4.6], and the fidelity gate's garage-link doorway probe
+  // stands at world x = 3.6, 4.35 and 5.1 on z = -18.7. The couch was in the
+  // link doorway of the house it is not even in - which is exactly the failure
+  // mode two frames exist to produce, and exactly why that probe is plan-only.
+  // Its world run is [0.9, 3.1] now, 0.5 m clear of the first probe station.
+  pair(builder, 'house living couch', [-2.0, 0.31, HOUSE_BACK_Z + 4.25], [2.2, 0.62, 0.9], m.interior,
+    { ballisticMaterial: 'wood' });
   // The upper crate lives in the BACK upper room, deliberately clear of the
   // front window seat that both the rare-gun site and the fidelity gate stand
   // on.
@@ -1835,7 +1920,28 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // x [-5.2, -3.8] and the stairwell now opens over x [-6.75, -4.80], so 0.4 m
   // of it hung over the void.
   pair(builder, 'house upper crate', [-0.5, UPPER_Y0 + LOW_COVER / 2, zMid - 3.0],
-    [1.4, LOW_COVER, 1.4], m.interior);
+    [1.4, LOW_COVER, 1.4], m.interior, { ballisticMaterial: 'wood' });
+  // ---- HF-478: THE TWO UPPER ROOMS ARE FURNISHED ROOMS ---------------------
+  // The reference's upper storey is two bedrooms either side of the landing,
+  // and the crate above was the only thing in either of them. One body per
+  // room, each placed against a measured constraint rather than by eye.
+  //
+  // The BACK room's bed clears the two openings in its own back wall: the
+  // balcony doorway runs x [-3.9, -2.1] and the upper back window x
+  // [0.75, 3.25], and the window is a JUMP-OUT EXIT the fidelity gate probes,
+  // so the bed stops at x = 0.4 - 0.35 m short of the window's own run - and
+  // starts at x = -1.4, 0.7 m clear of the balcony door. At 0.55 m it is also
+  // under the window's 0.9 m sill by enough that it cannot become an
+  // accidental step that changes what that probe measures.
+  pair(builder, 'house upper bed', [-0.5, UPPER_Y0 + 0.275, HOUSE_BACK_Z + 1.6],
+    [1.8, 0.55, 1.8], m.interior, { ballisticMaterial: 'wood' });
+  // The FRONT room is the power position - Activision's own guide calls these
+  // windows the biggest on the map - so its body is in the FAR EAST corner,
+  // 3.0 m from the window's east jamb and out of the rare gun's own stand.
+  // A dresser is cover for someone who has taken the room, never a parapet
+  // that hands the window seat more protection than the reference gives it.
+  pair(builder, 'house upper dresser', [3.2, UPPER_Y0 + LOW_COVER / 2, HOUSE_FRONT_Z - 2.3],
+    [1.2, LOW_COVER, 0.6], m.interior, { ballisticMaterial: 'wood' });
   // --- HF-440 Cycle 2: Interior lighting look & domestic dressing -----------
   // Ceiling light practical fixtures (emissive lenses driven above bloom threshold):
   // Ground front room:
@@ -2053,7 +2159,18 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   // where it lay ACROSS the rear door's own threshold, so a standing capsule
   // walking in from the yard hit it inside the doorway - onto the outboard
   // wall, where a workbench belongs.
-  pair(builder, 'garage bench', [8.1, LOW_COVER / 2, GARAGE_BACK_Z + 3.5], [1.4, LOW_COVER, 4.0], m.interior);
+  //
+  // HF-478 SHORTENS it from 4.0 m to 2.4 m and slides it to the back of the
+  // outboard wall. HF-432's invariant is the one that matters and it is
+  // UNCHANGED and now asserted: the bench's x run [7.4, 8.8] stays entirely
+  // clear of the rear doorway's own run [5.3, 7.1], so nothing stands in that
+  // threshold. What the 1.6 m buys is the bay the reference's garage actually
+  // has - a car in it - and the run of outboard wall the shelving needs.
+  // Every dependent body (worktop, lower shelf, pegboard, vice) is DERIVED
+  // from these three numbers rather than repeating the literals, which is why
+  // this move is one edit and not five.
+  pair(builder, 'garage bench', [GARAGE_BENCH_X, LOW_COVER / 2, GARAGE_BENCH_Z],
+    [GARAGE_BENCH_WIDTH, LOW_COVER, GARAGE_BENCH_DEPTH], m.interior, { ballisticMaterial: 'wood' });
   // --- HF-440 Cycle 2: Garage lighting, rafters, door hardware & workshop ---
   // Overhead fluorescent dual-tube light fixture:
   pair(builder, 'garage tube light housing', [cx, H - 0.12, zMid], [0.35, 0.08, 2.4], m.trim,
@@ -2077,15 +2194,97 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
       { solid: false, shots: false, cast: false });
   }
 
-  // Workbench enhancements (wood worktop, lower tool shelf, pegboard, vice):
-  pair(builder, 'garage bench top', [8.1, LOW_COVER + 0.02, GARAGE_BACK_Z + 3.5], [1.46, 0.05, 4.06], m.interiorFloor,
+  // Workbench enhancements (wood worktop, lower tool shelf, pegboard, vice).
+  // HF-478: all four DERIVED from the bench constants, so the bench is one
+  // number to move and not five.
+  pair(builder, 'garage bench top', [GARAGE_BENCH_X, LOW_COVER + 0.02, GARAGE_BENCH_Z],
+    [GARAGE_BENCH_WIDTH + 0.06, 0.05, GARAGE_BENCH_DEPTH + 0.06], m.interiorFloor,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'garage bench lower shelf', [8.1, 0.20, GARAGE_BACK_Z + 3.5], [1.20, 0.04, 3.80], m.trim,
+  pair(builder, 'garage bench lower shelf', [GARAGE_BENCH_X, 0.20, GARAGE_BENCH_Z],
+    [GARAGE_BENCH_WIDTH - 0.20, 0.04, GARAGE_BENCH_DEPTH - 0.20], m.trim,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'garage tool pegboard', [GARAGE_X1 - WALL_T / 2 - 0.02, 1.95, GARAGE_BACK_Z + 3.5], [0.04, 1.20, 3.80], m.trim,
+  pair(builder, 'garage tool pegboard', [GARAGE_X1 - WALL_T / 2 - 0.02, 1.95, GARAGE_BENCH_Z],
+    [0.04, 1.20, GARAGE_BENCH_DEPTH - 0.20], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'garage bench vice', [7.6, LOW_COVER + 0.12, GARAGE_BACK_Z + 1.8], [0.22, 0.18, 0.22], m.trim,
+  pair(builder, 'garage bench vice', [GARAGE_BENCH_X - 0.5, LOW_COVER + 0.12, GARAGE_BENCH_Z + GARAGE_BENCH_DEPTH / 2 - 0.4],
+    [0.22, 0.18, 0.22], m.trim,
     { solid: false, shots: false, cast: true });
+
+  // ---- HF-478: THE SHELVING ------------------------------------------------
+  // Steel racking on the outboard wall, in the 3.0 m of it the shortened bench
+  // freed. SOLID and 1.9 m tall, which is over the 1.82 m standing capsule -
+  // so it is hard cover a player uses, and the ground crouch sweep skips it
+  // because it blocks a crouch and a stand alike rather than inviting a duck.
+  // Rated `thin-metal` EXPLICITLY: left to the name classifier it would fall
+  // through every rule to `/garage/` and be rated `interior-wall`, i.e. a
+  // plasterboard partition, which is not what a loaded steel rack stops.
+  pair(builder, 'garage shelving rack', [GARAGE_SHELF_X, GARAGE_SHELF_H / 2, GARAGE_SHELF_Z],
+    [GARAGE_SHELF_WIDTH, GARAGE_SHELF_H, GARAGE_SHELF_DEPTH], m.interior,
+    { ballisticMaterial: 'thin-metal' });
+  // Four shelf boards, each at its OWN height. Not decoration for its own
+  // sake: the coplanar instrument compares the top faces of overlapping
+  // boxes, so boards sharing a top over one footprint would be four findings.
+  // 1.70 and not 1.82 for the top board: at 1.82 its own top face landed
+  // 0.02 m over the shortened uprights' - inside the instrument's 0.03 m
+  // window - and traded four findings for four more.
+  for (const [index, y] of [0.38, 0.86, 1.34, 1.70].entries()) {
+    pair(builder, `garage shelf board ${index}`,
+      [GARAGE_SHELF_X - 0.02, y, GARAGE_SHELF_Z], [GARAGE_SHELF_WIDTH + 0.04, 0.04, GARAGE_SHELF_DEPTH + 0.04], m.trim,
+      { solid: false, shots: false, cast: true });
+  }
+  for (const [index, z] of [GARAGE_SHELF_Z - GARAGE_SHELF_DEPTH / 2 + 0.06,
+    GARAGE_SHELF_Z + GARAGE_SHELF_DEPTH / 2 - 0.06].entries()) {
+    pair(builder, `garage shelf upright ${index}`,
+      // 0.08 m shorter than the rack, for the same reason the boards each have
+      // their own height: authored full height the uprights' top faces were
+      // EXACTLY the rack's, different material, no offset - four
+      // HOUSE-INTERIOR findings the instrument reported on the first build.
+      [GARAGE_SHELF_X - GARAGE_SHELF_WIDTH / 2 + 0.05, (GARAGE_SHELF_H - 0.08) / 2, z],
+      [0.06, GARAGE_SHELF_H - 0.08, 0.06], m.chrome,
+      { solid: false, shots: false, cast: true });
+  }
+
+  // ---- HF-478: THE CAR IN THE BAY ------------------------------------------
+  // A garage with a vehicle door and no vehicle reads as a room that happens
+  // to have a wide opening. This is the body that makes the bay a bay.
+  //
+  // ONE SOLID BODY to 1.45 m, with the cabin, glass and wheels above and
+  // beside it as presentation. Authoring the cabin as a second solid over an
+  // open sill is the exact shape the ground crouch sweep in
+  // `nuketown2-fidelity.test.ts` exists to catch - a gap a crouch clears and a
+  // stand does not - and it would put a crouch-only cell inside both garages.
+  //
+  // Rated `vehicle` EXPLICITLY, like the street cars: `car` is not a token in
+  // any classifier rule, so the name would fall through to `/garage/` and this
+  // would stop bullets like a plasterboard wall.
+  //
+  // Paint comes from the shared `carA` node graph, whose colour is a UNIFORM
+  // (HF-477 made it one after per-colour graphs compiled a pipeline each and
+  // pushed the arena's first submission past the 12,000 ms deploy fence), so
+  // the two garage cars add no pipeline and no in-combat compile.
+  const carY = GROUND_FLOOR_TOP;
+  pair(builder, 'garage car body', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H / 2, GARAGE_CAR_Z],
+    [GARAGE_CAR_WIDTH, GARAGE_CAR_BODY_H, GARAGE_CAR_LENGTH], m.carA,
+    { ballisticMaterial: 'vehicle' });
+  pair(builder, 'garage car cabin', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H + 0.12, GARAGE_CAR_Z + 0.2],
+    [GARAGE_CAR_WIDTH - 0.24, 0.24, GARAGE_CAR_LENGTH - 1.9], m.carA,
+    { solid: false, shots: false, cast: true });
+  // The glass is the CABIN's window band, not a strip laid on the body's own
+  // top face. Authored the second way its top sat 0.01 m over the body's, with
+  // 3.1 m2 of overlap - two different materials one depth quantum apart, which
+  // is the exact HOUSE-INTERIOR z-fight HF-448 was raised for, and the coplanar
+  // instrument reported it on both cars. It now sits inside the cabin, 0.20 m
+  // over the body top and 0.04 m under the cabin roof.
+  pair(builder, 'garage car glass', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H + 0.09, GARAGE_CAR_Z + 0.2],
+    [GARAGE_CAR_WIDTH - 0.18, 0.22, GARAGE_CAR_LENGTH - 1.8], m.carGlass,
+    { solid: false, shots: false, cast: false });
+  for (const [index, offset] of ([[-1, -1], [-1, 1], [1, -1], [1, 1]] as const).entries()) {
+    pair(builder, `garage car wheel ${index}`,
+      [GARAGE_CAR_X + offset[0] * (GARAGE_CAR_WIDTH / 2 - 0.06),
+        carY + 0.32, GARAGE_CAR_Z + offset[1] * (GARAGE_CAR_LENGTH / 2 - 0.75)],
+      [0.16, 0.64, 0.64], m.rubber,
+      { solid: false, shots: false, cast: true });
+  }
 }
 
 /**
