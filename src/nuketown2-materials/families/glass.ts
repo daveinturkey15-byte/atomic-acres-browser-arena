@@ -22,12 +22,12 @@
  * THROUGH less, not just a lighter grey, and a dirt term that only touches
  * colour reads as a paint stain on the pane.
  */
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
-const { clamp, float, fract, max, mix, smoothstep } =
+const { clamp, float, fract, max, mix, smoothstep, uniform } =
   TSL as unknown as Record<string, any>;
 
 export function glassSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
@@ -35,10 +35,10 @@ export function glassSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec
     name,
     family: 'glass',
     baseSrgb,
-    // Deliberate readability/performance exception to the skill's transmission
-    // 1.0 / IOR 1.5 clear-glass start: these panes use alpha/opaque glazing so
-    // coachGlass stays out of the transparent queue. Do not silently restore
-    // transmission here; the consumer's queue contract is part of the gate.
+    // HF-486 restores the skill's transmission / IOR 1.5 clear-glass start as
+    // thin-walled physical transmission (see createGlassMaterial). The panes
+    // stay opaque, so the glazing still keeps out of the transparent queue
+    // and the consumer's queue contract is unchanged.
     roughness: 0.045,
     // DIELECTRIC. Not negotiable, and the family gate asserts it.
     metalness: 0.0,
@@ -56,25 +56,50 @@ export interface GlassOptions {
    * Defaults to `opacity < 1`. A fully opaque glazing band stays OUT of the
    * transparent queue: putting it in would change render order and depth
    * behaviour for a surface whose only real defect was being metallic.
+   * Physical transmission (below) carries the see-through instead, so both
+   * shipped roles stay opaque.
    */
   readonly transparent?: boolean;
+  /**
+   * HF-486 thin-walled transmission amount, 0..1. A scalar property uploads
+   * as a uniform: the generated WGSL is identical for every value, so roles
+   * that differ only here keep sharing one pipeline.
+   */
+  readonly transmission?: number;
+  /** Thin-walled thickness in metres. Soda-lime panes read at 0.02-0.08. */
+  readonly thickness?: number;
+  /** Index of refraction. Soda-lime glass is 1.5. */
+  readonly ior?: number;
+  /**
+   * Per-role roughness trim, added into the shared roughness graph as a
+   * uniform node. Same graph shape for every role, per-role value.
+   */
+  readonly roughnessTrim?: number;
 }
 
 export function createGlassMaterial(
   name: string,
   baseSrgb: number,
   options: GlassOptions = {},
-): MeshStandardNodeMaterial {
+): MeshPhysicalNodeMaterial {
   const spec = glassSpec(name, baseSrgb);
   const opacity = options.opacity ?? 0.42;
   const transparent = options.transparent ?? opacity < 1;
-  const mat = new MeshStandardNodeMaterial({
+  const mat = new MeshPhysicalNodeMaterial({
     roughness: spec.roughness,
     metalness: spec.metalness,
     transparent,
     opacity,
+    transmission: options.transmission ?? 0.5,
+    thickness: options.thickness ?? 0.05,
+    ior: options.ior ?? 1.5,
   });
   mat.name = name;
+  // WebGL2 compat guard, same as every other family: WebGLRenderer queries
+  // shaderIDs[material.type] during WebGLProgram construction and a node
+  // material's own type string is unmapped. WebGPURenderer keeps evaluating
+  // the TSL nodes via isNodeMaterial. Both glazing roles carry this same
+  // string, so they keep sharing one graph key.
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
   if (options.polygonOffset !== undefined) {
@@ -101,7 +126,10 @@ export function createGlassMaterial(
 
   const body = uniformSwatch(baseSrgb).mul(wear.albedoMul);
   mat.colorNode = mix(body, body.mul(float(1.55)), grime.mul(float(0.35)));
-  mat.roughnessNode = clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35));
+  // The trim is a uniform node: same graph shape for every role, per-role
+  // value, no new pipeline.
+  const roughnessTrim = uniform(options.roughnessTrim ?? 0);
+  mat.roughnessNode = clamp(wear.roughness.add(grime.mul(float(0.13))).add(roughnessTrim), float(0.03), float(0.35));
   // Dirt makes glass less transparent. This is the term that stops the grime
   // reading as paint. An opaque band has no opacity to modulate, and writing
   // one would drag it into the transparent queue by the back door.

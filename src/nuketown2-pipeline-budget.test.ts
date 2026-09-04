@@ -266,14 +266,22 @@ describe('HF-477 nuketown2 WebGPU pipeline budget — the arena', () => {
     // shader, two uniforms. This pair alone was two cold compiles.
     expect(key('sidingA'), 'sidingA and sidingB are one siding shader').toBe(key('sidingB'));
 
-    // THE UNPANELLED PAINTED METAL. Roof glazing, signage, both chirality
-    // cooker banks and the coach waistline are the same enamelled steel in
-    // five colours; roughness, metalness and polygonOffset are CPU-side
-    // material properties and cost no shader. Five compiles collapse to one.
-    const unpanelled = ['roofGlazing', 'sign', 'applianceRed', 'applianceBlue', 'busTrim'];
+    // THE UNPANELLED PAINTED METAL. Signage, both chirality cooker banks and
+    // the coach waistline are the same enamelled steel in four colours;
+    // roughness, metalness and polygonOffset are CPU-side material properties
+    // and cost no shader. Four compiles collapse to one. (HF-486 moved the
+    // roof glazing out of this family and into the glass family below.)
+    const unpanelled = ['sign', 'applianceRed', 'applianceBlue', 'busTrim'];
     for (const role of unpanelled) {
-      expect(key(role), `${role} shares the unpanelled painted-metal shader`).toBe(key('roofGlazing'));
+      expect(key(role), `${role} shares the unpanelled painted-metal shader`).toBe(key('sign'));
     }
+
+    // THE TRANSMISSION GLAZING. HF-486: the roof glazing and the coach band
+    // are one thin-walled physical-transmission graph. Tint rides the shared
+    // albedo uniform, the per-role roughness trim rides a uniform node, and
+    // transmission/thickness/ior are scalar properties — so the pale roof
+    // pane and the dark coach band compile once, not twice.
+    expect(key('roofGlazing'), 'roofGlazing and coachGlass are one glazing shader').toBe(key('coachGlass'));
 
     // The driveway apron and its coplanar decal are the same pour.
     expect(key('drive'), 'drive and driveDecal are one apron shader').toBe(key('driveDecal'));
@@ -294,7 +302,8 @@ describe('HF-477 nuketown2 WebGPU pipeline budget — the arena', () => {
     const key = (role: string): string => keys.get(role)!;
 
     const mustDiffer: ReadonlyArray<readonly [string, string, string]> = [
-      ['garageDoor', 'roofGlazing', 'painted metal: panelled vs plain'],
+      ['garageDoor', 'roofGlazing', 'painted metal panelled vs glass'],
+      ['roofGlazing', 'sign', 'glass vs painted metal are different families'],
       ['drive', 'kerb', 'concrete: apron vs kerb'],
       ['drive', 'block', 'concrete: apron vs blockwork'],
       ['kerb', 'block', 'concrete: kerb vs blockwork'],

@@ -32,7 +32,7 @@
  * by the owner via x.com/prasenx/status/2095537643182563778; re-implemented
  * from first principles.
  */
-import type { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { createSidingMaterial } from './families/siding';
 import { createRoofMaterial } from './families/roof';
@@ -103,8 +103,8 @@ export interface Nuketown2MaterialRegistry {
   readonly fence: MeshStandardNodeMaterial;
   /** Painted panel signage. */
   readonly sign: MeshStandardNodeMaterial;
-  /** HF-477: the white house's pale blue-grey roof glazing. */
-  readonly roofGlazing: MeshStandardNodeMaterial;
+  /** HF-477 hex, HF-486 glass: the white house's pale blue-grey roof glazing. */
+  readonly roofGlazing: MeshPhysicalNodeMaterial;
   /** HF-477: cooker tops on the ORANGE house's front lawn. */
   readonly applianceRed: MeshStandardNodeMaterial;
   /** HF-477: cooker tops on the WHITE house's front lawn. */
@@ -114,7 +114,7 @@ export interface Nuketown2MaterialRegistry {
   /** Coach body trim band. Decal tier -1. */
   readonly busTrim: MeshStandardNodeMaterial;
   /** Coach glazing band — a DIELECTRIC, which is what it was not. Decal tier -1. */
-  readonly coachGlass: MeshStandardNodeMaterial;
+  readonly coachGlass: MeshPhysicalNodeMaterial;
 }
 
 /**
@@ -202,15 +202,19 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper'),
     sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream'),
     roof: createRoofMaterial(),
-    // HF-477: the white house's PALE BLUE-GREY ROOF GLAZING, the aerial's
+    // HF-486: the white house's PALE BLUE-GREY ROOF GLAZING, the aerial's
     // single strongest identifier for that house (measured #aebdc0/#b6c6c9 on
     // `nt2025-aerial-boii.jpg`). Authored 0xaebdc1 - within 1/255 of the
     // measurement and already this map's own `chrome` albedo, so no new value
-    // is invented. Smooth and unpanelled, because it is glazing rather than a
-    // shingled deck.
-    roofGlazing: createPaintedMetalMaterial('nuketown2-roof-glazing', 0xaebdc1, {
-      roughness: 0.22,
-      metalness: 0.10,
+    // is invented. HF-477 shipped it as unpanelled painted metal; HF-486
+    // re-answers it with the glass family — thin-walled physical transmission
+    // at IOR 1.5, opaque so it stays out of the transparent queue and shares
+    // one graph (and one pipeline) with the coach glazing band below.
+    roofGlazing: createGlassMaterial('nuketown2-roof-glazing', 0xaebdc1, {
+      opacity: 1,
+      transmission: 0.6,
+      thickness: 0.05,
+      roughnessTrim: 0.05,
     }),
 
     // A sectional door is PAINTED STEEL, not chrome. It was shipping at
@@ -256,10 +260,14 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
       metalness: 0.25,
     }),
     // Was metalness 0.5 — a coloured metal band, which is exactly the reading
-    // "looks like basic geometry" describes. Glass is a dielectric.
+    // "looks like basic geometry" describes. Glass is a dielectric. HF-486
+    // gives it the same thin-walled transmission as the roof glazing; the
+    // darker band transmits less, and the tint rides the shared uniform.
     coachGlass: createGlassMaterial('nuketown2-coach-glass-band', 0x2b3d47, {
       opacity: 1,
       polygonOffset: -1,
+      transmission: 0.45,
+      thickness: 0.05,
     }),
   });
 }

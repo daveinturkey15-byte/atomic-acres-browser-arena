@@ -242,11 +242,21 @@ describe('nuketown2 material registry', () => {
     expect(registry.sidingB.color.getHex()).toBe(0xeae3cf);
   });
 
-  it('keeps the coach glazing band a dielectric', () => {
-    // It shipped at metalness 0.5, which is a coloured metal band, not glass.
+  it('keeps both glazing bands dielectrics with thin-walled transmission', () => {
+    // The coach band shipped at metalness 0.5, which is a coloured metal
+    // band, not glass; the roof glazing shipped as painted metal. HF-486
+    // answers both with the glass family.
     const registry = createNuketown2MaterialRegistry();
-    expect(registry.coachGlass.metalness).toBe(0);
-    // Opaque, so it stays out of the transparent queue it was never in.
-    expect(registry.coachGlass.transparent).toBe(false);
+    for (const role of ['roofGlazing', 'coachGlass'] as const) {
+      expect(registry[role].metalness, `${role} is a dielectric`).toBe(0);
+      // Opaque, so both stay out of the transparent queue: transmission
+      // carries the see-through.
+      expect(registry[role].transparent, `${role} stays opaque`).toBe(false);
+      expect(registry[role].transmission, `${role} transmits`).toBeGreaterThan(0);
+      expect(registry[role].thickness, `${role} is thin-walled`).toBeLessThanOrEqual(0.1);
+      expect(registry[role].ior, `${role} IOR is soda-lime`).toBe(1.5);
+    }
+    // The pale roof pane transmits more than the dark coach band.
+    expect(registry.roofGlazing.transmission).toBeGreaterThan(registry.coachGlass.transmission);
   });
 });
