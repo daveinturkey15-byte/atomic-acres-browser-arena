@@ -1,3 +1,8 @@
+// Boots atomic-acres on the WebGPU route in Chrome, deploys a solo match, and captures the HF-383 declutter street-review frames.
+// Usage: node scripts/qa/capture-hf383-declutter.mjs
+// Env: BASE_URL (default: http://127.0.0.1:41977)
+// Writes: artifacts/hf383-frames/ (street-west.png, street-east.png, canyon-flank.png, midfield-cross.png)
+// Exit codes: 0 on success; non-zero on failure (no explicit process.exit calls)
 // HF-383 visual review: boot atomic-acres on the real WebGPU route in
 // installed Chrome (same launch contract as verify-arena-boot-cdp.mjs), deploy
 // into a solo match, teleport to street-level vantages and capture frames
