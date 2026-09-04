@@ -108,6 +108,15 @@ describe('hosted bot skirmish parity integration', () => {
     expect(main).toContain('updateHostedBotReplicaPresentations(frameDt, now)');
   });
 
+  it('keeps guest hosted-bot admission off the authoritative spawn selector', () => {
+    const selector = functionBody('selectSafeBotSpawn', 'neonBotHazeTexture');
+    const admission = functionBody('acceptHostedBotState', 'updateHostedBotReplicaPresentations');
+    expect(selector).toContain("if (network.role === 'client') throw new Error('Bot spawn selection is host-only');");
+    expect(admission).toContain('spawnBot(index, true, false, new THREE.Vector3(snapshot.x, snapshot.y, snapshot.z));');
+    expect(main).toContain('function spawnBot(index: number, hosted = false, dormantPresentation = false, initialPosition?: THREE.Vector3)');
+    expect(main).toContain('const spawn = initialPosition ?? selectSafeBotSpawn(botTeam, id);');
+  });
+
   it('keeps hosted-bot snapshots flowing while the host player respawns', () => {
     const start = main.indexOf('function scheduleStateBroadcast(): void');
     const end = main.indexOf('\nscheduleStateBroadcast();', start);

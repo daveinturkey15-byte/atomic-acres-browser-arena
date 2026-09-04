@@ -19951,6 +19951,7 @@ function castShot(
 }
 
 function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
+  if (network.role === 'client') throw new Error('Bot spawn selection is host-only');
   const spawnMode = activeSpawnMode();
   const spawnNow = performance.now();
   const otherPlayers = [
@@ -20107,7 +20108,7 @@ function equipNextBotArsenal(bot: BotPlayer): void {
   bot.grenade = grenade;
 }
 
-function spawnBot(index: number, hosted = false, dormantPresentation = false): void {
+function spawnBot(index: number, hosted = false, dormantPresentation = false, initialPosition?: THREE.Vector3): void {
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
   const id = hosted ? `host-bot-${index}` : `bot-${index}`;
@@ -20152,7 +20153,7 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
     node.userData.playerId = id;
     node.userData.targetRoot = root;
   });
-  const spawn = selectSafeBotSpawn(botTeam, id);
+  const spawn = initialPosition ?? selectSafeBotSpawn(botTeam, id);
   const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
   root.position.copy(position);
   scene.add(root);
@@ -20381,7 +20382,7 @@ function acceptHostedBotState(message: BotStateMessage): void {
     if (!bot) {
       const index = Number(snapshot.id.slice('host-bot-'.length));
       if (!Number.isSafeInteger(index) || index < 0 || index > 3) continue;
-      spawnBot(index, true);
+      spawnBot(index, true, false, new THREE.Vector3(snapshot.x, snapshot.y, snapshot.z));
       bot = bots.get(snapshot.id);
     }
     if (!bot || snapshot.seq <= Number(bot.root.userData.networkSeq ?? -1)) continue;
