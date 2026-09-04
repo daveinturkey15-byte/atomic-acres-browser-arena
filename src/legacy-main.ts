@@ -940,11 +940,7 @@ import {
   type InteractiveWorldSnapshotMessage,
   type ShedInteractionIntentMessage,
 } from './interactive-world-protocol';
-import {
-  THIN_METAL_PERFORATION_SCHEMA_VERSION,
-  ThinMetalPerforationAuthority,
-  type ThinMetalPerforationStateMessage,
-} from './thin-metal-perforation';
+import { broadcastThinMetalPerforationState, buildWorldApertureQuery, commitThinMetalPerforationRuntime, createAndAttachThinMetalPerforationRuntime, disposeThinMetalPerforationRuntime, handleThinMetalPerforationMessage, ownsThinMetalPanel, resetThinMetalPerforationRuntime, rollbackThinMetalPerforationRuntime, routeInteractiveWorldBallisticImpact, type ThinMetalPerforationRuntime } from './thin-metal-perforation-runtime';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorStanceSample, riggedOperatorTelemetry } from './operator-model';
@@ -3653,11 +3649,7 @@ let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
 let interactiveWorldTick = 0;
 let lastInteractiveWorldBroadcastRevision = -1;
-// HF-467: the plain thin-metal panel perforation authority, created beside the
-// interactive-world runtime and replicated through its own host-authoritative
-// state message (mirrors the shed's snapshot path end to end).
-let thinMetalPerforationAuthority: ThinMetalPerforationAuthority | null = null;
-let lastThinMetalPerforationBroadcastRevision = -1;
+let thinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
 let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
@@ -3714,29 +3706,6 @@ function createInteractiveWorldRuntime(
   // dynamic root rather than inheriting that procedural visibility toggle.
   scene.add(runtime.root);
   return runtime;
-}
-
-/**
- * HF-467: create the plain thin-metal panel authority for an arena that
- * fills the registry (nuketown2), and mount its presentation root at scene
- * level exactly like the interactive-world root, so it survives the
- * procedural-root visibility toggles. Arenas without a registry get null and
- * every thin-metal call site short-circuits - the shed path is untouched.
- */
-function createThinMetalPerforationAuthority(
-  activeArena: ArenaMap,
-  matchEpoch: number,
-  hostAuthority: boolean,
-): ThinMetalPerforationAuthority | null {
-  if (!activeArena.thinMetalPanels || activeArena.thinMetalPanels.length === 0) return null;
-  const authority = new ThinMetalPerforationAuthority(
-    activeArena.id,
-    matchEpoch,
-    activeArena.thinMetalPanels,
-    hostAuthority,
-  );
-  scene.add(authority.root);
-  return authority;
 }
 
 function invalidateActiveWorldCollisionCache(): void {
@@ -4610,19 +4579,7 @@ function traceWeaponPath(
   );
 }
 
-/**
- * HF-467: the ONE canonical aperture query every weapon trace consults - the
- * shed's apertures through the interactive-world runtime, plus the plain
- * thin-metal panels through the sibling authority. Both answers mean the same
- * thing: this exact entry point is inside an open hole, so the ray passes.
- */
-function worldApertureQuery(
-  surface: BallisticSurface,
-  point: Readonly<{ x: number; y: number; z: number }>,
-): boolean {
-  return (interactiveWorldRuntime?.apertureQuery(surface, point) ?? false)
-    || (thinMetalPerforationAuthority?.apertureQuery(surface, point) ?? false);
-}
+const worldApertureQuery = buildWorldApertureQuery(() => interactiveWorldRuntime?.apertureQuery, () => thinMetalPerforationRuntime);
 
 // Owner 2026-08-29 wall/prone clipping: the camera resolve probes the SAME
 // canonical shot-surface set the eye-clearance sweep measures. The felt
@@ -4702,8 +4659,6 @@ function applyInteractiveWorldBallisticTrace(
   if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
   const spec = WEAPONS[weapon];
   const unitDirection = direction.clone().normalize();
-  // HF-467: perforation and damage now cost the trace's REMAINING energy at
-  // each surface (`impact.energyAtEntryQ`), not a distance-blind muzzle constant.
   const damageQ = Math.max(1, Math.round(applyPenetrationDamage(spec.damage, trace.damageMultiplier)));
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
@@ -4712,7 +4667,7 @@ function applyInteractiveWorldBallisticTrace(
       && !impact.surface.majorDebris
       && !impact.surface.houseFragment
       && !impact.surface.houseMajorDebris
-      && !thinMetalPerforationAuthority?.ownsSurface(impact.surface)) continue;
+      && !ownsThinMetalPanel(thinMetalPerforationRuntime, impact.surface)) continue;
     const penetrationEnergyQ = Math.max(0, Math.round(impact.energyAtEntryQ));
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
@@ -4721,30 +4676,7 @@ function applyInteractiveWorldBallisticTrace(
       yQ: Math.round(unitDirection.y * impulseMagnitudeQ),
       zQ: Math.round(unitDirection.z * impulseMagnitudeQ),
     });
-    const result = thinMetalPerforationAuthority?.ownsSurface(impact.surface)
-      ? thinMetalPerforationAuthority.applyPanelImpact({
-        surface: impact.surface,
-        point: { x: point.x, y: point.y, z: point.z },
-        penetrationEnergyQ,
-        penetrated: impact.penetrated,
-      })
-      : impact.surface.houseFragment || impact.surface.houseMajorDebris
-        ? interactiveWorldRuntime.applyHouseBulletImpact({
-          surface: impact.surface,
-          damageQ,
-          penetrationEnergyQ,
-          impulseQ,
-        })
-      : interactiveWorldRuntime.applyBulletImpact({
-        surface: impact.surface,
-        point,
-        tick: interactiveWorldTick,
-        damageQ,
-        penetrationEnergyQ,
-        radiusUQ: apertureRadiusQ,
-        radiusVQ: apertureRadiusQ,
-        impulseQ,
-      });
+    const result = routeInteractiveWorldBallisticImpact(thinMetalPerforationRuntime, interactiveWorldRuntime, impact, point, damageQ, penetrationEnergyQ, apertureRadiusQ, impulseQ, interactiveWorldTick);
     if (!result?.accepted) continue;
     changed = true;
     if (impact.surface.majorDebris && characterPhysics) {
@@ -12575,9 +12507,7 @@ function interactiveWorldLineOfSight(
 }
 
 function broadcastInteractiveWorldState(forceReliable = false): void {
-  // HF-467: the plain thin-metal panels ride the same broadcast cadence, gated
-  // by their own revision so a silent match costs nothing.
-  broadcastThinMetalPerforationState(forceReliable);
+  broadcastThinMetalPerforationState(thinMetalPerforationRuntime, forceReliable, gameStarted, player.id, network, randomNonce);
   if (network.role !== 'host' || !interactiveWorldRuntime || !gameStarted) return;
   const revision = interactiveWorldRuntime.collisions().revision;
   if (!forceReliable && (interactiveWorldTick % 6 !== 0 || revision === lastInteractiveWorldBroadcastRevision)) return;
@@ -12592,22 +12522,6 @@ function broadcastInteractiveWorldState(forceReliable = false): void {
   network.send(message);
   if (forceReliable || interactiveWorldTick % 30 === 0) network.sendStateCommitReliably(message);
   lastInteractiveWorldBroadcastRevision = envelope.revision;
-}
-
-function broadcastThinMetalPerforationState(forceReliable = false): void {
-  if (network.role !== 'host' || !thinMetalPerforationAuthority || !gameStarted) return;
-  const envelope = thinMetalPerforationAuthority.stateEnvelope();
-  if (!forceReliable && envelope.revision === lastThinMetalPerforationBroadcastRevision) return;
-  const message: ThinMetalPerforationStateMessage = {
-    type: 'thin-metal-perforation-state',
-    schemaVersion: THIN_METAL_PERFORATION_SCHEMA_VERSION,
-    by: player.id,
-    envelope,
-    nonce: randomNonce(),
-  };
-  network.send(message);
-  if (forceReliable) network.sendStateCommitReliably(message);
-  lastThinMetalPerforationBroadcastRevision = envelope.revision;
 }
 
 function handleInteractiveWorldMessage(message: GameMessage): boolean {
@@ -12821,23 +12735,6 @@ function replayParkedMatchAdmissionMessages(): void {
 }
 
 
-/**
- * HF-467: guest ingress for the plain thin-metal panel state. Exactly the
- * shed snapshot's admission shape: client role only, host-authored only
- * (`isHostAuthorityMessage` already dropped any guest-minted copy at
- * network ingress), same arena, same match epoch.
- */
-function handleThinMetalPerforationMessage(message: GameMessage): boolean {
-  if (message.type !== 'thin-metal-perforation-state') return false;
-  if (network.role !== 'client'
-    || message.by !== privateLobbySnapshot?.hostId
-    || !thinMetalPerforationAuthority
-    || message.envelope.arenaId !== selectedArena.id
-    || message.envelope.matchEpoch !== interactiveWorldMatchEpoch) return true;
-  thinMetalPerforationAuthority.applyAuthoritativeEnvelope(message.envelope);
-  return true;
-}
-
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   // Lane J: first proof that the host's own match is LIVE. Restricted to the
@@ -12871,7 +12768,7 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (handleInteractiveWorldMessage(message)) return;
-  if (handleThinMetalPerforationMessage(message)) return;
+  if (handleThinMetalPerforationMessage(message, thinMetalPerforationRuntime, network.role, privateLobbySnapshot?.hostId, selectedArena.id, interactiveWorldMatchEpoch)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
   if (handleTaserAuthorityMessage(message)) return;
@@ -17558,13 +17455,7 @@ async function startGame(
   lastInteractiveWorldBroadcastRevision = -1;
   if (interactiveWorldRuntime) {
     const priorEpoch = interactiveWorldRuntime.telemetry().matchEpoch;
-    // HF-467: the plain thin-metal authority shares the runtime's epoch and
-    // role cadence - it is constructed in the same transition, so its prior
-    // epoch equals the runtime's.
-    if (thinMetalPerforationAuthority) {
-      if (interactiveWorldMatchEpoch > priorEpoch) thinMetalPerforationAuthority.reset(interactiveWorldMatchEpoch);
-      thinMetalPerforationAuthority.setHostAuthority(mode !== 'client');
-    }
+    resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, priorEpoch, mode !== 'client');
     if (interactiveWorldMatchEpoch > priorEpoch) interactiveWorldRuntime.reset(interactiveWorldMatchEpoch);
     else if (interactiveWorldMatchEpoch < priorEpoch) {
       throw new Error(`Interactive-world match epoch regressed (${interactiveWorldMatchEpoch} < ${priorEpoch})`);
@@ -30075,12 +29966,12 @@ async function performArenaSelection(
   const previousArena = arena;
   const previousPhysics = characterPhysics;
   const previousInteractiveWorldRuntime = interactiveWorldRuntime;
-  const previousThinMetalPerforationAuthority = thinMetalPerforationAuthority;
+  const previousThinMetalPerforationRuntime = thinMetalPerforationRuntime;
   const hadPreparedArena = gameplayArenaPrepared;
   let nextArena: ArenaMap | null = null;
   let nextPhysics: CharacterPhysics | null = null;
   let nextInteractiveWorldRuntime: InteractiveWorldRuntime | null = null;
-  let nextThinMetalPerforationAuthority: ThinMetalPerforationAuthority | null = null;
+  let nextThinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
   let committed = false;
   const assertAdmission = (): void => {
     if (admissionToken) assertMatchAdmissionCurrent(admissionToken);
@@ -30130,11 +30021,7 @@ async function performArenaSelection(
       true,
     );
     nextInteractiveWorldRuntime.root.visible = false;
-    nextThinMetalPerforationAuthority = createThinMetalPerforationAuthority(
-      nextArena,
-      interactiveWorldMatchEpoch,
-      true,
-    );
+    nextThinMetalPerforationRuntime = createAndAttachThinMetalPerforationRuntime(nextArena, interactiveWorldMatchEpoch, true, scene);
     latestArenaPerformanceBudgetSample = null;
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
@@ -30169,9 +30056,7 @@ async function performArenaSelection(
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
-    thinMetalPerforationAuthority = nextThinMetalPerforationAuthority;
-    lastThinMetalPerforationBroadcastRevision = -1;
-    previousThinMetalPerforationAuthority?.root.removeFromParent();
+    thinMetalPerforationRuntime = commitThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime);
     syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
@@ -30397,7 +30282,7 @@ async function performArenaSelection(
     setBootstrapStage('gameplay-assets-ready');
     document.documentElement.dataset.gameplayArena = selectedArena.id;
     previousInteractiveWorldRuntime?.dispose();
-    previousThinMetalPerforationAuthority?.dispose();
+    disposeThinMetalPerforationRuntime(previousThinMetalPerforationRuntime);
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
@@ -30415,7 +30300,7 @@ async function performArenaSelection(
     lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
-    thinMetalPerforationAuthority = previousThinMetalPerforationAuthority;
+    thinMetalPerforationRuntime = rollbackThinMetalPerforationRuntime(previousThinMetalPerforationRuntime);
     gameplayArenaPrepared = hadPreparedArena;
     document.documentElement.dataset.gameplayArena = hadPreparedArena
       ? previousArena.id
