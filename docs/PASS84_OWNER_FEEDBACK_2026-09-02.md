@@ -2266,3 +2266,4 @@ Take (SHIP-WITH-FIXES, at the **verified** heads, not the builder heads):
 Do NOT take:
 
 - `mp-weapon-pickup` @ `f77994aa` — DO-NOT-SHIP. Its only end-to-end evidence does not reproduce, and it introduces a "right gun withheld" regression in the lane whose whole subject is being unable to pick up guns. If it is later cleared, merge `mp-bugs-hf498` first and resolve every protocol-version conflict to **20**.
+- 23:22 **Perf lane 5 - HUD style recalc** (Luna, perf-hitl5 @ 7a888d6d): the five @property HUD variables no longer inherit and are written only on their target elements; per-frame HUD-write cost at the spawn pose 5.90 -> 1.51 ms, street 6.83 -> 4.31 ms; in-combat pipeline creations 0 on every rung; a browser contract test pins the target set. HITL 6 takes it.
