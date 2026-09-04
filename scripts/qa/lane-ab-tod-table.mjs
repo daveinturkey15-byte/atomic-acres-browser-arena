@@ -1,3 +1,8 @@
+// Prints, for every arena in ARENA_IDS, a markdown table of resolved lighting states (hour, sun, shadow floor, exposure, tints) for authored/early/midday/late lighting choices to stdout.
+// Usage: npx tsx scripts/qa/lane-ab-tod-table.mjs
+// Flags/env: none (script reads no process.argv entries, no process.env variables, no --flags)
+// Writes: stdout only (markdown table); no files or directories
+// Exit codes: 0 on success (no process.exit calls); non-zero only via uncaught exception
 import { ARENA_DAYLIGHT_PROFILES, resolveLightingConditions, resolveLightingHour } from '../../src/rendering/lighting-conditions.ts';
 import { ARENA_IDS } from '../../src/arena-identity.ts';
 const LABEL = { 'atomic-acres':'Nuke Town','skyline-terminal':'Terminal','rustworks-1v1':'RustRig','gun-range':'Gun Range',farcrysis:'Farcrysis','high-seas':'High Seas',test1:'Firing Range',test2:'Raid',map3:'Map 3',nuketown2:'Nuke Town Rebuild',raid2:'Raid Rebuild' };
