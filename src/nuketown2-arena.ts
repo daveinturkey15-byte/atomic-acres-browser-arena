@@ -105,7 +105,6 @@ import {
   batchPresentationOnlyBoxes,
   box,
   spawnRecord,
-  standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
 import {
@@ -138,12 +137,14 @@ import {
   nuketown2HandedSpan,
   nuketown2HandedX,
 } from './nuketown2-layout';
-import {
-  createNuketown2AsphaltMaterial,
-  createNuketown2DashMaterial,
-  createNuketown2DriveMaterial,
-  createNuketown2KerbMaterial,
-} from './nuketown2-street-materials';
+// PASS 94 materials lane. The arena no longer names a material family: it
+// asks `src/nuketown2-materials` for a ROLE and gets whatever family currently
+// answers it. Everything about how a surface is authored - three-scale wear,
+// the 10% albedo-visible-wear floor, the combat-readability darkening ceiling
+// - lives there, so re-authoring a surface is a change to that directory and
+// nothing else. Base colours and the HF-434 polygonOffset tiers are carried
+// over verbatim inside the registry.
+import { createNuketown2MaterialRegistry } from './nuketown2-materials';
 import {
   createNuketown2CeilingLightMaterial,
   createNuketown2DrywallMaterial,
@@ -153,11 +154,6 @@ import {
   createNuketown2PoolWaterMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
-import {
-  createNuketown2FenceMaterial,
-  createNuketown2LapSidingMaterial,
-  createNuketown2RoofMaterial,
-} from './nuketown2-facade-materials';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -1028,20 +1024,14 @@ function nuketown2Materials(): Nuketown2Materials {
   // head, the dashes cross the road). The THREE base materials that also dress
   // SOLID bodies (drive: the porch; trim: the door cases; carGlass: the car
   // cabins) stay clean; the decal-only clones carry the offsets.
-  const withOffset = (material: THREE.MeshStandardMaterial, name: string, factor: number): THREE.MeshStandardMaterial => {
-    material.name = name;
-    material.polygonOffset = true;
-    material.polygonOffsetFactor = factor;
-    material.polygonOffsetUnits = factor;
-    return material;
-  };
-  const lawn = withOffset(standard(0x496438, 1, 0), 'nuketown2-lawn-decal', -2);
-  // HF-440 Cycle 1 Priority 2: procedural TSL carriageway, kerbs, aprons and worn dashes
-  const asphalt = createNuketown2AsphaltMaterial();
-  const driveDecal = createNuketown2DriveMaterial();
-  const trimDecal = createNuketown2DashMaterial();
-  const kerb = createNuketown2KerbMaterial();
-  const coachGlass = withOffset(standard(0x2b3d47, 0.14, 0.5), 'nuketown2-coach-glass-band', -1);
+  //
+  // PASS 94 materials lane: that tier now lives WITH the material, in
+  // `src/nuketown2-materials`, instead of being reapplied here by a local
+  // helper - a role that is a decal is authored as one, so the tier cannot be
+  // dropped by a call site that forgets to wrap it. Every factor and unit
+  // value is carried over unchanged; `scripts/qa/find-coplanar-pairs.ts`
+  // reports the same 0 FINDINGS / 66 FENCED / 26 BENIGN split it did before.
+  const forged = createNuketown2MaterialRegistry();
   const busShell = createNuketown2CoachMaterial();
   const truckCab = createNuketown2TruckCabMaterial();
   const truckBox = createNuketown2TruckBoxMaterial();
@@ -1054,17 +1044,12 @@ function nuketown2Materials(): Nuketown2Materials {
   const taillight = createNuketown2TaillightMaterial();
   // decal: the pane is a collider and a ballistic surface.
   const windowGlass = createNuketown2GlassMaterial();
-  const busTrim = withOffset(standard(0xa8382c, 0.48, 0.25), 'nuketown2-coach-trim', -1);
   const interiorFloor = createNuketown2WoodFloorMaterial();
   const garageFloor = createNuketown2GarageFloorMaterial();
   const interior = createNuketown2DrywallMaterial(0xdbd1ba);
   const garageSiding = createNuketown2GarageWallMaterial();
   const warmLight = createNuketown2CeilingLightMaterial(true);
   const coldLight = createNuketown2CeilingLightMaterial(false);
-  const roof = createNuketown2RoofMaterial();
-  const sidingA = createNuketown2LapSidingMaterial(0x46809f, 'nuketown2-siding-north-blue');
-  const sidingB = createNuketown2LapSidingMaterial(0xf4be36, 'nuketown2-siding-south-yellow');
-  const fence = createNuketown2FenceMaterial();
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
     // colour (0x2f3a2c, nuketown-mountain-backdrop.ts) lifted toward the lawn,
@@ -1076,11 +1061,13 @@ function nuketown2Materials(): Nuketown2Materials {
     // between the shipped backdrop skirt's two authored ground colours - damp
     // forest floor 0x4c5340 and dry scrub 0x5d6047 - which is the ground this
     // slab is standing in for, so the plain and the tree line now read as the
-    // same land.
-    ground: standard(0x515642, 1, 0),
+    // same land. PASS 94: the same 0x515642 key, now carrying dry-scrub straw
+    // patches and metre-scale bare ground instead of one flat value.
+    ground: forged.ground,
     // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
     // this, and that field's blade green (0x5e9e41) was keyed against it.
-    lawn,
+    // PASS 94: mower bands and worn desire lines through to bare earth.
+    lawn: forged.lawn,
     // asphalt-aged's mean is 0x252a2c, and that is the value a TEXTURED road
     // wants: the shipped map's road carries a normal map and an aggregate
     // pattern, so half its pixels catch a highlight and the mean is what is
@@ -1091,53 +1078,53 @@ function nuketown2Materials(): Nuketown2Materials {
     // in the street-centre and into-sun frames, with the kerb line floating on
     // black. Lifted to the value that puts an unlit, unbroken box at the
     // rendered luminance the shipped map's textured road actually reaches.
-    asphalt,
+    asphalt: forged.asphalt,
     // concrete-poured, fresh at the kerb and weathered on the apron - the
     // shipped map's own tint-the-same-texture idiom (`grass` / `grassDark`).
-    kerb,
-    drive: standard(0x8b8879, 0.94, 0.02),           // SOLID users: the porch, the garage floor
-    driveDecal,
+    kerb: forged.kerb,
+    drive: forged.drive,                             // SOLID users: the porch, the garage floor
+    driveDecal: forged.driveDecal,
     garageFloor,
     warmLight,
     coldLight,
     // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
     // with the hue carried to the reference's blue (measured 117.9).
-    sidingA,
-    sidingB,
+    sidingA: forged.sidingA,
+    sidingB: forged.sidingB,
     // The ORANGE wing: siding-coral, unchanged.
     garageSiding,
     // The shipped map's `chrome`, verbatim - it is what dresses BOTH garage
     // doors there. The opening itself stays a hole (it is a route); this is the
     // door leaf parked in its head, which is what you see from the street.
-    garageDoor: standard(0xaebdc1, 0.18, 0.76),
+    garageDoor: forged.garageDoor,
     // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
-    trim: standard(0xf0e4c9, 0.68, 0.03),            // SOLID users: sills, heads, lintels
-    trimDecal,
-    roof,
+    trim: forged.trim,                               // SOLID users: sills, heads, lintels
+    trimDecal: forged.trimDecal,
+    roof: forged.roof,
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
     interior,
     interiorFloor,
     // wood-deck: the plank fence, the same timber the shipped map decks with.
-    fence,
-    block: standard(0x9d9a8c, 0.94, 0.01),
+    fence: forged.fence,
+    block: forged.block,
     busShell,
-    busTrim,
+    busTrim: forged.busTrim,
     truckCab,
     truckBox,
     carA,
     carGlass,
-    coachGlass,
+    coachGlass: forged.coachGlass,
     windowGlass,
     rubber,
     chrome,
     headlight,
     poolWater,
     taillight,
-    sign: standard(0xdbd1ba, 0.78, 0.06),
+    sign: forged.sign,
     // Hedges, the yard crate, the patio table and the alley planter are one
     // material and four of the five uses are garden mass, so it is keyed as
     // clipped hedge against the shipped map's `grassDark` (effective 0x243917).
-    planter: standard(0x415a33, 0.96, 0.01),
+    planter: forged.planter,
   });
 }
 
