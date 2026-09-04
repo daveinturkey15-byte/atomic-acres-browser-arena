@@ -92,18 +92,35 @@ describe('HF-472 TAA resolve', () => {
     expect(pass64).toContain('buildScreenSpacePostGraph');
   });
 
+  it('warms the unattached resolve and ping-pongs history without a per-frame colour copy', () => {
+    const source = readFileSync('src/rendering/taa-resolve.ts', 'utf8');
+    expect(source).toContain('await renderer.compileAsync(QUAD, QUAD.camera, targetScene)');
+    expect(source).toContain('renderer.setMRT(null)');
+    expect(source).toContain('this.historyTextureNode.value = this.historyReadTarget.texture');
+    expect(source).toContain('this.outputTexture.value = this.historyWriteTarget.texture');
+    expect(source).not.toContain('renderer.copyTextureToTexture(this.resolveTarget.texture, this.historyTarget.texture)');
+  });
+
   it('admits velocity on QUALITY, disables principal MSAA only with TAA, and filters AO/GI only with TAA', () => {
     const qualityWithMsaa = resolveGraphicsRuntime({
+      schemaVersion: 1,
+      preset: 'custom',
       ...GRAPHICS_PRESET_VALUES.high,
       antiAliasing: 'msaa-4x',
       taaResolve: true,
     });
     const qualityWithoutTaa = resolveGraphicsRuntime({
+      schemaVersion: 1,
+      preset: 'custom',
       ...GRAPHICS_PRESET_VALUES.high,
       antiAliasing: 'msaa-4x',
       taaResolve: false,
     });
-    const balanced = resolveGraphicsRuntime(GRAPHICS_PRESET_VALUES.balanced);
+    const balanced = resolveGraphicsRuntime({
+      schemaVersion: 1,
+      preset: 'custom',
+      ...GRAPHICS_PRESET_VALUES.balanced,
+    });
     expect(qualityWithMsaa.antialiasSamples).toBe(0);
     expect(qualityWithoutTaa.antialiasSamples).toBe(4);
     expect(screenSpaceMrtRequirement(qualityWithMsaa.screenSpace).velocity).toBe(true);

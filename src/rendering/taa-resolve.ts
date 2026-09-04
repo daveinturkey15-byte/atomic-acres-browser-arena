@@ -23,7 +23,7 @@ import {
   TempNode,
   Vector2,
 } from 'three/webgpu';
-import type { Node, NodeBuilder, NodeFrame, TextureNode } from 'three/webgpu';
+import type { Node, NodeBuilder, NodeFrame, TextureNode, WebGPURenderer } from 'three/webgpu';
 import {
   Fn,
   If,
@@ -83,12 +83,18 @@ export type TaaResolveSources = Readonly<{
   camera: TaaCamera;
 }>;
 
+/** The renderer surface needed by the admission-only resolve precompile. */
+export type TaaPrecompileRenderer = Pick<WebGPURenderer,
+  'getDrawingBufferSize' | 'initRenderTarget' | 'getRenderTarget' | 'getMRT'
+  | 'setMRT' | 'setRenderTarget' | 'compileAsync'>;
+
 export type TaaResolveGraph = Readonly<{
   stage: typeof TAA_RESOLVE_STAGE;
   node: TaaResolveNode;
   strength: { value: number };
   historyTarget: RenderTarget;
   resolveTarget: RenderTarget;
+  precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void>;
   setJitterFrozen(frozen: boolean): void;
   dispose(): void;
 }>;
@@ -154,9 +160,9 @@ export function resolveTaaSample(sample: TaaCpuSample): [number, number, number]
 
 /**
  * The one admission-time NodeMaterial used for the TAA resolve. Two RGBA16F
- * targets are retained: one history target and one resolve target. The latter
- * is copied into the former once per frame, matching the render-pipeline
- * lifetime rather than creating a second material per frame.
+ * targets are retained: one history target and one resolve target. They are
+ * ping-ponged so the resolve writes directly into the next history target;
+ * the old resolve-to-history copy was a full RGBA16F transfer every frame.
  */
 export class TaaResolveNode extends TempNode<'vec4'> {
   readonly isTaaResolveNode = true;
@@ -179,6 +185,10 @@ export class TaaResolveNode extends TempNode<'vec4'> {
   private readonly previousDepthNode = texture(new DepthTexture(1, 1));
   private readonly originalProjection = new Matrix4();
   private readonly outputTexture: ReturnType<typeof passTexture>;
+  private readonly historyTextureNode: TextureNode;
+  private historyReadTarget: RenderTarget;
+  private historyWriteTarget: RenderTarget;
+  private historyNeedsSeed = true;
   private velocityForJitter: Node<'vec4'> | null = null;
   private needsPipelineSync = false;
   private jitterIndex = 0;
@@ -207,7 +217,10 @@ export class TaaResolveNode extends TempNode<'vec4'> {
     this.resolveTarget.texture.name = 'TAA ours.resolve.RGBA16F';
     this.resolveMaterial = new NodeMaterial();
     this.resolveMaterial.name = 'TAA ours.resolve NodeMaterial';
-    this.outputTexture = passTexture(this as unknown as Parameters<typeof passTexture>[0], this.resolveTarget.texture);
+    this.historyReadTarget = this.historyTarget;
+    this.historyWriteTarget = this.resolveTarget;
+    this.historyTextureNode = texture(this.historyReadTarget.texture);
+    this.outputTexture = passTexture(this as unknown as Parameters<typeof passTexture>[0], this.historyWriteTarget.texture);
   }
 
   getTextureNode() {
@@ -256,24 +269,58 @@ export class TaaResolveNode extends TempNode<'vec4'> {
     const rendererState = RendererUtils.resetRendererState(renderer, {} as RendererState);
     const needsRestart = this.historyTarget.width !== width || this.historyTarget.height !== height;
     this.setSize(width, height);
-    if (needsRestart) {
+    if (needsRestart || this.historyNeedsSeed) {
       renderer.initRenderTarget(this.historyTarget);
       renderer.initRenderTarget(this.resolveTarget);
-      renderer.copyTextureToTexture(beautyRenderTarget.texture, this.historyTarget.texture);
+      renderer.copyTextureToTexture(beautyRenderTarget.texture, this.historyReadTarget.texture);
+      this.historyNeedsSeed = false;
     }
-    renderer.setRenderTarget(this.resolveTarget);
+    this.historyTextureNode.value = this.historyReadTarget.texture;
+    this.outputTexture.value = this.historyWriteTarget.texture;
+    const previousRenderTarget = renderer.getRenderTarget();
+    const previousMrt = renderer.getMRT();
+    renderer.setMRT(null);
+    renderer.setRenderTarget(this.historyWriteTarget);
     QUAD.material = this.resolveMaterial;
     QUAD.name = 'TAA ours resolve';
     QUAD.render(renderer);
-    renderer.setRenderTarget(null);
-    renderer.copyTextureToTexture(this.resolveTarget.texture, this.historyTarget.texture);
+    renderer.setRenderTarget(previousRenderTarget);
+    renderer.setMRT(previousMrt);
     renderer.getDrawingBufferSize(SIZE);
     if (this.historyTarget.width === SIZE.width && this.historyTarget.height === SIZE.height && this.historyTarget.depthTexture) {
       renderer.copyTextureToTexture(this.depthNode.value, this.historyTarget.depthTexture);
       this.previousDepthNode.value = this.historyTarget.depthTexture;
     }
+    const completedTarget = this.historyWriteTarget;
+    this.historyWriteTarget = this.historyReadTarget;
+    this.historyReadTarget = completedTarget;
     RendererUtils.restoreRendererState(renderer, rendererState);
     return true;
+  }
+
+  async precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void> {
+    const size = renderer.getDrawingBufferSize(SIZE);
+    this.setSize(size.width, size.height);
+    renderer.initRenderTarget(this.historyTarget);
+    renderer.initRenderTarget(this.resolveTarget);
+    // The first live update still has to seed whichever target is read. The
+    // precompile only warms shader/pipeline state; it must not pretend that a
+    // 1x1 or unrendered beauty texture is valid history.
+    this.historyNeedsSeed = true;
+    const previousRenderTarget = renderer.getRenderTarget();
+    const previousMrt = renderer.getMRT();
+    renderer.setMRT(null);
+    renderer.setRenderTarget(this.historyWriteTarget);
+    QUAD.material = this.resolveMaterial;
+    try {
+      // The resolve quad is intentionally unattached to the gameplay scene.
+      // Compile it explicitly against the same scene cache while admission is
+      // paused; otherwise the first live TAA update creates its pipeline.
+      await renderer.compileAsync(QUAD, QUAD.camera, targetScene);
+    } finally {
+      renderer.setRenderTarget(previousRenderTarget);
+      renderer.setMRT(previousMrt);
+    }
   }
 
   setup(builder: NodeBuilder) {
@@ -365,7 +412,7 @@ export class TaaResolveNode extends TempNode<'vec4'> {
       const depthRejected = closestDepth.sub(previousDepth).abs().greaterThan(TAA_DEPTH_REJECTION_THRESHOLD);
       const validHistory = validUv.and(edge.or(depthRejected.not()));
       const currentColor = this.beautyNode.sample(uvNode);
-      const historyColor = texture(this.historyTarget.texture).sample(historyUv);
+      const historyColor = this.historyTextureNode.sample(historyUv);
       const clampedHistory = neighbourhoodClamp(positionTexel as unknown as Node<'ivec2'>, historyColor);
       const velocityPixels = (historyUv as Node<'vec2'>).sub(uvNode).mul(textureSize).length();
       const motionCurrentWeight = velocityPixels.div(TAA_MAX_VELOCITY_PIXELS).saturate();
@@ -397,6 +444,7 @@ export function buildTaaResolveNode(sources: TaaResolveSources, tuning: TaaResol
     strength: node.strength,
     historyTarget: node.historyTarget,
     resolveTarget: node.resolveTarget,
+    precompile: (renderer, targetScene) => node.precompile(renderer, targetScene),
     setJitterFrozen: (frozen: boolean) => node.setJitterFrozen(frozen),
     dispose: () => node.dispose(),
   });

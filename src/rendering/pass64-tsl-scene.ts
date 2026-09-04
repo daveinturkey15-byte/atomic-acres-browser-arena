@@ -67,10 +67,15 @@ import {
   screenSpacePostStages,
   type ScreenSpacePostGraph,
 } from './screen-space-post';
+import type { TaaPrecompileRenderer } from './taa-resolve';
 import {
   adaptScreenSpacePostForPressure,
   SCREEN_SPACE_POST_DISABLED,
 } from './screen-space-post-profile';
+import {
+  censusTaaColdSessionPrecompileReach,
+  type TaaColdSessionPrecompileCensus,
+} from './cold-session-precompile-reach';
 // Lane L — per-arena art direction. The scene assembler owns two of its three
 // consumption points: the pre-tone-map scene grade uniforms and the
 // atmosphere particle mood; the third (the display grade composition) is
@@ -948,6 +953,7 @@ function configureHdrPipeline(
   linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
+  precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void>;
   beforeRender(): void;
   dispose(): void;
 }> {
@@ -1165,6 +1171,9 @@ function configureHdrPipeline(
         beforeRender() {
           screenSpace.beforeRender();
         },
+        precompile(renderer, targetScene) {
+          return screenSpace.precompile(renderer, targetScene);
+        },
         dispose() {
           screenSpace.dispose();
           gtaoDenoise?.dispose();
@@ -1295,6 +1304,7 @@ export function createPass64TslSceneSystems(
   // that follows. Without that split, the next attempt at the MAX admission
   // budget has to guess which half to attack. Published into the same
   // userData block QA already reads.
+  let taaPrecompileCensus: TaaColdSessionPrecompileCensus | null = null;
   let lastPrecompile: Readonly<{ durationMs: number; runs: number }> = Object.freeze({ durationMs: 0, runs: 0 });
   const publishActualGraphics = (): void => {
     const mist = root.getObjectByName('Pass 64 TSL mist');
@@ -1375,6 +1385,7 @@ export function createPass64TslSceneSystems(
       }),
       linearSourceStages: hdr.linearSourceStages,
       exactScenePassPrecompile: lastPrecompile,
+      ...(taaPrecompileCensus ? { taaPrecompileReach: taaPrecompileCensus } : {}),
       // Observed, not requested: read straight off `scene.environment` and
       // `scene.environmentIntensity`. The environmentIntensity control used to
       // publish nothing a probe could read, so its only "evidence" was a grep
@@ -1430,6 +1441,14 @@ export function createPass64TslSceneSystems(
         // the ScenePass target and MRT preserves the live pipeline cache keys;
         // a default-canvas compile would not warm the HDR/MRT path.
         await renderer.compileAsync(precompileRoot, camera, scene);
+        // The TAA resolve owns an admission-only fullscreen NodeMaterial and
+        // is deliberately not attached to the gameplay scene. Compile it now,
+        // against a single-target render context, after the exact ScenePass
+        // build has materialised the velocity-MRT graph and its variants.
+        await hdr.precompile(renderer, scene);
+        taaPrecompileCensus = constructedScreenSpace.taaResolve.enabled
+          ? censusTaaColdSessionPrecompileReach(scene)
+          : null;
       } finally {
         renderer.setRenderTarget(previousRenderTarget);
         renderer.setMRT(previousMrt);

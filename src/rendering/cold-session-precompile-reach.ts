@@ -1,4 +1,55 @@
+import * as THREE from 'three';
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
+import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
+
+/**
+ * PASS 2 admission census. These are the complete TAA-on reach items found
+ * by the pipeline census: one unattached resolve material, one copy-command
+ * path used only to seed history, and the exact material variants that the
+ * velocity MRT scene pass compiles. The last list is derived from the
+ * submitted scene, never maintained as a guessed roster.
+ */
+export const TAA_COLD_SESSION_PRECOMPILE_REACH = Object.freeze({
+  resolveNodeMaterial: TAA_RESOLVE_PIPELINE_ID,
+  historyCopy: 'taa-history.copyTextureToTexture',
+  velocityMrt: 'scene-pass.velocity-mrt',
+});
+
+export type TaaColdSessionPrecompileCensus = Readonly<{
+  resolveNodeMaterial: typeof TAA_RESOLVE_PIPELINE_ID;
+  historyCopy: typeof TAA_COLD_SESSION_PRECOMPILE_REACH.historyCopy;
+  velocityMrt: typeof TAA_COLD_SESSION_PRECOMPILE_REACH.velocityMrt;
+  velocityMrtMaterialVariants: readonly string[];
+}>;
+
+/**
+ * Enumerates the material variants present in the exact scene root that is
+ * handed to `compileAsync` with the velocity MRT selected. Names, versions and
+ * sides are the same identifying fields used by the WebGPU render-object
+ * pipeline census; duplicate uses of one material collapse to one variant.
+ */
+export function enumerateTaaVelocityMrtMaterialVariants(root: THREE.Object3D): readonly string[] {
+  const variants = new Set<string>();
+  root.traverseVisible((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    for (const material of materials) {
+      const pipelineId = typeof material.userData.tslPipelineId === 'string'
+        ? material.userData.tslPipelineId
+        : material.type;
+      variants.add(`${pipelineId}|${material.name || material.type}|v${material.version}|side=${material.side}`);
+    }
+  });
+  return Object.freeze([...variants].sort());
+}
+
+export function censusTaaColdSessionPrecompileReach(root: THREE.Object3D): TaaColdSessionPrecompileCensus {
+  return Object.freeze({
+    ...TAA_COLD_SESSION_PRECOMPILE_REACH,
+    velocityMrtMaterialVariants: enumerateTaaVelocityMrtMaterialVariants(root),
+  });
+}
 
 /**
  * Arenas whose OWN vocabulary has been MEASURED to exceed the 12 s admission

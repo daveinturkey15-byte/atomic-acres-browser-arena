@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { ARENA_IDS } from '../arena-identity';
 import {
   COLD_SESSION_PRECOMPILE_ARENAS,
   arenaNeedsColdSessionPrecompile,
+  censusTaaColdSessionPrecompileReach,
+  TAA_COLD_SESSION_PRECOMPILE_REACH,
 } from './cold-session-precompile-reach';
+import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
 
 describe('cold-session precompile reach', () => {
   it('names only real arenas, and cannot silently empty itself', () => {
@@ -36,5 +40,31 @@ describe('cold-session precompile reach', () => {
     // may reappear inline in the transition.
     expect(region.match(/selectedArena\.id === '/g) ?? []).toHaveLength(0);
     for (const id of ARENA_IDS) expect(region).not.toContain(`'${id}'`);
+  });
+
+  it('pins the TAA census vocabulary and derives velocity variants from the scene', () => {
+    const root = new THREE.Group();
+    const first = new THREE.MeshBasicMaterial();
+    first.name = 'velocity variant A';
+    const second = new THREE.MeshBasicMaterial();
+    second.name = 'velocity variant B';
+    root.add(new THREE.Mesh(new THREE.BufferGeometry(), first));
+    root.add(new THREE.Mesh(new THREE.BufferGeometry(), first));
+    root.add(new THREE.Mesh(new THREE.BufferGeometry(), second));
+
+    const census = censusTaaColdSessionPrecompileReach(root);
+    expect(TAA_COLD_SESSION_PRECOMPILE_REACH.resolveNodeMaterial).toBe(TAA_RESOLVE_PIPELINE_ID);
+    expect(census.historyCopy).toBe('taa-history.copyTextureToTexture');
+    expect(census.velocityMrt).toBe('scene-pass.velocity-mrt');
+    expect(census.velocityMrtMaterialVariants).toHaveLength(2);
+    expect(census.velocityMrtMaterialVariants.join('\n')).toContain('velocity variant A');
+    expect(census.velocityMrtMaterialVariants.join('\n')).toContain('velocity variant B');
+
+    root.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (mesh.isMesh) mesh.geometry.dispose();
+    });
+    first.dispose();
+    second.dispose();
   });
 });

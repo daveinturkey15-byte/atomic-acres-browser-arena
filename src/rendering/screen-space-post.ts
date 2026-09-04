@@ -64,6 +64,7 @@ import {
 import {
   buildTaaResolveNode,
   TAA_RESOLVE_STAGE,
+  type TaaPrecompileRenderer,
   type TaaResolveGraph,
 } from './taa-resolve';
 
@@ -310,6 +311,8 @@ export type ScreenSpacePostGraph = Readonly<{
   applyDepthOfField(linearHdr: Node<'vec4'>): Node<'vec4'>;
   /** Pushes a new runtime into the live uniforms. Topology is unchanged. */
   applyRuntime(next: ScreenSpacePostRuntime): void;
+  /** Compiles the unattached TAA resolve quad during scene admission. */
+  precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void>;
   /** Call once per presented frame, before submission. */
   beforeRender(): void;
   /** Freeze Halton jitter for deterministic review captures. */
@@ -722,6 +725,9 @@ export function buildScreenSpacePostGraph(
       // multiplied by zero. Ray count and recursion depth are topology and stay
       // on the pipeline-rebuild path, exactly like turning a march on or off.
       rayTracedGraph?.applyTuning(next.rayTracing);
+    },
+    precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void> {
+      return taaGraph?.precompile(renderer, targetScene) ?? Promise.resolve();
     },
     beforeRender(): void {
       // HF-481. The camera moves every frame and the sun moves with the arena's
