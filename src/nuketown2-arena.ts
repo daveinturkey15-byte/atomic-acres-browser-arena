@@ -159,6 +159,15 @@ import {
   createNuketown2RoofMaterial,
 } from './nuketown2-facade-materials';
 import {
+  type ForgedVehicle,
+  COACH_SPEC,
+  SEDAN_SPEC,
+  TRUCK_CAB_SPEC,
+  buildForgedVehicle,
+  buildForgedWheelSet,
+  createForgeMaterialSet,
+} from './vehicle-forge';
+import {
   createNuketown2CarPaintMaterial,
   createNuketown2ChromeMaterial,
   createNuketown2CoachMaterial,
@@ -2069,7 +2078,9 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // across it, this body keeps the longest clear centre-line run at 19.8 m
   // inside the 21.2 m band - and it is still the coach's counterweight, which
   // is the other property nuketown2-fidelity.test.ts measures.
-  const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
+  // The plan position is the hoisted constant (vehicle-forge lane) so the forged
+  // skin reads the same numbers the collider boxes do.
+  const HEAD_CAR = NUKETOWN2_HEAD_CAR;
   // HF-467: the cabin is the WINDSCREEN. `m.carGlass` has metalness 0.50, so
   // `classifyImpactSurface` called it metal and the vehicle name rule rated it
   // as bodywork - a windscreen priced like a door skin. Glazing is `glass`,
@@ -2114,12 +2125,11 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
  * points at the road.
  */
 function cars(builder: Builder, m: Nuketown2Materials): void {
-  const cx = (GARAGE_X0 + GARAGE_X1) / 2 + 0.5;   // 7.25, centred on the door
-  // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
-  // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
-  // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
-  // own apron (the dressing runs to z = -8) rather than out on the kerb.
-  const cz = GARAGE_FRONT_Z + 4.6;
+  // Hoisted constant (vehicle-forge lane): the box and its forged skin must not
+  // hold two copies of this coordinate. Its HF-432 item 4 derivation now lives
+  // on NUKETOWN2_DRIVEWAY_CAR itself.
+  const cx = NUKETOWN2_DRIVEWAY_CAR[0];
+  const cz = NUKETOWN2_DRIVEWAY_CAR[1];
   // HF-467: the driveway cars carry no `street-vehicle` name prefix, so BOTH
   // halves fell through to `reinforced` - a hatchback that stops a sniper.
   // Body `vehicle`, windscreen `glass`, matching the head car.
@@ -2152,6 +2162,225 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
         { solid: false, shots: false, cast: true });
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Forged street vehicles - PRESENTATION ONLY
+// ---------------------------------------------------------------------------
+
+/**
+ * The head car's plan position, and the driveway car's, hoisted out of their
+ * builders so the forged skins read the SAME numbers the boxes do. A second
+ * copy of a coordinate is how a skin ends up 20 cm off the body it dresses.
+ */
+const NUKETOWN2_HEAD_CAR: readonly [number, number] = [4.5, -0.8];
+const NUKETOWN2_DRIVEWAY_CAR: readonly [number, number] = Object.freeze([
+  (GARAGE_X0 + GARAGE_X1) / 2 + 0.5,   // 7.25, centred on the door
+  // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
+  // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
+  // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
+  // own apron (the dressing runs to z = -8) rather than out on the kerb.
+  GARAGE_FRONT_Z + 4.6,
+]) as readonly [number, number];
+
+/**
+ * Every authored box the lofted skins take over the PRESENTATION of, with the
+ * exact number of meshes each pattern must match.
+ *
+ * Not one of them is deleted, moved, resized or unregistered. Each is hidden
+ * and withdrawn from the presentation batcher, and every collider, ballistic
+ * surface, breakable-window id, 2x-damage core seat and roof-climb tread it
+ * owns stays exactly where it was authored - which is why the arena's own
+ * fidelity, symmetry, coplanar and parity gates read the same numbers before
+ * and after. The counts are the guard: if a future cut adds a lamp or renames
+ * a wheel, `nuketown2ForgeAudit` records a mismatch and the gate that reads it
+ * fails, rather than the arena quietly drawing a box inside a lofted body.
+ */
+const NUKETOWN2_FORGE_SUPERSEDED: ReadonlyArray<{ readonly pattern: RegExp; readonly expected: number }> = Object.freeze([
+  // The coach is lofted end to end, so its whole box dressing retires.
+  Object.freeze({ pattern: /^nuketown2 street-vehicle coach /, expected: 23 }),
+  // The truck: CAB ONLY. The cargo box keeps its deck, bulkhead, pierced
+  // flanks, roof and climb treads, because those ARE the HF-436 gameplay -
+  // three mouths you walk in through - and one lofted skin would seal them.
+  // Its taillights and rear step bar are on the box and stay boxes with it.
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck cab$/, expected: 1 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck bumper front$/, expected: 1 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck grille$/, expected: 1 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck windshield$/, expected: 1 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck headlight /, expected: 2 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck wheel \d+$/, expected: 3 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck hubcap /, expected: 6 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle truck wheel arch /, expected: 6 }),
+  // The head car in the turning head, and the two driveway cars.
+  Object.freeze({ pattern: /^nuketown2 street-vehicle head car /, expected: 22 }),
+  Object.freeze({ pattern: /^nuketown2 (north|south) car /, expected: 44 }),
+]);
+
+export interface Nuketown2ForgeAudit {
+  /** Meshes whose presentation the loft took over. */
+  readonly retired: number;
+  /** Patterns whose match count differed from the authored expectation. */
+  readonly mismatches: readonly string[];
+  readonly drawCalls: number;
+  readonly triangles: number;
+}
+
+function retireSupersededPresentation(builder: Builder): { retired: number; mismatches: string[] } {
+  let retired = 0;
+  const mismatches: string[] = [];
+  for (const { pattern, expected } of NUKETOWN2_FORGE_SUPERSEDED) {
+    let count = 0;
+    for (const child of builder.root.children) {
+      if (!(child instanceof THREE.Mesh) || !pattern.test(child.name)) continue;
+      child.visible = false;
+      // Withdraw it from the batcher as well. Hiding a batch CANDIDATE is not
+      // enough: `batchPresentationOnlyBoxes` folds its geometry into a merged
+      // mesh that is itself visible, so the box would go on drawing inside the
+      // lofted body it was replaced by.
+      child.userData.presentationBatchCandidate = false;
+      child.userData.supersededByVehicleForge = true;
+      count += 1;
+    }
+    if (count !== expected) mismatches.push(`${pattern.source}: expected ${expected}, matched ${count}`);
+    retired += count;
+  }
+  return { retired, mismatches };
+}
+
+/**
+ * Loft the coach, the moving truck's cab and all three cars, and hide the
+ * boxes those skins now cover.
+ *
+ * NOTHING HERE TOUCHES AUTHORITY. Every collider, physics collider and
+ * ballistic surface on this street was registered by the `streetVehicle` and
+ * `pair` calls above and is untouched; the forged groups register nothing and
+ * carry `presentationOnly` on every mesh, so `solidMeshes` in the fidelity
+ * gate - which selects parametric BoxGeometry that is NOT presentation-only -
+ * cannot see them and the enumerated asymmetric-vehicle list cannot grow.
+ *
+ * Each spec's envelope is its box's envelope, so the collider/visual parity
+ * audit still finds a visible mesh over every collider and no visible mesh
+ * without one. The one place the two differ is deliberate and stated in
+ * `vehicle-forge/specs.ts`: the sedan's 1.88 m greenhouse is tall for a 4.4 m
+ * saloon, and it stays tall because shrinking it would leave collider with no
+ * mass under it.
+ */
+function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
+  const { retired, mismatches } = retireSupersededPresentation(builder);
+
+  // Cream body, red waistline: the reference's coach, and the only saturated
+  // body left on the map now the truck is a plain van.
+  const coachMaterials = createForgeMaterialSet(0xe7dec6, 'nuketown2-forge-coach', 0xa8382c);
+  const truckMaterials = createForgeMaterialSet(0xe2dfd6, 'nuketown2-forge-truck-cab');
+  // Same aqua the box cars carried, and the same 0.20 base roughness, so the
+  // ray-traced preset's reflective-proxy admission is unchanged.
+  const carMaterials = createForgeMaterialSet(0x3d6f80, 'nuketown2-forge-car');
+
+  const c = NUKETOWN2_STREET_COACH;
+  const t = NUKETOWN2_CENTRAL_TRUCK;
+  const truckNoseX = t.cabX + t.cabLength / 2;
+  const placements: Array<{ built: ForgedVehicle; x: number; z: number; yaw: number }> = [];
+
+  placements.push({
+    built: buildForgedVehicle(COACH_SPEC, {
+      wheelStyle: 'cover',
+      headLamps: { x: 0.94, y: 0.98, radius: 0.13 },
+      tailLamps: { x: 0.94, y: 0.95, radius: 0.12 },
+      bumperY: 0.34,
+      // The reference paints its waistline at 1.35 m, and a waistline is LEVEL:
+      // ridden by ring index instead it climbs every wheel arch and humps over
+      // both wheels. Taken from where the loft's own flank crosses that height,
+      // so it follows the body's curvature without following its cut-outs.
+      stripe: { y: 1.35, bucket: 'accent', z0: 0.35, z1: 8.75, height: 0.3, proud: 0.012 },
+    }, coachMaterials),
+    x: c.x + COACH_SPEC.length / 2,
+    z: c.z,
+    yaw: -Math.PI / 2,
+  });
+
+  placements.push({
+    built: buildForgedVehicle(TRUCK_CAB_SPEC, {
+      wheelStyle: 'steel',
+      headLamps: { x: 0.92, y: 0.95, radius: 0.12 },
+      bumperY: 0.42,
+    }, truckMaterials),
+    x: truckNoseX,
+    z: t.z,
+    yaw: -Math.PI / 2,
+  });
+  // The cargo box's own axles: dressed, but with no arch to cut them into,
+  // because the box above them is authored gameplay geometry that stays boxy.
+  placements.push({
+    built: buildForgedWheelSet(
+      'nuketown2-truck-bogie',
+      TRUCK_CAB_SPEC.wheelRadius,
+      TRUCK_CAB_SPEC.tyreHalfWidth,
+      TRUCK_CAB_SPEC.trackHalfWidth,
+      [truckNoseX - (t.boxLength / 2 + 1.0), truckNoseX - (-t.boxLength / 2 + 1.1)],
+      'steel',
+      truckMaterials,
+    ),
+    x: truckNoseX,
+    z: t.z,
+    yaw: -Math.PI / 2,
+  });
+
+  const sedanDressing = {
+    wheelStyle: 'cover' as const,
+    headLamps: { x: 0.66, y: 0.84, radius: 0.115 },
+    tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
+    bumperY: 0.46,
+  };
+  // Head car: nose to +x, so the vehicle frame's +z maps to world -x.
+  placements.push({
+    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
+    x: NUKETOWN2_HEAD_CAR[0] + SEDAN_SPEC.length / 2,
+    z: NUKETOWN2_HEAD_CAR[1],
+    yaw: -Math.PI / 2,
+  });
+  // The two driveway cars point at the road, and the south one is the exact
+  // 180-degree partner of the north one - the same involution `pair` applies
+  // to their boxes, so the two skins stay as symmetric as the two colliders.
+  const [carX, carZ] = NUKETOWN2_DRIVEWAY_CAR;
+  placements.push({
+    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
+    x: carX,
+    z: carZ + SEDAN_SPEC.length / 2,
+    yaw: Math.PI,
+  });
+  placements.push({
+    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
+    x: -carX,
+    z: -(carZ + SEDAN_SPEC.length / 2),
+    yaw: 0,
+  });
+
+  let drawCalls = 0;
+  let triangles = 0;
+  for (const { built, x, z, yaw } of placements) {
+    // PASS 94 integration (HF-473 x HF-462). Every placement above is an
+    // AUTHORED coordinate, taken from the same constants the collider boxes
+    // use - and those boxes reach the world through `centred`/`streetVehicle`/
+    // `pair`, which mirror x. The forged skins did not, because this lane
+    // branched before the mirror existed. Left alone, every skin sat on the
+    // opposite side of the street from the body it dresses: five vehicles
+    // floating over empty road with five invisible boxes across from them, and
+    // no collider gate would have said a word, because a skin is presentation.
+    // The mirror is applied HERE, once, at the single place an authored vehicle
+    // number becomes a world object - the same discipline nuketown2-layout.ts
+    // states for solids.
+    //
+    // Reflecting x also reflects heading: a body facing (sin y, cos y) faces
+    // (-sin y, cos y) after the mirror, which is yaw -> -yaw. Position and
+    // heading have to move together or the skins land right and point wrong.
+    built.group.position.set(nuketown2HandedX(x), 0, z);
+    built.group.rotation.y = NUKETOWN2_HANDEDNESS === 1 ? yaw : -yaw;
+    builder.root.add(built.group);
+    drawCalls += built.drawCalls;
+    triangles += built.triangles;
+  }
+
+  return Object.freeze({ retired, mismatches: Object.freeze(mismatches), drawCalls, triangles });
 }
 
 /**
@@ -2609,6 +2838,11 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   truck(builder, m);
   coach(builder, m);
   cars(builder, m);
+  // HF-462 / HF-472: lofted vehicle bodies OVER the boxes above, which keep
+  // every collider and shot surface they registered. Runs BEFORE the batcher
+  // so the superseded boxes can withdraw from it, and its audit is recorded
+  // on the root for the gate that reads it.
+  builder.root.userData.nuketown2ForgeAudit = forgedStreetVehicles(builder);
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
 

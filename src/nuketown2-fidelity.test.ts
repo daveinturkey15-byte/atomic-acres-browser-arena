@@ -603,6 +603,77 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
   }, 60_000);
 
+  /**
+   * PASS 94 INTEGRATION GATE (HF-462 x HF-473), and it exists because the merge
+   * of two green lanes produced something neither of them could fail.
+   *
+   * The vehicle-forge lane branched before the handedness mirror and placed its
+   * forged skins at raw AUTHORED coordinates. The collider boxes those skins
+   * dress reach the world through `centred`/`streetVehicle`/`pair`, every one of
+   * which multiplies x by NUKETOWN2_HANDEDNESS. On the merged head, before this
+   * was fixed, all five skins stood on the opposite side of the street from
+   * their bodies: five vehicles floating over open road, five invisible boxes
+   * facing them, and not one existing gate with anything to say - because a skin
+   * is presentation, and every collider, parity and spawn gate looks only at the
+   * boxes. This is the falsifier that class of defect did not have.
+   */
+  it('lands every forged vehicle skin on the collider body it dresses, mirrored with it', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const planCentre = (object: THREE.Object3D): { x: number; z: number } => {
+      const box = new THREE.Box3().setFromObject(object);
+      return { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 };
+    };
+    // Only the OUTERMOST forged group per vehicle: the forge names its own
+    // sub-parts with the same prefix (grooves, lamps, wheel sets), and a
+    // sub-part is offset from its body by design.
+    const skins: THREE.Object3D[] = [];
+    map.root.traverse((node) => {
+      if (!node.name.startsWith('vehicle-forge ')) return;
+      if (node.parent?.name.startsWith('vehicle-forge ') === true) return;
+      skins.push(node);
+    });
+    // Coach, truck cab, truck bogie and three sedans (head car + both driveways).
+    expect(skins.length, 'forged street-vehicle skins').toBeGreaterThanOrEqual(6);
+    const bodies = map.raycastMeshes
+      .filter((mesh) => /(car body|coach body|truck cab)$/u.test(mesh.name))
+      .map((mesh) => ({ name: mesh.name, ...planCentre(mesh) }));
+    expect(bodies.length, 'solid vehicle bodies to dress').toBeGreaterThanOrEqual(4);
+    for (const skin of skins) {
+      const centre = planCentre(skin);
+      // The bogie dresses the cargo box's axles, which are behind the cab; it is
+      // held to the truck's own centre line instead of to a body centre.
+      if (skin.name.endsWith('truck-bogie')) {
+        const deck = map.raycastMeshes.find((mesh) => mesh.name.endsWith('truck deck'));
+        expect(deck, 'the truck deck the bogie runs under').toBeDefined();
+        expect(Math.abs(centre.z - planCentre(deck!).z), `${skin.name} is off the truck centre line`)
+          .toBeLessThan(0.35);
+        continue;
+      }
+      const nearest = bodies
+        .map((body) => ({ body, metres: Math.hypot(body.x - centre.x, body.z - centre.z) }))
+        .sort((left, right) => left.metres - right.metres)[0]!;
+      expect(
+        nearest.metres,
+        `${skin.name} at (${centre.x.toFixed(2)}, ${centre.z.toFixed(2)}) dresses no collider body `
+          + `(nearest is ${nearest.body.name} at ${nearest.metres.toFixed(2)} m). A skin placed in the `
+          + 'AUTHORED frame while its box is placed in the WORLD frame lands exactly one mirror away.',
+      ).toBeLessThan(0.35);
+    }
+    // ...and the mirror is asserted directly as well, so a future handedness
+    // flip cannot leave a coincidentally-passing pair behind. The head car is
+    // authored at x = 4.5 (HF-432 item 5); its BOX must stand at hx(4.5), and
+    // the skin on top of it.
+    const headCarBox = map.raycastMeshes.find((mesh) => mesh.name.endsWith('head car body'));
+    expect(headCarBox, 'the head car body').toBeDefined();
+    expect(planCentre(headCarBox!).x, 'head car body follows the handedness flag').toBeCloseTo(hx(4.5), 6);
+    const headCarSkin = skins
+      .map((skin) => ({ skin, centre: planCentre(skin) }))
+      .filter(({ skin }) => skin.name.endsWith('sedan'))
+      .sort((left, right) => Math.abs(left.centre.z) - Math.abs(right.centre.z))[0]!;
+    expect(headCarSkin.centre.x, 'the head car skin rides its own box').toBeCloseTo(hx(4.5), 6);
+  });
+
 
   // -------------------------------------------------------------------------
   // HF-473 - HANDEDNESS. Owner, 2026-09-04, having played the reference on
@@ -2031,4 +2102,50 @@ describe('Nuke Town Rebuild fidelity', () => {
       physics.dispose();
     }
   }, 60_000);
+  it('dresses the street vehicles with lofted skins WITHOUT moving any authority', () => {
+    // HF-462 / HF-472. `forgedStreetVehicles` adds a presentation-only group
+    // per vehicle and hides the authored boxes those skins cover. Everything
+    // that decides where a player can walk and what a bullet hits is still the
+    // boxes: this asserts it, rather than trusting the diff.
+    const scene = new THREE.Scene();
+    const map = buildNuketown2(scene);
+    const audit = map.root.userData.nuketown2ForgeAudit as {
+      retired: number; mismatches: readonly string[]; drawCalls: number; triangles: number;
+    };
+    // A rename, a new lamp or a deleted wheel changes a match count, and the
+    // arena would silently draw a box INSIDE a lofted body. The audit records
+    // it; this is the gate that reads the record.
+    expect(audit.mismatches, 'superseded-box pattern drift').toEqual([]);
+    expect(audit.retired).toBe(110);
+    expect(audit.drawCalls).toBeGreaterThan(0);
+
+    const superseded: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.userData.supersededByVehicleForge === true) superseded.push(node);
+    });
+    expect(superseded.length).toBe(audit.retired);
+    for (const mesh of superseded) {
+      // Hidden, and withdrawn from the batcher - a hidden batch CANDIDATE is
+      // still merged into a visible batch and goes on drawing.
+      expect(mesh.visible, mesh.name).toBe(false);
+      expect(mesh.userData.presentationBatchCandidate, mesh.name).toBe(false);
+      expect(mesh.userData.staticBatchRendered, mesh.name).toBeUndefined();
+    }
+    // The solid ones among them still own their colliders and shot surfaces.
+    const solidSuperseded = superseded.filter((mesh) => typeof mesh.userData.ballisticSurfaceId === 'string');
+    expect(solidSuperseded.length, 'retired solids keep their shot surfaces').toBeGreaterThanOrEqual(9);
+
+    // Not one forged mesh is a parametric box or claims a shot surface, so
+    // neither the enumerated asymmetric set above nor the ballistic roster can
+    // grow by adding art.
+    let forged = 0;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.name.startsWith('vehicle-forge ')) return;
+      forged += 1;
+      expect(node.userData.presentationOnly, node.name).toBe(true);
+      expect((node.geometry as THREE.BoxGeometry).parameters, node.name).toBeUndefined();
+      expect(node.userData.ballisticSurfaceId, node.name).toBeUndefined();
+    });
+    expect(forged).toBe(audit.drawCalls);
+  });
 });

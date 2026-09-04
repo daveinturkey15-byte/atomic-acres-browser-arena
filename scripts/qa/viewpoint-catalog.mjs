@@ -127,6 +127,13 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     // this arena gained that no existing station looks at.
     'nuketown2-north-balcony',
     'nuketown2-front-porch',
+    // The forged street vehicles, at the three ranges a player meets them and
+    // from the two elevations that show a silhouette rather than a skin.
+    'nuketown2-vehicle-near',
+    'nuketown2-vehicle-mid',
+    'nuketown2-vehicle-far',
+    'nuketown2-coach-elevation',
+    'nuketown2-truck-cab-near',
   ]),
   // RAID2 (Lane AQ, HF-408): the Raid layout rethink. Ten cameras rather than
   // the usual four because this arena's whole claim is about ten specific
