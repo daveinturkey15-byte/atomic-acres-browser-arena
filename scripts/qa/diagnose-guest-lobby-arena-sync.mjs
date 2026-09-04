@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// Probes the guest-side "Synchronizing <Arena> before ready-up…" deadlock: drives a host/guest Playwright pair into a room, has the host select the target arena, then samples the guest's lobby snapshot every second until ready-up enables or the wait budget expires.
+// Usage: node scripts/qa/diagnose-guest-lobby-arena-sync.mjs [--url <base>] [--peer-port <port>] [--arena <arena-id>] [--mode <tdm|ffa>] [--wait-ms <ms>]
+//   --url <base>      app base URL (default: http://127.0.0.1:41921/)
+//   --peer-port <port>  local PeerJS port (default: 9343)
+//   --arena <id>      target arena id selected on the host (default: rustworks-1v1)
+//   --mode <tdm|ffa>  lobby mode selected on the host (default: tdm)
+//   --wait-ms <ms>    guest-sync wait budget in milliseconds (default: 45000)
+// No environment variables are read.
+// Writes: nothing to disk; prints a JSON report (target, mode, outcome, host + guest samples) to stdout and log lines to stderr.
+// Exit codes: 0 = guest synchronized; 2 = budget expired unsynchronized; 3 = environment error.
+
 // Focused probe for the guest-side "Synchronizing <Arena> before ready-up…"
 // deadlock seen in verify-pass79-host-guest-fault-matrix (rustworks-1v1 and
 // farcrysis lanes): the HOST reaches READY-enabled but the GUEST's
