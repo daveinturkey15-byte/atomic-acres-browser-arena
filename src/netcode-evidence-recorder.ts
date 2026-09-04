@@ -100,7 +100,17 @@ export type EvidencePeerSummary = Readonly<{
   disagreementMeanM: number;
   disagreementP95M: number;
   disagreementMaxM: number;
+  /** The LIVE meter at export time: last-sample disagreement plus ack age. */
   desync: number;
+  /**
+   * The SESSION meter: the same formula run over the p95 disagreement and with
+   * no ack term, so it does not depend on the instant the export key was
+   * pressed. `scripts/qa/mp-evidence-analyse.mjs` recomputes exactly this and
+   * compares, which is only a meaningful tamper/version check because the two
+   * are the same statistic. Comparing it against `desync` would flag every
+   * healthy bundle, since `desync` is a different quantity by design.
+   */
+  desyncSessionP95: number;
   sampleCount: number;
 }>;
 
@@ -304,8 +314,16 @@ export function createNetcodeEvidenceRecorder(
           disagreementP95M: Math.round(summary.disagreementP95M * 1_000) / 1_000,
           disagreementMaxM: Math.round(summary.disagreementMaxM * 1_000) / 1_000,
           desync: Math.round(summary.desync * 1_000) / 1_000,
+          desyncSessionP95: 0, // replaced below, once the row it is derived from exists
           sampleCount: peer.disagreementM.length,
         });
+      }
+
+      // Derived from the finished row rather than from the live model, so the
+      // analyser recomputes it from exactly the numbers the bundle carries.
+      for (let index = 0; index < peers.length; index += 1) {
+        const row = peers[index] as EvidencePeerSummary;
+        peers[index] = { ...row, desyncSessionP95: Math.round(recomputedDesync(row) * 1_000) / 1_000 };
       }
 
       let droppedByBytes = 0;

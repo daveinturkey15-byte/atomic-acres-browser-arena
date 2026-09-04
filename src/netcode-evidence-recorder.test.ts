@@ -200,10 +200,28 @@ describe('bundle schema', () => {
     const forged = {
       peer: 'liar', role: 'guest', rttMs: 400, jitterMs: 300, lossFraction: 0.5,
       inboundRateHz: 40, outboundRateHz: 40, disagreementMeanM: 5,
-      disagreementP95M: 9, disagreementMaxM: 12, desync: 0, sampleCount: 10,
+      disagreementP95M: 9, disagreementMaxM: 12, desync: 0, desyncSessionP95: 0, sampleCount: 10,
     } as const;
     expect(forged.desync).toBe(0);
     expect(recomputedDesync(forged)).toBe(1);
+  });
+
+  it('writes a desyncSessionP95 the analyser can recompute exactly', () => {
+    // The bundle carries TWO desync numbers on purpose. `desync` is the live
+    // meter at the instant the export key was pressed and depends on ack age,
+    // so it is not reproducible from the bundle. `desyncSessionP95` is the same
+    // formula over the p95 disagreement with no ack term, which
+    // scripts/qa/mp-evidence-analyse.mjs recomputes and compares against. If
+    // these two were ever conflated, the analyser would print a tamper note on
+    // every healthy bundle and the note would stop meaning anything.
+    const model = createNetcodeDiagnosticsModel('guest', 'me', 'ROOM');
+    recordRttSample(model, 'host-1', 40);
+    recordInboundSnapshot(model, 'host-1', 1, 0);
+    recordInboundSnapshot(model, 'host-1', 2, 25);
+    for (const metres of [0.1, 0.2, 1.9, 0.3]) recordPositionDisagreement(model, 'host-1', metres);
+    const bundle = createNetcodeEvidenceRecorder().build(100, model, META);
+    const row = bundle.peers[0]!;
+    expect(row.desyncSessionP95).toBeCloseTo(recomputedDesync(row), 3);
   });
 
   it('names the file so a host and three guests never collide', () => {
