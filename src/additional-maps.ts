@@ -2628,17 +2628,33 @@ function terminalSurfaceTexture(
   if (pattern === 'terrazzo' || pattern === 'concrete' || pattern === 'panel') {
     const cells = 16;
     const cell = 256 / cells;
-    for (let gy = 0; gy < cells; gy += 1) {
-      for (let gx = 0; gx < cells; gx += 1) {
-        const multiplier = terminalAlbedoMultiplier(
-          sampleTerminalAlbedo((gx + 0.5) / cells, (gy + 0.5) / cells),
-        );
-        context.fillStyle = multiplier >= 1 ? '#ffffff' : '#000000';
-        context.globalAlpha = Math.abs(multiplier - 1);
-        context.fillRect(gx * cell, gy * cell, cell, cell);
+    // Apply the actual multiplier to the already-authored pixels. A white
+    // alpha overlay would lighten toward white rather than multiply the base
+    // colour when the sample is above 1, making the documented albedo contract
+    // false for coloured surfaces. This is arena-build work, never per-frame.
+    const image = context.getImageData(0, 0, 256, 256);
+    if (image) {
+      for (let gy = 0; gy < cells; gy += 1) {
+        for (let gx = 0; gx < cells; gx += 1) {
+          const multiplier = terminalAlbedoMultiplier(
+            sampleTerminalAlbedo((gx + 0.5) / cells, (gy + 0.5) / cells),
+          );
+          const startX = Math.floor(gx * cell);
+          const endX = Math.floor((gx + 1) * cell);
+          const startY = Math.floor(gy * cell);
+          const endY = Math.floor((gy + 1) * cell);
+          for (let y = startY; y < endY; y += 1) {
+            for (let x = startX; x < endX; x += 1) {
+              const offset = (y * 256 + x) * 4;
+              image.data[offset] = Math.min(255, Math.round(image.data[offset]! * multiplier));
+              image.data[offset + 1] = Math.min(255, Math.round(image.data[offset + 1]! * multiplier));
+              image.data[offset + 2] = Math.min(255, Math.round(image.data[offset + 2]! * multiplier));
+            }
+          }
+        }
       }
+      context.putImageData(image, 0, 0);
     }
-    context.globalAlpha = 1;
   }
 
   const texture = new THREE.CanvasTexture(canvas);

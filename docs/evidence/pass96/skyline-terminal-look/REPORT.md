@@ -53,6 +53,12 @@ noise-LUT pattern at uniform strength, emissive signage. No new pipeline.
 - OPEN — nine of eleven arenas still have sub-pixel motes (pre-existing,
   recorded in `ambient-visibility.test.ts`, not this lane's scope).
 
+## Luna review TODOs
+
+- TODO: obtain the required native-WebGPU visual capture for skyline terminal in both supported profiles; this review was intentionally no-browser/no-GPU.
+- TODO: obtain a quiet-machine frame-time/draw receipt for the bake-time canvas cost and the two static signage crowns; the current estimate is source-derived only.
+- TODO: keep the remaining nine sub-pixel arena-mote cases tracked in the existing quality-gap lane; this contribution intentionally changes only terminal.
+
 ## Per-frame cost estimate (defended)
 
 - Particles: instance counts identical (densities and capacities unchanged).
