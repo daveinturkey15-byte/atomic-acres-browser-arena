@@ -300,7 +300,7 @@ line with an opaque white window above it.
 
 ## 8. OPEN
 
-1. **Seven review cameras are missing from the nuketown2 arena definition** on
+1. **[Muse F3 / TRACKED OPEN] Seven review cameras are missing from the nuketown2 arena definition** on
    `pass93-candidate` — `nuketown2-front-porch`, `nuketown2-north-balcony`,
    `nuketown2-coach-elevation`, `nuketown2-truck-cab-near`, and the three
    `nuketown2-vehicle-*` cameras. The viewpoint catalog names them; the arena
@@ -316,7 +316,7 @@ line with an opaque white window above it.
    base and candidate. Somebody needs to work out whether these are machine
    state or a real regression on the branch, because right now neither gate can
    clear or condemn any lane's work.
-3. **Ten of eleven arenas still have sub-pixel ambient motes** (gun-range worst
+3. **[Muse F2 / TRACKED OPEN] Ten of eleven arenas still have sub-pixel ambient motes** (gun-range worst
    at 1.03 px). Same one-line fix as Nuke Town's; each belongs to its arena's
    lane.
 4. **Contact shadows, transmission glass, the time-of-day LUT and the shaft

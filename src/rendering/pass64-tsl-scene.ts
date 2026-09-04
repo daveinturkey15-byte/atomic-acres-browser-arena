@@ -184,6 +184,8 @@ export type Pass64TslSceneSystems = Readonly<{
    * without shadows) resolves to disabled here, so telemetry cannot claim it.
    */
   screenSpace: GraphicsRuntime['screenSpace'];
+  /** Re-anchors the existing atmosphere uniforms without rebuilding the graph. */
+  setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   /**
    * Linear-side stage receipt for the filmic grade chain's order contract,
    * including the optional screen-space stages this graph built.
@@ -940,6 +942,7 @@ function configureHdrPipeline(
 ): Readonly<{
   scenePass: ReturnType<typeof pass>;
   screenSpace: ScreenSpacePostGraph;
+  setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
@@ -1115,6 +1118,9 @@ function configureHdrPipeline(
     return {
       scenePass,
       screenSpace,
+      setAtmosphere(skyColor, sunWhite) {
+        screenSpace.setAtmosphere(skyColor, sunWhite);
+      },
       get linearSourceStages() { return linearSourceStages; },
       applyDefinition(next) {
         const sceneGrade = composeArtDirectedSceneGrade(
@@ -1388,6 +1394,7 @@ export function createPass64TslSceneSystems(
       ...graphics.ambientOcclusion,
     }),
     screenSpace: constructedScreenSpace,
+    setAtmosphere: (skyColor, sunWhite) => hdr.setAtmosphere(skyColor, sunWhite),
     // A getter, not a snapshot: the shaft stage can be added or removed by an
     // arena commit, and a frozen list would keep asserting a stage order the
     // installed pipeline no longer has.
