@@ -1,3 +1,10 @@
+// Captures deterministic visual-acceptance PNG screenshots of the Pass 62 arenas via a headless Playwright Chromium run.
+// Usage: node scripts/qa/capture-pass60-visual-acceptance.mjs [baseUrl]
+//   [baseUrl] (positional, optional) base URL to load; default: $QA_BASE_URL or http://127.0.0.1:4182/
+//   $QA_BASE_URL (env, optional) base URL fallback when [baseUrl] is not given; default: http://127.0.0.1:4182/
+//   $QA_ONLY_ATOMIC (env, optional) set to "1" to skip the RustWorks/Gun Range/Terminal arena captures; default: unset (captures all arenas)
+// Writes: artifacts/pass62-visual-acceptance/ — directory of PNG screenshots (01..05 aqua always; 07,08,08b,09,10,11,12,13,14 other arenas unless QA_ONLY_ATOMIC=1)
+// Exit codes: 0 = success; 1 = one or more pageerror events were captured
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
