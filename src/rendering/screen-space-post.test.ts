@@ -9,6 +9,7 @@ import {
   screenSpaceMrtRequirement,
   screenSpacePostActive,
   screenSpacePostStages,
+  AERIAL_PERSPECTIVE_STAGE,
 } from './screen-space-post';
 import { RAY_TRACED_LIGHT_STAGE } from './raytracing/raytraced-light-node';
 import {
@@ -29,6 +30,7 @@ const POST_DEFAULTS = Object.freeze({
 const EVERYTHING_ON = resolveScreenSpacePostRuntime({
   bakedIndirect: 'high',
   volumetricLightShafts: 'high',
+  volumetricQuality: 'high',
   screenSpaceReflections: 'high',
   screenSpaceGi: 'high',
   depthOfField: true,
@@ -56,6 +58,7 @@ describe('HF-364 screen-space MRT requirements', () => {
     const onlyBlur = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0.5, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     // Shafts and depth of field read the depth buffer the pass already owns,
@@ -64,6 +67,7 @@ describe('HF-364 screen-space MRT requirements', () => {
     const onlyShafts = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: true, depthOfFieldStrength: 1, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     expect(screenSpaceMrtRequirement(onlyShafts)).toEqual({ normal: false, material: false, velocity: false });
@@ -121,6 +125,10 @@ describe('HF-364 scene-pass assembly', () => {
       'contact-occlusion-multiply',
       'ssr-screen-space-reflection-add',
       'raytraced-reflection-refraction-add',
+      // HF-481 lane LOOK. Aerial perspective sits with the reflections and
+      // before the bloom: haze is volume in front of the surface, so GTAO must
+      // not darken it, and a bright hazy far field really does bloom.
+      'aerial-perspective-inscatter-add',
       'depth-guarded-bloom-add',
       'godrays-volumetric-shaft-add',
       'depth-of-field-bokeh',
@@ -147,6 +155,9 @@ describe('HF-364 scene-pass assembly', () => {
       screenSpace: SCREEN_SPACE_POST_DISABLED,
     });
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output']);
+    // HF-481. `SCREEN_SPACE_POST_DISABLED` is the WebGL2 compatibility route,
+    // which runs no linear composite for an additive term to be added into, so
+    // the atmosphere is absent here too. That is the ONLY way it is ever off.
     expect(systems.linearSourceStages).toEqual([
       'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
     ]);
@@ -161,6 +172,7 @@ describe('HF-364 scene-pass assembly', () => {
     const shaftsWithoutShadows = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: false });
     const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition, {
@@ -173,8 +185,15 @@ describe('HF-364 scene-pass assembly', () => {
       environmentIntensity: 1,
       screenSpace: shaftsWithoutShadows,
     }, undefined, null);
+    // HF-481. Aerial perspective is NOT arena-scoped and NOT capability-gated:
+    // it needs no shadow map, so it survives the very refusal that takes the
+    // shafts away. That is the point of it — the atmosphere does not switch off
+    // because an arena's sun stopped casting.
     expect(systems.linearSourceStages).toEqual([
-      'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
+      'scene-pass-linear-hdr',
+      'contact-occlusion-multiply',
+      'aerial-perspective-inscatter-add',
+      'depth-guarded-bloom-add',
     ]);
     const published = systems.root.userData.pass65AdvancedGraphics as {
       screenSpace: { godrays: { enabled: boolean; unavailableReason: string | null } };
@@ -225,6 +244,7 @@ describe('HF-398 ray-traced layer wiring', () => {
     const onlyRayTracing = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'reflections',
     }, { shadowsEnabled: true });
@@ -232,7 +252,12 @@ describe('HF-398 ray-traced layer wiring', () => {
     expect(screenSpaceMrtRequirement(onlyRayTracing))
       .toEqual({ normal: true, material: true, velocity: false });
     expect(screenSpacePostActive(onlyRayTracing)).toBe(true);
-    expect(screenSpacePostStages(onlyRayTracing)).toEqual([RAY_TRACED_LIGHT_STAGE]);
+    // HF-481. The atmosphere rides along in every WebGPU runtime: it has no
+    // off rung and no capability gate, so a runtime built to isolate the trace
+    // still carries it. Asserting the trace's stage alone would now be
+    // asserting a receipt that is not the graph.
+    expect(screenSpacePostStages(onlyRayTracing))
+      .toEqual([RAY_TRACED_LIGHT_STAGE, AERIAL_PERSPECTIVE_STAGE]);
   });
 
   it('reports itself unavailable rather than drawing shadowless reflections', () => {
@@ -242,13 +267,16 @@ describe('HF-398 ray-traced layer wiring', () => {
     const noSun = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'refractions',
     }, { shadowsEnabled: false });
     expect(noSun.rayTracing.enabled).toBe(false);
     expect(noSun.rayTracing.unavailableReason).toContain('Sun shadows');
     expect(screenSpaceMrtRequirement(noSun)).toEqual({ normal: false, material: false, velocity: false });
-    expect(screenSpacePostStages(noSun)).toEqual([]);
+    // The trace is refused; the atmosphere is not, because it never needed the
+    // sun's shadow map in the first place.
+    expect(screenSpacePostStages(noSun)).toEqual([AERIAL_PERSPECTIVE_STAGE]);
     expect(screenSpacePostActive(noSun)).toBe(false);
   });
 
@@ -280,6 +308,7 @@ describe('HF-398 ray-traced layer wiring', () => {
     const both = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'high', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off',
       rayTracing: 'reflections',
     }, { shadowsEnabled: true });
@@ -327,6 +356,7 @@ describe('HF-401 shaft stage follows the arena sun that actually casts shadows',
   const SHAFTS_ONLY = resolveScreenSpacePostRuntime({
     bakedIndirect: 'off',
     volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+    volumetricQuality: 'high',
     depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
   }, { shadowsEnabled: true });
   const SHAFT_STAGE = 'godrays-volumetric-shaft-add';
@@ -467,6 +497,7 @@ describe('HF-401 the shaft rebuild settles instead of recomposing on every apply
     const shaftsOnly = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'high', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: false, depthOfFieldStrength: 0, motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     const systems = createPass64TslSceneSystems(
