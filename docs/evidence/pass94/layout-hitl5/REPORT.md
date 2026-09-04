@@ -215,3 +215,151 @@ surface - all 36 deleted bodies were verge dressing outboard of the kerb line.
 5. **Corridor falsifier** - a non-stylised BO2-2025 overhead would let the section 1
    measurement close from the primary image instead of resting on the BO7 minimap.
 
+
+---
+
+## 6. Bays landed? NO - the handed-down design does not survive contact, and here is the one that does
+
+Lane: Claude Opus 5 (HITL 5 continuation), same worktree and branch, 30-minute box
+17:36-18:05. Head at entry 7ade1887. **The bays are NOT landed.** Three independent
+blockers were found in section 3's design, none of which is a matter of time, and the
+honest deliverable is the corrected specification below rather than a half-cut map.
+
+### Blocker 1 - the bays cannot go through `pair()` AT ALL, and the trap is worse than stated
+
+Section 3 records the trap as "confine the bay to x > mouthX". That is not sufficient; it
+is not even close. `pair()` (nuketown2-arena.ts:851) emits at authored `(x, z)` **and
+`(-x, -z)`**. The bulb occupies authored x in [-16.5, -0.5] at every |z| <= 8, and a bay
+at |z| in [5.3, 7.5] is inside that z band by construction. So a bay at x in [a, b] is
+clear only if BOTH `a > mouthX` and `-b > mouthX`, i.e. a > -0.5 AND b < 0.5. The stem is
+x in [-0.5, 18]; the intersection of the stem with its own 180-degree image is
+**x in [-0.5, 0.5] - one metre.** An 11.0 m bay, a 6.5 m bay, or any bay at all, cannot be
+a `pair()` body. [DERIVED - pair() body, NUKETOWN2_CUL_DE_SAC; the same arithmetic
+verge() states in its own header]
+
+**The resolution already exists in the file.** `street()` emits every carriageway body
+through `centred()` - ONCE, no 180-degree partner - under the enumerated
+`EXPECTED_ASYMMETRIC_CARRIAGEWAY` exception, which is paid for by four properties, and
+property (i) is *"every road body has an EXACT z-MIRROR partner"*. That is precisely the
+"one authored rectangle, both sides, mirrored, by construction" the design wanted - it is
+just a z-mirror in `street()`, not a 180-degree `pair()`. A bay pair authored this way
+satisfies (i) by construction, (ii) top <= 0.30 m, (iii) |z| <= 10.0 corridor half, and
+(iv) the road-plus-verge region stays 180-symmetric, because the bay replaces lawn with
+asphalt without changing which square metres are covered. **No gate has to move.**
+[OBSERVED - nuketown2-fidelity.test.ts:1719-1905]
+
+### Blocker 2 - the driveway apron eats the bay lengths
+
+The north verge is crossed by `street driveway north` at x in [4.25, 9.25]
+(GARAGE_X0..GARAGE_X1), running from the garage door out to the kerb at KERB_Z = -5.3. It
+occupies the exact band a bay wants. That leaves two free runs on the north verge:
+**x in [-0.5, 4.25] = 4.75 m** and **x in [9.25, 18.0] = 8.75 m**.
+
+- The 11.0 m coach bay **does not fit anywhere on the north verge.** The longest possible
+  run is 8.75 m; the coach body alone is 9.1 m.
+- The 6.5 m saloon bay fits only in the outer run, not the mouth run (4.75 m gross).
+
+**Consequence, stated plainly: the vehicle re-seat of section 5 item 2 is dead as
+designed.** No bay that fits holds the 9.1 m coach, so `NUKETOWN2_STREET_COACH` and the
+0.150 L measured offset from the truck that the overdrive core derives from are **left
+untouched** - which is the branch the brief asked for ("otherwise leave the vehicles and
+say so"). The bays are roadside widening pockets, which is what the owner asked for
+("bits either side of the road", "wider in the middle"); they are not car parks.
+[DERIVED - GARAGE_X0/GARAGE_X1 at nuketown2-arena.ts:264-265, NUKETOWN2_GROUND_DRESSING]
+
+### Blocker 3 - the fast path grows grass through the paving
+
+The tempting shortcut is to lay the bay as a `drive`-tier dressing piece ON TOP of the
+lawn tile, using the integer polygonOffset tiers (lawn is -2, drive is -1) so the coplanar
+instrument classes it as offset-separated rather than a FINDING, and split no lawn at all.
+It passes the coplanar gate and it is wrong: `nuketownRebuildLawnRegions()` drives the
+INSTANCED GRASS FIELD off the same dressing table, and a decal is not a solid, so the
+grass keep-out does not fire. Grass would grow straight through the paving. **The bay must
+be a real cut in the lawn table, not a stacked tier.** [OBSERVED - fidelity test :996-1002
+lawn regions, :1016 keep-out]
+
+### The corrected specification - complete, and it is what HITL 6 should type in
+
+Authored frame throughout. Kerb line |z| = 5.3, bay depth **2.2 m** (section 3's number,
+still OPEN on the same falsifier), so a bay is z in [-7.5, -5.3] and its exact z-mirror is
+z in [5.3, 7.5]. Both x-runs clear the apron by a 0.2 m kerb margin and stop 0.3 m short
+of the map edge.
+
+| Bay | authored x0 | x1 | length | derivation |
+|---|---|---|---|---|
+| `bay mouth` | -0.2 | 4.05 | 4.25 m | mouthX + 0.3 .. GARAGE_X0 - 0.2 |
+| `bay outer` | 9.45 | 17.7 | 8.25 m | GARAGE_X1 + 0.2 .. offMapX - 0.3 |
+
+[DERIVED - all four numbers from NUKETOWN2_CUL_DE_SAC and the garage span. Author them as
+expressions, never as literals: re-typing these is how the shipped map's rare-gun sites
+came to describe a house that had moved.]
+
+1. **Table.** Add the two rectangles (x-span authored once; the z-span is
+   `[kerb, kerb + 2.2]` mirrored) to `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` as four entries
+   generated from two authored rects by one z-mirror map, so the two sides cannot drift.
+   They must live in the footprint table, not as loose slabs: it is the union
+   `buildNuketown2Ground()` cuts and the union `scripts/qa/find-coplanar-pairs.ts`
+   classifies STREET against, and the bays have to be in both. **This is exactly why bays
+   are carriageway footprints and NOT verge bodies, so the 43-body verge ceiling holds
+   untouched and no headroom is raised.**
+2. **Geometry**, in `street()`, both emitted through `centred()` from one authored rect:
+   `carriageway bay <id> <side>` asphalt at centre y -0.06, size [len, 0.12, 2.2] - the
+   same slab section as `carriageway stem`, so the two abut at |z| = 5.3 with no plan
+   overlap and cannot become a coplanar pair; and `carriageway bay kerb <id> <side>` at
+   centre y 0.06, size [len, 0.24, 0.3] along the bay's OUTER edge - the same 0.24 m lip
+   and 0.3 m tread as `carriageway stem kerb`, under the 0.42 m autostep, so it reads as
+   a kerb and is never a wall, and it is a plain box collider the parity gate measures
+   like any other. The `nuketown2 carriageway ` name prefix is load-bearing: it is what
+   puts both bodies in the roadBodies half of the exception, where property (i) checks the
+   z-mirror the construction already guarantees.
+3. **Lawn cut - the actual work, 3 entries become 11.** The bays overlap
+   `verge lawn stem north 0`, `verge lawn stem north 1` and `verge lawn stem south`, and
+   the ground-cut gate (fidelity test :933) fails on any dressing overlapping a
+   carriageway footprint. Replace with, north side (full depth = z in [-10, -5.3]):
+   `[-0.5,-0.2]` full depth; `[-0.2,4.05]` z in [-10,-7.5]; `[4.05,4.25]` full depth;
+   `[9.25,9.45]` full depth; `[9.45,17.7]` z in [-10,-7.5]; `[17.7,18]` full depth - and
+   the exact z-mirror of all six on the south side, where the single current tile spans
+   x in [-0.5, 18] (five pieces there, since the south verge carries no apron in the
+   stem). Every new tile keeps `paired: false`, which is what auto-registers it in
+   `EXPECTED_ASYMMETRIC_CARRIAGEWAY` - that list is derived from the table's own flag, so
+   a tile added there cannot be missed and one deleted cannot be left behind.
+4. **Low wall / planter at the bay ends** (BO2 shows masses at the pocket ends): these are
+   the only pieces that would be verge bodies, and the ceiling is at 43 with zero
+   headroom, so they cannot be added without an argued diff that raises it. Either author
+   them as kerb-height carriageway islands at the bay ends (the `head kerb island`
+   precedent - inside the exception, not verge bodies, and capped at 0.30 m by property
+   (ii)), or hold them. **Held this lane.**
+5. **Effect.** Paved width at a bay becomes 10.6 + 2 x 2.2 = **15.0 m locally**, the
+   corridor stays 20.0 m and the ratio stays 1.818, and the new hard surface either side
+   of the road is 2 x (4.25 + 8.25) x 2.2 = **55.0 m2**. That is "wider in the middle"
+   with no reference-correct constant moved. [DERIVED]
+
+### Tests to add with it
+
+- Both bays present on both sides, derived from the footprint table (never a literal
+  list), each an exact z-mirror of its partner.
+- Every bay rect entirely at `x > NUKETOWN2_CUL_DE_SAC.mouthX` - the section 3 trap, kept
+  as an assertion even though `centred()` makes the `pair()` failure impossible, because
+  it is what stops a later pass re-authoring a bay through `pair()`.
+- No bay rect overlaps the `street driveway north/south` apron rects (blocker 2,
+  ratcheted so the apron collision cannot be rediscovered a third time).
+- Corridor ratio band, verge ceiling of 43, coplanar STREET 0 and HOUSE-INTERIOR 0 - all
+  unchanged, all already asserted, none touched.
+
+### Gates at hand-off
+
+Nothing but this file changed, so the gates are re-run rather than newly claimed.
+
+    npx tsc --noEmit                                 clean (exit 0)
+    npx vitest run src/nuketown2-fidelity.test.ts
+      src/collider-visual-parity-gate.test.ts
+      src/graphics-profile-contract.test.ts
+      src/legacy-main-size-ratchet.test.ts           4 files, 55 tests, all passed
+    npx tsx scripts/qa/find-coplanar-pairs.ts        boxes=757, pairs<=0.03m: 95,
+                                                     FINDINGS: 0, FENCED: 69,
+                                                     SAME-MATERIAL: 26,
+                                                     HOUSE-INTERIOR: 0, STREET: 0
+
+**HITL 6 owns the landing.** The specification above is buildable in one sitting by anyone
+who starts from the table rather than from the brief; what cost this box was proving that
+the previous table could not be built at all.
