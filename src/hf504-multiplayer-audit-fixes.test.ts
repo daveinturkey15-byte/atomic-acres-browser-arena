@@ -98,10 +98,38 @@ describe('HF-504 "cannot pick up guns" - a rejected pickup must repair the guest
 
   it('still rolls the optimistic local application back before adopting the host record', () => {
     const body = functionBody(main, 'function acceptLocalPickupResult(message: PickupResultMessage): void {');
-    const restore = body.indexOf('restorePendingLocalPickup(pending);');
-    const canonical = body.indexOf('applyCanonicalPickupDrop(message,');
+    const rejected = body.indexOf("if (message.status === 'rejected')");
+    const restore = body.indexOf('restorePendingLocalPickup(pending);', rejected);
+    const canonical = body.indexOf('applyCanonicalPickupDrop(message,', rejected);
     expect(restore).toBeGreaterThanOrEqual(0);
     expect(canonical).toBeGreaterThan(restore);
+  });
+});
+
+describe('HF-504 P-3/P-4 pickup authority - claims stay host-only and results are canonical', () => {
+  it('admits pickup claims to the host handler without relaying the untrusted payload', () => {
+    const ingress = network.slice(network.indexOf('private wireGuestEvents'), network.indexOf('private wireGuestState'));
+    expect(ingress).toContain("|| payload.type === 'reload-intent' || payload.type === 'pickup'");
+    expect(ingress).toContain('this.onMessage(payload);\n        return;');
+    const pickupIndex = ingress.indexOf("payload.type === 'pickup'");
+    const hostHandler = ingress.indexOf('this.onMessage(payload);', pickupIndex);
+    const relayIndex = ingress.indexOf('this.broadcast(payload, playerId);', pickupIndex);
+    expect(pickupIndex).toBeGreaterThanOrEqual(0);
+    expect(hostHandler).toBeGreaterThan(pickupIndex);
+    expect(relayIndex).toBeGreaterThan(hostHandler);
+  });
+
+  it('broadcasts the host result and repairs a non-claimant guest drop', () => {
+    const sender = functionBody(main, 'function sendRemotePickupResult(');
+    expect(sender).toContain('network.send(result);');
+    expect(sender).not.toContain('network.sendToPlayer(message.by, result);');
+    const consumer = functionBody(main, 'function acceptLocalPickupResult(');
+    const nonClaimant = consumer.indexOf('if (message.forPlayerId !== player.id)');
+    const canonical = consumer.indexOf('applyCanonicalPickupDrop(message, performance.now());', nonClaimant);
+    const inventory = consumer.indexOf('applyLocalCombatInventoryProjection(message.combatInventory, true);');
+    expect(nonClaimant).toBeGreaterThanOrEqual(0);
+    expect(canonical).toBeGreaterThan(nonClaimant);
+    expect(inventory).toBeGreaterThan(canonical);
   });
 });
 

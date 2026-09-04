@@ -1278,7 +1278,7 @@ export class ArenaNetwork {
         || payload.type === 'railgun-claim-request' || payload.type === 'railgun-shot-request'
         || payload.type === 'timed-map-weapon-claim-request'
         || payload.type === 'guest-resume-ack' || payload.type === 'guest-resume-nack'
-        || payload.type === 'reload-intent'
+        || payload.type === 'reload-intent' || payload.type === 'pickup'
         || payload.type === 'chat-submit') {
         this.onMessage(payload);
         return;

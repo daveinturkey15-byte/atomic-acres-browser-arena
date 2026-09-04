@@ -338,6 +338,7 @@ async function main() {
     ports: { dist: PORT, peer: PEER_PORT },
     flow: [],
     scenarios: {},
+    rowMeasures: {},
     stateDiff: { samples: [], divergences: [] },
     trace: {},
     findings,
@@ -615,23 +616,33 @@ async function runScenarios(peers, report, step) {
     report.scenarios[role] = results;
     step('scenarios', { peer: role });
 
-    results.pickup = await scenarioPickup(guest, host, role);
+    results.pickup = await scenarioPickup(guest, host, peers, role);
     results.reload = await scenarioReload(guest, host, role);
     results.swap = await scenarioSwap(guest, peers, role);
     results.fireAtHost = await scenarioFire(guest, host, role, 'host');
     results.fireAtGuest = await scenarioFire(guest, peers[role === 'guestA' ? 'guestB' : 'guestA'], role, 'other-guest');
     results.damageAndDeath = await scenarioDamageDeath(guest, host, peers, role);
     results.respawn = await scenarioRespawn(guest, host, role);
+    results.pickupAuthority = await scenarioPickupAuthority(guest, host, peers, role);
     results.scoreboard = await scenarioScoreboard(guest, host, role);
+    for (const [caseName, scenario] of [['pickup-rejected-claim', results.pickup], ['pickup-accepted-claim', results.pickupAuthority]]) {
+      for (const rowId of scenario.measuredRows ?? []) {
+        report.rowMeasures[rowId] ??= [];
+        report.rowMeasures[rowId].push({ role, case: caseName, ok: scenario.ok, result: scenario });
+      }
+    }
   }
   // Rejoin last: it tears a peer's session down, so everything else has run.
   report.scenarios.rejoin = await scenarioRejoin(peers, report);
 }
 
-/** OWNER ITEM "cannot pick up guns". Spawn a ground drop under the guest, press
- *  the real interact, and require the HOST to agree the guest now holds it. */
-async function scenarioPickup(guest, host, role) {
-  const result = { ok: false, steps: [] };
+/** P-3/P-4 negative path: a stale guest-local drop is a rejected claim. The
+ *  request must reach only the host, and the host's correction must be visible
+ *  to the claimant and the other guest. */
+async function scenarioPickup(guest, host, peers, role) {
+  const result = { ok: false, steps: [], measuredRows: ['P-3', 'P-4'] };
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const other = peers[otherRole];
   const before = await viewOf(guest.page);
   const selfId = before.selfId;
   result.weaponBefore = before.players[selfId].weapon;
@@ -668,6 +679,9 @@ async function scenarioPickup(guest, host, role) {
   }
   await sleep(250);
 
+  const hostMark = await markOf(host);
+  const otherMark = await markOf(other);
+
   const interact = await guest.page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     try { return { ok: true, returned: debug.interactDrop() ?? null }; } catch (error) { return { ok: false, reason: String(error?.message ?? error) }; }
@@ -680,30 +694,88 @@ async function scenarioPickup(guest, host, role) {
   result.weaponAfter = after.players[selfId].weapon;
   result.hostSeesWeapon = hostAfter.players[selfId]?.weapon ?? null;
   const trace = await traceSince(guest, mark);
+  const hostTrace = await traceSince(host, hostMark);
+  const otherTrace = await traceSince(other, otherMark);
   result.trace = trace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.hostTrace = hostTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.otherTrace = otherTrace.map((entry) => `${entry.direction}:${entry.type}`);
 
   const sentPickup = trace.some((entry) => entry.direction === 'out' && /pickup/i.test(entry.type));
   const gotResult = trace.some((entry) => entry.direction === 'in' && /pickup/i.test(entry.type));
   result.sentPickup = sentPickup;
   result.gotPickupResult = gotResult;
+  result.hostSawClaim = hostTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawRawClaim = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawCorrection = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
 
-  if (result.weaponBefore === result.weaponAfter) {
-    record(`PICKUP-NO-EFFECT-${role}`, 'critical', 'guest pressed interact on a ground weapon and its own weapon never changed',
-      { weaponBefore: result.weaponBefore, weaponAfter: result.weaponAfter, sentPickup, gotResult, trace: result.trace.slice(0, 20) });
-    return result;
-  }
   if (!sentPickup) {
-    record(`PICKUP-NOT-REQUESTED-${role}`, 'critical', 'guest changed weapon on a pickup WITHOUT asking the host - guest-authoritative pickup',
+    record(`PICKUP-NOT-REQUESTED-${role}`, 'critical', 'guest-local stale pickup did not send a claim to the host',
       { weaponAfter: result.weaponAfter, trace: result.trace.slice(0, 20) });
   } else if (!gotResult) {
     record(`PICKUP-UNACKNOWLEDGED-${role}`, 'high', 'guest sent a pickup request and applied it without a host result inside the ack budget',
       { ackBudgetMs: ACK_BUDGET_MS, trace: result.trace.slice(0, 20) });
   }
-  if (result.hostSeesWeapon !== result.weaponAfter) {
-    record(`PICKUP-HOST-DISAGREES-${role}`, 'critical', "the host's replica of the guest still holds the old weapon after a pickup",
-      { guestWeapon: result.weaponAfter, hostSeesWeapon: result.hostSeesWeapon });
+  if (!result.hostSawClaim) {
+    record(`PICKUP-HOST-MISSED-CLAIM-${role}`, 'high', 'the host never observed the guest pickup claim', result);
   }
-  result.ok = result.weaponBefore !== result.weaponAfter && result.hostSeesWeapon === result.weaponAfter;
+  if (result.otherSawRawClaim) {
+    record(`PICKUP-RAW-RELAY-${role}`, 'critical', 'the other guest received an unvalidated pickup claim', result);
+  }
+  if (!result.otherSawCorrection) {
+    record(`PICKUP-CORRECTION-MISSED-${role}`, 'critical', 'the other guest did not receive the host pickup correction', result);
+  }
+  // The staged drop is intentionally unknown to the host, so restoration of
+  // the original weapon is the expected rejected-claim outcome.
+  result.restored = result.weaponBefore === result.weaponAfter;
+  result.ok = sentPickup && gotResult && result.hostSawClaim && !result.otherSawRawClaim && result.otherSawCorrection && result.restored;
+  return result;
+}
+
+/** OWNER ITEM "cannot pick up guns". A real host-authored death drop is
+ *  consumed after respawn; require the claimant and host to converge, while
+ *  the other guest sees the same canonical post-transaction drop. */
+async function scenarioPickupAuthority(guest, host, peers, role) {
+  const result = { ok: false };
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const other = peers[otherRole];
+  const before = await viewOf(guest.page);
+  const selfId = before.selfId;
+  const staged = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const drop = debug.snapshot().deathDrops?.find((candidate) => candidate.weaponAvailable);
+    if (!drop) return { ok: false, reason: 'no host-authored death drop available after respawn' };
+    const current = debug.snapshot().player.primaryWeapon;
+    const alternative = ['carbine', 'smg', 'ak-alpha', 'm14-ebr'].find((weapon) => weapon !== drop.weapon && weapon !== current);
+    if (!alternative) return { ok: false, reason: 'no alternate primary available' };
+    const position = drop.position;
+    debug.equipWeapon(alternative);
+    debug.teleportPlayer(position[0], debug.snapshot().player.position[1], position[2]);
+    return { ok: true, dropId: drop.id, weapon: drop.weapon, holding: alternative };
+  });
+  result.staged = staged;
+  if (!staged.ok) return result;
+  await sleep(ACK_BUDGET_MS);
+  const marks = { guest: await markOf(guest), host: await markOf(host), other: await markOf(other) };
+  await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop());
+  await sleep(ACK_BUDGET_MS);
+  const after = await viewOf(guest);
+  const hostAfter = await viewOf(host);
+  result.guestWeapon = after.players[selfId]?.weapon ?? null;
+  result.hostWeapon = hostAfter.players[selfId]?.weapon ?? null;
+  const guestTrace = await traceSince(guest, marks.guest);
+  const hostTrace = await traceSince(host, marks.host);
+  const otherTrace = await traceSince(other, marks.other);
+  result.trace = guestTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.otherTrace = otherTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.sentPickup = guestTrace.some((entry) => entry.direction === 'out' && entry.type === 'pickup');
+  result.gotResult = guestTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.otherSawRawClaim = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawCanonicalResult = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.hostSawClaim = hostTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  if (result.otherSawRawClaim) record(`PICKUP-RAW-RELAY-AUTH-${role}`, 'critical', 'the other guest received a raw pickup claim during a real pickup', result);
+  if (!result.otherSawCanonicalResult) record(`PICKUP-CANONICAL-MISSED-${role}`, 'critical', 'the other guest missed the host canonical pickup result', result);
+  result.ok = result.sentPickup && result.gotResult && result.hostSawClaim && !result.otherSawRawClaim
+    && result.otherSawCanonicalResult && result.guestWeapon === result.hostWeapon;
   return result;
 }
 

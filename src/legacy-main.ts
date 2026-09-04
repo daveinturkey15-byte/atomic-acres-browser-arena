@@ -15655,7 +15655,11 @@ function sendRemotePickupResult(
     drop: pickupResultDropRecord(drop, now),
     nonce: message.nonce,
   };
-  network.sendToPlayer(message.by, result);
+  // Pickup claims are guest input, but the result is host state. Broadcast the
+  // canonical post-transaction drop to every admitted guest so a rejected
+  // claim repairs every replica that had rendered the same drop. The network
+  // ingress fence keeps the raw claim on the host only; guests never relay it.
+  network.send(result);
 }
 
 function rejectRemotePickup(
@@ -15717,8 +15721,13 @@ function applyCanonicalPickupDrop(message: PickupResultMessage, now: number): vo
 }
 
 function acceptLocalPickupResult(message: PickupResultMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId
-    || message.forPlayerId !== player.id) return;
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
+  // Every guest consumes the host's canonical drop correction. Only the
+  // claimant applies the inventory projection and correlates the nonce.
+  if (message.forPlayerId !== player.id) {
+    applyCanonicalPickupDrop(message, performance.now());
+    return;
+  }
   const pending = pendingLocalPickup;
   if (pending && (pending.nonce !== message.nonce || pending.dropId !== message.dropId)) return;
   if (message.status === 'rejected') {
