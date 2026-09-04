@@ -30,9 +30,10 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, uniformSwatch } from '../wear';
+import { boxUv, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -68,6 +69,56 @@ export interface ConcreteOptions {
   readonly dampFootY?: number;
 }
 
+let concreteGraph: { colorNode: any; roughnessNode: any } | null = null;
+
+function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (concreteGraph) return concreteGraph;
+  const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
+  const p = positionWorld;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const variant = uniforms.concreteVariant as any;
+  const isBlock = variant.greaterThan(float(1.5));
+  const isApron = variant.lessThan(float(0.5));
+  const run = p.x.add(p.z);
+  const courseV = p.y.div(float(BLOCK_COURSE_M));
+  const courseIdx = floor(courseV);
+  const bedJoint = smoothstep(float(0.012), float(0.0), abs(fract(courseV).sub(float(0.5))).mul(float(BLOCK_COURSE_M)));
+  const stretcherU = run.add(courseIdx.mul(float(BLOCK_STRETCHER_M * 0.5))).div(float(BLOCK_STRETCHER_M));
+  const perpJoint = smoothstep(float(0.012), float(0.0), abs(fract(stretcherU).sub(float(0.5))).mul(float(BLOCK_STRETCHER_M)));
+  const blockJoint = max(bedJoint, perpJoint);
+  const jointX = smoothstep(float(0.006), float(0.0), abs(fract(p.x.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
+  const jointZ = smoothstep(float(0.006), float(0.0), abs(fract(p.z.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
+  const slabJoint = max(jointX, jointZ);
+  const joint = isBlock.select(blockJoint, slabJoint);
+  const relief = isBlock.select(float(0), abs(fract(p.z.div(float(0.0025))).sub(float(0.5))).mul(float(2)));
+  const slabUnit = hash2(vec2(
+    floor(p.x.div(float(SLAB_JOINT_M))),
+    floor(p.z.div(float(SLAB_JOINT_M))),
+  )).sub(float(0.5)).mul(float(0.09));
+  const blockUnit = hash2(vec2(floor(stretcherU), courseIdx)).sub(float(0.5)).mul(float(0.11));
+  const unit = isBlock.select(blockUnit, slabUnit);
+  const footY = uniforms.concreteFootY;
+  const apronDamp = smoothstep(float(0.75), float(0.0), wear.soilMask.mul(float(1.6)));
+  const verticalDamp = smoothstep(footY.add(float(0.24)), footY.add(float(0.02)), p.y);
+  const damp = isApron.select(apronDamp, verticalDamp);
+  const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
+    .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
+  const spall = isApron.select(float(0), blockSpall);
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
+  const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
+  const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
+  const jointed = mix(finished, finished.mul(float(0.58)), joint);
+  concreteGraph = {
+    colorNode: mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7))),
+    roughnessNode: clamp(
+      wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
+      float(0.25),
+      float(1.0),
+    ),
+  };
+  return concreteGraph;
+}
+
 export function createConcreteMaterial(
   name: string,
   baseSrgb: number,
@@ -85,74 +136,12 @@ export function createConcreteMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const p = positionWorld;
-  const uv = boxUv();
-  const wear = buildWear(spec, uv);
-
-  // --- Structure -----------------------------------------------------------
-  // `joint` is the recessed line network, `relief` the shading that gives the
-  // surface between the joints its own texture, and `unit` a per-bay or
-  // per-block tonal spread. All three are family structure, not wear.
-  let joint: any;
-  let relief: any;
-  let unit: any;
-
-  if (variant === 'block') {
-    // Blockwork on a vertical face: 200 mm courses in half bond, 10 mm joints
-    // recessed a few millimetres, so both directions read as real mortar.
-    const run = p.x.add(p.z);
-    const courseV = p.y.div(float(BLOCK_COURSE_M));
-    const courseIdx = floor(courseV);
-    const bedJoint = smoothstep(float(0.012), float(0.0), abs(fract(courseV).sub(float(0.5))).mul(float(BLOCK_COURSE_M)));
-    const stretcherU = run.add(courseIdx.mul(float(BLOCK_STRETCHER_M * 0.5))).div(float(BLOCK_STRETCHER_M));
-    const perpJoint = smoothstep(float(0.012), float(0.0), abs(fract(stretcherU).sub(float(0.5))).mul(float(BLOCK_STRETCHER_M)));
-    joint = max(bedJoint, perpJoint);
-    // A block face is float-finished, not broomed: its relief is the cast
-    // texture, which is finer and non-directional.
-    relief = float(0);
-    unit = hash2(vec2(floor(stretcherU), courseIdx)).sub(float(0.5)).mul(float(0.11));
-  } else {
-    // A poured slab: sawn control joints in both axes, broom finish between.
-    const jointX = smoothstep(float(0.006), float(0.0), abs(fract(p.x.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
-    const jointZ = smoothstep(float(0.006), float(0.0), abs(fract(p.z.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
-    joint = max(jointX, jointZ);
-    // Straight parallel ridges at 2.5 mm pitch, square to the pour. Not noise:
-    // a broom leaves lines, and noise instead of lines is the tell.
-    relief = abs(fract(p.z.div(float(0.0025))).sub(float(0.5))).mul(float(2));
-    // Two adjacent bays poured from two trucks are never the same grey, and
-    // the joint between them is where you see it.
-    unit = hash2(vec2(
-      floor(p.x.div(float(SLAB_JOINT_M))),
-      floor(p.z.div(float(SLAB_JOINT_M))),
-    )).sub(float(0.5)).mul(float(0.09));
-  }
-
-  // --- Damp band -----------------------------------------------------------
-  // Wicking from the foot of the pour. A kerb face and a blockwork wall both
-  // have a real foot to wick from; a slab instead darkens where the metre-scale
-  // soiling field says water stands.
-  const footY = options.dampFootY ?? 0.0;
-  const damp = variant === 'apron'
-    ? smoothstep(float(0.75), float(0.0), wear.soilMask.mul(float(1.6)))
-    : smoothstep(float(footY + 0.24), float(footY + 0.02), p.y);
-
-  const base = uniformSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(unit));
-  const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
-  const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
-  const jointed = mix(finished, finished.mul(float(0.58)), joint);
-
-  // Spalls expose the pale unweathered core, so this is a LIGHT step, not a
-  // dark one — getting that backwards is the "cracks drawn dark" CG tell.
-  const spall = variant === 'apron'
-    ? float(0)
-    : smoothstep(float(0.55), float(0.86), wear.scuff).mul(smoothstep(float(footY + 0.10), float(footY + 0.16), p.y));
-  mat.colorNode = mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7)));
-
-  mat.roughnessNode = clamp(
-    wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
-    float(0.25),
-    float(1.0),
-  );
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  setNuketown2FamilyUniform(uniforms, 'concreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
+  setNuketown2FamilyUniform(uniforms, 'concreteFootY', options.dampFootY ?? 0.0);
+  const shared = sharedConcreteGraph(uniforms);
+  mat.colorNode = shared.colorNode;
+  mat.roughnessNode = shared.roughnessNode;
   return mat;
 }
 

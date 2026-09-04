@@ -66,7 +66,8 @@
  * registered rather than plain custom properties so that (a) an unwired build
  * still gets a sane typed default instead of an invalid-at-computed-value
  * cascade, and (b) the value is animatable and interpolable if a future lane
- * wants to ease one.
+ * wants to ease one. They are non-inherited: the runtime writes each value on
+ * the consuming cluster, not on #hud, so a frame invalidates only that cluster.
  *
  * --hud-sway-x   -1..1  normalised horizontal look lag (+ = camera turned right)
  * --hud-sway-y   -1..1  normalised vertical look lag   (+ = camera pitched up)
@@ -96,31 +97,31 @@
 
 @property --hud-sway-x {
   syntax: '<number>';
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
 @property --hud-sway-y {
   syntax: '<number>';
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
 @property --hud-breathe {
   syntax: '<number>';
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
 @property --hud-gait {
   syntax: '<number>';
-  inherits: true;
+  inherits: false;
   initial-value: 0;
 }
 
 @property --hud-health {
   syntax: '<number>';
-  inherits: true;
+  inherits: false;
   initial-value: 1;
 }
 
@@ -724,7 +725,8 @@
  *   `translate:`  the WIRED look/move lag. One declaration per cluster reading
  *                 --hud-sway-x / --hud-sway-y / --hud-breathe. It only
  *                 recomputes when the runtime writes those three properties on
- *                 #hud, which is one style write per frame on ONE element.
+ *                 the eight consuming cluster elements, so the root and its
+ *                 unrelated descendants are not invalidated by these writes.
  *
  *   `transform:`  the UNWIRED idle breathing, as a plain keyframe animation.
  *                 `translate` and `transform` are separate properties that

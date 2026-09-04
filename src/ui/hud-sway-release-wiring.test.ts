@@ -40,11 +40,11 @@ describe('hud-sway release live wiring', () => {
     const block = mainSource.slice(anchor, anchor + 1_200);
     // The apply path is now inside the live branch...
     expect(block).toContain('if (hudSwayLive) {');
-    expect(block).toContain('hudSway = applyHudSway(hudRoot, hudSway, {');
+    expect(block).toContain('hudSway = applyHudSway(hudMotionTargets, hudSway, {');
     // ...and the release path is latched, so a paused HUD is not rewriting
     // four custom properties on every frame it is not moving.
     expect(block).toContain('} else if (!hudSwayReleased) {');
-    expect(block).toContain('releaseHudSway(hudRoot)');
+    expect(block).toContain('releaseHudSway(hudMotionTargets)');
     expect(block).toContain('hudSwayReleased = true;');
     expect(block).toContain('hudSwayReleased = false;');
     // Resuming must not snap: the state is re-seeded at the current look

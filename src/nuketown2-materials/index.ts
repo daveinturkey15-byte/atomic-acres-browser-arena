@@ -149,6 +149,9 @@ export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
   'coachGlass',
 ] as const);
 
+/** Measured Pass 94/HITL 5 graph admission ceiling after family sharing. */
+export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 40;
+
 /**
  * Build one material per role.
  *

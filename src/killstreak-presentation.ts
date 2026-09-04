@@ -16,7 +16,11 @@ import {
 import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
-import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
+import {
+  deepFreezeSubtreeMatrices,
+  deepUnfreezeSubtreeMatrices,
+  freezeMatrixWorldWalk,
+} from './static-matrix-freeze';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
@@ -3017,6 +3021,10 @@ export class KillstreakPresentation {
     this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
     this.sensorRoot.add(...this.sensorSilhouettes);
     this.root.add(this.sensorRoot);
+    // The pool is a permanent scene child, but its 4.2k dormant nodes must
+    // not be descended by every renderer matrix walk. Live entity/effect
+    // roots are refreshed explicitly after sync mutates them.
+    freezeMatrixWorldWalk(this.root);
   }
 
   private static readonly PREWARMED_CAPACITIES: readonly [PresentedEntityPoolKey, number][] = Object.freeze([
@@ -3548,7 +3556,10 @@ export class KillstreakPresentation {
       for (let batchIndex = 0; batchIndex < stagedBatches.length; batchIndex += 1) {
         const batch = stagedBatches[batchIndex]!;
         stageBatchInView(batch, 30 + batchIndex * 4, batchIndex === 0 ? 2.5 : 0.9);
-        for (const stagedRoot of batch) stagedRoot.visible = true;
+        for (const stagedRoot of batch) {
+          stagedRoot.visible = true;
+          stagedRoot.updateWorldMatrix(true, true);
+        }
         await runtime.compileAndRender(this.root, camera, parentScene);
         for (const stagedRoot of batch) stagedRoot.visible = false;
         if (typeof document !== 'undefined' && batchIndex + 1 < stagedBatches.length) {
@@ -3605,6 +3616,7 @@ export class KillstreakPresentation {
               if (node instanceof THREE.LOD) node.update(camera);
             });
           }
+          for (const liveRoot of liveActivationRoots) liveRoot.updateWorldMatrix(true, true);
           await runtime.compileAndRender(this.root, camera, parentScene);
         }
       } finally {
@@ -3867,6 +3879,7 @@ export class KillstreakPresentation {
       }
       if (progress >= 1) this.deactivateBombShell(shell);
     }
+    this.updateLiveWorldMatrices();
   }
 
   private syncSensorContacts(contacts: readonly DroneSensorContact[]): void {
@@ -3882,6 +3895,26 @@ export class KillstreakPresentation {
       silhouette.userData.contactLifeId = contact.lifeId;
       silhouette.userData.relation = contact.relation;
       silhouette.userData.throughWall = contact.throughWall;
+    }
+  }
+
+  /** Refresh only roots whose transforms were touched during this sync. */
+  private updateLiveWorldMatrices(): void {
+    for (const presented of this.entities.values()) {
+      presented.root.updateWorldMatrix(true, true);
+    }
+    for (const flash of this.impactFlashPool) {
+      if (flash.active) flash.root.updateWorldMatrix(true, true);
+    }
+    for (const shell of this.bombShellPool) {
+      if (shell.active) shell.root.updateWorldMatrix(true, true);
+    }
+    for (const ember of this.emberPool) {
+      if (ember.active) ember.root.updateWorldMatrix(true, true);
+    }
+    if (this.visibleSensorContacts > 0) this.sensorRoot.updateWorldMatrix(true, true);
+    for (const marker of this.placementMarkers.values()) {
+      if (marker.root.visible) marker.root.updateWorldMatrix(true, true);
     }
   }
 
@@ -4053,6 +4086,12 @@ export class KillstreakPresentation {
         }
       }
     }
+    // Muse F1 (HF-491): the pool ROOT is a static traversal boundary
+    // (`freezeMatrixWorldWalk`), so the renderer's walk no longer descends
+    // into these newly activated shells/flashes/embers. `presentImpacts` is
+    // the one activation site outside `sync()`, so it must refresh the live
+    // roots itself or the effect draws one frame at its pooled rest pose.
+    this.updateLiveWorldMatrices();
   }
 
   entityRoot(id: string): THREE.Group | null {

@@ -21,6 +21,7 @@ import * as TSL from 'three/tsl';
 import { buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
+import { createNuketown2Uniforms, type Nuketown2Uniforms } from '../material-uniforms';
 
 const { abs, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -44,6 +45,35 @@ export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpe
   });
 }
 
+let roofGraph: { colorNode: any; roughnessNode: any } | null = null;
+
+function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (roofGraph) return roofGraph;
+  const spec = roofSpec('nuketown2-roof-shared');
+  const p = positionWorld;
+  const wear = buildWear(spec, vec2(p.x, p.z), undefined, uniforms);
+  const courseV = p.z.div(float(SHINGLE_COURSE_M));
+  const courseIdx = floor(courseV);
+  const withinCourse = fract(courseV);
+  const tabU = p.x.add(courseIdx.mul(float(SHINGLE_TAB_M * 0.5))).div(float(SHINGLE_TAB_M));
+  const tabIdx = floor(tabU);
+  const keyway = smoothstep(float(0.010), float(0.0), abs(fract(tabU).sub(float(0.5))).mul(float(SHINGLE_TAB_M)));
+  const buttShadow = smoothstep(float(0.90), float(1.0), withinCourse);
+  const shingleTone = hash2(vec2(tabIdx, courseIdx)).sub(float(0.5)).mul(float(0.16));
+  const granuleLoss = smoothstep(float(0.35), float(0.72), wear.scuff);
+  const matAsphalt = linearSwatch(0x2a2b2b);
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(shingleTone));
+  const withLoss = mix(base, matAsphalt, granuleLoss.mul(float(0.55)));
+  const streakField = fract(p.x.mul(float(1.7)).add(wear.soilMask.mul(float(0.4))));
+  const streak = smoothstep(float(0.58), float(0.86), streakField).mul(wear.soilMask);
+  const shaded = mix(withLoss, withLoss.mul(float(0.30)), max(buttShadow, keyway));
+  roofGraph = {
+    colorNode: mix(shaded, shaded.mul(float(0.74)), streak.mul(float(0.5))),
+    roughnessNode: wear.roughness.add(granuleLoss.mul(float(-0.12))).sub(buttShadow.mul(float(0.05))),
+  };
+  return roofGraph;
+}
+
 export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStandardNodeMaterial {
   const spec = roofSpec(name);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
@@ -51,52 +81,10 @@ export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStanda
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(spec.baseSrgb);
 
-  const p = positionWorld;
-  // The roof planes run along X and fall along Z, so the course coordinate is
-  // Z and the run is X — the same convention the arena builds them on.
-  const uv = vec2(p.x, p.z);
-  const wear = buildWear(spec, uv);
-
-  const courseV = p.z.div(float(SHINGLE_COURSE_M));
-  const courseIdx = floor(courseV);
-  const withinCourse = fract(courseV);
-
-  // Brick bond: half a tab of stagger per course.
-  const tabU = p.x.add(courseIdx.mul(float(SHINGLE_TAB_M * 0.5))).div(float(SHINGLE_TAB_M));
-  const tabIdx = floor(tabU);
-
-  // 3 mm keyway of the 333 mm tab.
-  const keyway = smoothstep(float(0.010), float(0.0), abs(fract(tabU).sub(float(0.5))).mul(float(SHINGLE_TAB_M)));
-  // The butt of each course throws its own shadow onto the course below: a
-  // shingle is 3 mm proud, and at this sun that is a 10-14 mm shadow.
-  const buttShadow = smoothstep(float(0.90), float(1.0), withinCourse);
-
-  // Per-shingle tonal spread. Real bundles are not one colour and a roof laid
-  // from three bundles shows it.
-  const shingleTone = hash2(vec2(tabIdx, courseIdx)).sub(float(0.5)).mul(float(0.16));
-
-  // Granule loss: the scuff scale, thresholded so it has an edge, revealing
-  // the black asphalt mat under the mineral bed.
-  const granuleLoss = smoothstep(float(0.35), float(0.72), wear.scuff);
-  const matAsphalt = linearSwatch(0x2a2b2b);
-
-  const base = linearSwatch(spec.baseSrgb).mul(wear.albedoMul).mul(float(1).add(shingleTone));
-  const withLoss = mix(base, matAsphalt, granuleLoss.mul(float(0.55)));
-
-  // Algae streaks run DOWN the slope, so they are stretched hard along Z and
-  // narrow along X. They are the darkest thing on a real suburban roof.
-  const streak = smoothstep(
-    float(0.58),
-    float(0.86),
-    fract(p.x.mul(float(1.7)).add(wear.soilMask.mul(float(0.4)))),
-  ).mul(wear.soilMask);
-
-  const shaded = mix(withLoss, withLoss.mul(float(0.30)), max(buttShadow, keyway));
-  mat.colorNode = mix(shaded, shaded.mul(float(0.74)), streak.mul(float(0.5)));
-  mat.roughnessNode = wear.roughness
-    .add(granuleLoss.mul(float(-0.12)))
-    .sub(buttShadow.mul(float(0.05)));
-
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
+  const shared = sharedRoofGraph(uniforms);
+  mat.colorNode = shared.colorNode;
+  mat.roughnessNode = shared.roughnessNode;
   return mat;
 }
 

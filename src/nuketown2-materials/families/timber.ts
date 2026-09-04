@@ -18,9 +18,10 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch, uniformSwatch } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -47,6 +48,44 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
   });
 }
 
+let timberGraph: { colorNode: any; roughnessNode: any } | null = null;
+
+function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (timberGraph) return timberGraph;
+  const spec = timberSpec('nuketown2-timber-shared', 0x673b24, 'fence');
+  const p = positionWorld;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const variant = uniforms.timberVariant as any;
+  const vertical = variant.lessThan(float(0.5));
+  const painted = variant.greaterThan(float(1.5));
+  const pitch = vertical.select(float(PICKET_PITCH_M), float(DECK_PITCH_M));
+  const boardCoord = vertical.select(p.x.add(p.z), p.z);
+  const boardV = boardCoord.div(pitch);
+  const boardIdx = floor(boardV);
+  const boardEdge = abs(fract(boardV).sub(float(0.5))).mul(float(2));
+  const rawGap = smoothstep(float(1).sub(float(0.006).div(pitch).mul(float(2))), float(1.0), boardEdge);
+  const gap = painted.select(float(0), rawGap);
+  const boardTone = hash2(vec2(boardIdx, vertical.select(float(41.3), float(7.9)))).sub(float(0.5)).mul(float(0.16));
+  const along = vertical.select(p.y, p.x);
+  const bandPhase = along.mul(float(1 / 0.0022)).add(hash2(vec2(boardIdx, float(3.1))).mul(float(30)));
+  const latewood = abs(fract(bandPhase).sub(float(0.5))).mul(float(2));
+  const knotCell = floor(along.div(float(0.55)));
+  const knotCentre = hash2(vec2(boardIdx, knotCell)).mul(float(0.55)).add(knotCell.mul(float(0.55)));
+  const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
+  const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
+  const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
+  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
+  const grained = wood.mul(float(1).sub(latewood.mul(painted.select(float(0.03), float(0.11)))));
+  const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
+  const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
+  const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
+  timberGraph = {
+    colorNode: mix(footed, linearSwatch(0x1a120c), gap),
+    roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
+  };
+  return timberGraph;
+}
+
 export function createTimberMaterial(
   name: string,
   baseSrgb: number,
@@ -58,57 +97,11 @@ export function createTimberMaterial(
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
 
-  const p = positionWorld;
-  // Deck boards lie flat and fence pickets stand up, so the wear field has
-  // to work on both orientations; the board structure below still reads its
-  // own explicit world axes.
-  const uv = boxUv();
-  const wear = buildWear(spec, uv);
-
-  const vertical = variant === 'fence';
-  const pitch = vertical ? PICKET_PITCH_M : DECK_PITCH_M;
-  // A picket runs vertically, so its boards repeat along the RUN; a deck board
-  // lies flat, so they repeat across the surface. Painted trim is a single
-  // dressed member and gets no board seam at all.
-  const boardCoord = vertical ? p.x.add(p.z) : p.z;
-  const boardV = boardCoord.div(float(pitch));
-  const boardIdx = floor(boardV);
-  const boardEdge = abs(fract(boardV).sub(float(0.5))).mul(float(2));
-  const gap = variant === 'painted-trim'
-    ? float(0)
-    : smoothstep(float(1 - (0.006 / pitch) * 2), float(1.0), boardEdge);
-
-  // Every board is a different board.
-  const boardTone = hash2(vec2(boardIdx, float(vertical ? 41.3 : 7.9))).sub(float(0.5)).mul(float(0.16));
-
-  // Latewood banding runs ALONG the board, which is why it is one-dimensional
-  // and not fBm: a wood grain that swirls in both axes is a marble.
-  const along = vertical ? p.y : p.x;
-  const bandPhase = along.mul(float(1 / 0.0022)).add(hash2(vec2(boardIdx, float(3.1))).mul(float(30)));
-  const latewood = abs(fract(bandPhase).sub(float(0.5))).mul(float(2));
-
-  // Knots: one every 0.3-0.9 m along the board.
-  const knotCell = floor(along.div(float(0.55)));
-  const knotCentre = hash2(vec2(boardIdx, knotCell)).mul(float(0.55)).add(knotCell.mul(float(0.55)));
-  const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
-
-  // Silvering: UV-bleached exposed timber. High and open goes pale; the damp
-  // foot stays dark. Both metre-scale, both albedo.
-  const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
-  const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
-
-  const wood = uniformSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(boardTone));
-  const grained = wood.mul(float(1).sub(latewood.mul(float(variant === 'painted-trim' ? 0.03 : 0.11))));
-  const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(float(variant === 'painted-trim' ? 0.15 : 0.8)));
-  const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(float(variant === 'painted-trim' ? 0.25 : 0.55)));
-  const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
-
-  mat.colorNode = mix(footed, linearSwatch(0x1a120c), gap);
-  mat.roughnessNode = clamp(
-    wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))),
-    float(0.25),
-    float(1.0),
-  );
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  setNuketown2FamilyUniform(uniforms, 'timberVariant', variant === 'fence' ? 0 : variant === 'deck' ? 1 : 2);
+  const shared = sharedTimberGraph(uniforms);
+  mat.colorNode = shared.colorNode;
+  mat.roughnessNode = shared.roughnessNode;
   return mat;
 }
 

@@ -38,6 +38,7 @@ import {
   scaleResolvable,
 } from './spec';
 import { BACKDROP_READ_DISTANCE_M, isBackdrop } from './wear';
+import { noiseLutTexture } from './noise-lut';
 import { sidingSpec } from './families/siding';
 import { roofSpec } from './families/roof';
 import { asphaltSpec, markingSpec } from './families/asphalt';
@@ -190,6 +191,12 @@ describe('nuketown2 material registry', () => {
   });
 
   it('loads no texture: every surface is generated', () => {
+    // GENERATED is the property, not "textureless". Since HF-491 the wear
+    // engine samples one shared noise tile through a TSL `texture()` node -
+    // a DataTexture whose bytes are computed on the CPU at first use (no
+    // file, no fetch, no decode; noise-lut.ts). That is generation, not
+    // loading, and it is pinned here on the bytes: an in-memory Uint8Array
+    // with no source URL. The classic map slots stay empty as before.
     const registry = createNuketown2MaterialRegistry() as unknown as Record<string, Record<string, unknown>>;
     const mapSlots = [
       'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap',
@@ -200,6 +207,9 @@ describe('nuketown2 material registry', () => {
         expect(registry[role]![slot] ?? null, `${role}.${slot} must stay procedural`).toBeNull();
       }
     }
+    const lut = noiseLutTexture();
+    expect(lut.image.data, 'the noise tile is CPU bytes').toBeInstanceOf(Uint8Array);
+    expect((lut.image as { src?: string }).src ?? null, 'the noise tile has no URL').toBeNull();
   });
 
   it('builds no light object', () => {

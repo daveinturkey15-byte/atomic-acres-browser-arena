@@ -112,6 +112,7 @@ import {
 } from './minigun-spool';
 import { RUNTIME_WEAPON_RETENTION_LIMIT } from './weapon-prewarm-catalog';
 import { stableDirectionDelta } from './stable-bone-orientation';
+import { ViewmodelMatrixPathUpdater } from './viewmodel-matrix-paths';
 import {
   VIEWMODEL_SURFACE_CLIP_PLANE_COUNT,
   type ViewmodelSurfacePlane,
@@ -2147,6 +2148,8 @@ export class WeaponPresentation {
     orientPreferredAxis: new THREE.Vector3(),
     orientDelta: new THREE.Quaternion(),
   };
+  private readonly viewmodelMatrixPaths = new ViewmodelMatrixPathUpdater();
+  private readonly viewmodelMatrixTargets: Array<THREE.Object3D | null | undefined> = [];
   private readonly meleeKnife = new THREE.Group();
   private readonly meleeRig = new THREE.Group();
   private readonly passiveKnife = new THREE.Group();
@@ -4673,12 +4676,13 @@ export class WeaponPresentation {
     if (lock <= 0) return;
     const sight = this.sightReference(model);
     if (!sight) return;
-    this.camera.updateMatrixWorld(true);
-    this.root.updateWorldMatrix(true, true);
+    this.viewmodelMatrixTargets.length = 0;
+    this.viewmodelMatrixTargets.push(sight);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     const cameraLocal = this.camera.worldToLocal(sight.getWorldPosition(new THREE.Vector3()));
     this.root.position.x -= cameraLocal.x * lock;
     this.root.position.y -= cameraLocal.y * lock;
-    this.root.updateWorldMatrix(true, true);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
   }
 
   presentationState() {
@@ -5042,7 +5046,10 @@ export class WeaponPresentation {
 
   private solveArms(arms: THREE.Object3D, activeModel: THREE.Object3D | undefined, reloadPose: ReloadPose): void {
     if (!activeModel || this.armRigs.length === 0) return;
-    this.root.updateMatrixWorld(true);
+    this.viewmodelMatrixTargets.length = 0;
+    this.viewmodelMatrixTargets.push(arms, activeModel);
+    for (const rig of this.armRigs) this.viewmodelMatrixTargets.push(rig.shoulder, rig.elbow, rig.hand);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     const diagnostics: Array<Record<string, unknown>> = [];
     for (const rig of this.armRigs) {
       const socketName = rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l';
@@ -5105,7 +5112,8 @@ export class WeaponPresentation {
     // the authored positive-handed armature and also keeps diagnostic fixtures
     // with a reflected ancestor mathematically stable; a quaternion must never
     // be asked to encode scale handedness.
-    bone.updateWorldMatrix(true, false);
+    // Ancestors were refreshed once for this solve; force only this bone.
+    bone.updateWorldMatrix(false, false, true);
     const parent = bone.parent;
     const desiredParent = scratch.orientDesiredDirection.copy(targetWorld);
     if (parent) parent.worldToLocal(desiredParent);
@@ -5123,7 +5131,7 @@ export class WeaponPresentation {
     // themselves; walking the whole subtree here (fingers, skinned sleeve and
     // whatever is socketed below the wrist) three bones x two arms x up to
     // three iterations per frame was the largest matrix cost in the frame.
-    bone.updateWorldMatrix(false, false);
+    bone.updateWorldMatrix(false, false, true);
   }
 
   /** The exported palm node is the complete position and orientation authority. */
@@ -5154,7 +5162,9 @@ export class WeaponPresentation {
 
   private alignRiggedPalmWorld(rig: RiggedViewArm, targetRotationWorld: THREE.Quaternion): number {
     const scratch = this.riggedArmSolveScratch;
-    rig.wrist.updateWorldMatrix(true, false); // HF-399: palmContact refreshes its own chain below
+    this.viewmodelMatrixTargets.length = 0;
+    this.viewmodelMatrixTargets.push(rig.wrist, rig.palmContact);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     const currentPalm = rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation);
     const wristWorld = rig.wrist.getWorldQuaternion(scratch.wristWorldRotation);
     const parentWorld = rig.wrist.parent
@@ -5163,7 +5173,7 @@ export class WeaponPresentation {
     scratch.palmRotationDelta.copy(targetRotationWorld).multiply(currentPalm.invert());
     wristWorld.premultiply(scratch.palmRotationDelta);
     rig.wrist.quaternion.copy(parentWorld.invert().multiply(wristWorld)).normalize();
-    rig.wrist.updateWorldMatrix(false, false); // HF-399
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     return rig.palmContact.getWorldQuaternion(scratch.palmWorldRotation).angleTo(targetRotationWorld);
   }
 
@@ -5371,6 +5381,9 @@ export class WeaponPresentation {
     handDirection: THREE.Vector3,
   ): THREE.Vector3 {
     const scratch = this.riggedArmSolveScratch;
+    this.viewmodelMatrixTargets.length = 0;
+    this.viewmodelMatrixTargets.push(rig.shoulder, rig.elbow, rig.wrist, rig.finger, rig.palmContact);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     const elbowTarget = solveTwoBoneElbowInto(
       shoulderPosition,
       wristTarget,
@@ -5384,6 +5397,7 @@ export class WeaponPresentation {
     this.orientRiggedBone(rig.elbow, rig.wrist, wristTarget);
     const handTarget = rig.wrist.getWorldPosition(scratch.handTarget).add(handDirection);
     this.orientRiggedBone(rig.wrist, rig.finger, handTarget);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     return elbowTarget;
   }
 
@@ -5454,7 +5468,11 @@ export class WeaponPresentation {
         left.wrist.scale.copy(support.wristScale);
         this.placeRiggedShoulderEntryBelowFrame(left, cameraRotation);
       }
-      arms.updateWorldMatrix(true, true);
+      this.viewmodelMatrixTargets.length = 0;
+      for (const rig of this.riggedArmRigs) {
+        this.viewmodelMatrixTargets.push(rig.shoulder, rig.elbow, rig.wrist, rig.finger, rig.palmContact);
+      }
+      this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
       const armsWorldRotation = arms.getWorldQuaternion(scratch.meleeArmsWorldRotation);
       const poseChain = (
         rig: RiggedViewArm,
@@ -5510,7 +5528,12 @@ export class WeaponPresentation {
         );
       }
     }
-    this.root.updateWorldMatrix(true, true);
+    this.viewmodelMatrixTargets.length = 0;
+    for (const rig of this.riggedArmRigs) {
+      this.viewmodelMatrixTargets.push(rig.shoulder, rig.elbow, rig.wrist, rig.finger, rig.palmContact);
+    }
+    this.viewmodelMatrixTargets.push(this.authoredMeleeKnife, this.authoredMeleeSocket);
+    this.viewmodelMatrixPaths.update(this.viewmodelMatrixTargets, this.camera);
     if (this.authoredMeleeKnife && this.authoredMeleeSocket) {
       // Re-align the knife blade axis to the current finger direction each frame
       // so the handle stays visibly seated in the palm through windup/thrust/recovery.
@@ -5586,7 +5609,18 @@ export class WeaponPresentation {
     if (this.riggedArmRigs.length === 0) return;
     this.restoreRiggedArmBindPose();
     if (!activeModel) return;
-    this.root.updateMatrixWorld(true);
+    // Refresh the camera, weapon sockets and the two authored IK chains only.
+    // The old forced root walk descended the complete 906-node viewmodel,
+    // including static weapon dressing and skinned sleeve descendants.
+    const matrixTargets = this.viewmodelMatrixTargets;
+    matrixTargets.length = 0;
+    matrixTargets.push(this.root, activeModel, this.cachedNamedNode(activeModel, 'muzzle-socket'));
+    for (const rig of this.riggedArmRigs) {
+      matrixTargets.push(rig.shoulder, rig.elbow, rig.wrist, rig.finger, rig.palmContact);
+      matrixTargets.push(this.cachedNamedNode(activeModel, rig.side === 'right' ? 'grip-socket-r' : 'support-socket-l'));
+      if (rig.side === 'left') matrixTargets.push(this.cachedNamedNode(activeModel, 'reload-socket-l'));
+    }
+    this.viewmodelMatrixPaths.update(matrixTargets, this.camera);
     const scratch = this.riggedArmSolveScratch;
     const cameraRotation = this.camera.getWorldQuaternion(scratch.cameraRotation);
     const now = performance.now();

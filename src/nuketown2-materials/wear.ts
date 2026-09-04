@@ -19,21 +19,20 @@
  */
 import * as THREE from 'three';
 import * as TSL from 'three/tsl';
-import { fbm2 } from '../map3/noise';
+import { NOISE_LUT_CELLS, lutFbm } from './noise-lut';
 import {
   MAX_ALBEDO_DARKENING,
   type Nuketown2MaterialSpec,
   assertSpec,
   readDistance,
-  scaleResolvable,
 } from './spec';
+import { createNuketown2Uniforms, type Nuketown2Uniforms } from './material-uniforms';
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
 const {
   cameraPosition,
   clamp,
   float,
-  fract,
   length,
   max,
   mix,
@@ -59,32 +58,35 @@ export function detailFalloff(nearM: number, farM: number): any {
  *
  * THE BUG THIS EXISTS FOR, and it is not a micro-optimisation. A 0.9 mm grain
  * authored across this arena's 220 m ground slab means noise coordinates up to
- * 1.2e5. float32 resolves about 0.008 at that magnitude, so `fract` quantises
- * to a couple of hundred steps and the grain stops being grain; worse, the
- * value hash then evaluates `sin` of an argument around 5e7, and a transcendental
- * that far out of range is both meaningless and, on this driver, catastrophically
- * slow - measured as a 12-second first-submission stall that failed the arena
- * boot smoke outright.
+ * 1.2e5. float32 resolves about 0.008 at that magnitude, so a per-fragment
+ * `fract` quantised to a couple of hundred steps and the grain stopped being
+ * grain; worse, the value hash then evaluated `sin` of an argument around 5e7,
+ * and a transcendental that far out of range is both meaningless and, on this
+ * driver, catastrophically slow - measured as a 12-second first-submission
+ * stall that failed the arena boot smoke outright.
  *
  * Wrapping the coordinate into a tile of a fixed number of lattice cells is
  * what a real texture generator does anyway: you author a 0.25 m grain tile and
- * repeat it. 256 keeps every noise argument inside [0, 256) at every scale, and
- * it is an INTEGER period, which is the condition tileable value noise needs -
- * a fractional period yields NaN, and NaN turns every surface into a mirror.
+ * repeat it. The tile is now a real texture (noise-lut.ts, HF-491): the sampler
+ * wraps the coordinate, so no shader arithmetic ever sees the large value, and
+ * the period is the LUT's own integer cell count.
  */
-export const NOISE_TILE_CELLS = 256;
+export const NOISE_TILE_CELLS = NOISE_LUT_CELLS;
 
 /**
  * Signed [-1, 1] fBm of a 2D surface coordinate at a given feature size in
  * metres, evaluated on a tile of `NOISE_TILE_CELLS` features.
  *
- * The tile spans `featureSizeM * NOISE_TILE_CELLS`: 0.23 m for a 0.9 mm grain,
- * 11.5 m for a 45 mm scuff, 614 m for a 2.4 m traffic gradient - which is
- * larger than the map, so the term that carries the big shapes never repeats.
+ * ONE texture fetch from the shared noise LUT, whatever the octave count
+ * (HF-491: the per-fragment lattice hash on fifty materials was the largest
+ * single frame-cost delta the bisect found). The tile spans
+ * `featureSizeM * NOISE_TILE_CELLS`: 6.4 cm for a 1 mm grain, 3.8 m for a
+ * 60 mm scuff, 154 m for a 2.4 m traffic gradient - larger than the map, so
+ * the term that carries the big shapes never repeats in view.
  */
-export function signedNoise(uv: any, featureSizeM: number, octaves = 2): any {
-  const tiled = fract(uv.mul(float(1 / (featureSizeM * NOISE_TILE_CELLS)))).mul(float(NOISE_TILE_CELLS));
-  return fbm2(tiled, octaves).sub(float(0.5)).mul(float(2));
+export function signedNoise(uv: any, featureSizeM: number, octaves: 1 | 2 | 3 = 2): any {
+  const frequency = typeof featureSizeM === 'number' ? float(1 / featureSizeM) : featureSizeM;
+  return lutFbm(uv.mul(frequency), octaves).sub(float(0.5)).mul(float(2));
 }
 
 /**
@@ -135,7 +137,8 @@ export function isBackdrop(spec: Nuketown2MaterialSpec): boolean {
  * ones at incommensurable periods is a smooth irregular mottle, which is what
  * a scrub plain looks like from 55 m.
  */
-export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
+export function backdropWear(spec: Nuketown2MaterialSpec, uniforms = createNuketown2Uniforms(spec, spec.baseSrgb)): WearNodes {
+  void spec;
   const p = positionWorld;
   const wave = (ax: number, az: number, periodM: number): any =>
     sin(p.x.mul(float((ax * 2 * Math.PI) / periodM)).add(p.z.mul(float((az * 2 * Math.PI) / periodM))));
@@ -146,12 +149,12 @@ export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
 
   const soilMask = smoothstep(float(-0.45), float(0.55), field);
   const albedoMul = clamp(
-    float(1).add(field.mul(float(spec.traffic.albedo))).sub(soilMask.mul(float(spec.soil))),
+    float(1).add(field.mul(uniforms.trafficAlbedo)).sub(soilMask.mul(uniforms.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
-    float(1 + spec.traffic.albedo),
+    float(1).add(uniforms.trafficAlbedo),
   );
   const roughness = clamp(
-    float(spec.roughness).add(field.mul(float(spec.traffic.roughness))),
+    uniforms.baseRoughness.add(field.mul(uniforms.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
@@ -163,7 +166,12 @@ export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
  * @param uv     a 2D surface coordinate IN METRES (x/z for a ground plane, run/height for a wall)
  * @param soilUv optional separate metre-scale coordinate for the soiling field; defaults to `uv`
  */
-export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv): WearNodes {
+export function buildWear(
+  spec: Nuketown2MaterialSpec,
+  uv: any,
+  soilUv: any = uv,
+  uniforms: Nuketown2Uniforms = createNuketown2Uniforms(spec, spec.baseSrgb),
+): WearNodes {
   assertSpec(spec);
 
   // A BACKDROP - a surface only ever read from tens of metres - gets an
@@ -184,32 +192,18 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
   // is simply beyond what this route will complete, and no octave count fixes
   // that. Three sines over the same surface cost nine instructions and read
   // the same from 55 m.
-  if (isBackdrop(spec)) return backdropWear(spec);
-
-  // Only the scales this surface's own read distance can resolve are
-  // evaluated. A term the frame cannot show is not authored detail, it is
-  // per-fragment arithmetic over the surface's whole projected area - and on
-  // the 220 m scrub plain that arithmetic was a measured 12-second stall.
-  const readM = readDistance(spec);
-  const zero = float(0);
-
-  // 0.5 - 1.5 mm. Paint tooth, aggregate grit, timber fibre. One octave: at
-  // this size a second octave is below a nanometre of feature and costs a
-  // texture fetch's worth of ALU for nothing.
-  const grain = scaleResolvable(spec.grain.sizeM, readM)
-    ? signedNoise(uv, spec.grain.sizeM, 1).mul(detailFalloff(0.8, 3.0))
-    : zero;
-
-  // 20 - 80 mm. Scuffs, chips, heel marks. Two octaves so the marks have
-  // edges rather than being blobs.
-  const scuff = scaleResolvable(spec.scuff.sizeM, readM)
-    ? signedNoise(uv, spec.scuff.sizeM, 2).mul(detailFalloff(4.0, 18.0))
-    : zero;
-
-  // 0.5 - 3 m. The term that does the actual work in a wide frame: traffic,
-  // rain wash, sun fade. Three octaves, no falloff - it is metres wide, and
-  // it is resolvable from anywhere on the map.
-  const traffic = signedNoise(soilUv, spec.traffic.sizeM, 3);
+  // The backdrop and surface paths share one node topology. A material
+  // reference selects the authored backdrop projection at render time, so
+  // lawn variants no longer create separate program identities. The enabled
+  // values are zero for the backdrop; its branch remains analytically cheap
+  // and, critically, the old hashed lattice is not reintroduced.
+  const grain = signedNoise(uv, uniforms.grainFrequency as any, 1)
+    .mul(detailFalloff(0.8, 3.0))
+    .mul(uniforms.grainEnabled);
+  const scuff = signedNoise(uv, uniforms.scuffFrequency as any, 2)
+    .mul(detailFalloff(4.0, 18.0))
+    .mul(uniforms.scuffEnabled);
+  const traffic = signedNoise(soilUv, uniforms.trafficFrequency as any, 3);
 
   // Soiling is one-sided: dirt subtracts. Thresholded so it has a shape (a
   // wash line, a lane) instead of being a uniform grey veil, which is the
@@ -218,24 +212,35 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
 
   const albedoMul = clamp(
     float(1)
-      .add(grain.mul(float(spec.grain.albedo)))
-      .add(scuff.mul(float(spec.scuff.albedo)))
-      .add(traffic.mul(float(spec.traffic.albedo)))
-      .sub(soilMask.mul(float(spec.soil))),
+      .add(grain.mul(uniforms.grainAlbedo))
+      .add(scuff.mul(uniforms.scuffAlbedo))
+      .add(traffic.mul(uniforms.trafficAlbedo))
+      .sub(soilMask.mul(uniforms.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
-    float(1 + spec.grain.albedo + spec.scuff.albedo + spec.traffic.albedo),
+    float(1)
+      .add(uniforms.grainAlbedo)
+      .add(uniforms.scuffAlbedo)
+      .add(uniforms.trafficAlbedo),
   );
 
   const roughness = clamp(
-    float(spec.roughness)
-      .add(grain.mul(float(spec.grain.roughness)))
-      .add(scuff.mul(float(spec.scuff.roughness)))
-      .add(traffic.mul(float(spec.traffic.roughness))),
+    uniforms.baseRoughness
+      .add(grain.mul(uniforms.grainRoughness))
+      .add(scuff.mul(uniforms.scuffRoughness))
+      .add(traffic.mul(uniforms.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
 
-  return { albedoMul, roughness, soilMask, grain, scuff };
+  const backdrop = backdropWear(spec, uniforms);
+  const useBackdrop = (uniforms.backdrop as any).greaterThan(float(0.5));
+  return {
+    albedoMul: useBackdrop.select(backdrop.albedoMul, albedoMul),
+    roughness: useBackdrop.select(backdrop.roughness, roughness),
+    soilMask: useBackdrop.select(backdrop.soilMask, soilMask),
+    grain: useBackdrop.select(backdrop.grain, grain),
+    scuff: useBackdrop.select(backdrop.scuff, scuff),
+  };
 }
 
 /**

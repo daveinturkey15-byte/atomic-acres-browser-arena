@@ -20,6 +20,19 @@ import * as THREE from 'three';
  * with one forced refresh when it returns to service. */
 function skipUpdateMatrixWorldWhileFrozen(this: THREE.Object3D): void {}
 
+/**
+ * Mark a presentation container as a static traversal boundary. The
+ * container stays in the scene graph, but the renderer's normal matrix walk
+ * does not descend into its dormant children. Owners of live children refresh
+ * those roots explicitly with updateWorldMatrix().
+ */
+export function freezeMatrixWorldWalk(root: THREE.Object3D): void {
+  if (root.matrixAutoUpdate) root.updateMatrix();
+  root.matrixAutoUpdate = false;
+  root.matrixWorldAutoUpdate = false;
+  root.updateMatrixWorld = skipUpdateMatrixWorldWhileFrozen;
+}
+
 /** Compose every node's current local transform once, then stop the
  * per-frame recompose AND the routine walk for the whole subtree. */
 export function deepFreezeSubtreeMatrices(root: THREE.Object3D): void {
@@ -32,6 +45,7 @@ export function deepFreezeSubtreeMatrices(root: THREE.Object3D): void {
   // gated (pass65-weapon-runtime-behavior) to never walk inactive rigs.
   // deepUnfreezeSubtreeMatrices does the one catch-up refresh instead.
   root.updateMatrixWorld = skipUpdateMatrixWorldWhileFrozen;
+  root.matrixWorldAutoUpdate = false;
 }
 
 /** Restore normal per-frame matrix dynamics for the whole subtree. */
@@ -41,8 +55,58 @@ export function deepUnfreezeSubtreeMatrices(root: THREE.Object3D): void {
   }
   root.traverse((node) => {
     node.matrixAutoUpdate = true;
+    node.matrixWorldAutoUpdate = true;
   });
   // Catch the subtree up after the frozen blackout before anything reads or
   // renders its world matrices.
   root.updateMatrixWorld(true);
+}
+
+/**
+ * HF-491 (perf lane HITL 5): stop the per-frame recompose for the parts of a
+ * mounted arena that provably never move, WITHOUT the walk-skip override.
+ *
+ * What qualifies, and why each is safe:
+ *   - meshes `batchStaticMeshes` hid (`userData.staticBatchRendered`): never
+ *     rendered again, and their world matrices are read only by raycast /
+ *     collision references that were baked from the same transform;
+ *   - the `*-render-batches` groups it produced: world-space geometry under an
+ *     identity transform by construction;
+ *   - `THREE.LOD` subtrees: the LOD object stands where the thing it draws
+ *     stands and the levels are baked in its local frame (vegetation).
+ * Subtrees flagged `userData.dynamic` are left alone entirely, as are
+ * nodes that are already frozen. Nothing here installs a walk skip - the
+ * routine walk still visits every node, so a later forced refresh
+ * (`updateMatrixWorld(true)`) sees a correct, once-composed local matrix.
+ *
+ * Measured on Nuke Town Rebuild (HITL 4 head): the arena root was 965 of the
+ * scene's 3,029 auto-updating nodes and one full-scene `updateMatrixWorld()`
+ * cost 0.9 ms in-page; three's renderer and the shadow / post passes walk it
+ * more than once a frame.
+ */
+export function freezeStaticArenaMatrices(root: THREE.Object3D): number {
+  let frozen = 0;
+  const freezeLeaf = (node: THREE.Object3D): void => {
+    if (!node.matrixAutoUpdate) return;
+    node.updateMatrix();
+    node.matrixAutoUpdate = false;
+    frozen += 1;
+  };
+  const freezeSubtree = (node: THREE.Object3D): void => {
+    node.traverse(freezeLeaf);
+  };
+  const visit = (node: THREE.Object3D): void => {
+    if (node.userData.dynamic === true) return;
+    if ((node as THREE.LOD).isLOD === true || /-render-batches$/.test(node.name)) {
+      freezeSubtree(node);
+      return;
+    }
+    if ((node as THREE.Mesh).isMesh === true && node.userData.staticBatchRendered === true) {
+      freezeLeaf(node);
+      return;
+    }
+    for (const child of node.children) visit(child);
+  };
+  visit(root);
+  return frozen;
 }

@@ -42,7 +42,21 @@ const WIDTH = Number(arg('--width', '2560'));
 const HEIGHT = Number(arg('--height', '1440'));
 const OUT_DIR = resolve(arg('--out-dir', 'docs/evidence/pass94/perf-hitl5/bisect'));
 const PROFILE = arg('--profile', 'none');
+const CPU_ALL = argv.includes('--cpu-all');
 const TOGGLES = arg('--toggles', 'baseline,wear,veg,lawn,vehicles,grime,props,pool,operators,shadows,baseline-again').split(',');
+// HF-491 perf lane 4: the owner's complaint is the whole map, not one camera.
+// `spawn` is the untouched deploy pose (what every earlier lane measured);
+// `street` stands on the road centre-line looking down the 36 m street, which
+// is the pose that actually puts the forged vehicles, both house facades and
+// the full wear set in the frustum. Nuke Town Rebuild is authored axis-aligned
+// and centred, road centre-line at z = 0 (`nuketown2-arena.ts` header), and
+// `teleportPlayer` takes EYE height with forward = (-sin yaw, 0, -cos yaw).
+const POSES = {
+  spawn: null,
+  street: { x: 0, y: 1.7, z: 0, yaw: Math.PI / 2, pitch: 0 },
+};
+const POSE = arg('--pose', 'spawn');
+if (!(POSE in POSES)) throw new Error(`unknown --pose ${POSE} (known: ${Object.keys(POSES).join(',')})`);
 const BOOT_TIMEOUT_MS = 300_000;
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -151,6 +165,16 @@ try {
   }, undefined, { timeout: BOOT_TIMEOUT_MS });
   console.error('[bisect] match active; warming up');
   await page.evaluate(() => { try { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen?.(true); } catch { /* absent */ } });
+  if (POSES[POSE]) {
+    await page.evaluate((pose) => { window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(pose.x, pose.y, pose.z, pose.yaw, pose.pitch); }, POSES[POSE]);
+    await page.waitForTimeout(1_500);
+  }
+  report.pose = { name: POSE, ...(POSES[POSE] ?? {}) };
+  report.poseState = await page.evaluate(() => {
+    const s = window.__ATOMIC_ACRES_DEBUG__.snapshot?.();
+    return s ? { playerPosition: s.playerPosition ?? null, yaw: s.yaw ?? null } : null;
+  });
+  console.error(`[bisect] pose ${POSE} ${JSON.stringify(report.poseState)}`);
   await page.waitForTimeout(WARMUP_SECONDS * 1000);
 
   // Scene census: what is actually in the scene (by material name), so the
@@ -183,8 +207,30 @@ try {
       }
     });
     const rows = [...byMaterial.values()].sort((a, b) => b.tris - a.tris);
-    return { meshes, visibleMeshes, materials: materials.size, rows };
+    // Where the nodes live (HF-491 offender 3): per top-level root, how many
+    // nodes three walks each frame, how many still auto-recompose, how many
+    // subtrees carry the static-matrix-freeze walk-skip, and how long ONE
+    // `updateMatrixWorld()` of that root costs (median of 50, in-page, CPU
+    // only - ComfyUI on the GPU cannot distort it).
+    const timeWalk = (object) => {
+      const samples = [];
+      for (let i = 0; i < 50; i += 1) { const t0 = performance.now(); object.updateMatrixWorld(); samples.push(performance.now() - t0); }
+      samples.sort((a, b) => a - b);
+      return Number(samples[25].toFixed(3));
+    };
+    const roots = scene.children.map((root) => {
+      let nodes = 0; let auto = 0; let frozen = 0; let rootMeshes = 0; let visible = 0;
+      root.traverse((n) => { nodes += 1; if (n.matrixAutoUpdate) auto += 1; if (Object.prototype.hasOwnProperty.call(n, 'updateMatrixWorld')) frozen += 1; if (n.isMesh) { rootMeshes += 1; let v = true; for (let p = n; p; p = p.parent) if (p.visible === false) { v = false; break; } if (v) visible += 1; } });
+      return { name: root.name || `(${root.type})`, type: root.type, visible: root.visible, nodes, auto, frozen, meshes: rootMeshes, visibleMeshes: visible, walkMs: timeWalk(root) };
+    }).sort((a, b) => b.walkMs - a.walkMs);
+    const prefixes = new Map();
+    scene.traverse((n) => { const key = (n.name || `(${n.type})`).split(/[\s:_-]+/).slice(0, 2).join('-'); prefixes.set(key, (prefixes.get(key) ?? 0) + 1); });
+    const prefixRows = [...prefixes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([prefix, count]) => ({ prefix, count }));
+    let totalNodes = 0; let totalAuto = 0; scene.traverse((n) => { totalNodes += 1; if (n.matrixAutoUpdate) totalAuto += 1; });
+    return { meshes, visibleMeshes, materials: materials.size, totalNodes, totalAuto, sceneWalkMs: timeWalk(scene), roots, prefixes: prefixRows, rows };
   });
+  console.error(`[bisect] scene walk ${report.census.sceneWalkMs} ms (${report.census.totalNodes} nodes, ${report.census.totalAuto} auto)`);
+  for (const root of report.census.roots.slice(0, 14)) console.error(`[bisect]   root ${root.name.padEnd(44).slice(0, 44)} nodes ${String(root.nodes).padStart(5)} auto ${String(root.auto).padStart(5)} frozen ${String(root.frozen).padStart(3)} meshes ${String(root.meshes).padStart(5)} vis ${String(root.visibleMeshes).padStart(3)} walk ${root.walkMs} ms${root.visible ? '' : ' (hidden)'}`);
   writeFileSync(join(OUT_DIR, `${LABEL}-${ARENA}-census.json`), `${JSON.stringify(report.census, null, 2)}\n`);
   console.error(`[bisect] census: ${report.census.meshes} meshes (${report.census.visibleMeshes} visible), ${report.census.materials} materials`);
   report.presentation = await page.evaluate(() => {
@@ -284,6 +330,28 @@ try {
       },
       revert: () => { for (const e of window.__BISECT_STASH__ ?? []) { const m = e.m; m.colorNode = e.colorNode; m.roughnessNode = e.roughnessNode; m.opacityNode = e.opacityNode; m.normalNode = e.normalNode; m.metalnessNode = e.metalnessNode; m.needsUpdate = true; } },
     },
+    // HF-491 perf lane 4: the CDP profile charges ~8.6 ms/frame to `(program)`
+    // - Blink work with no JS frame on the stack, i.e. style/layout/paint.
+    // The HUD root takes five CSS custom-property writes EVERY frame (four
+    // sway + --hud-health), each of which invalidates style for the whole HUD
+    // subtree. `hud-hidden` measures what the HUD subtree's recalc/paint is
+    // worth; `style-writes` no-ops setProperty app-wide and measures what the
+    // per-frame writes themselves cost. Both revert exactly.
+    'hud-hidden': {
+      apply: () => { const hud = document.querySelector('#hud') ?? document.querySelector('[data-surface="hud"]'); if (!hud) return 'no hud root found'; window.__BISECT_STASH__ = { hud, display: hud.style.display }; hud.style.display = 'none'; return `hid ${hud.id || hud.tagName} subtree (${hud.querySelectorAll('*').length} elements)`; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.hud) s.hud.style.display = s.display; },
+    },
+    // Narrower than `style-writes`: no-op ONLY the `--hud-*` registered custom
+    // properties the frame loop writes (four sway values + --hud-health), so
+    // the delta is those writes and nothing else.
+    'hud-var-writes': {
+      apply: () => { const proto = CSSStyleDeclaration.prototype; const original = proto.setProperty; window.__BISECT_STASH__ = { proto, setProperty: original }; proto.setProperty = function (name, ...rest) { if (typeof name === 'string' && name.startsWith('--hud-')) return; return original.call(this, name, ...rest); }; return 'setProperty no-oped for --hud-* only'; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.proto) s.proto.setProperty = s.setProperty; },
+    },
+    'style-writes': {
+      apply: () => { const proto = CSSStyleDeclaration.prototype; window.__BISECT_STASH__ = { proto, setProperty: proto.setProperty }; proto.setProperty = function () {}; return 'CSSStyleDeclaration.setProperty no-oped'; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.proto) s.proto.setProperty = s.setProperty; },
+    },
     // Strip the wind positionNode from foliage (vertex cost of hedge/tree sway).
     'foliage-wind': {
       apply: () => { const s = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph(); const seen = new Set(); const stash = []; s.traverse((n) => { if (!n.isMesh) return; const m = n.material; if (!m || Array.isArray(m) || seen.has(m) || !/foliage/.test(m.name) || !m.positionNode) return; seen.add(m); stash.push({ m, positionNode: m.positionNode }); m.positionNode = null; m.needsUpdate = true; }); window.__BISECT_STASH__ = stash; return `stripped wind from ${stash.length} foliage material(s)`; },
@@ -312,7 +380,27 @@ try {
       else { busy += dt; const key = `${fnName || '(anonymous)'} ${node.callFrame.url.split('/').pop()}:${node.callFrame.lineNumber}`; self.set(key, (self.get(key) ?? 0) + dt); }
     }
     const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([key, micros]) => ({ fn: key, ms: Number((micros / 1000).toFixed(1)) }));
-    return { result, cpu: { busyMs: busy / 1000, idleMs: idle / 1000, gcMs: gc / 1000, programMs: program / 1000, top } };
+    // Caller attribution for the matrix pass (HF-491 offender 3): for every
+    // sample inside updateMatrixWorld / updateWorldMatrix / multiplyMatrices /
+    // updateMatrix, charge it to the nearest ancestor frame that is NOT one
+    // of those (the app or renderer function that started the walk).
+    const parentOf = new Map();
+    for (const node of profile.nodes) for (const childId of node.children ?? []) parentOf.set(childId, node.id);
+    const MATRIX_FNS = new Set(['updateMatrixWorld', 'updateWorldMatrix', 'multiplyMatrices', 'updateMatrix', 'compose', 'skipUpdateMatrixWorldWhileFrozen']);
+    const matrixCallers = new Map();
+    let matrixMicros = 0;
+    for (let i = 0; i < profile.samples.length; i += 1) {
+      const node = byId.get(profile.samples[i]);
+      if (!node || !MATRIX_FNS.has(node.callFrame.functionName)) continue;
+      const dt = profile.timeDeltas[i] ?? 0;
+      matrixMicros += dt;
+      let cursor = node;
+      while (cursor && MATRIX_FNS.has(cursor.callFrame.functionName)) cursor = byId.get(parentOf.get(cursor.id));
+      const key = cursor ? `${cursor.callFrame.functionName || '(anonymous)'} ${cursor.callFrame.url.split('/').pop()}:${cursor.callFrame.lineNumber}` : '(root)';
+      matrixCallers.set(key, (matrixCallers.get(key) ?? 0) + dt);
+    }
+    const matrix = { totalMs: matrixMicros / 1000, callers: [...matrixCallers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, micros]) => ({ fn: key, ms: Number((micros / 1000).toFixed(1)) })) };
+    return { result, cpu: { busyMs: busy / 1000, idleMs: idle / 1000, gcMs: gc / 1000, programMs: program / 1000, top, matrix } };
   };
 
   for (const name of TOGGLES) {
@@ -321,7 +409,7 @@ try {
     const applied = await page.evaluate(toggle.apply);
     await page.waitForTimeout(SETTLE * 1000);
     let raw; let cpu = null;
-    if (name === 'baseline') {
+    if (name === 'baseline' || CPU_ALL) {
       const profiled = await profileWindow(async () => { await startSampler(); await page.waitForTimeout(SECONDS * 1000); return stopSampler(); });
       raw = profiled.result; cpu = profiled.cpu;
     } else {
@@ -337,7 +425,10 @@ try {
       perFrame: Object.fromEntries(Object.entries(raw.perFrame).map(([k, v]) => [k, Number(v.toFixed(1))])),
       created: raw.created,
     };
-    if (cpu) row.cpu = { ...cpu, busyMsPerFrame: Number((cpu.busyMs / Math.max(1, raw.frames)).toFixed(2)), programMsPerFrame: Number((cpu.programMs / Math.max(1, raw.frames)).toFixed(2)) };
+    if (cpu) {
+      row.cpu = { ...cpu, busyMsPerFrame: Number((cpu.busyMs / Math.max(1, raw.frames)).toFixed(2)), programMsPerFrame: Number((cpu.programMs / Math.max(1, raw.frames)).toFixed(2)), matrixMsPerFrame: Number((cpu.matrix.totalMs / Math.max(1, raw.frames)).toFixed(2)) };
+      console.error(`[bisect]   matrix ${row.cpu.matrixMsPerFrame} ms/frame by caller: ${cpu.matrix.callers.slice(0, 8).map((c) => `${c.fn}=${(c.ms / Math.max(1, raw.frames)).toFixed(2)}`).join('  ')}`);
+    }
     report.toggles.push(row);
     console.error(`[bisect] ${LABEL} ${ARENA} ${name.padEnd(14)} fps ${String(row.fps).padStart(6)}  p50 ${row.frameMs.p50} p95 ${row.frameMs.p95} p99 ${row.frameMs.p99}  draws ${row.perFrame.draws} tris ${Math.round(row.perFrame.triangles)} inst ${Math.round(row.perFrame.instances)} pipes+${row.created.renderPipelines}  (${applied})${cpu ? `  js-busy ${row.cpu.busyMsPerFrame} ms/frame` : ''}`);
   }

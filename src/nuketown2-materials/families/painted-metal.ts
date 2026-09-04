@@ -22,8 +22,9 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch, uniformSwatch } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, clamp, float, fract, max, mix, positionWorld, smoothstep } =
   TSL as unknown as Record<string, any>;
@@ -55,6 +56,38 @@ export interface PaintedMetalOptions {
   readonly metalness?: number;
 }
 
+let paintedMetalGraph: { colorNode: any; roughnessNode: any } | null = null;
+
+function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (paintedMetalGraph) return paintedMetalGraph;
+  const spec = paintedMetalSpec('nuketown2-painted-metal-shared', 0xaebdc1);
+  const p = positionWorld;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const panelled = uniforms.paintedPanelled;
+  const panelV = p.y.div(float(DOOR_PANEL_M));
+  const within = fract(panelV);
+  const panelShade = max(
+    smoothstep(float(1 - 0.012), float(1.0), within),
+    smoothstep(float(0.012), float(0.0), within),
+  ).mul(panelled);
+  const section = abs(fract(within.mul(float(2))).sub(float(0.5))).mul(float(2));
+  const stampLift = smoothstep(float(0.72), float(0.95), section).mul(panelled);
+  const chip = smoothstep(float(0.58), float(0.74), wear.scuff);
+  const primer = linearSwatch(0x9c968c);
+  const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
+  const weep = smoothstep(float(0.35), float(0.0), p.y).mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
+  const paint = uniforms.baseColor.mul(wear.albedoMul);
+  const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
+  const chipped = mix(chalked, primer, chip.mul(float(0.8)));
+  const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
+  const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
+  paintedMetalGraph = {
+    colorNode: mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4))),
+    roughnessNode: clamp(wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))), float(0.15), float(1.0)),
+  };
+  return paintedMetalGraph;
+}
+
 export function createPaintedMetalMaterial(
   name: string,
   baseSrgb: number,
@@ -73,54 +106,10 @@ export function createPaintedMetalMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const p = positionWorld;
-  // This family dresses door leaves (vertical) and bins, mailboxes and
-  // signage (boxes), so the wear field is authored for both.
-  const uv = boxUv();
-  const wear = buildWear(spec, uv);
-
-  // --- Panel joints and stampings -----------------------------------------
-  let panelShade: any = float(0);
-  let stampLift: any = float(0);
-  if (options.panelled === true) {
-    const panelV = p.y.div(float(DOOR_PANEL_M));
-    const within = fract(panelV);
-    // 6 mm shadow line of a 510 mm panel.
-    panelShade = max(
-      smoothstep(float(1 - 0.012), float(1.0), within),
-      smoothstep(float(0.012), float(0.0), within),
-    );
-    // Two raised sections per panel, each with a lit top edge.
-    const section = abs(fract(within.mul(float(2))).sub(float(0.5))).mul(float(2));
-    stampLift = smoothstep(float(0.72), float(0.95), section);
-  }
-
-  // --- Chips to primer -----------------------------------------------------
-  // Hard threshold: a chip has an EDGE. The exposed layer is a warm grey
-  // primer, well clear of the paint in luminance either way.
-  const chip = smoothstep(float(0.58), float(0.74), wear.scuff);
-  const primer = linearSwatch(0x9c968c);
-
-  // --- Chalking ------------------------------------------------------------
-  // UV degradation: pale, powdery, and MATTE. Albedo up, gloss down.
-  const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
-
-  // --- Rust weep -----------------------------------------------------------
-  // Only in the first 0.35 m, where a door meets its threshold and water sits.
-  const weep = smoothstep(float(0.35), float(0.0), p.y)
-    .mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
-
-  const paint = uniformSwatch(baseSrgb).mul(wear.albedoMul);
-  const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
-  const chipped = mix(chalked, primer, chip.mul(float(0.8)));
-  const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
-  const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
-
-  mat.colorNode = mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4)));
-  mat.roughnessNode = clamp(
-    wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))),
-    float(0.15),
-    float(1.0),
-  );
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  setNuketown2FamilyUniform(uniforms, 'paintedPanelled', options.panelled === true ? 1 : 0);
+  const shared = sharedPaintedMetalGraph(uniforms);
+  mat.colorNode = shared.colorNode;
+  mat.roughnessNode = shared.roughnessNode;
   return mat;
 }
