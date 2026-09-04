@@ -19,21 +19,24 @@
  *                       change that makes a lawn stop looking like a green
  *                       plane.
  *
- * MOWER STRIPES are the second term worth having: a roller lays alternate
- * 0.6 m bands away from and toward the viewer, and the two bands differ by
- * about 8% because you are looking at the tips of one and the flanks of the
- * other. It costs one `fract`.
+ * THE MOWN CHECKER is the second term worth having, and on this map it is not
+ * optional: the BO2-2025 aerial reference (`nt2025-aerial-boii.jpg`) shows both
+ * front lawns cross-mown into a clear chequerboard of roughly 2.2 m cells, and
+ * it is the single most recognisable material read in the whole overhead frame.
+ * Alternate cells differ by about 8% because you are looking at the tips of one
+ * and the flanks of the other. The cell edge is HARD - a roller leaves a crisp
+ * line, and softening it is what makes a mown lawn look like a noise texture.
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
-const { abs, clamp, float, fract, mix, positionWorld, smoothstep } =
+const { clamp, float, floor, fract, mix, positionWorld, smoothstep } =
   TSL as unknown as Record<string, any>;
 
-/** Mower band width, metres. */
-export const MOWER_BAND_M = 0.62;
+/** Mown checker cell, metres. Measured off the BO2-2025 aerial reference. */
+export const MOWER_CELL_M = 2.2;
 
 export type LawnVariant = 'turf' | 'scrub' | 'hedge';
 
@@ -85,11 +88,14 @@ export function createLawnMaterial(
 
   const turf = linearSwatch(baseSrgb).mul(wear.albedoMul);
 
-  // Mower stripes. Turf only — nobody mows scrubland or a hedge.
-  const stripe = variant === 'turf'
-    ? abs(fract(p.z.div(float(MOWER_BAND_M))).sub(float(0.5))).mul(float(2))
+  // The mown checker. Turf only - nobody mows scrubland or a hedge. Parity of
+  // (cellX + cellZ) is 0 or 1, which is the chequerboard; the edge stays hard.
+  const cellX = floor(p.x.div(float(MOWER_CELL_M)));
+  const cellZ = floor(p.z.div(float(MOWER_CELL_M)));
+  const parity = variant === 'turf'
+    ? fract(cellX.add(cellZ).mul(float(0.5))).mul(float(2))
     : float(0);
-  const striped = turf.mul(float(1).add(stripe.mul(float(0.075)).sub(float(0.037))));
+  const striped = turf.mul(float(0.962).add(parity.mul(float(0.076))));
 
   // Wear paths. Thresholded off the metre-scale field so they have a shape:
   // a broad thinning of the sward, and a narrower bare core inside it.
