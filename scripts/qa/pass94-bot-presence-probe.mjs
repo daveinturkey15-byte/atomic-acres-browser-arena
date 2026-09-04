@@ -138,14 +138,24 @@ function summarise(run) {
   };
 }
 
+// HITL 5 integration: bundled headless Chromium offers NO WebGPU adapter on
+// dave-gaming-pc (the lane recorded exactly that in probe-before.json), so the
+// probe launches installed Chrome with the same native-WebGPU flags the stock
+// arena gates use (playwright.config.ts under PASS73_NATIVE_WEBGPU=1): headless,
+// mute, parked off-screen, real GPU adapter.
 const browser = await chromium.launch({
   headless: true,
+  channel: 'chrome',
   args: [
     '--mute-audio',
+    '--enable-unsafe-webgpu',
+    '--use-angle=d3d11',
+    '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
-    '--enable-unsafe-swiftshader',
+    '--window-position=-32000,-32000',
+    '--window-size=2640,1520',
   ],
 });
 const runs = [];

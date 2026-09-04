@@ -127,7 +127,6 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
-  NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
@@ -161,7 +160,6 @@ import {
   createNuketown2CeilingLightMaterial,
   createNuketown2DrywallMaterial,
   createNuketown2GarageFloorMaterial,
-  createNuketown2GarageWallMaterial,
   createNuketown2GlassMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
@@ -1137,7 +1135,6 @@ function nuketown2Materials(): Nuketown2Materials {
   const interiorFloor = createNuketown2WoodFloorMaterial();
   const garageFloor = createNuketown2GarageFloorMaterial();
   const interior = createNuketown2DrywallMaterial(0xdbd1ba);
-  const garageSiding = createNuketown2GarageWallMaterial();
   const warmLight = createNuketown2CeilingLightMaterial(true);
   const coldLight = createNuketown2CeilingLightMaterial(false);
   return Object.freeze({
@@ -1187,7 +1184,13 @@ function nuketown2Materials(): Nuketown2Materials {
     applianceRed: forged.applianceRed,
     applianceBlue: forged.applianceBlue,
     // The ORANGE wing: siding-coral, unchanged.
-    garageSiding,
+    // HITL 5 (HF-491 captures, candidate 4b garage.png): the garage wing read
+    // BRIGHT RED because it wore the coral board-course graph that
+    // `createNuketown2GarageWallMaterial` authors for an interior wall. HF-426
+    // C2 and HF-477 both specify the wing as the same neutral cream as the
+    // house's ground storey, so it wears the registry's own cream siding role -
+    // no new hex, and one fewer material graph on the cold-compile path.
+    garageSiding: forged.sidingB,
     // The shipped map's `chrome`, verbatim - it is what dresses BOTH garage
     // doors there. The opening itself stays a hole (it is a route); this is the
     // door leaf parked in its head, which is what you see from the street.

@@ -234,7 +234,16 @@ describe('HF-477 nuketown2 WebGPU pipeline budget — the arena', () => {
     // The arena must still author materials in bulk: a future change that
     // deleted the node-material layer outright would otherwise "pass" by
     // building nothing.
-    expect(rows.length, 'node materials in the built arena').toBeGreaterThanOrEqual(80);
+    //
+    // FLOOR HISTORY. 80 when written (96 measured, candidate 4b). HITL 5 merged
+    // the perf lane's forge change - five per-vehicle material sets of nine
+    // buckets became five paint/accent pairs over ONE shared bucket set
+    // (45 -> 17 materials) - and re-pointed the garage wing at the registry's
+    // cream siding role (-1), so the arena measures 68. The floor moves to 60
+    // for that measured, explained reason and no other; it is a guard against
+    // an EMPTY material layer, not a target, and 60 still fails a build that
+    // drops the families.
+    expect(rows.length, 'node materials in the built arena').toBeGreaterThanOrEqual(60);
 
     expect(
       distinct.size,

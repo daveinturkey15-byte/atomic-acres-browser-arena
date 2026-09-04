@@ -68,9 +68,14 @@ export const MINIMAP_ARENA_OVERRIDES: Readonly<Record<string, MinimapArenaOverri
     rules: Object.freeze([
       Object.freeze({ name: 'nuketown2-house-footprint', className: 'house', pattern: /^nuketown2 (?:north|south) house (?:floor|roof deck|wall\b|front pier\b|upper front pier\b|back pier\b|upper back pier\b)/iu }),
       Object.freeze({ name: 'nuketown2-garage-footprint', className: 'garage', pattern: /^nuketown2 (?:north|south) garage (?:floor|roof|wall\b|link pier\b|front pier\b|back pier\b|door head\b)/iu }),
-      Object.freeze({ name: 'nuketown2-road', className: 'road', pattern: /^nuketown2 (?:north |south )?street (?:asphalt|turning head|kerb)/iu }),
+      // HITL 5: HF-477's lollipop renamed the road bodies `carriageway stem` /
+      // `carriageway turning head` (+ kerbs, dashes, head kerb islands); the
+      // older `street ...` spellings stay so a rollback of that lane still maps.
+      Object.freeze({ name: 'nuketown2-road', className: 'road', pattern: /^nuketown2 (?:carriageway (?:stem|turning head|head kerb island)\b|(?:north |south )?street (?:asphalt|turning head|kerb))/iu }),
       Object.freeze({ name: 'nuketown2-perimeter', className: 'perimeter', pattern: /^nuketown2 (?:north|south) perimeter wall/iu }),
-      Object.freeze({ name: 'nuketown2-vehicle', className: 'vehicle', pattern: /^nuketown2 (?:street-vehicle (?:truck (?:cab|deck|box)|coach body|head car body)|(?:north|south) car body)/iu }),
+      // HITL 5: HF-477 retired the single head car for the reference's two street
+      // cars (`stem saloon`, `stem classic`), so the authored vehicle set is six.
+      Object.freeze({ name: 'nuketown2-vehicle', className: 'vehicle', pattern: /^nuketown2 (?:street-vehicle (?:truck (?:cab|deck|box)|coach body|head car body|stem (?:saloon|classic) body)|(?:north|south) car body)/iu }),
     ]),
     group: (surface: MinimapSurfaceDescriptor, className: MinimapStructuralClass) => {
       if (className === 'road') return 'road';
@@ -81,6 +86,8 @@ export const MINIMAP_ARENA_OVERRIDES: Readonly<Record<string, MinimapArenaOverri
         if (/\bcoach\b/iu.test(surface.name)) return 'vehicle:coach';
         if (/\btruck\b/iu.test(surface.name)) return 'vehicle:truck';
         if (/\bhead car\b/iu.test(surface.name)) return 'vehicle:head-car';
+        if (/\bstem saloon\b/iu.test(surface.name)) return 'vehicle:saloon';
+        if (/\bstem classic\b/iu.test(surface.name)) return 'vehicle:classic';
         if (side) return `vehicle:${side}-car`;
       }
       return undefined;

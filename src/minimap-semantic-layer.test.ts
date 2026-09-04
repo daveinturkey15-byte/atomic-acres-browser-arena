@@ -86,7 +86,10 @@ describe('semantic minimap layer (HF-491)', () => {
     const factories = await loadArenaFactories();
     const arena = factories.nuketown2!.build(new THREE.Scene());
     const elements = buildMinimapStructuralElements(minimapInput(arena, 'nuketown2'));
-    const macroSet = { house: 2, garage: 2, perimeter: 1, road: 1, vehicle: 5 } as const;
+    // Vehicles: coach, truck, HF-477's two street cars (dark saloon, green
+    // classic - they replaced the single head car this set was first written
+    // against) and the two driveway cars. HITL 5 integration.
+    const macroSet = { house: 2, garage: 2, perimeter: 1, road: 1, vehicle: 6 } as const;
     const ceiling = Object.values(macroSet).reduce((total, count) => total + count, 0);
     expect(arena.colliders.length, 'before: every collider was a minimap rectangle').toBeGreaterThan(elements.length);
     expect(elements.length, 'after: only authored macro silhouettes remain').toBeLessThanOrEqual(ceiling);

@@ -69,10 +69,20 @@ const browser = await chromium.launch({
   headless: true,
   args: [
     '--headless=new',
+    // Owner standing instruction (browser-visibility-contract.test.mjs): every
+    // browser this repo launches is MUTE and OFF HIS SCREEN. These are the
+    // stock gate's own flags (tests/e2e/pass93-stock-flags-boot.spec.ts);
+    // HITL 5 found this launcher parked on monitor 2 and unmuted, which is
+    // what had the contract RED on candidate 4b.
+    '--mute-audio',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    '--window-position=-32000,-32000',
+    '--window-size=2640,1520',
     '--enable-unsafe-webgpu',
     '--enable-features=Vulkan',
     '--use-angle=d3d11',
-    '--window-position=2560,0',
     // PASS94_SOFTWARE=1 renders on Chrome's CPU WebGPU adapter. It is a
     // FALLBACK: it proves the node graphs compile and what they look like, and
     // it is not GPU evidence. Used when the shared-GPU gate never opens.
