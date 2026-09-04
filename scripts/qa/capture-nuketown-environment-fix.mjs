@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 /**
+ * Captures deterministic Nuke Town environment-fix evidence in installed Chrome (WebGPU): fixed-pose shot sets, ridge/sky luminance ratios, environment layer inventory, and frame pacing.
+ *
+ * Usage: node scripts/qa/capture-nuketown-environment-fix.mjs
+ *
+ * Flags (no environment variables are read):
+ * --url    base URL of the running dev server (default: http://127.0.0.1:41932)
+ * --label  label prefix for all output files (default: after)
+ * --out    output directory, resolved against cwd and created if missing (default: docs/assets/nuketown-environment-fix-2026-08-31)
+ *
+ * Writes: <out>/<label>-<shot>.png for every shot, <out>/<label>-<shot>-no-backdrop.png for ridge-meter and 2-horizon shots, and <out>/<label>-measurements.json; prints a JSON summary to stdout.
+ *
+ * Exit codes: no explicit process.exit call; 0 on success, non-zero on uncaught error (including Playwright wait timeouts).
+ */
+/**
  * Nuke Town environment fix evidence (2026-08-31).
  *
  * Matched before/after capture + measurement for the four measured environment
