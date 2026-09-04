@@ -1,3 +1,14 @@
+// Extract a real arena's analytic proxy scene from a running headless build so the offline bake has a true input.
+//
+// Usage: node scripts/qa/extract-arena-proxy.mjs --url <url> --arena <id> --out <dir> [--timeout <ms>]
+//   --url      Build URL to load (default: http://127.0.0.1:41947)
+//   --arena    Arena id to select (default: atomic-acres)
+//   --out      Output directory for the proxy JSON (default: artifacts/proxy)
+//   --timeout  Per-wait timeout in ms (default: 300000)
+//
+// Writes: <out>/<arena>.json (creates <out> if missing)
+// Exit codes: 0 = success, 1 = extraction failed, 2 = ComfyUI queue not empty (run refused)
+
 /**
  * HF-418 / Lane AL - the missing headless stage: pull a REAL arena's analytic
  * proxy scene out of a running build so the offline bake has something true to
