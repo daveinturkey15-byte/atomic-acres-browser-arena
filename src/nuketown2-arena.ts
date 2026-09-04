@@ -183,6 +183,11 @@ import {
   createNuketown2TruckCabMaterial,
   createNuketown2VehicleGlassMaterial,
 } from './nuketown2-vehicle-materials';
+import {
+  buildNuketown2ExteriorStairs,
+  buildNuketown2Rooflines,
+  type Nuketown2RoofMaterials,
+} from './nuketown2-roofs';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -581,7 +586,7 @@ export const NUKETOWN2_BALCONY = Object.freeze({
  * treads stay presentation - so it is walkable by construction and the
  * existing probe pattern covers it.
  *
- * 11 risers of exactly 0.30 span the 3.30 m to the upper floor. It runs
+ * 17 risers of exactly 3.30 / 17 span the 3.30 m to the upper floor. It runs
  * PARALLEL to the back wall, off the deck's NON-GARAGE end, in the 1.4 m of
  * the deck's depth nearest the house (see YARD_STAIR_Z for why that half and
  * not the other). Nothing is ever over it, so STAIR_MAX_FEET_UNDER_CEILING
@@ -589,8 +594,8 @@ export const NUKETOWN2_BALCONY = Object.freeze({
  * the yard stays open: a perpendicular flight would drive a 3.3 m ramp 4.2 m
  * into the yard and cut the spawn's own sightlines.
  */
-const YARD_STAIR_RISERS = 11;
-const YARD_STAIR_GOING = 0.42;
+const YARD_STAIR_RISERS = 17;
+const YARD_STAIR_GOING = 4.2 / 16;
 const YARD_STAIR_WIDTH = 1.4;
 const YARD_STAIR_RUN = YARD_STAIR_GOING * (YARD_STAIR_RISERS - 1);
 const YARD_STAIR_OVERLAP = 0.12;
@@ -1781,11 +1786,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Same frame, same sentence: "a circular concrete patio sits at the foot of
   // the flight." Everything in this arena is an axis-aligned box (see the file
   // header - a yawed solid measured 0.11 coverage against its own mesh on
-  // map3), so the circle is a BANDED APPROXIMATION: seven z-bands whose widths
-  // are the chords of a real circle of PATIO_RADIUS, sampled at each band's
-  // mid-line. Presentation only and 0.14 m thick like every other apron decal,
-  // so a stepped edge costs nothing but a silhouette - and at 0.35 m bands on a
-  // 2.45 m radius the step is under a boot width.
+  // map3), so the circle is a BANDED APPROXIMATION: thirteen z-bands whose
+  // widths are the chords of a real circle of PATIO_RADIUS, sampled at each
+  // band's mid-line. Presentation only, with its underside sunk 0.06 m below
+  // the ground datum and its top 0.06 m proud, so it cannot share a ground face.
   //
   // THE RADIUS IS SET BY WHAT IS ALREADY IN THE YARD, not by taste. The flight
   // lands at x = -9.4 in a 2.8 m slot: the destructible shed's registered
@@ -1794,7 +1798,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // the shed by 0.6 m, the butt pad by 0.1 m and the house corner by 0.75 m,
   // and still puts the stair foot inside the disc.
   const PATIO_RADIUS = 1.9;
-  const PATIO_BANDS = 7;
+  const PATIO_BANDS = 13;
   const patioCentreX = NUKETOWN2_YARD_STAIR.footX;
   const patioCentreZ = HOUSE_BACK_Z - 0.3;
   for (let index = 0; index < PATIO_BANDS; index += 1) {
@@ -1803,8 +1807,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     const mid = (t0 + t1) / 2;
     const chordHalf = PATIO_RADIUS * Math.sqrt(Math.max(0, 1 - mid * mid));
     pair(builder, `balcony stair patio band ${index}`,
-      [patioCentreX, 0.04, patioCentreZ + PATIO_RADIUS * mid],
-      [chordHalf * 2, 0.08, PATIO_RADIUS * (t1 - t0)], m.drive,
+      [patioCentreX, 0.00, patioCentreZ + PATIO_RADIUS * mid],
+      [chordHalf * 2, 0.12, PATIO_RADIUS * (t1 - t0)], m.drive,
       { solid: false, shots: false, cast: false });
   }
 
@@ -1841,13 +1845,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // rotated OBBs are kept in physicsColliders (the live authority) only.
   const yardRampBounds = new Set(builder.physicsColliders.slice(-2));
   builder.colliders = builder.colliders.filter((bounds) => !yardRampBounds.has(bounds));
-  for (let i = 0; i < yardStair.risers - 1; i += 1) {
-    const treadTop = bal.deckTop - yardStair.riser * (i + 1);
-    pair(builder, `yard stair ${i}`,
-      [yardStair.topX - yardStair.going * (i + 0.5), treadTop - 0.08 / 2, yardStair.centreZ],
-      [yardStair.going, 0.08, yardStair.width], m.trim,
-      { solid: false, shots: false, cast: true });
-  }
+  // Timber stringers, closed risers, treads and the outboard handrail are
+  // emitted after the presentation batch in buildNuketown2(), so each body
+  // remains individually auditable. The two ramps above remain the only
+  // movement authority for both flights.
 
   // ---- HF-465: the front ledge and the porch canopy ------------------------
   // The two rungs that make the upper front window a two-way opening. Heights
@@ -3065,6 +3066,18 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   cars(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
+  buildNuketown2Rooflines(builder, {
+    roof: m.roof,
+    roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
+    timber: m.fence,
+  } satisfies Nuketown2RoofMaterials);
+  buildNuketown2ExteriorStairs(builder, {
+    roof: m.roof,
+    roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
+    timber: m.fence,
+  } satisfies Nuketown2RoofMaterials);
 
   // ---- HF-426 JOB 3: the shipped map's LAWN, on this map's own rectangles --
   // Built HERE, after every prop, because `builder.colliders` is the keep-out
