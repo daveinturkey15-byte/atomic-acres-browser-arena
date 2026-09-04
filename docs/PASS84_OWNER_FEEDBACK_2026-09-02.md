@@ -1728,3 +1728,35 @@ assets and textures and lighting need to be tip top, raid can come next"
   windows and shootable blocks, spawns spread, chopper rockets (6 autopilot /
   12 piloted, weaker MG), swarm/drone speed, right-click taser, forged
   vehicles, materials/lighting still basic (lanes running), FPS.
+
+## HF-481 — owner 2026-09-04 14:20: "why do other examples look so much cooler and modern than ours? are you using the skills?"
+
+- Links to ingest: https://x.com/mattshumer_ (multiple works),
+  https://x.com/chrisgpt/status/2095399017723179173,
+  https://x.com/threejs/status/2095697056900026435 (video),
+  https://x.com/rileybrown/status/2095632207813521534 (video, "built this
+  morning"). Owner: "why are you taking so long making much less quality
+  stuff? we have so much compute"; "ensure any and all skills are ingested and
+  better used"; "surely we can produce better than a one-shot prompt in a
+  morning".
+- SAM/mocap rule refined: where a source says "no guns", adapt — hold something
+  else then add our gun after, or adjust the code into our own version; be
+  thoughtful; not distributed, local and friend sharing only.
+- **Three.js source-priority policy (standing, this machine only — not
+  jigglyclaw):** (1) query current Three.js docs first
+  (threejs.org/docs/llms.txt, llms-full.txt); (2) Poimandres docs MCP for
+  R3F/Drei/ecosystem (docs.pmnd.rs/api/mcp); (3) search current source/examples
+  (mrdoob/three.js, pmndrs/react-three-fiber, drei, examples,
+  react-three-examples) for implementation detail or visual inspiration;
+  (4) prefer current WebGPU/TSL for new work, check project/browser
+  requirements before replacing stable WebGL; (5) installed skills give
+  workflows/heuristics but never override current upstream docs/source;
+  (6) for visually ambitious requests search existing examples first
+  (shaders/TSL, particles, post-processing, reflections, transmission/glass,
+  scroll, physics, camera motion, procedural geometry, instancing, splats, XR,
+  animation); (7) check installed versions before copying APIs from HEAD;
+  (8) validate FPS, draw calls, memory/disposal, mobile, resize; (9) when a
+  strong reusable pattern is found, add a concise local recipe with the
+  upstream link to the project's Three.js knowledge directory. To be written
+  into AKP (dave-gaming-pc scope), the vault, every harness adapter, and the
+  ingestion hub, and enforced.
