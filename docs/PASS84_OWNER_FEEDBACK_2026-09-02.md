@@ -1936,3 +1936,14 @@ assets and textures and lighting need to be tip top, raid can come next"
   gates; needs the owner's ears afterwards.
 - **Layout (7ade1887):** corridor already at the BO2 ratio; clutter cut;
   roadside bays landing on the follow-on lane.
+
+## HF-488/489 status — daily frontier scan built, 2026-09-04 18:00
+
+- Vault `_Scripts/frontier_scan.py` + Windows task "Foundry frontier scan"
+  (daily 07:00, hidden python, next run 2026-09-05 07:00); first digest
+  `Ingestion/digests/2026-09-04.md` (both HF-490 posts, nukesimulation text,
+  13 examples r185 added, rankings, reachability, versions table, three
+  stage-0 rows). Reachable headless: GitHub, threejs.org, HN, single X posts.
+  Not reachable: Reddit (403), X profiles/syndication (429) → top-reposted
+  needs a logged-in session; `Ingestion/inbox.md` is the drop box.
+  `Ingestion/versions.md` carries the HF-489 update policy.
