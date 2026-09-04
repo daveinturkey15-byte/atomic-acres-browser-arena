@@ -165,7 +165,10 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
       roughness: 0.34,
     }),
     trim: createTimberMaterial('nuketown2-trim', 0xf0e4c9, 'painted-trim'),
-    fence: createTimberMaterial('nuketown2-timber-fence', 0x8a6244, 'fence'),
+    // The shipped fence timber, unchanged. This lane re-authors how a surface
+    // is WORN, not what colour it is; an earlier revision here drifted the
+    // fence a shade lighter and oranger and the review captures showed it.
+    fence: createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence'),
     sign: createPaintedMetalMaterial('nuketown2-sign', 0xdbd1ba, { roughness: 0.62 }),
     planter: createLawnMaterial('nuketown2-planter', 0x415a33, { variant: 'hedge' }),
 

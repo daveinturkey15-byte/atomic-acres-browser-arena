@@ -113,5 +113,5 @@ export function createTimberMaterial(
 }
 
 export function createNuketown2FenceMaterial(): MeshStandardNodeMaterial {
-  return createTimberMaterial('nuketown2-timber-fence', 0x8a6244, 'fence');
+  return createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence');
 }

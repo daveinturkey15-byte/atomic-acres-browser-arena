@@ -84,9 +84,24 @@ export function createSidingMaterial(
   const courseIdx = floor(courseV);
   const withinCourse = fract(courseV);
 
-  // The drip shadow under each butt: 3 mm of the 184 mm course, so a hard
-  // narrow line, not the soft 25 mm band a naive smoothstep gives you.
-  const dripShadow = smoothstep(float(0.985), float(1.0), withinCourse);
+  // The lap shadow.
+  //
+  // MEASURED AND CORRECTED. This first shipped as a 3 mm hard line - the true
+  // width of the drip edge itself - and the review captures showed the result:
+  // both houses came back as FLAT COLOURED BOXES, because 3 mm at the 8 m a
+  // player reads a wall from is 0.6 of a pixel. The shipped material it
+  // replaced used a 22 mm band and its courses read clearly at the same
+  // distance, so this was a straight regression dressed as physical accuracy.
+  //
+  // The physics is on the side of the wider band anyway: a weatherboard is a
+  // WEDGE, thicker at its butt, so the bottom fifth of every course tilts away
+  // from the sky and sits in its own shade - a graded band roughly 35 mm deep,
+  // with the drip edge itself as a hard core inside it. That is what a
+  // photograph of lap siding shows, and at 8 m it is 7 px of gradient with a
+  // 1 px line in it rather than 0.6 px of nothing.
+  const lapBand = smoothstep(float(0.80), float(1.0), withinCourse);
+  const dripCore = smoothstep(float(0.972), float(1.0), withinCourse);
+  const dripShadow = max(lapBand.mul(float(0.62)), dripCore);
   // The board's own top edge catches light where it meets the course above.
   const topCatch = smoothstep(float(0.06), float(0.0), withinCourse);
 
