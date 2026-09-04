@@ -1971,3 +1971,23 @@ assets and textures and lighting need to be tip top, raid can come next"
   for the owner to confirm: skyline-terminal also declares 6 and now escalates
   1 → 6 (one catalog field to pin it back). Gap recorded: no per-bot per-frame
   cost test exists in the suite.
+
+## HF-490/491 status — 2026-09-04 18:20
+
+- **Gemini reference critic, candidate 4b: 62/100** (candidate 3: 43). Top
+  three moves: BO2 rooflines (butterfly roof + six solar panels on the orange
+  house, capsule roofs with blue-grey glazing on the white house, +16); real
+  timber exterior stairs on a circular patio (+12); circular kerbed turning
+  head + streamlined liveried vehicles (+10). Lanes launched for all three
+  (Opus rooflines+stairs on layout-hitl5; Luna vehicle-forge-2).
+- **Roadside bays landed** (layout-hitl5 @ 6d3e1ad8): four kerb-side bays as
+  carriageway footprints, +4.4 m local paved width, corridor and ratio
+  untouched; verge ceiling split (furniture ≤ 36, aggregate ≤ 51); OPEN: ground
+  tiles 67 → 113, colliders 293 → 347 — needs a frame-time read in HITL 5b.
+- **Nuke horizon** (nuke-event @ 2f7855d2, 64 tests): distant risen cloud +
+  match-end detonation, capture pending. **r185 recipes** (r185-techniques @
+  aa465504): twelve recipes ranked; clustered lighting first → Luna lane
+  launched (night/dusk Nuke Town with dozens of local lights at fixed cost).
+- Cockpit delivery @ 70c9a49: liveness3 merged (9 scanned / 9 shown / 0
+  dropped, awaiting 6), suite 626 green; OPEN: /api/state warm latency ~3 s
+  under 94 % CPU load vs the peer's 1.1 s baseline — re-measure at low load.
