@@ -1,4 +1,25 @@
 /**
+ * WHAT: pure-CPU measurement of what one step of the runtime baked-indirect
+ * irradiance bake actually costs (worst, mean, p95, and >2x-budget overrun
+ * count) per tier (low/high), on a 24-occluder proxy scene, so the bake
+ * frame budget is checked as a bound rather than asserted.
+ *
+ * Usage:
+ *   npx tsx scripts/qa/measure-bake-step-budget.mjs --steps 400 --budget 3 --out docs/evidence/pass85/lane-al/step-budget.json
+ *
+ * Flags (all read from process.argv; no environment variables are read):
+ *   --steps <n>    number of bake steps measured per tier (default: 400)
+ *   --budget <ms>  bake frame budget in milliseconds used to count overruns (default: 3)
+ *   --out <path>   file to write the JSON report to (default: none, stdout only)
+ *
+ * Writes:
+ *   - the JSON report to stdout, always
+ *   - when --out is given: the report to that file, creating parent directories
+ *
+ * Exit codes: no explicit process.exit calls; 0 on success, non-zero on
+ * uncaught exception (e.g. the --out path is not writable).
+ */
+/**
  * HF-418 / Lane AL - what one step of the runtime bake actually costs.
  *
  * WHY THIS EXISTS. `BAKE_FRAME_BUDGET_MS = 3` was a declared budget that the
