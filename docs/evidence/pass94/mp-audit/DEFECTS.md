@@ -57,7 +57,8 @@ which is what the owner is describing.
 | **P-4** | A guest that rejects a pickup freezes that player until they die | follows P-3 | — | `legacy-main.ts:13498-13517` — the `return` at `:13516` runs on **guests** too, so guest B drops every later state message from that player | **TODO** — pairs with P-3 | ORIGINAL (guard), 2026-08-22 (the `return`) |
 | **P-5** | Auto-scavenge mutates guest state with no rollback record | walk over a drop | — | `legacy-main.ts:15375-15416` sets no `pendingLocalPickup`; the result handler's `pending === null` branch then force-switches the weapon (`:15558-15560`) | TODO | no — 2026-07-25 / 2026-08-22 |
 | **P-6** | Drops are not host-authoritative: every peer spawns its own copy | any death | ids match (`death-${nonce}`), **content does not** | `legacy-main.ts:15091` called from `processDeath` on all peers; weapon/position from each peer's local view | TODO — feeds the `weapon-mismatch`/`drop-distance` rejections that P-1 then makes permanent | ORIGINAL |
-| **P-7** | Driver reported `PICKUP-NO-EFFECT` on both guests | this run | `interact.returned: false`, `sentPickup: false` | **DRIVER-ARTIFACT** — `spawnDeathDrop` stages a drop from `victim: player.id`, i.e. the guest's *own* identical full-reserve primary, which `consumeDeathDropWeapon` correctly refuses | **FIXED in the driver** — stage an alternative primary, then re-equip, so the F-press is a genuine cross-weapon pickup | n/a |
+| **P-7** | Driver reported `PICKUP-NO-EFFECT` on both guests | baseline + `after` runs | `interact.returned: false`, `sentPickup: false` | **DRIVER-ARTIFACT** — `spawnDeathDrop` stages a drop from `victim: player.id`, i.e. the guest's *own* identical full-reserve primary, which `consumeDeathDropWeapon` correctly refuses | **FIXED in the driver** — stage an alternative primary, then re-equip | n/a |
+| **P-8** | With the corrected staging: the guest picks the gun up, then it **silently reverts** | `after2` run, both guests | `staged: smg`, `holding: carbine`, `interact.returned: **true**`, `sentPickup: **true**`, `gotPickupResult: **true**`, `weaponAfter: carbine` — trace `out:pickup, in:pickup-result` | the host **rejected** the claim. But the drop was staged by a guest-local QA hook, so the host never observed the death and legitimately has no such drop: `unknown-drop` is *correct* host behaviour here | **STILL DRIVER-LIMITED** — this cleanly demonstrates the P-1 apply→reject→revert path (and with the P-1 fix the guest now adopts the host record and shows `PICKUP DENIED` instead of reverting in silence), but it is **not** proof of the owner's defect. A true reproduction needs a drop created by a real death every peer observed | n/a |
 
 ### R — reload
 
@@ -125,12 +126,13 @@ which is what the owner is describing.
 
 | | Count |
 |---|---|
-| Rows total | 41 |
+| Rows total | 42 |
 | **Fixed this lane** | **5** (P-1, R-1, W-1, L-5, L-6) + 1 driver fix (P-7) |
 | TODO | 33 |
 | Other lane | 2 (R-6, X-3) |
 | ORIGINAL (survived since 2026-07-25, never corrected) | 12 |
 | Reproduced by the driver this run (MEASURED) | 6 |
+| Driver artifacts caught and retracted | 2 (P-7, P-8) |
 
 ## D. What this run did **not** exercise
 
