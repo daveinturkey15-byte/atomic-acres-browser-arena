@@ -240,6 +240,13 @@ any.
   list against one head: the overhead and low stem-facing views of the circular
   head, the two roof forms and the six solar panels, the timber flight and its
   patio, and a walk probe up both flights plus a jump onto the flat roof deck.
+- **TODO (OPEN, Muse F3)** - before HITL sign-off, collect and attach the
+  already-listed riser-tier captures: a timber-flight + patio close view, a walk
+  probe up both flights, and a jump onto the flat roof deck. Exact fix: verify
+  that the cloned `-1` riser depth tier at `src/nuketown2-roofs.ts:310-314`
+  removes the visible stair race without changing the authored appearance or
+  walk/shot behavior; no source change is authorized by this evidence-only
+  follow-up.
 - **OPEN** - the rooflines lane's F3 follow-up (reconcile the emitted roof
   plan-area sum, north 188.77 vs south 202.03, and the apex envelope 7.94 vs 8.15,
   then replace the measured pins with approved fairness bounds) is inherited
