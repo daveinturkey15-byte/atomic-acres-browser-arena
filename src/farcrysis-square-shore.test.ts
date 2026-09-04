@@ -202,6 +202,39 @@ describe('HF-395/396 square-shore contract (palms, detail, art)', () => {
       expectBand('shore boulder', origin.x, origin.z, SHORE_BOULDER_BAND);
     }
   });
+  it('art boulders carry their tint as per-instance colour on one shared family material', () => {
+    // Luna review (PASS 95 slice 2): the three boulder sets share ONE white
+    // material and ONE geometry; each set's tint rides the approved
+    // per-instance path (`instanceColor`, the varyInstanceColors idiom), never
+    // a baked geometry `color` attribute and never three material objects.
+    const expectedTint: Record<string, number> = {
+      'farcrysis-cliff-rocks': 0x716b60,
+      'farcrysis-interior-boulders': 0x7a7268,
+      'farcrysis-shore-boulders': 0x6d655c,
+    };
+    const materials = new Set<THREE.Material>();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const tint = new THREE.Color();
+    for (const [name, hex] of Object.entries(expectedTint)) {
+      const mesh = scene.getObjectByName(name) as THREE.InstancedMesh | undefined;
+      expect(mesh, `${name} missing`).toBeDefined();
+      const material = mesh!.material as THREE.MeshStandardMaterial;
+      expect(material.vertexColors, `${name} must not use baked vertex colours`).toBe(false);
+      materials.add(mesh!.material as THREE.Material);
+      geometries.add(mesh!.geometry as THREE.BufferGeometry);
+      expect(mesh!.geometry.getAttribute('color'), `${name} must not carry a baked color attribute`).toBeUndefined();
+      expect(mesh!.instanceColor, `${name} has no per-instance colour`).toBeTruthy();
+      tint.setHex(hex);
+      const array = mesh!.instanceColor!.array as ArrayLike<number>;
+      for (let i = 0; i < mesh!.count; i += 1) {
+        expect(array[i * 3], `${name} instance ${i} red`).toBeCloseTo(tint.r, 5);
+        expect(array[i * 3 + 1], `${name} instance ${i} green`).toBeCloseTo(tint.g, 5);
+        expect(array[i * 3 + 2], `${name} instance ${i} blue`).toBeCloseTo(tint.b, 5);
+      }
+    }
+    expect(materials.size, 'boulder sets stopped sharing one material').toBe(1);
+    expect(geometries.size, 'boulder sets stopped sharing one geometry').toBe(1);
+  });
 
   it('cliff rocks track the transition band including the corner diagonals', () => {
     const mesh = scene.getObjectByName('farcrysis-cliff-rocks') as THREE.InstancedMesh | undefined;

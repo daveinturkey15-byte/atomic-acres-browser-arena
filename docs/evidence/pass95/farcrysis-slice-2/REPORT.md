@@ -93,3 +93,38 @@ git status -sb
   timeouts.
 - TODO: capture exact-SHA WebGPU boulder parity/frame evidence when the
   no-browser/no-GPU review restriction is lifted.
+
+## Blocking findings fixed (Luna review response, 2026-09-04)
+
+**Claim-state key.** Same as §1: `VERIFIED` = ran the command or read the file in this
+session and quote what it said. `OPEN` = named as unknown.
+
+- **BLOCKING 1 — boulder tint off geometry attributes, onto the approved per-instance
+  path: FIXED — VERIFIED.** `src/farcrysis-art.ts`: the three boulder sets
+  (`farcrysis-cliff-rocks` 28 / `farcrysis-interior-boulders` 12 / `farcrysis-shore-boulders` 8)
+  now share ONE boulder geometry and ONE white `MeshStandardMaterial`
+  (`vertexColors: false`, roughness 0.92, metalness 0.04, same `terrain` ground maps); each set's
+  tint (`0x716b60` / `0x7a7268` / `0x6d655c`) is written per instance with `setColorAt` — the
+  `varyInstanceColors` / grass-tint idiom, i.e. the "one material per family with per-instance
+  tint" reauthoring `src/farcrysis-material-vocabulary.ts` names. No cloned geometries, no `color`
+  attributes. White x old tint == old tint (`new THREE.Color(hex)` already holds linear values).
+  Standard+instanceColor is already in the coverage draw via the palms/vegetation — no new
+  pipeline. Counts unchanged: tsx census `{"meshes":989,"materials":165,"standardMaterials":64,
+  "nodeMaterials":83,"otherMaterials":18}`, second collapse `collapsed=0` (fixed point holds).
+  Regression pin added in `src/farcrysis-square-shore.test.ts` (one shared material, one shared
+  geometry, `vertexColors === false`, no `color` attribute, per-instance tint values per set).
+  `CEILING_HISTORY` latest entry reworded to the instanceColor mechanism; ceiling stays 166
+  (number untouched — no threshold weakened, no assertion deleted).
+- **OPEN 2 — gates not independently completed: CLOSED — VERIFIED.** Re-ran every named gate
+  from this worktree with explicit file lists (the quoted `"src/farcrysis*.test.ts"` glob expands
+  to 2 files / 20 tests on Windows/Vitest — reproduced here, so the full set is passed
+  explicitly): `npx tsc --noEmit` → `TSC_EXIT:0`, no output; explicit 28-file Vitest set →
+  `Test Files 28 passed (28)` / `Tests 197 passed (197)` (196 + the new pin); budget + boot +
+  legacy-main ratchet 3-file run → `Test Files 3 passed (3)` / `Tests 9 passed (9)`;
+  `npx tsx scripts/qa/find-coplanar-pairs.ts | grep -ci farcrysis` → `0` (no farcrysis pairs;
+  grep exits 1 on zero matches — the count is the result); `git status -sb` clean except the
+  three intent files below.
+- **OPEN 3 — visual/runtime evidence absent: still OPEN (no-browser/no-GPU rule in force).**
+  Pixel identity of the three boulder sets remains `DESIGNED` (exact by construction: white
+  material x per-instance old tint == old per-set draw); exact-SHA WebGPU parity/frame evidence
+  still TODO when the restriction lifts — see the Luna TODOs above, unchanged.
