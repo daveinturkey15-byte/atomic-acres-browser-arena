@@ -1,3 +1,11 @@
+// Captures per-weapon, per-pose gameplay screenshots of the Atomic Acres solo match in Chrome (native-WebGPU args) for HF-410 near-plane / z-fighting review.
+// Usage: node scripts/qa/hf410-capture.mjs [--url <url>] [--out <dir>] [--label <label>] [--weapons <id,id,...>]
+//   --out <dir>       output directory for the PNGs, created if missing (default: artifacts/qa/hf410-frames)
+//   --label <label>   filename prefix for captured PNGs (default: run)
+//   --weapons <ids>   comma-separated weapon ids to equip in turn (default: carbine,lmg,sniper)
+//   --url <url>       game URL to load before solo start (default: http://127.0.0.1:41942/)
+// Writes: one PNG per weapon x pose, named <label>-<weapon>-<pose>.png, into the --out directory (e.g. run-carbine-open-ground-stand.png).
+// Exit codes: no explicit process.exit calls; 0 on completion, non-zero on unhandled error.
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
