@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// Measures the DEPLOYMENT-TIME arena commit path (startSolo without prior selectArena) on real installed-Chrome WebGPU.
+// Usage: node scripts/qa/measure-arena-commit-cdp.mjs
+//   --url <base>     Base URL of the app under test (default: http://127.0.0.1:41911)
+//   --trials <n>     Number of trials to run (default: 3)
+//   --timeout <ms>   Per-trial timeout in milliseconds (default: 150000)
+// Writes: artifacts/qa/arena-commit-deploy-path.json (creates artifacts/qa/ if missing)
+// Exit codes: 0 = PASS (all trials ok), 1 = FAIL (any failed trial), 2 = INVALID (environment invalidated)
+//
 // Measures the DEPLOYMENT-TIME arena commit path on real installed-Chrome WebGPU.
 //
 // verify-arena-boot-cdp.mjs calls selectArena() first, which commits the arena
