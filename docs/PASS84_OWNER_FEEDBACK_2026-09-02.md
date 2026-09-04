@@ -1307,3 +1307,31 @@ assets and textures and lighting need to be tip top, raid can come next"
   distance and angle; stairs smooth up and down in both houses; upstairs window
   drop-outs; ground-floor glass; truck open on three sides; kerb-side cover;
   road/kerb/facade/interior detail and materials; fps with Qwen idle.
+
+## HF-454 — owner 2026-09-04 06:50–07:15: "it is not stable, i cant even launch nuke town rebuild" / "pass 92 on the web doesn't work either" / "pass 91 doesn't work either, get all this sorted"
+
+- **Root cause (VERIFIED 07:19, orchestrator):** in the owner's installed Chrome
+  153.0.8010.12 with STOCK flags, the real visitor path (menu → Nuke Town
+  Rebuild card → DEPLOY) never reaches a live frame on the live PASS 92 and on
+  the local candidate, default and quality profiles alike. Console:
+  `Render pipeline creation failed (renderPipeline_RenderPipeline_25): An error
+  occurred while generating Tint IR — swizzle view instruction still has usages
+  after lowering` → invalid command buffer → `[Nuke Town Rebuild map selection
+  failed] WebGPU queue completion failed`, repeating every ~2 s. With
+  `--enable-unsafe-webgpu` the same builds boot on default/quality/max — every
+  QA smoke passes that flag, which is why all gates were green (the exact trap
+  recorded in the Chrome 153 Tint gotcha of 2026-08-30). The existing WGSL
+  swizzle shim misses this pipeline's shader. Not a GPU-memory, driver or
+  Chrome-update issue: GPU had 14 GB free, driver unchanged, the pending Chrome
+  153.0.8010.28 update is not yet active (new_chrome.exe staged, running
+  build is .12), no Chrome crashes since 08-31. Edge 152 and headless Chromium
+  load the menu fine; the failure is at arena pipeline creation.
+- **Evidence:** `docs/evidence/pass93/chrome153-live-repro/` (stock-flag probe
+  JSON per profile against the live URL, plus the probe script). Luna's
+  three-profile visitor reproduction with the unsafe flag (PASS on all three)
+  is in `aa-claude-hitl/docs/evidence/pass93/hitl-repro/`.
+- **Action:** one Opus agent (owner-authorised) is producing a hotfix on
+  `pass93-chrome153-hotfix` off the live head: extend the shim, install it
+  before the first pipeline, add an honest stock-flags boot spec to the cut
+  ritual. The Nuke Town tip-top branch (Luna verdict DO-NOT-SHIP: identical
+  siding on both houses, stray marker cubes) waits behind the hotfix.
