@@ -1,0 +1,335 @@
+{
+  "contract": "beast-run-config-v1",
+  "lane": "LANE-BB",
+  "date": "2026-09-04",
+  "timezone": "Europe/London",
+  "impact": "process-only",
+  "subject": "nuketown-2025",
+  "arenaId": "nuketown2",
+  "goal": "Make Nuke Town read as BO2 Nuketown 2025 through a photoreal procedural method while preserving every mechanical, gameplay, render-profile, provenance, and release gate.",
+  "nonGoals": [
+    "arena code changes in this plan task",
+    "browser execution during plan authoring",
+    "builds or deployment",
+    "production publication"
+  ],
+  "base": {
+    "name": "PASS94 candidate plus verified afternoon lanes",
+    "pass94ShaInput": "PASS94_MERGED_SHA",
+    "afternoonLaneInputs": [
+      "accuracy-2",
+      "materials",
+      "lighting",
+      "techniques",
+      "animation/skins",
+      "Raid",
+      "Farcrysis",
+      "load-time"
+    ],
+    "mergeOrder": [
+      "PASS94 candidate exact SHA",
+      "only afternoon lane exact SHAs proven landed by 22:00, in central-ledger order"
+    ],
+    "freezeOutput": "BEAST_BASE_SHA",
+    "requiresCleanTree": true,
+    "requiresCurrentOriginMain": true,
+    "preserveRecoveryRef": true,
+    "neverInferFromBranchName": true
+  },
+  "referenceSet": {
+    "requiredContract": "reference-set-v1",
+    "manifest": "docs/references/nuketown-2025/manifest.json",
+    "findings": "docs/references/nuketown-2025/FINDINGS.md",
+    "primaryTarget": "BO2-2025",
+    "sourcePolicy": {
+      "t1CommercialFirstParty": "measurement-only",
+      "criticTargets": "T2-own-capture-or-T3-permissive-reference-only",
+      "minimumTargetableSources": 1,
+      "failClosedWhenMissing": true,
+      "doNotFabricateExactHexValues": true
+    },
+    "requiredManifestFields": [
+      "contract",
+      "subject",
+      "subjectKind",
+      "sources",
+      "criticTargets",
+      "pairs",
+      "measurements",
+      "unknowns"
+    ],
+    "requiredVersionTag": "BO2-2025",
+    "researchCollectionNote": "The research collection manifest is not runner-compatible until converted and validated; do not hand it directly to the loop."
+  },
+  "judgeset": {
+    "contract": "nuketown2-frozen-judgeset-v1",
+    "count": 12,
+    "seed": "viewpoint",
+    "settleMs": 5000,
+    "samples": 3,
+    "oneHeadlessBrowser": true,
+    "stationSource": "PASS94 candidate named Nuketown fixed stations",
+    "stations": [
+      {
+        "id": "nuketown2-street-centre",
+        "class": "exterior",
+        "bo2Questions": ["street axis", "cul-de-sac/open-end read", "coach/truck placement"]
+      },
+      {
+        "id": "nuketown2-north-upper-window",
+        "class": "exterior",
+        "bo2Questions": ["orange-house upper mass", "glazing", "balcony/roof proportion"]
+      },
+      {
+        "id": "nuketown2-south-upper-window",
+        "class": "exterior",
+        "bo2Questions": ["white-house upper mass", "glazing", "balcony/roof proportion"]
+      },
+      {
+        "id": "nuketown2-into-sun-street",
+        "class": "exterior",
+        "bo2Questions": ["depth", "third house", "red car", "atmospheric/light read"]
+      },
+      {
+        "id": "nuketown2-garage",
+        "class": "exterior",
+        "bo2Questions": ["garage scale", "door/lifecycle", "handedness context"]
+      },
+      {
+        "id": "nuketown2-north-balcony",
+        "class": "exterior",
+        "bo2Questions": ["rear deck/stair", "upper-window relationship"]
+      },
+      {
+        "id": "nuketown2-front-porch",
+        "class": "exterior",
+        "bo2Questions": ["deep cantilever/eave semantics", "entry materials"]
+      },
+      {
+        "id": "nuketown2-north-interior",
+        "class": "interior",
+        "bo2Questions": ["orange-side materials", "occlusion", "collision/LOS"]
+      },
+      {
+        "id": "nuketown2-south-interior",
+        "class": "interior",
+        "bo2Questions": ["white-side materials", "occlusion", "collision/LOS"]
+      },
+      {
+        "id": "nuketown2-north-yard",
+        "class": "backyard-spawn",
+        "bo2Questions": ["garage on right", "yard identity", "spawn-safe sightlines"]
+      },
+      {
+        "id": "nuketown2-south-yard",
+        "class": "backyard-spawn",
+        "bo2Questions": ["garage on right", "yard identity", "spawn-safe sightlines"]
+      },
+      {
+        "id": "nuketown2-overhead",
+        "class": "overhead",
+        "bo2Questions": ["lollipop plan", "house/garage/street/yard topology"]
+      }
+    ],
+    "probeReceiptRequired": true,
+    "missingStationAction": "stop"
+  },
+  "loop": {
+    "runnerContract": "reference-loop-v1",
+    "runnerScript": "scripts/loop/run-loop.mjs",
+    "runnerHasNativeConfigLoader": false,
+    "orchestratorMustDispatchProviders": true,
+    "cycleLengthMinutes": 45,
+    "maxCycles": 10,
+    "cycleStartsLocal": [
+      "22:00",
+      "22:45",
+      "23:30",
+      "00:15",
+      "01:00",
+      "01:45",
+      "02:30",
+      "03:15",
+      "04:00",
+      "04:45"
+    ],
+    "wallClockFenceLocal": "05:30",
+    "visualCriticQuorum": {
+      "minimumValidCritics": 2,
+      "consecutiveExitCycles": 2,
+      "visualSeats": ["gemini", "alibaba-qwen-max"],
+      "lunaCountsTowardVisualQuorum": false
+    },
+    "runnerStopRules": {
+      "exitConsecutiveCycles": 2,
+      "plateauDelta": 1.0,
+      "plateauWindow": 2,
+      "invalidStreak": 2,
+      "oscillationWindow": 3,
+      "allowedPlateauEscalations": 1,
+      "regressionBlocksSuccess": true,
+      "tier0ContradictionBlocksSuccess": true
+    },
+    "cycleStages": [
+      "select-lowest-scoring-reference-region",
+      "one-bounded-builder-change-under-module-hook-discipline",
+      "frozen-twelve-station-capture-with-probe-receipt",
+      "mechanical-perceptual-precheck",
+      "Gemini-and-Alibaba-visual-critic-round",
+      "Luna-skeptic-on-every-third-cycle",
+      "both-profile-regression-and-journal-stop-evaluation"
+    ],
+    "lunaCycles": [3, 6, 9],
+    "finalAdjudication": true
+  },
+  "adapters": {
+    "builders": [
+      {
+        "id": "gemini",
+        "runnerAdapter": "omp-gemini",
+        "provider": "google-antigravity",
+        "model": "google-antigravity/gemini-3.8-flash-high",
+        "kind": "vision",
+        "priority": 1,
+        "roles": ["builder-primary", "visual-critic"],
+        "maxCalls": 20,
+        "callBreakdown": {"builder": 10, "critic": 10},
+        "availability": {
+          "window": "5-hour",
+          "priorExhaustedAtClaimed": "21:50 previous night",
+          "earliestRetryEstimateLocal": "02:50",
+          "probeBeforeUse": true,
+          "noQuotaRetryLoop": true
+        }
+      },
+      {
+        "id": "alibaba-qwen-max",
+        "runnerAdapter": "omp-gemini",
+        "provider": "alibaba-token-plan",
+        "model": "alibaba-token-plan/qwen3.8-max",
+        "kind": "vision",
+        "priority": 2,
+        "roles": ["builder-secondary", "visual-critic"],
+        "maxCalls": 20,
+        "callBreakdown": {"builder": 10, "critic": 10},
+        "availability": {
+          "window": "weekly-token-plan",
+          "stateClaimedAtHandoff": "fresh",
+          "probeBeforeUse": true,
+          "noQuotaRetryLoop": true
+        }
+      },
+      {
+        "id": "glm",
+        "runnerAdapter": "omp-gemini",
+        "provider": "zai",
+        "model": "zai/glm-5.3-flash",
+        "kind": "vision",
+        "priority": 3,
+        "roles": ["late-builder-fallback"],
+        "maxCalls": 2,
+        "availableAfterLocal": "05:04",
+        "availability": {
+          "window": "5-hour",
+          "resetClaimedLocal": "05:04",
+          "probeBeforeUse": true,
+          "noQuotaRetryLoop": true
+        }
+      }
+    ],
+    "criticSeats": [
+      {
+        "seat": "gemini",
+        "adapter": "omp-gemini",
+        "model": "google-antigravity/gemini-3.8-flash-high",
+        "input": "reference-paired-images-and-station-metadata",
+        "output": "four-row-critic-schema",
+        "countsTowardVisualQuorum": true
+      },
+      {
+        "seat": "alibaba-qwen-max",
+        "adapter": "omp-gemini",
+        "model": "alibaba-token-plan/qwen3.8-max",
+        "input": "reference-paired-images-and-station-metadata",
+        "output": "four-row-critic-schema",
+        "countsTowardVisualQuorum": true
+      },
+      {
+        "seat": "luna",
+        "adapter": "codex",
+        "model": "gpt-5.6-luna",
+        "reasoning": "xhigh",
+        "input": "station-summaries-precheck-receipt-probe-receipt-bo2-findings",
+        "output": "skeptic-findings-and-contract-adjudication",
+        "cycles": [3, 6, 9],
+        "countsTowardVisualQuorum": false,
+        "textOnly": true,
+        "headlessNotifyOverride": "-c notify=[]"
+      }
+    ],
+    "runnerLimitation": "The current CLI/API loads one adapter for a run and the Codex adapter cannot receive images. The orchestrator must keep Gemini and Alibaba as separate visual seats and treat Luna as text-only; do not claim that --critics A,B,C alone provides three heterogeneous visual routes."
+  },
+  "localQwen": {
+    "route": "qwen-local-8090/qwen38-27b-iq3xxs",
+    "endpoint": "http://127.0.0.1:8090",
+    "roles": ["header-chain", "qwen-bench-ladder-rerun", "single-file-exact-spec-jobs"],
+    "criticAdmitted": false,
+    "reason": "Failed the four-row receipt task; triage/mechanical work only.",
+    "vramWhileAwakeMiBApprox": 13800,
+    "sleepAfterLastRequestSecondsApprox": 45,
+    "benchRuns": 1,
+    "singleFileOnly": true,
+    "neverSelfApproves": true,
+    "gapOnly": true
+  },
+  "gpuAndConcurrency": {
+    "minimumFreeVramMiB": 3000,
+    "oneHeadlessBrowser": true,
+    "qwenMustSleepDuringCapture": true,
+    "lockFile": "C:\\Users\\david\\AppData\\Local\\Temp\\claude\\C--Users-david-Desktop-stuff\\4cfe1b40-a256-4a42-8146-934f0cf22570\\scratchpad\\gpu.lock",
+    "lockMeaning": "present means pause Qwen; capture owns the lock; Qwen runs only between cycles when absent",
+    "unknownLockHolderAction": "stop",
+    "noCredentialInspection": true
+  },
+  "launcher": {
+    "shell": "powershell",
+    "canonicalCheckoutInput": "PASS84_CANONICAL_CHECKOUT",
+    "pass94ShaInput": "PASS94_MERGED_SHA",
+    "mergeRule": "git merge --ff-only <verified-40-character-lane-sha> in ledger order after PASS94",
+    "preflightCommands": [
+      "git fetch origin --prune",
+      "git status -sb",
+      "git switch main",
+      "git pull --ff-only origin main"
+    ],
+    "manifestGuard": "Get-Content -LiteralPath docs\\references\\nuketown-2025\\manifest.json -Raw | ConvertFrom-Json | Out-Null",
+    "planCommand": "node scripts/loop/run-loop.mjs --subject nuketown-2025 --print-plan",
+    "dryRunCommand": "node scripts/loop/run-loop.mjs --subject chopper-gunner-cockpit-1080 --dry-run --fixture-dir scripts/loop/fixtures/dry-run --critics A,B,C --cycles 1 --evidence-root artifacts/loop/beast-plan-dry-run",
+    "captureLockProtocol": "create lock; wait for Qwen quiescence; run ledger-recorded twelve-station capture; verify probe receipt; remove lock in finally",
+    "codexInvocationRule": "headless codex exec must include -c notify=[]; watch DONE marker and terminate hung process after DONE"
+  },
+  "verification": {
+    "sixAmVerifier": "Claude Opus",
+    "checkExactBaseAndHeadShas": true,
+    "checkManifestAndTargetPolicy": true,
+    "checkAllTwelveStations": true,
+    "checkProbeAndCriticReceipts": true,
+    "checkMechanicalPrecheckAndRegression": true,
+    "checkBothProfiles": true,
+    "checkQwenWasAsleepForCapture": true,
+    "checkNoGateWasWeakened": true,
+    "morningHitl": {
+      "required": true,
+      "usesImmutableCandidateSha": true,
+      "checksBothBackyardGarageRightViews": true,
+      "checksBo2PaletteAndLandmarks": true,
+      "checksGeometryMaterialsLightingAndGameplayParity": true,
+      "publishes": false
+    }
+  },
+  "dryRunEvidence": {
+    "validatedAgainst": "existing chopper-gunner-cockpit-1080 fixture subject",
+    "nuketownExecution": "blocked until a runner-compatible manifest and targetable T2/T3 source exist",
+    "outputToQuoteAfterRun": true
+  }
+}
