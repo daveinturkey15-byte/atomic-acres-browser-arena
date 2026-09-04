@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+// Compares two arena-viewpoint capture directories (DIFF side) and reports per-viewpoint verdicts.
+//
+// Usage:
+//   node scripts/qa/diff-arena-viewpoints.mjs --base <baseDir> --candidate <candidateDir> [--out <outDir>]
+//
+// Flags:
+//   --base <dir>       base capture directory (required; no default)
+//   --candidate <dir>  candidate capture directory (required; no default)
+//   --out <dir>        output directory (default: artifacts/viewpoint-regression/diff-<baseName>-<candidateName>)
+//
+// Writes:
+//   <outDir>/diff-report.json, plus <outDir>/<arena>__<cameraId>.png composites for blocking viewpoints.
+//
+// Exit codes:
+//   0 = CLEAN, 1 = DIFFS (any REGION_CHANGED/GLOBAL_CHANGED/MISSING), 2 = bad args / missing or invalid capture-manifest.json
+//
 // Arena viewpoint regression — DIFF side.
 //
 // Compares two capture directories produced by capture-arena-viewpoints.mjs
