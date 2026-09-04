@@ -62,6 +62,12 @@ silently paved by the old square cut.
 5. The head is identical across the z=0 team axis in both Performance and
    Quality presentations, with no depth race or runtime warning.
 
+TODO (F4, larger than a code-only fix): confirm the square-minus-disc corner
+interpretation in a daylight HITL capture before release. The exact checks are
+the overhead and low stem-facing views at `docs/evidence/pass94/nuketown2-turning-head/REPORT.md:51-55`:
+the disc must have no pale rectangular apron, its kerb must read as a ring, and
+the corner pockets must intentionally remain ground/verge in both profiles.
+
 ## Validation commands
 
 ```text
