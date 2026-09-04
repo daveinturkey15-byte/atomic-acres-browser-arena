@@ -2089,3 +2089,11 @@ assets and textures and lighting need to be tip top, raid can come next"
   `docs/evidence/pass94/mp-bugs/REPORT.md` with claim-states.
 - **Planning requirements:** R105, R110, R203, R204, R232, R236, R304, R307,
   R600, R604, R605, R608, R610, R613.
+
+## HF-499 - owner 2026-09-04 19:55-20:05: online desync, rejoin, one-way replication (PASS 92/93 original Nuketown, with friends)
+
+- 'loads of desync, a bad experience, not good enough testing'; 'rejoin during progress feels bad; I see them move but they do not see me and no damage lands'. Routed to a Luna netcode lane (host + two headless guests under latency/loss; rejoin re-registration; damage credit) and a new multiplayer soak gate for the cut ritual from PASS 95. Testing gap acknowledged: release gates covered solo boot + bot probe only.
+
+## HF-500 - owner 2026-09-04 20:07: 'the in-game chat is annoying, move it up a bit so we do not keep hitting it'
+
+- Routed to a small Luna HUD lane; rides with the multiplayer HITL.
