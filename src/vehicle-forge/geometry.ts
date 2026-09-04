@@ -109,6 +109,15 @@ export interface VehicleSpec {
   readonly screens: readonly SpanZ[];
   /** Shut line positions along z. */
   readonly shutLines: readonly number[];
+  /**
+   * A glazing band cut out of the NOSE CAP, as a height range.
+   *
+   * Without it a cab-over coach or truck has no windscreen at all: the loft can
+   * only cut glass from a flank quad or a top-arc quad, so a body whose front
+   * IS its end cap gets a blank painted face with two lamps stuck on it, and
+   * every review frame reads it as a van rather than a vehicle with a driver.
+   */
+  readonly noseGlass?: { readonly yMin: number; readonly yMax: number };
   /** Background station spacing where nothing else asks for one. */
   readonly stationSpacing: number;
 }
@@ -608,22 +617,52 @@ export function loftBody(spec: VehicleSpec): LoftResult {
     }
   }
 
-  // End caps, fanned from the ring centre. Always painted: a cap classified as
-  // glass would be a windscreen you could see the road through.
+  // End caps, built as a stack of HORIZONTAL SLICES between consecutive right-
+  // half ring points, mirrored across the centre plane.
+  //
+  // Not a triangle fan, and the difference is the whole point. A fan cannot
+  // express a band: classifying its triangles by height gives two wedges
+  // meeting at the apex with a painted triangle between them, and a coach's
+  // windscreen comes out as a bow tie. Slices give a real band. Their heights
+  // are the RING'S OWN point heights and nothing else, so the cap's boundary is
+  // exactly the polyline the side quads meet, with no T-junction - which is why
+  // a `noseGlass` band snaps to those heights rather than cutting between them.
   for (const [index, sign] of [[0, -1], [rings.length - 1, 1]] as const) {
     const ring = rings[index]!;
-    const centreY = (ring.yLow + ring.yTop) / 2;
+    const nose = sign === -1 ? spec.noseGlass : undefined;
     const normal: Vec3 = [0, 0, sign];
-    for (let j = 0; j < RING_POINTS; j += 1) {
-      const j2 = (j + 1) % RING_POINTS;
-      const positions: Vec3[] = [
-        [0, centreY, ring.z],
-        [ring.points[j]![0], ring.points[j]![1], ring.z],
-        [ring.points[j2]![0], ring.points[j2]![1], ring.z],
-      ];
-      const uvs: Vec2[] = [[0.5, 0.5], [0.5, j / RING_POINTS], [0.5, j2 / RING_POINTS]];
-      pushTriangle(body, positions, [normal, normal, normal], uvs, [0, 1, 2], needsFlip(positions, normal));
-      quadCounts.body += 1;
+    const emit = (corners: Vec3[], glazed: boolean): void => {
+      const sink = glazed ? glass : body;
+      const uvs: Vec2[] = corners.map((_, k) => [k / corners.length, 0.5] as Vec2);
+      const flip = needsFlip(corners, normal);
+      const normals: Vec3[] = corners.map(() => normal);
+      pushTriangle(sink, corners, normals, uvs, [0, 1, 2], flip);
+      if (corners.length === 4) pushTriangle(sink, corners, normals, uvs, [0, 2, 3], flip);
+      if (glazed) quadCounts.glass += 1; else quadCounts.body += 1;
+    };
+    // The bottom and top edges are three ring points on one line (left, centre,
+    // right). One zero-area triangle through the centre point keeps both of its
+    // edges paired; without it the cap's single flat edge leaves the loft's two
+    // unmatched and the body is no longer watertight.
+    for (const [k, centre] of [[1, 0], [11, 12]] as const) {
+      const a = ring.points[k]!;
+      const c = ring.points[centre]!;
+      const mirrored = ring.points[(RING_POINTS - k) % RING_POINTS]!;
+      emit([[a[0], a[1], ring.z], [c[0], c[1], ring.z], [mirrored[0], mirrored[1], ring.z]], false);
+    }
+    for (let k = 1; k <= 10; k += 1) {
+      const a = ring.points[k]!;
+      const b = ring.points[k + 1]!;
+      if (Math.abs(a[1] - b[1]) < 1e-9 && Math.abs(a[0] - b[0]) < 1e-9) continue;
+      const glazed = nose !== undefined
+        && Math.min(a[1], b[1]) >= nose.yMin && Math.max(a[1], b[1]) <= nose.yMax;
+      if (glazed) {
+        glassMinZ = Math.min(glassMinZ, ring.z);
+        glassMaxZ = Math.max(glassMaxZ, ring.z);
+      }
+      emit([
+        [a[0], a[1], ring.z], [-a[0], a[1], ring.z], [-b[0], b[1], ring.z], [b[0], b[1], ring.z],
+      ], glazed);
     }
   }
 
@@ -820,9 +859,38 @@ export function chamferedBar(
  * a waist stripe sized from the overall length wraps the nose. Both extents
  * come from the loft's own edge points here, so neither can happen.
  */
-export function stripAlongRing(
+/**
+ * Where the flank crosses a given HEIGHT, and the outward normal there.
+ *
+ * A waistline is a level line at a fixed height, not a fixed ring index. Riding
+ * an index makes the stripe climb every wheel arch - the lower flank points are
+ * spaced as a fraction of the height remaining above the arch, so index 5 is at
+ * 1.2 m between the wheels and at 1.6 m over one - and the result is a red band
+ * that humps over each wheel like a decal applied by someone who never looked.
+ */
+function flankAtHeight(ring: Ring, y: number): { x: number; nx: number; ny: number } | null {
+  const normals = ringNormals(ring.points, (ring.yLow + ring.yTop) / 2);
+  for (let j = 1; j <= 8; j += 1) {
+    const a = ring.points[j]!;
+    const b = ring.points[j + 1]!;
+    const low = Math.min(a[1], b[1]);
+    const high = Math.max(a[1], b[1]);
+    if (y < low || y > high) continue;
+    const span = b[1] - a[1];
+    const t = Math.abs(span) < 1e-9 ? 0 : (y - a[1]) / span;
+    const na = normals[j]!;
+    const nb = normals[j + 1]!;
+    const nx = na[0] + (nb[0] - na[0]) * t;
+    const ny = na[1] + (nb[1] - na[1]) * t;
+    const length = Math.hypot(nx, ny) || 1;
+    return { x: a[0] + (b[0] - a[0]) * t, nx: nx / length, ny: ny / length };
+  }
+  return null;
+}
+
+export function stripAtHeight(
   rings: readonly Ring[],
-  ringIndex: number,
+  y: number,
   z0: number,
   z1: number,
   height: number,
@@ -835,14 +903,14 @@ export function stripAlongRing(
   for (let i = 0; i < used.length - 1; i += 1) {
     const a = used[i]!;
     const b = used[i + 1]!;
-    const na = ringNormals(a.points, (a.yLow + a.yTop) / 2);
-    const nb = ringNormals(b.points, (b.yLow + b.yTop) / 2);
+    const hitA = flankAtHeight(a, y);
+    const hitB = flankAtHeight(b, y);
+    if (!hitA || !hitB) continue;
     for (const side of [1, -1] as const) {
-      const index = side === 1 ? ringIndex : (RING_POINTS - ringIndex) % RING_POINTS;
-      const pa = a.points[index]!;
-      const pb = b.points[index]!;
-      const normalA = na[index]!;
-      const normalB = nb[index]!;
+      const pa: Vec2 = [hitA.x * side, y];
+      const pb: Vec2 = [hitB.x * side, y];
+      const normalA: Vec2 = [hitA.nx * side, hitA.ny];
+      const normalB: Vec2 = [hitB.nx * side, hitB.ny];
       const positions: Vec3[] = [
         [pa[0] + normalA[0] * proud, pa[1] + normalA[1] * proud + height / 2, a.z],
         [pa[0] + normalA[0] * proud, pa[1] + normalA[1] * proud - height / 2, a.z],

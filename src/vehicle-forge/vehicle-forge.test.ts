@@ -183,12 +183,24 @@ describe('vehicle-forge loft', () => {
       expect(loft.quadCounts.glass, `${spec.id} glass quads`).toBeGreaterThan(0);
       expect(loft.glass, `${spec.id} glass geometry`).not.toBeNull();
       const spans = [...spec.sideGlass, ...spec.screens];
-      const low = Math.min(...spans.map((span) => Math.min(span.z0, span.z1)));
+      const low = spec.noseGlass ? 0 : Math.min(...spans.map((span) => Math.min(span.z0, span.z1)));
       const high = Math.max(...spans.map((span) => Math.max(span.z0, span.z1)));
       const p = positionsOf(loft.glass!);
-      for (let i = 2; i < p.length; i += 3) {
-        expect(p[i]!, `${spec.id} glass z`).toBeGreaterThanOrEqual(low - 1e-3);
-        expect(p[i]!, `${spec.id} glass z`).toBeLessThanOrEqual(high + 1e-3);
+      for (let i = 0; i < p.length; i += 3) {
+        const z = p[i + 2]!;
+        expect(z, `${spec.id} glass z`).toBeGreaterThanOrEqual(low - 1e-3);
+        expect(z, `${spec.id} glass z`).toBeLessThanOrEqual(high + 1e-3);
+        // The NOSE band is the only glass allowed forward of the authored
+        // spans, and it must stay inside its own height band - a windscreen
+        // that leaks below it becomes a hole through the front bumper.
+        if (spec.noseGlass && z < Math.min(...spans.map((span) => Math.min(span.z0, span.z1))) - 1e-3) {
+          expect(p[i + 1]!, `${spec.id} nose glass y`).toBeGreaterThanOrEqual(spec.noseGlass.yMin - 1e-3);
+          expect(p[i + 1]!, `${spec.id} nose glass y`).toBeLessThanOrEqual(spec.noseGlass.yMax + 1e-3);
+        }
+      }
+      if (spec.noseGlass) {
+        const noseVerts = [...Array(p.length / 3).keys()].filter((k) => p[k * 3 + 2]! < 1e-3);
+        expect(noseVerts.length, `${spec.id} has a windscreen in its nose`).toBeGreaterThan(0);
       }
       // And the lining exists behind it, or a pane is a hole in the world.
       expect(loft.lining, `${spec.id} lining`).not.toBeNull();
@@ -326,7 +338,7 @@ describe('vehicle-forge assembly', () => {
         headLamps: { x: 0.66, y: 0.86, radius: 0.11 },
         tailLamps: { x: 0.68, y: 0.9, radius: 0.1 },
         bumperY: 0.5,
-        stripe: { ringIndex: 5, bucket: 'accent', z0: 0.4, z1: 4.0, height: 0.06, proud: 0.008 },
+        stripe: { y: 0.9, bucket: 'accent', z0: 0.4, z1: 4.0, height: 0.06, proud: 0.008 },
       },
       materials,
     );

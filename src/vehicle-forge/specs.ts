@@ -60,6 +60,9 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
   sideGlass: Object.freeze([{ z0: 1.45, z1: 8.2 }]),
   screens: Object.freeze([{ z0: 0.18, z1: 1.12 }, { z0: 8.5, z1: 9.02 }]),
   shutLines: Object.freeze([1.36, 2.38, 6.7]),
+  // A real coach screen in the raked front face, not only the sunroof-like
+  // band the top arc gives: without it the nose is a blank painted panel.
+  noseGlass: Object.freeze({ yMin: 1.54, yMax: 2.31 }),
   stationSpacing: 0.55,
 });
 
@@ -94,6 +97,7 @@ export const TRUCK_CAB_SPEC: VehicleSpec = Object.freeze({
   sideGlass: Object.freeze([{ z0: 0.58, z1: 1.5 }]),
   screens: Object.freeze([{ z0: 0.06, z1: 0.42 }]),
   shutLines: Object.freeze([1.6, 2.62]),
+  noseGlass: Object.freeze({ yMin: 1.74, yMax: 2.56 }),
   stationSpacing: 0.5,
 });
 

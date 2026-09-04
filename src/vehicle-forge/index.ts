@@ -21,7 +21,7 @@ export {
   loftBody,
   shutLineInset,
   stationRing,
-  stripAlongRing,
+  stripAtHeight,
   topAt,
 } from './geometry';
 export type { LoftResult, QuadKind, Ring, SpanZ, TopVertex, Vec2, VehicleSpec } from './geometry';

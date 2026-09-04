@@ -1807,10 +1807,11 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       headLamps: { x: 0.94, y: 0.98, radius: 0.13 },
       tailLamps: { x: 0.94, y: 0.95, radius: 0.12 },
       bumperY: 0.34,
-      // Ring index 5 rides the flank at ~1.2 m, where the reference paints its
-      // waistline. Taken from the LOFT's own edge points, so it follows the
-      // body around the nose radius instead of floating off it.
-      stripe: { ringIndex: 5, bucket: 'accent', z0: 0.35, z1: 8.75, height: 0.3, proud: 0.012 },
+      // The reference paints its waistline at 1.35 m, and a waistline is LEVEL:
+      // ridden by ring index instead it climbs every wheel arch and humps over
+      // both wheels. Taken from where the loft's own flank crosses that height,
+      // so it follows the body's curvature without following its cut-outs.
+      stripe: { y: 1.35, bucket: 'accent', z0: 0.35, z1: 8.75, height: 0.3, proud: 0.012 },
     }, coachMaterials),
     x: c.x + COACH_SPEC.length / 2,
     z: c.z,

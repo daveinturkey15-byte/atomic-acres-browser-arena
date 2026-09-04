@@ -23,7 +23,7 @@ import {
   type VehicleSpec,
   chamferedBar,
   loftBody,
-  stripAlongRing,
+  stripAtHeight,
 } from './geometry';
 import { type WheelStyle, lampParts, wheelParts } from './wheels';
 import {
@@ -82,8 +82,8 @@ export interface LampPlacement {
 }
 
 export interface WaistStripe {
-  /** Ring index the stripe rides. 7 is the belt line, 3 the sill shoulder. */
-  readonly ringIndex: number;
+  /** World height the stripe rides. A waistline is level, not a ring index. */
+  readonly y: number;
   /** `accent` for a painted waistline, `chrome` for a bright moulding. */
   readonly bucket: 'accent' | 'chrome';
   readonly z0: number;
@@ -248,20 +248,23 @@ export function buildForgedVehicle(
   }
 
   if (dressing.bumperY !== undefined) {
-    // Tucked INSIDE the loft's own z envelope at both ends. A bumper hung
-    // proud of the nose is visible mass outside the collider that owns this
-    // vehicle, which is an authority change wearing an art costume.
+    // 20 mm PROUD of each end, not flush with it. Flush puts the bar's back
+    // face exactly on the end cap's plane, the two race for the same depth
+    // samples, and the nose grows a hatched grey band that reads as damage.
+    // 20 mm also keeps the whole bar inside the collider's own footprint
+    // tolerance, so no visible mass escapes the authority that owns it.
     const halfLength = spec.halfWidth * 0.96;
     const halfDepth = 0.075;
-    for (const z of [halfDepth, spec.length - halfDepth]) {
+    const proud = 0.02;
+    for (const z of [halfDepth - proud, spec.length - halfDepth + proud]) {
       parts.chrome.push(translated(chamferedBar(halfLength, 0.11, halfDepth, 0.02), 0, dressing.bumperY, z));
     }
   }
 
   if (dressing.stripe) {
-    const strip = stripAlongRing(
+    const strip = stripAtHeight(
       loft.rings,
-      dressing.stripe.ringIndex,
+      dressing.stripe.y,
       dressing.stripe.z0,
       dressing.stripe.z1,
       dressing.stripe.height,
