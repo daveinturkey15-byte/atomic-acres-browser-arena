@@ -71,14 +71,13 @@ notes, per the HF-418/PASS 89 precedents.
 
 ## Luna review TODOs
 
-- TODO: run the named gates from a stable install after the concurrent `npm ci`
-  in this worktree has exited: `npx tsc --noEmit` and the twelve-file Vitest
-  gate plus `src/legacy-main-size-ratchet.test.ts` and
-  `src/collider-visual-parity-gate.test.ts`; run
-  `npx tsx scripts/qa/find-coplanar-pairs.ts` as well.
+- DONE (2026-09-04): named gates re-ran green from a stable install — see
+  `## Blocking findings fixed` for the quoted rows.
 - TODO: capture the exact-SHA WebGPU review cameras and representative frame
-  cost on the owner's approved hardware; this review intentionally ran no
-  browser, build, or GPU work.
+  cost on the owner's approved hardware; cameras authored at
+  `src/rendering/arenas/nuketown2.ts:100` (`reviewCameras`) and
+  `src/rendering/arenas/skyline-terminal.ts:25` (`reviewCameras`); no
+  browser/GPU work in this session per lane rules.
 
 ## Blocking findings fixed
 
