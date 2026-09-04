@@ -969,6 +969,9 @@ function centredPolygon(
     mesh.userData.ballisticMaterial = surface.material;
   }
   if (solid) {
+    // Deliberately register the floor-level cylinder as its bounding-square AABB;
+    // the visual/shot surface remains the circular mesh, and this low floor
+    // collider must not be copied as a wall-authority pattern.
     builder.colliders.push(bounds);
     builder.physicsColliders.push(bounds);
   }
