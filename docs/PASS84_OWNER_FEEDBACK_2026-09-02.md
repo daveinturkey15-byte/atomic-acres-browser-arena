@@ -1947,3 +1947,21 @@ assets and textures and lighting need to be tip top, raid can come next"
   Not reachable: Reddit (403), X profiles/syndication (429) → top-reposted
   needs a logged-in session; `Ingestion/inbox.md` is the drop box.
   `Ingestion/versions.md` carries the HF-489 update policy.
+
+## HF-491 status — candidate 4b serving, HITL 5 integrating, 2026-09-04 18:00
+
+- Candidate 4b (bc7868ae) is on http://localhost:4300 — fence fix landed
+  (0/17 → 26/26 captures, no fence rejection), accuracy/look/techniques/
+  materials/lighting merged, full suite 6006 pass / 1 timing-only fail, cold
+  boot smoke green; size ratchet moved 37_371 → 37_396 with a history row
+  (no further raise allowed; hoist instead). Known art defects: garage wing
+  bright red (should be cream), navy saloon lilac under the forge paint lift.
+- HITL 5 integrator (Fable high) launched 17:55: merges accuracy a1219fe8,
+  look df9cabdc, layout 04d2ef43, bots d549f60d(+), minimap 10baf2cc,
+  perf 145d33c5, audio 246b2fd2; fixes garage cream, saloon paint, the
+  headed capture launcher; stock-boot + cold smoke + bot probe + perf rung;
+  serves :4300. HITL 5b follows with the perf-fix and bot-count lanes.
+- Perf lane measured HITL 4 vs PASS 93 on nuketown2: p50 +3–4.4 ms, p95
+  1.4–2×, 7075 nodes vs 6366, 418 vs 250 pipelines; JS 15.2 ms/frame (matrix
+  updates ~4 ms, wear node graphs 1.4 ms, vegetation 22 draws). Fix lane
+  (Fable high) running on those three.
