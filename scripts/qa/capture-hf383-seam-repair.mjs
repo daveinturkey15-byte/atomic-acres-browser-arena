@@ -1,3 +1,9 @@
+// Boots atomic-acres in installed headless Chrome on the real WebGPU route and captures the re-staged side-verge cross-runs (HF-383 seam repair) as PNG review frames.
+// Usage: node scripts/qa/capture-hf383-seam-repair.mjs
+// Env: BASE_URL = app origin (default: http://127.0.0.1:41977)
+// Writes: artifacts/hf383-repair-frames/ (PNGs: east-verge-south, east-corner-seam, west-verge-north, west-corner-seam, street-west)
+// Exit codes: 0 = frames captured; 1 = no usable WebGPU device
+
 // Repair-round visual review: boot atomic-acres on the real WebGPU route in
 // INSTALLED Chrome, headless (real hardware WebGPU device; no browser slot
 // needed). Captures the re-staged side-verge cross-runs (HF-383 seam repair)
