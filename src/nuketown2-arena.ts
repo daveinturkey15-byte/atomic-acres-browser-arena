@@ -907,8 +907,9 @@ function pair(
   size: [number, number, number],
   /**
    * One material for both halves, or `[north, south]` for the two that differ
-   * by COLOUR ALONE. HF-426 Job 3: the reference's playable houses are blue,
-   * yellow and orange - not one repeated shell - and the two houses here are
+   * by COLOUR ALONE. HF-477: the reference's playable houses are
+   * terracotta-orange-over-cream and white/cream - not one repeated shell -
+   * and the two houses here are
    * the map's primary landmark, so a player who breaks into an upper room can
    * tell whose room it is from the siding. Geometry stays identical, which is
    * what the fidelity gate's 180-degree partner test measures (size + position,

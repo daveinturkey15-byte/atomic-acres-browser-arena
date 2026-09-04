@@ -167,6 +167,13 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // orange UPPER band only; `sidingB` is the cream that three of the four
     // storey-halves wear, which is why one material carries both ground
     // storeys and the whole south house.
+    //
+    // THE LANE'S OWN `wainscotSrgb` OPTION IS DECLINED HERE, and the reason is
+    // the deploy fence, not the paint: the accuracy lane split every house wall
+    // AT THE SAME y = 3.0 storey line, so the two-tone is already carried by
+    // geometry, and a second mechanism for it would only buy a SECOND siding
+    // node graph on the cold-compile path this candidate is fighting. Same
+    // picture, one pipeline.
     sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper'),
     sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream'),
     roof: createRoofMaterial(),
@@ -213,6 +220,9 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     }),
     planter: createLawnMaterial('nuketown2-planter', 0x415a33, { variant: 'hedge' }),
 
+    // Chrome-trim exception: the coach waistline is the one intentionally
+    // reflective painted-metal accent, so its 0.25 metalness is pinned here
+    // rather than mistaken for the dielectric factory-paint default.
     busTrim: createPaintedMetalMaterial('nuketown2-coach-trim', 0xa8382c, {
       polygonOffset: -1,
       roughness: 0.48,

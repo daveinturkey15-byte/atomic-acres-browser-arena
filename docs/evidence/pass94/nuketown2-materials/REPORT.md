@@ -271,13 +271,10 @@ tightened once during the lane, never loosened.
    which is authored at 0x515642, an olive. Whoever owns
    `nuketown-mountain-backdrop.ts` should look at that frame: the map currently
    sits on a beach.
-3. **The reference houses are orange-over-cream and white/cream, not blue and
-   yellow.** `docs/references/nuketown-2025/FINDINGS.md` is unambiguous and the
-   `nt2025-aerial-boii.jpg` capture confirms it. `nuketown2-fidelity.test.ts`
-   pins 0x46809f and 0xf4be36, so this lane did not touch the base hexes; the
-   siding family already accepts a two-tone `wainscot` break snapped to a real
-   course, so the storey-banded orange-over-cream house is one call away
-   whenever the accuracy lane owns that decision.
+3. **FIXED in this review pass: the reference houses are terracotta-orange over
+   cream and white/cream, not blue and yellow.** HF-477 pins `0x9f6147` for the
+   north upper siding and `0xeae3cf` for the shared cream/south house; the
+   existing siding wainscot hook now applies the cream ground-storey break.
 4. **The driveway aprons in the reference are mottled tan flagstones**, not the
    grey poured slabs the arena builds. That is a paving-type decision belonging
    to the geometry/accuracy lane, not a material treatment, so it was left alone
@@ -348,3 +345,18 @@ lane markings each read as their own material rather than as a coloured box.
    here rather than fixed. **The integrator should re-run both gates at the
    merge head.**
 
+## Muse review TODOs
+
+- **TODO (integrator; larger browser verification):** At the final merge head,
+  start the lane's isolated preview and run
+  `PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0 -g nuketown2`,
+  then run `npm run qa:stock-boot` with installed Chrome and no unsafe flags.
+  Retain receipts showing the final SHA and zero console errors; do not merge
+  on the existing capture receipt alone. This remains open here because this
+  repair pass is explicitly browser/build-free.
+- **TODO (vegetation/techniques owner; larger visual treatment):** Replace the
+  hedge `lawn` variant's flat green treatment with a real foliage-mass
+  presentation owned by the vegetation/techniques lane. Preserve the existing
+  movement/shot authority and profile parity, then add a deterministic hedge
+  review capture plus the affected material/vegetation gate before closing
+  this handoff; a lawn variant alone cannot prove foliage mass.
