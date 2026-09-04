@@ -583,6 +583,8 @@ export class ThinMetalPerforationAuthority {
       holes = Object.freeze([...panel.state.holes, aperture]);
     }
     panel.state = Object.freeze({
+      arenaId: this.arenaId,
+      matchEpoch: this.matchEpoch,
       panelId: panel.placement.id,
       hits: panel.state.hits + 1,
       holes,
