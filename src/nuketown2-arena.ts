@@ -1027,6 +1027,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, 'house upper front window apron',
       [wx, UPPER_Y0 + 0.83, zFront + WALL_T / 2 + 0.015], [width + 0.06, 0.08, 0.03], m.trim,
       { solid: false, shots: false, cast: false });
+    pair(builder, 'house upper front subwindow drywall',
+      [wx, UPPER_Y0 + 0.40, zFront + WALL_T / 2 + 0.01], [width, 0.80, 0.02], m.interior,
+      { solid: false, shots: false, cast: false });
   }
   // --- back wall: back door and one upper window ---------------------------
   const BACK_DOOR = doorRun('house back door');
@@ -1044,6 +1047,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const backDoorW = BACK_DOOR[1] - BACK_DOOR[0];
   const backDoorCx = (BACK_DOOR[0] + BACK_DOOR[1]) / 2;
   pair(builder, 'house back door pediment trim', [backDoorCx, DOOR_HEAD_Y + 0.08, -23.05], [backDoorW + 0.16, 0.16, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house back string course', [cx, GROUND_H, -23.03], [HOUSE_WIDTH + 0.08, 0.10, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
   [[HOUSE_X0 + WALL_T, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
@@ -1078,6 +1083,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house upper back window apron',
     [backUpperWx, UPPER_Y0 + 0.83, zBack - WALL_T / 2 - 0.015], [backUpperW + 0.06, 0.08, 0.03], m.trim,
     { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper back subwindow drywall',
+    [backUpperWx, UPPER_Y0 + 0.40, zBack - WALL_T / 2 - 0.01], [backUpperW, 0.80, 0.02], m.interior,
+    { solid: false, shots: false, cast: false });
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
   // Presentation treads remain visible, but one smooth rotated cuboid owns
   // movement for the complete flight. The ramp angle is below Rapier's 50°
@@ -1089,9 +1097,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const rampLength = Math.hypot(STAIR_RAMP_RUN, STAIR_RAMP_RISE);
   const rampCentreY = (GROUND_FLOOR_TOP + UPPER_Y0) / 2
     - Math.cos(STAIR_RAMP_ANGLE) * STAIR_RAMP_THICKNESS / 2;
-  const rampMaterial = m.interior.clone();
+  const rampMaterial = new THREE.MeshBasicMaterial({ visible: false });
   rampMaterial.name = 'nuketown2-house-stair-collision-authority';
-  rampMaterial.visible = false;
   const rampRotation: [number, number, number] = [-STAIR_RAMP_ANGLE, 0, 0];
   const northRamp = box(builder, 'nuketown2 north house stair ramp',
     [STAIR_CX, rampCentreY, (STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
@@ -1239,6 +1246,30 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, `house ground east wall drywall lining ${index}`,
       [HOUSE_X1 - WALL_T - 0.01, (GROUND_H - 0.08) / 2, (run[0]! + run[1]!) / 2],
       [0.02, GROUND_H - 0.08, run[1]! - run[0]!], m.interior,
+      { solid: false, shots: false, cast: false });
+  });
+  // Interior drywall lining on ground floor front and back walls:
+  // Completes 4-wall domestic interior drywall finish for living room and kitchen
+  const frontLiningRuns: [number, number][] = [
+    [HOUSE_X0 + WALL_T, FRONT_WINDOW_A[0]],
+    [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
+    [FRONT_DOOR[1], FRONT_WINDOW_B[0]],
+    [FRONT_WINDOW_B[1], HOUSE_X1 - WALL_T],
+  ];
+  frontLiningRuns.forEach((run, index) => {
+    pair(builder, `house ground front wall drywall lining ${index}`,
+      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zFront + WALL_T / 2 + 0.01],
+      [run[1] - run[0], GROUND_H - 0.08, 0.02], m.interior,
+      { solid: false, shots: false, cast: false });
+  });
+  const backLiningRuns: [number, number][] = [
+    [HOUSE_X0 + WALL_T, BACK_DOOR[0]],
+    [BACK_DOOR[1], HOUSE_X1 - WALL_T],
+  ];
+  backLiningRuns.forEach((run, index) => {
+    pair(builder, `house ground back wall drywall lining ${index}`,
+      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zBack - WALL_T / 2 - 0.01],
+      [run[1] - run[0], GROUND_H - 0.08, 0.02], m.interior,
       { solid: false, shots: false, cast: false });
   });
   // HF-440 Cycle 3: Interior partition wall domestic dressing
@@ -1913,18 +1944,28 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // clearance from every spawn and the spawn line is at |z| = 30-32.
   pair(builder, 'yard butt', [-8.5, LOW_COVER, -26], [1.2, LOW_COVER * 2, 1.2], m.block);
   // --- HF-440 Cycle 2: Backyard swimming pool, patio decks & contact skirts --
-  // Backyard swimming pool:
+  // Backyard swimming pool (HF-440 Lane BA: Beer-Lambert water feature):
   pair(builder, 'yard pool coping', [4.8, 0.18, -29.5], [4.4, 0.36, 3.2], m.drive,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard pool water nuketown2-yard-pool-water', [4.8, 0.24, -29.5], [3.8, 0.04, 2.6], m.poolWater,
+  pair(builder, 'yard pool water nuketown2-yard-pool-water', [4.8, 0.22, -29.5], [3.8, 0.04, 2.6], m.poolWater,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'yard pool ladder', [4.8 - 1.6, 0.45, -29.5], [0.12, 0.55, 0.48], m.chrome,
+  pair(builder, 'yard pool ladder rail left', [4.8 - 1.6, 0.45, -29.5 - 0.25], [0.06, 0.55, 0.06], m.chrome,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard pool deck chair 0', [4.8 + 0.6, 0.28, -27.3], [0.70, 0.25, 1.60], m.trim,
+  pair(builder, 'yard pool ladder rail right', [4.8 - 1.6, 0.45, -29.5 + 0.25], [0.06, 0.55, 0.06], m.chrome,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard pool deck chair 1', [4.8 - 0.6, 0.28, -27.3], [0.70, 0.25, 1.60], m.trim,
+  pair(builder, 'yard pool deck chair 0', [4.8 + 0.7, 0.22, -26.8], [0.70, 0.20, 1.60], m.trim,
     { solid: false, shots: false, cast: true });
-
+  pair(builder, 'yard pool deck chair 1', [4.8 - 0.7, 0.22, -26.8], [0.70, 0.20, 1.60], m.trim,
+    { solid: false, shots: false, cast: true });
+  // Domestic patio BBQ grill & cooler accessories (clear of pool deck and footings):
+  pair(builder, 'yard patio grill body', [4.8 + 1.8, 0.45, -25.8], [0.55, 0.60, 0.55], m.block,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard patio grill lid', [4.8 + 1.8, 0.82, -25.8], [0.58, 0.14, 0.58], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard patio cooler body', [4.8 + 1.8, 0.20, -24.8], [0.60, 0.35, 0.40], m.carA,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'yard patio cooler lid', [4.8 + 1.8, 0.40, -24.8], [0.62, 0.05, 0.42], m.trim,
+    { solid: false, shots: false, cast: true });
   // Foundation pads & contact skirts under yard obstacles (prevents grass blade clipping):
   pair(builder, 'yard cover crate pad', [-8.5, 0.04, HOUSE_BACK_Z - 4.5], [2.70, 0.08, 2.30], m.drive,
     { solid: false, shots: false, cast: false });

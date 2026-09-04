@@ -213,18 +213,16 @@ try {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
         }, undefined, { timeout: PER_ARENA_MS });
+        // Freeze the solo bot IMMEDIATELY so it does not wander to the driveway
+        // during settle time before camera review:
+        await page.evaluate(() => {
+          window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+        });
         // Let the deploy fade finish and grade/atmosphere settle before the
         // first camera move; a frame grabbed at match-active is still fading.
         await page.waitForTimeout(SETTLE_MS);
         await page.evaluate(() => {
           window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true);
-          // Freeze the solo bot BEFORE it can engage the idle player: an
-          // unfrozen bot shoots the idle player and paints a fullscreen damage /
-          // low-health vignette over the base frames (measured 2026-08-26,
-          // high-seas-bow-lane and rustrig-container-wall both GLOBAL_CHANGED
-          // on an identical bundle for exactly this reason). A frozen bot is
-          // a posed static operator - part of the compared world, not noise.
-          window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
         });
 
         mkdirSync(resolve(OUT_DIR, arena), { recursive: true });

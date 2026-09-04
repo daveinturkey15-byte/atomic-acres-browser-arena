@@ -261,10 +261,10 @@ export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
  */
 export function createNuketown2PoolWaterMaterial(): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial({
-    roughness: 0.05,
-    metalness: 0.08,
+    roughness: 0.14,
+    metalness: 0.02,
     transparent: true,
-    opacity: 0.76,
+    opacity: 0.78,
   });
   mat.name = 'nuketown2-pool-water-material';
   mat.type = 'MeshStandardMaterial';
