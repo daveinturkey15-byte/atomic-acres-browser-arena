@@ -27,10 +27,18 @@ describe('Pass 66 command shell', () => {
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual(
       SELECTABLE_ARENAS.map((entry) => entry.routeId),
     );
-    // Order is load-bearing, but it is derived from the registry so parking a
-    // registered arena cannot leave a stale literal menu roster behind.
-    expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1]))
-      .toEqual(SELECTABLE_ARENAS.map((entry) => entry.routeId));
+    // Order is still load-bearing, so pin the offered sequence explicitly too.
+    expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      'terminal',
+      'rustrig',
+      'gun-range',
+      'high-seas',
+      'test1',
+      'test2',
+      'map3',
+      'nuke-town-rebuild',
+      'raid-rebuild',
+    ]);
     // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
     // This pin has now swung three times - absent, present-and-PREVIEW, absent
     // again - so it is written DERIVED rather than as a third literal: every

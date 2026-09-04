@@ -9,6 +9,7 @@ import {
   LIGHTING_TIME_CHOICE_LABELS,
 } from '../rendering/lighting-conditions';
 import { DEFAULT_PRIVATE_MATCH_CONFIG, LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
+import { CHOPPER_MISSILE_CAPACITY } from '../killstreak-runtime';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -590,7 +591,7 @@ function hudMarkup(): string {
           <kbd>LMB</kbd><span>GUN</span><strong class="gunner-control-value"><b id="gunner-control-gun-ammo">&infin;</b></strong>
         </div>
         <div id="gunner-missile-status" class="gunner-control" hidden aria-hidden="true" aria-live="polite" data-ready="false">
-          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><b id="gunner-missile-ammo">&times;0 / 6</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
+          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><b id="gunner-missile-ammo">&times;0 / ${CHOPPER_MISSILE_CAPACITY}</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
         </div>
         <!-- HF-458: the Piloted Drone's right-click taser occupies the same RMB
              slot the Chopper uses for missiles, with its own id and hidden flag. -->
