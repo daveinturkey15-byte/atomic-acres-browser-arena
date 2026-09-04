@@ -34760,6 +34760,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotBuffer: remote.interpolation.stats,
       snapshotRateHz: remote.snapshotRateHz,
       continuity: remote.continuity,
+      authoritativeReady: remote.authoritativeReady,
       combatInventory: remoteCombatInventories.get(remote.snapshot.id) ?? null,
       historyFirst: remote.positionHistory[0]?.at ?? null,
       historyLatest: remote.positionHistory.at(-1)?.at ?? null,
