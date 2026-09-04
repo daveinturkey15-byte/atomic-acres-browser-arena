@@ -73,62 +73,108 @@
       {
         "id": "nuketown2-street-centre",
         "class": "exterior",
-        "bo2Questions": ["street axis", "cul-de-sac/open-end read", "coach/truck placement"]
+        "bo2Questions": [
+          "street axis",
+          "cul-de-sac/open-end read",
+          "coach/truck placement"
+        ]
       },
       {
         "id": "nuketown2-north-upper-window",
         "class": "exterior",
-        "bo2Questions": ["orange-house upper mass", "glazing", "balcony/roof proportion"]
+        "bo2Questions": [
+          "orange-house upper mass",
+          "glazing",
+          "balcony/roof proportion"
+        ]
       },
       {
         "id": "nuketown2-south-upper-window",
         "class": "exterior",
-        "bo2Questions": ["white-house upper mass", "glazing", "balcony/roof proportion"]
+        "bo2Questions": [
+          "white-house upper mass",
+          "glazing",
+          "balcony/roof proportion"
+        ]
       },
       {
         "id": "nuketown2-into-sun-street",
         "class": "exterior",
-        "bo2Questions": ["depth", "third house", "red car", "atmospheric/light read"]
+        "bo2Questions": [
+          "depth",
+          "third house",
+          "red car",
+          "atmospheric/light read"
+        ]
       },
       {
         "id": "nuketown2-garage",
         "class": "exterior",
-        "bo2Questions": ["garage scale", "door/lifecycle", "handedness context"]
+        "bo2Questions": [
+          "garage scale",
+          "door/lifecycle",
+          "handedness context"
+        ]
       },
       {
         "id": "nuketown2-north-balcony",
         "class": "exterior",
-        "bo2Questions": ["rear deck/stair", "upper-window relationship"]
+        "bo2Questions": [
+          "rear deck/stair",
+          "upper-window relationship"
+        ]
       },
       {
         "id": "nuketown2-front-porch",
         "class": "exterior",
-        "bo2Questions": ["deep cantilever/eave semantics", "entry materials"]
+        "bo2Questions": [
+          "deep cantilever/eave semantics",
+          "entry materials"
+        ]
       },
       {
         "id": "nuketown2-north-interior",
         "class": "interior",
-        "bo2Questions": ["orange-side materials", "occlusion", "collision/LOS"]
+        "bo2Questions": [
+          "orange-side materials",
+          "occlusion",
+          "collision/LOS"
+        ]
       },
       {
         "id": "nuketown2-south-interior",
         "class": "interior",
-        "bo2Questions": ["white-side materials", "occlusion", "collision/LOS"]
+        "bo2Questions": [
+          "white-side materials",
+          "occlusion",
+          "collision/LOS"
+        ]
       },
       {
         "id": "nuketown2-north-yard",
         "class": "backyard-spawn",
-        "bo2Questions": ["garage on right", "yard identity", "spawn-safe sightlines"]
+        "bo2Questions": [
+          "garage on right",
+          "yard identity",
+          "spawn-safe sightlines"
+        ]
       },
       {
         "id": "nuketown2-south-yard",
         "class": "backyard-spawn",
-        "bo2Questions": ["garage on right", "yard identity", "spawn-safe sightlines"]
+        "bo2Questions": [
+          "garage on right",
+          "yard identity",
+          "spawn-safe sightlines"
+        ]
       },
       {
         "id": "nuketown2-overhead",
         "class": "overhead",
-        "bo2Questions": ["lollipop plan", "house/garage/street/yard topology"]
+        "bo2Questions": [
+          "lollipop plan",
+          "house/garage/street/yard topology"
+        ]
       }
     ],
     "probeReceiptRequired": true,
@@ -157,7 +203,11 @@
     "visualCriticQuorum": {
       "minimumValidCritics": 2,
       "consecutiveExitCycles": 2,
-      "visualSeats": ["gemini", "alibaba-qwen-max", "meta-muse-spark"],
+      "visualSeats": [
+        "gemini",
+        "alibaba-qwen-max",
+        "meta-muse-spark"
+      ],
       "lunaCountsTowardVisualQuorum": false
     },
     "runnerStopRules": {
@@ -179,7 +229,11 @@
       "Luna-skeptic-on-every-third-cycle",
       "both-profile-regression-and-journal-stop-evaluation"
     ],
-    "lunaCycles": [3, 6, 9],
+    "lunaCycles": [
+      3,
+      6,
+      9
+    ],
     "finalAdjudication": true
   },
   "adapters": {
@@ -191,9 +245,15 @@
         "model": "google-antigravity/gemini-3.8-flash-high",
         "kind": "vision",
         "priority": 1,
-        "roles": ["builder-primary", "visual-critic"],
+        "roles": [
+          "builder-primary",
+          "visual-critic"
+        ],
         "maxCalls": 20,
-        "callBreakdown": {"builder": 10, "critic": 10},
+        "callBreakdown": {
+          "builder": 10,
+          "critic": 10
+        },
         "availability": {
           "window": "5-hour",
           "priorExhaustedAtClaimed": "21:50 previous night",
@@ -209,9 +269,15 @@
         "model": "alibaba-token-plan/qwen3.8-max",
         "kind": "vision",
         "priority": 2,
-        "roles": ["builder-secondary", "visual-critic"],
+        "roles": [
+          "builder-secondary",
+          "visual-critic"
+        ],
         "maxCalls": 20,
-        "callBreakdown": {"builder": 10, "critic": 10},
+        "callBreakdown": {
+          "builder": 10,
+          "critic": 10
+        },
         "availability": {
           "window": "weekly-token-plan",
           "stateClaimedAtHandoff": "fresh",
@@ -226,7 +292,9 @@
         "model": "zai/glm-5.3-flash",
         "kind": "vision",
         "priority": 3,
-        "roles": ["late-builder-fallback"],
+        "roles": [
+          "late-builder-fallback"
+        ],
         "maxCalls": 2,
         "availableAfterLocal": "05:04",
         "availability": {
@@ -262,7 +330,9 @@
         "kind": "vision",
         "input": "reference-paired-images-and-station-metadata",
         "output": "four-row-critic-schema",
-        "roles": ["visual-critic"],
+        "roles": [
+          "visual-critic"
+        ],
         "budget": {
           "maxCallsPerCycle": 1,
           "maxTotalCalls": 10
@@ -282,7 +352,11 @@
         "reasoning": "xhigh",
         "input": "station-summaries-precheck-receipt-probe-receipt-bo2-findings",
         "output": "skeptic-findings-and-contract-adjudication",
-        "cycles": [3, 6, 9],
+        "cycles": [
+          3,
+          6,
+          9
+        ],
         "countsTowardVisualQuorum": false,
         "textOnly": true,
         "headlessNotifyOverride": "-c notify=[]"
@@ -293,7 +367,7 @@
   "localQwen": {
     "route": "qwen-local-8090/qwen38-27b-iq3xxs",
     "endpoint": "http://127.0.0.1:8090",
-    "roles": ["header-chain", "qwen-bench-ladder-rerun", "single-file-exact-spec-jobs"],
+    "roles": [],
     "criticAdmitted": false,
     "reason": "Failed the four-row receipt task; triage/mechanical work only.",
     "vramWhileAwakeMiBApprox": 13800,
@@ -301,7 +375,9 @@
     "benchRuns": 1,
     "singleFileOnly": true,
     "neverSelfApproves": true,
-    "gapOnly": true
+    "gapOnly": true,
+    "enabled": false,
+    "retired": "HF-492 2026-09-04 17:27 owner: 'retire local qwen, i am going to do some comfy ui work' - server on :8090 stopped, header chain halted; do not start it during the beast run"
   },
   "gpuAndConcurrency": {
     "minimumFreeVramMiB": 3000,

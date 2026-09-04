@@ -6,6 +6,8 @@
 **Config:** `scripts/loop/configs/beast-run-2026-09-04.json`
 **Impact:** process-only. This lane writes no arena code and does not publish.
 
+> **HF-492 (2026-09-04 17:27):** local Qwen is RETIRED for this run - the owner is using the GPU for ComfyUI. `localQwen.enabled=false`; the header chain, bench-ladder rerun and single-file Qwen jobs are dropped; nothing in the run may start llama-server. Browser critics stay headless and short.
+
 ## Goal
 
 Make Nuke Town read as **BO2 Nuketown 2025** built by a photoreal procedural
