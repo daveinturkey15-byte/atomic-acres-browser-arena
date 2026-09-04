@@ -646,6 +646,7 @@ export class ThinMetalPerforationAuthority {
         hits: state.hits,
         holes: Object.freeze([...state.holes]),
       });
+      for (const aperture of state.holes) this.nextHoleId = Math.max(this.nextHoleId, aperture.id + 1);
     }
     this.presentation.sync([...this.panels.values()].map((entry) => entry.placement), this.panelStates());
     this.lastAppliedRevision = value.revision;

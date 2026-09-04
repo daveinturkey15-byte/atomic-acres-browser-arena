@@ -239,6 +239,22 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     expect(guest.applyAuthoritativeEnvelope(wrongMatch)).toBe(false);
   });
 
+  it('keeps hole ids fresh when a guest is promoted to host', () => {
+    const surfaces = Array.from({ length: 5 }, (_unused, index) => bladeSurface(`fresh:${index}`));
+    const placements = thinMetalPanelPlacements(
+      [{ surfaceName: 'verge street name blade', hitsToOpen: 1 }],
+      surfaces,
+    );
+    const host = new ThinMetalPerforationAuthority('nuketown2', 4, placements, true);
+    const guest = new ThinMetalPerforationAuthority('nuketown2', 4, placements, false);
+    for (const surface of surfaces.slice(0, 4)) hitAt(host, surface, { x: 7.7, y: 2.7, z: -0.45 });
+    expect(guest.applyAuthoritativeEnvelope(host.stateEnvelope())).toBe(true);
+    guest.setHostAuthority(true);
+    expect(hitAt(guest, surfaces[4]!, { x: 7.7, y: 2.7, z: -0.45 })?.accepted).toBe(true);
+    const minted = guest.panelStates().find((state) => state.panelId.endsWith('#4'))?.holes[0];
+    expect(minted?.id).toBe(4);
+  });
+
   it('requires sub-threshold and non-penetrating hits to be ignored', () => {
     const authority = panelAuthority(['a:1']);
     const surface = bladeSurface('a:1');
