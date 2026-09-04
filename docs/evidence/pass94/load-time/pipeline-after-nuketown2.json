@@ -1,0 +1,191 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-04T13:29:58.653Z",
+  "label": "lt-fixed-nuketown2",
+  "arena": "nuketown2",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-lt\\dist",
+  "seconds": 75,
+  "tod": null,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.022,
+    "rafCallbacks": 2998,
+    "stallCount": 7,
+    "stallsPerMinute": 5.6,
+    "frozenFractionPercent": 1.01,
+    "medianStallMs": 100,
+    "maxStallMs": 155.6
+  },
+  "pipelines": {
+    "beforeWindow": 253,
+    "inWindow": 1,
+    "perMinuteInWindow": 0.8,
+    "inStall": 0,
+    "inStallSharePercent": 0,
+    "expectedIfUnrelatedPercent": 1.01,
+    "enrichment": 0
+  },
+  "shaderModules": {
+    "beforeWindow": 290,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 1.01,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 73227,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 87477,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 89456,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [
+    {
+      "atMs": 87368,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ],
+      "materialsLost": []
+    },
+    {
+      "atMs": 117339,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ]
+    }
+  ],
+  "cacheKeyDiffCount": 2,
+  "determinantFlips": [
+    {
+      "atMs": 72936,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 87368,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 117339,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.58e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.58e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.58e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.58e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 3,
+  "samplePipelineLabels": [
+    {
+      "atMs": 89256,
+      "syncMs": 0.1,
+      "label": "renderPipeline_MeshBasicMaterial_774",
+      "stack": "at GPUDevice.patched [as createRenderPipeline] (<anonymous>:31:50) <- at iG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4644:12500) <- at wG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4645:29414) <- at sN._getRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4130:96560) <- at sN.getForRender (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4130:95356) <- at sN.updateForRender (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4130:96185) <- at OG._renderObjectDirect (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4136:70133) <- at OG.renderObject (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4136:68962) <- at OG._renderObjects (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4136:66141) <- at OG._renderTransparents (http://127.0.0.1:4193/assets/vendor-three-tyoDQgfT.js:4136:65982)"
+    }
+  ],
+  "stalls": [
+    {
+      "startMs": 84160.4,
+      "endMs": 84316,
+      "durationMs": 155.6
+    },
+    {
+      "startMs": 87381.5,
+      "endMs": 87487,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 91644,
+      "endMs": 91744,
+      "durationMs": 100
+    },
+    {
+      "startMs": 97638,
+      "endMs": 97738,
+      "durationMs": 100
+    },
+    {
+      "startMs": 100392,
+      "endMs": 100492,
+      "durationMs": 100
+    },
+    {
+      "startMs": 102150.9,
+      "endMs": 102251,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 102417,
+      "endMs": 102517,
+      "durationMs": 100
+    }
+  ]
+}

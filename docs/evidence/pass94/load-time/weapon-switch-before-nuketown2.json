@@ -1,0 +1,168 @@
+{
+  "contract": "weapon-switch-latency-v1",
+  "measuredAt": "2026-09-04T13:06:01.637Z",
+  "label": "lt-base-nuketown2",
+  "arena": "nuketown2",
+  "dist": "C:\\Users\\david\\projects\\aa-claude-lt-base\\dist",
+  "switches": 12,
+  "syncBudgetMs": 16.7,
+  "backend": "webgpu",
+  "rehearsal": {
+    "cadence": {
+      "waitedMs": 5034.254999971388,
+      "resets": 74,
+      "samples": 74,
+      "maximumGapMs": 77.91000000000349,
+      "admittedDegraded": true,
+      "exitReason": null,
+      "consecutiveStableFrames": null,
+      "visibilityState": "visible",
+      "documentHasFocus": true
+    },
+    "admissionWeaponIds": null,
+    "rehearsedWeaponIds": null,
+    "deferredWeaponIds": null,
+    "admissionDurationMs": 56934.75,
+    "reachable": [
+      "carbine",
+      "pistol",
+      "carbine"
+    ]
+  },
+  "reachableDeferred": null,
+  "cycles": [
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 1.605,
+      "commitFrames": 0,
+      "commitMs": 65.23,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 0.86,
+      "commitFrames": 0,
+      "commitMs": 68.935,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 0.86,
+      "commitFrames": 0,
+      "commitMs": 63.47,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 0.945,
+      "commitFrames": 0,
+      "commitMs": 63.525,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 0.89,
+      "commitFrames": 0,
+      "commitMs": 63.115,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 0.75,
+      "commitFrames": 0,
+      "commitMs": 65.03,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 0.855,
+      "commitFrames": 0,
+      "commitMs": 69.375,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 1.125,
+      "commitFrames": 0,
+      "commitMs": 70.455,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 0.84,
+      "commitFrames": 0,
+      "commitMs": 59.29,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 0.795,
+      "commitFrames": 0,
+      "commitMs": 63.37,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 1,
+      "before": "carbine",
+      "after": "pistol",
+      "committed": true,
+      "syncMs": 0.785,
+      "commitFrames": 0,
+      "commitMs": 66.88,
+      "maxGapMs": 0
+    },
+    {
+      "slot": 0,
+      "before": "pistol",
+      "after": "carbine",
+      "committed": true,
+      "syncMs": 0.62,
+      "commitFrames": 0,
+      "commitMs": 67.38,
+      "maxGapMs": 0
+    }
+  ],
+  "snapshotCostMs": 65.596,
+  "summary": {
+    "cycles": 12,
+    "committedCycles": 12,
+    "maxSyncMs": 1.605,
+    "medianSyncMs": 0.855,
+    "maxCommitFrames": 0,
+    "medianCommitMs": 65.03,
+    "maxGapMs": 0,
+    "snapshotCostMs": 65.596
+  },
+  "problems": [],
+  "pass": true
+}
