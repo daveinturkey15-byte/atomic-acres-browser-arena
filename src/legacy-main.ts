@@ -3407,7 +3407,7 @@ const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId
   // layout for the Raid flow, registered beside the shipped arena so the
   // original is never broken mid-pass. Eager: its builder is synchronous and
   // needs no wasm prepare step. See src/raid2-arena.ts.
-  raid2: eagerArena(buildRaid2),
+  raid2: eagerArena((scene) => buildRaid2(scene, { geometryDetail: reducedRenderMode ? 'reduced' : 'full' })),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;

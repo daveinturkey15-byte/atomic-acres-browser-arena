@@ -91,7 +91,7 @@ import type { ArenaMap } from './map';
 import { worldTiled } from './test-maps-art';
 import { raid2ForgedMaterial, raid2ForgedSurfaces } from './raid2-art';
 import { dressRaid2 } from './raid2-dressing';
-import { generateRaid2FacadeDetail } from './raid2-facade-detail';
+import { generateRaid2FacadeDetail, raid2FacadeDetailLevelForGeometryDetail } from './raid2-facade-detail';
 import { RAID2_MEASURED } from './raid2-reference';
 import {
   discBands, RAID2_POOL_COPING_DEPTH, RAID2_POOL_WATER, ringSegments, subtractRects,
@@ -356,7 +356,12 @@ function makeBuilder(scene: THREE.Scene, name: string): Builder {
 
 type RectOptions = Parameters<typeof box>[5];
 
-export function buildRaid2(scene: THREE.Scene): ArenaMap {
+export type Raid2BuildOptions = {
+  /** Canonical `geometryDetail` value; `reduced` suppresses facade detail. Defaults `full`. */
+  readonly geometryDetail?: 'reduced' | 'full' | string;
+};
+
+export function buildRaid2(scene: THREE.Scene, options: Raid2BuildOptions = {}): ArenaMap {
   const builder = makeBuilder(scene, 'Raid Rebuild arena');
   const m = raid2Materials();
 
@@ -999,7 +1004,9 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   dressRaid2(builder, m);
   // Procedural facade detail (r185 technique #6 in our likeness): derived from
   // the authored faces above, presentation-only, before the shared batcher.
-  generateRaid2FacadeDetail(builder, m);
+  // The canonical `geometryDetail` setting arrives via build options (wired to
+  // `reducedRenderMode` at the arena factory); `reduced` emits nothing.
+  generateRaid2FacadeDetail(builder, m, raid2FacadeDetailLevelForGeometryDetail(options.geometryDetail ?? 'full'));
 
   batchPresentationOnlyBoxes(builder.root, 'raid2-presentation');
 
