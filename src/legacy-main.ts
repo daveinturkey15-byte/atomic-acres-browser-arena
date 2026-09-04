@@ -113,6 +113,8 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
+import { configureNuketown2ShL2ForArena, setNuketown2ShL2Tier } from './rendering/lighting/sh-l2-irradiance-runtime';
+import { updateNuketown2Presentation } from './rendering/nuketown2-frame-presentation';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -4419,6 +4421,7 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   const module = await loadArenaVisualModule(arenaId);
   activeArenaVisualDefinition = module.definition;
   applySelectedArenaVisualDefinition(module.definition);
+  if (arenaId === NUKETOWN2_ARENA_ID) configureNuketown2ShL2ForArena(root, graphicsRuntime.shL2Irradiance, weatherMatchSeed, lightingConditionsElapsedSeconds, activeLightingTimeChoice(), lightingConditionsSkyDarken);
   if (renderRuntime.backend === 'webgpu') {
     // Browser assets survive map changes, but their GPU receipts are tied to
     // the active TSL/HDR light graph. Every committed definition can replace
@@ -28628,6 +28631,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   }
 
   graphicsRuntime = live;
+  setNuketown2ShL2Tier(live.shL2Irradiance);
   liveGraphicsProfile = desiredProfile;
   displayedGraphicsPreset = resolveDisplayedGraphicsPreset(pass65Settings.graphics.preset, queryRenderProfile);
   // Preserve topology/representation fields from renderer construction while
@@ -31258,12 +31262,7 @@ function frame(now: number, scheduleNext = true): void {
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);
       grassSystem?.update(visualNow / 1_000, camera.position, player.position, gameStarted);
     } else if (selectedArena.id === 'nuketown2') {
-      // HF-426 Job 3. The rebuild's lawn field is built INSIDE `buildNuketown2`
-      // and parks its wind hook on the arena root, so it takes the same single
-      // uniform write per frame the shipped map's lawn does. The light set is
-      // untouched here - `updateArenaArt` writes one uniform and then finds no
-      // rings, nucleus, beacon or fauna on this root and does nothing else.
-      if (arena.id === 'nuketown2') updateArenaArt(arena.root, visualNow);
+      updateNuketown2Presentation(selectedArena.id, arena, visualNow, updateArenaArt);
     } else if (selectedArena.id === 'gun-range') {
       // HF-347: pose the training dummies on HOST time, not this peer's own clock.
       // gunRangeTestBayRenderedDummyPose is a pure function of time with no

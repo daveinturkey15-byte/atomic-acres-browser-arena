@@ -45,14 +45,14 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: '445a9754',
-  balanced: '0753ee34',
+  performance: 'e3cf6692',
+  balanced: '5c0d54d1',
   // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
   // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
   // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
   // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
-  high: '430da2ad',
-  max: '03ee2e10',
+  high: 'd176ad92',
+  max: 'b89846f7',
 });
 
 describe('HF-418 graphics ladder', () => {

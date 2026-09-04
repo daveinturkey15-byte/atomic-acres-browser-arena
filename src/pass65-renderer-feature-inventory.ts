@@ -353,6 +353,19 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/rendering/lighting/baked-indirect.test.ts + src/rendering/lighting/baked-indirect-runtime.test.ts + src/rendering/lighting/baked-indirect-node.test.ts',
   }),
   feature({
+    id: 'nuketown2-sh-l2-indirect-light', title: 'Nuke Town interior bounce detail (SH-L2)', availability: 'active', owner: 'src/rendering/lighting/indirect-term.ts',
+    sourceProbes: [
+      { path: 'src/rendering/lighting/indirect-term.ts', symbol: 'createNuketown2IndirectMaterial' },
+      { path: 'src/rendering/lighting/sh-l2-irradiance-node.ts', symbol: 'buildShL2IrradianceNode' },
+      { path: 'src/rendering/lighting/nuketown2-sh-l2-occluders.ts', symbol: 'buildNuketown2ShL2BakeOccluders' },
+      { path: 'src/rendering/lighting/sh-l2-irradiance-node.ts', symbol: 'publishShL2Receipt' },
+    ],
+    pipelineIds: [],
+    control: control('setting', ['graphics.shL2Irradiance'], 'Off, Low or High interior bounce detail for Nuke Town, sampled from a fixed SH-L2 volume and kept out of the other arenas', 'The seven volume planes and the enable/strength controls are shared by every Nuke Town material graph, so the live switch changes uniforms only and the frozen light set and environment remain the fallback when it is off. The bake uses the authored building shells, doors, windows and footprints only; the large ground collider and combat shape budget are not part of it.'),
+    budget: 'Seven fixed RGBA16F 3D planes at 20x4x44 (192 KiB), one shared material graph and zero new render pipelines; the volume bake is loading-time work only.',
+    verifier: 'src/rendering/lighting/indirect-term.test.ts + src/rendering/lighting/nuketown2-sh-l2-runtime.test.ts + src/rendering/lighting/sh-l2-irradiance-node.test.ts',
+  }),
+  feature({
     id: 'screen-space-gi', title: 'Screen-space global illumination (ray-marched bounce light)', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
       { path: 'src/rendering/screen-space-post.ts', symbol: 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal' },

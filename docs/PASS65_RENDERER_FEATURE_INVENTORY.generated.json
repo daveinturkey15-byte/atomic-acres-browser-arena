@@ -176,6 +176,20 @@
       ]
     },
     {
+      "key": "graphics.shL2Irradiance",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "sh-l2-irradiance",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/lighting/indirect-term.ts",
+          "symbol": "createNuketown2IndirectMaterial",
+          "telemetryPath": "documentElement.dataset.shL2Irradiance (publishShL2Receipt)",
+          "liveObservation": "configureNuketown2ShL2 / setNuketown2ShL2Tier uniform observation"
+        }
+      ]
+    },
+    {
       "key": "graphics.ambientOcclusion",
       "applyMode": "pipeline-rebuild",
       "authorityAffecting": false,
@@ -622,6 +636,7 @@
         "shadowFilter": "auto",
         "indirectLighting": "low",
         "bakedIndirect": "off",
+        "shL2Irradiance": "off",
         "ambientOcclusion": "off",
         "screenSpaceReflections": "off",
         "screenSpaceGi": "off",
@@ -666,6 +681,7 @@
         "shadowMapSize": 1024,
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
+        "shL2Irradiance": "off",
         "indirectLightScale": 0.62,
         "ambientOcclusion": {
           "quality": "off",
@@ -830,6 +846,7 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "bakedIndirect": "low",
+        "shL2Irradiance": "low",
         "ambientOcclusion": "high",
         "screenSpaceReflections": "low",
         "screenSpaceGi": "off",
@@ -874,6 +891,7 @@
         "shadowMapSize": 2048,
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
+        "shL2Irradiance": "low",
         "indirectLightScale": 1,
         "ambientOcclusion": {
           "quality": "high",
@@ -1038,6 +1056,7 @@
         "shadowFilter": "auto",
         "indirectLighting": "high",
         "bakedIndirect": "high",
+        "shL2Irradiance": "high",
         "ambientOcclusion": "ultra",
         "screenSpaceReflections": "high",
         "screenSpaceGi": "high",
@@ -1082,6 +1101,7 @@
         "shadowMapSize": 2048,
         "shadowUpdateMode": "dynamic",
         "shadowFilter": "auto",
+        "shL2Irradiance": "high",
         "indirectLightScale": 1,
         "ambientOcclusion": {
           "quality": "ultra",
@@ -2104,6 +2124,42 @@
       "authorityAffecting": false
     },
     {
+      "id": "nuketown2-sh-l2-indirect-light",
+      "title": "Nuke Town interior bounce detail (SH-L2)",
+      "availability": "active",
+      "owner": "src/rendering/lighting/indirect-term.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/lighting/indirect-term.ts",
+          "symbol": "createNuketown2IndirectMaterial"
+        },
+        {
+          "path": "src/rendering/lighting/sh-l2-irradiance-node.ts",
+          "symbol": "buildShL2IrradianceNode"
+        },
+        {
+          "path": "src/rendering/lighting/nuketown2-sh-l2-occluders.ts",
+          "symbol": "buildNuketown2ShL2BakeOccluders"
+        },
+        {
+          "path": "src/rendering/lighting/sh-l2-irradiance-node.ts",
+          "symbol": "publishShL2Receipt"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.shL2Irradiance"
+        ],
+        "effectiveValue": "Off, Low or High interior bounce detail for Nuke Town, sampled from a fixed SH-L2 volume and kept out of the other arenas",
+        "rationale": "The seven volume planes and the enable/strength controls are shared by every Nuke Town material graph, so the live switch changes uniforms only and the frozen light set and environment remain the fallback when it is off. The bake uses the authored building shells, doors, windows and footprints only; the large ground collider and combat shape budget are not part of it."
+      },
+      "budget": "Seven fixed RGBA16F 3D planes at 20x4x44 (192 KiB), one shared material graph and zero new render pipelines; the volume bake is loading-time work only.",
+      "verifier": "src/rendering/lighting/indirect-term.test.ts + src/rendering/lighting/nuketown2-sh-l2-runtime.test.ts + src/rendering/lighting/sh-l2-irradiance-node.test.ts",
+      "authorityAffecting": false
+    },
+    {
       "id": "screen-space-gi",
       "title": "Screen-space global illumination (ray-marched bounce light)",
       "availability": "active",
@@ -2329,11 +2385,11 @@
     }
   ],
   "summary": {
-    "total": 37,
-    "active": 35,
+    "total": 38,
+    "active": 36,
     "unsupported": 2,
-    "adjustable": 28,
+    "adjustable": 29,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "e77fa8b973e65047851163900333d52a29de71bd6682709f9ae04c24870905b9"
+  "inventorySha256": "825657670ede5437466c7e02cb87e63f39369eaa393c0a612065782c14a0969b"
 }

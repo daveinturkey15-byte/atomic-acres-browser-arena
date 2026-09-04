@@ -64,6 +64,8 @@ export type AdvancedGraphicsValues = Readonly<{
    * decides how long the OFFLINE trace ran, not what the frame does.
    */
   bakedIndirect: BakedIndirectTier;
+  /** SH-L2 volume sampled in the shared Nuke Town material lighting graph. */
+  shL2Irradiance: LightingTier;
   ambientOcclusion: AmbientOcclusionQuality;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
@@ -122,6 +124,7 @@ export type GraphicsRuntimeConsumer =
   | 'arena-lighting'
   | 'ambient-occlusion'
   | 'baked-indirect'
+  | 'sh-l2-irradiance'
   | 'material-refinement'
   | 'atmosphere-runtime'
   | 'presentation-budget'
@@ -298,6 +301,12 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Light that has bounced off the world once or twice, traced before you got here: shaded sides pick up the colour of what is next to them instead of going flat grey. Costs the frame almost nothing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'baked-indirect',
+  }),
+  control({
+    key: 'shL2Irradiance', id: 'graphics-sh-l2-irradiance', category: 'lighting', label: 'Interior bounce detail',
+    description: 'Samples the SH-L2 irradiance volume inside the shared Nuke Town material graphs; OFF restores the frozen light set and environment path through uniforms only.',
+    kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
+    applyMode: 'live', runtimeConsumer: 'sh-l2-irradiance',
   }),
   control({
     key: 'ambientOcclusion', id: 'graphics-ambient-occlusion', category: 'lighting', label: 'Contact shadows (GTAO)',
@@ -595,6 +604,12 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
     'render.atomicSignal.advancedGraphics.screenSpace.bakedIndirect',
     'documentElement.dataset.bakedIndirect (publishBakedIndirectReceipt)',
   ),
+  shL2Irradiance: runtimeEvidence(
+    'src/rendering/lighting/indirect-term.ts',
+    'createNuketown2IndirectMaterial',
+    'documentElement.dataset.shL2Irradiance (publishShL2Receipt)',
+    'configureNuketown2ShL2 / setNuketown2ShL2Tier uniform observation',
+  ),
   screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
   screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
   // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
@@ -737,7 +752,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', shL2Irradiance: 'off', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
@@ -847,7 +862,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   balanced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', shL2Irradiance: 'low', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -886,7 +901,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', shL2Irradiance: 'low', ambientOcclusion: 'high',
     screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -939,7 +954,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     // 1.15x supersample, and it is the one control with no enforced bound.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', shL2Irradiance: 'high', ambientOcclusion: 'ultra',
     screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',

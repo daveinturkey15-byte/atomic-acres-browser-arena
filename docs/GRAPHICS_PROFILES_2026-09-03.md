@@ -193,6 +193,8 @@ unchanged; only the presets' control sets moved.
 | `shadowUpdateMode` | Static bake vs per-frame re-render | static | static | static | static | **dynamic** |
 | `shadowFilter` | PCF vs PCSS-soft selection | auto | auto | auto | auto | auto |
 | `indirectLighting` | Scalar on environment contribution (0 / 0.62 / 1) | low | **high** | high | high | high |
+| `bakedIndirect` | Offline SH-L1 bounce volume | off | low | low | high *(retired)* | high |
+| `shL2Irradiance` | Nuke Town interior SH-L2 bounce detail | off | low | low | — *(not present)* | high |
 | `ambientOcclusion` | GTAO: resolution scale, samples, radius, denoise | off | off | off | **high** (0.5 scale, 12 spl, denoise) | **ultra** (0.75, 16 spl) |
 | `screenSpaceReflections` | Depth-buffer march; **adds normal + material MRT attachments** | off | **off** | low (½-res, 6 m) | **off** (superseded by the trace) | high (¾-res, 12 m, binary refine) |
 | `screenSpaceGi` | Room-scale bounce gather — the expensive one | off | off | off | off | high (2×12, 8 m) |
@@ -229,10 +231,10 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `445a9754` |
-| `balanced` | `0753ee34` |
-| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
-| `max` (HF-438 full tier) | `03ee2e10` |
+| `performance` | `e3cf6692` |
+| `balanced` | `5c0d54d1` |
+| `high` (QUALITY, HF-438 light tier) | `d176ad92` |
+| `max` (HF-438 full tier) | `b89846f7` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
@@ -255,6 +257,12 @@ this document does not):
 > noise, so no figure in section 3 was rewritten from it. A full re-capture of
 > the 5x3 ladder with the baked layer live is an OPEN ITEM, not a claim made
 > here.
+
+> **PASS 96 SH-L2 fold.** `shL2Irradiance` is a live, uniform-only control for
+> the Nuke Town material graphs. PERFORMANCE keeps it off; BALANCED and QUALITY
+> use the low strength; MAX uses the high strength. It has no new render
+> pipeline and its fixed seven-plane volume is 192 KiB; the bake is loading-time
+> work against bake-only building occluders.
 
 ---
 
@@ -635,6 +643,12 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
    (`docs/evidence/pass92/graphics-fold/`). The cold-compile admission fence
    was not widened; the audit tripwire (zero pipelines in combat) is re-run per
    preset in the same evidence.
+6. **HF-486 SH-L2 material wiring.** Nuke Town's 24 material factories now
+   share one ambient lighting hook. The volume is sampled at world position
+   and normal, and its live OFF switch leaves the frozen light set and
+   environment path in place. The profile row and fingerprints above carry
+   the four resulting values; the bake occluder and interior/exterior gate are
+   in `src/rendering/lighting/nuketown2-sh-l2-runtime.test.ts`.
 
 ---
 
@@ -648,13 +662,9 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   admission frame. The shared skill's fix — precompile during the menu preview,
   where the fence does not apply — is not implemented. See
   `docs/NEURAL_RENDERING_OPTIONS_2026-09-03.md` §3 recommendation 2.
-- **OPEN (HF-418 item 4, blocked on Lane AL):** the individual lighting-feature
-  controls with tiers and measured costs (baked indirect, SSR, AO, contact
-  shadows) are Lane AL's deliverable and had not landed when this lane ran.
-  BALANCED carries a `TODO(HF-418 item 4, Lane AL)` at its definition naming
-  the decision that has to be argued when they do, and its control-set hash is
-  the tripwire: the moment a lighting default changes,
-  `graphics-profile-contract.test.ts` fails until this document is re-measured.
+- **OPEN:** the graphics ladder's original lighting measurements predate the
+  SH-L2 wiring. The profile contract is updated, but a fresh multi-profile
+  visual capture remains required before claiming a new frame-time delta.
 - **OPEN:** 39 of 40 controls are grep-verified only (§4).
 - **OPEN (capture coverage, narrower than measurement coverage):** the
   side-by-side review-camera captures in §3 cover **one arena of the three

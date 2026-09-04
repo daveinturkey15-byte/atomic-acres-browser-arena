@@ -105,6 +105,7 @@ export type GraphicsRuntime = Readonly<{
   shadowMapSize: 1024 | 2048;
   shadowUpdateMode: GraphicsSettings['shadowUpdateMode'];
   shadowFilter: ShadowFilterMode;
+  shL2Irradiance: GraphicsSettings['shL2Irradiance'];
   indirectLightScale: number;
   ambientOcclusion: Readonly<{
     quality: GraphicsSettings['ambientOcclusion'];
@@ -433,6 +434,7 @@ export function resolveGraphicsRuntime(
       shadowMapSize: 1024,
       shadowUpdateMode: 'static',
       shadowFilter: 'auto',
+      shL2Irradiance: 'off',
       indirectLightScale: 0.45,
       ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false }),
       reflectionScale: 0,
@@ -476,6 +478,7 @@ export function resolveGraphicsRuntime(
     shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
     shadowUpdateMode: settings.shadowUpdateMode,
     shadowFilter: settings.shadowFilter,
+    shL2Irradiance: settings.shL2Irradiance,
     indirectLightScale: lightingScale(settings.indirectLighting),
     ambientOcclusion,
     // Ultra shares High's unit reflection gain; the extra tier buys PMREM

@@ -41,6 +41,9 @@ const SCREEN_SPACE_KEYS = [
   // table that is not read is worse than no table - it told the owner MAX gets
   // no baked bounce while MAX shipped 'high'.
   'bakedIndirect',
+  // SH-L2 is a live uniform in the shared Nuke Town material graphs, so its
+  // profile value belongs in this executable matrix too.
+  'shL2Irradiance',
   'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
 ] as const;
 
@@ -183,8 +186,11 @@ describe('Advanced Graphics canonical registry', () => {
         .toEqual(['off', 'low', 'high']);
       // Adding or removing a raymarch changes MRT attachments and render
       // targets, so none of these may claim to be a live apply.
-      expect(definition?.applyMode, key).toBe('pipeline-rebuild');
+        expect(definition?.applyMode, key).toBe('pipeline-rebuild');
     }
+    expect(byKey.get('shL2Irradiance')).toMatchObject({
+      kind: 'select', applyMode: 'live', runtimeConsumer: 'sh-l2-irradiance', id: 'graphics-sh-l2-irradiance',
+    });
     expect(byKey.get('depthOfField')).toMatchObject({ kind: 'toggle', applyMode: 'pipeline-rebuild' });
     expect(byKey.get('depthOfFieldStrength')).toMatchObject({ kind: 'range', minimum: 0, maximum: 1, applyMode: 'live' });
     expect(byKey.get('motionBlur')).toMatchObject({ kind: 'range', minimum: 0, maximum: 1, applyMode: 'pipeline-rebuild' });
@@ -211,6 +217,7 @@ describe('Advanced Graphics canonical registry', () => {
     const matrix = {
       performance: {
         bakedIndirect: 'off',
+        shL2Irradiance: 'off',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
@@ -233,6 +240,7 @@ describe('Advanced Graphics canonical registry', () => {
         // this profile's proposition - and because leaving it OFF would have
         // made this rung darker than PERFORMANCE is bright once QUALITY got it.
         bakedIndirect: 'low',
+        shL2Irradiance: 'low',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
@@ -244,12 +252,14 @@ describe('Advanced Graphics canonical registry', () => {
         // rung's trace in at the LIGHT tier: the reflections tier on, SSR LOW
         // and MSAA 4x both kept, AO raised off to HIGH in the AO pin below.
         bakedIndirect: 'low',
+        shL2Irradiance: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'reflections',
         depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
       },
       max: {
         bakedIndirect: 'high',
+        shL2Irradiance: 'high',
         volumetricLightShafts: 'high', screenSpaceReflections: 'high', screenSpaceGi: 'high',
         // HF-438: MAX carries the trace at the FULL tier, on top of a stack
         // that already held every raised tier the retired rung had argued for
