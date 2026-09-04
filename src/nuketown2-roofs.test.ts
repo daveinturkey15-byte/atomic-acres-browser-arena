@@ -92,6 +92,11 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
     expect(NUKETOWN2_ROOF_PLAN_AREA_BY_SIDE.south).toBe(NUKETOWN2_HOUSE_WIDTH * NUKETOWN2_HOUSE_DEPTH);
 
     const roofBodies = NUKETOWN2_ROOF_BODY_TABLE.map((body) => roofMesh(map, `${body.side} ${body.name}`));
+    const deck = roofMesh(map, 'north house roof deck');
+    for (const body of NUKETOWN2_ROOF_BODY_TABLE.filter((entry) => entry.kind === 'rake')) {
+      expect(roofMesh(map, `${body.side} ${body.name}`).userData.impactSurface)
+        .toBe(deck.userData.impactSurface);
+    }
     expect(roofBodies.every((mesh) => mesh.userData.nuketown2RoofSolid === false)).toBe(true);
     expect(roofBodies.every((mesh) => mesh.userData.nuketown2RoofWalkable === false)).toBe(true);
     expect(roofBodies.filter((mesh) => mesh.userData.ballisticSurfaceId !== undefined)).toHaveLength(2);
