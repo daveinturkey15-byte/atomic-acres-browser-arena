@@ -21,6 +21,7 @@ export {
   loftBody,
   shutLineInset,
   stationRing,
+  surfaceBandAtHeights,
   stripAtHeight,
   topAt,
 } from './geometry';
@@ -46,6 +47,10 @@ export type {
   ForgedVehicle,
   ForgedVehicleMaterials,
   LampPlacement,
+  GrilleDetail,
+  MirrorDetail,
+  PanelSeam,
+  SurfaceBand,
   VehicleDressing,
   WaistStripe,
   ForgeSharedBucket,
@@ -55,4 +60,10 @@ export type {
   MergedForgedPlacements,
 } from './build';
 
-export { COACH_SPEC, FORGED_VEHICLE_SPECS, SEDAN_SPEC, TRUCK_CAB_SPEC } from './specs';
+export {
+  COACH_SPEC,
+  FORGED_VEHICLE_SPECS,
+  FORGED_VEHICLE_TRIANGLE_BUDGETS,
+  SEDAN_SPEC,
+  TRUCK_CAB_SPEC,
+} from './specs';

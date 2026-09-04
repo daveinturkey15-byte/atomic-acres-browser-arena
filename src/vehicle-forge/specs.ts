@@ -14,12 +14,11 @@
  *   sedan      4.4 x 1.9 x 1.88 m  (`car body` 0.22-1.22 + `car cabin` 1.22-1.88)
  *
  * The sedan envelope is the one worth flagging: 1.88 m is tall for a 4.4 m
- * saloon, so the forged body is a tall three-box estate rather than a low
- * coupe. Lowering the roof to a "correct" 1.45 m would leave 0.43 m of collider
- * with no visible mass under it, which is an authority change dressed as art -
- * exactly what the forging review exists to catch. The greenhouse therefore
- * tops out at 1.86 m and the belt sits at the `car body` box's own 1.16 m, so
- * the loft's silhouette IS the two boxes it replaces, with radii.
+ * saloon, so the greenhouse fills the authored box while its rounded stations
+ * supply the 1950s bubble profile. Lowering the roof to a "correct" 1.45 m
+ * would leave 0.43 m of collider with no visible mass under it, which is an
+ * authority change dressed as art - exactly what the forging review exists to
+ * catch.
  *
  * PROPORTIONS, as fractions of wheelbase, measured from these records:
  *   sedan      wheelbase 3.00  front overhang 0.70 (23 %)  axle-to-cowl 0.54 (18 %)
@@ -67,7 +66,7 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
 });
 
 /**
- * The moving truck's CAB ONLY, as a cab-over: flat front, raked screen at the
+ * The moving truck's CAB ONLY, with a rounded hood and raked screen at the
  * very nose, one arch over the front axle.
  *
  * The cargo box behind it stays exactly as the arena authored it - a deck, a
@@ -89,23 +88,25 @@ export const TRUCK_CAB_SPEC: VehicleSpec = Object.freeze({
   wheelZ: Object.freeze([0.8]),
   archGap: 0.05,
   top: Object.freeze([
-    { z: 0.0, yTop: 2.55, halfWidthTop: 1.02, topRadius: 0.3 },
-    { z: 0.45, yTop: 2.86, halfWidthTop: 1.16, topRadius: 0.2, crease: true },
+    { z: 0.0, yTop: 1.58, halfWidthTop: 0.92, topRadius: 0.28 },
+    { z: 0.42, yTop: 1.68, halfWidthTop: 1.08, topRadius: 0.24, crease: true },
+    { z: 1.25, yTop: 2.48, halfWidthTop: 1.14, topRadius: 0.2 },
+    { z: 1.65, yTop: 2.84, halfWidthTop: 1.16, topRadius: 0.18 },
     { z: 4.6, yTop: 2.88, halfWidthTop: 1.18, topRadius: 0.16 },
     { z: 5.2, yTop: 2.72, halfWidthTop: 1.02, topRadius: 0.3 },
   ]),
-  sideGlass: Object.freeze([{ z0: 0.58, z1: 1.5 }]),
-  screens: Object.freeze([{ z0: 0.06, z1: 0.42 }]),
+  sideGlass: Object.freeze([{ z0: 0.86, z1: 1.56 }]),
+  screens: Object.freeze([{ z0: 0.94, z1: 1.58 }]),
   shutLines: Object.freeze([1.6, 2.62]),
-  noseGlass: Object.freeze({ yMin: 1.74, yMax: 2.56 }),
+  noseGlass: Object.freeze({ yMin: 1.14, yMax: 1.62 }),
   stationSpacing: 0.5,
 });
 
 /**
- * The parked sedan, used for both driveway cars and the head car in the
- * turning head. Three boxes: hood, greenhouse, deck, with a crease at the cowl
- * and another where the roof meets the backlight, so the two hard breaks stay
- * sharp while every radius around them shades smoothly.
+ * The parked bubble saloon, used for both driveway cars and the head car in
+ * the turning head. Its hood, greenhouse and deck remain three readable
+ * volumes, but the crown is lofted through rounded stations instead of the
+ * square estate silhouette called out by the candidate-4b critic.
  */
 export const SEDAN_SPEC: VehicleSpec = Object.freeze({
   id: 'nuketown2-sedan',
@@ -123,15 +124,17 @@ export const SEDAN_SPEC: VehicleSpec = Object.freeze({
   top: Object.freeze([
     { z: 0.0, yTop: 1.06, halfWidthTop: 0.62, topRadius: 0.14 },
     { z: 0.3, yTop: 1.19, halfWidthTop: 0.86, topRadius: 0.09 },
-    { z: 1.24, yTop: 1.22, halfWidthTop: 0.88, topRadius: 0.08, crease: true },
-    { z: 1.95, yTop: 1.84, halfWidthTop: 0.78, topRadius: 0.1 },
-    { z: 2.95, yTop: 1.86, halfWidthTop: 0.8, topRadius: 0.11 },
-    { z: 3.5, yTop: 1.24, halfWidthTop: 0.88, topRadius: 0.08, crease: true },
+    { z: 1.2, yTop: 1.2, halfWidthTop: 0.88, topRadius: 0.1, crease: true },
+    { z: 1.62, yTop: 1.55, halfWidthTop: 0.84, topRadius: 0.12 },
+    { z: 2.12, yTop: 1.82, halfWidthTop: 0.79, topRadius: 0.16 },
+    { z: 2.9, yTop: 1.84, halfWidthTop: 0.8, topRadius: 0.16 },
+    { z: 3.28, yTop: 1.6, halfWidthTop: 0.84, topRadius: 0.12 },
+    { z: 3.52, yTop: 1.24, halfWidthTop: 0.88, topRadius: 0.1, crease: true },
     { z: 4.12, yTop: 1.21, halfWidthTop: 0.86, topRadius: 0.09 },
     { z: 4.4, yTop: 1.08, halfWidthTop: 0.62, topRadius: 0.14 },
   ]),
-  sideGlass: Object.freeze([{ z0: 1.98, z1: 2.92 }]),
-  screens: Object.freeze([{ z0: 1.28, z1: 1.92 }, { z0: 2.98, z1: 3.46 }]),
+  sideGlass: Object.freeze([{ z0: 1.64, z1: 3.2 }]),
+  screens: Object.freeze([{ z0: 1.22, z1: 1.62 }, { z0: 3.2, z1: 3.5 }]),
   shutLines: Object.freeze([1.42, 2.6, 3.58]),
   stationSpacing: 0.45,
 });
@@ -142,3 +145,14 @@ export const FORGED_VEHICLE_SPECS: readonly VehicleSpec[] = Object.freeze([
   TRUCK_CAB_SPEC,
   SEDAN_SPEC,
 ]);
+
+/**
+ * Triangle fences for the dressed presentation meshes. These leave room for
+ * the authored trim above the measured current counts without allowing a
+ * detail pass to turn a parked vehicle into a high-density prop.
+ */
+export const FORGED_VEHICLE_TRIANGLE_BUDGETS = Object.freeze({
+  coach: 10_000,
+  truck: 6_000,
+  saloon: 9_000,
+});

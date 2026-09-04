@@ -15,9 +15,9 @@
  *
  *   - A DARK COLOUR UNDER A CLEARCOAT IS NOT A DARK SURFACE. The renderer sums
  *     the clearcoat Fresnel AND the base Fresnel, so a 4 %-red maroon measures
- *     blue-over-red on every shaded panel and reads lilac. `paintAlbedo` keeps
- *     the dominant hue channel at or above 10 % and drops `specularIntensity`
- *     rather than darkening the pigment.
+ *     blue-over-red on every shaded panel and reads lilac. The forge therefore
+ *     keeps the authored pigment unchanged and drops `specularIntensity`
+ *     rather than applying a channel lift that turns navy into purple.
  *   - `new THREE.Color(r, g, b)` WITH FLOATS IS LINEAR since r152. Authoring a
  *     "cream" swatch as floats gives a washed pastel. Swatches here are hex and
  *     go through `setHex(..., SRGBColorSpace)`.
@@ -72,7 +72,7 @@ function dustFilm(): unknown {
 }
 
 export interface PaintOptions {
-  /** sRGB hex. The dominant channel must survive at >= 10 % - see the header. */
+  /** sRGB hex; the authored hue is preserved exactly in the linear uniform. */
   readonly color: number;
   readonly name: string;
   /** 0.35-0.7. Higher is a fresher, wetter-looking finish. */
@@ -100,13 +100,6 @@ export interface PaintOptions {
 
 export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNodeMaterial {
   const base = linearOf(options.color);
-  // Keep the pigment above the lilac threshold without changing its hue: lift
-  // every channel toward 0.1 x its own share of the strongest channel.
-  const peak = Math.max(base.r, base.g, base.b, 1e-4);
-  const floorScale = Math.max(1, 0.1 / peak);
-  const r = base.r * floorScale;
-  const g = base.g * floorScale;
-  const b = base.b * floorScale;
 
   const baseRoughness = options.roughness ?? 0.74;
   const material = new MeshPhysicalNodeMaterial({
@@ -117,13 +110,20 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   });
   material.name = options.name;
   material.specularIntensity = 0.08;
+  material.userData.forgeRole = 'paint';
+  material.userData.forgePaintSrgb = options.color;
+  material.userData.forgePaintUniform = true;
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
   const dust = dustFilm();
   // Wear that lives ONLY in roughness is invisible: it is carried here as an
   // albedo step first (the film greys the pigment) and roughness second.
   const film = vec3(0.58, 0.56, 0.52);
-  material.colorNode = mix(vec3(r, g, b), film, (dust as any).mul(float(0.30)));
+  // A uniform is intentional: all forge paints share one graph shape and the
+  // dark-blue saloon remains dark blue. In particular, never normalise the
+  // channels to a minimum floor here; that was the source of the purple trim
+  // seen in candidate 4b.
+  material.colorNode = mix(TSL.uniform(new THREE.Vector3(base.r, base.g, base.b)), film, (dust as any).mul(float(0.30)));
   material.roughnessNode = float(baseRoughness).add((dust as any).mul(float(0.20)));
   return material;
 }
@@ -199,6 +199,7 @@ export function createForgeChromeMaterial(worn = false): MeshStandardNodeMateria
     metalness: 1,
   });
   material.name = worn ? 'vehicle-forge-chrome-worn' : 'vehicle-forge-chrome';
+  material.userData.forgeRole = 'chrome';
   tagCompatibility(material, 'MeshStandardMaterial');
   return material;
 }
