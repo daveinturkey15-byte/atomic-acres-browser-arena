@@ -1937,6 +1937,13 @@ describe('Nuke Town Rebuild fidelity', () => {
     const bulbWorld = nuketown2HandedSpan(bulbRect.x0, bulbRect.x1);
     const stemWorld = nuketown2HandedSpan(stemRect.x0, stemRect.x1);
     const closedEndSign = Math.sign((bulbWorld[0] + bulbWorld[1]) - (stemWorld[0] + stemWorld[1]));
+    const closedEndWorld = Math.max(...bulbWorld);
+    const thirdHouseBlock = beyondBounds.find((mesh) => mesh.name === 'nuketown2 beyond-bounds third house block');
+    expect(thirdHouseBlock, 'the third-house anchor block is present').toBeDefined();
+    const thirdHouseBlockFootprint = planFootprint(thirdHouseBlock!);
+    expect(thirdHouseBlockFootprint.x0 - closedEndWorld,
+      'the third-house near face stays at its fixed 2.7 m closed-end offset')
+      .toBeCloseTo(2.7, 6);
     for (const mesh of beyondBounds) {
       expect(Math.sign(mesh.position.x), `${mesh.name} stands beyond the CLOSED end`).toBe(closedEndSign);
     }

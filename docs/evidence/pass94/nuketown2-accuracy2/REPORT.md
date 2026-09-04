@@ -149,8 +149,9 @@ enumerated classes, each paid for by a property:
   boundaries are an artefact of how the band was cut up; the region is the claim.
 - **Ground tiles** - 180-symmetric **everywhere off the carriageway**, sampled the same
   way, and classified by property rather than by a name list because the grid renumbers.
-- **Third house** - every body asserted **entirely outside NUKETOWN2_BOUNDS**, and on the
-  closed end, derived from the head's own footprint rather than from a literal sign.
+- **Third house** - every body asserted **entirely outside NUKETOWN2_BOUNDS**, on the
+  closed end, and anchored at a fixed 2.7 m near-face offset from the head's closed end;
+  both are derived from the head's own footprint rather than from a literal sign.
 
 Two bands moved, both with the reason written into the test:
 
