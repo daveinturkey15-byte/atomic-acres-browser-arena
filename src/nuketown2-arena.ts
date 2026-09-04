@@ -502,12 +502,6 @@ const BALCONY_POST = 0.16;
  * exterior flight off the NON-garage end into the open side yard - R4's real
  * constraint, since a flight off the other end would cross the garage rear
  * door's threshold and block a route the door gate walks.
- *
- * That keeps the deck inside the house's own width (span [-4.25, 0.15] against
- * a house of [-6.75, 4.25]) and still puts the exterior flight in the OPEN
- * side yard at the non-garage end, which is R4's real constraint: a flight off
- * the other end would run across the garage rear door's threshold and block a
- * route the door gate walks.
  */
 const BALCONY_CENTRE_X = (BACK_UPPER_WINDOW[1] + HOUSE_X1) / 2;
 const BALCONY_X0 = BALCONY_CENTRE_X - BALCONY_WIDTH / 2;
@@ -534,12 +528,12 @@ export const NUKETOWN2_BALCONY = Object.freeze({
  * existing probe pattern covers it.
  *
  * 11 risers of exactly 0.30 span the 3.30 m to the upper floor. It runs
- * PARALLEL to the back wall, off the deck's outboard (non-garage) end, in the
- * 1.4 m strip immediately inside the deck's own outboard edge, so nothing is
- * ever over it - STAIR_MAX_FEET_UNDER_CEILING cannot apply and the HF-432
- * wedging failure cannot recur - and the middle of the yard stays open. A
- * perpendicular flight would drive a 3.3 m ramp 4.2 m into the yard and cut
- * the spawn's own sightlines.
+ * PARALLEL to the back wall, off the deck's NON-GARAGE end, in the 1.4 m of
+ * the deck's depth nearest the house (see YARD_STAIR_Z for why that half and
+ * not the other). Nothing is ever over it, so STAIR_MAX_FEET_UNDER_CEILING
+ * cannot apply and the HF-432 wedging failure cannot recur, and the middle of
+ * the yard stays open: a perpendicular flight would drive a 3.3 m ramp 4.2 m
+ * into the yard and cut the spawn's own sightlines.
  */
 const YARD_STAIR_RISERS = 11;
 const YARD_STAIR_GOING = 0.42;
