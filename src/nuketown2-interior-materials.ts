@@ -254,26 +254,3 @@ export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
 
   return mat;
 }
-
-/**
- * Procedural Beer-Lambert water material for the backyard swimming pool.
- * Deep cyan/aquamarine absorption, clearcoat specular reflection, subtle surface ripples.
- */
-export function createNuketown2PoolWaterMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
-    roughness: 0.14,
-    metalness: 0.02,
-    transparent: true,
-    opacity: 0.78,
-  });
-  mat.name = 'nuketown2-pool-water-material';
-  mat.type = 'MeshStandardMaterial';
-
-  const p = positionWorld;
-  // Beer-Lambert absorption tone: cyan-turquoise deep water with surface ripple
-  const ripple = fbm2(vec2(p.x.mul(5.0), p.z.mul(5.0)), 2).sub(float(0.5)).mul(float(0.04));
-  const beerLambertColor = vec3(0.04, 0.44, 0.54).add(ripple);
-  mat.colorNode = beerLambertColor;
-
-  return mat;
-}

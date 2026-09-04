@@ -1,0 +1,7 @@
+[hf390] backend=webgpu gpu={"secureContext":true,"navigatorGpu":true,"vendor":"nvidia","hasDevice":true}
+[hf390] nuketown2          OK 48221 ms impacts=280/360 penetratingTraces=213 families={"interior-wall":243,"vehicle":36,"glass":10,"wood":12,"fence":14,"concrete":10,"thin-metal":13}
+{
+  "verdict": "PASS",
+  "backend": "webgpu",
+  "failedArenas": []
+}

@@ -60,6 +60,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { wrapAngleRadians } from './animation-additive-pose';
+import { setOperatorLookRenderBackend } from './operator-skin-tsl-materials'; // PASS 94
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
@@ -70,7 +71,12 @@ import { estimateResidentObjectMemory } from './rendering/resident-memory';
 // that was never rebuilt. Importing the shared key is the fix; two copies of a key was
 // always going to end with one of them being wrong.
 import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
-import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
+import {
+  ArenaVisualStreamController,
+  findAuthoredArenaReviewCamera,
+  loadArenaVisualModule,
+  type ArenaVisualSwitchReceipt,
+} from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
 import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
@@ -112,6 +118,7 @@ import {
   type LightingConditionWrites,
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
+import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -326,6 +333,7 @@ import {
   chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
+  type KillstreakTaserStunEvent,
   type KillstreakEntitySnapshot,
   type KillstreakRecipientSnapshot,
   type KillstreakTarget,
@@ -474,7 +482,7 @@ import {
   type CrossbowGlassPhase,
 } from './crossbow-glass-authority';
 import {
-  activeSoloBotTarget,
+  activeSoloBotTarget, initialSoloBotCount,
   arenaCanvasLabel,
   arenaSelection,
   hostedArenaDurationMs,
@@ -483,7 +491,7 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
+import { buildMinimapStructuralElements, headingDegrees, minimapLandmarkFootprint, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapElement } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
@@ -559,6 +567,7 @@ import {
 import { FramePacingSampler, cadenceWithNoProgressAge, presentationIsDisplayLimited } from './frame-pacing';
 import { advanceLocalHealthRegen } from './local-health-regen';
 import {
+  CAMERA_SHAKE_REFERENCE_DISTANCE,
   addCameraShakeImpulse,
   addCameraShakeTrauma,
   createCameraShakeTrauma,
@@ -903,7 +912,8 @@ import {
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { selectSpawnCandidates, spawnUseWindow, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
   CHARACTER_PHYSICS_CONFIG,
@@ -1081,6 +1091,16 @@ import {
   type FlashVictimAdmission,
 } from './flash-authority';
 import { isFlashResultMessage, type FlashResultMessage } from './flash-protocol';
+import {
+  TASER_AUTHORITY_SCHEMA_VERSION,
+  TaserHostAuthority,
+  TaserVictimResultConsumer,
+  taserActivationId,
+  taserMovementAdmission,
+  type TaserStunResult,
+} from './taser-stun';
+import { isTaserStunMessage, type TaserStunMessage } from './taser-protocol';
+import { PILOTED_DRONE_TASER_CHARGES, TASER_PRESENTATION, TASER_STUN_DURATION_MS } from './killstreak-tuning';
 import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
@@ -2007,6 +2027,11 @@ const gpuRetirement = createGpuRetirementScheduler({
 const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
 const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
+// PASS 94. The procedural operator looks are TSL node graphs, which only the
+// node-capable renderer evaluates; declaring the backend once here is what lets
+// `materialForTeam` choose between them and the shipped tinted path. Fail-closed:
+// until this runs, the tinted path is used.
+setOperatorLookRenderBackend(renderRuntime.backend);
 // (2026-08-30) The sticky WebGL2 fallback banner is retired with the
 // fallback itself - the renderer is WebGPU or an honest requirement screen.
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
@@ -4198,15 +4223,15 @@ function captureLightingConditionBaseline(baseline: LightingConditionBaseline): 
 }
 
 function resolveActiveLightingConditions(): LightingConditionWrites {
-  return resolveLightingConditions({
+  // LIGHTING: the Nuke Town Rebuild owns three authored skies (src/nuketown2-lighting); every other arena takes the game-wide sun arc, and both return the same record.
+  return (selectedArena.id === NUKETOWN2_ARENA_ID ? resolveNuketown2LightingConditions : resolveLightingConditions)({
     arenaId: selectedArena.id,
     matchSeed: weatherMatchSeed,
     elapsedSeconds: lightingConditionsElapsedSeconds,
     choice: activeLightingTimeChoice(),
     skyDarkenAmount: lightingConditionsSkyDarken,
-    // `?todhour=` is the same class of local override as `?tod=` and obeys the
-    // same rule: inside a hosted lobby it is ignored, so the scan hour cannot
-    // desync a guest from the host's sky either.
+    // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby
+    // so guests cannot select a different sky and desync the shared match.
     ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
   });
 }
@@ -4309,7 +4334,7 @@ function applyLightingConditionUniforms(force = false): void {
     fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
   }
-  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex()), pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
   // A deterministic review camera owns the exposure while it is set -- that is
   // the capture contract every viewpoint baseline in the repo rests on -- and it
   // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
@@ -4416,7 +4441,25 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   if (renderRuntime.backend === 'webgpu' && fence) await flushWebGpuFrames();
   arenaVisualReceipt = await arenaVisualStream.adoptGameplayRoot(arenaId, root);
   const module = await loadArenaVisualModule(arenaId);
+  // PASS 94 CANDIDATE 4b - THE DEFINITION AND THE REVIEW STATE ARE INSTALLED
+  // TOGETHER, BEFORE ANY WORK THAT CAN THROW.
+  //
+  // These five resets used to sit at the END of this function, after the whole
+  // WebGPU block. Every await between here and there is a throw point - the
+  // PMREM regen, the traversal audit, the sky-backdrop admission, the arena
+  // environment assertion - and none of them run under a try. So a throw left
+  // `activeArenaVisualDefinition` pointing at the NEW arena (it is assigned on
+  // the line below) while `activeArenaReview*` still described the OLD one: a
+  // review camera id, exposure, seed and HUD state for an arena that is no
+  // longer on screen, which `setArenaReviewCamera` and the debug capture path
+  // both read. Resetting them next to the assignment makes the pair one
+  // statement about which arena is installed, on every path out of here.
   activeArenaVisualDefinition = module.definition;
+  activeArenaReviewCameraId = null;
+  activeArenaReviewFixedTimeMs = null;
+  activeArenaReviewSeed = null;
+  activeArenaReviewExposure = null;
+  activeArenaReviewHud = null;
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
     // Browser assets survive map changes, but their GPU receipts are tied to
@@ -4501,11 +4544,6 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // is the point of landing it with the fix rather than after it.
     assertArenaEnvironmentLive(pass64TslSystems.observeArenaEnvironment());
   }
-  activeArenaReviewCameraId = null;
-  activeArenaReviewFixedTimeMs = null;
-  activeArenaReviewSeed = null;
-  activeArenaReviewExposure = null;
-  activeArenaReviewHud = null;
 }
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => (
@@ -4642,10 +4680,9 @@ function applyInteractiveWorldBallisticTrace(
   if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
   const spec = WEAPONS[weapon];
   const unitDirection = direction.clone().normalize();
-  const penetrationEnergyQ = Math.max(0, Math.round(
-    spec.penetration.penetrationPower * spec.penetration.fmjMultiplier * 10,
-  ));
-  const damageQ = Math.max(1, Math.round(spec.damage));
+  // HF-467: perforation and damage now cost the trace's REMAINING energy at
+  // each surface (`impact.energyAtEntryQ`), not a distance-blind muzzle constant.
+  const damageQ = Math.max(1, Math.round(applyPenetrationDamage(spec.damage, trace.damageMultiplier)));
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
   for (const impact of trace.impacts) {
@@ -4653,6 +4690,7 @@ function applyInteractiveWorldBallisticTrace(
       && !impact.surface.majorDebris
       && !impact.surface.houseFragment
       && !impact.surface.houseMajorDebris) continue;
+    const penetrationEnergyQ = Math.max(0, Math.round(impact.energyAtEntryQ));
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
     const impulseQ = Object.freeze({
@@ -5207,6 +5245,16 @@ let lastSmokeStateBroadcastRevision = -1;
 let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+// HF-458: the Piloted Drone taser. Same authority shape as the flashbang - the
+// host authors every stun, the victim client only replays an admitted result.
+const taserHostAuthority = new TaserHostAuthority(interactiveWorldMatchEpoch, 'host');
+const taserVictimConsumer = new TaserVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+let taserStunStartsAtHostTimeMs = 0;
+let taserStunEndsAtHostTimeMs = 0;
+let taserStunsAppliedThisMatch = 0;
+let taserStunNonce = 0;
+/** Bots the host has stunned: bot id -> host time the stun releases. */
+const botTaserStunUntilHostTimeMs = new Map<string, number>();
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 type CrossbowGlassMutationTrace = Readonly<{
   windowId: string;
@@ -6505,6 +6553,8 @@ let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackStat
 let lastSensoryPresentationAt = -Infinity;
 // HF-352: Camera shake and kill-confirm pulse presentation states
 let cameraShakeState: CameraShakeState = createCameraShakeState();
+/** HF-458: throttles the taser camera jitter to its authored rate. */
+let lastTaserJitterAtHostTimeMs = Number.NEGATIVE_INFINITY;
 // HF-370: the trauma model runs ALONGSIDE the spring model rather than
 // replacing it. Both feed the same camera; trauma supplies the weight and
 // falloff an explosion should have, the spring keeps the existing per-impulse
@@ -6554,10 +6604,11 @@ let minimapRenderCount = 0;
 // within 2 frames of a 60 fps loop.
 const MINIMAP_RENDER_HZ = 30;
 let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
-let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+let minimapLandmarksRendered: Array<{ id: string; kind: string; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
+const recentSpawnUses: SpawnUse[] = [];
 // HF-402: keyed by ACTOR, not by team, and carrying the point selected - two
 // bots on one team overwrote each other's record, and the record held no
 // position, so nothing could check afterwards WHERE a bot was put. Exposed on
@@ -12567,6 +12618,20 @@ function handleSmokeAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function handleTaserAuthorityMessage(message: GameMessage): boolean {
+  if (message.type !== 'taser-stun') return false;
+  // Same fail-closed fence as the flash result: only the sitting host may stun
+  // this client, only for this player, only during a live match.
+  if (network.role !== 'client'
+    || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id
+    || message.result.targetId !== player.id
+    || matchState.phase !== 'active'
+    || !player.alive) return true;
+  applyAuthoritativeTaserStun(message.result);
+  return true;
+}
+
 function handleFlashAuthorityMessage(message: GameMessage): boolean {
   if (message.type !== 'flash-result') return false;
   // The host transport rejects host-authority message kinds from guests before
@@ -12741,6 +12806,7 @@ function onNetworkMessage(message: GameMessage): void {
   if (handleInteractiveWorldMessage(message)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
+  if (handleTaserAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -16692,8 +16758,18 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   recentDeathPositions.push({ point: point.clone(), at: now });
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
+function recentSpawnUseRecords(now = performance.now()): readonly SpawnUse[] {
+  while (recentSpawnUses.length > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth && now - recentSpawnUses[0]!.at > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseAvoidanceMs) recentSpawnUses.shift(); // HF-491: derived horizons, not a flat 12 s
+  return recentSpawnUses;
+}
+function recordSpawnUse(index: number, now = performance.now()): void {
+  recentSpawnUseRecords(now);
+  recentSpawnUses.push({ index, at: now });
+  if (recentSpawnUses.length > Math.max(64, spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth)) recentSpawnUses.shift();
+}
 function spawnPoint(): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
+  const spawnNow = performance.now();
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -16720,12 +16796,9 @@ function spawnPoint(): THREE.Vector3 {
   // screen. A blocked home side now borrows the opposite side (spawn-safety
   // scoring still picks the least-exposed point), and only a map with no
   // authored spawns at all - an authoring error, not a match state - throws.
-  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) {
-    home = opposite;
-  }
   if (home.length === 0 && opposite.length === 0) {
     const rawFallback = [...arena.spawns[player.team], ...arena.spawns[oppositeTeam]]
-      .map((point, index) => ({ point, side: player.team, index: 200 + index }));
+      .map((point, index) => ({ point, side: index < arena.spawns[player.team].length ? player.team : oppositeTeam, index: 200 + index }));
     if (rawFallback.length === 0) throw new Error(`No authored player spawns exist for team ${player.team}`);
     home = rawFallback;
   }
@@ -16740,13 +16813,18 @@ function spawnPoint(): THREE.Vector3 {
       safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[player.team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[player.team] = flipDecision.state;
   const flipped = flipDecision.flip;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipped ? opposite : home;
+  // Team hysteresis supplies the preferred side; the shared selector still
+  // sees every valid point so solo/explore can distribute across the full map
+  // and a pressured team can borrow the opposite side without collapsing to a
+  // single fallback point.
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < minimumSeparationSq));
   const initialFfaReservation = spawnMode === 'ffa' && lastPlayerSpawnIndex < 0 && privateLobbySnapshot
@@ -16771,14 +16849,19 @@ function spawnPoint(): THREE.Vector3 {
   }));
   const previousIndex = lastPlayerSpawnIndex;
   const population = otherPlayers.length + 1;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population,
-    candidates: candidates.map(({ index, point }) => ({ index, point })),
+    team: player.team,
+    preferredSide: spawnMode === 'tdm' ? (flipped ? oppositeTeam : player.team) : undefined,
+    candidates: selectable.map(({ index, point, side }) => ({ index, point, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex,
     tieBreakSeed: stableSpawnTieBreakSeed(player.id),
@@ -16813,6 +16896,7 @@ function spawnPoint(): THREE.Vector3 {
     ],
   });
   lastPlayerSpawnIndex = selectedIndex;
+  recordSpawnUse(selectedIndex, spawnNow);
   return selectedSpawn.point.clone();
 }
 
@@ -17393,6 +17477,12 @@ async function startGame(
   lastSmokeStateBroadcastRevision = -1;
   lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
   flashHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserVictimConsumer.reset(interactiveWorldMatchEpoch, player.id, localContinuity);
+  taserStunStartsAtHostTimeMs = 0;
+  taserStunEndsAtHostTimeMs = 0;
+  taserStunsAppliedThisMatch = 0;
+  botTaserStunUntilHostTimeMs.clear();
   lastAuthoredFlashResults.clear();
   remoteFlashVictimLifeIds.clear();
   lastFlashDispatch = null;
@@ -17559,6 +17649,7 @@ async function startGame(
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
   recentDeathPositions.length = 0;
+  recentSpawnUses.length = 0;
   lastBotSpawnAudit.clear();
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
@@ -17692,7 +17783,7 @@ async function startGame(
   });
   element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+    : mode === 'solo' ? (initialSoloBotCount(selectedArena) === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
   element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
   element<HTMLElement>('#timer').hidden = !startBanner.clock;
   element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
@@ -19880,6 +19971,7 @@ function castShot(
 
 function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
+  const spawnNow = performance.now();
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
@@ -19892,16 +19984,15 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
   ];
   const validForSide = (side: Team) => arena.spawns[side]
-    .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
+    .map((candidate, localIndex) => ({ candidate, side, index: side * 100 + localIndex }))
     .filter(({ candidate }) => validArenaSpawnPoint(candidate, arena.bounds, activeWorldColliders()));
   let home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
   // Same fallback as the player path: debris/dynamic colliders can zero out a
   // side mid-match, and a bot respawn throw escapes its timer just as badly.
-  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) home = opposite;
   if (home.length === 0 && opposite.length === 0) {
     const rawFallback = [...arena.spawns[team], ...arena.spawns[team === 0 ? 1 : 0]]
-      .map((candidate, index) => ({ candidate, index: 200 + index }));
+      .map((candidate, index) => ({ candidate, side: index < arena.spawns[team].length ? team : (team === 0 ? 1 : 0), index: 200 + index }));
     if (rawFallback.length === 0) throw new Error(`No authored spawns exist for team ${team}`);
     home = rawFallback;
   }
@@ -19916,23 +20007,29 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[team] = flipDecision.state;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipDecision.flip ? opposite : home;
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < minimumSeparationSq));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population: otherPlayers.length + 1,
-    candidates: selectable.map(({ candidate, index }) => ({ index, point: candidate })),
+    team,
+    preferredSide: spawnMode === 'tdm' ? (flipDecision.flip ? (team === 0 ? 1 : 0) : team) : undefined,
+    candidates: selectable.map(({ candidate, side, index }) => ({ index, point: candidate, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
     tieBreakSeed: stableSpawnTieBreakSeed(actorId),
@@ -19949,6 +20046,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
     reason: selection.reason,
     position: [chosen.x, chosen.y, chosen.z],
   });
+  recordSpawnUse(selectedIndex, spawnNow);
   return chosen;
 }
 
@@ -20180,7 +20278,7 @@ function activateDormantBot(index: number): boolean {
 
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
-  const activeCount = hostedCount ?? selectedArena.soloBotCount;
+  const activeCount = hostedCount ?? initialSoloBotCount(selectedArena);
   resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
@@ -20204,7 +20302,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
-  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+  for (let index = activeCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     await prewarmRiggedOperatorActions(bot.root);
@@ -20216,8 +20314,8 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  if (selectedArena.soloBotCount > 0) {
-    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  if (activeCount > 0) {
+    addFeed(`${activeCount} low-damage hostile operator${activeCount === 1 ? '' : 's'} deployed`, 'coral');
   }
 }
 
@@ -21032,7 +21130,12 @@ function updateBots(dt: number, now: number): void {
     bot.stance = stanceDecision.stance;
     bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
     const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
-    const speed = Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
+    // HF-458: a tasered bot is held in place for the stun, exactly like a
+    // tasered human. Its aim and fire logic keep running; only movement stops.
+    const botStunnedUntil = botTaserStunUntilHostTimeMs.get(bot.id);
+    const botTasered = botStunnedUntil !== undefined && currentHostTimeMs() < botStunnedUntil;
+    if (botStunnedUntil !== undefined && !botTasered) botTaserStunUntilHostTimeMs.delete(bot.id);
+    const speed = botTasered ? 0 : Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     const botCapsuleHeight = 1.7;
     const movementColliders = collidersOverlappingVerticalSpan(
@@ -22637,6 +22740,73 @@ function dispatchAuthoritativeFlashResult(result: FlashResult): void {
   });
 }
 
+/**
+ * HF-458: the local victim side of a taser stun. Movement is refused by
+ * `localTaserMovementAdmission()` in updatePhysics; this only records the
+ * authored window and lets the presentation read it.
+ */
+function applyAuthoritativeTaserStun(result: TaserStunResult): boolean {
+  const admission = taserVictimConsumer.admit(result, currentHostTimeMs());
+  if (!admission.accepted) return false;
+  taserStunStartsAtHostTimeMs = result.startsAtHostTimeMs;
+  taserStunEndsAtHostTimeMs = result.endsAtHostTimeMs;
+  taserStunsAppliedThisMatch += 1;
+  return true;
+}
+
+function dispatchAuthoritativeTaserStun(result: TaserStunResult): void {
+  if (result.targetId === player.id) {
+    applyAuthoritativeTaserStun(result);
+    return;
+  }
+  if (network.role !== 'host') return;
+  const message: TaserStunMessage = {
+    type: 'taser-stun',
+    schemaVersion: TASER_AUTHORITY_SCHEMA_VERSION,
+    by: player.id,
+    forPlayerId: result.targetId,
+    result,
+    nonce: randomNonce(),
+  };
+  if (isTaserStunMessage(message)) network.sendToPlayer(result.targetId, message);
+}
+
+/** Movement/sprint/jump admission for the LOCAL player under a taser stun. */
+function localTaserMovementAdmission(nowHostTimeMs = currentHostTimeMs()) {
+  return taserMovementAdmission(taserStunEndsAtHostTimeMs, nowHostTimeMs, taserStunStartsAtHostTimeMs);
+}
+
+/**
+ * HF-458: turns one host-admitted taser hit into a replicated stun. Bots are
+ * stunned in the host's own bot table (they have no client to replicate to);
+ * humans go through TaserHostAuthority exactly like a flashbang victim.
+ */
+function applyKillstreakTaserStunEvent(event: KillstreakTaserStunEvent): boolean {
+  if (network.role === 'client') return false;
+  const nowHostTimeMs = currentHostTimeMs();
+  if (event.targetKind === 'bot') {
+    const bot = bots.get(event.targetId);
+    if (!bot?.alive) return false;
+    botTaserStunUntilHostTimeMs.set(bot.id, nowHostTimeMs + event.durationMs);
+    taserStunsAppliedThisMatch += 1;
+    return true;
+  }
+  taserStunNonce += 1;
+  const resolution = taserHostAuthority.resolveStun({
+    matchEpoch: interactiveWorldMatchEpoch,
+    activationId: taserActivationId(interactiveWorldMatchEpoch, event.ownerId, taserStunNonce),
+    startsAtHostTimeMs: nowHostTimeMs,
+    victims: [{
+      targetId: event.targetId,
+      targetLifeId: event.targetLifeId,
+      durationMs: Math.min(TASER_STUN_DURATION_MS, event.durationMs),
+    }],
+  });
+  if (!resolution.accepted || resolution.results.length !== 1) return false;
+  dispatchAuthoritativeTaserStun(resolution.results[0]!);
+  return true;
+}
+
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostTimeMs: number): void {
   // Clients may predict only projectile/world presentation. Human and AI flash
   // authority is resolved once by the host (or by the offline host runtime).
@@ -22724,6 +22894,7 @@ function updateOrdnanceVolumes(_now: number): void {
   if (authorityChanged) synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
   else updateSmokePresentationLeases(nowHostTimeMs);
   broadcastSmokeState(authorityChanged, nowHostTimeMs, authorityChanged);
+  updateTaserStunPresentation(nowHostTimeMs);
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntilHostTimeMs - nowHostTimeMs;
   if (remainingFlash <= 0) {
@@ -22733,6 +22904,43 @@ function updateOrdnanceVolumes(_now: number): void {
   } else {
     overlay.hidden = false;
     overlay.style.opacity = String(Math.min(1, flashExposureStrength * Math.min(1, remainingFlash / 550)));
+  }
+}
+
+/**
+ * HF-458 presentation: an electric-blue arc vignette plus a short camera jitter,
+ * so a tasered player never mistakes the effect for a flashbang. Reduced-sensory
+ * accessibility scales both, and the CSS crackle layer is disabled entirely
+ * under prefers-reduced-motion.
+ */
+function updateTaserStunPresentation(nowHostTimeMs: number): void {
+  const overlay = element<HTMLElement>('#taser-shock');
+  const stun = localTaserMovementAdmission(nowHostTimeMs);
+  if (!stun.stunned) {
+    if (!overlay.hidden) {
+      overlay.hidden = true;
+      overlay.style.opacity = '0';
+      overlay.style.setProperty('--taser-crackle', '0');
+    }
+    return;
+  }
+  const sensory = accessibilityRuntime.reducedSensory ? 0.4 : 1;
+  overlay.hidden = false;
+  overlay.style.opacity = String(Math.min(1, 0.35 + stun.intensity * 0.55) * sensory);
+  const crackle = Math.abs(Math.sin(nowHostTimeMs * Math.PI * 2 * TASER_PRESENTATION.crackleHz / 1_000));
+  overlay.style.setProperty('--taser-crackle', String(crackle * 0.55 * sensory));
+  // A jitter the flashbang never applies. Re-impulsed at the authored rate so
+  // the camera buzzes rather than heaves once and settles.
+  const jitterPeriodMs = 1_000 / TASER_PRESENTATION.cameraJitterHz;
+  if (nowHostTimeMs - lastTaserJitterAtHostTimeMs >= jitterPeriodMs) {
+    lastTaserJitterAtHostTimeMs = nowHostTimeMs;
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: CAMERA_SHAKE_REFERENCE_DISTANCE / Math.max(0.05, TASER_PRESENTATION.cameraJitterAmplitudeM * 8),
+      family: 'crossbow',
+      sensoryScale: accessibilityRuntime.weaponMotionScale * stun.intensity,
+      now: performance.now(),
+      seed: Math.round(nowHostTimeMs) | 0,
+    });
   }
 }
 
@@ -24187,7 +24395,7 @@ function requestKillstreakActivation(
 function requestKillstreakControl(
   entityId: string,
   action: KillstreakControlIntentMessage['action'],
-  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire'> = {},
+  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire' | 'taserFire'> = {},
   now = performance.now(),
 ): boolean {
   killstreakControlSequence += 1;
@@ -24234,6 +24442,31 @@ function requestKillstreakControl(
   refreshLocalKillstreakSnapshot(now);
   broadcastKillstreakState(now);
   return true;
+}
+
+/**
+ * HF-458 item 3: exact RMB action for the locally possessed Piloted Drone.
+ * Refused client-side when the drone has no charge left, so a dead click never
+ * costs a control packet; the host refuses it again regardless.
+ */
+function requestPossessedDroneTaser(now = performance.now()): boolean {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'piloted-drone') return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === possession.entityId
+    && candidate.kind === 'drone'
+    && candidate.mode === 'piloted'
+    && candidate.ownerId === player.id
+    && candidate.expiresInMs > 0
+    && (candidate.taserCharges ?? 0) > 0
+  ));
+  if (!entity) return false;
+  return requestKillstreakControl(entity.id, 'pilot-control', {
+    yawQ: player.yaw,
+    pitchQ: player.pitch,
+    fire: triggerHeld,
+    taserFire: true,
+  }, now);
 }
 
 /** Exact RMB action for the locally possessed Chopper Gunner. */
@@ -24587,6 +24820,17 @@ function syncGunnerCockpitHud(
       : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
     missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
   }
+  // HF-458: the drone's taser counter, same RMB slot, same lifecycle contract.
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  const dronePilot = possessionKind === 'piloted-drone';
+  taserStatus.hidden = !dronePilot;
+  taserStatus.setAttribute('aria-hidden', String(!dronePilot));
+  if (dronePilot) {
+    const charges = Math.max(0, Math.min(PILOTED_DRONE_TASER_CHARGES, entity.taserCharges ?? 0));
+    element<HTMLElement>('#gunner-taser-charges').textContent = `×${charges} / ${PILOTED_DRONE_TASER_CHARGES}`;
+    element<HTMLElement>('#gunner-taser-state').textContent = charges > 0 ? 'READY' : 'EMPTY';
+    taserStatus.dataset.ready = String(charges > 0);
+  }
   if (now >= gunnerTargetConfirmUntil) {
     element<HTMLElement>('#gunner-target-confirm').hidden = true;
     hud.dataset.hitConfirm = 'false';
@@ -24615,6 +24859,12 @@ function hideGunnerCockpitHud(): void {
   element<HTMLElement>('#gunner-control-gun-ammo').textContent = '∞';
   element<HTMLElement>('#gunner-missile-ammo').textContent = `×0 / ${CHOPPER_MISSILE_CAPACITY}`;
   element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  taserStatus.hidden = true;
+  taserStatus.setAttribute('aria-hidden', 'true');
+  taserStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-taser-charges').textContent = `×0 / ${PILOTED_DRONE_TASER_CHARGES}`;
+  element<HTMLElement>('#gunner-taser-state').textContent = 'OFFLINE';
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;
 }
@@ -24809,6 +25059,9 @@ function updatePass65KillstreakRuntime(now: number): void {
       (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
+    // HF-458: Piloted Drone taser hits, before damage - a stun is a control
+    // effect and must land even on a step where the victim also takes damage.
+    for (const stun of result.taserStunEvents) applyKillstreakTaserStunEvent(stun);
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) {
       recordOwnerSupportDamage(event);
@@ -26691,7 +26944,13 @@ function updatePhysics(dt: number): void {
   const keyProfile = activeKeyBindingProfile();
   const forwardInput = THREE.MathUtils.clamp(Number(actionHeld('move-forward', keys, keyProfile)) - Number(actionHeld('move-backward', keys, keyProfile)) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
   const strafeInput = THREE.MathUtils.clamp(Number(actionHeld('move-right', keys, keyProfile)) - Number(actionHeld('move-left', keys, keyProfile)) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
-  const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
+  // HF-458: a tasered operator supplies ZERO movement input for the stun -
+  // not reduced input - so the stun cannot be walked out of. Sprint follows for
+  // free (wantsSprint requires input.lengthSq() > 0) and jump is gated below.
+  const taserStun = localTaserMovementAdmission();
+  const input = taserStun.canMove
+    ? forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput)
+    : new THREE.Vector3();
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
   // HF-412: hold-crouch-to-prone, polled here because a held key produces no
@@ -26773,7 +27032,7 @@ function updatePhysics(dt: number): void {
   player.velocity.z = integrated.z;
 
   if (playerGrounded) lastGroundedAt = now;
-  const jumpBuffered = now - jumpQueuedAt <= 125;
+  const jumpBuffered = !taserStun.canJump ? false : now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
   if (jumpBuffered && coyoteGrounded && !adsHeld && player.stance === 'stand' && matchState.phase === 'active') {
     player.velocity.y = profile.jumpVelocity;
@@ -27641,118 +27900,23 @@ function checkMatchEnd(): void {
   updateMatchState(performance.now());
 }
 
-function drawMinimapLandmark(
-  context: CanvasRenderingContext2D,
-  id: string,
-  kind: MinimapLandmarkKind,
-  footprint: { x: number; y: number; width: number; height: number },
-): void {
-  const { x, y, width, height } = footprint;
-  const inset = Math.max(1.5, Math.min(width, height) * 0.12);
-  context.save();
-  context.lineWidth = 2.5;
-  context.strokeStyle = '#fff1bd';
-  context.fillStyle = id.startsWith('south-') ? 'rgba(255, 118, 95, .66)' : 'rgba(88, 227, 220, .62)';
-
-  if (kind === 'bus') {
-    context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
-    context.strokeStyle = 'rgba(7, 15, 18, .88)';
-    context.beginPath();
-    context.moveTo(x + width * 0.18, y + inset);
-    context.lineTo(x + width * 0.18, y + height - inset);
-    context.moveTo(x + width * 0.82, y + inset);
-    context.lineTo(x + width * 0.82, y + height - inset);
-    context.stroke();
-  } else if (kind === 'cargo-stack') {
-    context.fillStyle = 'rgba(225, 171, 52, .76)';
-    context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
-    context.strokeStyle = 'rgba(7, 15, 18, .78)';
-    context.beginPath();
-    context.moveTo(x + width / 3, y); context.lineTo(x + width / 3, y + height);
-    context.moveTo(x + width * 2 / 3, y); context.lineTo(x + width * 2 / 3, y + height);
-    context.moveTo(x, y + height / 2); context.lineTo(x + width, y + height / 2);
-    context.stroke();
-  } else if (kind === 'pipe-stack') {
-    context.fillStyle = 'rgba(173, 186, 188, .72)';
-    const radius = Math.max(2.5, Math.min(width / 6, height / 3.2));
-    const centres: Array<[number, number]> = [
-      [0.22, 0.66], [0.5, 0.66], [0.78, 0.66], [0.36, 0.30], [0.64, 0.30],
-    ];
-    for (const [px, py] of centres) {
-      context.beginPath();
-      context.arc(x + width * px, y + height * py, radius, 0, Math.PI * 2);
-      context.fill();
-      context.stroke();
-    }
-  } else if (kind === 'service-skip') {
-    context.fillStyle = 'rgba(225, 171, 52, .78)';
-    context.beginPath();
-    context.moveTo(x + inset, y);
-    context.lineTo(x + width - inset, y);
-    context.lineTo(x + width, y + height);
-    context.lineTo(x, y + height);
-    context.closePath();
-    context.fill();
-    context.stroke();
-    context.strokeStyle = 'rgba(7, 15, 18, .82)';
-    context.beginPath();
-    context.moveTo(x + inset, y + height * 0.34);
-    context.lineTo(x + width - inset, y + height * 0.34);
-    context.stroke();
-  } else if (kind === 'jetliner') {
-    context.fillStyle = 'rgba(226, 240, 244, .78)';
-    context.beginPath();
-    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-  } else if (kind === 'terminal') {
-    context.fillStyle = 'rgba(56, 178, 165, .62)';
-    context.fillRect(x, y, width, Math.max(3, height));
-    context.strokeRect(x, y, width, Math.max(3, height));
-  } else if (kind === 'fuel') {
-    context.fillStyle = 'rgba(217, 159, 46, .82)';
-    context.beginPath();
-    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-  } else {
-    context.fillStyle = 'rgba(232, 203, 92, .74)';
-    context.fillRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
-    context.strokeRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
-    context.fillStyle = '#10232a';
-    const wheelRadius = Math.max(2.3, Math.min(width, height) * 0.13);
-    for (const wheelX of [x + width * 0.24, x + width * 0.76]) {
-      context.beginPath();
-      context.arc(wheelX, y + height - inset * 0.45, wheelRadius, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-  context.restore();
-}
-
-// HF-399: Nuke Town's static minimap layer (road, houses, cover landmarks),
-// rebuilt only when the arena object or the canvas backing size changes.
+// HF-399/HF-491: static minimap layer, rebuilt only when the arena object or the
+// canvas backing size changes. Semantic admission lives in the pure minimap
+// module; this presenter paints only the resulting macro silhouettes.
 type MinimapStaticLayer = Readonly<{
   arena: ArenaMap;
   width: number;
   height: number;
   /**
-   * INVARIANT THIS CACHE DEPENDS ON: `arena.bounds`, `arena.houses` and
-   * `arena.physicalCover` are authored by the arena builder and never mutated
-   * at runtime (every `physicalCover` push in src/ is build-time). Arena
-   * identity therefore normally settles the cache on its own; these two counts
-   * are the cheap tripwire that catches a future change which grows or shrinks
-   * either list under a stable arena object, since a stale layer would show the
-   * wrong landmarks with no other symptom.
+   * INVARIANT THIS CACHE DEPENDS ON: the arena geometry channels are authored by
+   * the arena builder and never mutated at runtime. The counts are a cheap
+   * tripwire for a stale layer under a stable arena object.
    */
   houseCount: number;
   coverCount: number;
+  surfaceCount: number;
   canvas: HTMLCanvasElement;
-  /** Landmark label anchors in minimap pixel space (before the player transform). */
-  labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
-  landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }>;
+  elements: readonly MinimapElement[];
 }>;
 let minimapStaticLayer: MinimapStaticLayer | null = null;
 
@@ -27765,42 +27929,38 @@ function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMa
     && cached.height === height
     && cached.houseCount === arena.houses.length
     && cached.coverCount === arena.physicalCover.length
+    && cached.surfaceCount === arena.shotSurfaces.length
   ) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas2D minimap static layer is unavailable');
-  const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
-  const [roadLeft] = point(-10.25, 0);
-  const [roadRight] = point(10.25, 0);
-  context.fillStyle = 'rgba(126, 137, 132, .23)';
-  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
-  context.strokeStyle = 'rgba(244, 196, 79, .42)';
-  context.lineWidth = 2;
-  context.setLineDash([10, 10]);
-  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
-  context.setLineDash([]);
-  for (const house of arena.houses) {
-    const [cx, cy] = point(house.origin.x, house.origin.z);
-    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
-    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
-    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
-    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
-    context.lineWidth = 2;
-    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-  }
-  const labelAnchors: Array<{ label: string; x: number; y: number }> = [];
-  const landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
-  for (const cover of arena.physicalCover) {
-    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-    if (!kind) continue;
-    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-    drawMinimapLandmark(context, cover.id, kind, footprint);
-    const label = minimapLandmarkLabel(kind);
-    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
-    landmarks.push({ id: cover.id, kind, label });
+  const elements = buildMinimapStructuralElements({
+    arenaId: arena.id,
+    bounds,
+    width,
+    height,
+    houses: arena.houses,
+    physicalCover: arena.physicalCover,
+    surfaces: arena.shotSurfaces,
+  });
+  for (const element of elements) {
+    const footprint = minimapLandmarkFootprint(element.bounds, bounds, width, height);
+    const colours = element.className === 'vehicle'
+      ? ['rgba(244, 196, 79, .78)', 'rgba(255, 247, 223, .92)']
+      : element.className === 'road'
+        ? ['rgba(126, 137, 132, .30)', 'rgba(244, 196, 79, .42)']
+        : element.className === 'perimeter'
+          ? ['rgba(170, 113, 72, .30)', 'rgba(221, 164, 111, .72)']
+          : element.className === 'garage'
+            ? ['rgba(255, 164, 95, .32)', 'rgba(255, 196, 120, .78)']
+            : ['rgba(88, 227, 220, .28)', 'rgba(88, 227, 220, .78)'];
+    context.fillStyle = colours[0];
+    context.strokeStyle = colours[1];
+    context.lineWidth = element.className === 'road' ? 1.5 : 2;
+    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   }
   minimapStaticLayer = Object.freeze({
     arena,
@@ -27808,9 +27968,9 @@ function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMa
     height,
     houseCount: arena.houses.length,
     coverCount: arena.physicalCover.length,
+    surfaceCount: arena.shotSurfaces.length,
     canvas,
-    labelAnchors: Object.freeze(labelAnchors),
-    landmarks,
+    elements,
   });
   return minimapStaticLayer;
 }
@@ -27851,54 +28011,15 @@ function updateMinimap(now: number): void {
   context.strokeRect(4, 4, width - 8, height - 8);
 
   const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
-  // HF-399 streamline: one description of the player-up view, shared by the
-  // canvas transform below and by every upright label that has to be mapped
-  // through the same transform in closed form. Previously each landmark branch
-  // recomputed the rotation and the reflection for itself.
-  const labelView = {
-    width,
-    height,
-    playerX: worldPlayerX,
-    playerY: worldPlayerY,
-    rotation: playerUpRotationRadians(player.yaw),
-    scaleX: playerUpScaleX(),
-  };
   context.save();
   context.translate(width / 2, height / 2);
-  context.rotate(labelView.rotation);
-  context.scale(labelView.scaleX, 1);
+  context.rotate(playerUpRotationRadians(player.yaw));
+  context.scale(playerUpScaleX(), 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
-  let renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
-  const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
-  if (selectedArena.id === 'atomic-acres') {
-    // HF-399: the road, the two houses and every cover landmark are fixed for
-    // the life of the arena, so they are painted ONCE into an offscreen layer
-    // in minimap pixel space and composited under the per-frame player
-    // transform with one drawImage. Measured 2026-09-02 (Quality, 60 Hz
-    // minimap, atomic-acres lawn-idle): this function held 4.4% of an inclusive
-    // CPU profile - about 1.1 ms of the measured 26.1 ms frame - dominated by
-    // the landmark path work plus a getTransform()+DOMPoint allocation per
-    // cover per frame. Label anchors are the same points run through the same
-    // transform in closed form (minimapPlayerViewPoint, guarded against a
-    // composed affine reference by src/minimap-player-view-transform.test.ts),
-    // so the labels stay upright exactly as before.
-    const layer = activeMinimapStaticLayer(width, height, bounds);
-    context.drawImage(layer.canvas, 0, 0);
-    for (const anchor of layer.labelAnchors) {
-      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
-      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
-    }
-    renderedLandmarks = layer.landmarks;
-  } else {
-    context.lineWidth = 1.5;
-    context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
-    context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
-    for (const collider of activeWorldColliders()) {
-      const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
-      context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-      context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
-    }
+  const layer = activeMinimapStaticLayer(width, height, bounds);
+  context.drawImage(layer.canvas, 0, 0);
+  if (selectedArena.id !== 'atomic-acres') {
     // Owner 2026-08-30: Domination zones on the minimap - a ringed letter at
     // each zone anchor, coloured by the owning squad, pulsing while contested.
     const dominationMinimap = dominationDisplayState();
@@ -27922,30 +28043,17 @@ function updateMinimap(now: number): void {
         context.fillText(zone.id, zoneX, zoneY + 0.5);
       }
     }
-    for (const cover of arena.physicalCover) {
-      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-      if (!kind) continue;
-      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-      drawMinimapLandmark(context, cover.id, kind, footprint);
-      const label = minimapLandmarkLabel(kind);
-      // HF-399 streamline: the same mapping the atomic-acres branch uses, so no
-      // arena reads back the live canvas matrix and allocates a DOMPoint per
-      // landmark per frame any more. Guarded by
-      // src/minimap-player-view-transform.test.ts.
-      const [labelX, labelY] = minimapPlayerViewPoint(
-        footprint.x + footprint.width / 2,
-        footprint.y + footprint.height / 2,
-        labelView,
-      );
-      landmarkLabels.push({ label, x: labelX, y: labelY - 10 });
-      renderedLandmarks.push({ id: cover.id, kind, label });
-    }
     for (const target of arena.targets) {
       const [x, y] = point(target.root.position.x, target.root.position.z);
       context.fillStyle = target.distanceBand === 'near' ? '#58e3dc' : target.distanceBand === 'mid' ? '#f4c44f' : '#ff765f';
       context.beginPath(); context.arc(x, y, target.active ? 5 : 2.5, 0, Math.PI * 2); context.fill();
     }
   }
+  const renderedLandmarks = layer.elements.map((element) => ({
+    id: element.id,
+    kind: element.className,
+    label: element.className.toUpperCase(),
+  }));
   minimapLandmarksRendered = renderedLandmarks;
   // HF-399 streamline: loop-invariant in both entity loops below (it reads only
   // `now` and `scoutSweepUntil`), and was being re-evaluated once per remote and
@@ -27980,20 +28088,6 @@ function updateMinimap(now: number): void {
     context.fillText('2×', 0, 1);
     context.restore();
     context.textBaseline = 'alphabetic';
-  }
-  context.restore();
-  context.save();
-  context.font = '900 15px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'bottom';
-  context.lineJoin = 'round';
-  context.lineWidth = 4;
-  context.strokeStyle = 'rgba(7, 15, 18, .94)';
-  context.fillStyle = '#fff1bd';
-  for (const label of landmarkLabels) {
-    if (label.x < 18 || label.x > width - 18 || label.y < 22 || label.y > height - 8) continue;
-    context.strokeText(label.label, label.x, label.y);
-    context.fillText(label.label, label.x, label.y);
   }
   context.restore();
   const px = width / 2;
@@ -28997,6 +29091,7 @@ function pollGamepad(dt: number): void {
     // only re-fires held automatics), so a pad shot never waits on pointer lock.
     if (padTriggerActive && frame.pressed('fire')) tryFire(now);
     if (possession?.kind === 'chopper-gunner' && frame.pressed('ads')) requestPossessedChopperMissile(now);
+    if (possession?.kind === 'piloted-drone' && frame.pressed('ads')) requestPossessedDroneTaser(now);
     if (pointSupportTargeting && !tacticalMapOpen) {
       if (frame.pressed('fire') || frame.pressed('interact')) confirmCrosshairSupportTarget(now);
       else if (frame.pressed('crouch')) cancelSupportTargeting(true);
@@ -29418,6 +29513,15 @@ canvas.addEventListener('mousedown', (event) => {
     mouseAdsHeld = false;
     adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
     requestPossessedChopperMissile(performance.now());
+    return;
+  }
+  // HF-458: the same right-click slot on the possessed Piloted Drone fires the
+  // taser instead of entering ADS, mirroring the Chopper's RMB missile.
+  if (event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
+    event.preventDefault();
+    mouseAdsHeld = false;
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
+    requestPossessedDroneTaser(performance.now());
     return;
   }
   if (event.button === 2) {
@@ -29963,6 +30067,7 @@ async function performArenaSelection(
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
     recentDeathPositions.length = 0;
+    recentSpawnUses.length = 0;
     lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
@@ -30088,6 +30193,7 @@ async function performArenaSelection(
       lastPlayerSpawnIndex = -1;
       lastPlayerSpawnAudit = null;
       recentDeathPositions.length = 0;
+      recentSpawnUses.length = 0;
       lastBotSpawnAudit.clear();
       respawn(false);
       setArenaMenuCamera();
@@ -32450,6 +32556,16 @@ const debugWindow = window as Window & {
     } | null;
     /** QA-only: exact RMB missile request for the locally possessed chopper. */
     firePossessedChopperMissile: () => boolean;
+    /** HF-458: right-click taser on the possessed Piloted Drone. */
+    firePossessedDroneTaser: () => boolean;
+    /** HF-458: taser stun counters for a headless killstreak run. */
+    taserTelemetry: () => {
+      stunsApplied: number;
+      localStunRemainingMs: number;
+      botsStunned: number;
+      host: ReturnType<TaserHostAuthority['telemetry']>;
+      victim: ReturnType<TaserVictimResultConsumer['telemetry']>;
+    };
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -34216,14 +34332,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }),
     botEscalation: {
       deaths: soloBotDeaths,
-      initialBots: selectedArena.soloBotCount,
+      initialBots: initialSoloBotCount(selectedArena),
       targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
       dormantBots: dormantBots.size,
       dormantBotsPrewarmed,
       dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
-      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+      nextReinforcementAt: bots.size < selectedArena.maximumSoloBots
         ? (Math.floor(soloBotDeaths / BOT_DEATHS_PER_REINFORCEMENT) + 1) * BOT_DEATHS_PER_REINFORCEMENT
         : null,
       lastEliminationProfile: { ...lastBotEliminationProfile },
@@ -35213,6 +35329,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     };
   },
   firePossessedChopperMissile: () => requestPossessedChopperMissile(),
+  // HF-458 QA: the taser's right-click, and the counters a headless run reads.
+  firePossessedDroneTaser: () => requestPossessedDroneTaser(),
+  taserTelemetry: () => ({
+    stunsApplied: taserStunsAppliedThisMatch,
+    localStunRemainingMs: Math.max(0, taserStunEndsAtHostTimeMs - currentHostTimeMs()),
+    botsStunned: botTaserStunUntilHostTimeMs.size,
+    host: taserHostAuthority.telemetry(),
+    victim: taserVictimConsumer.telemetry(),
+  }),
   aimPossessedChopperAtBot: (botId) => {
     // QA-only: the training-dummy variant is gun-range-only; this aims the
     // possessed autocannon at a live bot on ANY arena so possessed-fire
@@ -35638,7 +35763,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArenaReviewCamera: (cameraId) => {
     resetDebugChopperExteriorReviewTracker();
-    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId);
+    // PASS 94 CANDIDATE 4b: the installed definition first, then the AUTHORED
+    // one. A review station is source data, not GPU state, so its reachability
+    // must not be a fact about whether a deploy-time fence was met - see
+    // `findAuthoredArenaReviewCamera`. `false` now means the id is declared by
+    // no loaded arena at all, which is the only honest refusal.
+    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId)
+      ?? findAuthoredArenaReviewCamera(cameraId);
     if (!reviewCamera) return false;
     camera.position.set(...reviewCamera.position);
     camera.lookAt(...reviewCamera.target);

@@ -25,6 +25,7 @@ import {
   createGunRangeTestBayDoorState,
   gunRangeTestBayDoorDynamicColliders,
 } from './gun-range-test-bay';
+import { BALLISTIC_MATERIAL_CLASS, traceBallisticPath } from './ballistics';
 import type { ArenaMap } from './map';
 import { WEAPONS, movementProfile, type Stance } from './gameplay';
 import { EYE_CLEARANCE_RADIUS_M } from './camera-eye-clearance';
@@ -670,12 +671,18 @@ describe('additional authored maps', () => {
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Indoor Gun Range');
     const scoreRangeTargets = map.targets.filter((target) => target.kind !== 'training-dummy');
-    expect(scoreRangeTargets).toHaveLength(16);
-    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    // HF-467: 16 -> 18 and near 7 -> 9. The penetration lab gained a
+    // thin-metal and a structural-metal lane, and every lane carries one
+    // 50-point scored plate behind its panel, so the plate census moves with
+    // the lane census by construction rather than by remembering this literal.
+    const wallbangLanes = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
+    expect(scoreRangeTargets.filter((target) => target.scoreValue === 50)).toHaveLength(wallbangLanes.length);
+    expect(scoreRangeTargets).toHaveLength(18);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(9);
     expect(scoreRangeTargets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
     expect(scoreRangeTargets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
     expect(scoreRangeTargets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
+      50, 50, 50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
     expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
@@ -700,8 +707,48 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-wallbang-panel-glass')).toBeTruthy();
     const wallbangSurfaces = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
-    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
-    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
+    // HF-467: the lab gained a thin-metal and a structural-metal lane, so the
+    // two families the owner named ("metal and glass should be shot through")
+    // can be compared here. The assertion is written against the CLASS
+    // projection rather than a material literal, so a future lane is covered
+    // by the same rule that admits it instead of needing this list edited.
+    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual([
+      'glass', 'thin-metal', 'wood', 'interior-wall', 'structural-metal', 'brick',
+    ]);
+    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.06, 0.24, 0.42, 0.18, 0.7]);
+    // Every class the material table defines must have a lane, so the lab
+    // cannot silently stop representing one of the owner's four behaviours.
+    expect(new Set(wallbangSurfaces.map((surface) => BALLISTIC_MATERIAL_CLASS[surface.material])))
+      .toEqual(new Set(['shatter', 'perforate', 'penetrate', 'stop']));
+    // Lanes must not overlap: 1.5 m panels on a 1.6 m pitch, inside the lab's
+    // own side walls (inner faces -18.36 and -8.64).
+    const laneEdges = wallbangSurfaces.map((surface) => [surface.bounds.minX, surface.bounds.maxX] as const);
+    for (let i = 1; i < laneEdges.length; i += 1) {
+      expect(laneEdges[i]![0], 'wallbang lanes must not overlap').toBeGreaterThan(laneEdges[i - 1]![1]);
+    }
+    expect(Math.min(...laneEdges.map(([minX]) => minX))).toBeGreaterThan(-18.36);
+    expect(Math.max(...laneEdges.map(([, maxX]) => maxX))).toBeLessThan(-8.64);
+    // The lab's contract, stated against the SHIPPED budgets rather than an
+    // assumption: a sidearm crosses every penetrable lane and is stopped by
+    // the one `stop` lane, while a sniper crosses all six. Note that this is
+    // NOT "no firearm crosses brick" - a 0.7 m brick lane costs 5.2 and the
+    // sniper carries 10.90, so a rifle wallbang through it is intended and is
+    // exactly what the far end of this lab is for.
+    const fire = (surface: (typeof wallbangSurfaces)[number], profile: typeof WEAPONS['pistol']['penetration']) => {
+      const midX = (surface.bounds.minX + surface.bounds.maxX) / 2;
+      return traceBallisticPath({ x: midX, y: 1.45, z: -5 }, { x: 0, y: 0, z: -1 }, 8, profile, [surface]);
+    };
+    for (const surface of wallbangSurfaces) {
+      const shouldCross = BALLISTIC_MATERIAL_CLASS[surface.material] !== 'stop';
+      expect(
+        fire(surface, WEAPONS.pistol.penetration).impacts[0]?.penetrated ?? false,
+        `${surface.name}: pistol expected ${shouldCross ? 'to cross' : 'to be stopped'}`,
+      ).toBe(shouldCross);
+      expect(
+        fire(surface, WEAPONS.sniper.penetration).impacts[0]?.penetrated ?? false,
+        `${surface.name}: the sniper must cross every lane in the lab`,
+      ).toBe(true);
+    }
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
@@ -1115,7 +1162,14 @@ describe('additional authored maps', () => {
   it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     for (const team of [0, 1] as const) {
-      expect(map.spawns[team]).toHaveLength(6);
+      // PASS 94 (HF-456): Skyline gained a seventh and eighth authored point per
+      // team when the spawn-distribution lane widened every arena's tables. The
+      // count pin is raised to the new authored reality rather than relaxed into
+      // a floor - src/spawn-layout-quality.test.ts owns the >= 8 floor, and this
+      // stays the exact-count tripwire that notices a table changing size at
+      // all. Every clearance, bounds and 6 m separation check below still runs
+      // over the whole table, so the two new points are proved, not waved past.
+      expect(map.spawns[team]).toHaveLength(8);
       for (const spawn of map.spawns[team]) {
         expect(pointInsideBounds(spawn, map.bounds, 0.5)).toBe(true);
         expect(isBlocked(spawn, map.colliders, 0.44), `${team}:${spawn.toArray().join(',')}`).toBe(false);

@@ -563,6 +563,7 @@ const snapshot = (
     gunController: index === 0 ? 'ai' : null,
     missileAmmo: index === 0 ? 6 : null,
     missileCooldownMs: index === 0 ? 0 : null,
+    taserCharges: null,
     captureActorId: null,
     captureProgress: null,
     revealedReward: null,

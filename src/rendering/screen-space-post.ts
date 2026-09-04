@@ -53,6 +53,11 @@ import {
 } from './raytracing/raytraced-light-node';
 import { publishBakedIndirectReceipt } from './lighting/baked-indirect-node';
 import {
+  AERIAL_PERSPECTIVE_STAGE,
+  buildAerialPerspectiveNode,
+  type AerialPerspectiveGraph,
+} from './atmosphere/aerial-perspective';
+import {
   buildBakedIndirectRuntime,
   type BakedIndirectRuntime,
 } from './lighting/baked-indirect-runtime';
@@ -63,6 +68,7 @@ export const BAKED_INDIRECT_STAGE = 'baked-indirect-probe-add';
 export const SSGI_STAGE = 'ssgi-screen-space-bounce-add';
 export const SSR_STAGE = 'ssr-screen-space-reflection-add';
 export const GODRAYS_STAGE = 'godrays-volumetric-shaft-add';
+export { AERIAL_PERSPECTIVE_STAGE };
 export const DEPTH_OF_FIELD_STAGE = 'depth-of-field-bokeh';
 
 /** The subset of the upstream `GodraysNode` surface this module drives. */
@@ -161,6 +167,7 @@ export function screenSpacePostStages(runtime: ScreenSpacePostRuntime): readonly
   if (runtime.globalIllumination.enabled) stages.push(SSGI_STAGE);
   if (runtime.reflections.enabled) stages.push(SSR_STAGE);
   if (runtime.rayTracing.enabled) stages.push(RAY_TRACED_LIGHT_STAGE);
+  if (runtime.aerialPerspective.gain > 0) stages.push(AERIAL_PERSPECTIVE_STAGE);
   if (runtime.godrays.enabled) stages.push(GODRAYS_STAGE);
   if (runtime.depthOfField.enabled) stages.push(DEPTH_OF_FIELD_STAGE);
   return Object.freeze(stages);
@@ -246,6 +253,20 @@ export type ScreenSpacePostGraph = Readonly<{
   bounceLight: Node<'vec3'> | null;
   /** Additive linear-HDR reflected light from SSR, or null. */
   reflectionLight: Node<'vec3'> | null;
+  /**
+   * HF-481 — additive linear-HDR aerial-perspective inscatter, or null on the
+   * compatibility route. Unlike every other term here it is never arena-scoped
+   * and never capability-gated: it needs no shadow map, no normal attachment
+   * and no second target, only the scene pass's own view-Z.
+   */
+  atmosphereLight: Node<'vec3'> | null;
+  /**
+   * HF-481 — the current haze colour and exposure-referred sun white. Called
+   * on arena commits and lighting epochs; the closure-owned values are copied
+   * in place, while the per-frame refresh of camera and sun happens in
+   * `beforeRender`.
+   */
+  setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   /**
    * Additive linear-HDR shaft light from the godrays raymarch, or null when the
    * stage is not built. Re-read after every `refreshShaftStage` that returns
@@ -417,6 +438,38 @@ export function buildScreenSpacePostGraph(
     stages.push(SSR_STAGE);
   }
 
+  // --- aerial perspective (HF-481) -----------------------------------------
+  // The atmosphere between the camera and whatever it is looking at, as the
+  // INSCATTERING half of the transmittance equation and only that half.
+  //
+  // It composites AFTER the contact-occlusion multiply, with the reflections
+  // and the shafts, and for exactly the reason the shaft comment gives: haze is
+  // volume in FRONT of the surface, not on it. Air between the camera and a
+  // shadowed wall is lit whether or not the wall is, so letting GTAO darken it
+  // would be a second occlusion of something that was never occluded. It goes
+  // in BEFORE the bloom add, because a bright hazy far field really does bloom.
+  //
+  // No render target, no second pass, no MRT read: it is arithmetic over the
+  // view-Z the scene pass already publishes, so its whole cost is instructions
+  // in the composite shader.
+  let aerialPerspective: AerialPerspectiveGraph | null = null;
+  // The arena tells the graph what its sky is and what its exposure calls
+  // white. FAIL-CLOSED until it does: the node's two radiance uniforms are
+  // built black, and `update()` is not called before the first
+  // `setAtmosphere`, so a menu frame or an arena that never commits gets an
+  // inscatter of exactly zero rather than a white flash of unattributed haze.
+  const atmosphereSkyColor = new THREE.Color(0, 0, 0);
+  let atmosphereSunWhite = 1;
+  let atmosphereReady = false;
+  if (runtime.aerialPerspective.gain > 0) {
+    aerialPerspective = buildAerialPerspectiveNode({
+      sceneViewZ: sources.sceneViewZ as unknown as Node<'float'>,
+      camera: sources.camera,
+      sun: sources.volumetricLight as THREE.DirectionalLight | null,
+    }, runtime.aerialPerspective);
+    stages.push(AERIAL_PERSPECTIVE_STAGE);
+  }
+
   // --- classic recursive ray tracing (HF-398) ------------------------------
   // Genuine Whitted-style tracing against the arena's analytic proxy set: real
   // world-space intersection, real reflection and refraction rays, and real
@@ -538,6 +591,12 @@ export function buildScreenSpacePostGraph(
     sceneColor,
     bounceLight,
     reflectionLight,
+    atmosphereLight: aerialPerspective?.light ?? null,
+    setAtmosphere(skyColor: THREE.Color, sunWhite: number): void {
+      atmosphereSkyColor.copy(skyColor);
+      atmosphereSunWhite = Math.max(1e-3, sunWhite);
+      atmosphereReady = true;
+    },
     shaftLight: () => shaftLight,
     shaftStage: () => Object.freeze({
       built: godraysNode !== null,
@@ -637,6 +696,13 @@ export function buildScreenSpacePostGraph(
       rayTracedGraph?.applyTuning(next.rayTracing);
     },
     beforeRender(): void {
+      // HF-481. The camera moves every frame and the sun moves with the arena's
+      // time of day, so the inscatter's direction and radiance are refreshed
+      // here rather than captured at build time. `sunWhite` is the arena's
+      // exposure-referred white: dividing by it is what keeps the Mie term
+      // inside the 0..1 band the combat ceiling is stated in, whatever
+      // intensity the arena authored.
+      if (atmosphereReady) aerialPerspective?.update(atmosphereSkyColor, atmosphereSunWhite);
       rayTracedGraph?.beforeRender();
       // Advances the arena's bake by at most a few milliseconds and republishes
       // the receipt, so what a headless check reads is what the frame just used

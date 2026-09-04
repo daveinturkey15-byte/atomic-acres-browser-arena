@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildNuketown2, NUKETOWN2_YARD_STAIR } from './nuketown2-arena';
+import { buildNuketown2, NUKETOWN2_CARRIAGEWAY_FOOTPRINTS, NUKETOWN2_YARD_STAIR } from './nuketown2-arena';
 import {
   NUKETOWN2_HOUSE_CENTRE_X,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_WIDTH,
   NUKETOWN2_UPPER_Y0,
+  isNuketown2BayFootprint,
+  nuketown2HandedSpan,
+  nuketown2HandedX,
 } from './nuketown2-layout';
 import {
   NUKETOWN2_EXTERIOR_STAIR,
@@ -154,5 +157,95 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
     expect(rampMeshes).toHaveLength(2);
     expect(rampMeshes.every((mesh) => mesh.userData.collisionOnly === true)).toBe(true);
     expect(map.shotSurfaces.filter((surface) => surface.name.includes('exterior stair'))).toHaveLength(6);
+  });
+
+  // ---- GEOMETRY-2 MERGE RECONCILIATION -------------------------------------
+  // Four lanes authored `nuketown2-arena.ts` against each other's absence. The
+  // three properties below only exist where two of them MEET, so no single lane
+  // could have gated them and none of them is implied by the lane tests above.
+  it('reconciles the merged lanes: paved cuts are disjoint, roofs stay ghosts, the standoff holds', () => {
+    const map = build();
+
+    // (1) THE PAVED CUTS DO NOT OVERLAP. The turning-head lane cut a circular
+    //     bulb, the layout lane cut roadside bays and the accuracy lane cut the
+    //     third house's drive - three separate paved cuts authored in three
+    //     branches. Two paved cuts sharing plan area are a coplanar race AND a
+    //     double ground cut, and the grass keep-out then fires twice on one
+    //     patch and not at all on another. The disc is tested with the SAME
+    //     nearest-point predicate the ground cut and the coplanar instrument
+    //     use, so all three agree on where the road is.
+    const head = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.find((piece) => piece.id === 'turning-head');
+    expect(head, 'the authored turning-head footprint').toBeDefined();
+    expect(head!.shape, 'the head is a disc, not its bounding square').toBe('circle');
+    if (head!.shape !== 'circle') throw new Error('turning-head footprint lost its circle shape');
+    const discCentreX = nuketown2HandedX(head!.centreX);
+
+    const worldBays = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS
+      .filter(isNuketown2BayFootprint)
+      .map((bay) => {
+        const [x0, x1] = nuketown2HandedSpan(bay.x0, bay.x1);
+        return { id: bay.id, x0, x1, z0: bay.z0, z1: bay.z1 };
+      });
+    expect(worldBays.length, 'the bays are still authored').toBeGreaterThan(0);
+
+    const driveMesh = map.root.getObjectByName('nuketown2 beyond-bounds third house drive');
+    expect(driveMesh, 'the third house keeps its drive').toBeDefined();
+    const driveBox = new THREE.Box3().setFromObject(driveMesh!);
+    const drive = { id: 'third house drive', x0: driveBox.min.x, x1: driveBox.max.x, z0: driveBox.min.z, z1: driveBox.max.z };
+
+    const discOverlapsRect = (rect: { x0: number; x1: number; z0: number; z1: number }): boolean => {
+      const nearestX = Math.max(rect.x0, Math.min(discCentreX, rect.x1));
+      const nearestZ = Math.max(rect.z0, Math.min(head!.centreZ, rect.z1));
+      return (nearestX - discCentreX) ** 2 + (nearestZ - head!.centreZ) ** 2 < head!.radius ** 2;
+    };
+    for (const rect of [...worldBays, drive]) {
+      expect(discOverlapsRect(rect), `the bulb disc laps ${rect.id}`).toBe(false);
+    }
+    for (const bay of worldBays) {
+      const overlap = Math.max(0, Math.min(bay.x1, drive.x1) - Math.max(bay.x0, drive.x0))
+        * Math.max(0, Math.min(bay.z1, drive.z1) - Math.max(bay.z0, drive.z0));
+      expect(overlap, `${bay.id} laps the third house drive`).toBe(0);
+    }
+
+    // (2) THE RAKE PLANES ARE STILL BALLISTIC GHOSTS OVER THE DECK AND BALCONY.
+    //     `collider-visual-parity-core` direction C has NO above-reach
+    //     exclusion, so a 1.16 m rake at y 6.5+ is unexplainable unless it is
+    //     rated directly. It is rated by NAME - `classifyImpactSurface` reads
+    //     the name first - so a rename is the failure mode this pins, and a
+    //     later lane adding a collider to a roof skin is the other.
+    for (const rake of NUKETOWN2_ROOF_BODY_TABLE.filter((body) => body.kind === 'rake')) {
+      expect(rake.solid, `${rake.name} must not be solid`).toBe(false);
+      expect(rake.shots, `${rake.name} must stay shot-rated`).toBe(true);
+      expect(rake.name.includes('roof'), `${rake.name} must classify as roof by name`).toBe(true);
+    }
+    const rakeSurfaces = map.shotSurfaces.filter((surface) => surface.name.includes('rake'));
+    expect(rakeSurfaces, "both houses keep their rakes on the shot roster").toHaveLength(2);
+
+    // (3) THE 1.2 m SPAWN STANDOFF SURVIVES THE NEW CARPENTRY. The rooflines
+    //     lane put stringers, a handrail and rail posts at z = -24.35 / -24.4,
+    //     which is 0.6-0.65 m from the |z| = 25 spawn line - INSIDE the 1.2 m
+    //     floor. They are legal only because they add no collider, exactly as
+    //     the two balcony corner posts in HF-477 were not. Stated as the
+    //     conditional it actually is, so a later lane that makes one solid to
+    //     "fix" a walk probe fails here instead of at spawn time.
+    const SPAWN_LINE_Z = 25;
+    const STANDOFF_M = 1.2;
+    const stairBodies = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && node.userData.nuketown2ExteriorStairBody === true
+    ));
+    expect(stairBodies.length, 'the merged carpentry is present').toBeGreaterThan(0);
+    let insideStandoff = 0;
+    for (const mesh of stairBodies) {
+      const box = new THREE.Box3().setFromObject(mesh);
+      const nearestToLine = Math.min(
+        SPAWN_LINE_Z - Math.abs(box.min.z),
+        SPAWN_LINE_Z - Math.abs(box.max.z),
+      );
+      if (nearestToLine >= STANDOFF_M) continue;
+      insideStandoff += 1;
+      expect(mesh.userData.nuketown2ExteriorStairSolid,
+        `${mesh.name} stands ${nearestToLine.toFixed(2)} m from the spawn line and must not be solid`).toBe(false);
+    }
+    expect(insideStandoff, 'the flight really does reach inside the standoff band').toBeGreaterThan(0);
   });
 });

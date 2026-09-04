@@ -7,6 +7,7 @@ import {
   arenaSelection,
   decodeArenaId,
   hostedArenaDurationMs,
+  initialSoloBotCount,
   isArenaId,
   soloLaunchLabel,
   SELECTABLE_ARENAS,
@@ -240,18 +241,82 @@ describe('opening arena selection', () => {
     });
   });
 
-  it('bounds Atomic ten-defeat reinforcements and never reinforces sibling modes', () => {
+  // HF-491 (owner, 2026-09-04, after playing Solo on the Nuke Town rebuild:
+  // "the bots not in there"). This assertion used to read "and never reinforces
+  // sibling modes", and it was true only because `activeSoloBotTarget` tested
+  // for the arena id `atomic-acres` - which HF-466 had already made
+  // unselectable, so the ladder was dead code for every arena the owner could
+  // pick. The ladder is now the rule for EVERY arena, bounded by that arena's
+  // own declared `maximumSoloBots`. Nothing here was deleted: the arenas that
+  // must not reinforce are still pinned to their exact counts below, and they
+  // hold because their catalog row declares max === start, not because the
+  // function knows their names.
+  it('runs the ten-defeat ladder on every arena, bounded by that arena own declared maximum', () => {
     const atomic = arenaSelection('atomic-acres');
     expect([0, 9, 10, 19, 20, 29, 30, 39, 40, 100].map((deaths) => activeSoloBotTarget(atomic, deaths)))
       .toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 6]);
+    // Arenas whose catalog row declares max === start cannot escalate, at any
+    // score. This is the fairness/safety half of the old assertion, kept whole.
     expect(activeSoloBotTarget(arenaSelection('rustworks-1v1'), 100)).toBe(1);
     expect(activeSoloBotTarget(arenaSelection('gun-range'), 100)).toBe(0);
-    expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 100)).toBe(1);
+    expect(activeSoloBotTarget(arenaSelection('map3'), 100)).toBe(0);
     expect(activeSoloBotTarget(arenaSelection('farcrysis'), 100)).toBe(2); // HF-359
     expect(activeSoloBotTarget(arenaSelection('high-seas'), 100)).toBe(2);
     // owner 2026-08-30: Test1/Test2 arenas added.
     expect(activeSoloBotTarget(arenaSelection('test1'), 100)).toBe(2);
     expect(activeSoloBotTarget(arenaSelection('test2'), 100)).toBe(2);
+    expect(activeSoloBotTarget(arenaSelection('raid2'), 100)).toBe(2);
+    // Terminal declares maximumSoloBots 6 like Atomic. Under the old id test it
+    // sat at one bot forever regardless of that declaration; it now honours it.
+    expect([0, 9, 10, 50, 100].map((deaths) => activeSoloBotTarget(arenaSelection('skyline-terminal'), deaths)))
+      .toEqual([1, 1, 2, 6, 6]);
+  });
+
+  // HF-491. nuketown2 is the arena the owner played, and the first arena to
+  // declare `initialSoloBots`. Four to open (the original is a 6v6 map, and one
+  // opponent on an 84 m street reads as an empty arena), then the same shared
+  // ladder to its declared six.
+  it('opens Nuke Town Rebuild on its declared four bots and ladders to six', () => {
+    const rebuild = arenaSelection('nuketown2');
+    expect(rebuild.initialSoloBots).toBe(4);
+    expect(initialSoloBotCount(rebuild)).toBe(4);
+    expect(activeSoloBotTarget(rebuild, 0)).toBe(4);
+    expect([0, 9, 10, 19, 20, 30, 100].map((deaths) => activeSoloBotTarget(rebuild, deaths)))
+      .toEqual([4, 4, 5, 5, 6, 6, 6]);
+    // The card states the count the match opens with, not the Pass 66 default.
+    expect(soloLaunchLabel(rebuild)).toBe('4 BOTS SKIRMISH');
+    expect(rebuild.rulesLabel).toContain('4 BOTS SOLO');
+  });
+
+  // HF-491. The default is the contract, and it is still the default: an arena
+  // that declares no starting count opens on Pass 66's exactly-one bot.
+  it('keeps the Pass 66 one-bot start for every arena that declares no initialSoloBots', () => {
+    const undeclared = ARENA_SELECTIONS.filter((entry) => entry.initialSoloBots === undefined);
+    expect(undeclared.map((entry) => entry.id)).not.toContain('nuketown2');
+    expect(undeclared.length).toBe(ARENA_SELECTIONS.length - 1);
+    for (const entry of undeclared) {
+      expect(initialSoloBotCount(entry)).toBe(entry.soloBotCount);
+      expect(activeSoloBotTarget(entry, 0)).toBe(entry.soloBotCount);
+    }
+    expect(initialSoloBotCount(arenaSelection('skyline-terminal'))).toBe(1);
+    expect(activeSoloBotTarget(arenaSelection('skyline-terminal'), 0)).toBe(1);
+  });
+
+  // HF-491. The clamp, not the caller, is what keeps a declaration honest: no
+  // arena may open above, or ladder past, the population its spawn table and
+  // per-bot frame budget were sized for.
+  it('never lets any arena start above or escalate past its declared maximum', () => {
+    for (const entry of ARENA_SELECTIONS) {
+      expect(initialSoloBotCount(entry)).toBeLessThanOrEqual(entry.maximumSoloBots);
+      expect(initialSoloBotCount(entry)).toBeGreaterThanOrEqual(0);
+      for (const deaths of [0, 1, 9, 10, 25, 100, 10_000]) {
+        const target = activeSoloBotTarget(entry, deaths);
+        expect(target).toBeLessThanOrEqual(entry.maximumSoloBots);
+        expect(target).toBeGreaterThanOrEqual(initialSoloBotCount(entry));
+      }
+      // Monotone in defeats: reinforcements arrive, they never retreat.
+      expect(activeSoloBotTarget(entry, 100)).toBeGreaterThanOrEqual(activeSoloBotTarget(entry, 0));
+    }
   });
 
   it('derives the solo launch label from the canonical arena catalog', () => {
@@ -271,8 +336,12 @@ describe('opening arena selection', () => {
       // the Gun Range was the only bot-less arena and the wrong words for the
       // second one.
       'START EXPLORING',
-      // NUKETOWN2 (HF-407): SOLO_BOT_COUNT, same as the shipped Nuke Town.
-      '1 BOT SKIRMISH',
+      // NUKETOWN2 (HF-407), then HF-491 (owner, 2026-09-04): the card states the
+      // count the match opens with. This arena declares `initialSoloBots: 4`
+      // because the original is a 6v6 map and one bot on this street reads as
+      // an empty arena; every other row here declares nothing and keeps the
+      // Pass 66 default.
+      '4 BOTS SKIRMISH',
       // RAID2 (HF-408): soloBotCount 2.
       '2 BOTS SKIRMISH',
     ]);

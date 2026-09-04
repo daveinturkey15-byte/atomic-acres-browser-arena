@@ -1286,10 +1286,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14],
+        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14], [23, 24], [-25, 23],
       ],
       [
-        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14],
+        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14], [23, -24], [-23, -24],
       ],
     ),
     patrolPoints: [
@@ -2292,25 +2292,51 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   lateralRangeTarget(builder, targets, 'lateral-cyan', -6.2, -29, 0, 0x56e7df);
   lateralRangeTarget(builder, targets, 'lateral-amber', 6.2, -29, Math.PI, 0xffb347);
 
-  // Subtle live wall-penetration lab: four isolated lanes use explicit material
-  // and thickness contracts, with a scored plate behind every panel.
+  // Subtle live wall-penetration lab: isolated lanes with explicit material and
+  // thickness contracts, and a scored plate behind every panel.
+  //
+  // HF-467, owner after PASS 93: "metal and glass should be shot through ...
+  // thin metal (the shed) should get a hole with no collision after". The lab
+  // shipped four lanes - glass, wood, plaster, brick - and no METAL of either
+  // kind, so the two families the owner named could not be compared here at
+  // all: the only sheet metal in the game was on a destructible shed in a back
+  // yard, and the only structural steel was the lab's own side walls. The two
+  // new lanes make the range the one place a human, or a headless probe, can
+  // shoot every material class side by side at a known thickness.
+  //
+  // Lane x positions are DERIVED from the lane count so a seventh lane cannot
+  // be added on top of a sixth: the row is centred on the lab and the panels
+  // narrowed from 2.05 m to 1.50 m so six fit between the lab's side walls
+  // (inner faces -18.36 and -8.64) instead of four.
   const wallbangGlass = new THREE.MeshStandardMaterial({ color: 0x8ccbd2, transparent: true, opacity: 0.34, roughness: 0.16, metalness: 0.04 });
+  const WALLBANG_LAB_CENTRE_X = -13.5;
+  const WALLBANG_LANE_SPACING = 1.6;
+  const WALLBANG_PANEL_WIDTH = 1.5;
+  // Ordered by BALLISTIC_MATERIAL_CLASS: shatter, perforate, then the three
+  // penetrate families, then stop. Shooting left to right walks the owner's
+  // sentence in order.
   const wallbangPanels = [
-    { x: -17.1, label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
-    { x: -14.7, label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
-    { x: -12.3, label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
-    { x: -9.9, label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
+    { label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
+    { label: 'THIN METAL 6 CM', material: 'thin-metal' as const, thickness: 0.06, render: standard(0x9aa4ad, 0.42, 0.78) },
+    { label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
+    { label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
+    { label: 'STEEL 18 CM', material: 'structural-metal' as const, thickness: 0.18, render: standard(0x5c646b, 0.55, 0.86) },
+    { label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
   ];
+  const wallbangLaneX = (index: number) => (
+    WALLBANG_LAB_CENTRE_X + (index - (wallbangPanels.length - 1) / 2) * WALLBANG_LANE_SPACING
+  );
   for (const [index, panel] of wallbangPanels.entries()) {
-    box(builder, `gun-range-wallbang-panel-${panel.material}`, [panel.x, 1.45, -7.6], [2.05, 2.9, panel.thickness], panel.render, {
+    const x = wallbangLaneX(index);
+    box(builder, `gun-range-wallbang-panel-${panel.material}`, [x, 1.45, -7.6], [WALLBANG_PANEL_WIDTH, 2.9, panel.thickness], panel.render, {
       solid: false,
       shots: true,
       ballisticMaterial: panel.material,
     });
-    rangeTarget(builder, targets, `wallbang-${panel.material}`, panel.x, -12.4, 50, 'near');
-    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.05, 0.55]);
+    rangeTarget(builder, targets, `wallbang-${panel.material}`, x, -12.4, 50, 'near');
+    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [WALLBANG_PANEL_WIDTH, 0.55]);
     if (label) {
-      label.position.set(panel.x, 3.35, -7.5);
+      label.position.set(x, 3.35, -7.5);
       root.add(label);
     }
   }
@@ -2396,8 +2422,8 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
       // six-player FFA every player drew from the same three spots and could
       // spawn on top of each other. Widened to six points across the firing
       // line's full width, and the second list offset so the two never collide.
-      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5]],
-      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5]],
+      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5], [-4, 16.5], [4, 16.5]],
+      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5], [-4, 8.5], [4, 8.5]],
     ),
     patrolPoints: [],
     targets,
@@ -3953,10 +3979,19 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14],
+        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14], [-12, -14], [12, -14],
       ],
+      // PASS 94 integration: the spawn-distribution lane (HF-456) added the
+      // seventh and eighth point at x = -12 and 12, which sat 4.00 m from the
+      // authored -18/-6 and 6/18 - inside src/additional-maps.test.ts' 6 m
+      // Skyline separation floor, which is stricter than the 3 m repo-wide one.
+      // The eight points are RE-SPACED along the same line rather than the
+      // floor being lowered: -24/-16/-10/-4/4/10/16/24 gives gaps of
+      // 8/6/6/8/6/6/8 m, every one at or over 6, with the same span and the
+      // same eight points the lane asked for. Team 0's line already cleared it
+      // (9/6/6/12/6/6/9) and is untouched.
       [
-        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30],
+        [-24, 30], [-16, 30], [-10, 30], [-4, 30], [4, 30], [10, 30], [16, 30], [24, 30],
       ],
     ),
     patrolPoints: [

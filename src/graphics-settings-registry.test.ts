@@ -294,6 +294,7 @@ describe('Advanced Graphics canonical registry', () => {
         // shipped presets' baked composite never reached the envelope assert.
         bakedIndirect: preset.bakedIndirect,
         volumetricLightShafts: preset.volumetricLightShafts,
+        volumetricQuality: 'high',
         screenSpaceReflections: preset.screenSpaceReflections,
         screenSpaceGi: preset.screenSpaceGi,
         depthOfField: preset.depthOfField,
@@ -321,6 +322,7 @@ describe('Advanced Graphics canonical registry', () => {
     const maxRuntime = resolveScreenSpacePostRuntime({
       bakedIndirect: 'off',
       volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
+      volumetricQuality: 'high',
       depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
       depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,
       motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',

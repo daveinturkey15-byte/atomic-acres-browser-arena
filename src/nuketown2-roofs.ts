@@ -290,11 +290,34 @@ export function buildNuketown2ExteriorStairs(builder: Builder, materials: Nuketo
     [stair.railPostSize, stair.railPostHeight, stair.railPostSize], materials.timber,
     { solid: false, shots: false });
 
+  // GEOMETRY-2 MERGE (HF-497 x the rooflines carpentry). The two lanes were
+  // authored against each other's absence, and their intersection is a real
+  // finding the strengthened checker caught the moment they met: every closed
+  // riser's TOP face sits at exactly its tread's top (`treadTop`), in the same
+  // `timber` material, overlapping the tread's back edge by
+  // `riserDepth/2 x (width - 0.2)` = 0.03 m2 — over the 0.02 m2 race floor, and
+  // on a surface the player walks with their eyes 1 m from it. 32 bodies, 16 per
+  // flight, both flights: the single largest same-material race on the map.
+  //
+  // Fixed the way HF-497 fixes the other three, and for the same reason: the
+  // SMALLER body (riser plan area 0.06 m2 vs tread 0.37 m2) takes the arena's
+  // -1 decal tier on its own cloned material, so its top wins the shared plane
+  // deterministically on both backends. Geometry is untouched — the rooflines
+  // lane's 17/16 envelope, `YARD_STAIR_RUN`, the patio centre and the |z| = 25
+  // spawn standoff all stay bit-identical — and `materials.timber` itself stays
+  // clean for the stringers, handrail and posts. Same paint, same geometry;
+  // only the depth tie-break moved.
+  const riserMaterial = materials.timber.clone();
+  riserMaterial.name = 'nuketown2-exterior-stair-riser';
+  riserMaterial.polygonOffset = true;
+  riserMaterial.polygonOffsetFactor = -1;
+  riserMaterial.polygonOffsetUnits = -1;
+
   for (let index = 0; index < stair.treadCount; index += 1) {
     const treadTop = stair.totalRise - stair.rise * (index + 1);
     pairedStairBox(builder, `exterior stair closed riser ${index}`,
       [stair.topX - stair.going * (index + 1), treadTop - stair.rise / 2, stair.centreZ],
-      [stair.riserDepth, stair.rise, stair.width - 0.2], materials.timber,
+      [stair.riserDepth, stair.rise, stair.width - 0.2], riserMaterial,
       { solid: false, shots: false });
     pairedStairBox(builder, `exterior stair tread ${index}`,
       [stair.topX - stair.going * (index + 0.5), treadTop - stair.treadHeight / 2, stair.centreZ],

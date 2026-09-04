@@ -36,8 +36,10 @@ import {
 } from './animation-blend-graph';
 import {
   solveLocomotion,
+  type LocomotionPlaybackLimits,
   type LocomotionSolution,
 } from './animation-locomotion';
+import type { OperatorPostureOutput } from './operator-posture-layer';
 import {
   advanceHitReaction,
   createHitReactionState,
@@ -110,6 +112,21 @@ export type OperatorAnimationInput = Readonly<{
   armed?: boolean;
   /** Clip names the mixer has bound. Nothing outside this set is ever emitted. */
   availableClips: readonly string[];
+  /**
+   * PASS 94. The posture layer's output for this operator this frame, from
+   * `operator-posture-layer.ts`. Optional, and omitting it reproduces the
+   * pre-PASS-94 behaviour exactly: clip selection on the raw ground speed, no
+   * cadence correction, full aim authority.
+   *
+   * When present it does three things and nothing else:
+   *   - clip selection sees the speed the POSTURE can honestly show, so a prone
+   *     operator never selects a full run;
+   *   - every emitted `timeScale` is multiplied by the posture's cadence scale
+   *     and re-clamped to the profile's playback limits, which is what stops a
+   *     crouch-walk skating on a standing stride;
+   *   - the additive aim pitch is scaled by what the posture can reach.
+   */
+  stance?: OperatorPostureOutput | null;
 }>;
 
 export type OperatorAnimationLayer = Readonly<{ clip: string; weight: number; timeScale: number }>;
@@ -132,6 +149,8 @@ export type OperatorAnimationOutput = Readonly<{
   posture: OperatorPostureBias;
   hitReaction: HitReactionOutput;
   locomotion: LocomotionSolution;
+  /** The posture layer this frame was solved against, or null when none was supplied. */
+  stance: OperatorPostureOutput | null;
 }>;
 
 export type OperatorAnimationDirector = {
@@ -272,6 +291,29 @@ const ONE_SHOT_CLIPS: Readonly<Record<OperatorOneShotKind, readonly string[]>> =
 
 const HIT_CLIPS = Object.freeze(['HitRecieve', 'HitRecieve_2'] as const);
 
+/**
+ * PASS 94. Re-times the emitted base layers for the posture.
+ *
+ * A shorter stride covers less ground per cycle, so the same ground speed needs
+ * a faster cycle to keep the planted foot planted. The result is re-clamped to
+ * the SAME playback limits `animation-locomotion.ts` already enforces - the
+ * bounds exist because a walk below 0.55x reads as slow motion and above 1.75x
+ * the legs blur, and a posture correction is not a reason to leave that window.
+ * Weights are untouched, so the base still sums to exactly 1.
+ */
+function applyCadence(
+  layers: readonly OperatorAnimationLayer[],
+  stance: OperatorPostureOutput | null,
+  limits: LocomotionPlaybackLimits,
+): readonly OperatorAnimationLayer[] {
+  if (stance === null || !(stance.cadenceScale > 1)) return layers;
+  return Object.freeze(layers.map((layer) => Object.freeze({
+    clip: layer.clip,
+    weight: layer.weight,
+    timeScale: Math.min(limits.maximum, Math.max(limits.minimum, layer.timeScale * stance.cadenceScale)),
+  })));
+}
+
 export function advanceOperatorAnimation(
   director: OperatorAnimationDirector,
   input: OperatorAnimationInput,
@@ -282,9 +324,18 @@ export function advanceOperatorAnimation(
   const available = new Set(input.availableClips);
   const idleClip = selectIdleClip(director, input.availableClips);
 
+  const stance = input.stance ?? null;
+  // Clip selection sees the speed the posture can show. The direction is
+  // untouched: a crouched operator strafing still picks the lateral run, it just
+  // picks it at a speed a crouch can reach.
+  const rawSpeed = Math.hypot(finiteOr(input.forwardMps, 0), finiteOr(input.strafeMps, 0));
+  const selectionScale = stance !== null && rawSpeed > 1e-4
+    ? Math.min(1, stance.clipSelectionSpeedMps / rawSpeed)
+    : 1;
+
   const locomotion = solveLocomotion({
-    forwardMps: input.forwardMps,
-    strafeMps: input.strafeMps,
+    forwardMps: finiteOr(input.forwardMps, 0) * selectionScale,
+    strafeMps: finiteOr(input.strafeMps, 0) * selectionScale,
     availableClips: input.availableClips,
     armed: input.armed,
     playbackLimits: director.profile.locomotionPlaybackLimits,
@@ -292,7 +343,7 @@ export function advanceOperatorAnimation(
 
   const aim = advanceAdditivePose(director.pose, {
     deltaSeconds,
-    desiredAimPitchRadians: input.aimPitchRadians,
+    desiredAimPitchRadians: input.aimPitchRadians * (stance?.aimPitchScale ?? 1),
     yawErrorRadians: input.yawErrorRadians,
     strafeMps: input.strafeMps,
     groundSpeedMps: locomotion.groundSpeedMps,
@@ -309,10 +360,10 @@ export function advanceOperatorAnimation(
   }
   const graphLayers = deltaSeconds > 0 ? advanceBlendGraph(director.graph, deltaSeconds) : blendGraphLayers(director.graph);
 
-  const layers = mergeLayers(graphLayers.map((layer) => [
+  const layers = applyCadence(mergeLayers(graphLayers.map((layer) => [
     layer.weight,
     stateClips(layer.state as OperatorAnimationStateName, director, input, locomotion, idleClip),
-  ] as const));
+  ] as const)), stance, director.profile.locomotionPlaybackLimits);
 
   const hitReaction = advanceHitReaction(director.hits, deltaSeconds, director.profile.hitReactionGain);
   const additiveLayers: OperatorAnimationLayer[] = [];
@@ -347,5 +398,6 @@ export function advanceOperatorAnimation(
     posture: clampedPostureBias(director.profile.posture),
     hitReaction,
     locomotion,
+    stance,
   });
 }

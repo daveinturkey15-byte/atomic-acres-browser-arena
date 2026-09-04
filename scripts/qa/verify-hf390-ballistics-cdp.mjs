@@ -18,6 +18,14 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+// PASS 94 integration repair: `defaultBootRoster()` was called on line 33 and
+// never imported, so this probe threw ReferenceError before its first line of
+// work - with or without `--arenas`, because the default argument is evaluated
+// eagerly. It has been dead since b30bd1aa (PASS 85 Lane N derived the roster
+// here and moved the helper out without bringing the import along), which is
+// why no run of it appears in any evidence directory. Repairing a verifier that
+// cannot start is not weakening one: nothing about what it asserts changes.
+import { defaultBootRoster } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {

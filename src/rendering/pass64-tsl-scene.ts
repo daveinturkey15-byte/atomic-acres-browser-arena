@@ -146,6 +146,10 @@ export function pass64LinearSourceStages(
   stages.push('contact-occlusion-multiply');
   if (optional.includes('ssr-screen-space-reflection-add')) stages.push('ssr-screen-space-reflection-add');
   if (optional.includes('raytraced-reflection-refraction-add')) stages.push('raytraced-reflection-refraction-add');
+  // HF-481. Aerial perspective sits with the reflections and the shafts, after
+  // the occlusion multiply and before the bloom: haze is volume in front of the
+  // surface (so GTAO must not darken it) and a bright hazy far field does bloom.
+  if (optional.includes('aerial-perspective-inscatter-add')) stages.push('aerial-perspective-inscatter-add');
   stages.push('depth-guarded-bloom-add');
   if (optional.includes('godrays-volumetric-shaft-add')) stages.push('godrays-volumetric-shaft-add');
   if (optional.includes('depth-of-field-bokeh')) stages.push('depth-of-field-bokeh');
@@ -180,6 +184,8 @@ export type Pass64TslSceneSystems = Readonly<{
    * without shadows) resolves to disabled here, so telemetry cannot claim it.
    */
   screenSpace: GraphicsRuntime['screenSpace'];
+  /** Re-anchors the existing atmosphere uniforms without rebuilding the graph. */
+  setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   /**
    * Linear-side stage receipt for the filmic grade chain's order contract,
    * including the optional screen-space stages this graph built.
@@ -936,6 +942,7 @@ function configureHdrPipeline(
 ): Readonly<{
   scenePass: ReturnType<typeof pass>;
   screenSpace: ScreenSpacePostGraph;
+  setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
@@ -969,6 +976,7 @@ function configureHdrPipeline(
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneNormal = wantsNormal ? scenePass.getTextureNode('normal') : null;
+  const atmosphereSkyColor = new THREE.Color();
   const screenSpace = buildScreenSpacePostGraph({
     sceneColor,
     sceneDepth,
@@ -1057,12 +1065,19 @@ function configureHdrPipeline(
     const withReflections = screenSpace.reflectionLight
       ? occluded.add(screenSpace.reflectionLight)
       : occluded;
+    // HF-481. The inscattering half of the transmittance equation, added never
+    // mixed, so it can wash a far silhouette's CONTRAST but can never delete
+    // the silhouette. Its ceiling is swept in `atmosphere/aerial-perspective.ts`
+    // and clamped again per channel inside the node.
+    const withAtmosphere = screenSpace.atmosphereLight
+      ? withReflections.add(screenSpace.atmosphereLight)
+      : withReflections;
     // Pass 76: the linear-side vignette stage was retired. The display-side
     // 'display-vignette-falloff' stage in the filmic grade chain is the ONE
     // vignette owner (legacy-main drives setDisplayVignetteStrength); running
     // both stacked two falloffs on exactly the screen periphery enemies enter
     // from, while this one held the setting and the display one idled at zero.
-    const hdrWithBloom = withReflections.add(emissiveBloom.rgb.mul(depthEdgeGuard));
+    const hdrWithBloom = withAtmosphere.add(emissiveBloom.rgb.mul(depthEdgeGuard));
     // Shafts reuse the bloom path's depth-discontinuity guard rather than the
     // upstream depthAwareBlend helper: that helper mixes toward a flat colour,
     // which at shaft strength replaces a silhouette with solid light. Adding a
@@ -1103,6 +1118,9 @@ function configureHdrPipeline(
     return {
       scenePass,
       screenSpace,
+      setAtmosphere(skyColor, sunWhite) {
+        screenSpace.setAtmosphere(skyColor, sunWhite);
+      },
       get linearSourceStages() { return linearSourceStages; },
       applyDefinition(next) {
         const sceneGrade = composeArtDirectedSceneGrade(
@@ -1112,6 +1130,15 @@ function configureHdrPipeline(
         saturation.value = sceneGrade.saturation;
         contrast.value = sceneGrade.contrast;
         pushArtDirectionToChain(next.id);
+        // HF-481. The arena's AUTHORED fog colour is the haze colour, which is
+        // the honest source: it is already the colour the arena says its air is,
+        // it is already tinted per time of day by the lighting lane's
+        // `LightingConditionWrites`, and taking it here means the atmosphere and
+        // the fog can never disagree about what the air looks like. `sunWhite`
+        // is the arena's own key intensity, which is what normalises the Mie
+        // term into the band the combat ceiling is stated in.
+        atmosphereSkyColor.setHex(next.fog.color);
+        screenSpace.setAtmosphere(atmosphereSkyColor, next.lighting.sunIntensity);
         // The committing arena has already installed its sun by the time a
         // definition is applied, so this is where the shaft stage learns
         // whether it has a shadow map to raymarch. Recompose only when the
@@ -1367,6 +1394,7 @@ export function createPass64TslSceneSystems(
       ...graphics.ambientOcclusion,
     }),
     screenSpace: constructedScreenSpace,
+    setAtmosphere: (skyColor, sunWhite) => hdr.setAtmosphere(skyColor, sunWhite),
     // A getter, not a snapshot: the shaft stage can be added or removed by an
     // arena commit, and a frozen list would keep asserting a stage order the
     // installed pipeline no longer has.

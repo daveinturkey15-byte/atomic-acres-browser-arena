@@ -70,6 +70,13 @@ for (const arena of ARENAS) {
   }
 }
 const SEED = arg('--seed', 'viewpoint');
+// HITL 5: optional station subset (`--cameras a,b,c`). Opt-in only; the default
+// is still the whole catalog, and the summary line names the subset size so a
+// partial run can never read as a full one.
+const CAMERAS = arg('--cameras', null)?.split(',').map((entry) => entry.trim()).filter(Boolean) ?? null;
+const stationsFor = (arena) => CAMERAS
+  ? VIEWPOINT_CATALOG[arena].filter((id) => CAMERAS.includes(id))
+  : VIEWPOINT_CATALOG[arena];
 
 // shell:true wraps the server in cmd.exe; killing the wrapper alone orphans
 // the vite child and leaves :41931 occupied for the next run. Kill the tree.
@@ -236,7 +243,7 @@ try {
         });
 
         mkdirSync(resolve(OUT_DIR, arena), { recursive: true });
-        for (const cameraId of VIEWPOINT_CATALOG[arena]) {
+        for (const cameraId of stationsFor(arena)) {
           // setArenaReviewCamera returns BOOLEAN, not the revision; read the
           // live revision first and demand a committed presentation receipt
           // at the NEW revision for THIS camera id.
@@ -341,7 +348,7 @@ try {
       record.errors = [...new Set(errors)].slice(0, 4);
       results.push(record);
       const shotCount = record.shots.filter((shot) => shot.ok).length;
-      console.error(`[viewpoint-capture] ${arena.padEnd(18)} ${record.ok ? 'OK' : 'FAIL'} ${shotCount}/${VIEWPOINT_CATALOG[arena].length} shots ${record.ms} ms`
+      console.error(`[viewpoint-capture] ${arena.padEnd(18)} ${record.ok ? 'OK' : 'FAIL'} ${shotCount}/${stationsFor(arena).length}${CAMERAS ? ' (subset)' : ''} shots ${record.ms} ms`
         + (record.ok ? '' : ` — ${record.diagnostics?.bootstrapStage ?? record.error ?? JSON.stringify(record.shots.filter((s) => !s.ok))}`));
       // Back to the menu so the next arena starts from a clean surface.
       await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});

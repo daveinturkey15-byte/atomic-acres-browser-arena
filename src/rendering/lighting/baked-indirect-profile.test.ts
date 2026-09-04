@@ -22,6 +22,7 @@ import { EXTRACTION_DEBOUNCE_MS, buildBakedIndirectRuntime } from './baked-indir
 const SELECTION = {
   bakedIndirect: 'off',
   volumetricLightShafts: 'off',
+  volumetricQuality: 'high',
   screenSpaceReflections: 'off',
   screenSpaceGi: 'off',
   depthOfField: false,

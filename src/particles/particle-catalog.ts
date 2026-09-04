@@ -288,10 +288,27 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
   // out of the two back yards. Deliberately close to the shipped Nuke Town's
   // suburban air rather than a new idea - this lane is a LAYOUT rejig, and the
   // air being familiar is what lets the owner read the layout change on its own.
+  //
+  // HF-481 lane LOOK, 2026-09-04: the air was SHIPPED and INVISIBLE. Not a
+  // guess - measured. A 0.014 m mote at the 12 m reading distance subtends
+  //   2 * 0.014 / (2 * 12 * tan(35 deg)) * 720 = 1.20 px
+  // at the 1280x720 review viewport, and it was drawn additively at opacity
+  // 0.09. A sub-pixel sprite at 9% additive alpha is below anything an eye
+  // resolves, and sure enough not one mote appears in any of the seven PASS 94
+  // exterior captures. The catalog said the arena had air; the frame did not.
+  //
+  // The fix is RADIUS and ALPHA, not density. Both DENSITIES are unchanged, so
+  // the instance count, the capacity ceiling, the draw count and the whole
+  // per-frame budget are byte-identical to what shipped - this costs a little
+  // fill on a few hundred 2 px sprites and nothing else. Neither alpha moves a
+  // ceiling: motes sits AT its own family ceiling of 0.11 and drift at 0.15
+  // under its 0.16, both of which are themselves under the readability
+  // contract's 0.16 for a fine, non-obscuring family. `ambient-visibility.test.ts`
+  // measures the subtended pixels rather than trusting this comment.
   'nuketown2': arena(
     'nuketown2', 'road-grit-and-dry-lawn-seed',
-    { density: 0.72, colorWarm: 0xe6d8b8, colorCool: 0xc0bfb4, radiusM: 0.014, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.09 },
-    { density: 0.42, kind: 'seed', colorWarm: 0xdfd2a4, colorCool: 0xaeae94, radiusM: 0.04, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.1 },
+    { density: 0.72, colorWarm: 0xe6d8b8, colorCool: 0xc0bfb4, radiusM: 0.026, riseMps: 0.055, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
+    { density: 0.42, kind: 'seed', colorWarm: 0xdfd2a4, colorCool: 0xaeae94, radiusM: 0.055, fallMps: 0.29, windPull: 0.82, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.15 },
     0.55, 21, 12, 4,
   ),
   // RAID2 (PREVIEW, HF-408): the same garden pollen family as test2, drifting a

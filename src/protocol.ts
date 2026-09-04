@@ -55,6 +55,10 @@ import {
   type FlashProtocolMessage,
 } from './flash-protocol';
 import {
+  isTaserProtocolMessage,
+  type TaserProtocolMessage,
+} from './taser-protocol';
+import {
   isTimedMapWeaponProtocolMessage,
   type TimedMapWeaponProtocolMessage,
   type TimedMapWeaponStateMessage,
@@ -647,7 +651,7 @@ export type StickyAttachedMessage = {
 export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | EmoteMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
-  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
+  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage | TaserProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
   | StickyAttachedMessage
   // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
@@ -786,6 +790,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isInteractiveWorldProtocolMessage(value)) return true;
   if (isSmokeProtocolMessage(value)) return true;
   if (isFlashProtocolMessage(value)) return true;
+  if (isTaserProtocolMessage(value)) return true; // HF-458
   if (isTimedMapWeaponProtocolMessage(value)) return true;
   if (isFlarePresentationProtocolMessage(value)) return true;
   if (isBotWeaponPresentationMessage(value)) return true;
@@ -1309,6 +1314,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
   if (isFlashProtocolMessage(message)) return message.by === playerId;
+  if (isTaserProtocolMessage(message)) return message.by === playerId;
   if (isTimedMapWeaponProtocolMessage(message)) return message.by === playerId;
   if (isFlarePresentationProtocolMessage(message)) return message.by === playerId;
   if (isBotWeaponPresentationMessage(message)) return message.by === playerId;
@@ -1392,6 +1398,9 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     // to the sitting host.
     || isHostSuccessionProtocolMessage(message)
     || isFlashProtocolMessage(message)
+    // HF-458: the taser stun is host-authored exactly like the flash result, so
+    // a guest may never mint one and network.ts drops it on a guest connection.
+    || isTaserProtocolMessage(message)
     || message.type === 'interactive-world-snapshot'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'

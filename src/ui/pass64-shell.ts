@@ -9,6 +9,7 @@ import {
   LIGHTING_TIME_CHOICE_LABELS,
 } from '../rendering/lighting-conditions';
 import { DEFAULT_PRIVATE_MATCH_CONFIG, LOBBY_KILL_LIMITS, LOBBY_TIME_LIMITS_MS } from '../private-match';
+import { CHOPPER_MISSILE_CAPACITY } from '../killstreak-runtime';
 import { CHAT_TEXT_MAX_CHARS } from '../text-chat';
 import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
@@ -590,7 +591,12 @@ function hudMarkup(): string {
           <kbd>LMB</kbd><span>GUN</span><strong class="gunner-control-value"><b id="gunner-control-gun-ammo">&infin;</b></strong>
         </div>
         <div id="gunner-missile-status" class="gunner-control" hidden aria-hidden="true" aria-live="polite" data-ready="false">
-          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><b id="gunner-missile-ammo">&times;0 / 6</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
+          <kbd>RMB</kbd><span>MISSILES</span><strong class="gunner-control-value"><b id="gunner-missile-ammo">&times;0 / ${CHOPPER_MISSILE_CAPACITY}</b></strong><em id="gunner-missile-cooldown">OFFLINE</em>
+        </div>
+        <!-- HF-458: the Piloted Drone's right-click taser occupies the same RMB
+             slot the Chopper uses for missiles, with its own id and hidden flag. -->
+        <div id="gunner-taser-status" class="gunner-control" hidden aria-hidden="true" aria-live="polite" data-ready="false">
+          <kbd>RMB</kbd><span>TASER</span><strong class="gunner-control-value"><b id="gunner-taser-charges">&times;0 / 3</b></strong><em id="gunner-taser-state">OFFLINE</em>
         </div>
       </div>
       <div class="gunner-instruments" aria-hidden="true">
@@ -646,7 +652,7 @@ export function renderPass64Shell(model: Pass64ShellViewModel): string {
   return `<canvas id="game" aria-label="${arenaCanvasLabel(ARENA_SELECTIONS[0]!)}"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
-    <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="killstreak-logo-flash" hidden></div>
+    <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="taser-shock" hidden aria-hidden="true"></div><div id="killstreak-logo-flash" hidden></div>
     <div id="nuke-flash" hidden></div>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}

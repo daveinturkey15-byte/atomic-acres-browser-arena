@@ -35,7 +35,13 @@
  *   total screen offset is capped so a fast flick cannot erase a target.
  */
 
-import type { LightingTier } from '../graphics-settings-registry';
+import type { LightingTier, QualityTier } from '../graphics-settings-registry';
+import {
+  AERIAL_PERSPECTIVE_OFF,
+  assertAerialPerspectiveCombatSafety,
+  resolveAerialPerspectiveTuning,
+  type AerialPerspectiveTuning,
+} from './atmosphere/aerial-perspective';
 import {
   BAKED_INDIRECT_MAXIMUM_GAIN,
   resolveBakedIndirectTuning,
@@ -204,6 +210,17 @@ export type ScreenSpacePostRuntime = Readonly<{
   depthOfField: DepthOfFieldTuning;
   motionBlur: MotionBlurTuning;
   upscaling: SpatialUpscalingTuning;
+  /**
+   * HF-481 lane LOOK — aerial perspective. It rides in this runtime for the
+   * same reason the baked probe does: it composites into the linear-HDR chain
+   * as one more additive term over the scene pass's own view-Z, and everything
+   * that decides its shape is already resolved here. Its numbers, its physics
+   * and its combat sweep live in `atmosphere/aerial-perspective.ts`.
+   *
+   * It has no `off` rung on purpose. Atmosphere is not an effect; a player who
+   * could switch the haze off would gain distance vision nobody else has.
+   */
+  aerialPerspective: AerialPerspectiveTuning;
   /**
    * HF-398 — the classic recursive ray tracer. It rides in this runtime rather
    * than beside it because it composites into exactly the same additive
@@ -508,6 +525,7 @@ export function assertScreenSpacePostCombatSafety(runtime: ScreenSpacePostRuntim
       `HF-364 motion blur offset ${runtime.motionBlur.maximumUvOffset} exceeds ${MOTION_BLUR_MAXIMUM_UV_OFFSET}`,
     );
   }
+  assertAerialPerspectiveCombatSafety(runtime.aerialPerspective);
   assertDepthOfFieldCombatSafety(runtime.depthOfField);
   assertRayTracingCombatSafety(runtime.rayTracing);
 }
@@ -524,6 +542,14 @@ export type ScreenSpacePostSelection = Readonly<{
   spatialUpscaling: SpatialUpscalingMode;
   /** HF-398 — the classic recursive ray-tracing tier. */
   rayTracing: RayTracingTier;
+  /**
+   * HF-481 — the atmosphere tier. Deliberately the EXISTING
+   * `graphics.volumetricQuality` rather than a new control: it already means
+   * "how much atmosphere", it already exists in every profile, and a new
+   * control would have to answer the orphan-option gate for a feature that has
+   * no legitimate off state.
+   */
+  volumetricQuality: QualityTier;
 }>;
 
 /**
@@ -543,6 +569,7 @@ export function resolveScreenSpacePostRuntime(
     depthOfField: resolveDepthOfFieldTuning(selection.depthOfField, selection.depthOfFieldStrength),
     motionBlur: resolveMotionBlurTuning(selection.motionBlur),
     upscaling: resolveSpatialUpscaling(selection.spatialUpscaling),
+    aerialPerspective: resolveAerialPerspectiveTuning(selection.volumetricQuality),
     // The trace supplies its own normal and material attachments through
     // `screenSpaceMrtRequirement`, so those two capabilities are always
     // available once the tier is on; the shadow-casting sun is the one real
@@ -608,6 +635,7 @@ export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze(
   depthOfField: resolveDepthOfFieldTuning(false, 0),
   motionBlur: MOTION_BLUR_OFF,
   upscaling: resolveSpatialUpscaling('off'),
+  aerialPerspective: AERIAL_PERSPECTIVE_OFF,
   rayTracing: RAY_TRACING_DISABLED,
 });
 

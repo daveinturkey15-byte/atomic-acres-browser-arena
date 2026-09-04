@@ -43,7 +43,9 @@ function setup(enterControl = true): Readonly<{ runtime: HostKillstreakRuntime; 
 }
 
 describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
-  it('admits only possessed edge requests, owns six rounds, and never queues cooldown clicks', () => {
+  // HF-458 item 1 (owner 2026-09-02): the payload is twelve, not six. The
+  // autopilot's half of it is covered by chopper-autopilot-rockets.test.ts.
+  it('admits only possessed edge requests, owns twelve rounds, and never queues cooldown clicks', () => {
     const outside = setup(false);
     expect(outside.runtime.control({
       by: 'owner', matchEpoch: 7, lifeId: 1, sequence: 1, entityId: outside.entityId,
@@ -82,7 +84,7 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
         const cooldown = runtime.advance(now + 500, world());
         expect(cooldown.shotEvents).toEqual([]);
         expect(cooldown.impactEvents.filter((event) => event.phase === 'drop')).toEqual([]);
-        expect(runtime.snapshotFor('owner', now + 500).entities[0].missileAmmo).toBe(5);
+        expect(runtime.snapshotFor('owner', now + 500).entities[0].missileAmmo).toBe(CHOPPER_MISSILE_CAPACITY - 1);
       }
       now += CHOPPER_MISSILE_CADENCE_MS;
     }
@@ -162,6 +164,8 @@ describe('Pass 70 host-authoritative Chopper Gunner missiles', () => {
       // HF-334: host killstreak result object includes careWeaponGrantEvents
       // (care-package weapon grants, e.g. the 10% flamethrower reward).
       careWeaponGrantEvents: [],
+      // HF-458: and taserStunEvents (Piloted Drone taser hits).
+      taserStunEvents: [],
     });
   });
 

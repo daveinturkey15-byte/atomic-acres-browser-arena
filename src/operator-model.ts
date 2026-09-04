@@ -33,6 +33,17 @@ import {
   stanceIdleClip,
   type OperatorStanceId,
 } from './operator-appearance-catalog'; // HF-382
+import {
+  advanceOperatorPosture,
+  createOperatorPostureLayer,
+  type OperatorPostureLayerState,
+  type OperatorPostureOutput,
+} from './operator-posture-layer'; // PASS 94
+import { resolveOperatorLook } from './operator-skin-look-registry'; // PASS 94
+import {
+  operatorLookMaterialForAuthored,
+  operatorLookMaterialsEnabled,
+} from './operator-skin-tsl-materials'; // PASS 94
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -46,6 +57,11 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
   });
   let adjusted = 0;
   for (const material of materials) {
+    // MUSE F5 (PASS 94 animation+skins review): TSL node materials fail every
+    // instanceof below and are skipped on purpose - the procedural operator skins
+    // carry no emissive fill to scale (see animation-skins REPORT 5.2). A future
+    // brightness tune that expects to reach WebGPU operators must add a node path
+    // here rather than assume this loop covered them.
     if (!(material instanceof THREE.MeshStandardMaterial)
       && !(material instanceof THREE.MeshLambertMaterial)
       && !(material instanceof THREE.MeshPhongMaterial)) continue;
@@ -360,6 +376,15 @@ type RiggedOperatorRuntime = {
   speed: number;
   /** Pass 77: the composed animation director this operator is driven by. */
   director: OperatorAnimationDirector;
+  /**
+   * PASS 94: the posture layer. It turns the gameplay stance and ground speed
+   * into the cadence correction, capped clip-selection speed and sprint
+   * envelope the director solves against, so a crouch-walk stops skating on a
+   * standing stride and a sprint reads as one. Presentation only.
+   */
+  posture: OperatorPostureLayerState;
+  /** PASS 94: last posture solve, read by the stance pose for the sprint lean. */
+  lastPosture: OperatorPostureOutput | null;
   /** Terminal: once dead, the corpse clip owns the mixer until a reset. */
   dead: boolean;
   /** Clips the mixer had non-zero weight on last frame, so they can be released. */
@@ -841,17 +866,29 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
     proneAdjustment ? proneAdjustment.slideM : 0,
     alpha,
   );
+  // PASS 94: the sprint lean. The posture layer only produces a non-zero lean
+  // while STANDING, where `pivotPitch` is 0, so this cannot fight the prone
+  // pivot. Negative pitches the body forward, the same sign convention the
+  // prone pose uses.
+  const sprintLean = -(runtimeState.lastPosture?.leanRadians ?? 0);
   runtimeState.stancePivot.rotation.x = THREE.MathUtils.lerp(
     runtimeState.stancePivot.rotation.x,
-    proneAdjustment ? target.pivotPitch * proneAdjustment.pitchScale : target.pivotPitch,
+    (proneAdjustment ? target.pivotPitch * proneAdjustment.pitchScale : target.pivotPitch) + sprintLean,
     alpha,
   );
 
   // The visible loadout lives in body space rather than under an animated
   // wrist. That keeps its muzzle authoritative while both arms are solved onto
   // the weapon after the animation mixer has written the current pose.
+  // MUSE F3 (PASS 94 animation+skins review): one body, one sprint. The posture
+  // layer's latched sprint (5.2/4.4 m/s with a ramp) drives lean and aim, so the
+  // weapon socket reads from it too; without that the socket finished dropping at
+  // ~6.8 m/s while the lean had barely started and sprint read as two systems.
+  // The stateless smoothstep stays as the fallback for callers that pose an
+  // operator without running the posture layer.
   const sprint = runtimeState.stance === 'stand'
-    ? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8)
+    ? (runtimeState.lastPosture?.sprint
+      ?? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8))
     : 0;
   const weaponId = String(runtimeState.weaponSocket.children[0]?.userData.weaponId ?? 'carbine');
   const proneMount = PRONE_WEAPON_MOUNT[weaponId] ?? PRONE_WEAPON_MOUNT.carbine;
@@ -948,6 +985,20 @@ function materialForTeam(
   skinId = 'default',
 ): THREE.Material {
   if (!(material instanceof THREE.MeshStandardMaterial)) return material.clone();
+  // PASS 94. In-match team appearance takes the procedural TSL look instead of
+  // a multiply tint over a ~40/255 atlas plus an emissive fill. Gated on the
+  // node-capable backend and on the material being one of the three authored
+  // garment roles; anything else - Skin, Visor, the menu showcase, the
+  // neon-purple test dummies, and the whole WebGL2 compatibility route - falls
+  // through to the shipped path below unchanged.
+  if (appearance === 'team' && operatorLookMaterialsEnabled()) {
+    const look = resolveOperatorLook(skinId, team === 0 ? 0 : 1);
+    const procedural = operatorLookMaterialForAuthored(material.name, look.id, {
+      flattenMaterials,
+      authored: material,
+    });
+    if (procedural) return procedural;
+  }
   const result = material.clone();
   const name = material.name.toLowerCase();
   if (appearance === 'neon-purple' && name === 'swat') {
@@ -1887,6 +1938,11 @@ const DIRECTIONAL_ACTION_NAME_SET: ReadonlySet<string> = new Set(RIGGED_OPERATOR
  * that reads them fills in whatever is missing, once, from the operator itself.
  */
 function ensureAnimationRuntime(runtimeState: RiggedOperatorRuntime, root: THREE.Object3D): void {
+  // PASS 94: back-filled independently of the director, because a hand-built
+  // runtime that predates either field must gain both, and a future one might
+  // supply only the older half.
+  runtimeState.posture ??= createOperatorPostureLayer(runtimeState.stance ?? 'stand');
+  runtimeState.lastPosture ??= null;
   if (runtimeState.director) return;
   runtimeState.director = createOperatorAnimationDirector(
     String(root.userData.operatorSkinId ?? 'default'),
@@ -2094,6 +2150,8 @@ export function createRiggedOperator(
     // Keyed on the skin's archetype and the operator's replicated name, so two
     // bots of one archetype are visibly out of phase and every peer agrees how.
     director: createOperatorAnimationDirector(skinId, name),
+    posture: createOperatorPostureLayer('stand'),
+    lastPosture: null,
     dead: false,
     activeAnimationClips: base ? [base] : [],
     visualYawRadians: root.rotation.y,
@@ -2302,6 +2360,17 @@ export function updateRiggedOperator(
   // turn rate, applied on the stance pivot the prone solve already owns.
   const yawError = wrapAngleRadians(root.rotation.y - runtimeState.visualYawRadians);
 
+  // PASS 94. The posture layer is solved first, from the SAME stance the pose
+  // solve already uses, and its output is what the director times its clips
+  // against. Nothing here decides the stance; it only decides how a standing
+  // clip corpus should be played to represent it.
+  const posture = advanceOperatorPosture(runtimeState.posture, {
+    deltaSeconds: dt,
+    stance,
+    groundSpeedMps: Math.hypot(velocity.forwardMps, velocity.strafeMps),
+    dead: runtimeState.dead,
+  });
+
   let animation = advanceOperatorAnimation(runtimeState.director, {
     deltaSeconds: dt,
     forwardMps: velocity.forwardMps,
@@ -2311,7 +2380,9 @@ export function updateRiggedOperator(
     dead: runtimeState.dead,
     armed: motion?.armed ?? true,
     availableClips: [...runtimeState.clips.keys()],
+    stance: posture,
   });
+  runtimeState.lastPosture = posture;
   // HF-382: the published IDLE STANCE overrides which authored idle the mixer
   // plays, cross-faded. Presentation only - it cannot reach hit proxies or
   // movement authority, and an unpublished root behaves exactly as before.

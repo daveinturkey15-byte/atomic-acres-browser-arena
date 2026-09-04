@@ -1,5 +1,6 @@
 import { PASS65_KILLSTREAK_CATALOG, validateKillstreakLoadout, type KillstreakLoadoutV1, type Pass65KillstreakId } from './killstreak-catalog';
 import type { CombatTiming } from './network-fairness';
+import { PILOTED_DRONE_TASER_CHARGES } from './killstreak-tuning';
 import type {
   CareCaptureAdmissionReason,
   DroneSensorContact,
@@ -302,7 +303,7 @@ function isEntitySnapshot(value: unknown): boolean {
   if (!object(value) || !exactKeys(value, [
     'id', 'activationId', 'ownerId', 'team', 'kind', 'mode', 'phase', 'position', 'velocity', 'attitude', 'health', 'expiresInMs',
     'magazine', 'reserveClips', 'gunProfileId', 'gunController', 'missileAmmo', 'missileCooldownMs',
-    'captureActorId', 'captureProgress', 'revealedReward', 'revision',
+    'taserCharges', 'captureActorId', 'captureProgress', 'revealedReward', 'revision',
   ]) || !hostEntityId(value.id) || !activationId(value.activationId) || !actorId(value.ownerId)
     || (value.team !== 0 && value.team !== 1)
     || (value.kind !== 'aircraft' && value.kind !== 'chopper' && value.kind !== 'drone' && value.kind !== 'care-crate')
@@ -315,7 +316,12 @@ function isEntitySnapshot(value: unknown): boolean {
     if (!safeCounter(value.magazine, 20)
       || (value.mode === 'piloted' ? !safeCounter(value.reserveClips, 3) : value.reserveClips !== null)
       || value.gunProfileId !== DRONE_SUPPORT_DEFINITIONS[value.mode].gunProfileId) return false;
-  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null || value.gunProfileId !== null) return false;
+    // HF-458: only the Piloted Drone carries taser charges.
+    if (value.mode === 'piloted'
+      ? !safeCounter(value.taserCharges, PILOTED_DRONE_TASER_CHARGES)
+      : value.taserCharges !== null) return false;
+  } else if (value.mode !== null || value.magazine !== null || value.reserveClips !== null
+    || value.gunProfileId !== null || value.taserCharges !== null) return false;
   const phaseValid = value.kind === 'aircraft' ? value.phase === 'inbound' || value.phase === 'active' || value.phase === 'outbound'
     : value.kind === 'chopper' ? value.phase === 'inbound' || value.phase === 'orbiting' || value.phase === 'outbound'
     : value.kind === 'drone' ? value.phase === 'active' || value.phase === 'reloading'
@@ -506,7 +512,7 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
   }
   if (value.type === 'killstreak-control-intent') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'lifeId', 'sequence', 'entityId', 'action', 'nonce'], [
-      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'missileFire', 'timing',
+      'yawQ', 'pitchQ', 'thrustQ', 'strafeQ', 'verticalQ', 'fire', 'missileFire', 'taserFire', 'timing',
     ]) && baseIntent(value) && hostEntityId(value.entityId)
       && (value.action === 'toggle-chopper-gunner' || value.action === 'toggle-piloted-drone' || value.action === 'pilot-control' || value.action === 'exit-piloted-drone')
       && (value.yawQ === undefined || finite(value.yawQ, -Math.PI, Math.PI))
@@ -516,6 +522,8 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       && (value.verticalQ === undefined || finite(value.verticalQ, -1, 1))
       && (value.fire === undefined || typeof value.fire === 'boolean')
       && (value.missileFire === undefined || (value.action === 'pilot-control' && typeof value.missileFire === 'boolean'))
+      // HF-458: right-click taser, admitted on the same pilot-control action.
+      && (value.taserFire === undefined || (value.action === 'pilot-control' && typeof value.taserFire === 'boolean'))
       && timing(value.timing);
   }
   if (value.type === 'killstreak-care-capture-intent') {

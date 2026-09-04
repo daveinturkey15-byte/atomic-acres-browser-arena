@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "post-build-final3-max-only",
+  "generatedAt": "2026-09-04T06:46:35.698Z",
+  "summary": [
+    {
+      "profile": "max",
+      "ok": false,
+      "liveFrame": false,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "consoleWarnings": 2,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": "page.waitForFunction: Timeout 60000ms exceeded."
+    }
+  ]
+}

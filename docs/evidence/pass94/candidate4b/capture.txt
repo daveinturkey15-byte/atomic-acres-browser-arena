@@ -1,0 +1,9 @@
+[viewpoint-capture] backend=webgpu renderer=webgpu adapter={"gpu":true,"adapter":true,"device":true,"vendor":"nvidia","architecture":"blackwell"}
+[viewpoint-capture] nuketown2          OK 26/26 shots 181431 ms
+{
+  "verdict": "PASS",
+  "backend": "webgpu",
+  "adapterVendor": "nvidia",
+  "failed": [],
+  "out": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate4b\\captures"
+}

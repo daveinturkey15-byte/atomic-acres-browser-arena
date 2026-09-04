@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 94",
+  "feedbackReceivedAt": "2026-09-04T15:35:00Z",
+  "status": "candidate",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "One deterministic shared selector distributes player and bot spawns",
+      "expected": "Every player and bot deployment scores the complete valid candidate pool using threat distance, line-of-sight safety, recent death pressure, recent-use avoidance, occupancy, repeat avoidance and team-side awareness where applicable.",
+      "falsifier": "A runtime path still selects only the first point, a side-local list, or a point used within the avoidance window while a fresh valid alternative exists.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-selection.test.ts",
+          "command": "npx vitest run src/spawn-selection.test.ts src/spawn-safety.test.ts",
+          "note": "Pins 200 seeded deployments, 80% coverage, avoidance-window behavior, threat monotonicity, deterministic ties and TDM side preference."
+        },
+        {
+          "kind": "contract",
+          "ref": "src/legacy-main.ts",
+          "command": "rg -n \"selectSpawnCandidates|recentSpawnUses\" src/legacy-main.ts",
+          "note": "The player and bot deployment paths call the shared module; the call-site delta is 30 LF lines, with the selector logic isolated in src/spawn-selection.ts."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "All 11 registered arena spawn tables meet count and spread floors",
+      "expected": "Each team arena has at least eight player/bot points per team, each explore arena retains its authored five-point contract, and every table meets its recorded spread and mean-nearest-neighbour floor.",
+      "falsifier": "Any registered row, including parked farcrysis, has a count, spread, floor, route, cover, standoff, open-arc or cross-team failure.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-layout-quality.test.ts",
+          "command": "npx vitest run src/spawn-layout-quality.test.ts src/farcrysis-spawns.test.ts",
+          "note": "All registered rows are measured and the explicit per-arena count/spread/mean-NN floor table is pinned."
+        },
+        {
+          "kind": "contract",
+          "ref": "artifacts/qa/pass94-spawn-layouts-after.json",
+          "command": "npx tsx scripts/qa/measure-spawn-layouts.ts --out artifacts/qa/pass94-spawn-layouts-after.json",
+          "note": "All 11 rows report in-envelope 100%, floor 100%, reach 100% and verdict ok."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Nuke Town Rebuild has distributed authored bot points without geometry edits",
+      "expected": "nuketown2 offers eight gate-passing points per team across the house-side yards, street-end and cul-de-sac approach; no added point is inside the truck or coach, and only the spawn declaration changes.",
+      "falsifier": "The source diff changes nuketown2 geometry, or the built audit finds an added point inside geometry, without floor/route/cover/standoff/open-arc/LOS validity.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/nuketown2-arena.ts",
+          "command": "git diff -- src/nuketown2-arena.ts",
+          "note": "Only NUKETOWN2_SPAWN_LAYOUT changed; the added points are [1,-40], [-16,-40] and exact rotational partners."
+        },
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/pass94-deploy/nuketown2.json",
+          "command": "node scripts/qa/verify-spawn-deploys.mjs --label pass94-nuketown2 --dist dist --port 4297 --arenas nuketown2 --layouts artifacts/qa/pass94-spawn-layouts-after.json --bot-watch-ms 90000 --out artifacts/qa/pass94-deploy",
+          "note": "One solo deployment and explicit respawn plus six bots all matched gate-passing authored points; six distinct bot spawn positions were recorded over the 90-second watch."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "The candidate is mechanically ready for immutable preview review",
+      "expected": "TypeScript, focused spawn/registry/map/size tests, spawn/walkable audits and the permitted Nuke Town runtime probe are recorded without weakening a threshold or assertion.",
+      "falsifier": "Any required focused gate is red, the candidate depends on a weakened verifier, or the browser probe is claimed without a permitted single-browser run.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "focused-pass94-gates",
+          "command": "npx tsc --noEmit; npx vitest run src/spawn-selection.test.ts src/spawn-safety.test.ts src/spawn-layout-quality.test.ts src/farcrysis-spawns.test.ts src/arena-factory-registry.test.ts src/map-selection.test.ts src/legacy-main-size-ratchet.test.ts --reporter=dot",
+          "note": "TypeScript passed; 7 Vitest files and 244 tests passed; legacy-main is ratcheted at the verified 37,130-line ceiling."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/qa/solve-spawn-layouts.ts; scripts/qa/solve-farcrysis-spawns.ts; scripts/qa/eye-clearance-sweep-contract.test.mjs",
+          "command": "npx tsx scripts/qa/solve-spawn-layouts.ts --all --wanted 8; npx tsx scripts/qa/solve-farcrysis-spawns.ts --wanted 8; npm run qa:eye-clearance:contract",
+          "note": "Applied proposals and farcrysis terrain proposal passed; RustRig and test1 rejected proposals remained rejected; eye-clearance contract 36/36 passed."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Owner reviews the immutable PASS 94 preview before publication",
+      "expected": "Dave plays the exact immutable preview and confirms that all maps now distribute players and bots naturally, with particular attention to Nuke Town's yards and street ends.",
+      "falsifier": "This manifest represents owner preview inspection or release approval before an immutable preview exists and Dave has played it.",
+      "acceptance": "human",
+      "state": "pending",
+      "evidence": []
+    },
+    {
+      "id": "R6",
+      "summary": "Nuke Town Rebuild review cameras cover every catalog station",
+      "expected": "The north rear-balcony/exterior-flight station and south front-porch/eave station are authored in the live visual definition, derive their poses from the shared layout, apply handedness once, and remain covered by the viewpoint catalog.",
+      "falsifier": "A catalog station has no matching authored runtime camera, or either HF-465 camera reverts to a mirrored literal that no longer follows the shared layout.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-review-camera.test.ts",
+          "command": "npx vitest run src/nuketown2-fidelity.test.ts src/nuketown2-review-camera.test.ts",
+          "note": "The roster-derived assertion passed alongside the Nuke Town fidelity suite; TypeScript also passed with npx tsc --noEmit."
+        },
+        {
+          "kind": "browser",
+          "ref": "docs/evidence/pass94/review-cameras (deleted after inspection)",
+          "command": "node scripts/qa/capture-arena-viewpoints.mjs --url http://127.0.0.1:4304 --arenas nuketown2 --out docs/evidence/pass94/review-cameras",
+          "note": "Native WebGPU/NVIDIA capture passed 17/17 stations on this Pass 94 base, including both HF-465 stations; generated PNGs were deleted after visual inspection as requested."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "Nuke Town ground grime families have distinct visual depth",
+      "expected": "Overlapping transparent driveway, border-path and yard grime families are vertically separated while remaining inside the existing audited ground-film window.",
+      "falsifier": "Two overlapping ground families share one y depth, or the family lift moves a film outside the 0.03 m audit window.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-grime-decals.test.ts",
+          "command": "npx vitest run src/nuketown2-grime-decals.test.ts",
+          "note": "The focused test proves overlapping ground families are separated and the existing offset/window assertions pass."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Yard props remain on the authored front and back lawn zones",
+      "expected": "The appliance bank stays in the derived west front-lawn zone, ends at the turning-head boundary without entering the road, and all solid yard props retain their existing paired authority.",
+      "falsifier": "The appliance footprint leaves the derived lawn zone or enters the carriageway, or a prop loses its exact rotational partner/collider contract.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-yard-props.test.ts",
+          "command": "npx vitest run src/nuketown2-yard-props.test.ts",
+          "note": "The focused suite proves lawn-zone placement, red north/blue south side binding, paired silhouettes and reduced-tier authority."
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "summary": "Hob colours follow the pushed accuracy-lane house sides",
+      "expected": "The accuracy lane's HF-477 constants are respected: north is the orange house and red appliance tops remain on north, while blue tops remain on the south cream/white house.",
+      "falsifier": "The built north hob is not the red material, the built south hob is not the blue material, or the hob pair is detached from the authored house sides.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "origin/contrib/dave-gaming-pc/claude/nuketown2-bo2-accuracy@a5fb188e170129e7264084ca8c3556072c2ee6a1",
+          "command": "git show a5fb188e170129e7264084ca8c3556072c2ee6a1:src/nuketown2-arena.ts",
+          "note": "The pushed branch defines north terracotta-orange/south cream and red/blue appliance materials; the current built-arena test proves the side mapping."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "The obsolete interior water factory is removed",
+      "expected": "The unreferenced createNuketown2PoolWaterMaterial export is absent from src/nuketown2-interior-materials.ts, while the live pool-water module remains the caller target.",
+      "falsifier": "The obsolete export remains, or the live arena pool caller resolves to the removed interior module.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/nuketown2-interior-materials.ts",
+          "command": "rg -n \"createNuketown2PoolWaterMaterial\" src/nuketown2-interior-materials.ts src/nuketown2-pool-water.ts src/nuketown2-arena.ts",
+          "note": "The old interior definition is absent; the only live definition/call are the replacement pool module and arena."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Close-range prop and grime review stations are authored and catalogued",
+      "expected": "The live Nuke Town visual definition and roster-derived viewpoint catalog cover both appliance banks, the three yard hero props, the driveway apron, border path and both wall-grime runs.",
+      "falsifier": "Any requested close-range station lacks an authored runtime camera or is absent from the catalog coverage test.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/arena-viewpoint-regression.test.mjs",
+          "command": "node --test --test-name-pattern \"arena roster|catalog covers every authored review camera|catalog has no stale entries\" scripts/qa/arena-viewpoint-regression.test.mjs",
+          "note": "The roster-derived camera and catalog checks pass for all newly authored stations."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "Close-range visual inspection waits for a valid owner-machine GPU window",
+      "expected": "The close-range PNG set is captured and inspected only when both ComfyUI queue arrays are empty, GPU free memory is at least 3,000 MiB, and no other headless Chrome is present.",
+      "falsifier": "A capture is made during another headless Chrome workload, below the GPU-free threshold, with a non-empty queue, or without visual inspection.",
+      "acceptance": "visual",
+      "state": "deferred",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "GPU poll 2026-09-04",
+          "command": "curl -s http://127.0.0.1:8188/queue; nvidia-smi; inspect headless Chrome process count",
+          "note": "The required 25 polls kept queue running/pending at 0 and GPU free above 3,000 MiB, but headless Chrome remained 4-12; capture remains OPEN and no PNGs were written."
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "summary": "The techniques candidate passes its focused mechanical gates",
+      "expected": "TypeScript, lane tests, camera roster checks and coplanar inspection pass without relaxing thresholds, and UNAUDITED remains 52.",
+      "falsifier": "Any required focused gate fails, FINDINGS becomes non-zero, HOUSE-INTERIOR or STREET becomes non-zero, or UNAUDITED grows beyond 52.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "focused-pass94-techniques-gates",
+          "command": "npx tsc --noEmit; npx vitest run src/nuketown2-fidelity.test.ts src/collider-visual-parity-gate.test.ts src/nuketown2-vegetation.test.ts src/nuketown2-pool-water.test.ts src/nuketown2-yard-props.test.ts src/nuketown2-grime-decals.test.ts; npx tsx scripts/qa/find-coplanar-pairs.ts",
+          "note": "70 focused tests passed; coplanar output is HOUSE-INTERIOR 0, STREET 0, FINDINGS 0 and UNAUDITED 52."
+        }
+      ]
+    }
+  ]
+}

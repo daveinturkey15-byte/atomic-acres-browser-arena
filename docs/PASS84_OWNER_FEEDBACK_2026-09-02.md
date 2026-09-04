@@ -1336,6 +1336,75 @@ assets and textures and lighting need to be tip top, raid can come next"
   ritual. The Nuke Town tip-top branch (Luna verdict DO-NOT-SHIP: identical
   siding on both houses, stray marker cubes) waits behind the hotfix.
 
+## HF-464 — owner 2026-09-02: "the windows upstairs need to be breakable"
+
+- **Owner lane:** Nuke Town Rebuild fidelity / destructibility.
+- **Affected maps and modes:** `nuketown2` only, all modes.
+- **State:** VERIFIED (registration), 2026-09-04, lane I1.
+- **What was wrong:** `buildNuketown2` returned `breakableWindows: []`. The
+  arena had glazing you could see and not one pane in it — upstairs or down —
+  could ever break, because a `BreakableWindow` row is what binds a pane to
+  `glass-authority.ts`, to `activeBallisticSurfaces()`'s break filter and to
+  `activeGlassDynamicColliders()`.
+- **Mechanical falsifier:** `src/nuketown2-glass-authority.test.ts`. It asserts
+  eight registered panes with unique ids (two ground-front, one upper-front and
+  one upper-back per house), a `glass` explicit ballistic surface bound to each
+  window id, that NO pane appears in `arena.colliders` (a static collider can
+  never be removed, so `solid: true` would leave the frame shut after the break
+  and would also blind bots through that window permanently), and that driving
+  the shipped `admitGlassImpact` phase machine to `breached` drops that pane —
+  and only that pane — from `deriveGlassDynamicColliders`.
+- **Required evidence:** the suite above plus
+  `src/glass-collider-bounds.test.ts` and `src/glass-authority.test.ts`.
+- **Mutation check performed:** flipping one pane to `solid: true` fails the
+  static-collider assertion by name; recorded in the lane report.
+- **Planning mapping:** Nuke Town Rebuild destructibility; no protocol change —
+  it rides the existing validated-broadcast `window-break` message.
+
+## HF-467 — owner 2026-09-02: "glass or blocks have no penetration; metal and glass should be shot through, glass breaks; thin metal (the shed) should get a hole with no collision after"
+
+- **Owner lane:** shared ballistics / material authoring.
+- **Affected maps and modes:** `nuketown2` (the arena the owner was playing),
+  `gun-range` (the penetration lab), all modes.
+- **State:** VERIFIED for the rating and the gate; the perforation AUTHORITY
+  outside the field shed remains OPEN by design (see "explicitly not done").
+- **What was wrong, all measured:**
+  1. 30 shot surfaces on `nuketown2` classified `fallback` and therefore
+     resolved to `reinforced` (entryCost 1000 against a sniper's 10.90) — the
+     yard "stores", the path buttresses, both driveway cars, the sign boards,
+     the wheelie bins. They were literally unshootable, which is exactly the
+     "blocks have no penetration" the owner reported.
+  2. Three misclassification families inverted the owner's expectation: window
+     TRIM (sill/head) was rated `glass` because its name contains "window", so
+     bullets crossed the frame like air; the ground-floor partition was rated
+     `earth` because its name contains "ground", making it harder than brick
+     while the identical wall one storey up was `interior-wall`; car windscreens
+     were rated as bodywork because `m.carGlass` has metalness 0.50.
+  3. The zero-fallback assertion that should have caught (1) iterated a
+     hardcoded six-builder literal and had never built `nuketown2`, `map3`,
+     `raid2`, `test1` or `test2`.
+  4. Perforation admission used the MUZZLE constant
+     `penetrationPower × fmjMultiplier × 10`, so a shot through two walls at
+     60 m perforated sheet metal exactly as hard as a point-blank shot.
+- **Mechanical falsifier:** `src/ballistics.test.ts` — the roster is now derived
+  from the canonical registry (`ARENA_IDS` → `loadArenaFactories`), with an
+  explicit per-arena fallback ceiling (`nuketown2: 0`) that may only shrink, a
+  pinned `BALLISTIC_MATERIAL_CLASS` projection, and three assertions that the
+  trace's `energyAtEntryQ` falls with distance and with prior cover.
+  `src/additional-maps.test.ts` derives the penetration lab's lane contract.
+- **Required evidence:** the RED run of the derived gate naming all 30 surfaces
+  (`docs/evidence/pass94/nuketown2-ballistics/step2-red-derived-roster-gate.txt`),
+  the green rerun, `npm run qa:ballistic-parity -- --arenas nuketown2,gun-range`
+  at UNRATED 0 / ceiling 0, and the lane report.
+- **Explicitly NOT done in this lane, so it is not later mistaken for done:**
+  no perforable-panel authority outside the field shed (the moving truck's box
+  body and the new `thin-metal` sign faces are RATED but cannot yet gain a
+  hole); no persistent holes in wood; perforation still does not open bot line
+  of sight; `perforateEnergyQ` was deliberately not retuned in the same change
+  as its input.
+- **Planning mapping:** shared ballistics authority; no protocol change — glass
+  rides `window-break`, perforation rides `interactive-world-snapshot`.
+
 ## PASS 93 publish record — 2026-09-04 08:10 BST (hotfix)
 
 - **Published** by `scripts/orchestration/publish_pass93.py` (exit 0) from head
@@ -1357,6 +1426,287 @@ assets and textures and lighting need to be tip top, raid can come next"
   shared node_modules was half-reinstalled by an elevated Codex run and cannot
   be repaired unelevated (EPERM on the rolldown binding); the integration
   branch is checked out in `aa-claude-hotfix` until the owner repairs it.
+
+## HF-455..457 — owner 2026-09-04 08:25 after playing PASS 93
+
+- **HF-455 (standing rule):** "It would be good to get a human in the loop
+  preview before you publish it that's been debugged" → every future pass gets
+  a local HITL build (stock-Chrome gate green first) and the owner's play
+  before publication. PASS 93 was the hotfix exception.
+- **HF-456 (P1, all maps):** "on the Nuke Town map the bot spawns seem to just
+  spawn in 1 or two places; all maps need better spawns for both players and
+  bots, that's a big thing to fix" → spawn-distribution lane: audit every
+  registered arena's player and bot spawn sets and the selection logic; spread
+  spawns (farthest-from-threat, recent-use avoidance, team-side aware), add
+  points where an arena has too few, keep the spawn audits green.
+- **HF-457:** "there's still wild z-fighting on the floor in the houses" and
+  the stairs → confirmed: PASS 93 is hotfix-only; Luna's floor/stair fixes and
+  the visual polish live on `nuketown2-tiptop`, being made shippable now
+  (HITL next, then PASS 94).
+
+## HF-458 — owner 2026-09-04 09:30: killstreak tuning (helicopter, drone swarm, piloted drone taser)
+
+- Helicopter: rockets 6 → **12**; on autopilot it fires only 6, a human pilot
+  can use the extra 6; the AI must actually use its rockets; machine-gun
+  damage **−25 %**.
+- Drone swarm: fire rate **+25 %**, movement speed **+15 %**.
+- Piloted drone: movement speed **+15 %**, fire rate **+25 %**; **right-click =
+  electric taser**: stuns the target (cannot move ~1 s, a flashbang-like but
+  clearly "tasered" effect), **3 taser charges**; fires automatically when the
+  drone is unpiloted and manually when piloted.
+- Lane: `killstreak-tuning` off the PASS 93 head (Luna), unit-tested numbers
+  and stun effect, HITL before publish per HF-455.
+
+## HF-458 result — 2026-09-04 10:00 (Opus, branch `killstreak-tuning`, commit 517b7491)
+
+- Chopper: rockets 6 → 12; autopilot budget 6 (before: the AI could never fire a
+  rocket, launches measured at 3.0/5.6/8.2/10.8/13.4/16.0 s then stops with 6
+  left for a human); MG damage ×0.75 (34/22 → 25.5/16.5).
+- Swarm: cadence 300 → 240 ms and the fire lane 460 → 368 (the real limiter);
+  ingress/patrol/approach speeds ×1.15. Piloted drone: cadence 240, speed
+  3 → 3.45 manual / 6 → 6.9 autonomous.
+- Taser: 3 charges per drone, 1.0 s stun, 1.5 s cooldown, 22 m; auto-fires
+  when unpiloted at the nearest hostile with line of sight, right-click when
+  piloted; bots stunned; electric-blue edge vignette + camera jitter (not the
+  white flash); host-authority replicated like the flashbang.
+- Gates: tsc clean; full suite 582 files / 5689 tests. OPEN: browser checks
+  (VRAM held by the local model at the time), live two-peer stun, and the
+  owner's read of the taser effect (HITL).
+
+## HF-459 — HITL candidate 2 (PASS 94 candidate), 2026-09-04 10:05
+
+- **Handoff claim:** candidate `c3880181` on `pass93-candidate` (worktree
+  `aa-claude-hitl`) = live PASS 93 head + `killstreak-tuning` (517b7491)
+  + `nuketown2-tiptop` (Luna ship-candidate verdict SHIP: north house siding
+  0x46809f, south 0xf4be36 pinned distinct; marker cubes removed; stock-Chrome
+  boot 10/10 shots there). Built 10:0x, served on http://127.0.0.1:4300/ (host
+  0.0.0.0). Still calls itself PASS 93 until the real cut. NOT published.
+- **Owner checklist:** house floors (no z-fighting at any angle), stairs both
+  ways, house colours read blue vs yellow, detail/materials/lighting, pool,
+  chopper rockets (autopilot 6 / piloted 12, weaker MG), swarm and piloted
+  drone speed, right-click taser (3 charges, 1 s stun, blue crackle), FPS.
+- **Not in it yet:** spawn distribution (Luna, running) and the two load-time
+  branches (need the browser tripwire probe).
+
+## HF-460..466 — owner 2026-09-04 10:30 after playing HITL candidate 2 ("gameplay is feeling great now")
+
+- **HF-460 (Qwen handoffs):** "you can't be injecting thousands of context;
+  just a bit, the tools it needs, be very specific" → done (contextWindow 61440,
+  --no-skills --no-lsp, one file per call, exact edit spec).
+- **HF-461 (P1 accuracy):** "maybe the garages are on the wrong side, almost
+  like you've created the mirror of the map" → verify Nuke Town Rebuild's
+  orientation against the real BO2 Nuketown (house/garage sides, which house
+  is which colour from the spawn's point of view); fix if mirrored.
+- **HF-462 (assets):** vehicles read as code-made; owner shared
+  https://x.com/prasenx/status/2095537643182563778 (Astra: AI-driven Blender
+  asset generation) and asks for the same result WITHOUT Blender — a
+  code-native asset forge (procedural, higher fidelity, lower poly, cheaper),
+  or a Blender-like tool of our own if needed; start with code. Ingest the
+  thread into the technique register; first targets: coach, truck, cars.
+- **HF-463 (P1):** "still Z tearing in the middle of the street" → road
+  markings/centre dashes vs carriageway; fix with the same geometric rule as
+  the interiors (no coplanar surfaces, not offsets).
+- **HF-464 (P1):** "the windows upstairs need to be breakable" → breakable
+  glass on the upper-floor windows (the shipped house-glass mechanism).
+- **HF-465 (P1):** "we're missing some balconies if you check the actual map
+  layout and architecture of the original Black Ops 2 Nuketown" → research
+  the real architecture (balconies/porches/decks) and add them.
+- **HF-466 (directive):** "hide the original Nuketown now and accelerate on
+  making Nuke Town really good" → park the original arena (selectable: false,
+  like Farcrysis), keep gates deriving rosters; Nuke Town Rebuild becomes the
+  focus arena.
+- **HF-467 (P1 ballistics):** "glass or blocks have no penetration; metal and
+  glass should be shot through, glass breaks; thin metal (the shed) should get
+  a hole with no collision after" → per-material penetration classes (glass
+  breakable + pass-through, thin metal perforates and loses collision at the
+  hole, concrete/brick stop), using the destructible-shed machinery.
+
+## HF-462 correction — 2026-09-04 10:35: the shared post is "morning-diner", not "Astra"
+
+- The X post (prasenx, 2026-09-03) is a Claude-Fable-built, 100 % procedural
+  three.js diner — "all code, nothing was downloaded": textures generated in
+  Workers at boot, two-sun rig with baked probes, HDR post chain, cars and the
+  exterior built from code, made with a modified Matt Shumer gauntlet loop
+  (we carry that method as the `visual-gauntlet-loop` skill). Repo:
+  https://github.com/StarKnightt/morning-diner (docs/PROMPT.md = the verbatim
+  brief, BUILD.md = the 344 KB build log, src/procedural/textures.ts,
+  src/core/materials.ts, src/scene/Lighting.ts, src/scene/Exterior.ts = cars).
+  Cloned read-only to `C:\Users\david\projects\morning-diner-ref` for the
+  asset-forge lane: extract the technique into a skill, then apply it to Nuke
+  Town's vehicles and materials in code — no Blender.
+
+## HF-468 — owner 2026-09-04 10:50: "Astra" threads ingested; code-native equivalent wanted
+
+- Read in the pane without login: mattshumer_ 2095609734845927525 ("GPT-6
+  Astra built this Manhattan world in Unreal Engine over a week, street by
+  street"); Stefan_3D_AI 2095720649922871630 (OpenAI launch, 4 Sept 2026:
+  GPT-6 Astra works inside Blender autonomously — gathers reference photos,
+  builds the scene, renders test frames, checks them against the references,
+  fixes what is off, ships to UE5 as a walkable level), 2095720653500695029
+  (Palace of Fine Arts rebuilt from hundreds of photos by render-and-compare),
+  2095720656944115856 (house from a design drawing → UE5; Playco: one greybox →
+  three playable prototypes with ~half the manual fixes).
+- **Owner:** get close to that outside Blender, or use Blender later on a test
+  map ("test map 4"); ideally our own light version that uses WebGPU to the
+  fullest plus our skills.
+- **Assessment:** Astra's loop is the gauntlet loop with two additions we lack:
+  (1) reference gathering (real photos/drawings as the target), (2) a critic
+  that compares renders AGAINST the references, not against a rubric. Our
+  stack can do both in code: first-party reference sets per subject, headless
+  captures, reference-grounded critics (vision models given the reference and
+  the capture side by side), fixes in TSL/three.js. That is the asset-forge
+  lane's design; Blender stays optional for a later test-map experiment.
+
+## HF-469 — owner 2026-09-04 10:55: "kick off the research before the reset, then go ham"
+
+- Research workflow launched 10:57 (five parallel Opus lanes, research only,
+  outputs under `docs/research/2026-09-04/` on branch `research-2026-09-04`):
+  R1 diner method → skill draft (photoreal-procedural-scene-forge, vehicle-
+  from-code recipe, TSL port table); R2 code-native reference-grounded loop
+  (Astra equivalent: reference sets, reference-comparing critics, runner);
+  R3 material penetration/perforation design (glass, thin metal with holes and
+  collision loss, wood, concrete; host-authority replication; gates); R4 BO2
+  Nuketown accuracy (mirror/garages/colours/balconies with provenance); R5
+  skills and tooling survey (our store, Skills Hub, three.js TSL resources,
+  Blender-AI best practices, licences). Each ends with an ordered
+  implementation plan sized for one post-reset Opus lane.
+- Owner idea logged: Blender experiments, if ever needed, go on a test map
+  ("test map 4"), never on Nuke Town.
+
+## HF-470 — research outcomes, 2026-09-04 10:55 (branch `research-2026-09-04`, docs/research/2026-09-04/, 3,253 lines)
+
+- **R1 diner method:** the repo has NO licence (private: true) → port the
+  method and physics, never the source; attribute. 16-step skill draft
+  `photoreal-procedural-scene-forge` (textures at true physical size in 8
+  OffscreenCanvas workers, wear at three scales, albedo-visible wear rule,
+  physical exposure and film curve, two-sun rig + probes, closed-form slat
+  transmittance), a TSL port table (every onBeforeCompile patch must become
+  TSL nodes; their post chain is replaced by ours; photographic sun:shade
+  ratios must NOT enter a competitive FPS), and a vehicle-from-code recipe
+  (station rings on a flank profile, superellipse arches, crease normals,
+  shut lines, glass cut from the loft, paint as pigment under clearcoat).
+- **R2 reference loop:** VERIFIED the 18 overnight critic files never named a
+  reference; scores drifted 77 → 97 against a rubric with no anchor, and
+  nothing proves the critics received image bytes. Design: first-party
+  reference sets with provenance (HF-426 precedent), a reference-comparing
+  critic with a probe-token receipt, a mechanical perceptual pre-check, a
+  journaled runner replacing the .cmd chains.
+- **R3 penetration:** the system already SHIPS (traceBallisticPath energy
+  budget, apertureQuery holes, glass crack/breach/detach, host-authoritative
+  shed perforation). Nuke Town Rebuild never connected to it:
+  `breakableWindows: []`, window glass is a permanent static collider, 22
+  shot surfaces fall through to `reinforced` (unshootable — the owner's
+  "blocks"), trim/partitions/car glass misclassified, and the ballistics gate
+  hard-codes six builders (nuketown2, map3, raid2, test1, test2 never gated).
+- **R4 accuracy:** the Rebuild has no chirality — every handed feature is
+  built through pair() (180° rotation), so "mirrored" is undefined; fix =
+  reference-anchored frame + NUKETOWN2_HANDEDNESS + a gate, then a ten-second
+  owner look sets the sign. Balconies are absent entirely; spec written (rear
+  balcony 4.4 × 2.0 m deck at y = 3.3, 1.1 m rail, exterior stair, front
+  ledge + porch canopy). House colours for the 2025 remaster CLAIMED
+  blue + orange, needs one capture to settle.
+- **R5 survey:** the shared skills junction had drifted again (this harness
+  saw 0 of 163) → relinked 11:18; Skills Hub has zero procedural-texture
+  skills and nothing above our TSL contract → ingest nothing, write our own.
+
+## HF-471 — owner 2026-09-04 11:00: control plane, subscriptions, governance (cross-repo)
+
+- Owner will use Codex/ChatGPT (GPT-6 Astra) more this weekend; Claude Code
+  stays the orchestrator (local Qwen, Gemini + Z.ai via OMP, Codex/Luna,
+  Hermes; Muse Spark 1.3 and possibly Grok 4.6 coming). Requirements, recorded
+  in the control-plane repo (`worktrees/foundry-fleet-contract-poc`,
+  `control-plane/provider-plans-notes-2026-09-04.md`): fix the inherited
+  Codex problems with skills and the publish pipeline; wire Codex/ChatGPT into
+  the Obsidian vault, shared skills, AKP rules and the run ledger like Claude
+  and OMP are; the Foundry OS cockpit must report live sessions truthfully
+  (Codex/Luna, OMP Gemini, OMP Z.ai, local Qwen were invisible or mislabelled;
+  "open 6 / live 1" confusion), with provider logos, a much smaller dispatch
+  box, no key-like strings, 5-hour + weekly usage per provider top-right, a
+  fully detailed Models & Plans tab, new tabs for usage over time and a
+  quality/hill-climb dashboard (Karpathy-style auto-research with a
+  self-improving meta layer; research "NVIDIA AVO"), and a daily digest.
+- Dispatch: post-reset Opus lanes CP1–CP5 in that repo; the game lanes
+  continue in parallel.
+
+## HF-472 / HF-473 — owner 2026-09-04 11:15
+
+- **HF-472 (ingestion policy, standing):** when the owner shares three.js
+  examples or repos, licensed or not: (1) check what our skills and code
+  already cover, (2) measure against a central skills-ingestion hub (to be set
+  up — pre-orchestrated or manual), (3) never copy or fork: re-implement the
+  techniques in our own likeness, adapted to our use case (a "no guns" clause
+  or a missing licence is irrelevant because nothing is copied). This is the
+  stance R1 took for morning-diner; make it the hub's rule.
+- **HF-473 (handedness, decisive owner observation):** "when I play Black Ops
+  2 on Steam the garage is always on the RIGHT of the house from behind it,
+  whereas here both garages are on the LEFT". This is consistent with R4:
+  the real map is 180°-rotationally symmetric (both houses garage-right from
+  their own backyard) and so is ours, but with the opposite handedness. The
+  fix is a MIRROR of the whole layout across the street axis (flip
+  NUKETOWN2_HANDEDNESS), not a rotation; add a gate: viewed from each house's
+  backyard spawn, its garage is on the right. Also the Atomic Acres precedent:
+  the top-right minimap was back-to-front months ago — check the minimap
+  projection too. Reference against BO2 screenshots/videos, not only
+  top-downs; the target is a high-fidelity skeleton of BO2 Nuketown with
+  better graphics and gameplay, evolving from there.
+- **Cadence from the reset:** research and tooling in the remaining hour, then
+  improvements every hour or two with owner HITL feedback (possibly videos).
+
+## HF-474 — 2026-09-04 11:40: post-reset blitz launched (ten parallel Opus lanes)
+
+- Game: I1 Nuke Town ballistics wiring (branch `nuketown2-ballistics`), I4
+  handedness mirror + gate + balconies/porch (`nuketown2-handedness`) — both
+  start when Luna's round 2 exits and build on it; I2 vehicle forge
+  (`vehicle-forge`, presentation-only, method re-implemented from the diner
+  recipe); I3 reference-grounded loop runner (`reference-loop-runner`); I6
+  diner-method skill installed under AKP governance; Raid and Farcrysis plans
+  (research docs).
+- Control plane and governance: CP3 cockpit tabs (usage over time, quality /
+  hill-climb, daily digest) after Luna's cockpit lane; CP4 auto-research +
+  meta-loop spec (Karpathy autoresearch; "NVIDIA AVO" to be resolved
+  honestly); CP5 governance (Codex system-skills wipe fix, run-ledger writes
+  for delegated jobs, Codex/ChatGPT parity, inherited Codex problems closed);
+  the skills-ingestion hub (register, pipeline, script) in the vault.
+- Also running: Luna round 2, spawns, Qwen benchmark, cockpit NOW/Models&Plans;
+  Qwen header chain; Alibaba token plan wired into OMP.
+
+## HF-475 — blitz outcomes, 2026-09-04 12:50 (ten Opus lanes, 69 min)
+
+- **I1 ballistics** (`nuketown2-ballistics` d8eaa1df): 30 unshootable
+  "reinforced" fallbacks rated (concrete/wood/thin-metal/vehicle/glass),
+  trim/partition/road misclassifications fixed, roster-derived ballistics gate
+  with shrink-only ledgers (test2 135 / raid2 105 / test1 58 / map3 21 debts
+  now pinned), material classes shatter/perforate/penetrate/stop, perforation
+  charged from remaining energy, glass-authority test for all 8 panes, wallbang
+  lab gains thin-metal + steel lanes. 201/201 tests. OPEN: browser probes (GPU
+  held by the local model), holes on non-shed sheet metal (signs, truck box).
+- **I4 handedness + balconies** (`nuketown2-handedness`, 10 commits): ours WAS
+  the mirror; `NUKETOWN2_HANDEDNESS = -1` applied at the four solid-authoring
+  seams; rear balcony, exterior flight, ledge, canopy per R4. OPEN: browser
+  gates and the two backyard captures (GPU).
+- **I2 vehicle forge** (`vehicle-forge`, 4 commits): src/vehicle-forge/ lofted
+  bodies from data specs; street vehicles dressed with forged skins;
+  presentation-only. OPEN: boot smoke and GPU captures.
+- **I3 loop runner** (`reference-loop-runner` 00673bc0): perceptual pre-check,
+  probe-token receipt, adapters; local Qwen NOT admitted as a critic (failed a
+  four-row task). **I6** skill `photoreal-procedural-scene-forge` installed
+  under AKP governance (vault eedc437, AKP 28608fc). **Raid** and **Farcrysis**
+  plans written (research branch da95b7d4). **CP3** cockpit Usage/Quality tabs
+  + digest pushed (04860a5) — owner must restart the cockpit. **CP4**
+  auto-research spec (Karpathy autoresearch confirmed real; the "NVIDIA AVO"
+  reference resolution is in the doc). **CP5**: skills-wipe ROOT CAUSE
+  CONFIRMED (Codex writes `.system` skills into its skills root on every
+  start) and FIXED (Codex gets a private root with a junction to the shared
+  store; relinker idempotent + locked); AKP gotcha 17835e6; owner decision:
+  lift Codex's AKP quarantine. **HUB**: vault Ingestion/ register (52 rows),
+  pipeline, script; AKP tools row.
+- **Cross-cutting gap:** every browser gate in the blitz was OPEN because the
+  local model held VRAM continuously (header chain). GPU lock set 12:48 for
+  the candidate gates; a day-time policy is needed (small model, night-only
+  chain, or a VRAM-aware scheduler).
+- **Integrator launched 12:50:** PASS 94 candidate = PASS 93 + killstreaks +
+  spawns + handedness (incl. round 2) + ballistics + vehicle forge; honest
+  gates; HITL on :4300.
 
 ## HF-473 and HF-465 — PASS 94 lane I4 status, 2026-09-04
 
@@ -1436,6 +1786,132 @@ additive so the two merge without touching each other's rows.)*
     then `node scripts/qa/capture-arena-viewpoints.mjs --serve-dist dist-vr-i4
     --arenas nuketown2 --label pass94-handedness --sha <head>`.
 
+---
+
+## PASS 94 lane TECHNIQUES — the owner's shared 3D techniques, applied to the Rebuild
+
+Owner ask: *"can we be using the cool three.js techniques from the threads I
+shared (Fable, Opus, GLM and more) — get it really nice?"*
+
+Branch `contrib/dave-gaming-pc/claude/nuketown2-techniques`, head `d74174e4`,
+based on `nuketown2-handedness` @ `5f5ecc47` (the brief's `pass93-candidate`
+does not exist on origin — see the report's section 0). Full write-up, register
+row mapping and evidence: `docs/evidence/pass94/nuketown2-techniques/REPORT.md`.
+
+Four new modules, all presentation-safe, plus one frame-loop instrument:
+
+- `src/nuketown2-vegetation.ts` — register rows 18/24/38. Clipped hedges that
+  clad the arena's own solid hedge/planter bodies, and a 54-trunk avenue in the
+  previously empty band between the perimeter wall and the forest ring. Two
+  species, three LOD levels each, layered GPU wind on the one existing hook.
+- `src/nuketown2-pool-water.ts` — register row 46. Replaces the pool's constant
+  colour with a real per-channel Beer-Lambert integral over an authored bed
+  depth and the view angle, backscatter upstream of it, depth-driven edge foam,
+  and local Fresnel transparency. Restated from published physics; no part of
+  the paid library was purchased, downloaded or read.
+- `src/nuketown2-yard-props.ts` — img2threejs. The BO2-2025 aerial's appliance
+  bank, glasshouse, garden pod and sand pit at three authored reading tiers.
+  Geometry is an exact 180-degree pair; the reference's yard identity is carried
+  by the hob COLOUR alone (red / blue), which FINDINGS Q4 calls the cheapest
+  chirality anchor in the reference.
+- `src/nuketown2-grime-decals.ts` — rows 47/48. Tyre scuff, oil, slab cracking,
+  court paint, stepping stones and wall grime on a -3 offset tier, only where
+  `find-coplanar-pairs.ts` honours an offset.
+
+Gates: `tsc` clean; coplanar **0 FINDINGS / 0 STREET / 0 HOUSE-INTERIOR**
+(boxes 726 -> 802, FENCED 170, BENIGN 26); 10 test files / 95 tests green
+including 33 new ones; WebGPU review captures 10 of 12 cameras on
+nvidia/blackwell with zero page or console errors; draw calls 356 -> 391
+(+9.8 %, under the 15 % ceiling) with the frame loop still at one entry point.
+
+**Three findings this lane hands over rather than absorbing:**
+
+1. **HF-465's two review cameras do not exist at runtime.**
+   `nuketown2-north-balcony` and `nuketown2-front-porch` return
+   `setArenaReviewCamera returned false - authored camera missing`. They are in
+   `viewpoint-catalog.mjs` and in `src/rendering/arenas/nuketown2.ts`, but the
+   runtime path rejects them. **PRE-EXISTING**: an identical run at base
+   `5f5ecc47` in a separate worktree fails on exactly the same two. This blocks
+   the handedness lane's own two owed captures.
+2. **The shared `node_modules` lost `@playwright/test` and `.bin` mid-pass.**
+   `aa-claude-chopper/node_modules` is junctioned by several worktrees; 350
+   packages remain and no install is running, so it was pruned rather than
+   being mid-install. `qa:pass74:arena-boot-smoke` and `qa:stock-boot` are
+   therefore **OPEN**. Not repaired — that tree is shared with live lanes.
+3. **The ground outside the perimeter wall is the biggest remaining art
+   problem.** `nuketown2-overhead` shows a vast pale sand-cream plain that now
+   occupies more of the frame than the map does, and the new avenue draws the
+   eye straight to it. Pre-existing ground-slab material; belongs to the
+   materials lane; highest-value visible fix in these frames.
+
+Not merged into this branch and owed at integration: `nuketown2-ballistics`,
+`vehicle-forge`, `spawn-distribution`. Re-run the coplanar instrument after the
+`vehicle-forge` merge in particular.
+
+## HF-476 — owner 2026-09-04 12:58: "nuketown in black ops 2 is what we need, not a diff one"
+
+- Reference target is Black Ops 2's **Nuketown 2025** only. Other Nuketowns
+  (BO1 original, Cold War '84, Nukehouse, BO6/BO7) are secondary evidence,
+  admissible only for features shown identical in BO2 Nuketown 2025, and
+  every reference and finding must be labelled with its game version. The
+  balcony spec from R4 (inherited from '84/original) must be re-checked
+  against BO2 Nuketown 2025 images before it ships.
+
+## HF-477 — BO2 Nuketown 2025 reference facts, 2026-09-04 13:20 (Opus, 20 version-tagged images, `research-2026-09-04` docs/references/nuketown-2025/)
+
+- **Garage RIGHT from each own backyard spawn — VERIFIED (BO2-2025)**, same
+  for both teams (180° pair); a global mirror flips both, so the gate must be
+  the right/left cross-product form, not "towards the cul-de-sac".
+- **House colours — the yellow/blue premise is BO1, not BO2-2025.** In 2025
+  the houses are **terracotta-orange over cream** and **white/cream modernist
+  with pale blue-grey glazing**. Current branch pins blue 0x46809f / yellow
+  0xf4be36 → both wrong; exact hex OPEN (no calibrated source). Chirality
+  anchors: RED three-unit appliance bank on the orange lawn, BLUE on the white
+  lawn; yards differ (glasshouse/carport vs garden-pod/sand-pit/shuffleboard).
+- **Rear deck + wooden exterior stair — VERIFIED on both houses**, at the end
+  OPPOSITE the garage on the yard side, over an undercroft with a circular
+  patio at the stair foot. Porch = a wide cantilevered eave, not a canopy on
+  posts. Under-window front ledge OPEN.
+- **Overhead — VERIFIED:** lollipop cul-de-sac: ONE circular turning head at
+  one end with a stem running off-map (ours has a centred 16 m head and two
+  blank ends); a THIRD house beyond the head with its own drive and a red
+  car; tour coach on the orange house's side, box truck + dark saloon on the
+  white house's side, both nosed down the stem; a green classic car in the
+  stem. No bomb shelter in 2025. Mailboxes OPEN.
+- Next Nuke Town lane (after the PASS 94 candidate HITL): "BO2-2025 accuracy
+  pass 2" — colours, deck/stair placement, eave, lollipop head + stem + third
+  house, vehicle placement, lawn appliance banks, cross-product gate.
+
+## HF-478 — 2026-09-04 13:35: afternoon wave (six Opus lanes) and the beast-run plan
+
+- Owner: "when is the next HITL... then scheduling a beast run? why are you not
+  orchestrating more now we have usage resets". Launched six parallel Opus
+  lanes: BO2-2025 accuracy pass 2 (colours orange/white, deck opposite the
+  garage, eave porch, lollipop head + stem + third house, vehicle placement,
+  lawn appliance-bank anchors), Nuke Town materials depth (photoreal
+  procedural library at true scale), lighting/atmosphere (three times of day,
+  physical exposure with a combat floor, baked indirect), Raid rebuild slice 1,
+  Farcrysis rework slice 1 (parked), load-time verification (both admission
+  branches merged and proven with the tripwire probe).
+- Beast run (tonight): the reference-grounded loop runner drives Gemini/GLM/
+  Alibaba builders and reference-comparing critics on the Rebuild for hours
+  (probe-token receipts, journaled scores, plateau rule), local Qwen on
+  mechanical tasks with the GPU-yield rule, Opus verification at ~06:00; each
+  cycle's candidate is a HITL for the owner in the morning.
+
+## HF-479 — owner 2026-09-04 13:45: apply the shared three.js techniques; animation + skins from image/local video
+
+- "can we be using some of the cool three.js techniques from the threads I
+  shared... get it really nice? and find a way to use image and H3 local video
+  to get better animations too? players and bots, and better skins?"
+- Launched two Opus lanes: **techniques** (register-driven: vegetation LOD +
+  wind, pool water upgrade, hero props via img2threejs from the BO2-2025
+  references — mailboxes, appliance banks, bins, garden pod, sand-pit,
+  shuffleboard, glasshouse/carport — tiered decals/grime, frame-loop audit
+  with a 15 % draw-call ceiling) and **animation + skins** (capability map
+  honouring the SAM/mocap rule — never mocap where guns are involved — with
+  the licence-safe local routes; slice 1: procedural locomotion/aim layer for
+  players and bots and a TSL operator skin system replacing tint-only skins).
 ### HF-477 — BO2 Nuketown 2025 accuracy (LANE ACCURACY-2, 2026-09-04)
 
 **Owner lane:** arena accuracy. **Maps/modes:** Nuke Town Rebuild (`nuketown2`), all modes.

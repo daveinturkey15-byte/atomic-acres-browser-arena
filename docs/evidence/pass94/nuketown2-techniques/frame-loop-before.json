@@ -1,0 +1,26 @@
+{
+  "head": "nuketown2 frame-loop audit",
+  "drawCalls": {
+    "worstCaseLodNear": 356,
+    "typicalFromArenaCentre": 356
+  },
+  "triangles": {
+    "worstCaseLodNear": 215326,
+    "typicalFromArenaCentre": 215326
+  },
+  "frameLoop": {
+    "entryPoints": 1,
+    "entryPoint": "root.userData.nuketownLawnWind (driven by updateArenaArt)",
+    "framesSampled": 6000,
+    "microsecondsPerFrame": 0.0381,
+    "heapBytesPerFrame": 18.43
+  },
+  "lawn": {
+    "blades": 9298,
+    "triangles": 139470,
+    "drawCalls": 8,
+    "regions": 8
+  },
+  "colliders": 292,
+  "raycastMeshes": 304
+}

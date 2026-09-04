@@ -26,6 +26,17 @@ import {
   type SupportAircraftCollisionEnvelope,
 } from './support-aircraft-collision';
 import {
+  CHOPPER_AUTOPILOT_MISSILE_ARM_DELAY_MS,
+  CHOPPER_AUTOPILOT_MISSILE_BUDGET,
+  CHOPPER_AUTOPILOT_MISSILE_CADENCE_MS,
+  CHOPPER_AUTOPILOT_MISSILE_RANGE_M,
+  CHOPPER_MISSILE_CAPACITY_AFTER,
+  PILOTED_DRONE_TASER_CHARGES,
+  PILOTED_DRONE_TASER_RANGE_M,
+  TASER_STUN_DURATION_MS,
+} from './killstreak-tuning';
+import { admitTaserShot, selectAutoTaserTarget, type TaserChargeState } from './taser-stun';
+import {
   rollCarePackageReward,
   downgradeCarePackageWeaponReward,
   type CarePackageReward,
@@ -38,8 +49,14 @@ export const ADRENALINE_MOVEMENT_MULTIPLIER = 1.1;
 export const ADRENALINE_RELOAD_DURATION_MULTIPLIER = 0.9;
 export const CHOPPER_DURATION_MS = 30_000;
 export const CHOPPER_HEALTH = 800;
-/** One finite operator payload per Chopper activation; the 30 mm cannon remains belt-fed. */
-export const CHOPPER_MISSILE_CAPACITY = 6;
+/**
+ * One finite operator payload per Chopper activation; the 30 mm cannon remains
+ * belt-fed. HF-458 doubled it 6 -> 12 and split it: the autopilot may spend at
+ * most CHOPPER_AUTOPILOT_MISSILE_BUDGET of the twelve, so a human who takes
+ * the gun always has the remainder (all twelve, if they take it immediately).
+ */
+export const CHOPPER_MISSILE_CAPACITY = CHOPPER_MISSILE_CAPACITY_AFTER;
+export { CHOPPER_AUTOPILOT_MISSILE_BUDGET } from './killstreak-tuning';
 export const CHOPPER_MISSILE_CADENCE_MS = 1_000;
 export const CHOPPER_MISSILE_FLIGHT_MS = 780;
 // HF-335: alternating wing sockets the missiles launch from, in the chopper's
@@ -289,6 +306,10 @@ type ChopperEntity = EntityBase & {
   pendingPlayerFire: boolean;
   pendingPlayerMissile: Readonly<{ aimYaw: number; aimPitch: number }> | null;
   missilesRemaining: number;
+  /** HF-458: how many of the shared payload the AUTOPILOT has spent. */
+  aiMissilesFired: number;
+  /** HF-458: the autopilot's own launch clock, independent of the pilot's. */
+  nextAiMissileAtMs: number;
   nextMissileAtMs: number;
   nextMissileOrdinal: number;
   pendingMissiles: Array<Readonly<{
@@ -318,6 +339,10 @@ type DroneEntity = EntityBase & {
   strafe: number;
   vertical: number;
   pendingPlayerFire: boolean;
+  /** HF-458 item 3: right-click taser request from the pilot (edge, not held). */
+  pendingPlayerTaser: boolean;
+  /** HF-458 item 3: three charges per drone, shared by pilot and autopilot. */
+  taser: TaserChargeState;
   gunProfileId: DroneGunProfileId;
   nextSensorRefreshAtMs: number;
   sensorContacts: DroneSensorContact[];
@@ -443,6 +468,8 @@ export type KillstreakControlIntent = Readonly<{
   fire?: boolean;
   /** Edge-triggered RMB request. It is never interpreted as a held fire state. */
   missileFire?: boolean;
+  /** HF-458 item 3: Piloted Drone right-click taser (edge request). */
+  taserFire?: boolean;
 }>;
 
 export type KillstreakAdmission = Readonly<{
@@ -507,6 +534,28 @@ export type KillstreakAdvanceResult = Readonly<{
   expiredEntityIds: readonly string[];
   /** HF-334: weapon grants completed by enemy-hold captures this host step. */
   careWeaponGrantEvents: readonly CareWeaponGrantEvent[];
+  /** HF-458: Piloted Drone taser hits the host admitted this step. */
+  taserStunEvents: readonly KillstreakTaserStunEvent[];
+}>;
+
+/**
+ * HF-458: one admitted taser hit. The host turns each of these into a
+ * `TaserHostAuthority` result and replicates it exactly like a flashbang, so
+ * the stun a victim sees is always host-authored.
+ */
+export type KillstreakTaserStunEvent = Readonly<{
+  activationId: string;
+  entityId: string;
+  ownerId: string;
+  targetId: string;
+  targetKind: 'player' | 'bot';
+  targetLifeId: number;
+  position: SupportVec3;
+  durationMs: number;
+  /** False when the drone fired it on autopilot. */
+  pilotFired: boolean;
+  chargesRemaining: number;
+  atMs: number;
 }>;
 
 export type KillstreakActorSnapshot = Readonly<{
@@ -542,6 +591,8 @@ export type KillstreakEntitySnapshot = Readonly<{
   gunController: 'ai' | 'owner-player' | null;
   missileAmmo: number | null;
   missileCooldownMs: number | null;
+  /** HF-458: remaining taser charges; null for every non-piloted-drone entity. */
+  taserCharges: number | null;
   captureActorId: string | null;
   captureProgress: number | null;
   revealedReward: Pass65KillstreakId | null;
@@ -1693,6 +1744,12 @@ export class HostKillstreakRuntime {
         kind: 'chopper', phase: 'inbound', seed, routeCentre: centre, gunController: 'ai',
         nextShotAtMs: nowMs + 600, nextShotOrdinal: 0, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
         pendingPlayerMissile: null, missilesRemaining: CHOPPER_MISSILE_CAPACITY,
+        aiMissilesFired: 0,
+        // The autopilot arms only once the airframe is on station; a launch
+        // from the inbound phase reads as a scripted cutscene, not support.
+        // It is a SEPARATE clock from nextMissileAtMs so a human who takes the
+        // gun on frame one is not made to wait out the autopilot's arm delay.
+        nextAiMissileAtMs: nowMs + CHOPPER_AUTOPILOT_MISSILE_ARM_DELAY_MS,
         nextMissileAtMs: nowMs, nextMissileOrdinal: 0, pendingMissiles: [],
       };
       const pose = chopperRoutePose(seed, nowMs, nowMs, centre, world.bounds);
@@ -1712,6 +1769,8 @@ export class HostKillstreakRuntime {
         magazine: DRONE_MAGAZINE_SIZE, reserveClips: PILOTED_DRONE_RESERVE_CLIPS,
         reloadCompletesAtMs: null, nextShotAtMs: nowMs, nextShotOrdinal: 0, targetId: null,
         yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
+        pendingPlayerTaser: false,
+        taser: Object.freeze({ charges: PILOTED_DRONE_TASER_CHARGES, nextTaserAtMs: nowMs }),
         gunProfileId: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
         nextSensorRefreshAtMs: nowMs,
         sensorContacts: [],
@@ -1756,6 +1815,10 @@ export class HostKillstreakRuntime {
           magazine: DRONE_MAGAZINE_SIZE, reserveClips: null,
           reloadCompletesAtMs: null, nextShotAtMs: nowMs + 500 + index * 35, nextShotOrdinal: 0, targetId: null,
           yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
+          // HF-458 gave the taser to the Piloted Drone only; a 24-unit swarm
+          // with 72 stun charges is a different feature nobody asked for.
+          pendingPlayerTaser: false,
+          taser: Object.freeze({ charges: 0, nextTaserAtMs: nowMs }),
           gunProfileId: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
           nextSensorRefreshAtMs: Number.POSITIVE_INFINITY,
           sensorContacts: [],
@@ -1990,6 +2053,7 @@ export class HostKillstreakRuntime {
       if (entity.kind !== 'drone' || entity.mode !== 'piloted') return reject('wrong-entity-kind');
       if (actor.possession?.kind === 'piloted-drone' && actor.possession.entityId === entity.id) {
         entity.pendingPlayerFire = false;
+        entity.pendingPlayerTaser = false;
         entity.thrust = 0;
         entity.strafe = 0;
         entity.vertical = 0;
@@ -2011,6 +2075,7 @@ export class HostKillstreakRuntime {
     } else if (intent.action === 'exit-piloted-drone') {
       if (entity.kind !== 'drone' || entity.mode !== 'piloted') return reject('wrong-entity-kind');
       entity.pendingPlayerFire = false;
+      entity.pendingPlayerTaser = false;
       entity.thrust = 0;
       entity.strafe = 0;
       entity.vertical = 0;
@@ -2020,11 +2085,13 @@ export class HostKillstreakRuntime {
       this.restoreActorControl(actor, false);
     } else {
       if (![intent.yawQ, intent.pitchQ, intent.thrustQ, intent.strafeQ, intent.verticalQ].every((value) => value === undefined || Number.isFinite(value))
-        || (intent.missileFire !== undefined && typeof intent.missileFire !== 'boolean')) {
+        || (intent.missileFire !== undefined && typeof intent.missileFire !== 'boolean')
+        || (intent.taserFire !== undefined && typeof intent.taserFire !== 'boolean')) {
         return reject('invalid-control-value');
       }
       if (entity.kind === 'chopper') {
         if (entity.gunController === 'ai' || entity.gunController.actorId !== actor.actorId || entity.gunController.lifeId !== actor.lifeId) return reject('not-gun-controller');
+        if (intent.taserFire === true) return reject('taser-unavailable');
         entity.aimYaw = wrapAngle(intent.yawQ ?? entity.aimYaw);
         entity.aimPitch = clamp(intent.pitchQ ?? entity.aimPitch, -1.2, 0.5);
         // Fire is a held-state intent. Assignment (rather than OR-latching)
@@ -2049,6 +2116,12 @@ export class HostKillstreakRuntime {
         entity.strafe = clamp(intent.strafeQ ?? entity.strafe, -1, 1);
         entity.vertical = clamp(intent.verticalQ ?? entity.vertical, -1, 1);
         entity.pendingPlayerFire = intent.fire === true;
+        // HF-458: an edge request, never a held latch - repeated RMB packets
+        // during the taser cooldown are accepted as control updates but never
+        // queued for a later automatic discharge (same rule as chopper RMB).
+        if (intent.taserFire === true
+          && entity.taser.charges > 0
+          && nowMs >= entity.taser.nextTaserAtMs) entity.pendingPlayerTaser = true;
         entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       } else return reject('wrong-entity-kind');
       entity.revision += 1;
@@ -2071,6 +2144,7 @@ export class HostKillstreakRuntime {
       const drone = this.entities.get(possession.entityId);
       if (drone?.kind === 'drone') {
         drone.pendingPlayerFire = false;
+        drone.pendingPlayerTaser = false;
         drone.thrust = 0;
         drone.strafe = 0;
         drone.vertical = 0;
@@ -2199,11 +2273,11 @@ export class HostKillstreakRuntime {
   advance(nowMs: number, world: KillstreakWorld): KillstreakAdvanceResult {
     if (!Number.isFinite(nowMs)) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
-      careWeaponGrantEvents: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]), taserStunEvents: Object.freeze([]),
     });
     if (this.lastAdvancedAtMs !== 0 && nowMs < this.lastAdvancedAtMs) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
-      careWeaponGrantEvents: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]), taserStunEvents: Object.freeze([]),
     });
     const canonicalNowMs = Math.max(this.lastAdvancedAtMs, nowMs);
     const previousAt = this.lastAdvancedAtMs === 0 ? canonicalNowMs : this.lastAdvancedAtMs;
@@ -2215,6 +2289,7 @@ export class HostKillstreakRuntime {
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
     const careWeaponGrantEvents: CareWeaponGrantEvent[] = [];
+    const taserStunEvents: KillstreakTaserStunEvent[] = [];
     // One host step may advance all 24 swarm drones for the same owner. Build
     // and sort that owner's hostile set once instead of allocating it again
     // for every target lookup, sensor scan and area-damage query.
@@ -2319,7 +2394,7 @@ export class HostKillstreakRuntime {
         if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
       } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world, careWeaponGrantEvents);
       else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, impactEvents);
-      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents);
+      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, taserStunEvents);
     }
     this.enforceSwarmSeparation(dt, world);
     // Recipient admission is keyed by this aggregate revision. Every mutable
@@ -2332,6 +2407,7 @@ export class HostKillstreakRuntime {
       impactEvents: Object.freeze(impactEvents),
       expiredEntityIds: Object.freeze(expiredEntityIds),
       careWeaponGrantEvents: Object.freeze(careWeaponGrantEvents),
+      taserStunEvents: Object.freeze(taserStunEvents),
     });
   }
 
@@ -2513,6 +2589,57 @@ export class HostKillstreakRuntime {
       entity.pendingMissiles = pending;
     }
 
+    // HF-458 item 1, owner: "ensure it is also using those rockets". Before
+    // this the autopilot NEVER launched - `pendingPlayerMissile` is only ever
+    // set by a possessing human - so the whole payload was dead weight on an
+    // unpossessed Chopper. The autopilot now spends up to
+    // CHOPPER_AUTOPILOT_MISSILE_BUDGET of the twelve at a slow cadence and only
+    // against a hostile it can actually see, leaving the remainder for a human.
+    if (entity.gunController === 'ai'
+      && entity.missilesRemaining > 0
+      && entity.aiMissilesFired < CHOPPER_AUTOPILOT_MISSILE_BUDGET
+      && nowMs >= entity.nextAiMissileAtMs
+      && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
+      const missileTarget = this.nearestVisibleTarget(firingPosition, owner.actorId, owner.team, world);
+      const targetRange = missileTarget ? distance(firingPosition, missileTarget.position) : Number.POSITIVE_INFINITY;
+      if (missileTarget && targetRange <= CHOPPER_AUTOPILOT_MISSILE_RANGE_M) {
+        entity.missilesRemaining -= 1;
+        entity.aiMissilesFired += 1;
+        entity.nextAiMissileAtMs = nowMs + CHOPPER_AUTOPILOT_MISSILE_CADENCE_MS;
+        const ordinal = entity.nextMissileOrdinal;
+        entity.nextMissileOrdinal += 1;
+        // The autopilot aims at the ground under its target rather than at a
+        // camera ray it does not have; the blast radius does the rest.
+        const position: SupportVec3 = [
+          missileTarget.position[0],
+          supportGroundHeight(world, missileTarget.position[0], missileTarget.position[2]),
+          missileTarget.position[2],
+        ];
+        const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
+        const socketSide = ordinal % 2 === 0 ? 1 : -1;
+        const launchPosition = translatedSupportOffset(firingPosition, firingAttitude, [
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[0] * socketSide,
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[1],
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[2],
+        ]);
+        entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs, launchPosition }));
+        impactEvents.push(Object.freeze({
+          activationId: entity.activationId,
+          source: 'chopper',
+          ordinal,
+          phase: 'drop',
+          position,
+          launchPosition,
+          impactAtMs,
+          atMs: nowMs,
+        }));
+        entity.revision += 1;
+      } else {
+        // Re-probe soon rather than burning the full cadence on an empty sky.
+        entity.nextAiMissileAtMs = nowMs + 250;
+      }
+    }
+
     if (entity.pendingPlayerMissile !== null
       && entity.gunController !== 'ai'
       && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
@@ -2628,6 +2755,7 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     damageEvents: KillstreakDamageEvent[],
     shotEvents: KillstreakSupportShotEvent[],
+    taserStunEvents: KillstreakTaserStunEvent[],
   ): void {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
@@ -2637,6 +2765,7 @@ export class HostKillstreakRuntime {
       && owner.possession?.kind === 'piloted-drone'
       && owner.possession.entityId === entity.id;
     if (playerControlled) this.updatePilotedDroneSensor(entity, owner, nowMs, world);
+    this.resolveDroneTaser(entity, owner, playerControlled, nowMs, world, taserStunEvents);
     if (entity.phase === 'reloading') {
       if (entity.reloadCompletesAtMs !== null && nowMs >= entity.reloadCompletesAtMs) {
         if (entity.reserveClips === null || entity.reserveClips > 0) {
@@ -2756,7 +2885,7 @@ export class HostKillstreakRuntime {
             this.moveDroneToward(
               entity,
               [engagementPoint[0], Math.max(engagementPoint[1], minimumY), engagementPoint[2]],
-              8,
+              DRONE_DEPLOYMENT_POLICY.swarmEngagementApproachSpeedMps,
               1,
               dt,
               world,
@@ -2853,6 +2982,64 @@ export class HostKillstreakRuntime {
       }
     }
     entity.revision += 1;
+  }
+
+  /**
+   * HF-458 item 3. One admission for both firing modes: the pilot's right-click
+   * and the autopilot's automatic shot go through the same `admitTaserShot`
+   * charge/cooldown gate, so "3 charges per drone" cannot become three per
+   * mode. The swarm carries zero charges, so this returns immediately for it.
+   *
+   * Piloted: the pilot's own aim decides the victim (the same aimed cone the
+   * gun uses), because a stun that fires itself while a human is aiming is not
+   * a right-click weapon. Unpiloted: nearest hostile in taser range with LOS.
+   */
+  private resolveDroneTaser(
+    entity: DroneEntity,
+    owner: ActorAuthorityState,
+    playerControlled: boolean,
+    nowMs: number,
+    world: KillstreakWorld,
+    taserStunEvents: KillstreakTaserStunEvent[],
+  ): void {
+    if (entity.mode !== 'piloted') return;
+    const requested = playerControlled ? entity.pendingPlayerTaser : true;
+    entity.pendingPlayerTaser = false;
+    if (!requested || entity.taser.charges <= 0 || nowMs < entity.taser.nextTaserAtMs) return;
+    const target = playerControlled
+      ? this.aimedVisibleTarget(
+        entity.position,
+        entity.yaw,
+        entity.pitch,
+        owner.actorId,
+        owner.team,
+        world,
+        PILOTED_DRONE_TASER_RANGE_M,
+      )
+      : (selectAutoTaserTarget({
+        piloted: false,
+        origin: entity.position,
+        candidates: this.sortedHostileTargets(world, owner.actorId, owner.team),
+        hasLineOfSight: (from, to) => lineOfSight(world, from as SupportVec3, to as SupportVec3),
+        rangeM: PILOTED_DRONE_TASER_RANGE_M,
+      }) as KillstreakTarget | null);
+    const admission = admitTaserShot({ state: entity.taser, nowMs, hasTarget: target !== null });
+    if (!admission.accepted || !target) return;
+    entity.taser = admission.state;
+    entity.revision += 1;
+    taserStunEvents.push(Object.freeze({
+      activationId: entity.activationId,
+      entityId: entity.id,
+      ownerId: owner.actorId,
+      targetId: target.id,
+      targetKind: target.kind === 'bot' ? 'bot' : 'player',
+      targetLifeId: target.lifeId,
+      position: [target.position[0], target.position[1], target.position[2]] as SupportVec3,
+      durationMs: TASER_STUN_DURATION_MS,
+      pilotFired: playerControlled,
+      chargesRemaining: admission.state.charges,
+      atMs: nowMs,
+    }));
   }
 
   private moveDroneToward(
@@ -3259,6 +3446,7 @@ export class HostKillstreakRuntime {
         gunProfileId: entity.kind === 'drone' ? entity.gunProfileId : null,
         gunController: entity.kind === 'chopper' ? entity.gunController === 'ai' ? 'ai' : 'owner-player' : null,
         missileAmmo: entity.kind === 'chopper' ? entity.missilesRemaining : null,
+        taserCharges: entity.kind === 'drone' && entity.mode === 'piloted' ? entity.taser.charges : null,
         missileCooldownMs: entity.kind === 'chopper'
           ? Math.min(CHOPPER_MISSILE_CADENCE_MS, Math.max(0, entity.nextMissileAtMs - nowMs))
           : null,

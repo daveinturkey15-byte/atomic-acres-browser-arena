@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_100;
+const LINE_CEILING = 37_396;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -230,6 +230,72 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
       + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
       + 'the auto-stand it fed - so the net is comment, not code.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_335,
+    note:
+      'PASS 94 HF-458 (owner 2026-09-02): the Piloted Drone taser. +235 lines for the victim '
+      + 'side of a new host-authored status effect - authority/consumer state, the apply and '
+      + 'dispatch pair, the guest-side handler, the movement/jump gate in updatePhysics, the '
+      + 'bot stun hold in updateBots, the electric-blue overlay update, the RMB request and '
+      + 'its HUD counter, plus the QA hooks. Every DECISION is outside this file: the charge, '
+      + 'cooldown, targeting and movement rules are in src/taser-stun.ts, the wire message in '
+      + 'src/taser-protocol.ts and every tuned number in src/killstreak-tuning.ts. What lands '
+      + 'here is the wiring those modules cannot do for themselves, mirroring the flashbang '
+      + 'path line for line so the two status effects cannot drift apart.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_130,
+    note:
+      'PASS 94 spawn distribution (HF-456): the shared selector call sites now pass the '
+      + 'full valid tables and a twelve-second cross-actor spawn-use history, while retaining '
+      + 'team-side preference and the existing threat/death/occupancy safety inputs. The '
+      + 'measured +30 lines are the minimal runtime wiring; selection logic lives in '
+      + 'src/spawn-selection.ts rather than growing this legacy module further.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_365,
+    note:
+      'PASS 94 integration: the measured size of the merged head, not an estimate. The two '
+      + 'rows above were each measured on their OWN lane head - the taser lane at 37_335 and '
+      + 'the spawn lane at 37_130 - because both were forged in parallel from the same 37_100 '
+      + 'PASS 93 base, so neither number contains the other. 37_100 + 235 (taser wiring) + 30 '
+      + '(spawn selector call sites) = 37_365, which is what wc -l reports here. No line was '
+      + 'added to reach this ceiling and the ledger keeps both lane rows so a reviewer can see '
+      + 'which feature bought which lines.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_371,
+    note:
+      'PASS 94 candidate 4: +6 for the animation+skins lane, and nothing else. Measured, '
+      + 'not estimated - git diff --numstat of each merged lane against its own merge base '
+      + 'reports src/legacy-main.ts untouched by nuketown2-materials and nuketown2-techniques, '
+      + '4 added / 4 removed (net 0) by nuketown2-lighting, and 6 added / 0 removed by '
+      + 'animation-skins: the posture-layer call sites that feed stance and speed into the '
+      + 'operator director. 37_365 + 0 + 6 = 37_371, which is what wc -l reports here. The '
+      + 'skin registry, the TSL skin materials and the posture solver itself are three new '
+      + 'modules (src/operator-skin-look-registry.ts, src/operator-skin-tsl-materials.ts, '
+      + 'src/operator-posture-layer.ts), not lines in this file.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_396,
+    note:
+      'PASS 94 candidate 4b: +2 for the nuketown2-lighting re-merge (the lane Muse fixes, '
+      + '3 added / 1 removed) and +23 for the DEPLOY-FENCE ORDERING FIX, which is the whole '
+      + 'of the rest. Measured per change, not estimated. The fix moves the five '
+      + 'activeArenaReview* resets from the END of configurePlayableArenaVisuals up beside '
+      + 'the activeArenaVisualDefinition assignment, so the pair is one statement about which '
+      + 'arena is installed on every path out of a function whose every await can throw; and '
+      + 'it makes setArenaReviewCamera fall back to the AUTHORED definition, so a review '
+      + 'station - numbers in a source file - stops being unreachable because a cold first '
+      + 'WebGPU submission overran its 12 s fence. Nineteen of the 23 lines are the two '
+      + 'comments recording why, and the lookup itself is a new function in '
+      + 'src/rendering/arena-visual-stream.ts, not lines in this file.',
   },
 ];
 

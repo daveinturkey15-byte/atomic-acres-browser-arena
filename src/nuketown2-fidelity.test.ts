@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { auditNuketown2Coplanar } from './nuketown2-coplanar-audit';
 import { isBlocked } from './collision';
 import { deriveGlassDynamicColliders } from './glass-collider-bounds';
 import { FALL_DAMAGE_SAFE_SPEED, computeFallDamage, movementProfile } from './gameplay';
@@ -18,6 +19,7 @@ import {
   NUKETOWN2_SECTION,
   NUKETOWN2_SPAWN_LAYOUT,
   NUKETOWN2_STAIRWELL,
+  NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_SEGMENTS,
@@ -25,6 +27,7 @@ import {
   NUKETOWN2_YARD_STAIR,
   buildNuketown2,
 } from './nuketown2-arena';
+import { ARENA_VISUAL_REGISTRY } from './rendering/arena-visual-stream';
 import {
   NUKETOWN2_BAY_DEPTH,
   NUKETOWN2_BAY_RUNS,
@@ -724,6 +727,120 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
   }, 60_000);
 
+  /**
+   * PASS 94 INTEGRATION GATE (HF-462 x HF-473), and it exists because the merge
+   * of two green lanes produced something neither of them could fail.
+   *
+   * The vehicle-forge lane branched before the handedness mirror and placed its
+   * forged skins at raw AUTHORED coordinates. The collider boxes those skins
+   * dress reach the world through `centred`/`streetVehicle`/`pair`, every one of
+   * which multiplies x by NUKETOWN2_HANDEDNESS. On the merged head, before this
+   * was fixed, all five skins stood on the opposite side of the street from
+   * their bodies: five vehicles floating over open road, five invisible boxes
+   * facing them, and not one existing gate with anything to say - because a skin
+   * is presentation, and every collider, parity and spawn gate looks only at the
+   * boxes. This is the falsifier that class of defect did not have.
+   */
+  /**
+   * PASS 94 integration gate. The two back-yard review stations are the frames
+   * HF-473 is judged on, and their whole claim - written in the comment beside
+   * them in src/rendering/arenas/nuketown2.ts - is that the camera STANDS ON A
+   * SPAWN. That claim quietly stopped being true when the spawn table was
+   * re-solved in this integration: authored (-10, -29) is not a spawn any more.
+   * Nothing failed, because nothing checked. This does.
+   */
+  it('stands both back-yard review cameras on an authored spawn, looking at their own house', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY.nuketown2();
+    const map = buildNuketown2(new THREE.Scene());
+    for (const [team, id] of [[0, 'nuketown2-north-yard'], [1, 'nuketown2-south-yard']] as const) {
+      const station = definition.reviewCameras.find((entry) => entry.id === id);
+      expect(station, `${id} review camera`).toBeDefined();
+      const [x, , z] = station!.position;
+      const onSpawn = NUKETOWN2_SPAWN_LAYOUT[team]!
+        .some(([sx, sz]) => Math.abs(sx - x) < 1e-6 && Math.abs(sz - z) < 1e-6);
+      expect(
+        onSpawn,
+        `${id} stands at (${x}, ${z}), which is not one of team ${team}'s authored spawns: `
+          + `${JSON.stringify(NUKETOWN2_SPAWN_LAYOUT[team])}. The station's evidence value is that a `
+          + 'player really starts a round there.',
+      ).toBe(true);
+      // ...and it is looking at its own house, which is the other half of the
+      // claim: the garage-on-the-RIGHT frame only means anything aimed here.
+      const house = NUKETOWN2_HOUSE_LAYOUT[team]!;
+      const [tx, , tz] = station!.target;
+      expect(Math.abs(tx - hx(house.x)), `${id} aims off its own house centre line`).toBeLessThan(0.01);
+      expect(Math.sign(tz - z), `${id} looks toward the street`).toBe(house.facing);
+      // The gate that reads the built world, restated at the station itself.
+      expect(isBlocked({ x, y: 1.7, z }, map.colliders, PLAYER_RADIUS), `${id} stands inside geometry`).toBe(false);
+    }
+  });
+
+  it('lands every forged vehicle skin on the collider body it dresses, mirrored with it', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const planCentre = (object: THREE.Object3D): { x: number; z: number } => {
+      const box = new THREE.Box3().setFromObject(object);
+      return { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 };
+    };
+    // One entry per VEHICLE. PERF (HITL 5, HF-491) folds every vehicle into
+    // one mesh per material, so the per-vehicle groups are no longer in the
+    // scene; the forge audit records where each vehicle's baked world-space
+    // geometry landed instead, and that is what this gate reads - the same
+    // "did the skin land on its box" falsifier, measured from the geometry
+    // the player actually sees.
+    const audit = map.root.userData.nuketown2ForgeAudit as {
+      skins: readonly { name: string; centre: { x: number; z: number } }[];
+    };
+    const skins = audit.skins;
+    // Coach, truck cab, truck bogie and four sedans: HF-477's two STREET cars
+    // (`stem saloon`, `stem classic` - the reference's dark saloon and green
+    // classic, which replaced the single aqua head car) and both driveways.
+    expect(skins.length, 'forged street-vehicle skins').toBeGreaterThanOrEqual(7);
+    const bodies = map.raycastMeshes
+      .filter((mesh) => /(car body|saloon body|classic body|coach body|truck cab)$/u.test(mesh.name))
+      .map((mesh) => ({ name: mesh.name, ...planCentre(mesh) }));
+    expect(bodies.length, 'solid vehicle bodies to dress').toBeGreaterThanOrEqual(4);
+    for (const skin of skins) {
+      const centre = skin.centre;
+      // The bogie dresses the cargo box's axles, which are behind the cab; it is
+      // held to the truck's own centre line instead of to a body centre.
+      if (skin.name.endsWith('truck-bogie')) {
+        const deck = map.raycastMeshes.find((mesh) => mesh.name.endsWith('truck deck'));
+        expect(deck, 'the truck deck the bogie runs under').toBeDefined();
+        expect(Math.abs(centre.z - planCentre(deck!).z), `${skin.name} is off the truck centre line`)
+          .toBeLessThan(0.35);
+        continue;
+      }
+      const nearest = bodies
+        .map((body) => ({ body, metres: Math.hypot(body.x - centre.x, body.z - centre.z) }))
+        .sort((left, right) => left.metres - right.metres)[0]!;
+      expect(
+        nearest.metres,
+        `${skin.name} at (${centre.x.toFixed(2)}, ${centre.z.toFixed(2)}) dresses no collider body `
+          + `(nearest is ${nearest.body.name} at ${nearest.metres.toFixed(2)} m). A skin placed in the `
+          + 'AUTHORED frame while its box is placed in the WORLD frame lands exactly one mirror away.',
+      ).toBeLessThan(0.35);
+    }
+    // ...and the mirror is asserted directly as well, so a future handedness
+    // flip cannot leave a coincidentally-passing pair behind. HF-477 retired
+    // the authored head car for the reference's two STREET cars, so the claim
+    // moves to them WITHOUT losing a single assertion: each car's BOX must
+    // stand at hx() of its own authored seat, and its skin on top of it.
+    for (const [id, seat] of [
+      ['stem saloon', NUKETOWN2_STREET_CARS.saloon],
+      ['stem classic', NUKETOWN2_STREET_CARS.classic],
+    ] as const) {
+      const box = map.raycastMeshes.find((mesh) => mesh.name.endsWith(`${id} body`));
+      expect(box, `the ${id} body`).toBeDefined();
+      expect(planCentre(box!).x, `${id} body follows the handedness flag`).toBeCloseTo(hx(seat.x), 6);
+      const skin = skins
+        .map((entry) => ({ entry, centre: entry.centre }))
+        .filter(({ centre }) => Math.abs(centre.z - seat.z) < 0.35)
+        .sort((left, right) => Math.abs(left.centre.x - hx(seat.x)) - Math.abs(right.centre.x - hx(seat.x)))[0]!;
+      expect(skin.centre.x, `the ${id} skin rides its own box`).toBeCloseTo(hx(seat.x), 6);
+    }
+  });
+
 
   // -------------------------------------------------------------------------
   // HF-473 - HANDEDNESS. Owner, 2026-09-04, having played the reference on
@@ -997,18 +1114,19 @@ describe('Nuke Town Rebuild fidelity', () => {
     //     house's lawn, blue on the white house's. Measured on the BUILT
     //     geometry, and tied to the houses rather than to a literal sign, so a
     //     later mirror of the arena carries them with it.
-    for (const index of [0, 1, 2]) {
-      const red = colourOf(named(`nuketown2 north verge appliance top ${index}`), `north appliance top ${index}`);
-      const blue = colourOf(named(`nuketown2 south verge appliance top ${index}`), `south appliance top ${index}`);
-      expect(red.r, `appliance top ${index} on the orange lawn is RED`).toBeGreaterThan(red.b);
-      expect(blue.b, `appliance top ${index} on the white lawn is BLUE`).toBeGreaterThan(blue.r);
-      expect(margin(red, blue), `appliance top ${index} colour margin`).toBeGreaterThan(0.15);
-    }
+    // INTEGRATION (candidate 4b): measured on the techniques lane's shipped
+    // bank (`nuketown2-yard-props.ts`), which is the one build of this feature
+    // in the arena - see the note where this lane's duplicate stood.
+    const red = colourOf(named('nuketown2 north lawn appliance bank hob deck'), 'north hob deck');
+    const blue = colourOf(named('nuketown2 south lawn appliance bank hob deck'), 'south hob deck');
+    expect(red.r, 'the hob deck on the ORANGE house lawn is RED').toBeGreaterThan(red.b);
+    expect(blue.b, 'the hob deck on the WHITE house lawn is BLUE').toBeGreaterThan(blue.r);
+    expect(margin(red, blue), 'hob deck colour margin').toBeGreaterThan(0.15);
     // The bank stands on the lawn between the hedge and the kerb, on the same
     // side of the street as its own house - so it reads from that house's own
     // spawn across the road, which is the whole point of an anchor.
     for (const half of ['north', 'south'] as const) {
-      const cabinet = named(`nuketown2 ${half} verge appliance cabinet`)!;
+      const cabinet = named(`nuketown2 ${half} lawn appliance bank cabinet`)!;
       expect(cabinet, `${half} appliance cabinet`).toBeDefined();
       const houseZ = NUKETOWN2_HOUSE_LAYOUT[half === 'north' ? 0 : 1]!.z;
       expect(Math.sign(cabinet.position.z), `${half} bank is on its own house's side`).toBe(Math.sign(houseZ));
@@ -2546,6 +2664,56 @@ describe('Nuke Town Rebuild fidelity', () => {
       physics.dispose();
     }
   }, 60_000);
+  it('dresses the street vehicles with lofted skins WITHOUT moving any authority', () => {
+    // HF-462 / HF-472. `forgedStreetVehicles` adds a presentation-only group
+    // per vehicle and hides the authored boxes those skins cover. Everything
+    // that decides where a player can walk and what a bullet hits is still the
+    // boxes: this asserts it, rather than trusting the diff.
+    const scene = new THREE.Scene();
+    const map = buildNuketown2(scene);
+    const audit = map.root.userData.nuketown2ForgeAudit as {
+      retired: number; mismatches: readonly string[]; drawCalls: number; triangles: number;
+    };
+    // A rename, a new lamp or a deleted wheel changes a match count, and the
+    // arena would silently draw a box INSIDE a lofted body. The audit records
+    // it; this is the gate that reads the record.
+    expect(audit.mismatches, 'superseded-box pattern drift').toEqual([]);
+    // 110 -> 132: HF-477's two street cars carry 22 superseded boxes each where
+    // the retired head car carried 22 once. Arithmetic, not a fitted number -
+    // `NUKETOWN2_FORGE_SUPERSEDED` names both patterns with their counts and
+    // the audit fails on any pattern that matches a different number.
+    expect(audit.retired).toBe(132);
+    expect(audit.drawCalls).toBeGreaterThan(0);
+
+    const superseded: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.userData.supersededByVehicleForge === true) superseded.push(node);
+    });
+    expect(superseded.length).toBe(audit.retired);
+    for (const mesh of superseded) {
+      // Hidden, and withdrawn from the batcher - a hidden batch CANDIDATE is
+      // still merged into a visible batch and goes on drawing.
+      expect(mesh.visible, mesh.name).toBe(false);
+      expect(mesh.userData.presentationBatchCandidate, mesh.name).toBe(false);
+      expect(mesh.userData.staticBatchRendered, mesh.name).toBeUndefined();
+    }
+    // The solid ones among them still own their colliders and shot surfaces.
+    const solidSuperseded = superseded.filter((mesh) => typeof mesh.userData.ballisticSurfaceId === 'string');
+    expect(solidSuperseded.length, 'retired solids keep their shot surfaces').toBeGreaterThanOrEqual(9);
+
+    // Not one forged mesh is a parametric box or claims a shot surface, so
+    // neither the enumerated asymmetric set above nor the ballistic roster can
+    // grow by adding art.
+    let forged = 0;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.name.startsWith('vehicle-forge ')) return;
+      forged += 1;
+      expect(node.userData.presentationOnly, node.name).toBe(true);
+      expect((node.geometry as THREE.BoxGeometry).parameters, node.name).toBeUndefined();
+      expect(node.userData.ballisticSurfaceId, node.name).toBeUndefined();
+    });
+    expect(forged).toBe(audit.drawCalls);
+  });
 });
 
 /**
@@ -2660,10 +2828,13 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
 
     // Load-bearing pieces that are NOT clutter and must survive any later
     // declutter pass: the HF-437 cover pair, the climb-chain hedge, the
-    // chirality anchor and the one retained letterbox.
+    // chirality anchor and the one retained letterbox. The chirality anchor is
+    // the techniques-lane prop (`nuketown2 <half> lawn appliance bank cabinet`,
+    // src/nuketown2-yard-props.ts) - candidate 4b deduplicated the two banks
+    // onto it, so that is the name the shipped bank carries.
     for (const kept of [
       'verge low wall', 'verge kerb planter', 'verge front hedge',
-      'verge appliance cabinet', 'verge mailbox',
+      'lawn appliance bank cabinet', 'verge mailbox',
     ]) {
       expect(names.some((n) => n.includes(kept)), `"${kept}" is load-bearing and must stay`).toBe(true);
     }
@@ -2868,7 +3039,22 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     }
     // The circular kerb is a new real keep-out, so this is a new measured
     // ratchet rather than the old rectangular-head population floor.
-    expect(blades, 'the lawn field retains the measured circular-head population').toBe(8910);
+    //
+    // GEOMETRY-2 MERGE: re-measured 8910 -> 8303 when the turning-head lane met
+    // the candidate line. `keepOuts` is `builder.colliders.slice(...)` — every
+    // collider the arena authors after the ground — so the candidate's hedges,
+    // verge/alley planters and avenue bodies are keep-outs on the same tick they
+    // are built, and 607 blades stop growing through them. The direction is the
+    // one this gate wants: MORE paving and planting covered, never less.
+    // VERIFIED mechanically that no lawn REGION was lost — the field still emits
+    // the same eleven instanced regions (0,1,2,3,5,6,8,10,11,14,15) it emitted at
+    // `3aab05ac`, so the fall is keep-out coverage inside unchanged regions and
+    // not a region dropping out of the table. Still an EXACT equality: a silent
+    // future loss of grass fails here exactly as before. The assertions that
+    // actually protect the paving — zero lawn-region/bay overlap above, and no
+    // blade root inside a bay in the loop above — are untouched and independent
+    // of this number.
+    expect(blades, 'the lawn field retains the measured circular-head population').toBe(8303);
 
     // (3) The re-tiled stem verge still COVERS its band exactly: every square
     //     metre that is not bay or driveway apron is still lawn, and no two
@@ -2910,5 +3096,23 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
       }
     }
     expect(holes, 'the stem verge band is completely covered by lawn, bay or apron').toEqual([]);
+  });
+
+  it('pins the HF-497 SAME-MATERIAL-VISIBLE coplanar class at zero', () => {
+    // The HF-434 instrument dismissed same-material coplanar pairs as benign;
+    // HF-497 rules that a pair whose bodies BOTH render and whose race region
+    // can draw at a player-visible pixel is a FINDING, fixed by a depth tier or
+    // an offset - never by hiding geometry. `auditNuketown2Coplanar` is the
+    // EXACT core `scripts/qa/find-coplanar-pairs.ts` reports from, so this pin
+    // and the instrument cannot drift apart. The classification is derived
+    // from the built roster (materials, presentation flags, box volumes), not
+    // from a name list, so every other arena inherits the same rule with its
+    // own geometry.
+    const audit = auditNuketown2Coplanar();
+    const visible = audit.rows
+      .filter((row) => row.verdict === 'same-material-visible')
+      .map((row) => `${row.first.name} x ${row.second.name}`);
+    expect(visible, `SAME-MATERIAL-VISIBLE coplanar pairs:\n${visible.join('\n')}`)
+      .toHaveLength(0);
   });
 });

@@ -16,7 +16,7 @@
 // enemy, cover within reach, no enemy spawn in sight, team separation) before
 // spread is even considered.
 //
-//   npx tsx scripts/qa/solve-spawn-layouts.ts [--arenas test2,...] [--all]
+//   npx tsx scripts/qa/solve-spawn-layouts.ts [--arenas test2,...] [--all] [--wanted 8]
 //
 // By default only arenas whose AUTHORED layout fails are solved; --all solves
 // every selectable arena so the proposal can be compared against the shipped
@@ -47,7 +47,7 @@ const ONLY = arg('--arenas')?.split(',').map((entry) => entry.trim()).filter(Boo
 const ALL = argv.includes('--all');
 
 const MIN_PAIR = 4.5;      // comfortably above the gate's 3 m floor
-const WANTED = 6;
+const WANTED = Math.max(1, Number(arg('--wanted') ?? '6'));
 /**
  * Each team searches its own end of the separation axis: this fraction of the
  * axis measured from its edge, widening only when the narrower band cannot
@@ -163,9 +163,10 @@ function greedySpread(chosen: XZ[], candidates: readonly XZ[]): XZ[] {
   return chosen;
 }
 
-// MAP3 (HF-409 finisher 2): buildMap3 throws until its wasm is resolved.
-await (await import('../../src/map3-arena')).prepareMap3();
-for (const [id, build] of SELECTABLE_ARENA_BUILDERS()) {
+async function main(): Promise<void> {
+  // MAP3 (HF-409 finisher 2): buildMap3 throws until its wasm is resolved.
+  await (await import('../../src/map3-arena')).prepareMap3();
+  for (const [id, build] of SELECTABLE_ARENA_BUILDERS()) {
   if (ONLY && !ONLY.includes(id)) continue;
   const arena = build(new THREE.Scene());
   const before = measureSpawnLayout(id, arena);
@@ -211,5 +212,11 @@ for (const [id, build] of SELECTABLE_ARENA_BUILDERS()) {
     + (after.summary.worstOffender ? ` (${after.summary.worstOffender})` : '')
     + `; cover max ${after.summary.maxCoverDistanceM} m, nearest visible enemy pair ${after.summary.nearestVisibleEnemyPairM ?? 'none'} m (bot arena: ${botArena}, limit ${SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM})`);
   console.log('    team0: ' + JSON.stringify(recheck0.map((p) => [p.x, p.z])));
-  console.log('    team1: ' + JSON.stringify(team1.chosen.map((p) => [p.x, p.z])));
+    console.log('    team1: ' + JSON.stringify(team1.chosen.map((p) => [p.x, p.z])));
+  }
 }
+
+main().catch((error: unknown) => {
+  console.error('[spawn-layout] solver crashed', error);
+  process.exitCode = 1;
+});

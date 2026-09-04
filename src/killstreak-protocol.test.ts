@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
+  CHOPPER_MISSILE_CAPACITY,
   HostKillstreakRuntime,
   MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD,
   MAX_SUPPORT_SHOT_EVENTS_PER_STEP,
@@ -111,12 +112,12 @@ describe('killstreak protocol', () => {
     const chopperMissile = {
       ...message,
       impacts: [
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'drop' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_000 },
-        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: 5, phase: 'impact' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_780 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: CHOPPER_MISSILE_CAPACITY - 1, phase: 'drop' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_000 },
+        { activationId: 'ks-activation-7-2', source: 'chopper' as const, ordinal: CHOPPER_MISSILE_CAPACITY - 1, phase: 'impact' as const, position: [3, 0, 4] as const, impactAtMs: 2_780, atMs: 2_780 },
       ],
     };
     expect(isKillstreakProtocolMessage(chopperMissile)).toBe(true);
-    expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], ordinal: 6 }] })).toBe(false);
+    expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], ordinal: CHOPPER_MISSILE_CAPACITY }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[0], atMs: 2_001 }] })).toBe(false);
     expect(isKillstreakProtocolMessage({ ...chopperMissile, impacts: [{ ...chopperMissile.impacts[1], atMs: 2_781 }] })).toBe(false);
   });
@@ -273,14 +274,15 @@ describe('killstreak protocol', () => {
     }).accepted).toBe(true);
     const snapshot = runtime.snapshotFor('owner', 1_000);
     const message = { type: 'killstreak-state' as const, by: 'host', forPlayerId: 'owner', snapshot, nonce: 81 };
-    expect(snapshot.entities[0]).toMatchObject({ missileAmmo: 6, missileCooldownMs: 0 });
+    // HF-458 item 1: the Chopper payload is twelve, six of them autopilot-only.
+    expect(snapshot.entities[0]).toMatchObject({ missileAmmo: CHOPPER_MISSILE_CAPACITY, missileCooldownMs: 0 });
     expect(isKillstreakProtocolMessage(message)).toBe(true);
     const chopper = snapshot.entities[0]!;
     const withChopper = (replacement: unknown) => ({
       ...message,
       snapshot: { ...snapshot, entities: [replacement] },
     });
-    expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileAmmo: 7 }))).toBe(false);
+    expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileAmmo: CHOPPER_MISSILE_CAPACITY + 1 }))).toBe(false);
     expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileCooldownMs: 1_001 }))).toBe(false);
     expect(isKillstreakProtocolMessage(withChopper({ ...chopper, missileAmmo: null }))).toBe(false);
     const missingAmmo = Object.fromEntries(Object.entries(chopper).filter(([key]) => key !== 'missileAmmo'));
