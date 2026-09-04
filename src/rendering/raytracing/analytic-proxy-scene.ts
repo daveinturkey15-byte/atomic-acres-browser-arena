@@ -118,14 +118,21 @@ function unrotateYaw(point: Vec3, yaw: number): Vec3 {
   return rotateYaw(point, -yaw);
 }
 
-/** Slab test against a yaw-oriented box. Returns the nearest positive entry. */
+/**
+ * Slab test against a yaw-oriented box. Returns the nearest positive entry
+ * with the box's outward geometric normal. The previous implementation kept
+ * the entry sign when a ray started inside and selected a ray-facing sign on
+ * one exterior side: harmless for sign-symmetric mirrors, wrong for diffuse.
+ */
 export function intersectBox(origin: Vec3, direction: Vec3, shape: ProxyShape): RayHit {
   const localOrigin = rotateYaw(sub(origin, shape.centre), shape.yaw);
   const localDirection = rotateYaw(direction, shape.yaw);
   let near = Number.NEGATIVE_INFINITY;
   let far = Number.POSITIVE_INFINITY;
-  let axis = 0;
-  let sign = 1;
+  let nearAxis = 0;
+  let nearSign = 1;
+  let farAxis = 0;
+  let farSign = 1;
   for (let index = 0; index < 3; index += 1) {
     const half = shape.halfExtents[index];
     const d = localDirection[index];
@@ -137,23 +144,31 @@ export function intersectBox(origin: Vec3, direction: Vec3, shape: ProxyShape): 
     const inverse = 1 / d;
     let t0 = (-half - o) * inverse;
     let t1 = (half - o) * inverse;
-    let axisSign = -Math.sign(d);
+    let nearFaceSign = -1;
+    let farFaceSign = 1;
     if (t0 > t1) {
       const swap = t0;
       t0 = t1;
       t1 = swap;
-      axisSign = Math.sign(d);
+      nearFaceSign = 1;
+      farFaceSign = -1;
     }
     if (t0 > near) {
       near = t0;
-      axis = index;
-      sign = axisSign;
+      nearAxis = index;
+      nearSign = nearFaceSign;
     }
-    if (t1 < far) far = t1;
+    if (t1 < far) {
+      far = t1;
+      farAxis = index;
+      farSign = farFaceSign;
+    }
     if (near > far) return NO_HIT;
   }
   const t = near > SURFACE_EPSILON_M ? near : far;
   if (!(t > SURFACE_EPSILON_M) || !Number.isFinite(t)) return NO_HIT;
+  const axis = near > SURFACE_EPSILON_M ? nearAxis : farAxis;
+  const sign = near > SURFACE_EPSILON_M ? nearSign : farSign;
   const localNormal = vec3(
     axis === 0 ? sign : 0,
     axis === 1 ? sign : 0,

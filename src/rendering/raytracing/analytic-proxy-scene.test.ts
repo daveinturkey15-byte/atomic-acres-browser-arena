@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
   extractProxyScene,
+  intersectBox,
   REFLECTIVE_ROUGHNESS_CEILING,
   WATER_PROXY_MAXIMUM_METALNESS,
   DEFAULT_PROXY_EXTRACTION,
@@ -160,5 +161,34 @@ describe('analytic proxy extraction', () => {
   it('leaves the declared cost bounds where the registration put them', () => {
     expect(ARENA_PROXY_EXTRACTION.maximumShapes).toBe(DEFAULT_PROXY_EXTRACTION.maximumShapes);
     expect(ARENA_PROXY_EXTRACTION.minimumFootprintM2).toBe(DEFAULT_PROXY_EXTRACTION.minimumFootprintM2);
+  });
+});
+
+describe('analytic proxy intersection normals', () => {
+  const proxyBox = (centre: [number, number, number]) => ({
+    kind: 'box' as const,
+    centre,
+    halfExtents: [1, 1, 1] as [number, number, number],
+    yaw: 0,
+    normal: [0, 1, 0] as [number, number, number],
+    albedo: [0.5, 0.5, 0.5] as [number, number, number],
+    metalness: 0,
+    roughness: 1,
+    name: 'normal-test',
+  });
+
+  it('returns outward normals on both exterior sides and on an interior exit', () => {
+    const fromNegativeZ = intersectBox([0, 0, -10], [0, 0, 1], proxyBox([0, 0, 0]));
+    const fromPositiveZ = intersectBox([0, 0, 10], [0, 0, -1], proxyBox([0, 0, 0]));
+    const fromInside = intersectBox([0, 0, 0], [0, 0, 1], proxyBox([0, 0, 0]));
+    expect(fromNegativeZ.normal).toEqual([0, 0, -1]);
+    expect(fromPositiveZ.normal).toEqual([0, 0, 1]);
+    expect(fromInside.normal).toEqual([0, 0, 1]);
+    for (const [hit, direction] of [
+      [fromNegativeZ, [0, 0, 1]], [fromPositiveZ, [0, 0, -1]],
+    ] as const) {
+      const cosine = hit.normal[0] * direction[0] + hit.normal[1] * direction[1] + hit.normal[2] * direction[2];
+      expect(cosine).toBeLessThan(0);
+    }
   });
 });
