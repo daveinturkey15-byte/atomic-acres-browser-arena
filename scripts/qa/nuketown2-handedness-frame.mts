@@ -74,6 +74,28 @@ for (const half of ['north', 'south'] as const) {
   lines.push('');
 }
 
+// The two HF-465 stations, checked the same way: a review camera whose subject
+// is outside its own frustum is a capture nobody can read.
+lines.push('HF-465 stations - subject angle off aim (a 60 deg camera sees +/- 30):');
+for (const [cameraId, subjects] of [
+  ['nuketown2-north-balcony', ['north balcony deck', 'north yard stair 5', 'north balcony rail outboard']],
+  ['nuketown2-front-porch', ['north verge front hedge', 'north porch canopy wing 0', 'north window ledge sill']],
+] as const) {
+  const camera = definition.reviewCameras.find((entry) => entry.id === cameraId);
+  if (!camera) throw new Error(`no ${cameraId}`);
+  const eye = new THREE.Vector3(...camera.position);
+  const aim = new THREE.Vector3(...camera.target).sub(eye);
+  lines.push(`  ${cameraId} at (${eye.x.toFixed(1)}, ${eye.y.toFixed(1)}, ${eye.z.toFixed(1)})`);
+  for (const subject of subjects) {
+    const centre = planCentre(subject);
+    const to = new THREE.Vector3(centre.x - eye.x, 0, centre.z - eye.z);
+    const flat = new THREE.Vector3(aim.x, 0, aim.z);
+    const degrees = (Math.acos(Math.min(1, to.clone().normalize().dot(flat.clone().normalize()))) * 180) / Math.PI;
+    lines.push(`    ${subject.padEnd(30)} ${to.length().toFixed(1).padStart(5)} m away, ${degrees.toFixed(1).padStart(5)} deg off aim`);
+  }
+}
+lines.push('');
+
 lines.push('Every spawn, not just the camera station:');
 for (const [team, half] of (['north', 'south'] as const).entries()) {
   const house = planCentre(`${half} house roof deck`);

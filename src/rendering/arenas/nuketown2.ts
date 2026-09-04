@@ -157,7 +157,11 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-north-balcony', [hx(-9.5), 1.75, -27.5], [hx(-3.0), 3.4, -24.0], 'geometry', 1.08),
     // ...and the front climb chain: hedge, porch canopy, window ledge, upper
     // front window, in one frame off the verge.
-    camera('nuketown2-front-porch', [hx(-5.0), 1.75, -6.4], [hx(-1.25), 3.2, -9.8], 'geometry', 1.08),
+    // Stood back on the carriageway rather than on the verge: from the verge
+    // the hedge - the chain's first rung - sat 40 degrees off aim and out of
+    // a 60 degree frame, which
+    // scripts/qa/nuketown2-handedness-frame.mts measures rather than eyeballs.
+    camera('nuketown2-front-porch', [hx(-8.0), 1.9, -4.6], [hx(-1.25), 3.1, -9.7], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',
