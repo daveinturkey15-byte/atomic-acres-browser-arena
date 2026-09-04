@@ -1,4 +1,21 @@
 #!/usr/bin/env node
+// Launches one headless Chrome browser per graphics preset and captures the selected arena's authored review cameras, writing per-shot PNGs plus a manifest.
+//
+// Usage: node scripts/qa/capture-graphics-profile-views.mjs [--url <url>] [--arena <arenaId>] [--presets <csv>] [--cameras <csv>] [--out <dir>] [--width <px>] [--height <px>] [--settle-ms <ms>]
+//
+// Flags (from process.argv; no environment variables are read):
+//   --url        Base URL of the deployed game (default http://localhost:41977)
+//   --arena      Arena id from the viewpoint catalog (default atomic-acres)
+//   --presets    Comma-separated graphics presets to apply in order (default performance,balanced,high,max)
+//   --cameras    Comma-separated authored camera ids (default: first two catalog cameras for --arena)
+//   --out        Output directory, relative to the working directory (default artifacts/graphics-audit/views)
+//   --width      Viewport width in pixels (default 1280)
+//   --height     Viewport height in pixels (default 720)
+//   --settle-ms  Milliseconds to wait after match start before capture (default 5000)
+//
+// Writes: <out>/<arena>/<cameraId>.<preset>.png for each captured shot, and <out>/manifest.json with per-preset capture receipts.
+//
+// Exit codes: 0 = all presets captured; 1 = one or more preset/shot records failed (process.exitCode); 2 = no catalog cameras for --arena (process.exit(2)).
 // ===========================================================================
 // HF-414 — the same authored review camera, once per graphics profile.
 //
