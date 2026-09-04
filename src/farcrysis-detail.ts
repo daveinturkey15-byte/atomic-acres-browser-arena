@@ -275,17 +275,36 @@ function buildMossPatches(root: THREE.Object3D, rng: () => number): void {
 function buildRocks(root: THREE.Object3D, rng: () => number): void {
   const rockCount = 8 + Math.floor(rng() * 5); // 8-12
 
+  // PASS 94 rework slice 1 - ONE rock material for the whole family.
+  //
+  // Every rock used to own a MeshStandardMaterial that differed from its
+  // neighbours' in nothing but `color`, so eleven scattered stones cost eleven
+  // material objects out of the arena's measured 198. The tint is real and
+  // worth keeping, so it moves from the material onto the GEOMETRY: with
+  // `vertexColors: true` three multiplies the material colour by the per-vertex
+  // colour, and a white material times the old per-rock grey is the old per-rock
+  // grey, exactly. The rock PBR maps that `applyFarcrysisTextures` assigns to
+  // the 'rock' category (every mesh here is named `farcrysis-detail-rock-N`, so
+  // every one of them classifies identically) then multiply on top as before.
+  //
+  // Colour space, because this is where this idiom is usually got wrong:
+  // `new THREE.Color(hex)` already converts sRGB to the working linear space,
+  // so `.r/.g/.b` are the values a vertex-colour attribute wants. Converting
+  // again would wash the rocks out.
+  const rockMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.85,
+    metalness: 0.05,
+  });
+  const rockTint = new THREE.Color();
+
 
   for (let i = 0; i < rockCount; i++) {
     // Pass 76: darker earthy grey — the old 0x7a-0x9a range read as pale
     // tarpaulin against the saturated jungle floor.
     const gray = 0x5c + Math.floor(rng() * 0x1c);
     const color = (gray << 16) | ((gray + (Math.floor(rng() * 10) - 5)) << 8) | gray;
-    const rockMat = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.85,
-      metalness: 0.05,
-    });
 
     // Base icosahedron, detail 1
     const detail = rng() < 0.5 ? 0 : 1;
@@ -315,7 +334,18 @@ function buildRocks(root: THREE.Object3D, rng: () => number): void {
     posAttr.needsUpdate = true;
     geom.computeVertexNormals();
 
-    const rock = new THREE.Mesh(geom, rockMat);
+    // Bake this rock's tint into its own geometry, so the whole family can
+    // share one material without losing a single stone's colour.
+    rockTint.setHex(color);
+    const rockColors = new Float32Array(posAttr.count * 3);
+    for (let j = 0; j < posAttr.count; j += 1) {
+      rockColors[j * 3] = rockTint.r;
+      rockColors[j * 3 + 1] = rockTint.g;
+      rockColors[j * 3 + 2] = rockTint.b;
+    }
+    geom.setAttribute('color', new THREE.BufferAttribute(rockColors, 3));
+
+    const rock = new THREE.Mesh(geom, rockMaterial);
     artMark(rock, `farcrysis-detail-rock-${i}`);
     rock.castShadow = true;
     rock.receiveShadow = true;
