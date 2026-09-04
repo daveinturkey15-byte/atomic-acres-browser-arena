@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// Reads HF-391 arena trace JSON files from a directory and prints per-segment HUD motion statistics and frame-time percentiles for each trace.
+// Usage: node scripts/qa/hf391-analyse-trace.mjs [dir]
+//   [dir] (process.argv[2]): directory containing <arena>.json trace files (default: artifacts/hf391/traces-baseline)
+// Writes: no files or directories; prints the report to stdout.
+// Exit codes: 0 on success (no process.exit calls; non-zero only from an uncaught exception).
 // HF-391 trace analysis: reads artifacts/hf391/<dir>/<arena>.json files and
 // reports per-segment motion statistics for each HUD custom property.
 import { readFileSync, readdirSync } from 'node:fs';
