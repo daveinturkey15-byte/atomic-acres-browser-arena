@@ -1,0 +1,60 @@
+{
+  "_fixture": "A well-behaved critic. sawImages.answer is the literal string ECHO, which the fixture adapter replaces with the round's derived probe token - that is how a recorded fixture can be a valid round without hard-coding a token that depends on the capture's sha256.",
+  "contract": "reference-critic-v1",
+  "subject": "chopper-gunner-cockpit-1080",
+  "cycle": 1,
+  "criticId": "A",
+  "sawImages": { "answer": "ECHO" },
+  "rows": [
+    {
+      "row": "geometry-match",
+      "weight": 25,
+      "score": 15,
+      "regions": ["r2c2", "r2c1"],
+      "finding": "The cockpit frame stops part-way across the lower band where the reference carries it to the frame edge, so the bottom-right corner reads as open screen rather than as structure.",
+      "referenceEvidence": "reference lower-right, frame member continues to the corner",
+      "captureEvidence": "capture region r2c2, measured edge IoU 0.30",
+      "severity": "P1",
+      "boundedCorrection": "Extend the cockpit frame member to the lower-right frame edge. Change nothing else."
+    },
+    {
+      "row": "proportion",
+      "weight": 25,
+      "score": 22,
+      "regions": ["r1c1"],
+      "finding": "Centre-of-view proportions agree with the reference within the measurement noise of the pair.",
+      "referenceEvidence": "reference centre third",
+      "captureEvidence": "capture region r1c1, edge IoU well above the floor",
+      "severity": "P3",
+      "boundedCorrection": ""
+    },
+    {
+      "row": "material-read",
+      "weight": 25,
+      "score": 23,
+      "regions": ["r1c0"],
+      "finding": "Surfaces read as the same material class as the reference at this distance.",
+      "referenceEvidence": "reference left mid band",
+      "captureEvidence": "capture region r1c0",
+      "severity": "P3",
+      "boundedCorrection": ""
+    },
+    {
+      "row": "lighting-match",
+      "weight": 25,
+      "score": 21,
+      "regions": ["r0c1", "r2c2"],
+      "finding": "The lower-right band sits a value step darker than the reference because the missing frame member is not catching the key.",
+      "referenceEvidence": "reference lower-right value",
+      "captureEvidence": "capture region r2c2",
+      "severity": "P2",
+      "boundedCorrection": "No separate lighting change; this resolves with the geometry correction."
+    }
+  ],
+  "largestGap": { "row": "geometry-match", "regions": ["r2c2"], "rootCauseClass": "implementation" },
+  "contractConflict": null,
+  "decision": "refine-code",
+  "notMatchable": [
+    "Both images come from the same renderer, so colour temperature agreement here is not evidence about art direction and was not scored."
+  ]
+}

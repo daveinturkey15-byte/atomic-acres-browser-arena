@@ -1,0 +1,77 @@
+{
+  "_fixture": "A critic that contradicts the measurement: it scores geometry-match 24/25 on r2c2, whose measured edge IoU on this real pair is 0.3031, below the 0.4 floor. Tier 0 blocks tier 1 from being believed, so this round is INVALID even though the probe token is correct and the schema is clean.",
+  "contract": "reference-critic-v1",
+  "subject": "chopper-gunner-cockpit-1080",
+  "cycle": 1,
+  "criticId": "C",
+  "sawImages": {
+    "answer": "ECHO"
+  },
+  "rows": [
+    {
+      "row": "geometry-match",
+      "weight": 25,
+      "score": 24,
+      "regions": [
+        "r2c2"
+      ],
+      "finding": "The cockpit frame looks essentially identical to the reference in the lower right.",
+      "referenceEvidence": "reference lower-right, frame member continues to the corner",
+      "captureEvidence": "capture region r2c2, measured edge IoU 0.30",
+      "severity": "P1",
+      "boundedCorrection": ""
+    },
+    {
+      "row": "proportion",
+      "weight": 25,
+      "score": 22,
+      "regions": [
+        "r1c1"
+      ],
+      "finding": "Centre-of-view proportions agree with the reference within the measurement noise of the pair.",
+      "referenceEvidence": "reference centre third",
+      "captureEvidence": "capture region r1c1, edge IoU well above the floor",
+      "severity": "P3",
+      "boundedCorrection": ""
+    },
+    {
+      "row": "material-read",
+      "weight": 25,
+      "score": 23,
+      "regions": [
+        "r1c0"
+      ],
+      "finding": "Surfaces read as the same material class as the reference at this distance.",
+      "referenceEvidence": "reference left mid band",
+      "captureEvidence": "capture region r1c0",
+      "severity": "P3",
+      "boundedCorrection": ""
+    },
+    {
+      "row": "lighting-match",
+      "weight": 25,
+      "score": 21,
+      "regions": [
+        "r0c1",
+        "r2c2"
+      ],
+      "finding": "The lower-right band sits a value step darker than the reference because the missing frame member is not catching the key.",
+      "referenceEvidence": "reference lower-right value",
+      "captureEvidence": "capture region r2c2",
+      "severity": "P2",
+      "boundedCorrection": "No separate lighting change; this resolves with the geometry correction."
+    }
+  ],
+  "largestGap": {
+    "row": "lighting-match",
+    "regions": [
+      "r2c2"
+    ],
+    "rootCauseClass": "camera-lighting"
+  },
+  "contractConflict": null,
+  "decision": "refine-code",
+  "notMatchable": [
+    "Both images come from the same renderer, so colour temperature agreement here is not evidence about art direction and was not scored."
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "contract": "reference-set-v1",
+  "subject": "chopper-gunner-cockpit-1080",
+  "subjectKind": "prop",
+  "purpose": [
+    "proof that the reference-grounded loop runs end to end on a real committed pair",
+    "framing and value-composition agreement of the chopper gunner cockpit at 1920x1080"
+  ],
+  "provenanceNote": "This is a TIER 2 set: both images are our own build output, committed to this repository, so there is no licence question and no third-party art anywhere in the loop. It was chosen deliberately as the first subject because the pair is measured, documented and same-camera, which makes a critic's findings checkable by a human against a commit message rather than against a taste.",
+  "sources": [
+    {
+      "id": "S1",
+      "tier": "T2",
+      "kind": "own-capture",
+      "localPath": "docs/assets/chopper-gunner-2026-08-31/after-desktop-1920x1080.png",
+      "sha256": "240fada99688861af375e7956ecd2a99e0acd810333496e67f16f5ef654b76de",
+      "licence": "Own work, this repository. No third-party rights.",
+      "licenceReadAt": "2026-09-04",
+      "evidenceFor": "The approved post-fix state of the Chopper Gunner cockpit at 1920x1080: the cockpit frames the whole view instead of stopping mid-screen, and the HUD is reworked to the existing house style. Committed at 02d9058fe2186a5f0eb518fa28c93971084c64eb, 2026-08-31.",
+      "viewpoint": "chopper gunner first-person, desktop 1920x1080",
+      "usableFor": ["framing", "value-composition", "hud-legibility", "geometry-presence"],
+      "notUsableFor": [
+        "absolute colour calibration - it is a renderer capture, not a photometric measurement",
+        "material-class judgement at print distance - it is a gameplay-distance frame"
+      ],
+      "caveats": "Our own build output, so it can only ever anchor us to a state we already reached. It is a REGRESSION anchor, not an aspiration anchor. A real-world photograph is what raises the bar; this raises confidence in the harness."
+    },
+    {
+      "id": "S2",
+      "tier": "T2",
+      "kind": "own-capture",
+      "localPath": "docs/assets/chopper-gunner-2026-08-31/before-desktop-1920x1080.png",
+      "sha256": "98c4a4da05de524f4584046373ffe986cb8a0e7826fbcb9f79bb74c37fb44dda",
+      "licence": "Own work, this repository. No third-party rights.",
+      "licenceReadAt": "2026-09-04",
+      "evidenceFor": "The pre-fix state of the same view at the same camera and resolution, retained as the thing the approved state had to improve on. It stands in for a candidate capture so the loop can be exercised without building anything.",
+      "viewpoint": "chopper gunner first-person, desktop 1920x1080",
+      "usableFor": ["standing in for a candidate capture in a harness proof"],
+      "notUsableFor": ["being shown to a critic as a target - it is the thing being graded, not the bar"],
+      "caveats": "Never allow-list this as a criticTarget. It is the capture side of the pair."
+    }
+  ],
+  "criticTargets": [
+    {
+      "sourceId": "S1",
+      "asTarget": true,
+      "reason": "T2 own work: the approved post-fix frame is the state the capture is being measured against, and showing it to a critic carries no licence or trade-dress risk at all."
+    },
+    { "sourceId": "S2", "asTarget": false, "reason": "capture side of the pair" }
+  ],
+  "pairs": [
+    {
+      "id": "cockpit-desktop-1080",
+      "sourceId": "S1",
+      "capture": "docs/assets/chopper-gunner-2026-08-31/before-desktop-1920x1080.png",
+      "camera": "same authored camera on both sides; no camera solve needed for this subject",
+      "note": "Same camera on both sides is what makes this pair a HARNESS proof rather than a fidelity claim. A reference photograph would not share our camera and its absolute tier-0 numbers would mean much less."
+    }
+  ],
+  "measurements": [],
+  "unknowns": [
+    "Absolute real-world scale is not derivable from either image and is not claimed.",
+    "This set cannot raise the visual bar: both sides are our own output. Raising the bar needs a T2 photograph we took or a T3 permissively-licensed one, and that is an owner decision (R2 section 10, open item 2).",
+    "Whether the same probe-token receipt survives on the metered OMP/Gemini route is not settled by this set - it was proven here on the local vision route only."
+  ],
+  "notMatchable": [
+    "Both images come from the same renderer, so an agreement on colour temperature here is not evidence that the art direction is right - it is evidence that nothing changed the grade."
+  ]
+}
