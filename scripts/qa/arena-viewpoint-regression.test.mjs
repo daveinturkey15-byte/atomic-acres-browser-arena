@@ -172,6 +172,10 @@ test('capture script keeps its environment proofs', () => {
   // Provenance manifest so two directories can be attributed to builds.
   assert.match(source, /capture-manifest\.json/);
   assert.match(source, /bundleAtStart/);
+  assert.match(source, /bundleSha256/);
+  assert.match(source, /waitForReviewCameraRegistry/);
+  assert.match(source, /sampleArenaReviewCameraRegistry/);
+  assert.match(source, /4222/);
   // A webgpu run that got another backend is INVALIDATED, never recorded as a baseline.
   assert.match(source, /asked for webgpu, got backend=/);
 });
@@ -182,6 +186,7 @@ test('diff script refuses cross-backend comparisons and pins provenance', () => 
   assert.match(source, /process\.exit\(2\)/);
   assert.match(source, /environmentInvalid/);
   assert.match(source, /diff-report\.json/);
+  assert.match(source, /bundleSha256/);
 });
 
 test('diff thresholds stay at calibrated strictness', async () => {
@@ -354,8 +359,8 @@ test('persistence-min separates transient actor noise from persistent change', a
 
 test('diff manifest validation refuses non-PASS verdicts and identical bundleAtStart', async () => {
   const { validateManifests } = await import('./diff-arena-viewpoints.mjs');
-  const validBase = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-base.js' };
-  const validCand = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-cand.js' };
+  const validBase = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-base.js', bundleSha256: 'a'.repeat(64) };
+  const validCand = { backend: 'webgpu', verdict: 'PASS', bundleAtStart: '/bundle-cand.js', bundleSha256: 'b'.repeat(64) };
   assert.deepEqual(validateManifests(validBase, validCand), []);
 
   // Base verdict !== 'PASS'
@@ -456,4 +461,3 @@ test('diff CLI refuses when both captures served the same bundle', () => {
     rmSync(tmpCand, { recursive: true, force: true });
   }
 });
-

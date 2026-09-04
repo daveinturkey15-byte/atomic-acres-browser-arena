@@ -26,6 +26,9 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'raid2': () => import('./arenas/raid2'),
 });
 
+/** Read-only registry of every authored arena definition resolved this session. */
+const LOADED_ARENA_VISUAL_DEFINITIONS = new Map<ArenaId, ArenaVisualDefinition>();
+
 export async function loadArenaVisualModule(
   arenaId: ArenaId,
   registry: ArenaVisualRegistry = ARENA_VISUAL_REGISTRY,
@@ -34,9 +37,37 @@ export async function loadArenaVisualModule(
   if (module.definition.id !== arenaId) {
     throw new Error(`Arena module identity mismatch: requested ${arenaId}, loaded ${module.definition.id}`);
   }
+  LOADED_ARENA_VISUAL_DEFINITIONS.set(arenaId, module.definition);
   return module;
 }
 
+/**
+ * The authored review station carrying `cameraId`, from any arena module this
+ * session has loaded. Returns undefined when no loaded arena declares that id -
+ * a genuinely missing camera, which is the only case the caller should refuse.
+ */
+export function findAuthoredArenaReviewCamera(
+  cameraId: string,
+): ArenaVisualDefinition['reviewCameras'][number] | undefined {
+  for (const definition of LOADED_ARENA_VISUAL_DEFINITIONS.values()) {
+    const camera = definition.reviewCameras.find((entry) => entry.id === cameraId);
+    if (camera) return camera;
+  }
+  return undefined;
+}
+
+/** Test seam: the ids whose modules this session has resolved. */
+export function loadedArenaVisualDefinitionIds(): readonly ArenaId[] {
+  return Object.freeze([...LOADED_ARENA_VISUAL_DEFINITIONS.keys()]);
+}
+
+/** Read-only QA telemetry for the authored review-camera registry. */
+export function loadedArenaVisualDefinitionReviewCameraIds(): Readonly<Record<string, readonly string[]>> {
+  return Object.freeze(Object.fromEntries([...LOADED_ARENA_VISUAL_DEFINITIONS.entries()].map(([arenaId, definition]) => [
+    arenaId,
+    Object.freeze(definition.reviewCameras.map((camera) => camera.id)),
+  ])));
+}
 export type ArenaVisualSwitchReceipt = Readonly<{
   arenaId: ArenaId;
   generation: number;

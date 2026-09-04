@@ -384,3 +384,52 @@ figure exists, and none is claimed. That is OPEN 6.
    `dist-vr-after` (4ab23611, `legacy-main-Ao7VKn3G.js`) - so the pair can be
    re-run without rebuilding, and those two hashes are what the diff tool's
    served-bundle check must show as different.
+
+## 9. Capture pair (with the fixed harness)
+
+**VERIFIED:** Both sides were rebuilt with the fixed registry-wait/PID-teardown
+harness on the same installed Chrome native-WebGPU route, cold and serialized on
+port 4222. The base was `978da7e6` plus the scoped harness changes in the
+throwaway checkout; the candidate was this lane at `fc1d333b` plus the same
+scoped harness changes. The base manifest records `verdict=PASS`, `17/17`,
+`/legacy-main-CCiKzoG3.js`, and served bundle SHA-256
+`2c072253e55a1515611ef64957beec302fe85f6f964311a3b8f3e56222c9e832`; the
+candidate records `verdict=PASS`, `17/17`, `/legacy-main-fFGHtqrJ.js`, and
+served bundle SHA-256
+`b4f6ede106799a9808dcacd7d9b6af4e8efe49a21c5491132aa0f21f9cfd3b6d`.
+
+**VERIFIED:** The registry wait passed on both sides. Base state was
+`loadedArenaIds=["nuketown2"]` with all 17 `nuketown2-*` station IDs; candidate
+state was `loadedArenaIds=["nuketown2","atomic-acres"]` with the same 17
+Nuke Town station IDs. The diff runner confirmed distinct served bundles and
+produced `DIFFS`: all 17 requested Nuke Town comparisons were
+`GLOBAL_CHANGED`; its additional 62 `MISSING` entries are the other catalog
+arenas intentionally not captured in this pair.
+
+**VERIFIED:** Mean absolute luminance delta is on the 0-255 analysis scale;
+the overall 17-station mean is **60.867** (equal-sized 640x360 analysis frames).
+
+- **OBSERVED:** `nuketown2-overhead` — macro/micro variation is visible across the roofs, grass and road; asphalt is no longer a uniform black field.
+- **OBSERVED:** `nuketown2-north-yard` — siding, concrete and lawn show broad colour breakup plus fine wear; no asphalt is in the principal read.
+- **OBSERVED:** `nuketown2-south-yard` — the mirrored yard shows the same macro/micro surface variation; asphalt is not the dominant surface.
+- **OBSERVED:** `nuketown2-street-centre` — asphalt is visibly no longer black, with road wear/specular breakup and changed vehicle paint.
+- **OBSERVED:** `nuketown2-north-upper-window` — the window surround and adjacent siding carry visible albedo breakup at both scales; asphalt is not the principal read.
+- **OBSERVED:** `nuketown2-south-upper-window` — the mirrored window/siding read carries the same macro and micro variation; asphalt is not the principal read.
+- **OBSERVED:** `nuketown2-into-sun-street` — road material is lighter and textured rather than black, with visible vehicle and facade variation.
+- **OBSERVED:** `nuketown2-north-interior` — interior walls and timber floor show differentiated macro colour and fine surface wear; asphalt is not present.
+- **OBSERVED:** `nuketown2-south-interior` — the paired interior shows the same wall/floor variation at both scales; asphalt is not present.
+- **OBSERVED:** `nuketown2-garage` — garage masonry, grass and adjacent facade surfaces show visible macro/micro variation; asphalt is secondary.
+- **OBSERVED:** `nuketown2-north-balcony` — balcony-adjacent siding, roof and yard surfaces read with non-uniform albedo; asphalt is not dominant.
+- **OBSERVED:** `nuketown2-front-porch` — porch, siding and planted surfaces show visible macro/micro breakup; asphalt is not the principal read.
+- **OBSERVED:** `nuketown2-vehicle-near` — near vehicle paint and the road carry visible variation, and the asphalt is no longer uniformly black.
+- **OBSERVED:** `nuketown2-vehicle-mid` — mid-distance vehicle paint, road and masonry show the changed albedo response; asphalt is visibly lifted from black.
+- **OBSERVED:** `nuketown2-vehicle-far` — far vehicle surfaces retain visible colour/wear variation against a textured road; asphalt is no longer a black monolith.
+- **OBSERVED:** `nuketown2-coach-elevation` — coach paint and road materials both show macro/micro variation; the asphalt read is no longer black.
+- **OBSERVED:** `nuketown2-truck-cab-near` — truck paint, nearby masonry and road wear are visibly differentiated; asphalt is no longer uniformly black.
+
+**VERIFIED:** The candidate material-variation test remained green at **104/104**,
+including the preserved channel-mean assertions. The capture artifacts are at
+`artifacts/viewpoint-regression/pass96-base-cold-17-rerun`,
+`artifacts/viewpoint-regression/pass96-candidate-cold-17`, and
+`artifacts/viewpoint-regression/pass96-diff-cold-17`; port 4222 was closed after
+each capture.

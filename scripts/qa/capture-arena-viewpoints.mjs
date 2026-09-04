@@ -29,13 +29,18 @@
 // Usage: node scripts/qa/capture-arena-viewpoints.mjs [--url http://127.0.0.1:41911]
 //        [--label <name>] [--sha <sha>] [--arenas a,b] [--settle-ms 5000]
 //        [--serve-dist <dir>] [--out artifacts/viewpoint-regression/<label>]
-//        [--samples 3]
+//        [--samples 3] [--registry-wait-ms 30000] [--warm-up]
 import { chromium } from '@playwright/test';
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS } from './viewpoint-catalog.mjs';
+import {
+  startPreviewServer,
+  stopPreviewServer,
+  waitForReviewCameraRegistry,
+} from './capture-arena-viewpoints-support.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,6 +56,8 @@ let BASE = arg('--url', 'http://127.0.0.1:41911');
 const LABEL = arg('--label', null);
 const SETTLE_MS = Number(arg('--settle-ms', '5000'));
 const PER_ARENA_MS = Number(arg('--per-arena-ms', '150000'));
+const REGISTRY_WAIT_MS = Number(arg('--registry-wait-ms', '30000'));
+const WARM_UP = flag('--warm-up');
 const VIEWPORT = (() => {
   const [w, h] = arg('--viewport', '1280x720').split('x').map(Number);
   return { width: w, height: h };
@@ -70,46 +77,29 @@ for (const arena of ARENAS) {
   }
 }
 const SEED = arg('--seed', 'viewpoint');
+// Optional station subset for bounded evidence runs. The default remains the
+// complete authored catalog, so an unqualified capture cannot silently omit a
+// review station.
+const CAMERAS = arg('--cameras', null)?.split(',').map((entry) => entry.trim()).filter(Boolean) ?? null;
+const stationsFor = (arena) => CAMERAS
+  ? VIEWPOINT_CATALOG[arena].filter((id) => CAMERAS.includes(id))
+  : VIEWPOINT_CATALOG[arena];
 
-// shell:true wraps the server in cmd.exe; killing the wrapper alone orphans
-// the vite child and leaves :41931 occupied for the next run. Kill the tree.
-let SERVE_CHILD = null;
-const killServeChild = () => {
-  if (!SERVE_CHILD || SERVE_CHILD.pid == null) return;
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    SERVE_CHILD.kill('SIGTERM');
-  }
+let SERVE_SERVER = null;
+const stopServe = async () => {
+  if (!SERVE_SERVER) return;
+  const server = SERVE_SERVER;
+  SERVE_SERVER = null;
+  await stopPreviewServer(server);
 };
 
 const serveDist = arg('--serve-dist', null);
 if (serveDist) {
-  // Short-lived server, spawned here and reaped via killServeChild() in
-  // `finally`. Port chosen away from 41900/41901 (owner builds) and
-  // 41910/41911 (shared gauntlet preview).
-  const PORT = 41931;
+  // Short-lived direct vite child, reaped by the LISTENING pid on the QA port.
+  const PORT = 4222;
   console.error(`[viewpoint-capture] serving ${serveDist} on :${PORT}`);
-  // Node >=20 blocks .cmd/.bat spawns without a shell (CVE-2024-27980).
-  const server = spawn('npx', ['vite', 'preview', '--outDir', serveDist,
-    '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
-    { stdio: 'ignore', shell: process.platform === 'win32' });
-  const deadline = Date.now() + 60_000;
-  let up = false;
-  while (Date.now() < deadline && !up) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${PORT}/`);
-      up = res.ok;
-    } catch { /* not up yet */ }
-    if (!up) await new Promise((r) => setTimeout(r, 500));
-  }
-  if (!up) {
-    killServeChild();
-    console.error('[viewpoint-capture] served dist never came up');
-    process.exit(2);
-  }
-  BASE = `http://127.0.0.1:${PORT}`;
-  SERVE_CHILD = server;
+  SERVE_SERVER = await startPreviewServer({ serveDist, port: PORT, cwd: process.cwd() });
+  BASE = SERVE_SERVER.url;
 }
 
 const OUT_DIR = resolve(process.cwd(), arg('--out',
@@ -151,13 +141,21 @@ try {
 
   // A dist rebuilt mid-sweep serves SPA-fallback HTML for assets, which fails
   // arenas with exactly the signature of a real regression. Pin the bundle.
-  const servedBundle = () => page.evaluate(() => {
+  const servedBundle = () => page.evaluate(async () => {
     const entry = performance.getEntriesByType('resource')
       .map((resource) => resource.name)
       .find((name) => name.includes('/legacy-main-'));
-    return entry ? entry.slice(entry.lastIndexOf('/')) : null;
+    if (!entry) return null;
+    const response = await fetch(entry, { cache: 'no-store' });
+    if (!response.ok) return { path: entry.slice(entry.lastIndexOf('/')), sha256: null };
+    const bytes = await response.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return { path: entry.slice(entry.lastIndexOf('/')), sha256: hash };
   }).catch(() => null);
-  const BUNDLE_AT_START = await servedBundle();
+  const bundleAtStart = await servedBundle();
+  const BUNDLE_AT_START = bundleAtStart?.path ?? null;
+  const BUNDLE_HASH_AT_START = bundleAtStart?.sha256 ?? null;
 
   const backend = await page.evaluate(() => document.documentElement.dataset.renderBackend ?? null);
   // An adapter is not a device, and a Microsoft vendor string means the
@@ -182,6 +180,7 @@ try {
     : adapterInfo.adapter !== true ? 'requestAdapter returned nothing'
     : adapterInfo.device !== true ? 'requestDevice failed - adapter without device is not a usable WebGPU route'
     : (adapterInfo.vendor ?? '').toLowerCase() === 'microsoft' ? 'adapter vendor=microsoft means software rasteriser; captures would not represent the owner route'
+    : BUNDLE_HASH_AT_START === null ? 'served legacy-main bundle SHA-256 unavailable'
     : null;
 
   const results = [];
@@ -197,22 +196,40 @@ try {
           () => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 },
         ).then(() => true).catch(() => false);
         const bundleNow = await servedBundle();
-        if (!debugReady || bundleNow !== BUNDLE_AT_START) {
+        if (!debugReady || bundleNow?.path !== BUNDLE_AT_START || bundleNow?.sha256 !== BUNDLE_HASH_AT_START) {
           record.environmentInvalid = !debugReady
             ? 'debug handle never returned after reload'
-            : `bundle changed mid-sweep (${BUNDLE_AT_START} -> ${bundleNow})`;
+            : `bundle changed mid-sweep (${BUNDLE_AT_START}@${BUNDLE_HASH_AT_START} -> ${bundleNow?.path ?? null}@${bundleNow?.sha256 ?? null})`;
           record.ms = Date.now() - startedAt;
           results.push(record);
           break;
         }
       }
       try {
-        await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arena);
-        await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
-        await page.waitForFunction(() => {
-          const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-          return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
-        }, undefined, { timeout: PER_ARENA_MS });
+        const deployArena = async (purpose) => {
+          await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arena);
+          await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
+          await page.waitForFunction(() => {
+            const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+            return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
+          }, undefined, { timeout: PER_ARENA_MS });
+          const registryWait = await waitForReviewCameraRegistry(
+            () => page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.sampleArenaReviewCameraRegistry()),
+            { arena, cameraIds: stationsFor(arena), timeoutMs: REGISTRY_WAIT_MS },
+          );
+          console.error(`[viewpoint-capture] ${arena} ${purpose} review-camera registry ready after ${registryWait.waitedMs} ms `
+            + `(${registryWait.attempts} polls): ${JSON.stringify(registryWait.state)}`);
+        };
+        if (WARM_UP) {
+          await deployArena('warm-up');
+          await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu(); });
+          await page.waitForFunction(() => {
+            const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+            return snapshot.matchPhase !== 'active' && snapshot.gameStarted === false;
+          }, undefined, { timeout: 30_000 });
+          console.error(`[viewpoint-capture] ${arena} warm-up deploy complete; starting measured deploy`);
+        }
+        await deployArena('capture');
         // Freeze the solo bot IMMEDIATELY so it does not wander to the driveway
         // during settle time before camera review, and hide/relocate it away from
         // the camera review viewpoints:
@@ -326,7 +343,7 @@ try {
         }
         record.ok = record.shots.every((shot) => shot.ok);
       } catch (error) {
-        record.error = String(error).slice(0, 160);
+        record.error = String(error).slice(0, 400);
         record.diagnostics = await page.evaluate(() => {
           const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
           return {
@@ -362,6 +379,7 @@ try {
     backend,
     adapter: adapterInfo,
     bundleAtStart: BUNDLE_AT_START,
+    bundleSha256: BUNDLE_HASH_AT_START,
     viewport: VIEWPORT,
     seed: SEED,
     settleMs: SETTLE_MS,
@@ -375,6 +393,9 @@ try {
   exitCode = verdict === 'PASS' ? 0 : verdict === 'INVALID' ? 2 : 1;
 } finally {
   await browser.close();
-  killServeChild();
+  await stopServe().catch((error) => {
+    console.error(`[viewpoint-capture] preview teardown failed: ${String(error).slice(0, 400)}`);
+    exitCode = 2;
+  });
 }
 process.exit(exitCode);
