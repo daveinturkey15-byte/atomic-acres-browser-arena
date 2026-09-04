@@ -230,9 +230,10 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
     //     "fix" a walk probe fails here instead of at spawn time.
     const SPAWN_LINE_Z = 25;
     const STANDOFF_M = 1.2;
-    const stairBodies = map.root.children.filter((node): node is THREE.Mesh => (
-      node instanceof THREE.Mesh && node.userData.nuketown2ExteriorStairBody === true
-    ));
+    const stairBodies: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.userData.nuketown2ExteriorStairBody === true) stairBodies.push(node);
+    });
     expect(stairBodies.length, 'the merged carpentry is present').toBeGreaterThan(0);
     let insideStandoff = 0;
     for (const mesh of stairBodies) {
