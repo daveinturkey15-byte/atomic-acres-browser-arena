@@ -2585,6 +2585,37 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0))
     * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0))
   );
+  const rectUnionArea = (
+    rects: ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number }>,
+  ): number => {
+    const xCuts = [...new Set(rects.flatMap((rect) => [snapM(rect.x0), snapM(rect.x1)]))]
+      .sort((a, b) => a - b);
+    let area = 0;
+    for (let index = 0; index < xCuts.length - 1; index += 1) {
+      const x0 = xCuts[index]!;
+      const x1 = xCuts[index + 1]!;
+      if (x1 <= x0) continue;
+      const zSpans = rects
+        .filter((rect) => snapM(rect.x0) < x1 && snapM(rect.x1) > x0)
+        .map((rect) => [snapM(rect.z0), snapM(rect.z1)] as const)
+        .sort((a, b) => a[0] - b[0]);
+      let coveredZ = 0;
+      let current: [number, number] | undefined;
+      for (const [z0, z1] of zSpans) {
+        if (!current) {
+          current = [z0, z1];
+        } else if (z0 <= current[1]) {
+          current[1] = Math.max(current[1], z1);
+        } else {
+          coveredZ += current[1] - current[0];
+          current = [z0, z1];
+        }
+      }
+      if (current) coveredZ += current[1] - current[0];
+      area += (x1 - x0) * coveredZ;
+    }
+    return snapM(area);
+  };
   it('lands a roadside bay on both sides of the stem, each an exact z-mirror of its partner', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
@@ -2754,6 +2785,17 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
       ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint),
       ...NUKETOWN2_GROUND_DRESSING.filter((piece) => piece.id.startsWith('street driveway ')),
     ];
+    const stemBand = [
+      { x0: NUKETOWN2_CUL_DE_SAC.mouthX, x1: NUKETOWN2_CUL_DE_SAC.offMapX,
+        z0: NUKETOWN2_HOUSE_FRONT_Z, z1: -NUKETOWN2_STREET_HALF_WIDTH },
+      { x0: NUKETOWN2_CUL_DE_SAC.mouthX, x1: NUKETOWN2_CUL_DE_SAC.offMapX,
+        z0: NUKETOWN2_STREET_HALF_WIDTH, z1: -NUKETOWN2_HOUSE_FRONT_Z },
+    ];
+    const stemBandCovers = covers.flatMap((cover) => stemBand.map((band) => ({
+      x0: Math.max(cover.x0, band.x0), x1: Math.min(cover.x1, band.x1),
+      z0: Math.max(cover.z0, band.z0), z1: Math.min(cover.z1, band.z1),
+    }))).filter((rect) => rect.x1 > rect.x0 && rect.z1 > rect.z0);
+    expect(rectUnionArea(stemBandCovers), 'stem verge cover has no sub-sample slivers').toBe(rectUnionArea(stemBand));
     const kerbZ = NUKETOWN2_STREET_HALF_WIDTH;
     const holes: Array<[number, number]> = [];
     for (let x = NUKETOWN2_CUL_DE_SAC.mouthX + 0.07; x < NUKETOWN2_CUL_DE_SAC.offMapX; x += 0.13) {
