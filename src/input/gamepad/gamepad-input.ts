@@ -54,10 +54,14 @@ export type GamepadFrame = Readonly<{
   layout: PadLayout | null;
   /** Shaped left stick (x right, y down) after deadzone/curve. */
   move: Readonly<{ x: number; y: number }>;
-  /** Shaped right stick (x right, y down; inverted if the setting says so). */
+  /** Shaped right stick (x right, y down; inverted if the setting says so, scaled by sensitivity). */
   look: Readonly<{ x: number; y: number }>;
   /** Raw (unshaped) look magnitude, for telemetry and assist weighting. */
   rawLookMagnitude: number;
+  /** Raw d-pad held state (physical buttons 12–15), independent of semantic remaps. */
+  dpad: Readonly<{ up: boolean; down: boolean; left: boolean; right: boolean }>;
+  /** Raw d-pad press edges, for menu navigation. */
+  dpadPressed: Readonly<{ up: boolean; down: boolean; left: boolean; right: boolean }>;
   held: (action: PadAction) => boolean;
   pressed: (action: PadAction) => boolean;
   released: (action: PadAction) => boolean;
@@ -92,12 +96,16 @@ export type GamepadTelemetry = Readonly<{
   frames: number;
 }>;
 
+const IDLE_DPAD = Object.freeze({ up: false, down: false, left: false, right: false });
+
 const IDLE_FRAME: GamepadFrame = Object.freeze({
   connected: false,
   layout: null,
   move: Object.freeze({ x: 0, y: 0 }),
   look: Object.freeze({ x: 0, y: 0 }),
   rawLookMagnitude: 0,
+  dpad: IDLE_DPAD,
+  dpadPressed: IDLE_DPAD,
   held: () => false,
   pressed: () => false,
   released: () => false,
@@ -115,6 +123,10 @@ export class GamepadInputRuntime {
   private layout: PadLayout | null = null;
   private layoutKey: string | null = null;
   private previousButtons: boolean[] = [];
+  /** Reused across polls so presence sampling allocates no per-frame arrays. */
+  private scratchSamples: HotplugPadSample[] = [];
+  /** Second edge buffer: poll swaps the pair so no per-frame boolean arrays allocate after warmup. */
+  private scratchButtons: boolean[] = [];
   private lastPadInputAt = 0;
   private lastKeyboardMouseInputAt = 0;
   private scheme: InputScheme = 'keyboard';
@@ -179,7 +191,8 @@ export class GamepadInputRuntime {
   }
 
   private samplePads(pads: readonly (GamepadLike | null)[]): HotplugPadSample[] {
-    const samples: HotplugPadSample[] = [];
+    const samples = this.scratchSamples;
+    samples.length = 0;
     pads.forEach((pad, slot) => {
       if (!pad) return;
       const index = typeof pad.index === 'number' ? pad.index : slot;
@@ -194,11 +207,11 @@ export class GamepadInputRuntime {
 
   private reconcile(at: number): readonly (GamepadLike | null)[] {
     const pads = this.safeGamepads();
-    this.applyHotplug(reduceHotplug(this.hotplug, { type: 'poll', pads: this.samplePads(pads), at }));
+    this.applyHotplug(reduceHotplug(this.hotplug, { type: 'poll', pads: this.samplePads(pads), at }), pads);
     return pads;
   }
 
-  private applyHotplug(next: HotplugState): void {
+  private applyHotplug(next: HotplugState, pads: readonly (GamepadLike | null)[] | null = null): void {
     const wasConnected = hotplugConnected(this.hotplug);
     const previousActive = this.hotplug.activeIndex;
     this.hotplug = next;
@@ -211,12 +224,14 @@ export class GamepadInputRuntime {
         this.layoutKey = null;
         this.lastPadInputAt = 0;
       }
-      this.refreshLayout();
+      // Seed from the already-fetched pad list: refreshLayout(pad) below must
+      // not re-fetch, or a connect poll costs two getGamepads() walks.
       // A button already held at the moment a pad connects (or is promoted by
       // activity) is "held", not "pressed": seed the edge baseline from the
       // live sample so the first frame cannot fire or jump without a fresh press.
-      const pad = connected ? this.activePad() : null;
-      this.previousButtons = pad && this.layout ? this.buttonStates(pad, this.layout) : [];
+      const pad = connected ? this.activePad(pads) : null;
+      this.refreshLayout(pad);
+      if (pad && this.layout) this.buttonStates(pad, this.layout, this.previousButtons);
       for (const listener of this.padListeners) listener(connected, this.layout);
       this.updateScheme();
     }
@@ -225,23 +240,26 @@ export class GamepadInputRuntime {
   /**
    * Per-physical-index pressed truth for edge detection. Fire and ADS use the
    * analogue trigger threshold; everything else the digital one, so shared
-   * buttons (reload/interact) see one consistent press.
+   * buttons (reload/interact) see one consistent press. Writes into `target`
+   * (the reused `previousButtons` buffer) so polls allocate no edge arrays.
    */
-  private buttonStates(pad: GamepadLike, layout: PadLayout): boolean[] {
-    const states = (pad.buttons ?? []).map((button) => buttonPressed(button));
+  private buttonStates(pad: GamepadLike, layout: PadLayout, target: boolean[] = []): boolean[] {
+    const buttons = pad.buttons ?? [];
+    target.length = buttons.length;
+    for (let i = 0; i < buttons.length; i += 1) target[i] = buttonPressed(buttons[i]);
     for (const action of ['fire', 'ads'] as const) {
       const buttonIndex = layout.buttons[action];
-      if (buttonIndex !== null) states[buttonIndex] = buttonPressed(pad.buttons?.[buttonIndex], TRIGGER_PRESS_THRESHOLD);
+      if (buttonIndex !== null) target[buttonIndex] = buttonPressed(pad.buttons?.[buttonIndex], TRIGGER_PRESS_THRESHOLD);
     }
-    return states;
+    return target;
   }
 
-  private activePad(): GamepadLike | null {
+  private activePad(pads: readonly (GamepadLike | null)[] | null = null): GamepadLike | null {
     const index = this.hotplug.activeIndex;
     if (index === null) return null;
-    const pads = this.safeGamepads();
-    return pads.find((pad) => pad && (typeof pad.index === 'number' ? pad.index : -1) === index)
-      ?? pads[index]
+    const list = pads ?? this.safeGamepads();
+    return list.find((pad) => pad && (typeof pad.index === 'number' ? pad.index : -1) === index)
+      ?? list[index]
       ?? null;
   }
 
@@ -288,8 +306,9 @@ export class GamepadInputRuntime {
     const pads = this.reconcile(at);
     const index = this.hotplug.activeIndex;
     const pad = index === null ? null : pads.find((candidate) => candidate && (typeof candidate.index === 'number' ? candidate.index : -1) === index) ?? pads[index] ?? null;
-    if (!pad) {
-      this.previousButtons = [];
+    if (!pad || !this.settings.enabled) {
+      this.previousButtons.length = 0;
+      this.scratchButtons.length = 0;
       this.lastFrame = IDLE_FRAME;
       return IDLE_FRAME;
     }
@@ -300,7 +319,11 @@ export class GamepadInputRuntime {
     const rawLook = { x: axes[layout.axes.lookX] ?? 0, y: axes[layout.axes.lookY] ?? 0 };
     const move = shapeStick(rawMove.x, rawMove.y, this.settings.moveCurve);
     const shapedLook = shapeStick(rawLook.x, rawLook.y, this.settings.lookCurve);
-    const look = { x: shapedLook.x, y: this.settings.invertLookY ? -shapedLook.y : shapedLook.y };
+    const sensitivity = this.settings.lookSensitivity;
+    const look = {
+      x: shapedLook.x * sensitivity,
+      y: (this.settings.invertLookY ? -shapedLook.y : shapedLook.y) * sensitivity,
+    };
     const buttons = (pad.buttons ?? []).map((button) => buttonPressed(button));
     const triggerValue = (action: PadAction): number => {
       const buttonIndex = layout.buttons[action];
@@ -316,36 +339,59 @@ export class GamepadInputRuntime {
       return buttons[buttonIndex] === true;
     };
     const previous = this.previousButtons;
-    const wasHeld = (action: PadAction): boolean => {
-      const buttonIndex = layout.buttons[action];
+    const actionIndex = (action: PadAction): number => PAD_ACTIONS.indexOf(action);
+    const wasHeldByIndex = (index: number): boolean => {
+      const buttonIndex = layout.buttons[PAD_ACTIONS[index]];
       return buttonIndex !== null && previous[buttonIndex] === true;
     };
-    const heldNow = new Map<PadAction, boolean>();
-    for (const action of PAD_ACTIONS) heldNow.set(action, isHeld(action));
+    // Per-frame edge snapshot: owned by this frame so retained frames stay
+    // valid after the shared baseline buffers swap underneath them.
+    const heldList: boolean[] = PAD_ACTIONS.map((action) => isHeld(action));
+    const wasList: boolean[] = PAD_ACTIONS.map((_, index) => wasHeldByIndex(index));
+    // Raw d-pad (physical 12–15) rides alongside the semantic map so menus work under any remap.
+    const dpadRaw = (i: number): boolean => buttonPressed(pad.buttons?.[i]);
+    const dpad = Object.freeze({
+      up: dpadRaw(12),
+      down: dpadRaw(13),
+      left: dpadRaw(14),
+      right: dpadRaw(15),
+    });
+    const dpadWas = (i: number): boolean => previous[i] === true;
+    const dpadPressed = Object.freeze({
+      up: dpad.up && !dpadWas(12),
+      down: dpad.down && !dpadWas(13),
+      left: dpad.left && !dpadWas(14),
+      right: dpad.right && !dpadWas(15),
+    });
     const anyInput = move.x !== 0 || move.y !== 0 || shapedLook.x !== 0 || shapedLook.y !== 0 || buttons.some(Boolean)
-      || heldNow.get('fire') === true || heldNow.get('ads') === true;
+      || heldList[actionIndex('fire')] === true || heldList[actionIndex('ads')] === true;
     if (anyInput) {
       this.lastPadInputAt = Math.max(this.lastPadInputAt, at);
       this.updateScheme();
     }
-    this.previousButtons = this.buttonStates(pad, layout);
+    // Swap the edge pair instead of allocating: the snapshot above keeps this
+    // frame's closures valid while the old baseline buffer becomes next frame's scratch.
+    this.buttonStates(pad, layout, this.scratchButtons);
+    const finished = this.scratchButtons;
+    this.scratchButtons = this.previousButtons;
+    this.previousButtons = finished;
     const frame: GamepadFrame = Object.freeze({
       connected: true,
       layout,
       move: Object.freeze(move),
       look: Object.freeze(look),
       rawLookMagnitude: Math.min(1, Math.hypot(rawLook.x, rawLook.y)),
-      held: (action) => heldNow.get(action) === true,
-      pressed: (action) => heldNow.get(action) === true && !wasHeld(action),
-      released: (action) => heldNow.get(action) !== true && wasHeld(action),
+      dpad,
+      dpadPressed,
+      held: (action) => heldList[actionIndex(action)] === true,
+      pressed: (action) => heldList[actionIndex(action)] === true && wasList[actionIndex(action)] !== true,
+      released: (action) => heldList[actionIndex(action)] !== true && wasList[actionIndex(action)] === true,
       value: triggerValue,
       anyInput,
     });
     this.lastFrame = frame;
     return frame;
   }
-
-  // ---- Remap capture -----------------------------------------------------
 
   /** Starts listening for the next newly pressed physical button on the active pad. */
   beginButtonCapture(): boolean {

@@ -6,6 +6,7 @@ export * from './glyphs';
 export * from './hotplug';
 export * from './hud-glyphs';
 export * from './mapping';
+export * from './menu-nav';
 export * from './rumble';
 export * from './settings-panel';
 import './gamepad.css';

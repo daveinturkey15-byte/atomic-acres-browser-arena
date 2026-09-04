@@ -1,12 +1,12 @@
 /**
  * Gamepad section of the Options panel (PASS 84 Lane E): live pad status,
- * per-stick inner/outer deadzone + response-curve sliders, invert-Y, rumble
- * switch, the fairness
+ * enable switch, per-stick inner/outer deadzone + response-curve sliders,
+ * look sensitivity, invert-Y, rumble switch, the fairness
  * tier read-out and pad button remapping with reset-to-defaults. The markup
  * lives in the shell (`pass64-shell.ts`); this module only binds it.
  */
 
-import { DEFAULT_GAMEPAD_SETTINGS, STICK_CURVE_LIMITS, type GamepadSettings } from './curves';
+import { DEFAULT_GAMEPAD_SETTINGS, LOOK_SENSITIVITY_LIMITS, STICK_CURVE_LIMITS, type GamepadSettings } from './curves';
 import type { GamepadInputRuntime } from './gamepad-input';
 import { PAD_ACTION_LABELS, PAD_ACTIONS, padButtonGlyph, type PadAction, type PadLayout } from './mapping';
 
@@ -14,12 +14,14 @@ export const GAMEPAD_SETTINGS_IDS = Object.freeze({
   section: 'gamepad-settings',
   status: 'gamepad-status',
   statusRow: 'gamepad-status-row',
+  enabled: 'gamepad-enabled',
   moveDeadzone: 'gamepad-move-deadzone',
   moveOuter: 'gamepad-move-outer',
   moveCurve: 'gamepad-move-curve',
   lookDeadzone: 'gamepad-look-deadzone',
   lookOuter: 'gamepad-look-outer',
   lookCurve: 'gamepad-look-curve',
+  lookSensitivity: 'gamepad-look-sensitivity',
   invertY: 'gamepad-invert-y',
   rumble: 'gamepad-rumble',
   bindingRows: 'gamepad-binding-rows',
@@ -35,17 +37,20 @@ export function gamepadSettingsMarkup(): string {
   const dz = STICK_CURVE_LIMITS.deadzone;
   const ex = STICK_CURVE_LIMITS.exponent;
   const ou = STICK_CURVE_LIMITS.outer;
+  const sn = LOOK_SENSITIVITY_LIMITS;
   const d = DEFAULT_GAMEPAD_SETTINGS;
   return `<section id="${ids.section}" class="settings-section" aria-labelledby="gamepad-settings-title">
       <header><b id="gamepad-settings-title">GAMEPAD</b><span id="${ids.status}">NO PAD DETECTED · PRESS ANY BUTTON</span><button id="${ids.settingsReset}" type="button">RESET STICKS</button></header>
       <div class="gamepad-status-row" id="${ids.statusRow}" data-connected="false"><b>DISCONNECTED</b><span>Plug in or pair a pad, then press any button. Works mid-match; no click or mouse capture needed.</span></div>
       <div class="settings-grid">
+        <label class="setting-check"><input id="${ids.enabled}" type="checkbox" checked> ENABLE GAMEPAD INPUT</label>
         <label>MOVE STICK DEADZONE<input id="${ids.moveDeadzone}" type="range" min="${dz.min}" max="${dz.max}" step="0.01" value="${d.moveCurve.deadzone}"></label>
         <label>MOVE OUTER DEADZONE<input id="${ids.moveOuter}" type="range" min="${ou.min}" max="${ou.max}" step="0.01" value="${d.moveCurve.outer}"></label>
         <label>MOVE RESPONSE CURVE<input id="${ids.moveCurve}" type="range" min="${ex.min}" max="${ex.max}" step="0.05" value="${d.moveCurve.exponent}"></label>
         <label>LOOK STICK DEADZONE<input id="${ids.lookDeadzone}" type="range" min="${dz.min}" max="${dz.max}" step="0.01" value="${d.lookCurve.deadzone}"></label>
         <label>LOOK OUTER DEADZONE<input id="${ids.lookOuter}" type="range" min="${ou.min}" max="${ou.max}" step="0.01" value="${d.lookCurve.outer}"></label>
         <label>LOOK RESPONSE CURVE<input id="${ids.lookCurve}" type="range" min="${ex.min}" max="${ex.max}" step="0.05" value="${d.lookCurve.exponent}"></label>
+        <label>LOOK SENSITIVITY<input id="${ids.lookSensitivity}" type="range" min="${sn.min}" max="${sn.max}" step="0.05" value="${d.lookSensitivity}"></label>
         <label class="setting-check"><input id="${ids.invertY}" type="checkbox"> INVERT LOOK Y</label>
         <label class="setting-check"><input id="${ids.rumble}" type="checkbox" checked> RUMBLE (FIRE / HIT / DAMAGE)</label>
       </div>
@@ -102,7 +107,9 @@ export function bindGamepadSettingsPanel(
   const lookDeadzone = byId<HTMLInputElement>(doc, ids.lookDeadzone);
   const lookOuter = byId<HTMLInputElement>(doc, ids.lookOuter);
   const lookCurve = byId<HTMLInputElement>(doc, ids.lookCurve);
-  const sliders = [moveDeadzone, moveOuter, moveCurve, lookDeadzone, lookOuter, lookCurve];
+  const lookSensitivity = byId<HTMLInputElement>(doc, ids.lookSensitivity);
+  const sliders = [moveDeadzone, moveOuter, moveCurve, lookDeadzone, lookOuter, lookCurve, lookSensitivity];
+  const enabled = byId<HTMLInputElement>(doc, ids.enabled);
   const invertY = byId<HTMLInputElement>(doc, ids.invertY);
   const rumble = byId<HTMLInputElement>(doc, ids.rumble);
   const rows = byId<HTMLElement>(doc, ids.bindingRows);
@@ -113,12 +120,14 @@ export function bindGamepadSettingsPanel(
   let captureAction: PadAction | null = null;
 
   const writeSettingsInputs = (settings: GamepadSettings): void => {
+    if (enabled) enabled.checked = settings.enabled;
     if (moveDeadzone) moveDeadzone.value = String(settings.moveCurve.deadzone);
     if (moveOuter) moveOuter.value = String(settings.moveCurve.outer);
     if (moveCurve) moveCurve.value = String(settings.moveCurve.exponent);
     if (lookDeadzone) lookDeadzone.value = String(settings.lookCurve.deadzone);
     if (lookOuter) lookOuter.value = String(settings.lookCurve.outer);
     if (lookCurve) lookCurve.value = String(settings.lookCurve.exponent);
+    if (lookSensitivity) lookSensitivity.value = String(settings.lookSensitivity);
     if (invertY) invertY.checked = settings.invertLookY;
     if (rumble) rumble.checked = settings.rumble;
   };
@@ -213,6 +222,7 @@ export function bindGamepadSettingsPanel(
   const onSlider = (): void => {
     const current = runtime.getSettings();
     runtime.updateSettings({
+      enabled: enabled?.checked ?? current.enabled,
       moveCurve: {
         deadzone: sliderValue(moveDeadzone, current.moveCurve.deadzone),
         outer: sliderValue(moveOuter, current.moveCurve.outer),
@@ -223,12 +233,13 @@ export function bindGamepadSettingsPanel(
         outer: sliderValue(lookOuter, current.lookCurve.outer),
         exponent: sliderValue(lookCurve, current.lookCurve.exponent),
       },
+      lookSensitivity: sliderValue(lookSensitivity, current.lookSensitivity),
       invertLookY: invertY?.checked ?? current.invertLookY,
       rumble: rumble?.checked ?? current.rumble,
     });
   };
   for (const input of sliders) input?.addEventListener('input', onSlider);
-  for (const input of [invertY, rumble]) input?.addEventListener('change', onSlider);
+  for (const input of [enabled, invertY, rumble]) input?.addEventListener('change', onSlider);
 
   const offPad = runtime.onPadChange(() => refresh());
   const offScheme = runtime.onSchemeChange(() => renderStatus());
