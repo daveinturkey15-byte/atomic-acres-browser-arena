@@ -1672,3 +1672,20 @@ assets and textures and lighting need to be tip top, raid can come next"
 - Next Nuke Town lane (after the PASS 94 candidate HITL): "BO2-2025 accuracy
   pass 2" — colours, deck/stair placement, eave, lollipop head + stem + third
   house, vehicle placement, lawn appliance banks, cross-product gate.
+
+## HF-478 — 2026-09-04 13:35: afternoon wave (six Opus lanes) and the beast-run plan
+
+- Owner: "when is the next HITL... then scheduling a beast run? why are you not
+  orchestrating more now we have usage resets". Launched six parallel Opus
+  lanes: BO2-2025 accuracy pass 2 (colours orange/white, deck opposite the
+  garage, eave porch, lollipop head + stem + third house, vehicle placement,
+  lawn appliance-bank anchors), Nuke Town materials depth (photoreal
+  procedural library at true scale), lighting/atmosphere (three times of day,
+  physical exposure with a combat floor, baked indirect), Raid rebuild slice 1,
+  Farcrysis rework slice 1 (parked), load-time verification (both admission
+  branches merged and proven with the tripwire probe).
+- Beast run (tonight): the reference-grounded loop runner drives Gemini/GLM/
+  Alibaba builders and reference-comparing critics on the Rebuild for hours
+  (probe-token receipts, journaled scores, plateau rule), local Qwen on
+  mechanical tasks with the GPU-yield rule, Opus verification at ~06:00; each
+  cycle's candidate is a HITL for the owner in the morning.
