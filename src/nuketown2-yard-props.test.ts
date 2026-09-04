@@ -51,7 +51,12 @@ describe('Nuke Town Rebuild yard props', () => {
   });
 
   it('keeps the appliance bank on the authored front-lawn zone, outside the road', () => {
-    const lawn = NUKETOWN2_GROUND_DRESSING.find((piece) => piece.id === 'street lawn west');
+    // HF-477 retiled the front verge for the lollipop: the four paired
+    // `street lawn *` entries became nine explicit per-side tiles, and the one
+    // this bank stands on is the north frontage of the cul-de-sac head. Same
+    // ground, same boundary at the turning head - only the tile's name and its
+    // derivation changed.
+    const lawn = NUKETOWN2_GROUND_DRESSING.find((piece) => piece.id === 'verge lawn head frontage north');
     expect(lawn).toBeDefined();
     const bank = NUKETOWN2_APPLIANCE_BANK;
     expect(bank.x - bank.width / 2).toBeGreaterThanOrEqual(lawn!.x0);
@@ -75,8 +80,12 @@ describe('Nuke Town Rebuild yard props', () => {
     // The pushed accuracy lane's HF-477 constants make north the orange house
     // and south the cream/white house; the side binding above keeps the
     // reference's red-on-orange / blue-on-white relationship when integrated.
-    expect(materialName('nuketown2 north house wall west')).toContain('north');
-    expect(materialName('nuketown2 south house wall west')).toContain('south');
+    // HF-477 splits each house wall at the y = 3.0 storey line: both GROUND
+    // storeys are the reference's cream, and the UPPER leaf is what carries the
+    // identity (terracotta-orange north, cream south). So the side binding is
+    // read off the upper leaf, which is where FINDINGS Q2 reads it too.
+    expect(materialName('nuketown2 north house wall west upper')).toContain('orange');
+    expect(materialName('nuketown2 south house wall west upper')).toContain('cream');
   });
 
   it('makes only the silhouette tier solid, and that tier carries the collider', () => {

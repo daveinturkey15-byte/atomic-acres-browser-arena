@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_371;
+const LINE_CEILING = 37_396;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -280,6 +280,22 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'skin registry, the TSL skin materials and the posture solver itself are three new '
       + 'modules (src/operator-skin-look-registry.ts, src/operator-skin-tsl-materials.ts, '
       + 'src/operator-posture-layer.ts), not lines in this file.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_396,
+    note:
+      'PASS 94 candidate 4b: +2 for the nuketown2-lighting re-merge (the lane Muse fixes, '
+      + '3 added / 1 removed) and +23 for the DEPLOY-FENCE ORDERING FIX, which is the whole '
+      + 'of the rest. Measured per change, not estimated. The fix moves the five '
+      + 'activeArenaReview* resets from the END of configurePlayableArenaVisuals up beside '
+      + 'the activeArenaVisualDefinition assignment, so the pair is one statement about which '
+      + 'arena is installed on every path out of a function whose every await can throw; and '
+      + 'it makes setArenaReviewCamera fall back to the AUTHORED definition, so a review '
+      + 'station - numbers in a source file - stops being unreachable because a cold first '
+      + 'WebGPU submission overran its 12 s fence. Nineteen of the 23 lines are the two '
+      + 'comments recording why, and the lookup itself is a new function in '
+      + 'src/rendering/arena-visual-stream.ts, not lines in this file.',
   },
 ];
 

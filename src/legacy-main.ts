@@ -71,7 +71,12 @@ import { estimateResidentObjectMemory } from './rendering/resident-memory';
 // that was never rebuilt. Importing the shared key is the fix; two copies of a key was
 // always going to end with one of them being wrong.
 import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
-import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
+import {
+  ArenaVisualStreamController,
+  findAuthoredArenaReviewCamera,
+  loadArenaVisualModule,
+  type ArenaVisualSwitchReceipt,
+} from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
 import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
@@ -4436,7 +4441,25 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   if (renderRuntime.backend === 'webgpu' && fence) await flushWebGpuFrames();
   arenaVisualReceipt = await arenaVisualStream.adoptGameplayRoot(arenaId, root);
   const module = await loadArenaVisualModule(arenaId);
+  // PASS 94 CANDIDATE 4b - THE DEFINITION AND THE REVIEW STATE ARE INSTALLED
+  // TOGETHER, BEFORE ANY WORK THAT CAN THROW.
+  //
+  // These five resets used to sit at the END of this function, after the whole
+  // WebGPU block. Every await between here and there is a throw point - the
+  // PMREM regen, the traversal audit, the sky-backdrop admission, the arena
+  // environment assertion - and none of them run under a try. So a throw left
+  // `activeArenaVisualDefinition` pointing at the NEW arena (it is assigned on
+  // the line below) while `activeArenaReview*` still described the OLD one: a
+  // review camera id, exposure, seed and HUD state for an arena that is no
+  // longer on screen, which `setArenaReviewCamera` and the debug capture path
+  // both read. Resetting them next to the assignment makes the pair one
+  // statement about which arena is installed, on every path out of here.
   activeArenaVisualDefinition = module.definition;
+  activeArenaReviewCameraId = null;
+  activeArenaReviewFixedTimeMs = null;
+  activeArenaReviewSeed = null;
+  activeArenaReviewExposure = null;
+  activeArenaReviewHud = null;
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
     // Browser assets survive map changes, but their GPU receipts are tied to
@@ -4521,11 +4544,6 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // is the point of landing it with the fix rather than after it.
     assertArenaEnvironmentLive(pass64TslSystems.observeArenaEnvironment());
   }
-  activeArenaReviewCameraId = null;
-  activeArenaReviewFixedTimeMs = null;
-  activeArenaReviewSeed = null;
-  activeArenaReviewExposure = null;
-  activeArenaReviewHud = null;
 }
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => (
@@ -35910,7 +35928,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArenaReviewCamera: (cameraId) => {
     resetDebugChopperExteriorReviewTracker();
-    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId);
+    // PASS 94 CANDIDATE 4b: the installed definition first, then the AUTHORED
+    // one. A review station is source data, not GPU state, so its reachability
+    // must not be a fact about whether a deploy-time fence was met - see
+    // `findAuthoredArenaReviewCamera`. `false` now means the id is declared by
+    // no loaded arena at all, which is the only honest refusal.
+    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId)
+      ?? findAuthoredArenaReviewCamera(cameraId);
     if (!reviewCamera) return false;
     camera.position.set(...reviewCamera.position);
     camera.lookAt(...reviewCamera.target);

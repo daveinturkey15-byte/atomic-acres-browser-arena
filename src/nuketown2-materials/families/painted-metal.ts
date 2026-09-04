@@ -22,7 +22,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, linearSwatch, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { abs, clamp, float, fract, max, mix, positionWorld, smoothstep } =
@@ -110,7 +110,7 @@ export function createPaintedMetalMaterial(
   const weep = smoothstep(float(0.35), float(0.0), p.y)
     .mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
 
-  const paint = linearSwatch(baseSrgb).mul(wear.albedoMul);
+  const paint = uniformSwatch(baseSrgb).mul(wear.albedoMul);
   const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));

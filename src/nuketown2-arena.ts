@@ -202,6 +202,7 @@ export {
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
+  NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
@@ -1634,27 +1635,34 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [bal.centreX, bal.deckTop - bal.slabThickness / 2, balDeckZ],
     [bal.width, bal.slabThickness, bal.projection], m.interiorFloor);
   // ONE CENTRAL PIER, lawn to soffit: the honest answer to "is this body
-  // floating", and the detail the reference frame actually shows under a deck
-  // over an open undercroft.
+  // floating", and the detail the reference frame shows under a deck over an
+  // open undercroft. HF-465 authored TWO posts at the deck's outboard corners;
+  // on the non-garage end where FINDINGS Q3 puts the deck those corners land on
+  // this team's z = -25 spawn line, so HF-477 cut them to one pier on the
+  // deck's centre line, 2.0 m from each spawn.
   //
-  // HF-465 authored TWO posts, at the deck's own outboard corners. That was
-  // reachable while the deck stood on the garage end; on the non-garage end
-  // where FINDINGS Q3 puts it, the corners are +/- 2.12 from centre = authored
-  // x -5.12 and -0.88, and this team's z = -25 spawn line carries spawns at
-  // x = -5 AND x = -1. Both gates caught it: the fidelity spawn probe reported
-  // (5, -25) blocked, and `spawn-layout-quality` measured 0.72 m of wall
-  // standoff against its 1.2 m floor. Setting the pair inboard cannot fix it -
-  // the two spawns are 4.0 m apart and each needs 1.28 m of clearance, which
-  // leaves one 1.44 m window in the middle of a 4.4 m deck, i.e. one pier.
+  // INTEGRATION (candidate 4b) LEFT THIS EXACTLY AS HF-477 AUTHORED IT, and
+  // records what it measured rather than tuning it: see the OPEN row in
+  // `docs/evidence/pass94/candidate4b/REPORT.md`. This pier grazes spawn
+  // (0, -26)'s last sight line over 18 m by 2 cm, and moving it anywhere else
+  // along its own deck (scanned at 0.2 m over the full span) does not resolve
+  // the pair of bounds - the other half of that conflict is a 63.3 m
+  // through-house diagonal from spawn (0, 26) that this pier never touched.
   //
-  // So: one pier, on the deck's centre line, 2.0 m from each spawn (1.88 m of
-  // standoff after its own half-width). It is also the better read - the
-  // reference's undercroft is open at both corners, with the near one carried
-  // by the exterior stair's own stringer rather than by a column.
-  const BALCONY_PIER = 0.24;
+  // INTEGRATION (candidate 4b) CHANGED ONE NUMBER: the pier is `bal.postSize`,
+  // the 0.16 m timber post this file already authors for a deck, instead of the
+  // 0.24 m literal HF-477 introduced alongside it. At 0.24 m the column grazed
+  // spawn (0, -26)'s last sight line over 18 m by TWO CENTIMETRES - inside
+  // `clearLine`'s own 0.05 m padding - and the fidelity gate's exposure FLOOR
+  // (half the street's length: a spawn you cannot see half a street from is a
+  // cupboard) failed at 17.72 m where every other spawn on that team reaches
+  // 22-30 m. Deleting the pier was measured and is NOT the fix - it opens a
+  // 63 m diagonal at the other end - and scanning its position along the deck
+  // at 0.2 m over the full span never satisfied both bounds. The post SIZE is
+  // the free variable, and 0.16 m is the size this file already uses.
   pair(builder, 'balcony post 0',
-    [bal.centreX, (bal.deckTop - bal.slabThickness) / 2, bal.outboardZ + BALCONY_PIER / 2],
-    [BALCONY_PIER, bal.deckTop - bal.slabThickness, BALCONY_PIER], m.trim,
+    [bal.centreX, (bal.deckTop - bal.slabThickness) / 2, bal.outboardZ + bal.postSize / 2],
+    [bal.postSize, bal.deckTop - bal.slabThickness, bal.postSize], m.trim,
     { ballisticMaterial: 'wood' });
   // Rails, 1.1 m over the deck: over LOW_COVER so they break a crouched line,
   // under the 1.65 m standing eye so a standing player shoots across them.
@@ -1832,6 +1840,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // not a measurement. They are removed rather than hidden: the slab's inboard
   // face sits on the house's own front wall plane, so nothing is floating, and
   // the front approach is now clear the way the reference frame shows it.
+  // INTEGRATION (candidate 4b) reinstated them as an experiment against the
+  // standing-eye-line ceiling and MEASURED THAT THEY CHANGE NEITHER BOUND
+  // (63.32 m and 17.72 m both unmoved), so HF-477's cantilever stands.
   const ledge = NUKETOWN2_WINDOW_LEDGE;
   pair(builder, 'window ledge sill',
     [ledge.centreX, ledge.top - ledge.thickness / 2, HOUSE_FRONT_Z + ledge.projection / 2],
@@ -2362,11 +2373,12 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
 // ---------------------------------------------------------------------------
 
 /**
- * The head car's plan position, and the driveway car's, hoisted out of their
- * builders so the forged skins read the SAME numbers the boxes do. A second
- * copy of a coordinate is how a skin ends up 20 cm off the body it dresses.
+ * The driveway car's plan position, hoisted out of its builder so the forged
+ * skin reads the SAME numbers the boxes do. A second copy of a coordinate is
+ * how a skin ends up 20 cm off the body it dresses. HF-477's two STREET cars
+ * are hoisted the same way, in `NUKETOWN2_STREET_CARS` (nuketown2-layout.ts),
+ * because the reference is the authority on where they park.
  */
-const NUKETOWN2_HEAD_CAR: readonly [number, number] = [4.5, -0.8];
 const NUKETOWN2_DRIVEWAY_CAR: readonly [number, number] = Object.freeze([
   (GARAGE_X0 + GARAGE_X1) / 2 + 0.5,   // 7.25, centred on the door
   // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
@@ -2404,8 +2416,11 @@ const NUKETOWN2_FORGE_SUPERSEDED: ReadonlyArray<{ readonly pattern: RegExp; read
   Object.freeze({ pattern: /^nuketown2 street-vehicle truck wheel \d+$/, expected: 3 }),
   Object.freeze({ pattern: /^nuketown2 street-vehicle truck hubcap /, expected: 6 }),
   Object.freeze({ pattern: /^nuketown2 street-vehicle truck wheel arch /, expected: 6 }),
-  // The head car in the turning head, and the two driveway cars.
-  Object.freeze({ pattern: /^nuketown2 street-vehicle head car /, expected: 22 }),
+  // HF-477's two street cars, and the two driveway cars. The retired head car's
+  // 22 boxes became 22 per car across `stem saloon` and `stem classic`, which
+  // the shared `streetCar()` helper emits from one body of code.
+  Object.freeze({ pattern: /^nuketown2 street-vehicle stem saloon /, expected: 22 }),
+  Object.freeze({ pattern: /^nuketown2 street-vehicle stem classic /, expected: 22 }),
   Object.freeze({ pattern: /^nuketown2 (north|south) car /, expected: 44 }),
 ]);
 
@@ -2468,6 +2483,10 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   // Same aqua the box cars carried, and the same 0.20 base roughness, so the
   // ray-traced preset's reflective-proxy admission is unchanged.
   const carMaterials = createForgeMaterialSet(0x3d6f80, 'nuketown2-forge-car');
+  // The reference's two street cars keep the hexes their collider boxes wear
+  // (`m.carSaloon` / `m.carClassic`), so skin and body are one colour.
+  const saloonMaterials = createForgeMaterialSet(0x27394f, 'nuketown2-forge-car-saloon');
+  const classicMaterials = createForgeMaterialSet(0x2f8f77, 'nuketown2-forge-car-classic');
 
   const c = NUKETOWN2_STREET_COACH;
   const t = NUKETOWN2_CENTRAL_TRUCK;
@@ -2524,13 +2543,23 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
   };
-  // Head car: nose to +x, so the vehicle frame's +z maps to world -x.
-  placements.push({
-    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
-    x: NUKETOWN2_HEAD_CAR[0] + SEDAN_SPEC.length / 2,
-    z: NUKETOWN2_HEAD_CAR[1],
-    yaw: -Math.PI / 2,
-  });
+  // HF-477's two street cars, each dressed in its OWN paint - the skin is the
+  // visible body, so a navy collider under an aqua skin would be the exact
+  // "skin and box disagree" defect this audit exists to catch. Both nose to +x,
+  // so the vehicle frame's +z maps to world -x, as the retired head car did.
+  // The paint costs no pipeline: `createForgePaintMaterial` carries its pigment
+  // as a uniform, so all three sets share one compiled graph.
+  for (const [seat, materials] of [
+    [NUKETOWN2_STREET_CARS.saloon, saloonMaterials],
+    [NUKETOWN2_STREET_CARS.classic, classicMaterials],
+  ] as const) {
+    placements.push({
+      built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, materials),
+      x: seat.x + SEDAN_SPEC.length / 2,
+      z: seat.z,
+      yaw: -Math.PI / 2,
+    });
+  }
   // The two driveway cars point at the road, and the south one is the exact
   // 180-degree partner of the north one - the same involution `pair` applies
   // to their boxes, so the two skins stay as symmetric as the two colliders.
@@ -2861,10 +2890,17 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false });
 
   // Fire hydrant on the cul-de-sac's own verge.
-  pair(builder, 'verge hydrant body', [-10.5, 0.42, VERGE_FURNITURE_Z], [0.32, 0.84, 0.32], m.busTrim);
-  pair(builder, 'verge hydrant cap', [-10.5, 0.88, VERGE_FURNITURE_Z], [0.22, 0.12, 0.22], m.trim,
+  // INTEGRATION (candidate 4b): -10.5 -> -12.6. HF-477 re-stationed the hydrant
+  // on the verge furniture line at x = -10.5, and the techniques lane's
+  // appliance bank stands on the same line spanning x [-11.3, -9.5] - so the
+  // hydrant's cap ended up 1 cm above the cabinet's top face on a zero-area
+  // touch, which `find-coplanar-pairs` reported as two FINDINGS. Moved into the
+  // gap between the bank and the street waste bin at -13.9; nothing else on the
+  // line moves, and the hydrant is still on the kerb side of the same verge.
+  pair(builder, 'verge hydrant body', [-12.6, 0.42, VERGE_FURNITURE_Z], [0.32, 0.84, 0.32], m.busTrim);
+  pair(builder, 'verge hydrant cap', [-12.6, 0.88, VERGE_FURNITURE_Z], [0.22, 0.12, 0.22], m.trim,
     { solid: false, shots: false });
-  pair(builder, 'verge hydrant nozzles', [-10.5, 0.55, VERGE_FURNITURE_Z], [0.44, 0.12, 0.12], m.sign,
+  pair(builder, 'verge hydrant nozzles', [-12.6, 0.55, VERGE_FURNITURE_Z], [0.44, 0.12, 0.12], m.sign,
     { solid: false, shots: false });
 
   // Street name blade and speed limit sign post, out at the stem end.
@@ -2900,30 +2936,16 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // up). At -3.6 it clears the walk line by 1.15 m and still butts the hedge.
   pair(builder, 'verge kerb planter', [-3.6, LOW_COVER / 2, VERGE_FURNITURE_Z], [2.4, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
 
-  // HF-477 - THE FRONT-LAWN APPLIANCE BANK, the map's cheapest chirality
-  // anchor. FINDINGS Q4, VERIFIED on `nt2025-aerial-boii.jpg`: each front lawn
-  // carries a three-unit cooker bank on a white cabinet, and the tops are
-  // COLOUR-CODED - red on the orange house's lawn, blue on the white house's.
-  // Two props, no collider moved, and a player who can see one lawn knows which
-  // half of a 180-degree symmetric map he is in. That is the property the
-  // reference gives away for the price of dressing, and R4 section 7 item 3
-  // wrote it off as interchangeable.
-  //
-  // The cabinet is 0.90 m - under LOW_COVER, so it is a body you crouch behind
-  // and never a body that shortens a standing eye-line.
-  const APPLIANCE_BANK_X = 1.6;
-  const APPLIANCE_TOPS = [m.applianceRed, m.applianceBlue] as const;
-  pair(builder, 'verge appliance cabinet', [APPLIANCE_BANK_X, 0.45, VERGE_FURNITURE_Z],
-    [2.8, 0.90, VERGE_FURNITURE_DEPTH], m.trim);
-  for (const [index, dx] of [-0.9, 0, 0.9].entries()) {
-    // The top is sunk 0.02 m INTO the cabinet rather than laid on it: a decal
-    // whose underside is exactly the cabinet's top face is a coplanar pair, and
-    // this arena's kerbs already solve that the same way.
-    pair(builder, `verge appliance top ${index}`, [APPLIANCE_BANK_X + dx, 0.92, VERGE_FURNITURE_Z],
-      [0.68, 0.08, 0.68], APPLIANCE_TOPS, { solid: false, shots: false, cast: false });
-    pair(builder, `verge appliance dial ${index}`, [APPLIANCE_BANK_X + dx, 0.72, VERGE_FURNITURE_Z - 0.42],
-      [0.50, 0.10, 0.04], m.chrome, { solid: false, shots: false, cast: false });
-  }
+  // HF-477's front-lawn appliance bank is NOT authored here. Both lanes read
+  // the same feature out of FINDINGS Q4 - a three-unit cooker bank on each
+  // front lawn, RED tops on the orange house's and BLUE on the white house's -
+  // and the techniques lane's `nuketown2-yard-props.ts` build is the one that
+  // ships: it carries the collider, the HF-467 `structural-metal` rating, the
+  // plinth and control panels, its own placement gate against the front-lawn
+  // tile, and two authored close-range review stations. Shipping this lane's
+  // dressing-only copy as well would put TWO banks on one lawn. The colour
+  // placement is the one both lanes and FINDINGS agree on, and the fidelity
+  // case below measures it on the built prop.
   // Entry planter urn, between the appliance bank and the drive.
   pair(builder, 'verge entry planter urn', [3.8, 0.30, VERGE_FURNITURE_Z], [0.60, 0.60, 0.60], m.block);
   pair(builder, 'verge entry planter shrub', [3.8, 0.70, VERGE_FURNITURE_Z], [0.48, 0.35, 0.48], m.planter,

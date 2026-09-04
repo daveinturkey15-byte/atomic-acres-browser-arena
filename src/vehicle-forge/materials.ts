@@ -42,6 +42,7 @@ const {
   pow,
   saturate,
   smoothstep,
+  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -123,7 +124,19 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   // Wear that lives ONLY in roughness is invisible: it is carried here as an
   // albedo step first (the film greys the pigment) and roughness second.
   const film = vec3(0.58, 0.56, 0.52);
-  material.colorNode = mix(vec3(r, g, b), film, (dust as any).mul(float(0.30)));
+  // PASS 94 CANDIDATE 4b - THE PIGMENT IS A UNIFORM, NOT THREE CONSTANTS.
+  //
+  // Same fix, same reason, as `createNuketown2CarPaintMaterial` (HF-477): a
+  // literal's VALUE is part of a node graph's cache key, so a baked
+  // `vec3(r, g, b)` compiled one WGSL shader and one WebGPU pipeline PER
+  // COLOUR the forge was asked for. Nuke Town alone asks for five (coach body,
+  // coach waistline, truck cab, and the reference's two street cars), and a
+  // cold first submission pays for every one of them inside the 12 s deploy
+  // fence. As a uniform the graph is identical for every colour, so all forged
+  // paint - on every arena - shares ONE compiled pipeline. The pigment fed in
+  // is the same lifted triple, and the film, dust and roughness terms above and
+  // below are untouched, so nothing about the look changes.
+  material.colorNode = mix(uniform(new THREE.Vector3(r, g, b)), film, (dust as any).mul(float(0.30)));
   material.roughnessNode = float(baseRoughness).add((dust as any).mul(float(0.20)));
   return material;
 }

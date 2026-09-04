@@ -135,7 +135,12 @@ export const definition = createProceduralArenaVisualDefinition({
     // Team 1's yard, the exact 180-degree partner. If these two frames are not
     // rotations of each other, the arena's rotational symmetry is broken and
     // one team has something the other does not.
-    camera('nuketown2-south-yard', [hx(10), 1.75, 29], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
+    // INTEGRATION (candidate 4b): back to (12, 31). This station's whole
+    // evidence value is that a player really starts a round there, and the
+    // fidelity gate measures exactly that; (10, 29) is not in team 1's
+    // authored spawn table, so the frame stopped being a spawn's-eye view.
+    // The AIM is the accuracy lane's, unchanged.
+    camera('nuketown2-south-yard', [hx(12), 1.75, 31], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
     // Along the street centre-line. HF-477 turned this into the LOLLIPOP frame
     // without moving it: the camera stands at the closed end of the cul-de-sac
     // and looks straight down the stem, so the bulb's kerb ring, the coach and

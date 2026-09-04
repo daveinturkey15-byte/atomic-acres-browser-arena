@@ -52,7 +52,7 @@ export {
   assertSpec,
   maxDarkening,
 } from './spec';
-export { buildWear, linearRgb, linearSwatch } from './wear';
+export { buildWear, linearRgb, linearSwatch, uniformSwatch } from './wear';
 export { createSidingMaterial, sidingSpec } from './families/siding';
 export { createRoofMaterial, roofSpec } from './families/roof';
 export { asphaltSpec, createAsphaltMaterial, createMarkingMaterial, markingSpec } from './families/asphalt';
@@ -115,6 +115,30 @@ export interface Nuketown2MaterialRegistry {
   /** Coach glazing band — a DIELECTRIC, which is what it was not. Decal tier -1. */
   readonly coachGlass: MeshStandardNodeMaterial;
 }
+
+/**
+ * Hard ceiling on the DISTINCT node graphs the whole nuketown2 arena builds.
+ *
+ * WHY A CEILING AT ALL. The WebGPU renderer caches a compiled program by the
+ * WGSL SOURCE a node graph generates (`Pipelines` looks a `ProgrammableStage`
+ * up by shader text, and a render pipeline by the pair of stage ids), so one
+ * distinct graph is one WGSL compile and one pipeline. Arena admission forces a
+ * single full-coverage draw with culling off and then fences the GPU queue for
+ * 12,000 ms, so every one of those compiles has to complete inside ONE
+ * submission — the same budget HF-374 blew on farcrysis foliage.
+ *
+ * WHY 54. Measured on this tree by `src/nuketown2-pipeline-budget.test.ts`:
+ * the built arena carries 96 node materials over 52 distinct graphs. Before the
+ * HF-477 uniform-swatch pass it was 55 for the same 96 materials, because every
+ * family factory baked its caller's hex into the graph as a literal `vec3` — so
+ * the two sidings, and five of the six painted-metal roles, each compiled their
+ * own shader for what is ONE surface with a different colour in a buffer. The
+ * ceiling is the measured 52 plus a margin of TWO: room for a couple of
+ * genuinely new surfaces from another lane's dressing and nothing more. A third
+ * new graph is a review, not a bump — raising this number is a decision about
+ * the deploy fence, so it is made here, once, in the open.
+ */
+export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 54;
 
 /** Every role name, for the gates that sweep the registry rather than naming rows. */
 export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([

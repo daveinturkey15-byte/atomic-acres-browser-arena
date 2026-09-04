@@ -18,7 +18,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, linearSwatch, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 
@@ -97,7 +97,7 @@ export function createTimberMaterial(
   const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
   const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
 
-  const wood = linearSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(boardTone));
+  const wood = uniformSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(boardTone));
   const grained = wood.mul(float(1).sub(latewood.mul(float(variant === 'painted-trim' ? 0.03 : 0.11))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(float(variant === 'painted-trim' ? 0.15 : 0.8)));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(float(variant === 'painted-trim' ? 0.25 : 0.55)));

@@ -29,7 +29,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { clamp, float, floor, fract, mix, positionWorld, smoothstep } =
@@ -95,7 +95,7 @@ export function createLawnMaterial(
   const uv = boxUv();
   const wear = buildWear(spec, uv);
 
-  const turf = linearSwatch(baseSrgb).mul(wear.albedoMul);
+  const turf = uniformSwatch(baseSrgb).mul(wear.albedoMul);
 
   // The mown checker. Turf only - nobody mows scrubland or a hedge. Parity of
   // (cellX + cellZ) is 0 or 1, which is the chequerboard; the edge stays hard.
@@ -116,7 +116,7 @@ export function createLawnMaterial(
   // is a minority of the surface, which is what a desire line is.
   const thin = smoothstep(float(0.42), float(0.78), wear.soilMask);
   const bare = smoothstep(float(0.76), float(0.93), wear.soilMask);
-  const earth = linearSwatch(options.soilSrgb ?? 0x6b5741);
+  const earth = uniformSwatch(options.soilSrgb ?? 0x6b5741);
 
   const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(variant === 'hedge' ? 0.35 : 1.0));
   const worn = mix(thinned, earth, bare.mul(variant === 'hedge' ? 0.15 : 0.60));

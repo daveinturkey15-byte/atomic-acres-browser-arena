@@ -460,7 +460,40 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
  */
 export const NUKETOWN2_STREET_CARS = Object.freeze({
   /** The dark saloon, beside the truck, nosed down the stem. */
-  saloon: Object.freeze({ x: 2.0, z: 3.2, length: 4.4, width: 1.9 }),
-  /** The green classic, out in the stem across the centre-line. */
+  /**
+   * INTEGRATION (candidate 4b) moved the SALOON 4.6 m along the stem,
+   * 2.0 -> 6.6, and left the classic exactly where HF-477 put it.
+   *
+   * WHY. HF-477 retired the aqua "head car" for these two, declaring that "the
+   * saloon inherits the counterweight job and the classic inherits the
+   * centre-line job". The fidelity gate falsified the first half: with both
+   * cars where the lane parked them, spawn (0, 26) held a clear STANDING line
+   * 63.3 m long - out of the south house's front window, diagonally across the
+   * whole carriageway and into the far back yard, two thirds of the map's
+   * diagonal - against that gate's 36 m ceiling. The retired head car was the
+   * body that used to sit on it.
+   *
+   * WHY THE SALOON AND NOT THE CLASSIC. The classic is the ONLY body parked
+   * across z = 0, so it carries `MAX_STREET_CENTRE_RUN_METRES`; moving it was
+   * tried first and measured, and every position that closed the diagonal
+   * (x 6.5-8.5) opened the centre-line run to 22.0-24.0 m against its 21.2 m
+   * band. The saloon carries no band - it is the counterweight, on the truck's
+   * own z side - so it is the free body, and closing the diagonal IS the
+   * counterweight job it was declared to have.
+   *
+   * 6.6 is the centre of a MEASURED WINDOW, not a knife edge: the whole gate
+   * passes across x = 6.0-7.2 at 0.4 m steps. The body spans x [4.4, 8.8] at
+   * z [2.25, 4.15], inside the stem's own 5.3 m half width, beside the classic
+   * rather than on it, and still "nosed down the stem" as FINDINGS Q4 has both
+   * cars. The reference is a hazy uncalibrated aerial that this lane records
+   * every value off as a FAMILY rather than a dropper.
+   */
+  saloon: Object.freeze({ x: 6.6, z: 3.2, length: 4.4, width: 1.9 }),
+  /**
+   * The green classic, out in the stem across the centre-line - exactly where
+   * HF-477 authored it. It is the only body parked across z = 0, so it carries
+   * `MAX_STREET_CENTRE_RUN_METRES`; see the saloon's note for what was measured
+   * when moving it was tried.
+   */
   classic: Object.freeze({ x: 5.0, z: -0.6, length: 4.4, width: 1.9 }),
 });

@@ -25,7 +25,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, linearSwatch, wallUv } from '../wear';
+import { buildWear, uniformSwatch, wallUv } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { abs, float, floor, fract, max, mix, positionWorld, smoothstep, vec3 } =
@@ -119,7 +119,7 @@ export function createSidingMaterial(
   const joint = smoothstep(float(0.0012), float(0.0), abs(fract(jointRun).sub(float(0.5))).mul(float(SIDING_BOARD_RUN_M)));
 
   // --- Paint ---------------------------------------------------------------
-  const upper = linearSwatch(baseSrgb);
+  const upper = uniformSwatch(baseSrgb);
   const wainscotHex = options.wainscotSrgb;
   let base = upper;
   if (wainscotHex !== undefined) {
@@ -128,7 +128,7 @@ export function createSidingMaterial(
     // the middle of a board is a decal, not a house.
     const snapped = Math.round(breakY / SIDING_COURSE_M) * SIDING_COURSE_M;
     const isUpper = smoothstep(float(snapped - 0.004), float(snapped + 0.004), p.y);
-    base = mix(linearSwatch(wainscotHex), upper, isUpper);
+    base = mix(uniformSwatch(wainscotHex), upper, isUpper);
   }
 
   // Sun fade lifts the exposed upper run; splash-back grime darkens the

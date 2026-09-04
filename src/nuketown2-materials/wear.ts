@@ -17,6 +17,7 @@
  * NO PER-FRAME ALLOCATIONS. Everything here builds node expressions once, at
  * material construction. Nothing in this file runs per frame on the CPU.
  */
+import * as THREE from 'three';
 import * as TSL from 'three/tsl';
 import { fbm2 } from '../map3/noise';
 import {
@@ -39,6 +40,7 @@ const {
   positionWorld,
   sin,
   smoothstep,
+  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -286,11 +288,39 @@ export function boxUv(): any {
  * with no chance of a double decode turning a warm timber into near-black.
  */
 export function linearSwatch(srgbHex: number): any {
-  const decode = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const r = decode(((srgbHex >> 16) & 0xff) / 255);
-  const g = decode(((srgbHex >> 8) & 0xff) / 255);
-  const b = decode((srgbHex & 0xff) / 255);
+  const [r, g, b] = linearRgb(srgbHex);
   return vec3(r, g, b);
+}
+
+/**
+ * The SAME colour as `linearSwatch`, carried as a UNIFORM instead of a literal.
+ *
+ * HF-477: A COLOUR A CALLER CHOOSES IS NOT A GRAPH CONSTANT. `linearSwatch`
+ * returns `vec3(r, g, b)`, which puts the value INSIDE the node graph, and the
+ * WebGPU renderer caches a compiled program by the WGSL SOURCE it generates
+ * (`Pipelines._getRenderCacheKey` looks the program up by shader text). So two
+ * materials from the same family that differ only by hex generate two
+ * different shader sources, compile twice and get two pipelines — and this
+ * library's factories are ALL parameterised by hex, so `createNuketown2Material
+ * Registry()` was paying ~21 cold compiles for what is really 15 surfaces.
+ * That is the cost that pushed nuketown2's first WebGPU submission onto the
+ * 12,000 ms deploy fence, and it is exactly the defect `nuketown2-vehicle-
+ * materials.ts` already fixed for car paint (commit b594fe35).
+ *
+ * As a uniform the generated WGSL is IDENTICAL for every hex, so a family's
+ * roles share one program and one pipeline no matter how many colours the
+ * arena asks for. Nothing about the look changes: the value fed in is the same
+ * decoded linear triple `linearSwatch` would have baked.
+ *
+ * WHICH ONE TO USE. Uniform for a colour the CALLER supplies; `linearSwatch`
+ * for a colour that is FIXED for the whole family — chip primer, rust weep,
+ * the drip-shadow tint, an asphalt spec's own base — because those are the
+ * same value in every material of the family, cost no extra pipeline, and are
+ * cheaper as constants the compiler can fold.
+ */
+export function uniformSwatch(srgbHex: number): any {
+  const [r, g, b] = linearRgb(srgbHex);
+  return uniform(new THREE.Vector3(r, g, b));
 }
 
 /** Same decode, as plain numbers, for CPU-side gates. */

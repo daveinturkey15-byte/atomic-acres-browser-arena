@@ -18,6 +18,7 @@ import {
   NUKETOWN2_SECTION,
   NUKETOWN2_SPAWN_LAYOUT,
   NUKETOWN2_STAIRWELL,
+  NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_WINDOWS,
@@ -689,10 +690,12 @@ describe('Nuke Town Rebuild fidelity', () => {
       if (node.parent?.name.startsWith('vehicle-forge ') === true) return;
       skins.push(node);
     });
-    // Coach, truck cab, truck bogie and three sedans (head car + both driveways).
-    expect(skins.length, 'forged street-vehicle skins').toBeGreaterThanOrEqual(6);
+    // Coach, truck cab, truck bogie and four sedans: HF-477's two STREET cars
+    // (`stem saloon`, `stem classic` - the reference's dark saloon and green
+    // classic, which replaced the single aqua head car) and both driveways.
+    expect(skins.length, 'forged street-vehicle skins').toBeGreaterThanOrEqual(7);
     const bodies = map.raycastMeshes
-      .filter((mesh) => /(car body|coach body|truck cab)$/u.test(mesh.name))
+      .filter((mesh) => /(car body|saloon body|classic body|coach body|truck cab)$/u.test(mesh.name))
       .map((mesh) => ({ name: mesh.name, ...planCentre(mesh) }));
     expect(bodies.length, 'solid vehicle bodies to dress').toBeGreaterThanOrEqual(4);
     for (const skin of skins) {
@@ -717,17 +720,23 @@ describe('Nuke Town Rebuild fidelity', () => {
       ).toBeLessThan(0.35);
     }
     // ...and the mirror is asserted directly as well, so a future handedness
-    // flip cannot leave a coincidentally-passing pair behind. The head car is
-    // authored at x = 4.5 (HF-432 item 5); its BOX must stand at hx(4.5), and
-    // the skin on top of it.
-    const headCarBox = map.raycastMeshes.find((mesh) => mesh.name.endsWith('head car body'));
-    expect(headCarBox, 'the head car body').toBeDefined();
-    expect(planCentre(headCarBox!).x, 'head car body follows the handedness flag').toBeCloseTo(hx(4.5), 6);
-    const headCarSkin = skins
-      .map((skin) => ({ skin, centre: planCentre(skin) }))
-      .filter(({ skin }) => skin.name.endsWith('sedan'))
-      .sort((left, right) => Math.abs(left.centre.z) - Math.abs(right.centre.z))[0]!;
-    expect(headCarSkin.centre.x, 'the head car skin rides its own box').toBeCloseTo(hx(4.5), 6);
+    // flip cannot leave a coincidentally-passing pair behind. HF-477 retired
+    // the authored head car for the reference's two STREET cars, so the claim
+    // moves to them WITHOUT losing a single assertion: each car's BOX must
+    // stand at hx() of its own authored seat, and its skin on top of it.
+    for (const [id, seat] of [
+      ['stem saloon', NUKETOWN2_STREET_CARS.saloon],
+      ['stem classic', NUKETOWN2_STREET_CARS.classic],
+    ] as const) {
+      const box = map.raycastMeshes.find((mesh) => mesh.name.endsWith(`${id} body`));
+      expect(box, `the ${id} body`).toBeDefined();
+      expect(planCentre(box!).x, `${id} body follows the handedness flag`).toBeCloseTo(hx(seat.x), 6);
+      const skin = skins
+        .map((entry) => ({ entry, centre: planCentre(entry) }))
+        .filter(({ centre }) => Math.abs(centre.z - seat.z) < 0.35)
+        .sort((left, right) => Math.abs(left.centre.x - hx(seat.x)) - Math.abs(right.centre.x - hx(seat.x)))[0]!;
+      expect(skin.centre.x, `the ${id} skin rides its own box`).toBeCloseTo(hx(seat.x), 6);
+    }
   });
 
 
@@ -1003,18 +1012,19 @@ describe('Nuke Town Rebuild fidelity', () => {
     //     house's lawn, blue on the white house's. Measured on the BUILT
     //     geometry, and tied to the houses rather than to a literal sign, so a
     //     later mirror of the arena carries them with it.
-    for (const index of [0, 1, 2]) {
-      const red = colourOf(named(`nuketown2 north verge appliance top ${index}`), `north appliance top ${index}`);
-      const blue = colourOf(named(`nuketown2 south verge appliance top ${index}`), `south appliance top ${index}`);
-      expect(red.r, `appliance top ${index} on the orange lawn is RED`).toBeGreaterThan(red.b);
-      expect(blue.b, `appliance top ${index} on the white lawn is BLUE`).toBeGreaterThan(blue.r);
-      expect(margin(red, blue), `appliance top ${index} colour margin`).toBeGreaterThan(0.15);
-    }
+    // INTEGRATION (candidate 4b): measured on the techniques lane's shipped
+    // bank (`nuketown2-yard-props.ts`), which is the one build of this feature
+    // in the arena - see the note where this lane's duplicate stood.
+    const red = colourOf(named('nuketown2 north lawn appliance bank hob deck'), 'north hob deck');
+    const blue = colourOf(named('nuketown2 south lawn appliance bank hob deck'), 'south hob deck');
+    expect(red.r, 'the hob deck on the ORANGE house lawn is RED').toBeGreaterThan(red.b);
+    expect(blue.b, 'the hob deck on the WHITE house lawn is BLUE').toBeGreaterThan(blue.r);
+    expect(margin(red, blue), 'hob deck colour margin').toBeGreaterThan(0.15);
     // The bank stands on the lawn between the hedge and the kerb, on the same
     // side of the street as its own house - so it reads from that house's own
     // spawn across the road, which is the whole point of an anchor.
     for (const half of ['north', 'south'] as const) {
-      const cabinet = named(`nuketown2 ${half} verge appliance cabinet`)!;
+      const cabinet = named(`nuketown2 ${half} lawn appliance bank cabinet`)!;
       expect(cabinet, `${half} appliance cabinet`).toBeDefined();
       const houseZ = NUKETOWN2_HOUSE_LAYOUT[half === 'north' ? 0 : 1]!.z;
       expect(Math.sign(cabinet.position.z), `${half} bank is on its own house's side`).toBe(Math.sign(houseZ));
@@ -2518,7 +2528,11 @@ describe('Nuke Town Rebuild fidelity', () => {
     // arena would silently draw a box INSIDE a lofted body. The audit records
     // it; this is the gate that reads the record.
     expect(audit.mismatches, 'superseded-box pattern drift').toEqual([]);
-    expect(audit.retired).toBe(110);
+    // 110 -> 132: HF-477's two street cars carry 22 superseded boxes each where
+    // the retired head car carried 22 once. Arithmetic, not a fitted number -
+    // `NUKETOWN2_FORGE_SUPERSEDED` names both patterns with their counts and
+    // the audit fails on any pattern that matches a different number.
+    expect(audit.retired).toBe(132);
     expect(audit.drawCalls).toBeGreaterThan(0);
 
     const superseded: THREE.Mesh[] = [];

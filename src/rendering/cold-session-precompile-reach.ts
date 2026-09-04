@@ -43,8 +43,39 @@ import { ARENA_IDS, type ArenaId } from '../arena-identity';
  *
  * TO REMOVE AN ENTRY you need the measurement that removing the gate did not
  * reintroduce the fence failure on a COLD boot of that arena, not an argument.
+ *
+ * NUKETOWN2 JOINED THE LIST IN PASS 94 CANDIDATE 4b, on the same kind of
+ * measurement that put farcrysis here. Candidate 4 merged four art lanes into
+ * this arena, and its cold first submission then lost the race outright:
+ *
+ *   [Nuke Town Rebuild map selection failed] WebGPU queue completion exceeded
+ *   12000 ms for submission 1 (pending 12001 ms, fenced draws 568)
+ *
+ * on the pass74 arena boot smoke AND on one qa:stock-boot attempt, both on real
+ * hardware WebGPU (nvidia/blackwell), with the retry passing warm. That is the
+ * farcrysis signature exactly: a cold session realising the arena's OWN
+ * vocabulary synchronously inside submission 1. The selection rolled back, so
+ * the map came up with no visual definition installed and every one of its 17
+ * authored review cameras was unreachable (0/17 captures).
+ *
+ * The relief this buys is the SAME relief: `precompileExactScenePass` runs
+ * first, through `compileAsync` -> `createRenderPipelineAsync`, which Dawn
+ * compiles on worker threads OUTSIDE any fence, so the fenced warm frame finds
+ * the pipelines already built. IT DOES NOT WIDEN THE FENCE - the 12 s bound in
+ * the transition is untouched and `presentation-prewarm-contract.test.ts` still
+ * pins it verbatim. It costs this arena's first load the added
+ * `visual-definition` time lane H2 measured, which is the price farcrysis
+ * already pays and is worth paying against a rollback.
+ *
+ * The cost side is being attacked in parallel rather than accepted: candidate
+ * 4b made the nuketown2 material families' base colours UNIFORMS instead of
+ * baked graph constants (`uniformSwatch`, and the same fix in
+ * `vehicle-forge/materials.ts`), which took the arena from 55 distinct node
+ * graphs to 52 over the same 96 node materials, pinned by
+ * `src/nuketown2-pipeline-budget.test.ts`. When that work has taken enough out
+ * of the cold set, this entry is a candidate for removal - with a measurement.
  */
-const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis']);
+const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis', 'nuketown2']);
 
 export const COLD_SESSION_PRECOMPILE_ARENAS: readonly ArenaId[] = Object.freeze(
   ARENA_IDS.filter((id) => MEASURED_COLD_SESSION_FENCE_LOSERS.includes(id)),

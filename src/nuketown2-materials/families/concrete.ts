@@ -30,7 +30,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 
@@ -136,7 +136,7 @@ export function createConcreteMaterial(
     ? smoothstep(float(0.75), float(0.0), wear.soilMask.mul(float(1.6)))
     : smoothstep(float(footY + 0.24), float(footY + 0.02), p.y);
 
-  const base = linearSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(unit));
+  const base = uniformSwatch(baseSrgb).mul(wear.albedoMul).mul(float(1).add(unit));
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);

@@ -24,7 +24,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, uniformSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { clamp, float, fract, max, mix, smoothstep } =
@@ -99,7 +99,7 @@ export function createGlassMaterial(
   // soiling field rather than invented from a world constant.
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
 
-  const body = linearSwatch(baseSrgb).mul(wear.albedoMul);
+  const body = uniformSwatch(baseSrgb).mul(wear.albedoMul);
   mat.colorNode = mix(body, body.mul(float(1.55)), grime.mul(float(0.35)));
   mat.roughnessNode = clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35));
   // Dirt makes glass less transparent. This is the term that stops the grime

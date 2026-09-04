@@ -26,6 +26,29 @@ export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
   'raid2': () => import('./arenas/raid2'),
 });
 
+/**
+ * EVERY ARENA DEFINITION THIS SESSION HAS LOADED, kept after the load.
+ *
+ * PASS 94 CANDIDATE 4b. A review camera is an AUTHORED property of an arena -
+ * `src/rendering/arenas/<id>.ts` writes the position, target, exposure and seed
+ * of every station, and `arena-visual-definition.ts` validates the set. Whether
+ * that station is REACHABLE was, until now, a fact about the GPU: the only
+ * resolver read `activeArenaVisualDefinition`, a single slot that is repointed
+ * by the next successful `configurePlayableArenaVisuals` - including the one
+ * the transition ROLLBACK runs when a deploy-time fence rejects. So a cold
+ * first submission that overran its 12 s fence took every authored camera on
+ * that arena down with it (`setArenaReviewCamera returned false - authored
+ * camera missing`, 0/17 stations) even though nothing about the cameras had
+ * failed, or could fail: they are numbers in a source file.
+ *
+ * This map holds each definition from the moment its module resolves, which is
+ * BEFORE any fenced work runs. It is a read-only lookup for authored data. It
+ * confers no authority - what is on screen is still exactly
+ * `activeArenaVisualDefinition`, and every runtime consumer of the definition
+ * still reads that slot and only that slot.
+ */
+const LOADED_ARENA_VISUAL_DEFINITIONS = new Map<ArenaId, ArenaVisualDefinition>();
+
 export async function loadArenaVisualModule(
   arenaId: ArenaId,
   registry: ArenaVisualRegistry = ARENA_VISUAL_REGISTRY,
@@ -34,7 +57,28 @@ export async function loadArenaVisualModule(
   if (module.definition.id !== arenaId) {
     throw new Error(`Arena module identity mismatch: requested ${arenaId}, loaded ${module.definition.id}`);
   }
+  LOADED_ARENA_VISUAL_DEFINITIONS.set(arenaId, module.definition);
   return module;
+}
+
+/**
+ * The authored review station carrying `cameraId`, from any arena module this
+ * session has loaded. Returns undefined when no loaded arena declares that id -
+ * a genuinely missing camera, which is the only case the caller should refuse.
+ */
+export function findAuthoredArenaReviewCamera(
+  cameraId: string,
+): ArenaVisualDefinition['reviewCameras'][number] | undefined {
+  for (const definition of LOADED_ARENA_VISUAL_DEFINITIONS.values()) {
+    const camera = definition.reviewCameras.find((entry) => entry.id === cameraId);
+    if (camera) return camera;
+  }
+  return undefined;
+}
+
+/** Test seam: the ids whose modules this session has resolved. */
+export function loadedArenaVisualDefinitionIds(): readonly ArenaId[] {
+  return Object.freeze([...LOADED_ARENA_VISUAL_DEFINITIONS.keys()]);
 }
 
 export type ArenaVisualSwitchReceipt = Readonly<{
