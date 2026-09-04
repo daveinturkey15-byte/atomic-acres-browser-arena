@@ -103,7 +103,7 @@ const Z_START = -52;
 const Z_END = -62;
 /** The cell's far extent, so the corridor that owns it can report its true length. */
 export const STREET_CELL_Z_END = Z_END;
-const CELL_LEN = Z_START - Z_END;                  // 22
+const CELL_LEN = Z_START - Z_END;                  // 10
 
 /** Vertex-attribute part ids for the one ground material. */
 const PART_ROAD = 0;
@@ -977,7 +977,7 @@ export function createStreetCell(seed = 419): StreetCell {
     return mesh;
   };
 
-  // Kerb line for pole-mounted items: 0.55 m back from the kerb face, which is
+  // pole 0.72 m back from the kerb face, which is where a real street puts
   // where a real street puts them — far enough that a wing mirror clears.
   const poleX = ROAD_HALF + KERB_W + 0.42;
 
@@ -1034,7 +1034,7 @@ export function createStreetCell(seed = 419): StreetCell {
     const z = Z_START - 3.2 - Math.floor(i / 2) * 5.6 - rnd() * 0.5;
     if (z - 2.2 < Z_END) continue;
     cars.push({
-      // Sill 0.17 m clear of the kerb face: parked, not embedded, and close
+      // Sill 0.125 m clear of the kerb face: parked, not embedded, and close
       // enough to be cover rather than an obstacle in the lane.
       x: side * (ROAD_HALF - 1.02), y: ROAD_Y - CAMBER * 0.7, z,
       ry: side < 0 ? Math.PI + (rnd() - 0.5) * 0.05 : (rnd() - 0.5) * 0.05,
