@@ -3022,6 +3022,10 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
       if (node instanceof THREE.InstancedMesh && node.name.startsWith('nuketown2-lawn-region-')) lawnMeshes.push(node);
     });
     expect(lawnMeshes.length, 'Nuke Town lawn regions').toBeGreaterThan(0);
+    const lawnRegionIds = lawnMeshes
+      .map((mesh) => Number(mesh.name.slice('nuketown2-lawn-region-'.length)))
+      .sort((left, right) => left - right);
+    expect(lawnRegionIds, 'Nuke Town lawn region identity').toEqual([0, 1, 2, 3, 5, 6, 8, 10, 11, 14, 15]);
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     let blades = 0;
