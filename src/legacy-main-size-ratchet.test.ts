@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_335;
+const LINE_CEILING = 37_365;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -244,6 +244,28 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'src/taser-protocol.ts and every tuned number in src/killstreak-tuning.ts. What lands '
       + 'here is the wiring those modules cannot do for themselves, mirroring the flashbang '
       + 'path line for line so the two status effects cannot drift apart.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_130,
+    note:
+      'PASS 94 spawn distribution (HF-456): the shared selector call sites now pass the '
+      + 'full valid tables and a twelve-second cross-actor spawn-use history, while retaining '
+      + 'team-side preference and the existing threat/death/occupancy safety inputs. The '
+      + 'measured +30 lines are the minimal runtime wiring; selection logic lives in '
+      + 'src/spawn-selection.ts rather than growing this legacy module further.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_365,
+    note:
+      'PASS 94 integration: the measured size of the merged head, not an estimate. The two '
+      + 'rows above were each measured on their OWN lane head - the taser lane at 37_335 and '
+      + 'the spawn lane at 37_130 - because both were forged in parallel from the same 37_100 '
+      + 'PASS 93 base, so neither number contains the other. 37_100 + 235 (taser wiring) + 30 '
+      + '(spawn selector call sites) = 37_365, which is what wc -l reports here. No line was '
+      + 'added to reach this ceiling and the ledger keeps both lane rows so a reviewer can see '
+      + 'which feature bought which lines.',
   },
 ];
 

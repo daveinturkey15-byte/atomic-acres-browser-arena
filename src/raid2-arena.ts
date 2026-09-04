@@ -807,10 +807,10 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // ZERO spawn-to-spawn sightlines, 12/12 points legal, envelope/floor/reachable
   // all 100%.
   const team0: [number, number][] = [
-    [-32, -16], [-38, -10], [-41, -2], [-48, 2], [-33, 2], [-39, 4],
+    [-32, -16], [-38, -10], [-41, -2], [-48, 2], [-33, 2], [-39, 4], [-34, -33], [-48, -18],
   ];
   const team1: [number, number][] = [
-    [32, -16], [38, -10], [41, -2], [48, 2], [33, 2], [39, 4],
+    [32, -16], [38, -10], [41, -2], [48, 2], [33, 2], [39, 4], [30, 30], [31, 16],
   ];
 
   return {

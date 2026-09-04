@@ -494,8 +494,8 @@ const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.
  * Team 1 stays the exact 180-degree negation of team 0, in order.
  */
 export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
-  Object.freeze([[13, -24] as const, [-5, -25] as const, [1, -25] as const, [7, -25] as const, [-10, -29] as const, [14, -31] as const]),
-  Object.freeze([[-13, 24] as const, [5, 25] as const, [-1, 25] as const, [-7, 25] as const, [10, 29] as const, [-14, 31] as const]),
+  Object.freeze([[13, -24] as const, [-5, -25] as const, [1, -25] as const, [7, -25] as const, [-10, -29] as const, [14, -31] as const, [1, -40] as const, [-16, -40] as const]),
+  Object.freeze([[-13, 24] as const, [5, 25] as const, [-1, 25] as const, [-7, 25] as const, [10, 29] as const, [-14, 31] as const, [-1, 40] as const, [16, 40] as const]),
 ]);
 
 // ---------------------------------------------------------------------------

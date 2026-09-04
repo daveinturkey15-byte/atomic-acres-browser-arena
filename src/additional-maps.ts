@@ -1275,10 +1275,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14],
+        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14], [23, 24], [-25, 23],
       ],
       [
-        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14],
+        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14], [23, -24], [-23, -24],
       ],
     ),
     patrolPoints: [
@@ -2385,8 +2385,8 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
       // six-player FFA every player drew from the same three spots and could
       // spawn on top of each other. Widened to six points across the firing
       // line's full width, and the second list offset so the two never collide.
-      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5]],
-      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5]],
+      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5], [-4, 16.5], [4, 16.5]],
+      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5], [-4, 8.5], [4, 8.5]],
     ),
     patrolPoints: [],
     targets,
@@ -3942,10 +3942,10 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14],
+        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14], [-12, -14], [12, -14],
       ],
       [
-        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30],
+        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30], [-12, 30], [12, 30],
       ],
     ),
     patrolPoints: [

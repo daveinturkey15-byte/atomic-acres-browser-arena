@@ -905,7 +905,8 @@ import {
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { selectSpawnCandidates, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
   CHARACTER_PHYSICS_CONFIG,
@@ -6582,6 +6583,7 @@ let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; lab
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
+const recentSpawnUses: SpawnUse[] = [];
 // HF-402: keyed by ACTOR, not by team, and carrying the point selected - two
 // bots on one team overwrote each other's record, and the record held no
 // position, so nothing could check afterwards WHERE a bot was put. Exposed on
@@ -16731,8 +16733,18 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   recentDeathPositions.push({ point: point.clone(), at: now });
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
+function recentSpawnUseRecords(now = performance.now()): readonly SpawnUse[] {
+  while (recentSpawnUses.length > 0 && now - recentSpawnUses[0]!.at > 12_000) recentSpawnUses.shift();
+  return recentSpawnUses;
+}
+function recordSpawnUse(index: number, now = performance.now()): void {
+  recentSpawnUseRecords(now);
+  recentSpawnUses.push({ index, at: now });
+  if (recentSpawnUses.length > 64) recentSpawnUses.shift();
+}
 function spawnPoint(): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
+  const spawnNow = performance.now();
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -16759,12 +16771,9 @@ function spawnPoint(): THREE.Vector3 {
   // screen. A blocked home side now borrows the opposite side (spawn-safety
   // scoring still picks the least-exposed point), and only a map with no
   // authored spawns at all - an authoring error, not a match state - throws.
-  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) {
-    home = opposite;
-  }
   if (home.length === 0 && opposite.length === 0) {
     const rawFallback = [...arena.spawns[player.team], ...arena.spawns[oppositeTeam]]
-      .map((point, index) => ({ point, side: player.team, index: 200 + index }));
+      .map((point, index) => ({ point, side: index < arena.spawns[player.team].length ? player.team : oppositeTeam, index: 200 + index }));
     if (rawFallback.length === 0) throw new Error(`No authored player spawns exist for team ${player.team}`);
     home = rawFallback;
   }
@@ -16779,13 +16788,18 @@ function spawnPoint(): THREE.Vector3 {
       safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[player.team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[player.team] = flipDecision.state;
   const flipped = flipDecision.flip;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipped ? opposite : home;
+  // Team hysteresis supplies the preferred side; the shared selector still
+  // sees every valid point so solo/explore can distribute across the full map
+  // and a pressured team can borrow the opposite side without collapsing to a
+  // single fallback point.
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < minimumSeparationSq));
   const initialFfaReservation = spawnMode === 'ffa' && lastPlayerSpawnIndex < 0 && privateLobbySnapshot
@@ -16810,14 +16824,19 @@ function spawnPoint(): THREE.Vector3 {
   }));
   const previousIndex = lastPlayerSpawnIndex;
   const population = otherPlayers.length + 1;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population,
-    candidates: candidates.map(({ index, point }) => ({ index, point })),
+    team: player.team,
+    preferredSide: spawnMode === 'tdm' ? (flipped ? oppositeTeam : player.team) : undefined,
+    candidates: selectable.map(({ index, point, side }) => ({ index, point, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow),
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex,
     tieBreakSeed: stableSpawnTieBreakSeed(player.id),
@@ -16852,6 +16871,7 @@ function spawnPoint(): THREE.Vector3 {
     ],
   });
   lastPlayerSpawnIndex = selectedIndex;
+  recordSpawnUse(selectedIndex, spawnNow);
   return selectedSpawn.point.clone();
 }
 
@@ -17604,6 +17624,7 @@ async function startGame(
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
   recentDeathPositions.length = 0;
+  recentSpawnUses.length = 0;
   lastBotSpawnAudit.clear();
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
@@ -19925,6 +19946,7 @@ function castShot(
 
 function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
+  const spawnNow = performance.now();
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
@@ -19937,16 +19959,15 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
   ];
   const validForSide = (side: Team) => arena.spawns[side]
-    .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
+    .map((candidate, localIndex) => ({ candidate, side, index: side * 100 + localIndex }))
     .filter(({ candidate }) => validArenaSpawnPoint(candidate, arena.bounds, activeWorldColliders()));
   let home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
   // Same fallback as the player path: debris/dynamic colliders can zero out a
   // side mid-match, and a bot respawn throw escapes its timer just as badly.
-  if (home.length === 0 && spawnMode !== 'ffa' && opposite.length > 0) home = opposite;
   if (home.length === 0 && opposite.length === 0) {
     const rawFallback = [...arena.spawns[team], ...arena.spawns[team === 0 ? 1 : 0]]
-      .map((candidate, index) => ({ candidate, index: 200 + index }));
+      .map((candidate, index) => ({ candidate, side: index < arena.spawns[team].length ? team : (team === 0 ? 1 : 0), index: 200 + index }));
     if (rawFallback.length === 0) throw new Error(`No authored spawns exist for team ${team}`);
     home = rawFallback;
   }
@@ -19961,23 +19982,29 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[team] = flipDecision.state;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipDecision.flip ? opposite : home;
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < minimumSeparationSq));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population: otherPlayers.length + 1,
-    candidates: selectable.map(({ candidate, index }) => ({ index, point: candidate })),
+    team,
+    preferredSide: spawnMode === 'tdm' ? (flipDecision.flip ? (team === 0 ? 1 : 0) : team) : undefined,
+    candidates: selectable.map(({ candidate, side, index }) => ({ index, point: candidate, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow),
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
     tieBreakSeed: stableSpawnTieBreakSeed(actorId),
@@ -19994,6 +20021,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
     reason: selection.reason,
     position: [chosen.x, chosen.y, chosen.z],
   });
+  recordSpawnUse(selectedIndex, spawnNow);
   return chosen;
 }
 
@@ -30179,6 +30207,7 @@ async function performArenaSelection(
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
     recentDeathPositions.length = 0;
+    recentSpawnUses.length = 0;
     lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
@@ -30304,6 +30333,7 @@ async function performArenaSelection(
       lastPlayerSpawnIndex = -1;
       lastPlayerSpawnAudit = null;
       recentDeathPositions.length = 0;
+      recentSpawnUses.length = 0;
       lastBotSpawnAudit.clear();
       respawn(false);
       setArenaMenuCamera();

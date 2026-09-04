@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 94",
+  "feedbackReceivedAt": "2026-09-04T07:25:00Z",
+  "status": "candidate",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "One deterministic shared selector distributes player and bot spawns",
+      "expected": "Every player and bot deployment scores the complete valid candidate pool using threat distance, line-of-sight safety, recent death pressure, recent-use avoidance, occupancy, repeat avoidance and team-side awareness where applicable.",
+      "falsifier": "A runtime path still selects only the first point, a side-local list, or a point used within the avoidance window while a fresh valid alternative exists.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-selection.test.ts",
+          "command": "npx vitest run src/spawn-selection.test.ts src/spawn-safety.test.ts",
+          "note": "Pins 200 seeded deployments, 80% coverage, avoidance-window behavior, threat monotonicity, deterministic ties and TDM side preference."
+        },
+        {
+          "kind": "contract",
+          "ref": "src/legacy-main.ts",
+          "command": "rg -n \"selectSpawnCandidates|recentSpawnUses\" src/legacy-main.ts",
+          "note": "The player and bot deployment paths call the shared module; the call-site delta is 30 LF lines, with the selector logic isolated in src/spawn-selection.ts."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "All 11 registered arena spawn tables meet count and spread floors",
+      "expected": "Each team arena has at least eight player/bot points per team, each explore arena retains its authored five-point contract, and every table meets its recorded spread and mean-nearest-neighbour floor.",
+      "falsifier": "Any registered row, including parked farcrysis, has a count, spread, floor, route, cover, standoff, open-arc or cross-team failure.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-layout-quality.test.ts",
+          "command": "npx vitest run src/spawn-layout-quality.test.ts src/farcrysis-spawns.test.ts",
+          "note": "All registered rows are measured and the explicit per-arena count/spread/mean-NN floor table is pinned."
+        },
+        {
+          "kind": "contract",
+          "ref": "artifacts/qa/pass94-spawn-layouts-after.json",
+          "command": "npx tsx scripts/qa/measure-spawn-layouts.ts --out artifacts/qa/pass94-spawn-layouts-after.json",
+          "note": "All 11 rows report in-envelope 100%, floor 100%, reach 100% and verdict ok."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Nuke Town Rebuild has distributed authored bot points without geometry edits",
+      "expected": "nuketown2 offers eight gate-passing points per team across the house-side yards, street-end and cul-de-sac approach; no added point is inside the truck or coach, and only the spawn declaration changes.",
+      "falsifier": "The source diff changes nuketown2 geometry, or the built audit finds an added point inside geometry, without floor/route/cover/standoff/open-arc/LOS validity.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/nuketown2-arena.ts",
+          "command": "git diff -- src/nuketown2-arena.ts",
+          "note": "Only NUKETOWN2_SPAWN_LAYOUT changed; the added points are [1,-40], [-16,-40] and exact rotational partners."
+        },
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/pass94-deploy/nuketown2.json",
+          "command": "node scripts/qa/verify-spawn-deploys.mjs --label pass94-nuketown2 --dist dist --port 4297 --arenas nuketown2 --layouts artifacts/qa/pass94-spawn-layouts-after.json --bot-watch-ms 90000 --out artifacts/qa/pass94-deploy",
+          "note": "One solo deployment and explicit respawn plus six bots all matched gate-passing authored points; six distinct bot spawn positions were recorded over the 90-second watch."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "The candidate is mechanically ready for immutable preview review",
+      "expected": "TypeScript, focused spawn/registry/map/size tests, spawn/walkable audits and the permitted Nuke Town runtime probe are recorded without weakening a threshold or assertion.",
+      "falsifier": "Any required focused gate is red, the candidate depends on a weakened verifier, or the browser probe is claimed without a permitted single-browser run.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "focused-pass94-gates",
+          "command": "npx tsc --noEmit; npx vitest run src/spawn-selection.test.ts src/spawn-safety.test.ts src/spawn-layout-quality.test.ts src/farcrysis-spawns.test.ts src/arena-factory-registry.test.ts src/map-selection.test.ts src/legacy-main-size-ratchet.test.ts --reporter=dot",
+          "note": "TypeScript passed; 7 Vitest files and 244 tests passed; legacy-main is ratcheted at the verified 37,130-line ceiling."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/qa/solve-spawn-layouts.ts; scripts/qa/solve-farcrysis-spawns.ts; scripts/qa/eye-clearance-sweep-contract.test.mjs",
+          "command": "npx tsx scripts/qa/solve-spawn-layouts.ts --all --wanted 8; npx tsx scripts/qa/solve-farcrysis-spawns.ts --wanted 8; npm run qa:eye-clearance:contract",
+          "note": "Applied proposals and farcrysis terrain proposal passed; RustRig and test1 rejected proposals remained rejected; eye-clearance contract 36/36 passed."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Owner reviews the immutable PASS 94 preview before publication",
+      "expected": "Dave plays the exact immutable preview and confirms that all maps now distribute players and bots naturally, with particular attention to Nuke Town's yards and street ends.",
+      "falsifier": "This manifest represents owner preview inspection or release approval before an immutable preview exists and Dave has played it.",
+      "acceptance": "human",
+      "state": "pending",
+      "evidence": []
+    }
+  ]
+}
