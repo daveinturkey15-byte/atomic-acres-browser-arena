@@ -16739,26 +16739,17 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   recentDeathPositions.push({ point: point.clone(), at: now });
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
-function recentSpawnUseRecords(
-  now = performance.now(),
-  window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
-): readonly SpawnUse[] {
+function recentSpawnUseRecords(now = performance.now(), window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length)): readonly SpawnUse[] {
   while (recentSpawnUses.length > window.recentUseDepth && now - recentSpawnUses[0]!.at > window.recentUseAvoidanceMs) recentSpawnUses.shift(); // HF-491: derived horizons, not a flat 12 s
   return recentSpawnUses;
 }
-function recordSpawnUse(
-  index: number,
-  now = performance.now(),
-  window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
-): void {
+function recordSpawnUse(index: number, now = performance.now(), window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length)): void {
   recentSpawnUseRecords(now, window);
   recentSpawnUses.push({ index, at: now });
   if (recentSpawnUses.length > Math.max(64, window.recentUseDepth)) recentSpawnUses.shift();
 }
 function spawnPoint(): THREE.Vector3 {
-  const spawnMode = activeSpawnMode();
-  const spawnNow = performance.now();
-  const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
+  const spawnMode = activeSpawnMode(); const spawnNow = performance.now(); const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -19960,9 +19951,7 @@ function castShot(
 
 function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
   if (network.role === 'client') throw new Error('Bot spawn selection is host-only');
-  const spawnMode = activeSpawnMode();
-  const spawnNow = performance.now();
-  const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
+  const spawnMode = activeSpawnMode(); const spawnNow = performance.now(); const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
