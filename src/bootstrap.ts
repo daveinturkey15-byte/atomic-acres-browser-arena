@@ -17,6 +17,7 @@ import './ui/pass75-menu-redesign.css';
 // unlayered and outranks every @layer, so a layered sheet could not land.
 import './ui/pass77-instrument-hud.css';
 import './ui/pass77-command-shell.css';
+import './ui/pass94-hud-chat.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,

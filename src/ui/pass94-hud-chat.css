@@ -1,0 +1,61 @@
+@layer pass94.hud-chat {
+  /* HF-500: the game chat is an explicit keyboard surface, never a play-area
+     hit target. The open state is entered by Enter and is the only state that
+     restores pointer access for the composer. */
+  #text-chat[data-context='game'] {
+    left: clamp(16px, 1.5vw, 28px);
+    right: auto;
+    top: clamp(48px, calc(50vh - 300px), 240px);
+    bottom: auto;
+    width: min(360px, calc(100vw - 48px));
+    max-height: 220px;
+    padding: 7px 10px;
+    pointer-events: none;
+  }
+
+  /* Closed chat remains a one-line reminder, even while recent messages are
+     still within their display window. This keeps the sightline quiet. */
+  #text-chat[data-context='game'][data-open='false'] {
+    width: min(260px, calc(100vw - 48px));
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    opacity: 0.82;
+  }
+
+  #text-chat[data-context='game'][data-open='false'] header {
+    margin-bottom: 0;
+  }
+
+  #text-chat[data-context='game'][data-open='false'] #text-chat-log,
+  #text-chat[data-context='game'][data-open='false'] #text-chat-form {
+    display: none !important;
+  }
+
+  #text-chat[data-context='game'][data-open='true'] {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  @media (max-width: 700px) {
+    #text-chat[data-context='game'] {
+      left: 8px;
+      top: 118px;
+      width: min(216px, calc(100vw - 174px));
+      max-height: 220px;
+    }
+
+    #text-chat[data-context='game'][data-open='false'] {
+      width: min(216px, calc(100vw - 174px));
+    }
+
+    #text-chat[data-context='game'][data-open='true'] #text-chat-log {
+      max-height: 104px;
+    }
+
+    #text-chat[data-context='game'] #text-chat-log p {
+      font-size: 11px;
+    }
+  }
+}

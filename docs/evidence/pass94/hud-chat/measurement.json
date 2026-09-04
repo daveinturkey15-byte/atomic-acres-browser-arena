@@ -1,0 +1,43 @@
+{
+  "backend": "webgpu",
+  "chat": {
+    "left": 21.59375,
+    "top": 150,
+    "right": 281.59375,
+    "bottom": 370,
+    "width": 260,
+    "height": 220,
+    "pointerEvents": "none"
+  },
+  "ammo": {
+    "left": 867.6483154296875,
+    "top": 772.6781616210938,
+    "right": 1167.8421630859375,
+    "bottom": 880.7360229492188,
+    "width": 300.19384765625,
+    "height": 108.057861328125,
+    "pointerEvents": "none"
+  },
+  "minimap": {
+    "left": 1205.2506103515625,
+    "top": 14.71258544921875,
+    "right": 1425.7655029296875,
+    "bottom": 300.10992431640625,
+    "width": 220.514892578125,
+    "height": 285.3973388671875,
+    "pointerEvents": "none"
+  },
+  "crosshair": {
+    "left": 695.9896850585938,
+    "top": 424.61767578125,
+    "right": 746.0263061523438,
+    "bottom": 474.654296875,
+    "width": 50.03662109375,
+    "height": 50.03662109375,
+    "pointerEvents": "none"
+  },
+  "chatOpen": "false",
+  "chatVisible": "true",
+  "chatDisplay": "block",
+  "errors": []
+}

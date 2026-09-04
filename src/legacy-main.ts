@@ -29507,6 +29507,10 @@ textChatInput.addEventListener('keyup', (event) => event.stopPropagation());
 // HF-324: Clicking or tapping anywhere on the chat panel opens chat and focuses its input.
 const handleTextChatPanelOpenAffordance = (event: Event): void => {
   if (!textChatAvailable()) return;
+  // HF-500: in-match chat is opened by the explicit Enter key only. The game
+  // surface is pointer-inert while closed, and clicking its open surface must
+  // not become a second play-area entry path.
+  if (textChatRoot.dataset.context === 'game') return;
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest('button[type="submit"]')) return;
   // HF-324 residual (Lane J, "cant type in lobby"): openTextChat() focuses the
