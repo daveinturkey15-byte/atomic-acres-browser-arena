@@ -621,14 +621,33 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     pos.needsUpdate = true;
     boulderGeometry.computeVertexNormals();
   }
-  const makeRockMaterial = (color: number): THREE.MeshStandardMaterial => {
-    const rockMat = new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.04 });
-    // Ground-material grain at rock scale (repeat 2 ≈ 0.5 m tiles on a
-    // metre-class boulder) so rocks share the terrain's surface language.
-    applyFarcrysisGroundMaterial(rockMat, 'terrain', 2);
-    rockMat.color.setHex(color); // applyFarcrysisGroundMaterial leaves colour, but be explicit
-    return rockMat;
-  };
+  // PASS 95 slice 2 - one shared boulder family material (-2 objects).
+  // The three scatter sets differed in nothing but tint (0x716b60 / 0x7a7268 /
+  // 0x6d655c, same roughness 0.92 / metalness 0.04, same 'terrain' ground maps),
+  // so the tint moves onto per-group geometry exactly like slice 1's detail
+  // rocks: white x old tint == old tint (`new THREE.Color(hex)` already holds
+  // linear working-space values, so no second conversion). Shade lift never
+  // matched these names (emissive stays 0x000000 on all three), and the ground
+  // maps classify identically, so one shared representative is invisible by
+  // construction. vertexColors Standard is already in the coverage draw via
+  // the detail rocks - no new pipeline.
+  const boulderMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, metalness: 0.04 });
+  applyFarcrysisGroundMaterial(boulderMaterial, 'terrain', 2);
+  boulderMaterial.color.setHex(0xffffff);
+  const boulderTint = new THREE.Color();
+  function tintedBoulderGeometry(hex: number): THREE.BufferGeometry {
+    const tinted = boulderGeometry.clone();
+    boulderTint.setHex(hex);
+    const position = tinted.getAttribute('position') as THREE.BufferAttribute;
+    const colors = new Float32Array(position.count * 3);
+    for (let claim = 0; claim < position.count; claim += 1) {
+      colors[claim * 3] = boulderTint.r;
+      colors[claim * 3 + 1] = boulderTint.g;
+      colors[claim * 3 + 2] = boulderTint.b;
+    }
+    tinted.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return tinted;
+  }
   const scatterBoulders = (
     name: string,
     color: number,
@@ -636,7 +655,7 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     seed: number,
     place: (rng: () => number, index: number) => [number, number, number], // x, z, scale
   ): void => {
-    const rocks = farcrysisInstancedMesh(boulderGeometry, makeRockMaterial(color), count);
+    const rocks = farcrysisInstancedMesh(tintedBoulderGeometry(color), boulderMaterial, count);
     rocks.name = name;
     const rng = mulberry32(seed);
     const m = new THREE.Matrix4();

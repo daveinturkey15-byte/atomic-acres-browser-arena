@@ -40,7 +40,7 @@ import { tslResetWindUniforms } from './farcrysis-tsl-foliage';
  * you have quoted the admission pair ratio from
  * `scripts/qa/collect-farcrysis-admission-evidence.mjs` at the new number.
  */
-const MATERIAL_CEILING = 168;
+const MATERIAL_CEILING = 166;
 
 /**
  * Parity with the shipped control. `docs/evidence/pass87/lane-r/frame-time-at-head.json`
@@ -73,6 +73,14 @@ const CEILING_HISTORY: ReadonlyArray<{ readonly at: string; readonly ceiling: nu
       + 'MeshStandardMaterial objects merged onto one representative each, zero visual change), '
       + '-10 from the detail rock family moving its per-stone tint off eleven materials and onto '
       + 'the geometry as vertex colours.',
+  },
+  {
+    at: '2026-09-04',
+    ceiling: 166,
+    why: 'PASS 95 slice 2. -2 from the art boulder family (farcrysis-cliff-rocks / '
+      + 'farcrysis-interior-boulders / farcrysis-shore-boulders) moving its per-set tint off three '
+      + 'materials and onto per-group geometry as vertex colours behind one shared white '
+      + 'vertexColors representative (slice-1 rock idiom, zero visual change by construction).',
   },
 ];
 
