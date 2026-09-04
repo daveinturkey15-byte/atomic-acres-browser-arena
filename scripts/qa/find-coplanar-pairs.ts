@@ -40,7 +40,7 @@ import {
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
 } from '../../src/nuketown2-arena';
-import { nuketown2HandedSpan } from '../../src/nuketown2-layout';
+import { nuketown2HandedSpan, nuketown2HandedX } from '../../src/nuketown2-layout';
 
 const NEAR_METERS = 0.03;
 
@@ -127,6 +127,14 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
 }
 
 type PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
+type PlanCircle = Readonly<{
+  shape: 'circle';
+  centreX: number;
+  centreZ: number;
+  radius: number;
+  x0: number; x1: number; z0: number; z1: number;
+}>;
+type CarriagewayFootprint = PlanRect | PlanCircle;
 
 // HF-473: NUKETOWN2_BUILDING_FOOTPRINTS is an AUTHORED table and the boxes
 // collected above are WORLD, so the mirror is applied before the two are
@@ -167,15 +175,31 @@ function overlapInsideBuilding(first: Box, second: Box): boolean {
  * verge decals that are nowhere near the road - the road it was comparing them
  * against was the reflection of the real one.
  */
-const WORLD_CARRIAGEWAY_FOOTPRINTS = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
+const WORLD_CARRIAGEWAY_FOOTPRINTS: readonly CarriagewayFootprint[] = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
   const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
-  return { ...footprint, x0, x1 };
+  return footprint.shape === 'circle'
+    ? { ...footprint, centreX: nuketown2HandedX(footprint.centreX), x0, x1 }
+    : { x0, x1, z0: footprint.z0, z1: footprint.z1 };
 });
 
+function circleOverlapsPlanRect(circle: PlanCircle, rect: PlanRect): boolean {
+  const nearestX = Math.max(rect.x0, Math.min(circle.centreX, rect.x1));
+  const nearestZ = Math.max(rect.z0, Math.min(circle.centreZ, rect.z1));
+  return (nearestX - circle.centreX) ** 2 + (nearestZ - circle.centreZ) ** 2 < circle.radius ** 2;
+}
+
 function overlapInsideCarriageway(first: Box, second: Box): boolean {
+  const overlap: PlanRect = {
+    x0: Math.max(first.x0, second.x0),
+    x1: Math.min(first.x1, second.x1),
+    z0: Math.max(first.z0, second.z0),
+    z1: Math.min(first.z1, second.z1),
+  };
   return WORLD_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
-    Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
-    && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
+    footprint.shape === 'circle'
+      ? circleOverlapsPlanRect(footprint, overlap)
+      : Math.min(overlap.x1, footprint.x1) - Math.max(overlap.x0, footprint.x0) > 1e-4
+        && Math.min(overlap.z1, footprint.z1) - Math.max(overlap.z0, footprint.z0) > 1e-4
   ));
 }
 
