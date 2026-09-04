@@ -745,7 +745,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', clusteredLighting: true, bakedIndirect: 'off', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'low',
+    // HF-490: the fixed 48-light/24-per-tile bound and cold precompile keep this
+    // bounded topology deterministic even on the lowest named preset.
+    clusteredLighting: true, bakedIndirect: 'off', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
