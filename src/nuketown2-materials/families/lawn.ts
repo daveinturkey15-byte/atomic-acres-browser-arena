@@ -104,16 +104,22 @@ export function createLawnMaterial(
   const parity = variant === 'turf'
     ? fract(cellX.add(cellZ).mul(float(0.5))).mul(float(2))
     : float(0);
-  const striped = turf.mul(float(0.962).add(parity.mul(float(0.076))));
+  const striped = turf.mul(float(0.950).add(parity.mul(float(0.100))));
 
   // Wear paths. Thresholded off the metre-scale field so they have a shape:
   // a broad thinning of the sward, and a narrower bare core inside it.
-  const thin = smoothstep(float(0.30), float(0.72), wear.soilMask);
-  const bare = smoothstep(float(0.62), float(0.88), wear.soilMask);
+  // MEASURED AND PULLED BACK. The first review capture of the overhead frame
+  // showed both yards as brown blotches rather than as lawns with paths worn
+  // across them: the bare core opened too early and went too far, so the wear
+  // stopped reading as traffic and started reading as mud, and it swamped the
+  // mown checker underneath it. The thresholds are now late and the bare core
+  // is a minority of the surface, which is what a desire line is.
+  const thin = smoothstep(float(0.42), float(0.78), wear.soilMask);
+  const bare = smoothstep(float(0.76), float(0.93), wear.soilMask);
   const earth = linearSwatch(options.soilSrgb ?? 0x6b5741);
 
-  const thinned = mix(striped, mix(striped, earth, float(0.45)), thin.mul(variant === 'hedge' ? 0.35 : 1.0));
-  const worn = mix(thinned, earth, bare.mul(variant === 'hedge' ? 0.15 : 0.85));
+  const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(variant === 'hedge' ? 0.35 : 1.0));
+  const worn = mix(thinned, earth, bare.mul(variant === 'hedge' ? 0.15 : 0.60));
 
   // Dry patches: sun-scorched turf goes straw, not brown, and it goes UP in
   // luminance. Scrubland is mostly this.
