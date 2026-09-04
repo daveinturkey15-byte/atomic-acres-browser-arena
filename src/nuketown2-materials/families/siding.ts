@@ -48,6 +48,10 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
     name,
     family: 'siding',
     baseSrgb,
+    // Intentional arena exception: the photoreal scene skill starts exterior
+    // painted walls at 0.92, but this lane keeps 0.74 so the controlled key
+    // still gives the visible siding a readable highlight. Albedo-carried wear
+    // remains the primary carrier and the family gate retains the range check.
     roughness: 0.74,
     metalness: 0.0,
     grain: { sizeM: 0.0009, albedo: 0.030, roughness: 0.05 },
