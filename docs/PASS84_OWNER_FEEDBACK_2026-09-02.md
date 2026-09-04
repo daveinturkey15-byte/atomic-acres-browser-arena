@@ -2024,3 +2024,9 @@ assets and textures and lighting need to be tip top, raid can come next"
   review fixes, HITL 5b), Muse Spark (reviews, image audits), Gemini (reference
   critic on HITL 5 captures), GLM (thin-metal TODOs). The HITL 5 Fable
   integrator finishes its last four gate jobs and is not re-poked.
+- 18:40 Gemini reference critic on HITL 5 captures: **63/100** (4b: 62) — same
+  top three (rooflines +15, timber stairs +12, circular kerbed turning head +
+  liveried vehicles +10); all three now on Codex/Luna lanes (rooflines+stairs,
+  vehicle-forge-2, nuketown2-turning-head). OMP credential store emptied again
+  at 18:33 (second time); restored from backup, gotcha recorded, fresh backup
+  taken; GLM-6 (thin-metal follow-ups) and the critic relaunched.
