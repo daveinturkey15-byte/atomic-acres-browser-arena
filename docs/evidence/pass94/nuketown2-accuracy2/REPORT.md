@@ -29,6 +29,7 @@ and `pass93-chrome153-hotfix` as ancestors. This lane is based on that.
 | 2b | Deck over an **undercroft** | **VERIFIED** | both frames above - paved, recessed, in shadow under the deck |
 | 2c | **Circular patio** at the stair foot | **VERIFIED (geometry)** / **OPEN (frame)** | `nuketown2-plan.png`; the review camera that should show it stands behind a pre-existing 1.9 m water butt |
 | 2d | Porch is a **wide cantilevered eave, no posts** | **VERIFIED** | `captures/nuketown2-front-porch.png` |
+| 0 | Every canonical arena, nuketown2 included, **boots a clean visible solo match** | **VERIFIED** | `boot-smoke-pass74.txt` - 13 passed |
 | 3a | Street is a **lollipop** - one circular head, stem off-map | **VERIFIED (plan)** / **OPEN (in-engine)** | `nuketown2-plan.png`, `overhead-panel.txt`; see "The road is black" |
 | 3b | **Third house** beyond the head, own drive, **red car** | **VERIFIED** | `captures/nuketown2-overhead.png` (the block outside the fence at the head end); `nuketown2-plan.png` |
 | 3c | Coach on the **orange** side, truck + dark saloon on the **white** side, all nosed down the stem | **VERIFIED** | `captures/nuketown2-street-centre.png`; `nuketown2-plan.png` |
@@ -96,6 +97,10 @@ capture of the head, or an asphalt-albedo lift, from a lighting lane.
       ok 3 nuketown2: the real menu reaches a live frame with zero pipeline errors (1.1m)
       ok 4 skyline-terminal: the real menu reaches a live frame with zero pipeline errors (1.1m)
       4 passed (2.3m)
+
+    $ PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0
+      [12/13] arena boot smoke - every canonical arena > nuketown2: boots a clean visible solo match
+      13 passed (9.5m)
 
     $ node scripts/qa/capture-arena-viewpoints.mjs --arenas nuketown2 ...
     [viewpoint-capture] backend=webgpu renderer=webgpu adapter={"gpu":true,"adapter":true,"device":true,"vendor":"nvidia","architecture":"blackwell"}
@@ -198,7 +203,11 @@ gate both compared **world** boxes against the **authored** carriageway rects.
    about 5 m in front of both back-yard spawn stations, and the 1.9 m water butt stands
    between the balcony station and the new circular patio. Not touched: dressing this lane
    does not own, and moving it changes cover.
-7. **pass74-arena-boot-smoke** result is in `boot-smoke-pass74.txt` if present.
+7. **`pass74-arena-boot-smoke` needs `PASS73_NATIVE_WEBGPU=1` and the npm script does not
+   set it.** Without it the chromium project takes the bundled Chromium, which cannot get
+   a WebGPU device on this machine, and all ten arenas time out - `atomic-acres` included,
+   so it reads like a whole-build failure when it is a harness misconfiguration. With it,
+   13 passed. Worth fixing in `package.json` by a lane that owns it.
 8. **The shared node_modules at aa-claude-chopper was destroyed mid-lane** by another
    process (`.bin` emptied, `@playwright` removed). This worktree was re-junctioned to
    `aa-shared-install/node_modules`, which every other lane already uses. Worth a gotcha.
