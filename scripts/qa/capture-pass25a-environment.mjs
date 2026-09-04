@@ -1,3 +1,17 @@
+// Capture the pass25a reference environment: launch Chromium (Playwright), start a solo match
+// at the QA base URL with render=performance, and record browser/WebGL/OS facts plus the
+// package-lock SHA-256 as a JSON reference-environment manifest.
+//
+// Usage: node scripts/qa/capture-pass25a-environment.mjs [--record]
+//   --record                 Also write the manifest to baselines/pass25a/ (default: off)
+//   QA_BASE_URL=<url>        App base URL (default: http://127.0.0.1:4180/)
+//   QA_HEADED=1              Launch headed Chromium; unset/other = headless (default: headless)
+//
+// Writes: artifacts/pass25a/reference-environment.json; with --record also
+//         baselines/pass25a/reference-environment.json; manifest is also printed to stdout.
+// Exit codes: 0 on success; non-zero on failure (no explicit process.exit call;
+//             an unhandled rejection in the top-level await chain terminates the process).
+
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
