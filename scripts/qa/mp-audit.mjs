@@ -844,7 +844,7 @@ async function scenarioPickupAuthority(guest, host, peers, role) {
   await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop());
   await sleep(ACK_BUDGET_MS);
   const after = await viewOf(guest.page);
-  const hostAfter = await viewOf(host);
+  const hostAfter = await viewOf(host.page);
   result.guestWeapon = after.players[selfId]?.weapon ?? null;
   result.hostWeapon = hostAfter.players[selfId]?.weapon ?? null;
   const guestTrace = await traceSince(guest, marks.guest);
