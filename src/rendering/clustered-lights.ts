@@ -3,6 +3,7 @@ import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_DRIVEWAY_CAR,
   NUKETOWN2_HEAD_CAR,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_LAMP_POST_LAYOUT,
@@ -209,8 +210,8 @@ for (const side of [-1, 1]) {
 
 // Driveway-car lamps follow the same garage-derived centre used by the arena's
 // paired civilian cars, so each side has two fixed forward-facing sources.
-const drivewayCarX = garageCenterX + 0.5;
-const drivewayCarZ = garageFrontZ + 4.6;
+const drivewayCarX = NUKETOWN2_DRIVEWAY_CAR.x;
+const drivewayCarZ = NUKETOWN2_DRIVEWAY_CAR.z;
 for (const offset of [-0.7, 0.7]) {
   catalog.push(...pair(
     `driveway-car-${offset < 0 ? 'left' : 'right'}`,

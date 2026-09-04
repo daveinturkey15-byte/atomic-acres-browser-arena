@@ -459,6 +459,11 @@ export const NUKETOWN2_WINDOWS = Object.freeze([
   Object.freeze({ id: 'upper back', face: 'back' as const, pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
 ]);
 
+export const NUKETOWN2_DRIVEWAY_CAR = Object.freeze({
+  x: (GARAGE_X0 + GARAGE_X1) / 2 + 0.5,
+  z: GARAGE_FRONT_Z + 4.6,
+});
+
 /**
  * The authored section, in metres. Every number here is the one the build
  * itself uses, and the along-street offset is READ BACK from the house layout
@@ -1662,12 +1667,12 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
  * points at the road.
  */
 function cars(builder: Builder, m: Nuketown2Materials): void {
-  const cx = (GARAGE_X0 + GARAGE_X1) / 2 + 0.5;   // 7.25, centred on the door
+  const cx = NUKETOWN2_DRIVEWAY_CAR.x;
   // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
   // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
   // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
   // own apron (the dressing runs to z = -8) rather than out on the kerb.
-  const cz = GARAGE_FRONT_Z + 4.6;
+  const cz = NUKETOWN2_DRIVEWAY_CAR.z;
   pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA);
   pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass);
   // Driveway sedan bumpers, sloped windows, headlights, taillights, and wheels:
