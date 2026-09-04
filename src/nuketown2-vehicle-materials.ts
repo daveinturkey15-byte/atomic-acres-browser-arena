@@ -16,8 +16,10 @@ import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { lutFbm } from './nuketown2-materials/noise-lut';
+import { centredLutField } from './nuketown2-materials/wear';
 
 const {
+  clamp,
   float,
   fract,
   positionWorld,
@@ -31,6 +33,13 @@ const {
  * authored swatch, roughness and flake recipe in material properties so the
  * two bodies bind one node topology instead of compiling one pipeline each.
  */
+/** Panel-scale drift, metres. One body panel between two shut lines. */
+export const VEHICLE_PAINT_PANEL_M = 1.6;
+/** Peak hue-stable luminance swing at that scale. Paint is the tightest family here. */
+export const VEHICLE_PAINT_PANEL_ALBEDO = 0.022;
+/** Peak roughness swing at that scale - the term that actually makes a flank read. */
+export const VEHICLE_PAINT_PANEL_ROUGHNESS = 0.055;
+
 const VEHICLE_PAINT_UNIFORMS = Object.freeze({
   baseColor: (TSL.uniform(new THREE.Color(0.82, 0.76, 0.64)) as any).onObjectUpdate((frame: any) => {
     frame.material?.userData?.nuketown2VehiclePaintUniforms &&
@@ -48,6 +57,25 @@ const VEHICLE_PAINT_UNIFORMS = Object.freeze({
     const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
     if (values) VEHICLE_PAINT_UNIFORMS.flakeStrength.value = values.flakeStrength;
   }),
+  // HF-503. The flake above is a 4 cm field and the roughness below was a
+  // CONSTANT, so a coach flank read as one value across five metres of paint -
+  // which is what the reference critic recorded as "identical flat chalk white"
+  // and "untextured vehicle hulls". A real painted panel is not flat at panel
+  // scale: the roller and the polisher both leave a 1-2 m drift, and the drift
+  // shows in the ROUGHNESS more than in the colour, because a clearcoat varies
+  // in how it reflects long before it varies in what it is.
+  panelFrequency: (TSL.uniform(1 / VEHICLE_PAINT_PANEL_M) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.panelFrequency.value = values.panelFrequency;
+  }),
+  panelAlbedo: (TSL.uniform(VEHICLE_PAINT_PANEL_ALBEDO) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.panelAlbedo.value = values.panelAlbedo;
+  }),
+  panelRoughness: (TSL.uniform(VEHICLE_PAINT_PANEL_ROUGHNESS) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.panelRoughness.value = values.panelRoughness;
+  }),
 });
 
 function bindVehiclePaintUniforms(
@@ -62,6 +90,9 @@ function bindVehiclePaintUniforms(
     roughness,
     flakeFrequency,
     flakeStrength,
+    panelFrequency: 1 / VEHICLE_PAINT_PANEL_M,
+    panelAlbedo: VEHICLE_PAINT_PANEL_ALBEDO,
+    panelRoughness: VEHICLE_PAINT_PANEL_ROUGHNESS,
   };
 }
 
@@ -85,9 +116,23 @@ function createSharedVehiclePaintMaterial(
       p.x.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
       p.y.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
     ), 1).sub(float(0.5)).mul(VEHICLE_PAINT_UNIFORMS.flakeStrength);
+    // ONE shared field drives both the luminance and the roughness, and that
+    // correlation is the point: paint that is a shade lighter is paint the
+    // polisher reached, and paint the polisher reached is smoother. Two
+    // independent noises here would read as two textures fighting.
+    const panel = centredLutField(vec2(
+      p.x.add(p.z).mul(VEHICLE_PAINT_UNIFORMS.panelFrequency),
+      p.y.mul(VEHICLE_PAINT_UNIFORMS.panelFrequency),
+    ), 2);
     sharedVehiclePaintGraph = {
-      colorNode: (VEHICLE_PAINT_UNIFORMS.baseColor as any).add(flake),
-      roughnessNode: VEHICLE_PAINT_UNIFORMS.roughness,
+      colorNode: (VEHICLE_PAINT_UNIFORMS.baseColor as any)
+        .add(flake)
+        .mul(float(1).add(panel.mul(VEHICLE_PAINT_UNIFORMS.panelAlbedo))),
+      roughnessNode: clamp(
+        (VEHICLE_PAINT_UNIFORMS.roughness as any).add(panel.mul(VEHICLE_PAINT_UNIFORMS.panelRoughness)),
+        float(0.05),
+        float(1.0),
+      ),
     };
   }
   mat.colorNode = sharedVehiclePaintGraph.colorNode;

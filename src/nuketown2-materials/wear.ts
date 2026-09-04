@@ -126,6 +126,21 @@ function centred(sample: any, channel: 0 | 1 | 2 | 3): any {
 }
 
 /**
+ * The zero-mean signed field, for a module OUTSIDE the family library.
+ *
+ * `nuketown2-vehicle-materials.ts` is the one caller: it has its own uniform
+ * set and its own shared graph, so it cannot take `Nuketown2Uniforms`, but it
+ * must not grow a second, differently-centred copy of this arithmetic either.
+ * One implementation, two callers.
+ *
+ * @param p       a 2D coordinate IN LATTICE CELLS
+ * @param channel 0 = one octave, 2 = three-octave fBm, 3 = ridged
+ */
+export function centredLutField(p: any, channel: 0 | 1 | 2 | 3): any {
+  return centred(lutSample(p), channel);
+}
+
+/**
  * The two combat-distance scales, the tint they carry, and the normal they
  * perturb (HF-503, pass 96).
  *
