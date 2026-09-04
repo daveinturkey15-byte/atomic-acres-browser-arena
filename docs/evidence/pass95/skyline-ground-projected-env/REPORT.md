@@ -49,8 +49,16 @@ Files: `src/rendering/ground-projected-env.ts` (+`.test.ts`),
 - DESIGNED (needs a measurement) — frame cost. Budgeted at one draw + one
   equirect fetch on background pixels (<0.15 ms p95 by construction, no target,
   no MRT change); no representative-hardware probe in this session.
-- OPEN — full unit suite was still running at report time; see handoff for the
-  row. Brief gates and all dependent suites above are green.
+- OPEN — clean full-suite row. Four full runs on this tree: the first found
+  only the renderer-feature-inventory gap (2 tests — fixed by design: feature
+  entry + regenerated JSON/MD, second commit). The three runs since show
+  6078–6080 passed with 1–3 failures confined to real-clock audio suites
+  (`audio-music-rotation-runtime`, `sound-event-inventory`, once
+  `player-profile-main-integration`), a varying set per run; all three files
+  pass in isolation on this tree (`3 passed (3) / 124 passed (124)`). No test
+  uses fake timers; per-test durations of 20–28 s under a 600-file parallel
+  suite on a ComfyUI-loaded machine. Read: load flake, not a regression —
+  but the clean-row proof still wants a quiet-machine (or owner CI) run.
 
 ## Fences kept
 
