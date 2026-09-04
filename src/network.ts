@@ -15,6 +15,13 @@ import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 import { clientRuntimeLogEntryFromError, type ClientRuntimeLogEntry } from './client-runtime-log';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
 
+// PASS 95 netcode diagnostics: the outbound half of the per-peer overlay.
+// Three call sites, all of them one line after an existing `transmit`, because
+// this is where the send actually happened rather than where it was requested.
+// `observeOutbound*` is a no-op beyond one boolean read unless the evidence
+// recorder is running; see src/netcode-diagnostics-runtime.ts.
+import { observeOutbound, observeOutboundToHost } from './netcode-diagnostics-runtime';
+
 export type NetworkRole = 'offline' | 'host' | 'client';
 
 export type NetworkConnectionAttempt = Readonly<{
@@ -775,6 +782,7 @@ export class ArenaNetwork {
         : this.hostEventConnection;
       if (connection?.open) {
         this.transmit(connection, message, isStateTrafficMessage(message));
+        observeOutboundToHost(message, performance.now());
         if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
         if (stateFallback) this.stateFallbackMessages += 1;
       }
@@ -816,6 +824,7 @@ export class ArenaNetwork {
       : bundle?.events;
     if (!connection?.open) return false;
     this.transmit(connection, message, isStateTrafficMessage(message));
+    observeOutbound(message, playerId, performance.now());
     if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
     if (stateFallback) this.stateFallbackMessages += 1;
     return true;
@@ -1525,6 +1534,7 @@ export class ArenaNetwork {
         : bundle.events;
       if (!connection?.open) continue;
       this.transmit(connection, message, isStateTrafficMessage(message));
+      observeOutbound(message, bundle.playerId, performance.now());
       if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
       if (stateFallback) this.stateFallbackMessages += 1;
     }

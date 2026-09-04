@@ -915,6 +915,18 @@ import {
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
 import { selectSpawnCandidates, spawnUseWindow, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
+// PASS 95 netcode diagnostics (owner priority 2026-09-02: "a netcode
+// diagnostics overlay", "WAN sessions with friends as evidence"). F3 toggles
+// the per-peer HUD, Ctrl+F3 starts/saves an evidence bundle. Six call sites in
+// this file, all one-liners; every metric, every ring buffer and all of the DOM
+// live in src/netcode-diagnostics*.ts.
+import {
+  handleNetcodeKeydown,
+  observeDisagreement as observeNetcodeDisagreement,
+  observeInbound as observeNetcodeInbound,
+  observeRtt as observeNetcodeRtt,
+  tickNetcodeDiagnostics,
+} from './netcode-diagnostics-runtime';
 import {
   CHARACTER_PHYSICS_CONFIG,
   CharacterPhysics,
@@ -9968,6 +9980,7 @@ function acceptClockPong(message: Extract<GameMessage, { type: 'clock-pong' }>):
   hostTimeMapping = observation.mapping;
   if (!observation.accepted) return;
   localLobbyPingMs = Math.round(hostTimeMapping.rttMs);
+  observeNetcodeRtt(message.by, hostTimeMapping.rttMs);
   renderPrivateLobby();
 }
 
@@ -10761,6 +10774,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         uncertaintyMs: message.reportedUncertaintyMs ?? undefined,
       }));
       if (member && message.reportedRttMs !== null) hostLobbyMembers.set(message.by, { ...member, pingMs: Math.round(message.reportedRttMs) });
+      observeNetcodeRtt(message.by, reportedRttMs);
       const hostSentMonoMs = performance.now();
       network.sendToPlayer(message.by, {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
@@ -12772,6 +12786,7 @@ function replayParkedMatchAdmissionMessages(): void {
 }
 
 function onNetworkMessage(message: GameMessage): void {
+  observeNetcodeInbound(message, performance.now());
   if (handleLobbyMessage(message)) return;
   // Lane J: first proof that the host's own match is LIVE. Restricted to the
   // admission types, which only a started host emits — clock pongs and other
@@ -13587,6 +13602,10 @@ function onNetworkMessage(message: GameMessage): void {
         yaw: admittedIncoming.yaw, stance: admittedIncoming.stance ?? 'stand', continuity: admittedContinuity,
       });
       remote.target.set(admittedIncoming.x, admittedIncoming.y - stanceEyeHeight(admittedIncoming.stance), admittedIncoming.z);
+      // Metres between the pose we are DRAWING and the pose authority just
+      // admitted. Measured here, before the mesh is moved, because after the
+      // move the disagreement is zero by construction and unmeasurable.
+      observeNetcodeDisagreement(admittedIncoming.id, remote.root.position.distanceTo(remote.target), now, admittedIncoming.seq);
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.awaitingReplacementState = false;
@@ -29348,6 +29367,16 @@ window.addEventListener('keydown', (event) => {
   openTextChat();
 });
 
+// PASS 95: F3 toggles the netcode overlay, Ctrl+F3 starts then saves a WAN
+// evidence bundle. Registered before the gameplay handler and guarded on chat
+// so a player typing "F3" in chat does not open a netgraph. preventDefault is
+// applied only on a press we actually consumed, because F3 is find-again in
+// some browsers and swallowing it unconditionally would be rude.
+window.addEventListener('keydown', (event) => {
+  if (isTextChatTyping()) return;
+  if (handleNetcodeKeydown(event, performance.now()) !== 'none') event.preventDefault();
+});
+
 window.addEventListener('keydown', (event) => {
   gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: keyboard use hands HUD prompts back to key labels
   if (isTextChatTyping()) return;
@@ -31107,6 +31136,7 @@ function frame(now: number, scheduleNext = true): void {
   // A pending rAF can run after beforeunload has begun. Never touch renderer
   // resources once page-exit teardown has started, and do not reschedule it.
   if (gameplayRuntimeDisposing) return;
+  tickNetcodeDiagnostics(network.role === 'host' ? 'host' : network.role === 'client' ? 'guest' : 'offline', player.id, network.roomCode ?? '', now);
   clearExpiredLocalReloadAuthority(now);
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
