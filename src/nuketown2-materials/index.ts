@@ -153,6 +153,12 @@ export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
 export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 40;
 
 /**
+ * HF-477 admission fence: the arena's single coverage submission may realise
+ * no more than this many distinct WebGPU/TSL shader graph shapes.
+ */
+export const NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS = 54;
+
+/**
  * Build one material per role.
  *
  * Called ONCE per arena build. Nothing in this library allocates per frame:

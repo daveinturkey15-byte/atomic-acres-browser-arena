@@ -808,7 +808,7 @@ describe('Nuke Town Rebuild fidelity', () => {
         const deck = map.raycastMeshes.find((mesh) => mesh.name.endsWith('truck deck'));
         expect(deck, 'the truck deck the bogie runs under').toBeDefined();
         expect(Math.abs(centre.z - planCentre(deck!).z), `${skin.name} is off the truck centre line`)
-          .toBeLessThan(0.35);
+          .toBeLessThan(0.20);
         continue;
       }
       const nearest = bodies
@@ -819,7 +819,7 @@ describe('Nuke Town Rebuild fidelity', () => {
         `${skin.name} at (${centre.x.toFixed(2)}, ${centre.z.toFixed(2)}) dresses no collider body `
           + `(nearest is ${nearest.body.name} at ${nearest.metres.toFixed(2)} m). A skin placed in the `
           + 'AUTHORED frame while its box is placed in the WORLD frame lands exactly one mirror away.',
-      ).toBeLessThan(0.35);
+      ).toBeLessThan(0.20);
     }
     // ...and the mirror is asserted directly as well, so a future handedness
     // flip cannot leave a coincidentally-passing pair behind. HF-477 retired

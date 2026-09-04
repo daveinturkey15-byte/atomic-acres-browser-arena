@@ -15,10 +15,9 @@
  *
  *   - A DARK COLOUR UNDER A CLEARCOAT IS NOT A DARK SURFACE. The renderer sums
  *     the clearcoat Fresnel AND the base Fresnel, so a 4 %-red maroon measures
- *     blue-over-red on every shaded panel and reads lilac. The defence is the
- *     low `specularIntensity` (0.08), NOT a pigment lift: HITL 5 measured the
- *     10 % channel lift this file used to apply as a violet band on a navy
- *     body, so `createForgePaintMaterial` ships the authored albedo.
+ *     blue-over-red on every shaded panel and reads lilac. The forge therefore
+ *     keeps the authored pigment unchanged and drops `specularIntensity`
+ *     rather than applying a channel lift that turns navy into purple.
  *   - `new THREE.Color(r, g, b)` WITH FLOATS IS LINEAR since r152. Authoring a
  *     "cream" swatch as floats gives a washed pastel. Swatches here are hex and
  *     go through `setHex(..., SRGBColorSpace)`.
@@ -43,7 +42,6 @@ const {
   pow,
   saturate,
   smoothstep,
-  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -74,7 +72,7 @@ function dustFilm(): unknown {
 }
 
 export interface PaintOptions {
-  /** sRGB hex. The dominant channel must survive at >= 10 % - see the header. */
+  /** sRGB hex; the authored hue is preserved exactly in the linear uniform. */
   readonly color: number;
   readonly name: string;
   /** 0.35-0.7. Higher is a fresher, wetter-looking finish. */
@@ -102,20 +100,6 @@ export interface PaintOptions {
 
 export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNodeMaterial {
   const base = linearOf(options.color);
-  // HITL 5 (HF-491, candidate 4b garage.png): THE PIGMENT IS NOT LIFTED. This
-  // function used to scale every channel so the strongest reached 0.1 linear,
-  // as a defence against the lilac failure described in the file header. The
-  // first genuinely dark body the forge was asked for - Nuke Town's navy saloon,
-  // 0x27394f, peak channel 0.08 - showed the lift as a violet band across the
-  // flank instead: a 25 % brighter navy under a summed clearcoat-plus-base
-  // Fresnel reads lilac, exactly the failure the lift was meant to prevent. The
-  // defence that actually works is the one the header names second - the 0.08
-  // `specularIntensity` below - so dark paint now ships its authored albedo and
-  // navy stays navy. Light and mid paints are unaffected (the lift was a no-op
-  // above a 0.1 peak).
-  const r = base.r;
-  const g = base.g;
-  const b = base.b;
 
   const baseRoughness = options.roughness ?? 0.74;
   const material = new MeshPhysicalNodeMaterial({
@@ -126,25 +110,20 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   });
   material.name = options.name;
   material.specularIntensity = 0.08;
+  material.userData.forgeRole = 'paint';
+  material.userData.forgePaintSrgb = options.color;
+  material.userData.forgePaintUniform = true;
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
   const dust = dustFilm();
   // Wear that lives ONLY in roughness is invisible: it is carried here as an
   // albedo step first (the film greys the pigment) and roughness second.
   const film = vec3(0.58, 0.56, 0.52);
-  // PASS 94 CANDIDATE 4b - THE PIGMENT IS A UNIFORM, NOT THREE CONSTANTS.
-  //
-  // Same fix, same reason, as `createNuketown2CarPaintMaterial` (HF-477): a
-  // literal's VALUE is part of a node graph's cache key, so a baked
-  // `vec3(r, g, b)` compiled one WGSL shader and one WebGPU pipeline PER
-  // COLOUR the forge was asked for. Nuke Town alone asks for five (coach body,
-  // coach waistline, truck cab, and the reference's two street cars), and a
-  // cold first submission pays for every one of them inside the 12 s deploy
-  // fence. As a uniform the graph is identical for every colour, so all forged
-  // paint - on every arena - shares ONE compiled pipeline. The pigment fed in
-  // is the authored triple, and the film, dust and roughness terms above and
-  // below are untouched, so nothing about the look changes.
-  material.colorNode = mix(uniform(new THREE.Vector3(r, g, b)), film, (dust as any).mul(float(0.30)));
+  // A uniform is intentional: all forge paints share one graph shape and the
+  // dark-blue saloon remains dark blue. In particular, never normalise the
+  // channels to a minimum floor here; that was the source of the purple trim
+  // seen in candidate 4b.
+  material.colorNode = mix(TSL.uniform(new THREE.Vector3(base.r, base.g, base.b)), film, (dust as any).mul(float(0.30)));
   material.roughnessNode = float(baseRoughness).add((dust as any).mul(float(0.20)));
   return material;
 }
@@ -220,6 +199,7 @@ export function createForgeChromeMaterial(worn = false): MeshStandardNodeMateria
     metalness: 1,
   });
   material.name = worn ? 'vehicle-forge-chrome-worn' : 'vehicle-forge-chrome';
+  material.userData.forgeRole = 'chrome';
   tagCompatibility(material, 'MeshStandardMaterial');
   return material;
 }

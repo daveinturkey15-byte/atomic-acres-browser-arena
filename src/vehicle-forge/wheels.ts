@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { type Vec2, latheGeometry } from './geometry';
 
-export type WheelStyle = 'cover' | 'steel';
+export type WheelStyle = 'cover' | 'steel' | 'whitewall';
 
 export interface WheelParts {
   /** Tyre carcass and tread. */
@@ -29,6 +29,8 @@ export interface WheelParts {
   readonly face: THREE.BufferGeometry;
   /** Inboard disc and the bead-gap annulus - matte dark, never a mirror. */
   readonly dark: THREE.BufferGeometry;
+  /** A raised sidewall ring used by the 1950s saloon. */
+  readonly whitewall: THREE.BufferGeometry | null;
 }
 
 /** Bottom of the tyre squashed into a contact patch, metres. */
@@ -96,17 +98,8 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
   applyContactPatch(tyre, radius);
   tyre.name = 'vehicle-forge-tyre';
 
-  const coverProfile: Vec2[] = style === 'cover'
+  const coverProfile: Vec2[] = style === 'steel'
     ? [
-      [rim, face + 0.004],
-      [rim * 0.95, face + 0.010],
-      [rim * 0.66, face - 0.004],
-      [rim * 0.34, face - 0.010],
-      [rim * 0.14, face + 0.002],
-      [rim * 0.05, face + 0.010],
-      [0, face + 0.012],
-    ]
-    : [
       // A steel wheel: rolled lip, then a spider face dished ~60 mm inside the
       // sidewall, then a small centre cap.
       [rim, face + 0.002],
@@ -115,6 +108,14 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
       [rim * 0.22, face - 0.038],
       [rim * 0.10, face - 0.020],
       [0, face - 0.016],
+    ] : [
+      [rim, face + 0.004],
+      [rim * 0.95, face + 0.010],
+      [rim * 0.66, face - 0.004],
+      [rim * 0.34, face - 0.010],
+      [rim * 0.14, face + 0.002],
+      [rim * 0.05, face + 0.010],
+      [0, face + 0.012],
     ];
   const outboard = toAxleFrame(latheGeometry(coverProfile, RADIAL_SEGMENTS, 40));
   outboard.name = 'vehicle-forge-wheel-face';
@@ -129,7 +130,17 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
   const dark = toAxleFrame(latheGeometry(darkProfile, RADIAL_SEGMENTS, 40));
   dark.name = 'vehicle-forge-wheel-dark';
 
-  return { tyre, face: outboard, dark };
+  const whitewall = style === 'whitewall'
+    ? toAxleFrame(latheGeometry([
+      [rim * 1.02, face + 0.012],
+      [radius * 0.91, face + 0.012],
+      [radius * 0.91, face + 0.020],
+      [rim * 1.02, face + 0.020],
+    ], RADIAL_SEGMENTS, 40))
+    : null;
+  if (whitewall) whitewall.name = 'vehicle-forge-whitewall';
+
+  return { tyre, face: outboard, dark, whitewall };
 }
 
 export interface LampParts {

@@ -8,7 +8,7 @@
  *
  * BUDGET. Every part is merged into one mesh per material bucket, so a whole
  * vehicle - body, shut lines, glass, lining, chrome, tyres, wheel faces and
- * two lamp colours - costs at most eight draw calls no matter how many parts
+ * two lamp colours - costs at most nine draw calls no matter how many parts
  * it is made of. Merging is per VEHICLE, deliberately, not across vehicles:
  * one merged mesh spanning the whole street would have an axis-aligned bounds
  * that no single collider explains, and the collider/visual parity audit would
@@ -23,6 +23,7 @@ import {
   type VehicleSpec,
   chamferedBar,
   loftBody,
+  surfaceBandAtHeights,
   stripAtHeight,
 } from './geometry';
 import { type WheelStyle, lampParts, wheelParts } from './wheels';
@@ -148,12 +149,15 @@ export function mergeForgedPlacements(
   const groupMatrix = new THREE.Matrix4();
   const skins: ForgedSkinPlacement[] = [];
   const bounds = new THREE.Box3();
+  const skinBounds = new THREE.Box3();
   for (const { built, x, z, yaw } of placements) {
     built.group.position.set(x, 0, z);
     built.group.rotation.set(0, yaw, 0);
     built.group.updateMatrix();
     groupMatrix.copy(built.group.matrix);
     bounds.makeEmpty();
+    skinBounds.makeEmpty();
+    let hasPaintBody = false;
     for (const child of built.group.children) {
       if (!(child instanceof THREE.Mesh)) continue;
       child.updateMatrix();
@@ -163,7 +167,12 @@ export function mergeForgedPlacements(
       geometry.computeBoundingBox();
       if (geometry.boundingBox) bounds.union(geometry.boundingBox);
       const material = child.material as THREE.Material;
-      const bucketLabel = child.name.split(' ').pop() ?? material.name;
+      const bucketLabel = child.userData.forgeBucket as string | undefined;
+      if (bucketLabel === undefined) throw new Error(`Forged mesh is missing its material bucket: ${child.name}`);
+      if (bucketLabel === 'paint' && geometry.boundingBox) {
+        skinBounds.union(geometry.boundingBox);
+        hasPaintBody = true;
+      }
       const entry = byMaterial.get(material);
       if (entry) entry.geometries.push(geometry);
       else byMaterial.set(material, { geometries: [geometry], source: child, label: bucketLabel });
@@ -171,7 +180,13 @@ export function mergeForgedPlacements(
     }
     skins.push({
       name: built.group.name,
-      centre: { x: (bounds.min.x + bounds.max.x) / 2, z: (bounds.min.z + bounds.max.z) / 2 },
+      // Panel seams can continue from a cab into the authored cargo box. The
+      // fidelity mirror is about the forged body it dresses, not those detail
+      // bars, so anchor it to the paint body when present.
+      centre: {
+        x: ((hasPaintBody ? skinBounds : bounds).min.x + (hasPaintBody ? skinBounds : bounds).max.x) / 2,
+        z: ((hasPaintBody ? skinBounds : bounds).min.z + (hasPaintBody ? skinBounds : bounds).max.z) / 2,
+      },
     });
   }
   const meshes: THREE.Mesh[] = [];
@@ -214,6 +229,39 @@ export interface WaistStripe {
   readonly proud: number;
 }
 
+export interface SurfaceBand {
+  /** Lower and upper heights of a body-colour panel. */
+  readonly y0: number;
+  readonly y1: number;
+  readonly bucket: 'accent' | 'chrome';
+  readonly z0: number;
+  readonly z1: number;
+  readonly proud: number;
+}
+
+export interface GrilleDetail {
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly depth: number;
+  readonly barCount?: number;
+}
+
+export interface MirrorDetail {
+  readonly y: number;
+  readonly z: number;
+  readonly x: number;
+}
+
+export interface PanelSeam {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly height: number;
+  readonly width?: number;
+  readonly depth?: number;
+}
+
 export interface VehicleDressing {
   readonly wheelStyle: WheelStyle;
   /**
@@ -227,6 +275,10 @@ export interface VehicleDressing {
   /** Front and rear bumper bars, at the given height and depth from each end. */
   readonly bumperY?: number;
   readonly stripe?: WaistStripe;
+  readonly surfaceBands?: readonly SurfaceBand[];
+  readonly grille?: GrilleDetail;
+  readonly mirrors?: readonly MirrorDetail[];
+  readonly panelSeams?: readonly PanelSeam[];
 }
 
 export interface ForgedVehicle {
@@ -288,6 +340,7 @@ export function buildForgedWheelSet(
       );
       parts.tyre.push(place(wheel.tyre));
       parts.chrome.push(place(wheel.face));
+      if (wheel.whitewall) parts.chrome.push(place(wheel.whitewall));
       parts.tyre.push(place(wheel.dark));
     }
   }
@@ -304,6 +357,7 @@ export function buildForgedWheelSet(
     mesh.castShadow = bucket === 'tyre';
     mesh.receiveShadow = true;
     mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
     group.add(mesh);
     drawCalls += 1;
     triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
@@ -336,6 +390,7 @@ export function buildForgedVehicle(
       );
       parts.tyre.push(place(wheel.tyre));
       parts.chrome.push(place(wheel.face));
+      if (wheel.whitewall) parts.chrome.push(place(wheel.whitewall));
       // The inboard disc and the bead gap go in the TYRE bucket, not the
       // lining's. They are matte dark either way, but the lining is a cabin
       // backdrop that lives at greenhouse height, and folding four knee-high
@@ -383,6 +438,58 @@ export function buildForgedVehicle(
     }
   }
 
+  if (dressing.grille) {
+    const { y, width, height, depth, barCount = 5 } = dressing.grille;
+    const grilleDepth = depth / 2;
+    parts.chrome.push(translated(
+      chamferedBar(width / 2, height / 2, grilleDepth, Math.min(0.03, height * 0.18, grilleDepth * 0.45)),
+      0, y, grilleDepth + 0.008,
+    ));
+    const count = Math.max(1, Math.floor(barCount));
+    for (let index = 0; index < count; index += 1) {
+      const x = count === 1 ? 0 : -width * 0.38 + (width * 0.76 * index) / (count - 1);
+      const bar = chamferedBar(height / 2, 0.018, grilleDepth * 0.92, 0.006);
+      bar.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+      parts.chrome.push(translated(bar, x, y, grilleDepth + 0.018));
+    }
+  }
+
+  if (dressing.mirrors) {
+    for (const mirror of dressing.mirrors) {
+      for (const side of [1, -1] as const) {
+        const stem = chamferedBar(0.018, 0.14, 0.018, 0.006);
+        stem.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+        parts.chrome.push(translated(stem, side * mirror.x, mirror.y - 0.14, mirror.z));
+        parts.chrome.push(translated(
+          chamferedBar(0.12, 0.075, 0.035, 0.012),
+          side * (mirror.x + 0.06), mirror.y, mirror.z,
+        ));
+      }
+    }
+  }
+
+  if (dressing.panelSeams) {
+    for (const seam of dressing.panelSeams) {
+      const seamGeometry = chamferedBar(
+        seam.height / 2,
+        (seam.width ?? 0.018) / 2,
+        (seam.depth ?? 0.014) / 2,
+        0.004,
+      );
+      seamGeometry.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
+      parts.groove.push(translated(seamGeometry, seam.x, seam.y, seam.z));
+    }
+  }
+
+  if (dressing.surfaceBands) {
+    for (const band of dressing.surfaceBands) {
+      const surface = surfaceBandAtHeights(
+        spec, loft.rings, band.y0, band.y1, band.z0, band.z1, band.proud,
+      );
+      if (surface) parts[band.bucket].push(surface);
+    }
+  }
+
   if (dressing.stripe) {
     const strip = stripAtHeight(
       loft.rings,
@@ -414,6 +521,7 @@ export function buildForgedVehicle(
     mesh.castShadow = bucket === 'paint' || bucket === 'tyre';
     mesh.receiveShadow = bucket !== 'groove';
     mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
     if (bucket === 'glass') mesh.renderOrder = 3;
     group.add(mesh);
     drawCalls += 1;

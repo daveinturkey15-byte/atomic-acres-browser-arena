@@ -928,3 +928,78 @@ export function stripAtHeight(
   }
   return toGeometry(sink, 'strip');
 }
+
+/**
+ * A broad two-tone panel clipped to the loft's own side surface.
+ *
+ * This is deliberately a second loft operation, not a flat decal: each patch
+ * borrows the same flank points and analytic normals as the body, and glass
+ * quads are skipped.  That keeps a coach's maroon upper shell off its window
+ * band while preserving the exact rounded silhouette and the body envelope.
+ */
+export function surfaceBandAtHeights(
+  spec: VehicleSpec,
+  rings: readonly Ring[],
+  y0: number,
+  y1: number,
+  z0: number,
+  z1: number,
+  proud: number,
+): THREE.BufferGeometry | null {
+  const sink = emptySink();
+  const lowY = Math.min(y0, y1);
+  const highY = Math.max(y0, y1);
+  const lowZ = Math.min(z0, z1);
+  const highZ = Math.max(z0, z1);
+  const used = rings.filter((ring) => ring.z >= lowZ && ring.z <= highZ);
+  const edgeSlice = (ring: Ring, j: number, low: number, high: number): [Vec3, Vec3, Vec3, Vec3] | null => {
+    const a = ring.points[j]!;
+    const b = ring.points[(j + 1) % RING_POINTS]!;
+    const edgeLow = Math.min(a[1], b[1]);
+    const edgeHigh = Math.max(a[1], b[1]);
+    const from = Math.max(low, edgeLow);
+    const to = Math.min(high, edgeHigh);
+    if (to - from < 1e-6) return null;
+    const normals = ringNormals(ring.points, (ring.yLow + ring.yTop) / 2);
+    const at = (y: number): [Vec3, Vec3] => {
+      const span = b[1] - a[1];
+      const t = Math.abs(span) < 1e-9 ? 0 : (y - a[1]) / span;
+      const na = normals[j]!;
+      const nb = normals[(j + 1) % RING_POINTS]!;
+      const nx = na[0] + (nb[0] - na[0]) * t;
+      const ny = na[1] + (nb[1] - na[1]) * t;
+      const length = Math.hypot(nx, ny) || 1;
+      return [[a[0] + (b[0] - a[0]) * t, y, ring.z], [nx / length, ny / length, 0]];
+    };
+    const [pa, na] = at(from);
+    const [pb, nb] = at(to);
+    return [pa, pb, na, nb];
+  };
+
+  for (let i = 0; i < used.length - 1; i += 1) {
+    const a = used[i]!;
+    const b = used[i + 1]!;
+    // The right flank is 1..8; its mirror is 15..22.  Top-arc quads stay
+    // painted so the band has a real roof rail instead of climbing over it.
+    for (const j of [...Array.from({ length: 8 }, (_, k) => k + 1), ...Array.from({ length: 8 }, (_, k) => k + 15)]) {
+      if (classifyQuad(spec, a, b, j) !== 'body') continue;
+      const sliceA = edgeSlice(a, j, lowY, highY);
+      const sliceB = edgeSlice(b, j, lowY, highY);
+      if (!sliceA || !sliceB) continue;
+      const [aLow, aHigh, aNormal, aHighNormal] = sliceA;
+      const [bLow, bHigh, bNormal, bHighNormal] = sliceB;
+      const positions: Vec3[] = [
+        [aLow[0] + aNormal[0] * proud, aLow[1] + aNormal[1] * proud, aLow[2]],
+        [aHigh[0] + aHighNormal[0] * proud, aHigh[1] + aHighNormal[1] * proud, aHigh[2]],
+        [bHigh[0] + bHighNormal[0] * proud, bHigh[1] + bHighNormal[1] * proud, bHigh[2]],
+        [bLow[0] + bNormal[0] * proud, bLow[1] + bNormal[1] * proud, bLow[2]],
+      ];
+      const normals: Vec3[] = [aNormal, aHighNormal, bHighNormal, bNormal];
+      const uvs: Vec2[] = [[0, 0], [0, 1], [1, 1], [1, 0]];
+      const flip = needsFlip(positions, normals[0]!);
+      pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
+      pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
+    }
+  }
+  return toGeometry(sink, 'surface-band');
+}

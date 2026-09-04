@@ -2580,21 +2580,27 @@ function retireSupersededPresentation(builder: Builder): { retired: number; mism
 function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   const { retired, mismatches } = retireSupersededPresentation(builder);
 
-  // Cream body, red waistline: the reference's coach, and the only saturated
-  // body left on the map now the truck is a plain van.
+  // Cream lower shell / maroon upper shell: the reference's coach, and the
+  // only saturated body left on the map now the truck is a dark mover.
   // PERF (HITL 5, HF-491): one shared set of colourless bucket materials, so
   // every vehicle's tyres/chrome/glass/lamps merge into one draw each below.
   const sharedMaterials = createForgeSharedMaterials();
   const coachMaterials = createForgeMaterialSet(0xe7dec6, 'nuketown2-forge-coach', 0xa8382c, 0.2, sharedMaterials);
-  const truckMaterials = createForgeMaterialSet(0xe2dfd6, 'nuketown2-forge-truck-cab', 0xe2dfd6, 0.2, sharedMaterials);
-  // Same aqua the box cars carried, and the same 0.20 base roughness, so the
-  // ray-traced preset's reflective-proxy admission is unchanged.
-  const carMaterials = createForgeMaterialSet(0x3d6f80, 'nuketown2-forge-car', 0x3d6f80, 0.2, sharedMaterials);
-  // The reference's two street cars keep the hexes their collider boxes wear
-  // (`m.carSaloon` / `m.carClassic`), so skin and body are one colour; they
-  // share the same colourless bucket set as every other forged body.
-  const saloonMaterials = createForgeMaterialSet(0x27394f, 'nuketown2-forge-car-saloon', 0x27394f, 0.2, sharedMaterials);
-  const classicMaterials = createForgeMaterialSet(0x2f8f77, 'nuketown2-forge-car-classic', 0x2f8f77, 0.2, sharedMaterials);
+  const truckMaterials = createForgeMaterialSet(0x243139, 'nuketown2-forge-truck', 0x243139, 0.2, sharedMaterials);
+  // The 1950s saloon is dark navy with a light sidewall/rim contrast. The
+  // paint uniform keeps this navy navy under the clearcoat (candidate 4b's
+  // purple result came from lifting dark channels toward a common floor).
+  const carMaterials = createForgeMaterialSet(0x173451, 'nuketown2-forge-saloon', 0xf4eee0, 0.2, sharedMaterials);
+
+  // The cargo geometry stays authored because its three walk-through mouths
+  // are gameplay cover. It is presentation-only material dressing here: the
+  // same dark forge paint as the lofted cab gives it a coherent box-truck body
+  // without changing a collider, shot surface or box extent.
+  for (const child of builder.root.children) {
+    if (!(child instanceof THREE.Mesh) || !/^nuketown2 street-vehicle truck (deck|box )/.test(child.name)) continue;
+    child.material = truckMaterials.paint;
+    child.userData.vehicleForgeRole = 'truck-box-paint';
+  }
 
   const c = NUKETOWN2_STREET_COACH;
   const t = NUKETOWN2_CENTRAL_TRUCK;
@@ -2607,11 +2613,11 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       headLamps: { x: 0.94, y: 0.98, radius: 0.13 },
       tailLamps: { x: 0.94, y: 0.95, radius: 0.12 },
       bumperY: 0.34,
-      // The reference paints its waistline at 1.35 m, and a waistline is LEVEL:
-      // ridden by ring index instead it climbs every wheel arch and humps over
-      // both wheels. Taken from where the loft's own flank crosses that height,
-      // so it follows the body's curvature without following its cut-outs.
-      stripe: { y: 1.35, bucket: 'accent', z0: 0.35, z1: 8.75, height: 0.3, proud: 0.012 },
+      surfaceBands: [{ y0: 1.78, y1: 2.46, bucket: 'accent', z0: 0.75, z1: 8.35, proud: 0.01 }],
+      // A narrow chrome moulding separates the cream lower body from the
+      // maroon upper shell; the clipped band leaves the window run open.
+      stripe: { y: 1.75, bucket: 'chrome', z0: 0.55, z1: 8.55, height: 0.045, proud: 0.014 },
+      grille: { y: 1.08, width: 1.36, height: 0.34, depth: 0.10, barCount: 5 },
     }, coachMaterials),
     x: c.x + COACH_SPEC.length / 2,
     z: c.z,
@@ -2623,6 +2629,18 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       wheelStyle: 'steel',
       headLamps: { x: 0.92, y: 0.95, radius: 0.12 },
       bumperY: 0.42,
+      grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
+      mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
+      panelSeams: [
+        { x: -1.31, y: 1.62, z: 5.82, height: 2.38 },
+        { x: -1.31, y: 1.62, z: 7.44, height: 2.38 },
+        { x: -1.31, y: 1.62, z: 9.06, height: 2.38 },
+        { x: -1.31, y: 1.62, z: 10.68, height: 2.38 },
+        { x: 1.31, y: 1.62, z: 5.82, height: 2.38 },
+        { x: 1.31, y: 1.62, z: 7.44, height: 2.38 },
+        { x: 1.31, y: 1.62, z: 9.06, height: 2.38 },
+        { x: 1.31, y: 1.62, z: 10.68, height: 2.38 },
+      ],
     }, truckMaterials),
     x: truckNoseX,
     z: t.z,
@@ -2646,23 +2664,17 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   });
 
   const sedanDressing = {
-    wheelStyle: 'cover' as const,
+    wheelStyle: 'whitewall' as const,
     headLamps: { x: 0.66, y: 0.84, radius: 0.115 },
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
   };
-  // HF-477's two street cars, each dressed in its OWN paint - the skin is the
-  // visible body, so a navy collider under an aqua skin would be the exact
-  // "skin and box disagree" defect this audit exists to catch. Both nose to +x,
-  // so the vehicle frame's +z maps to world -x, as the retired head car did.
-  // The paint costs no pipeline: `createForgePaintMaterial` carries its pigment
-  // as a uniform, so all three sets share one compiled graph.
-  for (const [seat, materials] of [
-    [NUKETOWN2_STREET_CARS.saloon, saloonMaterials],
-    [NUKETOWN2_STREET_CARS.classic, classicMaterials],
-  ] as const) {
+  // HF-477's two street cars are dressed by the shared forge paint graph. Both
+  // nose to +x, so the vehicle frame's +z maps to world -x, as the retired head
+  // car did; paint remains a uniform-carried value rather than a new graph.
+  for (const seat of [NUKETOWN2_STREET_CARS.saloon, NUKETOWN2_STREET_CARS.classic]) {
     placements.push({
-      built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, materials),
+      built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
       x: seat.x + SEDAN_SPEC.length / 2,
       z: seat.z,
       yaw: -Math.PI / 2,
