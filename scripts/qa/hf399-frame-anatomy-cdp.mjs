@@ -1,4 +1,27 @@
 #!/usr/bin/env node
+// Captures one frame's render-pass sequence (labels, attachment sizes/formats/sample counts, draws, instances, triangles per pass) at a fixed pose plus a CDP CPU profile over a window at the same pose, to determine whether the frame is JS-bound or GPU-bound.
+//
+// Usage: node scripts/qa/hf399-frame-anatomy-cdp.mjs --dist dist --label local
+//
+// Flags (read from process.argv; default shown):
+//   --dist <dir>          static build directory to serve locally; default: none (one of --dist/--url is required)
+//   --url <url>           base URL of an already-running server; default: none (one of --dist/--url is required)
+//   --arena <id>          arena id; default: atomic-acres
+//   --label <label>       run label embedded in the output file name; default: run
+//   --port <n>            local static-server port; default: 41941
+//   --width <n>           viewport width; default: 2560
+//   --height <n>          viewport height; default: 1440
+//   --out-dir <dir>       report output directory (created if missing); default: artifacts/qa/hf399
+//   --pose <pose>         fixed capture pose (e.g. lawn-idle, open-ground); default: lawn-idle
+//   --profile-seconds <n> CDP CPU profile window seconds; default: 6
+//   --warmup <n>          warmup seconds before capture; default: 8
+//   --query <query>       extra query string appended to the page URL; default: (empty)
+// Environment variables: none read (no process.env usage).
+//
+// Writes: <out-dir>/<label>-<arena>-anatomy-<pose>.json (frame anatomy + CPU profile report);
+//         creates <out-dir> if missing.
+// Exit codes: no explicit process.exit calls; 0 on normal completion, non-zero on thrown error.
+
 // ===========================================================================
 // HF-399 FRAME ANATOMY. What are the ~23 render passes in one Quality frame,
 // how big are their targets, how many draws land in each, and is the main
