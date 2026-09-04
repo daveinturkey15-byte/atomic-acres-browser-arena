@@ -54,16 +54,20 @@ export interface ForgedVehicleMaterials {
  * street of forged bodies compiles one paint program per colour rather than
  * one per body.
  */
-export function createForgeMaterialSet(
-  paintHex: number,
-  paintName: string,
-  accentHex = paintHex,
-  /** See `PaintOptions.roughness`: 0.20 keeps a body SSR-eligible. */
-  baseRoughness = 0.2,
-): ForgedVehicleMaterials {
+/** The buckets every vehicle shares: no colour of its own, so one material serves the whole street. */
+export type ForgeSharedBucket = 'glass' | 'lining' | 'groove' | 'chrome' | 'tyre' | 'headLamp' | 'tailLamp';
+export type ForgeSharedMaterials = Readonly<Pick<ForgedVehicleMaterials, ForgeSharedBucket>>;
+
+/**
+ * PERF (HITL 5, HF-491). One instance of each colourless bucket material. A
+ * material set used to build all nine per vehicle, so three sets on the street
+ * carried three tyre, three chrome, three glass ... materials with identical
+ * graphs - each a separate draw per vehicle and a separate pipeline to
+ * compile inside the fenced first submission. Sharing them is what lets
+ * `mergeForgedPlacements` fold every vehicle's tyres into ONE draw.
+ */
+export function createForgeSharedMaterials(): ForgeSharedMaterials {
   return {
-    paint: createForgePaintMaterial({ color: paintHex, name: paintName, roughness: baseRoughness }),
-    accent: createForgePaintMaterial({ color: accentHex, name: `${paintName}-accent`, roughness: baseRoughness }),
     glass: createForgeGlassMaterial('vehicle-forge-glass'),
     lining: createForgeLiningMaterial(),
     groove: createForgeGrooveMaterial(),
@@ -72,6 +76,124 @@ export function createForgeMaterialSet(
     headLamp: createForgeLampMaterial('head'),
     tailLamp: createForgeLampMaterial('tail'),
   };
+}
+
+export function createForgeMaterialSet(
+  paintHex: number,
+  paintName: string,
+  accentHex = paintHex,
+  /** See `PaintOptions.roughness`: 0.20 keeps a body SSR-eligible. */
+  baseRoughness = 0.2,
+  shared: ForgeSharedMaterials = createForgeSharedMaterials(),
+): ForgedVehicleMaterials {
+  return {
+    paint: createForgePaintMaterial({ color: paintHex, name: paintName, roughness: baseRoughness }),
+    accent: createForgePaintMaterial({ color: accentHex, name: `${paintName}-accent`, roughness: baseRoughness }),
+    ...shared,
+  };
+}
+
+export interface ForgedPlacement {
+  readonly built: ForgedVehicle;
+  /** World position of the vehicle group. */
+  readonly x: number;
+  readonly z: number;
+  /** World yaw of the vehicle group, radians about +y. */
+  readonly yaw: number;
+}
+
+export interface ForgedSkinPlacement {
+  /** The source group's name, e.g. `vehicle-forge nuketown2-coach`. */
+  readonly name: string;
+  /** Plan centre of the vehicle's BAKED world-space geometry (all of its parts). */
+  readonly centre: Readonly<{ x: number; z: number }>;
+}
+
+export interface MergedForgedPlacements {
+  /** One presentation-only mesh per distinct material, world-space geometry. */
+  readonly meshes: readonly THREE.Mesh[];
+  readonly drawCalls: number;
+  readonly triangles: number;
+  /**
+   * Where each vehicle actually landed, measured from the transformed
+   * geometry - the fidelity mirror gate (HF-473) reads these instead of the
+   * per-vehicle groups the merge no longer adds to the scene.
+   */
+  readonly skins: readonly ForgedSkinPlacement[];
+}
+
+/**
+ * PERF (HITL 5, HF-491). Fold every placed vehicle into ONE mesh per material.
+ *
+ * The street vehicles are static scenery. Built one group per vehicle they
+ * cost a draw per bucket per vehicle - six placements on Nuke Town Rebuild
+ * were ~40 draws, most of the +42 draws/frame the HITL 4 candidate carried
+ * over PASS 93. With the colourless buckets shared (`createForgeSharedMaterials`)
+ * the same street is one draw per material: three paints, up to three
+ * accents, and seven shared buckets.
+ *
+ * Each vehicle's world transform (position + yaw, exactly what the caller
+ * would have set on the group) is baked into its geometry, geometries are
+ * merged per material, and the per-vehicle groups are never added to the
+ * scene. Shadow flags, `renderOrder` and `presentationOnly` come from the
+ * source meshes, so a merged mesh casts and sorts exactly as its parts did.
+ * Source geometries are disposed here - they are copied, not referenced.
+ */
+export function mergeForgedPlacements(
+  placements: readonly ForgedPlacement[],
+  namePrefix = 'vehicle-forge merged',
+): MergedForgedPlacements {
+  const byMaterial = new Map<THREE.Material, { geometries: THREE.BufferGeometry[]; source: THREE.Mesh; label: string }>();
+  const transform = new THREE.Matrix4();
+  const groupMatrix = new THREE.Matrix4();
+  const skins: ForgedSkinPlacement[] = [];
+  const bounds = new THREE.Box3();
+  for (const { built, x, z, yaw } of placements) {
+    built.group.position.set(x, 0, z);
+    built.group.rotation.set(0, yaw, 0);
+    built.group.updateMatrix();
+    groupMatrix.copy(built.group.matrix);
+    bounds.makeEmpty();
+    for (const child of built.group.children) {
+      if (!(child instanceof THREE.Mesh)) continue;
+      child.updateMatrix();
+      transform.multiplyMatrices(groupMatrix, child.matrix);
+      const geometry = child.geometry.clone();
+      geometry.applyMatrix4(transform);
+      geometry.computeBoundingBox();
+      if (geometry.boundingBox) bounds.union(geometry.boundingBox);
+      const material = child.material as THREE.Material;
+      const bucketLabel = child.name.split(' ').pop() ?? material.name;
+      const entry = byMaterial.get(material);
+      if (entry) entry.geometries.push(geometry);
+      else byMaterial.set(material, { geometries: [geometry], source: child, label: bucketLabel });
+      child.geometry.dispose();
+    }
+    skins.push({
+      name: built.group.name,
+      centre: { x: (bounds.min.x + bounds.max.x) / 2, z: (bounds.min.z + bounds.max.z) / 2 },
+    });
+  }
+  const meshes: THREE.Mesh[] = [];
+  let triangles = 0;
+  for (const [material, { geometries, source, label }] of byMaterial) {
+    const merged = geometries.length === 1 ? geometries[0]! : mergeGeometries(geometries, false);
+    if (geometries.length > 1) for (const geometry of geometries) geometry.dispose();
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.name = `${namePrefix} ${label}`;
+    mesh.castShadow = source.castShadow;
+    mesh.receiveShadow = source.receiveShadow;
+    mesh.renderOrder = source.renderOrder;
+    mesh.userData.presentationOnly = true;
+    // Static scenery: nothing moves it after this, so three need not recompose
+    // its matrix every frame (r185 recomposes every auto-updating node).
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
+    meshes.push(mesh);
+    triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
+  }
+  return { meshes, drawCalls: meshes.length, triangles, skins };
 }
 
 export interface LampPlacement {

@@ -659,15 +659,16 @@ describe('Nuke Town Rebuild fidelity', () => {
       const box = new THREE.Box3().setFromObject(object);
       return { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 };
     };
-    // Only the OUTERMOST forged group per vehicle: the forge names its own
-    // sub-parts with the same prefix (grooves, lamps, wheel sets), and a
-    // sub-part is offset from its body by design.
-    const skins: THREE.Object3D[] = [];
-    map.root.traverse((node) => {
-      if (!node.name.startsWith('vehicle-forge ')) return;
-      if (node.parent?.name.startsWith('vehicle-forge ') === true) return;
-      skins.push(node);
-    });
+    // One entry per VEHICLE. PERF (HITL 5, HF-491) folds every vehicle into
+    // one mesh per material, so the per-vehicle groups are no longer in the
+    // scene; the forge audit records where each vehicle's baked world-space
+    // geometry landed instead, and that is what this gate reads - the same
+    // "did the skin land on its box" falsifier, measured from the geometry
+    // the player actually sees.
+    const audit = map.root.userData.nuketown2ForgeAudit as {
+      skins: readonly { name: string; centre: { x: number; z: number } }[];
+    };
+    const skins = audit.skins;
     // Coach, truck cab, truck bogie and three sedans (head car + both driveways).
     expect(skins.length, 'forged street-vehicle skins').toBeGreaterThanOrEqual(6);
     const bodies = map.raycastMeshes
@@ -675,7 +676,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       .map((mesh) => ({ name: mesh.name, ...planCentre(mesh) }));
     expect(bodies.length, 'solid vehicle bodies to dress').toBeGreaterThanOrEqual(4);
     for (const skin of skins) {
-      const centre = planCentre(skin);
+      const centre = skin.centre;
       // The bogie dresses the cargo box's axles, which are behind the cab; it is
       // held to the truck's own centre line instead of to a body centre.
       if (skin.name.endsWith('truck-bogie')) {
@@ -703,7 +704,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(headCarBox, 'the head car body').toBeDefined();
     expect(planCentre(headCarBox!).x, 'head car body follows the handedness flag').toBeCloseTo(hx(4.5), 6);
     const headCarSkin = skins
-      .map((skin) => ({ skin, centre: planCentre(skin) }))
+      .map((skin) => ({ skin, centre: skin.centre }))
       .filter(({ skin }) => skin.name.endsWith('sedan'))
       .sort((left, right) => Math.abs(left.centre.z) - Math.abs(right.centre.z))[0]!;
     expect(headCarSkin.centre.x, 'the head car skin rides its own box').toBeCloseTo(hx(4.5), 6);

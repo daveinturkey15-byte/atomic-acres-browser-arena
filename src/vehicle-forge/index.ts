@@ -41,13 +41,18 @@ export {
 } from './materials';
 export type { LampKind, PaintOptions } from './materials';
 
-export { buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet } from './build';
+export { buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet, createForgeSharedMaterials, mergeForgedPlacements } from './build';
 export type {
   ForgedVehicle,
   ForgedVehicleMaterials,
   LampPlacement,
   VehicleDressing,
   WaistStripe,
+  ForgeSharedBucket,
+  ForgeSharedMaterials,
+  ForgedPlacement,
+  ForgedSkinPlacement,
+  MergedForgedPlacements,
 } from './build';
 
 export { COACH_SPEC, FORGED_VEHICLE_SPECS, SEDAN_SPEC, TRUCK_CAB_SPEC } from './specs';
