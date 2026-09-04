@@ -14,7 +14,8 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { fbm2, hash2, valueNoise2 } from './map3/noise';
+import { hash2 } from './map3/noise';
+import { lutFbm } from './nuketown2-materials/noise-lut';
 
 /** Cast boundary for TSL DSL runtime helpers */
 const {
@@ -63,7 +64,7 @@ export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
   const seam = max(seamU, seamV);
 
   // Fine wood grain along plank length (Z)
-  const grain = fbm2(vec2(p.x.mul(3.5), p.z.mul(14.0)), 2).sub(float(0.5)).mul(float(0.035));
+  const grain = lutFbm(vec2(p.x.mul(3.5), p.z.mul(14.0)), 2).sub(float(0.5)).mul(float(0.035));
 
   // Base warm oak tone: sRGB approx #99734e -> linear ~ [0.32, 0.18, 0.08]
   const baseWood = vec3(0.32, 0.19, 0.09).add(toneOffset).add(grain);
@@ -132,7 +133,7 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
   const p = positionWorld;
 
   // Base poured concrete speckle
-  const concreteGrain = fbm2(vec2(p.x.mul(6.0), p.z.mul(6.0)), 2).sub(float(0.5)).mul(float(0.03));
+  const concreteGrain = lutFbm(vec2(p.x.mul(6.0), p.z.mul(6.0)), 2).sub(float(0.5)).mul(float(0.03));
 
   // Expansion joint grid: 2.5 m in X, 3.5 m in Z
   const edgeX = abs(fract(p.x.div(float(2.5))).sub(float(0.5))).mul(float(2.0));
@@ -143,7 +144,7 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
   );
 
   // Oil stain puddles where workbench and vehicles sit
-  const oilField = fbm2(vec2(p.x.mul(1.2).add(23.4), p.z.mul(1.2).add(11.8)), 3);
+  const oilField = lutFbm(vec2(p.x.mul(1.2).add(23.4), p.z.mul(1.2).add(11.8)), 3);
   const oilStain = smoothstep(float(0.68), float(0.82), oilField).mul(float(0.65));
 
   const baseConcrete = vec3(0.24, 0.23, 0.22).add(concreteGrain);
@@ -170,7 +171,7 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
 
   const p = positionWorld;
   // Fine plaster stipple
-  const stipple = valueNoise2(vec2(p.x.mul(16.0), p.y.mul(16.0)))
+  const stipple = lutFbm(vec2(p.x.mul(16.0), p.y.mul(16.0)), 1)
     .sub(float(0.5))
     .mul(float(0.024));
 
@@ -249,7 +250,7 @@ export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
 
   const p = positionWorld;
   const baseTint = vec3(0.60, 0.72, 0.78);
-  const shimmer = fbm2(vec2(p.x.mul(1.5), p.y.mul(1.5)), 2).sub(float(0.5)).mul(float(0.035));
+  const shimmer = lutFbm(vec2(p.x.mul(1.5), p.y.mul(1.5)), 2).sub(float(0.5)).mul(float(0.035));
   mat.colorNode = baseTint.add(shimmer);
 
   return mat;
@@ -271,7 +272,7 @@ export function createNuketown2PoolWaterMaterial(): MeshStandardNodeMaterial {
 
   const p = positionWorld;
   // Beer-Lambert absorption tone: cyan-turquoise deep water with surface ripple
-  const ripple = fbm2(vec2(p.x.mul(5.0), p.z.mul(5.0)), 2).sub(float(0.5)).mul(float(0.04));
+  const ripple = lutFbm(vec2(p.x.mul(5.0), p.z.mul(5.0)), 2).sub(float(0.5)).mul(float(0.04));
   const beerLambertColor = vec3(0.04, 0.44, 0.54).add(ripple);
   mat.colorNode = beerLambertColor;
 

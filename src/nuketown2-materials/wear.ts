@@ -18,7 +18,7 @@
  * material construction. Nothing in this file runs per frame on the CPU.
  */
 import * as TSL from 'three/tsl';
-import { fbm2 } from '../map3/noise';
+import { NOISE_LUT_CELLS, lutFbm } from './noise-lut';
 import {
   MAX_ALBEDO_DARKENING,
   type Nuketown2MaterialSpec,
@@ -32,7 +32,6 @@ const {
   cameraPosition,
   clamp,
   float,
-  fract,
   length,
   max,
   mix,
@@ -57,32 +56,34 @@ export function detailFalloff(nearM: number, farM: number): any {
  *
  * THE BUG THIS EXISTS FOR, and it is not a micro-optimisation. A 0.9 mm grain
  * authored across this arena's 220 m ground slab means noise coordinates up to
- * 1.2e5. float32 resolves about 0.008 at that magnitude, so `fract` quantises
- * to a couple of hundred steps and the grain stops being grain; worse, the
- * value hash then evaluates `sin` of an argument around 5e7, and a transcendental
- * that far out of range is both meaningless and, on this driver, catastrophically
- * slow - measured as a 12-second first-submission stall that failed the arena
- * boot smoke outright.
+ * 1.2e5. float32 resolves about 0.008 at that magnitude, so a per-fragment
+ * `fract` quantised to a couple of hundred steps and the grain stopped being
+ * grain; worse, the value hash then evaluated `sin` of an argument around 5e7,
+ * and a transcendental that far out of range is both meaningless and, on this
+ * driver, catastrophically slow - measured as a 12-second first-submission
+ * stall that failed the arena boot smoke outright.
  *
  * Wrapping the coordinate into a tile of a fixed number of lattice cells is
  * what a real texture generator does anyway: you author a 0.25 m grain tile and
- * repeat it. 256 keeps every noise argument inside [0, 256) at every scale, and
- * it is an INTEGER period, which is the condition tileable value noise needs -
- * a fractional period yields NaN, and NaN turns every surface into a mirror.
+ * repeat it. The tile is now a real texture (noise-lut.ts, HF-491): the sampler
+ * wraps the coordinate, so no shader arithmetic ever sees the large value, and
+ * the period is the LUT's own integer cell count.
  */
-export const NOISE_TILE_CELLS = 256;
+export const NOISE_TILE_CELLS = NOISE_LUT_CELLS;
 
 /**
  * Signed [-1, 1] fBm of a 2D surface coordinate at a given feature size in
  * metres, evaluated on a tile of `NOISE_TILE_CELLS` features.
  *
- * The tile spans `featureSizeM * NOISE_TILE_CELLS`: 0.23 m for a 0.9 mm grain,
- * 11.5 m for a 45 mm scuff, 614 m for a 2.4 m traffic gradient - which is
- * larger than the map, so the term that carries the big shapes never repeats.
+ * ONE texture fetch from the shared noise LUT, whatever the octave count
+ * (HF-491: the per-fragment lattice hash on fifty materials was the largest
+ * single frame-cost delta the bisect found). The tile spans
+ * `featureSizeM * NOISE_TILE_CELLS`: 6.4 cm for a 1 mm grain, 3.8 m for a
+ * 60 mm scuff, 154 m for a 2.4 m traffic gradient - larger than the map, so
+ * the term that carries the big shapes never repeats in view.
  */
-export function signedNoise(uv: any, featureSizeM: number, octaves = 2): any {
-  const tiled = fract(uv.mul(float(1 / (featureSizeM * NOISE_TILE_CELLS)))).mul(float(NOISE_TILE_CELLS));
-  return fbm2(tiled, octaves).sub(float(0.5)).mul(float(2));
+export function signedNoise(uv: any, featureSizeM: number, octaves: 1 | 2 | 3 = 2): any {
+  return lutFbm(uv.mul(float(1 / featureSizeM)), octaves).sub(float(0.5)).mul(float(2));
 }
 
 /**

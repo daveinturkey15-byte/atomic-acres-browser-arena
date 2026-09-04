@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { fbm2, valueNoise2 } from './map3/noise';
+import { lutFbm } from './nuketown2-materials/noise-lut';
 
 const {
   float,
@@ -42,7 +42,7 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
   const p = positionWorld;
 
   // Metallic flake sparkle
-  const flake = valueNoise2(vec2(p.x.mul(32.0), p.z.mul(32.0)))
+  const flake = lutFbm(vec2(p.x.mul(32.0), p.z.mul(32.0)), 1)
     .sub(float(0.5))
     .mul(float(0.04));
 
@@ -65,7 +65,7 @@ export function createNuketown2CoachMaterial(): MeshStandardNodeMaterial {
   mat.type = 'MeshStandardMaterial';
 
   const p = positionWorld;
-  const flake = valueNoise2(vec2(p.x.mul(24.0), p.y.mul(24.0))).sub(float(0.5)).mul(float(0.02));
+  const flake = lutFbm(vec2(p.x.mul(24.0), p.y.mul(24.0)), 1).sub(float(0.5)).mul(float(0.02));
   // Cream body: linear ~ [0.82, 0.76, 0.64]
   mat.colorNode = vec3(0.82, 0.76, 0.64).add(flake);
   mat.roughnessNode = float(0.32);
@@ -85,7 +85,7 @@ export function createNuketown2TruckCabMaterial(): MeshStandardNodeMaterial {
   mat.type = 'MeshStandardMaterial';
 
   const p = positionWorld;
-  const flake = valueNoise2(vec2(p.x.mul(20.0), p.y.mul(20.0))).sub(float(0.5)).mul(float(0.025));
+  const flake = lutFbm(vec2(p.x.mul(20.0), p.y.mul(20.0)), 1).sub(float(0.5)).mul(float(0.025));
   mat.colorNode = vec3(0.74, 0.72, 0.66).add(flake);
   mat.roughnessNode = float(0.38);
 
@@ -129,7 +129,7 @@ export function createNuketown2VehicleGlassMaterial(): MeshStandardNodeMaterial 
   mat.type = 'MeshStandardMaterial';
 
   const p = positionWorld;
-  const sheen = fbm2(vec2(p.x.mul(1.2), p.z.mul(1.2)), 2).sub(float(0.5)).mul(float(0.03));
+  const sheen = lutFbm(vec2(p.x.mul(1.2), p.z.mul(1.2)), 2).sub(float(0.5)).mul(float(0.03));
   mat.colorNode = vec3(0.12, 0.18, 0.22).add(sheen);
 
   return mat;
@@ -199,7 +199,7 @@ export function createNuketown2TireMaterial(): MeshStandardNodeMaterial {
   mat.type = 'MeshStandardMaterial';
 
   const p = positionWorld;
-  const tread = fbm2(vec2(p.x.mul(12.0), p.z.mul(12.0)), 2).sub(float(0.5)).mul(float(0.025));
+  const tread = lutFbm(vec2(p.x.mul(12.0), p.z.mul(12.0)), 2).sub(float(0.5)).mul(float(0.025));
   mat.colorNode = vec3(0.08, 0.09, 0.10).add(tread);
   mat.roughnessNode = float(0.88);
 

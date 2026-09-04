@@ -25,7 +25,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { buildWear, groundUv, linearSwatch, signedNoise } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
-import { fbm2, ridgedFbm2 } from '../../map3/noise';
+import { lutFbm, lutRidgedFbm } from '../noise-lut';
 
 const { abs, clamp, float, fract, max, min, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -67,7 +67,7 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
   // --- Cold patches --------------------------------------------------------
   // Thresholded hard so the edge reads as a saw cut. The patch is BLACKER and
   // finer than the road around it, and its own aggregate is smaller.
-  const patchField = fbm2(vec2(p.x.mul(float(0.085)).add(float(17.3)), p.z.mul(float(0.085)).add(float(41.1))), 3);
+  const patchField = lutFbm(vec2(p.x.mul(float(0.085)).add(float(17.3)), p.z.mul(float(0.085)).add(float(41.1))), 3);
   const patch = smoothstep(float(0.545), float(0.572), patchField);
 
   // --- Tar seams -----------------------------------------------------------
@@ -86,7 +86,7 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
   );
 
   // --- Cracks --------------------------------------------------------------
-  const crack = smoothstep(float(0.925), float(0.992), ridgedFbm2(vec2(p.x.mul(float(3.0)), p.z.mul(float(3.0))), 3));
+  const crack = smoothstep(float(0.925), float(0.992), lutRidgedFbm(vec2(p.x.mul(float(3.0)), p.z.mul(float(3.0)))));
 
   // --- Wheel paths ---------------------------------------------------------
   // Two polished lanes at +/- 1.6 m from the crown, 0.9 m wide, LIGHTER than
