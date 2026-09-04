@@ -120,11 +120,15 @@ import {
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_APPLIANCE_BLUE,
+  NUKETOWN2_BAY_DEPTH,
+  NUKETOWN2_BAY_RUNS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
+  NUKETOWN2_GARAGE_SPAN,
+  NUKETOWN2_GARAGE_WIDTH,
   NUKETOWN2_GROUND_FLOOR_T,
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
@@ -132,12 +136,14 @@ import {
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HOUSE_WIDTH,
   NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_UPPER_Y0,
+  isNuketown2BayFootprint,
   nuketown2HandedSpan,
   nuketown2HandedX,
 } from './nuketown2-layout';
@@ -186,6 +192,8 @@ import {
 export {
   NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_BAY_DEPTH,
+  NUKETOWN2_BAY_RUNS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
@@ -193,9 +201,11 @@ export {
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_HALF,
+  NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_HANDEDNESS,
+  isNuketown2BayFootprint,
 } from './nuketown2-layout';
 
 /** The ratio base. Every "0.nnn L" in this file is a fraction of this. */
@@ -205,8 +215,12 @@ const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 /**
  * Width of a house along the street. Reference: the main house block measures
  * 121 px of 400 along the street axis = 0.303 L. 11 / 36 = 0.306.
+ *
+ * HF-491 moved the number itself into `nuketown2-layout.ts`, because the
+ * roadside bays are authored off the GARAGE span and the garage hangs off this
+ * width - so both files now read one constant instead of re-typing it.
  */
-const HOUSE_WIDTH = 11;
+const HOUSE_WIDTH = NUKETOWN2_HOUSE_WIDTH;
 /**
  * Back yard depth, house back wall to the yard fence. The reference's back lot
  * (house back wall to the playable boundary) is 0.503 L on one side and 0.583 L
@@ -260,9 +274,13 @@ const HOUSE_X1 = NUKETOWN2_HOUSE_LAYOUT[0].x + HOUSE_WIDTH / 2;  // 4.25
  * 180-degree rotation then puts the two garages at opposite ends, which is
  * where the map's diagonal actually comes from.
  */
-const GARAGE_WIDTH = 5;
-const GARAGE_X0 = HOUSE_X1;                                       // 4.25
-const GARAGE_X1 = GARAGE_X0 + GARAGE_WIDTH;                       // 9.25
+const GARAGE_WIDTH = NUKETOWN2_GARAGE_WIDTH;
+// HF-491: read from the layout's own span rather than re-derived here, so the
+// bay runs (`NUKETOWN2_BAY_RUNS`, authored as GARAGE_X0 - 0.2 and
+// GARAGE_X1 + 0.2) and the apron below cannot come apart. Both are still
+// exactly HOUSE_X1 and HOUSE_X1 + GARAGE_WIDTH; the fidelity gate asserts it.
+const GARAGE_X0 = NUKETOWN2_GARAGE_SPAN.x0;                       // 4.25, flush with HOUSE_X1
+const GARAGE_X1 = NUKETOWN2_GARAGE_SPAN.x1;                       // 9.25
 /** Set-back of the garage front from the house front. Reference 67 px of 400 = 0.168 L. */
 const GARAGE_SETBACK = 6;
 const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
@@ -2325,6 +2343,11 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
  * proud of the interior floor, and every gate in the repository stayed green.
  */
 const HEAD = NUKETOWN2_CUL_DE_SAC;
+/** The two HF-491 bay runs, read from the layout table and never re-typed. */
+const BAY_MOUTH = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'mouth')!;
+const BAY_OUTER = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'outer')!;
+/** North-side outer edge of a bay: the kerb line pushed 2.2 m into the verge. */
+const BAY_BACK_Z = KERB_Z - NUKETOWN2_BAY_DEPTH;
 export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] = Object.freeze([
   // Driveway apron: garage door out to the kerb. HF-477 ran it the last 2.7 m
   // to KERB_Z instead of stopping at the old centred head's |z| = 8 edge -
@@ -2366,11 +2389,35 @@ export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] =
   // exactly there.
   Object.freeze({ id: 'verge lawn head end', material: 'lawn' as const, paired: false, x0: NUKETOWN2_BOUNDS.minX, x1: HEAD.closedX, z0: HOUSE_FRONT_Z, z1: -HOUSE_FRONT_Z }),
   Object.freeze({ id: 'verge lawn head frontage north', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: HEAD.mouthX, z0: HOUSE_FRONT_Z, z1: -NUKETOWN2_TURNING_HEAD_HALF }),
-  Object.freeze({ id: 'verge lawn stem north 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: GARAGE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
-  Object.freeze({ id: 'verge lawn stem north 1', material: 'lawn' as const, paired: false, x0: GARAGE_X1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  // ---- HF-491: THE STEM VERGE, RE-TILED AROUND THE ROADSIDE BAYS ---------
+  // Three tiles became eleven, and every edge below is an expression on one of
+  // the bay runs, the garage span or the map bound. The bays are CARRIAGEWAY
+  // FOOTPRINTS (see NUKETOWN2_CARRIAGEWAY_FOOTPRINTS), so the ground-cut gate
+  // fails on any dressing that laps one: this is the real cut in the lawn
+  // table the bays need, not a decal stacked on top of the lawn. A decal
+  // passes the coplanar gate and still grows instanced grass through the
+  // paving, because `nuketownRebuildLawnRegions()` reads THIS table.
+  //
+  // The band is z in [HOUSE_FRONT_Z, KERB_Z] on the north side. `BAY_BACK_Z`
+  // is the bay's outer edge, so a tile over a bay run keeps only the strip
+  // BEHIND the bay and a tile between two bay runs keeps its full depth.
+  // North carries the driveway apron over the whole garage span, so it needs
+  // six tiles; south has no apron on the stem, so its three middle pieces
+  // merge into one and it needs five. Complete cover with no overlaps, and
+  // `nuketown2-fidelity.test.ts` measures exactly that.
+  Object.freeze({ id: 'verge lawn stem north 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: BAY_MOUTH.x0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 1', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x0, x1: BAY_MOUTH.x1, z0: HOUSE_FRONT_Z, z1: BAY_BACK_Z }),
+  Object.freeze({ id: 'verge lawn stem north 2', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x1, x1: GARAGE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 3', material: 'lawn' as const, paired: false, x0: GARAGE_X1, x1: BAY_OUTER.x0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 4', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x0, x1: BAY_OUTER.x1, z0: HOUSE_FRONT_Z, z1: BAY_BACK_Z }),
+  Object.freeze({ id: 'verge lawn stem north 5', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
   Object.freeze({ id: 'verge lawn head frontage south 0', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: -GARAGE_X1, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
   Object.freeze({ id: 'verge lawn head frontage south 1', material: 'lawn' as const, paired: false, x0: -GARAGE_X0, x1: HEAD.mouthX, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
-  Object.freeze({ id: 'verge lawn stem south', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: NUKETOWN2_BOUNDS.maxX, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: BAY_MOUTH.x0, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 1', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x0, x1: BAY_MOUTH.x1, z0: -BAY_BACK_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 2', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x1, x1: BAY_OUTER.x0, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 3', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x0, x1: BAY_OUTER.x1, z0: -BAY_BACK_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 4', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x1, x1: NUKETOWN2_BOUNDS.maxX, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
 ]);
 
 /**
@@ -2516,6 +2563,41 @@ function street(builder: Builder, m: Nuketown2Materials): void {
       [(head.mouthX + head.offMapX) / 2, 0.06, side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15)],
       [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, { cast: false });
   }
+  // ---- HF-491: THE ROADSIDE BAYS -------------------------------------------
+  // Owner, 2026-09-04: the map "needs to be WIDER IN THE MIDDLE, have BITS
+  // EITHER SIDE OF THE ROAD like it does in the game".
+  //
+  // Each bay is emitted through `centred()`, ONCE per side, from the SAME four
+  // rectangles `buildNuketown2Ground()` cuts and `find-coplanar-pairs.ts`
+  // classifies STREET against - one table, three consumers, so the paving, the
+  // hole in the lawn and the instrument can never describe different ground.
+  //
+  // THEY ARE NOT `pair()` BODIES, and they cannot be. `pair()` emits at (x, z)
+  // AND (-x, -z); the bulb fills authored x in [closedX, mouthX] at every
+  // |z| <= 8, and a bay at |z| in [5.3, 7.5] is inside that z band by
+  // construction, so a paired bay lands its own image in the middle of the
+  // cul-de-sac. The intersection of the stem with its own 180-degree image is
+  // one metre wide. The z-MIRROR the two rectangles already carry is the
+  // fairness property that actually matters - the teams are separated across
+  // z - and `nuketown2-fidelity.test.ts` property (i) checks it directly.
+  //
+  // Section: the same 0.12 m asphalt slab as `carriageway stem`, at the same
+  // centre y, so bay and stem abut at |z| = 5.3 with no plan overlap and
+  // cannot become a coplanar pair; and the same 0.24 m lip on a 0.3 m tread as
+  // `carriageway stem kerb`, along the bay's OUTER edge, well under the 0.42 m
+  // autostep so it reads as a kerb and is never a wall.
+  for (const bay of NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint)) {
+    const length = bay.x1 - bay.x0;
+    const midX = (bay.x0 + bay.x1) / 2;
+    centred(builder, `carriageway ${bay.id}`, [midX, -0.06, (bay.z0 + bay.z1) / 2],
+      [length, 0.12, NUKETOWN2_BAY_DEPTH], m.asphalt, road);
+    // Outer edge = the one further from the road centre-line; the kerb's 0.3 m
+    // tread sits INSIDE the bay, exactly as the stem kerb sits inside the stem.
+    const outerZ = Math.abs(bay.z0) > Math.abs(bay.z1) ? bay.z0 : bay.z1;
+    centred(builder, `carriageway ${bay.id} kerb`, [midX, 0.06, outerZ - Math.sign(outerZ) * 0.15],
+      [length, 0.24, 0.3], m.kerb, { cast: false });
+  }
+
   // Centre line, down the stem only: a cul-de-sac bulb is not marked.
   for (let i = 0; i < 4; i += 1) {
     // HF-463: the dash is a real 0.04 m solid raised 0.04 m above the road.

@@ -186,6 +186,82 @@ export const NUKETOWN2_CUL_DE_SAC = Object.freeze({
 export const NUKETOWN2_APPLIANCE_BLUE = 0x2f5f92;
 
 /**
+ * The house block along the street, and the garage wing bolted to its outer
+ * end. Both were arena-local literals until HF-491's roadside bays needed the
+ * GARAGE SPAN here: the bays are authored as offsets off the garage, and the
+ * garage span is the only thing on the stem verge that decides where they can
+ * go (`NUKETOWN2_BAY_RUNS`). `nuketown2-arena.ts` reads these three constants
+ * instead of re-typing 11 / 5 / 4.25 / 9.25, which is the rule this file's
+ * header states and the rule the shipped map broke when its rare-gun sites
+ * came to describe a house that had moved.
+ *
+ * Reference: the main house block measures 121 px of 400 along the street axis
+ * = 0.303 L, and 11 / 36 = 0.306. The garage takes 5 m of street frontage
+ * (reference 50-58 px of 400 = 0.125-0.145 L; 5 / 36 = 0.139 L).
+ */
+export const NUKETOWN2_HOUSE_WIDTH = 11;
+/** Authored x of the NORTH house's centre. The south house is its negation. */
+export const NUKETOWN2_HOUSE_CENTRE_X = -1.25;
+/** Street frontage of the garage wing. */
+export const NUKETOWN2_GARAGE_WIDTH = 5;
+/** Authored x span of the north garage: 4.25 to 9.25, flush with the house's outer end. */
+export const NUKETOWN2_GARAGE_SPAN = Object.freeze({
+  x0: NUKETOWN2_HOUSE_CENTRE_X + NUKETOWN2_HOUSE_WIDTH / 2,
+  x1: NUKETOWN2_HOUSE_CENTRE_X + NUKETOWN2_HOUSE_WIDTH / 2 + NUKETOWN2_GARAGE_WIDTH,
+});
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * HF-491 - THE ROADSIDE BAYS. Owner, 2026-09-04: the map "needs to be WIDER IN
+ * THE MIDDLE, have BITS EITHER SIDE OF THE ROAD like it does in the game".
+ *
+ * A bay is a 2.2 m pocket of asphalt let into the front verge on BOTH sides of
+ * the stem, so the paved width at a bay is 10.6 + 2 x 2.2 = 15.0 m while the
+ * corridor stays 20.0 m and the reference-correct corridor:house-width ratio
+ * stays 1.818. Nothing measured off the minimaps moves; the bays take their
+ * ground from the lawn, which is what "bits either side of the road" is.
+ *
+ * WHY THE RUNS ARE THESE RUNS, and why no other run exists. The stem's north
+ * verge is crossed by `street driveway north` over the whole garage span, so
+ * the verge offers exactly two free runs: the bulb's mouth to the garage, and
+ * the garage to the map edge. Both are taken, each inset 0.2 m from the apron
+ * so a bay never abuts a driveway, 0.3 m from the bulb mouth and 0.3 m from
+ * the map edge. That yields 4.25 m and 8.25 m of bay.
+ *
+ * THESE NUMBERS ARE EXPRESSIONS ON PURPOSE. A previous cut of this design was
+ * typed as literals against a garage that had already moved; see the header of
+ * NUKETOWN2_RARE_GUN_SITES for what that costs.
+ *
+ * THE BAYS ARE NOT CAR PARKS, and the report says so in the same words: the
+ * longest run is 8.25 m and the street coach is 9.1 m, so no bay holds it.
+ * `NUKETOWN2_STREET_COACH` and the 0.150 L truck offset the overdrive core
+ * derives from are untouched by this change.
+ *
+ * Depth is 2.2 m and OPEN on the same falsifier as the rest of the verge
+ * geometry: a BO2-2025 orthographic overhead that is not a stylised minimap.
+ */
+export const NUKETOWN2_BAY_DEPTH = 2.2;
+
+/**
+ * The two authored bay runs along x. The z span is the same for both and is
+ * derived, not authored: `[kerb, kerb + NUKETOWN2_BAY_DEPTH]` on the north
+ * side and its exact z-mirror on the south, so the two sides cannot drift
+ * apart and both teams get the identical pocket.
+ */
+export const NUKETOWN2_BAY_RUNS = Object.freeze([
+  Object.freeze({
+    id: 'mouth' as const,
+    x0: NUKETOWN2_CUL_DE_SAC.mouthX + 0.3,
+    x1: NUKETOWN2_GARAGE_SPAN.x0 - 0.2,
+  }),
+  Object.freeze({
+    id: 'outer' as const,
+    x0: NUKETOWN2_GARAGE_SPAN.x1 + 0.2,
+    x1: NUKETOWN2_CUL_DE_SAC.offMapX - 0.3,
+  }),
+]);
+
+/**
  * Plan union that owns the carriageway floor. The ground builder cuts these
  * exact rectangles before emitting the real road slabs, so visual geometry and
  * the coplanar-pair instrument share one source of truth.
@@ -197,6 +273,16 @@ export const NUKETOWN2_APPLIANCE_BLUE = 0x2f5f92;
  * the same asphalt slab. Cutting the disc out band by band instead would
  * multiply the ground tiler's grid - it builds one tile per (x-cut, z-cut) cell
  * - for a boundary no player ever stands on the far side of.
+ *
+ * SIX RECTANGLES SINCE HF-491, and the four new ones are the roadside bays.
+ * They are carriageway FOOTPRINTS and not verge dressing for three reasons
+ * that all matter: this union is what `buildNuketown2Ground()` cuts, so a bay
+ * is a real hole in the lawn table rather than a decal stacked on top of it
+ * (a decal would pass the coplanar gate and still grow instanced grass through
+ * the paving, because `nuketownRebuildLawnRegions()` drives the grass field off
+ * the same dressing table); it is what `scripts/qa/find-coplanar-pairs.ts`
+ * classifies STREET against; and it keeps the bays out of the verge clutter
+ * ceiling, which is a furniture budget with zero headroom.
  */
 export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
   Object.freeze({
@@ -213,7 +299,28 @@ export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
     z0: -NUKETOWN2_TURNING_HEAD_HALF,
     z1: NUKETOWN2_TURNING_HEAD_HALF,
   }),
+  // Two authored rectangles, one z-mirror map, four entries. The mirror is
+  // applied HERE and nowhere else, so no later edit can move one side of a bay
+  // without moving the other.
+  ...NUKETOWN2_BAY_RUNS.flatMap((run) => {
+    const north = {
+      id: `bay ${run.id} north`,
+      x0: run.x0,
+      x1: run.x1,
+      z0: -(NUKETOWN2_STREET_HALF_WIDTH + NUKETOWN2_BAY_DEPTH),
+      z1: -NUKETOWN2_STREET_HALF_WIDTH,
+    };
+    return [
+      Object.freeze(north),
+      Object.freeze({ ...north, id: `bay ${run.id} south`, z0: -north.z1, z1: -north.z0 }),
+    ];
+  }),
 ]);
+
+/** True for the four HF-491 bay footprints, false for the street and the bulb. */
+export function isNuketown2BayFootprint(footprint: { id: string }): boolean {
+  return footprint.id.startsWith('bay ');
+}
 
 /**
  * Kerb line to house front - THE STRIP THE OWNER CALLED TOO NARROW ("the
@@ -268,8 +375,8 @@ const UPPER_Y0 = NUKETOWN2_UPPER_Y0;
  * the GARAGES being on opposite ends under the 180-degree rotation.
  */
 export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
-  Object.freeze({ id: 'north', team: 0 as const, x: -1.25, z: HOUSE_FRONT_Z - HOUSE_DEPTH / 2, facing: 1 as const }),
-  Object.freeze({ id: 'south', team: 1 as const, x: 1.25, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
+  Object.freeze({ id: 'north', team: 0 as const, x: NUKETOWN2_HOUSE_CENTRE_X, z: HOUSE_FRONT_Z - HOUSE_DEPTH / 2, facing: 1 as const }),
+  Object.freeze({ id: 'south', team: 1 as const, x: -NUKETOWN2_HOUSE_CENTRE_X, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
 ]);
 
 /**
