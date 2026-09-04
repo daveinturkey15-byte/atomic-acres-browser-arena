@@ -62,6 +62,23 @@ export type ArenaSelection = Readonly<{
    */
   showcasePath?: string;
   soloBotCount: number;
+  /**
+   * HOW MANY BOTS SOLO OPENS WITH, when that is not the Pass 66 default.
+   *
+   * HF-491 (owner, 2026-09-04, after playing Solo on the Nuke Town rebuild:
+   * "the bots not in there"). Pass 66 routing fixes `soloBotCount` at one bot
+   * on every bot-enabled arena, and that stays the declared default. This is
+   * the per-arena opt-out for a map whose real shape wants a fuller lobby -
+   * BO2's Nuke Town is a 6v6 map, and one opponent on an 84 m street reads as
+   * an empty arena. Absent means "keep the Pass 66 default", so every arena
+   * that does not declare it is unchanged by HF-491.
+   *
+   * Always read through `initialSoloBotCount`, never directly: the value is
+   * clamped by this arena's own `maximumSoloBots` so a declaration can never
+   * out-run the population the arena's spawn table and perf budget were sized
+   * for.
+   */
+  initialSoloBots?: number;
   maximumSoloBots: number;
   multiplayer: boolean;
   fieldSupport: boolean;
@@ -439,8 +456,12 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'REBUILD',
     menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
     summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 1 BOT SOLO · PREVIEW',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 4 BOTS SOLO · +1 / 10 DEFEATS · MAX 6 · PREVIEW',
     soloBotCount: SOLO_BOT_COUNT,
+    // HF-491 (owner, 2026-09-04): "the bots not in there". The original is a
+    // 6v6 map; one bot on this street is an empty map. Four to open, the shared
+    // ten-defeat ladder to six from there.
+    initialSoloBots: 4,
     maximumSoloBots: MAX_SOLO_BOTS,
     multiplayer: true,
     fieldSupport: true,
@@ -532,9 +553,38 @@ export function arenaCanvasLabel(selection: ArenaSelection): string {
   return `${selection.displayName} ${selection.kind === 'explore' ? 'explore' : 'multiplayer'} arena`;
 }
 
+/**
+ * How many bots Solo opens with on this arena. Derived from the catalog row -
+ * the declared start, clamped by the arena's own declared maximum - so no call
+ * site ever has to know an arena id to answer the question.
+ */
+export function initialSoloBotCount(selection: ArenaSelection): number {
+  const declared = selection.initialSoloBots;
+  if (declared === undefined || !Number.isFinite(declared)) return selection.soloBotCount;
+  return Math.min(selection.maximumSoloBots, Math.max(0, Math.floor(declared)));
+}
+
+/**
+ * HF-491 (owner, 2026-09-04, after playing Solo on the Nuke Town rebuild:
+ * "the bots not in there").
+ *
+ * Before this change the ten-defeat reinforcement ladder ran for the arena id
+ * `atomic-acres` and nothing else - and HF-466 had already made that arena
+ * unselectable, so the ladder was dead code for the whole selectable roster
+ * and every arena the owner could actually pick fielded exactly one bot
+ * forever, no matter what its `maximumSoloBots` declared.
+ *
+ * The rule is now derived from the catalog row instead of an arena roster: an
+ * arena escalates up to whatever maximum it declares, from whatever start it
+ * declares. An arena whose maximum equals its start (rustworks-1v1 at 1,
+ * gun-range and map3 at 0, farcrysis/high-seas/test1/test2/raid2 at 2) is
+ * pinned by its own declaration exactly as before - the clamp does that, not a
+ * special case - so Pass 66's "exactly one enemy bot" still holds wherever the
+ * catalog still says so.
+ */
 export function activeSoloBotTarget(selection: ArenaSelection, cumulativeDeaths: number): number {
-  if (selection.id !== 'atomic-acres') return selection.soloBotCount;
-  return Math.min(selection.maximumSoloBots, soloBotTargetForDeaths(cumulativeDeaths));
+  const initial = initialSoloBotCount(selection);
+  return Math.min(selection.maximumSoloBots, soloBotTargetForDeaths(cumulativeDeaths, initial, selection.maximumSoloBots));
 }
 
 export function soloLaunchLabel(selection: ArenaSelection): string {
@@ -542,6 +592,11 @@ export function soloLaunchLabel(selection: ArenaSelection): string {
   // arena was the Gun Range, and it is the wrong words for the second one.
   // Map 3 is an explore mode, not a firing range, so the label follows what
   // the arena IS rather than what the first bot-less arena happened to be.
-  if (selection.soloBotCount === 0) return selection.id === 'gun-range' ? 'START RANGE' : 'START EXPLORING';
-  return `${selection.soloBotCount} BOT${selection.soloBotCount === 1 ? '' : 'S'} SKIRMISH`;
+  // HF-491: the label states the count the match actually opens with, which is
+  // the declared start clamped by the arena maximum - not the Pass 66 default.
+  // A card that promises 1 and deploys 4 is the same dishonesty as one that
+  // promises 4 and deploys 1.
+  const initial = initialSoloBotCount(selection);
+  if (initial === 0) return selection.id === 'gun-range' ? 'START RANGE' : 'START EXPLORING';
+  return `${initial} BOT${initial === 1 ? '' : 'S'} SKIRMISH`;
 }

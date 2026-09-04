@@ -73,10 +73,24 @@ export function shouldBotThrowGrenade(sense: BotGrenadeSense): boolean {
     && sense.random < 0.32;
 }
 
-/** Ten-defeat Nuke Town reinforcements, capped so an uncapped score race stays performant. */
-export function soloBotTargetForDeaths(botDeaths: number): number {
+/**
+ * Ten-defeat reinforcements, capped so an uncapped score race stays performant.
+ *
+ * HF-491 (owner, 2026-09-04): the ladder is now the rule for EVERY arena that
+ * declares a maximum, not a single hard-coded arena id, so `initialBots` and
+ * `maximumBots` are parameters read off the arena catalog. Both default to the
+ * Pass 66 constants, so an arena that declares nothing behaves exactly as it
+ * did before this change - that is what keeps the Pass 66 contract true.
+ */
+export function soloBotTargetForDeaths(
+  botDeaths: number,
+  initialBots: number = SOLO_BOT_COUNT,
+  maximumBots: number = MAX_SOLO_BOTS,
+): number {
   const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
-  return Math.min(MAX_SOLO_BOTS, SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
+  const start = Number.isFinite(initialBots) ? Math.max(0, Math.floor(initialBots)) : SOLO_BOT_COUNT;
+  const ceiling = Number.isFinite(maximumBots) ? Math.max(0, Math.floor(maximumBots)) : MAX_SOLO_BOTS;
+  return Math.min(ceiling, start + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
 }
 
 /** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */

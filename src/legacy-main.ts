@@ -482,7 +482,7 @@ import {
   type CrossbowGlassPhase,
 } from './crossbow-glass-authority';
 import {
-  activeSoloBotTarget,
+  activeSoloBotTarget, initialSoloBotCount,
   arenaCanvasLabel,
   arenaSelection,
   hostedArenaDurationMs,
@@ -913,7 +913,7 @@ import {
   type MatchParticipantReportInput,
 } from './match-report';
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
-import { selectSpawnCandidates, type SpawnUse } from './spawn-selection';
+import { selectSpawnCandidates, spawnUseWindow, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
   CHARACTER_PHYSICS_CONFIG,
@@ -16759,13 +16759,13 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
 function recentSpawnUseRecords(now = performance.now()): readonly SpawnUse[] {
-  while (recentSpawnUses.length > 0 && now - recentSpawnUses[0]!.at > 12_000) recentSpawnUses.shift();
+  while (recentSpawnUses.length > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth && now - recentSpawnUses[0]!.at > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseAvoidanceMs) recentSpawnUses.shift(); // HF-491: derived horizons, not a flat 12 s
   return recentSpawnUses;
 }
 function recordSpawnUse(index: number, now = performance.now()): void {
   recentSpawnUseRecords(now);
   recentSpawnUses.push({ index, at: now });
-  if (recentSpawnUses.length > 64) recentSpawnUses.shift();
+  if (recentSpawnUses.length > Math.max(64, spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth)) recentSpawnUses.shift();
 }
 function spawnPoint(): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
@@ -16860,7 +16860,7 @@ function spawnPoint(): THREE.Vector3 {
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(spawnNow),
-    recentUses: recentSpawnUseRecords(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
     nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex,
@@ -17783,7 +17783,7 @@ async function startGame(
   });
   element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+    : mode === 'solo' ? (initialSoloBotCount(selectedArena) === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
   element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
   element<HTMLElement>('#timer').hidden = !startBanner.clock;
   element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
@@ -20028,7 +20028,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(spawnNow),
-    recentUses: recentSpawnUseRecords(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
     nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
@@ -20278,7 +20278,7 @@ function activateDormantBot(index: number): boolean {
 
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
-  const activeCount = hostedCount ?? selectedArena.soloBotCount;
+  const activeCount = hostedCount ?? initialSoloBotCount(selectedArena);
   resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
@@ -20302,7 +20302,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
-  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+  for (let index = activeCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     await prewarmRiggedOperatorActions(bot.root);
@@ -20314,8 +20314,8 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  if (selectedArena.soloBotCount > 0) {
-    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  if (activeCount > 0) {
+    addFeed(`${activeCount} low-damage hostile operator${activeCount === 1 ? '' : 's'} deployed`, 'coral');
   }
 }
 
@@ -34497,14 +34497,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }),
     botEscalation: {
       deaths: soloBotDeaths,
-      initialBots: selectedArena.soloBotCount,
+      initialBots: initialSoloBotCount(selectedArena),
       targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
       dormantBots: dormantBots.size,
       dormantBotsPrewarmed,
       dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
-      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+      nextReinforcementAt: bots.size < selectedArena.maximumSoloBots
         ? (Math.floor(soloBotDeaths / BOT_DEATHS_PER_REINFORCEMENT) + 1) * BOT_DEATHS_PER_REINFORCEMENT
         : null,
       lastEliminationProfile: { ...lastBotEliminationProfile },
