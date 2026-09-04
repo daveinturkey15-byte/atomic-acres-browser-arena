@@ -96,16 +96,16 @@ export function createGlassMaterial(
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
   const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  if (options.polygonOffset !== undefined) {
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = options.polygonOffset;
+    mat.polygonOffsetUnits = options.polygonOffset;
+  }
   if (!transparent) {
     const shared = sharedGlassGraph(uniforms);
     mat.colorNode = shared.colorNode;
     mat.roughnessNode = shared.roughnessNode;
     return mat;
-  }
-  if (options.polygonOffset !== undefined) {
-    mat.polygonOffset = true;
-    mat.polygonOffsetFactor = options.polygonOffset;
-    mat.polygonOffsetUnits = options.polygonOffset;
   }
 
   const uv = boxUv();
