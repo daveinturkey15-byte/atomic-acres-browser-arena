@@ -1,4 +1,14 @@
 /**
+ * PASS 87 Map 3 EXPLORE evidence capture: asserts the explore HUD shows no clock/scoreline, captures eight corridor stills, and verifies the menu showcase link, all in one headless browser session.
+ * Usage: node scripts/qa/capture-map3-explore-evidence.mjs
+ * --dist <dir>           static server root (default: dist)
+ * --port <n>             server port (default: 4195, or $QA_PREVIEW_PORT)
+ * --out <dir>            output directory (default: docs/evidence/pass87/map3-explore)
+ * $QA_PREVIEW_PORT       env fallback for --port (default: 4195)
+ * Writes: $OUT/ — map3-menu-showcase-link.png, map3-explore-hud.png, map3-corridor-{id}.png (×8), map3-explore-evidence.json
+ * Exit codes: 0 = pass; 1 = falsifier failure, boot/selection failure, or uncaught error
+ */
+/**
  * capture-map3-explore-evidence.mjs - the PASS 87 Map 3 EXPLORE evidence run.
  *
  * WHAT THIS PROVES, AND WHY IT IS ONE SCRIPT.
