@@ -79,8 +79,9 @@ const CEILING_HISTORY: ReadonlyArray<{ readonly at: string; readonly ceiling: nu
     ceiling: 166,
     why: 'PASS 95 slice 2. -2 from the art boulder family (farcrysis-cliff-rocks / '
       + 'farcrysis-interior-boulders / farcrysis-shore-boulders) moving its per-set tint off three '
-      + 'materials and onto per-group geometry as vertex colours behind one shared white '
-      + 'vertexColors representative (slice-1 rock idiom, zero visual change by construction).',
+      + 'materials and onto per-instance instanceColor behind one shared white material and one '
+      + 'shared geometry (varyInstanceColors idiom per the Luna review, zero visual change by '
+      + 'construction).',
   },
 ];
 

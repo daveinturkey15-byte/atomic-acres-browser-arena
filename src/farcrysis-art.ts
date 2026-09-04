@@ -624,30 +624,22 @@ function buildInlineTerrain(scene: THREE.Scene): void {
   // PASS 95 slice 2 - one shared boulder family material (-2 objects).
   // The three scatter sets differed in nothing but tint (0x716b60 / 0x7a7268 /
   // 0x6d655c, same roughness 0.92 / metalness 0.04, same 'terrain' ground maps),
-  // so the tint moves onto per-group geometry exactly like slice 1's detail
-  // rocks: white x old tint == old tint (`new THREE.Color(hex)` already holds
-  // linear working-space values, so no second conversion). Shade lift never
-  // matched these names (emissive stays 0x000000 on all three), and the ground
-  // maps classify identically, so one shared representative is invisible by
-  // construction. vertexColors Standard is already in the coverage draw via
-  // the detail rocks - no new pipeline.
-  const boulderMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, metalness: 0.04 });
+  // so the tint rides the approved per-instance path: ONE shared geometry and
+  // ONE shared white material, with each set's tint in its InstancedMesh
+  // `instanceColor` (the `varyInstanceColors` / grass-tint idiom, and the "one
+  // material per family with per-instance tint" reauthoring the vocabulary
+  // module names). White x old tint == old tint (`new THREE.Color(hex)`
+  // already holds linear working-space values, so no second conversion).
+  // Shade lift never matched these names (emissive stays 0x000000 on all
+  // three), and the ground maps classify identically, so one shared
+  // representative is invisible by construction. Standard+instanceColor is
+  // already in the coverage draw via the palms and vegetation - no new
+  // pipeline. (Luna review: geometry `color` attributes are not an explicit
+  // tint carrier; instanceColor keeps the tint on the instanced draw.)
+  const boulderMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.04 });
   applyFarcrysisGroundMaterial(boulderMaterial, 'terrain', 2);
   boulderMaterial.color.setHex(0xffffff);
   const boulderTint = new THREE.Color();
-  function tintedBoulderGeometry(hex: number): THREE.BufferGeometry {
-    const tinted = boulderGeometry.clone();
-    boulderTint.setHex(hex);
-    const position = tinted.getAttribute('position') as THREE.BufferAttribute;
-    const colors = new Float32Array(position.count * 3);
-    for (let claim = 0; claim < position.count; claim += 1) {
-      colors[claim * 3] = boulderTint.r;
-      colors[claim * 3 + 1] = boulderTint.g;
-      colors[claim * 3 + 2] = boulderTint.b;
-    }
-    tinted.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    return tinted;
-  }
   const scatterBoulders = (
     name: string,
     color: number,
@@ -655,7 +647,7 @@ function buildInlineTerrain(scene: THREE.Scene): void {
     seed: number,
     place: (rng: () => number, index: number) => [number, number, number], // x, z, scale
   ): void => {
-    const rocks = farcrysisInstancedMesh(tintedBoulderGeometry(color), boulderMaterial, count);
+    const rocks = farcrysisInstancedMesh(boulderGeometry, boulderMaterial, count);
     rocks.name = name;
     const rng = mulberry32(seed);
     const m = new THREE.Matrix4();
@@ -675,6 +667,14 @@ function buildInlineTerrain(scene: THREE.Scene): void {
       rocks.setMatrixAt(i, m);
     }
     rocks.instanceMatrix.needsUpdate = true;
+    // Per-set tint on the approved instanced path: every instance in the set
+    // carries the set's old material tint, so the shared white material
+    // reproduces the old draw exactly.
+    boulderTint.setHex(color);
+    for (let i = 0; i < count; i += 1) {
+      rocks.setColorAt(i, boulderTint);
+    }
+    if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true;
     rocks.computeBoundingSphere();
     rocks.castShadow = true;
     rocks.receiveShadow = true;
