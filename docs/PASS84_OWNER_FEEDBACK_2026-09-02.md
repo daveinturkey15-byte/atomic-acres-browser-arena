@@ -1896,3 +1896,9 @@ assets and textures and lighting need to be tip top, raid can come next"
   serve; HITL 5 integrator (Fable high) at ~T+70 merges everything green and
   serves on :4300 with captures. Nuke-event (Luna xhigh) and daily frontier
   scan (Luna) run beside the sprint, not in it.
+
+## HF-492 — owner 2026-09-04 17:27: "retire local qwen, i am going to do some comfy ui work"
+
+- Done 17:28: llama-server on :8090 stopped, Qwen header chain halted
+  (STOP + gpu.lock), Qwen removed from the sprint and the beast-run recipe.
+  QA browsers stay headless and short; ComfyUI (:8188) is never touched.
