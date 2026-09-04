@@ -73,10 +73,20 @@ const browser = await chromium.launch({
     '--enable-features=Vulkan',
     '--use-angle=d3d11',
     '--window-position=2560,0',
+    // PASS94_SOFTWARE=1 renders on Chrome's CPU WebGPU adapter. It is a
+    // FALLBACK: it proves the node graphs compile and what they look like, and
+    // it is not GPU evidence. Used when the shared-GPU gate never opens.
+    ...(process.env.PASS94_SOFTWARE === '1' ? ['--use-webgpu-adapter=swiftshader'] : []),
   ],
 });
 
-const receipt = { capturedAt: new Date().toISOString(), sheets: [], consoleErrors: [] };
+const receipt = {
+  capturedAt: new Date().toISOString(),
+  adapter: process.env.PASS94_SOFTWARE === '1' ? 'software (swiftshader) - NOT GPU evidence' : 'gpu',
+  scale: process.env.PASS94_SCALE ?? '1',
+  sheets: [],
+  consoleErrors: [],
+};
 
 try {
   const page = await browser.newPage({ viewport: { width: 1700, height: 1400 } });
@@ -86,7 +96,8 @@ try {
   page.on('pageerror', (error) => receipt.consoleErrors.push(`pageerror: ${error.message}`));
 
   for (const sheet of SHEETS) {
-    const url = `http://127.0.0.1:${port}/pass94-operator-looks.html?mode=${sheet.mode}&looks=${sheet.looks}`;
+    const scale = process.env.PASS94_SCALE ?? '1';
+    const url = `http://127.0.0.1:${port}/pass94-operator-looks.html?mode=${sheet.mode}&looks=${sheet.looks}&scale=${scale}`;
     process.stdout.write(`\ncapturing ${sheet.name} -> ${url}\n`);
     await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
     await page.waitForSelector('body[data-capture-ready="1"]', { timeout: 180_000 });

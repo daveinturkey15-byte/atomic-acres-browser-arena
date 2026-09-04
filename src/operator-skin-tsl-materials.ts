@@ -125,10 +125,17 @@ function camoField(look: OperatorLookDefinition, scaleM: number, offset: readonl
     return mx_fractal_noise_float(cells, 2, 2, 0.5, 1);
   }
   if (look.camo.kind === 'stripe') {
-    // Tiger stripe: a vertical wave whose phase is dragged sideways by noise,
-    // which is what makes the stripes tear rather than read as corduroy.
+    // Tiger stripe. Two things here were learned from looking at the first
+    // capture rather than reasoned in advance:
+    //   - a wave in Y alone wraps a limb into regular RINGS, because a leg is a
+    //     cylinder and a horizontal band is its natural iso-line. Tilting the
+    //     axis into X breaks the ring;
+    //   - a warp amplitude below the wave's own period cannot tear the stripe,
+    //     it only wobbles it, which reads as corduroy. It has to be able to
+    //     push a crest past its neighbour.
+    const axis = positionGeometry.y.add(positionGeometry.x.mul(0.42));
     const warp = mx_fractal_noise_float(p.mul(0.5), 2, 2, 0.5, 1);
-    return sin(positionGeometry.y.mul(Math.PI * 2 / scaleM).add(warp.mul(2.4)));
+    return sin(axis.mul(Math.PI * 2 / scaleM).add(warp.mul(5.2)));
   }
   return mx_fractal_noise_float(p, 3, 2, 0.5, 1);
 }

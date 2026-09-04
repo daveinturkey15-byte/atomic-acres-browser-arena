@@ -46,10 +46,25 @@ type Tile = Readonly<{
 }>;
 
 const COLUMNS = 5;
-const TILE_W = 320;
-const TILE_H = 400;
-const SETTLE_FRAMES = 150;
-const STEP_S = 1 / 60;
+// `scale` shrinks the sheet for the software-adapter fallback run, where every
+// pixel is shaded on the CPU. The layout is identical; only the resolution
+// changes, so the two runs stay comparable.
+const SCALE = Math.min(1, Math.max(0.25, Number(new URLSearchParams(location.search).get('scale') ?? '1') || 1));
+const TILE_W = Math.round(320 * SCALE);
+const TILE_H = Math.round(400 * SCALE);
+// The settle loop must advance REAL time. `poseOperator`'s explicit delta only
+// reaches the weapon animation; `updateRiggedOperator` derives its own dt from
+// `performance.now() - lastUpdatedAt`, so a synchronous loop hands the mixer,
+// the blend graph and the posture cross-fade a delta of about zero and every
+// tile comes out in the same bind-ish pose. The first capture did exactly that:
+// idle, walk, run, sprint and death were five photographs of one pose.
+const SETTLE_FRAMES = 96;
+const STEP_MS = 16;
+const STEP_S = STEP_MS / 1000;
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolveFrame) => { setTimeout(resolveFrame, STEP_MS); });
+}
 
 const SKINS = ['default', 'explorer', 'symbiote', 'navalops'] as const;
 
@@ -107,16 +122,17 @@ function studio(): THREE.Scene {
 
 function tileCamera(stance: Stance): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(30, TILE_W / TILE_H, 0.1, 60);
-  // Three-quarter front, slightly above the chest; dropped and pulled back for
-  // the ground stances so the whole body stays in frame.
+  // Three-quarter FRONT. The first capture put the camera at +Z and produced
+  // eight photographs of the operators' backs: the authored rig faces +Z, not
+  // three's default -Z, so the front of the body is on the negative side.
   if (stance === 'prone') {
-    camera.position.set(2.6, 1.15, 3.0);
-    camera.lookAt(0, 0.25, 0);
+    camera.position.set(1.7, 1.0, -3.2);
+    camera.lookAt(0, 0.2, 0);
   } else if (stance === 'crouch') {
-    camera.position.set(2.1, 1.25, 2.9);
-    camera.lookAt(0, 0.65, 0);
+    camera.position.set(1.5, 1.15, -3.1);
+    camera.lookAt(0, 0.6, 0);
   } else {
-    camera.position.set(2.2, 1.55, 3.1);
+    camera.position.set(1.5, 1.5, -3.4);
     camera.lookAt(0, 0.95, 0);
   }
   return camera;
@@ -143,28 +159,36 @@ function drawLabel(index: number, text: string): void {
 
 async function renderSheet(
   renderer: WebGPURenderer,
-  canvas: HTMLCanvasElement,
+  gpuCanvas: HTMLCanvasElement,
+  sheetCanvas: HTMLCanvasElement,
   tiles: readonly Tile[],
 ): Promise<void> {
   const rows = Math.ceil(tiles.length / COLUMNS);
-  canvas.width = COLUMNS * TILE_W;
-  canvas.height = rows * TILE_H;
-  canvas.style.width = `${COLUMNS * TILE_W}px`;
+  // Each tile is rendered at FULL canvas size and then blitted into the sheet.
+  // The first attempt drove one canvas with per-tile viewport and scissor and
+  // `autoClear = false`; it produced one black tile and a figure grid offset
+  // from its own labels. Rendering whole frames and compositing them in 2D has
+  // no such failure mode, and a contact sheet is not a place to be clever.
+  gpuCanvas.width = TILE_W;
+  gpuCanvas.height = TILE_H;
+  renderer.setSize(TILE_W, TILE_H, false);
+
+  sheetCanvas.width = COLUMNS * TILE_W;
+  sheetCanvas.height = rows * TILE_H;
+  sheetCanvas.style.width = `${COLUMNS * TILE_W}px`;
   sheet.style.width = `${COLUMNS * TILE_W}px`;
-  renderer.setSize(canvas.width, canvas.height, false);
+  const context = sheetCanvas.getContext('2d');
+  if (!context) throw new Error('no 2d context for the contact sheet');
+  context.fillStyle = '#14171a';
+  context.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
   labels.replaceChildren();
 
-  renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, canvas.width, canvas.height);
-  renderer.clear();
-  renderer.autoClear = false;
-  renderer.setScissorTest(true);
+  const scene = studio();
 
   for (let index = 0; index < tiles.length; index += 1) {
     const tile = tiles[index]!;
     say(`rendering ${index + 1}/${tiles.length}: ${tile.label}`);
 
-    const scene = studio();
     const operator = buildOperator(tile.team, `capture-${index}`, false, null, 'team', tile.skinId);
     scene.add(operator);
     // `buildOperator` returns the rigged root itself, so the death clip is
@@ -174,30 +198,23 @@ async function renderSheet(
       for (const child of operator.children) if (deathRiggedOperator(child)) break;
     }
     // Settle the blend graphs, the posture cross-fade and the sprint envelope
-    // at a fixed step, so the sheet is deterministic rather than whatever the
-    // frame the screenshot happened to land on.
+    // at a fixed step, so the sheet is deterministic rather than whatever frame
+    // the screenshot happened to land on.
     for (let frame = 0; frame < SETTLE_FRAMES; frame += 1) {
-      if (tile.travel === true) operator.position.z -= tile.speedMps * STEP_S;
-      poseOperator(operator, tile.stance, tile.speedMps, frame * 0.016, 1, 0, STEP_S);
+      await nextFrame();
+      if (tile.travel === true) operator.position.z += tile.speedMps * STEP_S;
+      poseOperator(operator, tile.stance, tile.speedMps, frame * STEP_S, 1, 0, STEP_S);
     }
     // Bring the operator back under the camera; the pose is already settled.
     operator.position.set(0, 0, 0);
     operator.updateWorldMatrix(true, true);
 
-    const column = index % COLUMNS;
-    const row = Math.floor(index / COLUMNS);
-    // WebGPU viewport origin is bottom-left; the grid is authored top-left.
-    const y = canvas.height - (row + 1) * TILE_H;
-    renderer.setViewport(column * TILE_W, y, TILE_W, TILE_H);
-    renderer.setScissor(column * TILE_W, y, TILE_W, TILE_H);
     await renderer.renderAsync(scene, tileCamera(tile.stance));
+    context.drawImage(gpuCanvas, (index % COLUMNS) * TILE_W, Math.floor(index / COLUMNS) * TILE_H);
     drawLabel(index, tile.label);
 
     scene.remove(operator);
   }
-
-  renderer.setScissorTest(false);
-  renderer.autoClear = true;
 }
 
 async function main(): Promise<void> {
@@ -207,9 +224,14 @@ async function main(): Promise<void> {
   const backend = new URLSearchParams(location.search).get('looks') === 'tinted' ? 'webgl2' : 'webgpu';
   setOperatorLookRenderBackend(backend);
 
-  const canvas = document.createElement('canvas');
-  sheet.insertBefore(canvas, labels);
-  const renderer = new WebGPURenderer({ canvas, antialias: true });
+  // The WebGPU canvas is off-sheet and tile-sized; the visible sheet is a 2D
+  // canvas the tiles are blitted into.
+  const gpuCanvas = document.createElement('canvas');
+  gpuCanvas.style.display = 'none';
+  document.body.appendChild(gpuCanvas);
+  const sheetCanvas = document.createElement('canvas');
+  sheet.insertBefore(sheetCanvas, labels);
+  const renderer = new WebGPURenderer({ canvas: gpuCanvas, antialias: true });
   await renderer.init();
   renderer.setPixelRatio(1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -219,7 +241,7 @@ async function main(): Promise<void> {
   await loadAll();
 
   const tiles = mode === 'skins' ? SKIN_TILES : GAIT_TILES;
-  await renderSheet(renderer, canvas, tiles);
+  await renderSheet(renderer, gpuCanvas, sheetCanvas, tiles);
 
   const looks = OPERATOR_LOOK_REGISTRY.looks.map((look) => look.id).join(', ');
   say(`READY mode=${mode} looks=${backend === 'webgpu' ? 'procedural' : 'tinted'} registry=[${looks}]`);

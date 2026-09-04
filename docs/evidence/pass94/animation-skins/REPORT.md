@@ -108,7 +108,59 @@ New tests inside that total: 24 (`operator-skin-look-registry.test.ts`), 16
 (`operator-skin-tsl-materials.test.ts`), 24 (`operator-posture-layer.test.ts`), 9
 (`operator-posture-director-integration.test.ts`).
 
-<!-- CAPTURE-GATES -->
+### Headless capture — what the sheets show, and what they are not
+
+`docs/evidence/pass94/animation-skins/captures/`, receipt `receipt.json`.
+**Four sheets, zero console errors, zero page errors.**
+
+**These are SOFTWARE-adapter renders, and that is a limitation, not a footnote.**
+`adapter: "software (swiftshader) - NOT GPU evidence"` is in the receipt. The shared-GPU rule
+for this pass permits a headless browser only when no other headless Chrome is running; the
+gate was polled 22 times over about 17 minutes and another lane held 2 to 6 headless Chrome
+processes the entire window. Rather than break the rule or ship nothing to look at, the capture
+was re-run on Chrome's CPU WebGPU adapter, which uses no GPU. It proves the node graphs compile
+and what they render; it is **not** evidence of GPU behaviour, pipeline count or frame cost.
+A GPU-backed re-capture is OPEN (section 6).
+
+| Sheet | What it is |
+|---|---|
+| `gaits-procedural.png` | One bot in nine states: idle, walk 1.2, run 4.2, sprint 8.7, death, crouch idle, crouch walk 1.8, prone idle, prone crawl 0.9 |
+| `gaits-tinted.png` | The same nine on the shipped materials |
+| `skins-procedural.png` | Four skins x two teams, procedural looks |
+| `skins-tinted.png` | The same eight with the look gate closed |
+
+**Looked at, and what they say:**
+
+- Every gait is a **distinct pose**. Walk, run and sprint show visibly different stride length
+  and arm swing; death is a face-down corpse on the ground; crouch idle and crouch walk are a
+  bent-knee body at the right height; prone idle and prone crawl are flat on the deck. That is
+  the whole locomotion and posture claim, visible in one image.
+- The **procedural-versus-tinted skin pair is decisive**. The tinted sheet is eight low-contrast
+  teal-and-purple silhouettes with no material read - it is the owner's "they all looked greyed
+  out" complaint, reproduced on demand. The procedural sheet has mottled woodland, blocky urban,
+  mottled arid and dark maroon, all clearly camouflaged, with the faction trim band readable on
+  the shoulders.
+- Two looks per team are **visibly different from each other**, not just numerically.
+
+**Two defects the capture found and the code was changed for, before it was believed:**
+
+1. The first sheet rendered **five identical poses** for idle, walk, run, sprint and death.
+   `poseOperator`'s explicit delta only reaches the weapon animation; `updateRiggedOperator`
+   derives its own `dt` from `performance.now() - lastUpdatedAt`, so a synchronous settle loop
+   hands the mixer, the blend graph and the posture cross-fade a delta of about zero. The
+   harness now advances real time between frames. **This is a property of the harness, not of
+   the runtime** - but it is exactly the kind of quiet nothing that a capture is supposed to
+   catch, and the first version of this report would have claimed nine states from one pose.
+2. `marauder-nightfall`'s tiger stripe wrapped the limbs as **regular pink rings**: a wave in Y
+   alone follows a cylinder's natural iso-line, and a warp amplitude below the wave's own period
+   wobbles a stripe rather than tearing it. The stripe axis is now tilted into X, the warp
+   amplitude more than doubled, and the palette desaturated. The near-black `hardArmour` values
+   were lifted in the same pass, because the torso plate was reading as a silhouette-less mass.
+
+**Still not right, honestly:** the torso plate is the darkest part of every look and carries the
+least pattern; the sheets are a neutral studio rig, not arena lighting; and the operators carry
+no weapon in the capture (`weaponId: null`), so the arms hang.
+
 
 No gate, threshold or assertion was weakened. One test in this lane was written against an
 exponential envelope that could never reach its declared target; the **implementation** was
@@ -151,3 +203,10 @@ changed to a rate-limited ramp so it genuinely arrives, and the test was left as
    files that own them.
 5. Branch is one commit behind `origin/contrib/dave-gaming-pc/omp/pass84-overnight`; not rebased,
    because a rebase during an active overnight is the integrator's call.
+6. **The GPU-backed capture is OPEN.** The sheets in this report are CPU-rendered. Re-run
+   `node scripts/pass94/capture-operator-looks.mjs` without `PASS94_SOFTWARE=1` when the shared
+   GPU is free.
+7. **`qa:stock-boot` and the gun-range arena boot smoke did not run.** Both need a headless
+   browser and the same gate was still closed at the end of this lane. `npx tsc --noEmit`, the
+   399-test suite, `qa:text-integrity` (2,816 files, ok) and `src/project-map.test.ts` all
+   passed; the two browser gates are unrun, not green, and must not be reported as green.
