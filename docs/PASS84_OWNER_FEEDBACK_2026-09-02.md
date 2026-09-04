@@ -1387,3 +1387,19 @@ assets and textures and lighting need to be tip top, raid can come next"
   drone is unpiloted and manually when piloted.
 - Lane: `killstreak-tuning` off the PASS 93 head (Luna), unit-tested numbers
   and stun effect, HITL before publish per HF-455.
+
+## HF-458 result — 2026-09-04 10:00 (Opus, branch `killstreak-tuning`, commit 517b7491)
+
+- Chopper: rockets 6 → 12; autopilot budget 6 (before: the AI could never fire a
+  rocket, launches measured at 3.0/5.6/8.2/10.8/13.4/16.0 s then stops with 6
+  left for a human); MG damage ×0.75 (34/22 → 25.5/16.5).
+- Swarm: cadence 300 → 240 ms and the fire lane 460 → 368 (the real limiter);
+  ingress/patrol/approach speeds ×1.15. Piloted drone: cadence 240, speed
+  3 → 3.45 manual / 6 → 6.9 autonomous.
+- Taser: 3 charges per drone, 1.0 s stun, 1.5 s cooldown, 22 m; auto-fires
+  when unpiloted at the nearest hostile with line of sight, right-click when
+  piloted; bots stunned; electric-blue edge vignette + camera jitter (not the
+  white flash); host-authority replicated like the flashbang.
+- Gates: tsc clean; full suite 582 files / 5689 tests. OPEN: browser checks
+  (VRAM held by the local model at the time), live two-peer stun, and the
+  owner's read of the taser effect (HITL).
