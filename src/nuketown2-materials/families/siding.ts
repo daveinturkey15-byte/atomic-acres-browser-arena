@@ -25,7 +25,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, wallUv } from '../wear';
+import { buildDetailNormal, buildWear, wallUv } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
@@ -55,12 +55,26 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
     scuff: { sizeM: 0.045, albedo: 0.055, roughness: 0.09 },
     traffic: { sizeM: 1.6, albedo: 0.070, roughness: 0.07 },
     soil: 0.070,
+    // 2.8 m is a bay of wall between two windows, which is the unit a painter
+    // actually works in and the unit a repaint drifts by; 0.14 m is just under
+    // one board exposure, so the mottle crosses courses instead of striping
+    // them. 4 degrees of tilt is the board's own cup and the brush's tooth -
+    // enough for the sun to find, far short of anything that reads as relief.
+    variation: {
+      macro: { sizeM: 2.8, albedo: 0.045, roughness: 0.05 },
+      micro: { sizeM: 0.14, albedo: 0.030, roughness: 0.06 },
+      tintSpread: 0.030,
+      normalDegrees: 4.0,
+      edgeWear: 0.10,
+      soilRoughness: 0.08,
+      polishRoughness: 0.05,
+    },
   });
 }
 
-let sidingGraph: { colorNode: any; roughnessNode: any } | null = null;
+let sidingGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (sidingGraph) return sidingGraph;
   const spec = sidingSpec('nuketown2-siding-shared', 0x46809f);
   const p = positionWorld;
@@ -87,12 +101,23 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const base = (uniforms.sidingWainscot as any).greaterThan(float(0.5)).select(wainscotBase, uniforms.baseColor);
   const sunFade = smoothstep(float(1.2), float(5.2), p.y).mul(float(0.09));
   const splash = smoothstep(float(0.55), float(0.02), p.y).mul(float(0.16));
-  const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash));
+  const painted = base.mul(wear.albedoMul).mul(wear.tint).mul(float(1).add(sunFade)).mul(float(1).sub(splash));
   const shadowed = mix(painted, painted.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
   const lit = mix(shadowed, shadowed.mul(float(1.12)), topCatch.mul(float(0.6)));
+  // EDGE WEAR on the one chamfer this family models: the top lip of every lap
+  // board, where a ladder, a hose and thirty summers take the paint back
+  // towards primer. Paint fails at an arris first, and an arris that stays the
+  // same colour as the field is the tell that a surface was tinted rather than
+  // weathered.
+  const arris = mix(lit, lit.mul(float(1).add(uniforms.edgeWear.mul(float(2.0)))), topCatch);
   sidingGraph = {
-    colorNode: mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5))),
-    roughnessNode: wear.roughness.add(dripShadow.mul(float(0.06))).add(splash.mul(float(0.10))).sub(sunFade.mul(float(0.30))),
+    colorNode: mix(arris, arris.mul(float(0.82)), nail.mul(float(0.5))),
+    roughnessNode: wear.roughness
+      .add(dripShadow.mul(float(0.06)))
+      .add(splash.mul(float(0.10)))
+      .sub(sunFade.mul(float(0.30)))
+      .sub(topCatch.mul(uniforms.edgeWear)),
+    normalNode: buildDetailNormal(uniforms, uv),
   };
   return sidingGraph;
 }
@@ -125,6 +150,7 @@ export function createSidingMaterial(
   const shared = sharedSidingGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 
