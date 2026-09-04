@@ -67,7 +67,7 @@ export function createWeatherCorridor(seed = 21): Corridor {
 
     const baseColor = mix(mix(mix(spring, summer, a), autumnG, b), winterG, c);
 
-    // Wet mud & puddles in the autumn storm bay (z between -14 and -28)
+    // Wet mud & puddles in the autumn storm bay (z between -28 and -42)
     const inStorm = smoothstep(float(-BAY * 0.9), float(-BAY * 1.4), z)
       .mul(float(1.0).sub(smoothstep(float(-BAY * 2.7), float(-BAY * 3.1), z)));
 
@@ -103,8 +103,8 @@ export function createWeatherCorridor(seed = 21): Corridor {
 
   const woodBatch: THREE.BufferGeometry[] = [];
   const xf = new THREE.Matrix4();
-  // MAP3 (HF-409): all three seasons' trunks end up in ONE merged wood mesh
-  // 51 m long, so the scatter is the only place a trunk is individually known.
+  // MAP3 (HF-409): all four seasons' trunks end up in ONE merged wood mesh
+  // 56 m long, so the scatter is the only place a trunk is individually known.
   const solids: CorridorSolid[] = [];
 
   SEASONS.forEach((season, s) => {
