@@ -81,6 +81,7 @@ const RENDERER = arg('--renderer', 'webgpu');
 const RENDER_PROFILE = arg('--render', 'quality');
 const UNSAFE_WEBGPU = flag('--unsafe-webgpu');
 const CPU_PROFILE = flag('--cpu-profile');
+const EVENT_DELAY_QA_MS = Math.max(0, Math.min(250, Number(arg('--event-delay-qa-ms', '0')) || 0));
 // --solo: ONE browser, the real map card + #solo button, same probe. The
 // baseline that says whether a stall is the map or the multiplayer path.
 const SOLO = flag('--solo');
@@ -234,6 +235,7 @@ function pageUrl(role, arenaId) {
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('peerQaPort', String(PEER_PORT));
   url.searchParams.set('peerQaPath', '/peerjs');
+  if (EVENT_DELAY_QA_MS > 0) url.searchParams.set('eventDelayQaMs', String(EVENT_DELAY_QA_MS));
   url.searchParams.set('seed', `mp-lab-${arenaId}-${role}`);
   return url.toString();
 }
@@ -304,7 +306,7 @@ const snapshotOf = (page) => page.evaluate(() => {
 // ---------------------------------------------------------------------------
 // In-page instrument: presented frames + rAF discriminator + movement driver
 // ---------------------------------------------------------------------------
-export { serveDist, startPeerServer, launchBrowser, chromeArgs, openPlayer, snapshotOf, installProbe, stopProbe, startCpuProfile, stopCpuProfile };
+export { serveDist, startPeerServer, launchBrowser, chromeArgs, openPlayer, pageUrl, snapshotOf, installProbe, stopProbe, startCpuProfile, stopCpuProfile };
 
 // ---------------------------------------------------------------------------
 // Optional main-thread CPU profile over the sample window (--cpu-profile).

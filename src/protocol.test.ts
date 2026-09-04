@@ -445,12 +445,12 @@ describe('network protocol guards', () => {
     const intent = {
       type: 'reload-intent' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'abc', connectionEpoch: 'connection_epoch_abc', lifeId: 3,
-      actionSequence: 4, weapon: 'carbine' as const, action: 'start' as const, nonce: 194,
+      actionSequence: 4, requestId: 'reload-request-start-4', weapon: 'carbine' as const, action: 'start' as const, nonce: 194,
     } as const;
     const result = {
       type: 'reload-result' as const, protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
       by: 'host', forPlayerId: 'abc', connectionEpoch: intent.connectionEpoch, lifeId: intent.lifeId,
-      actionSequence: intent.actionSequence, weapon: intent.weapon, status: 'started' as const,
+      actionSequence: intent.actionSequence, requestId: intent.requestId, weapon: intent.weapon, status: 'started' as const,
       reason: 'accepted' as const, completesAtHostTimeMs: 4_200, shotSequenceWatermark: 2,
       combatInventory: {
         revision: 11,
@@ -465,6 +465,8 @@ describe('network protocol guards', () => {
     expect(isHostAuthorityMessage(intent)).toBe(false);
     expect(isGameMessage(result)).toBe(true);
     expect(isHostAuthorityMessage(result)).toBe(true);
+    expect(isGameMessage({ ...intent, requestId: undefined })).toBe(false);
+    expect(isGameMessage({ ...result, requestId: undefined })).toBe(false);
     expect(isGameMessage({ ...intent, actionSequence: -1 })).toBe(false);
     expect(isGameMessage({ ...intent, weapon: 'railgun' })).toBe(false);
     expect(isGameMessage({ ...result, combatInventory: { ...result.combatInventory, revision: -1 } })).toBe(false);
