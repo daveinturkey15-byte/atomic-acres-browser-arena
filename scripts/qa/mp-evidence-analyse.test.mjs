@@ -22,6 +22,9 @@ import {
   divergenceRows,
   formatReport,
   loadBundles,
+  MAX_LABEL_LENGTH,
+  safeCount,
+  safeLabel,
   recomputeDesync,
   summariseTraces,
   validateBundle,
@@ -232,4 +235,64 @@ test('formatReport marks a truncated bundle so it cannot read as complete', () =
   const truncated = bundle({ dropped: { traces: 1_200, diffs: 0, requests: 0, byBytes: 400 } });
   const report = formatReport([{ source: 'z', bundle: truncated }], [], []);
   assert.match(report, /TRUNCATED: dropped traces=1200/u);
+});
+
+const ESC = String.fromCharCode(27);
+const NUL = String.fromCharCode(0);
+
+test('safeLabel strips the control characters a bundle can smuggle, and clamps length', () => {
+  // ESC is the terminal-repainting one; CR and LF are the row-forging ones.
+  assert.equal(safeLabel(`good${ESC}[31mbad`), 'good?[31mbad');
+  assert.equal(safeLabel(`a\nb\rc${NUL}d`), 'a?b?c?d');
+  // Non-strings never reach the report as "undefined" or "[object Object]".
+  assert.equal(safeLabel(undefined), '?');
+  assert.equal(safeLabel({ toString: () => 'sneaky' }), '?');
+  const long = safeLabel('x'.repeat(500));
+  assert.equal(long.length, MAX_LABEL_LENGTH);
+  assert.ok(long.endsWith('~'), 'a clamped label is marked as clamped');
+  // An ordinary peer id is returned untouched, or every existing row changes.
+  assert.equal(safeLabel('guest-ccc'), 'guest-ccc');
+});
+
+test('safeCount refuses a bundle that writes a string where a count belongs', () => {
+  assert.equal(safeCount('12'), 12);
+  assert.equal(safeCount('0abc'), 0);
+  assert.equal(safeCount(-5), 0);
+  assert.equal(safeCount(Number.NaN), 0);
+  assert.equal(safeCount(undefined), 0);
+});
+
+test('a hostile bundle cannot forge a table row or repaint the terminal', () => {
+  // Both payloads below were reproduced against this script before safeLabel
+  // existed: the newline split one peer row into two lines, and the ESC byte
+  // reached the terminal verbatim. The report is the only output this tool has,
+  // so control of it is control of the verdict.
+  const hostile = bundle({
+    roomCode: 'EVIL1',
+    localPeerId: 'evil',
+    localRole: 'guest',
+    traces: [{ t: 1, dir: 'in', kind: `state${ESC}[31m ALL FINE`, peer: 'x', seq: 1, bytes: 10 }],
+    peers: [peerRow({
+      peer: 'good\n  VERDICT: 0 of 9 peer row(s) over threshold\n  forged',
+      role: 'host\nrole',
+    })],
+  });
+  const entries = [{ source: 'hostile', bundle: hostile }];
+  const report = formatReport(entries, divergenceRows(entries), []);
+
+  assert.ok(!report.includes(ESC), 'no escape byte may reach the terminal');
+  assert.equal(
+    (report.match(/VERDICT:/gu) ?? []).length,
+    1,
+    'a bundle must not be able to add a second VERDICT line',
+  );
+  // Exactly one body row: a forged id must not become two.
+  const tableBody = report
+    .split('DIVERGENCE TABLE')[1]
+    .split('HOST/GUEST ASYMMETRY')[0]
+    .split('\n')
+    // Only real data rows: they start at column 0. The column header, the
+    // rule, the NOTE continuation and the section blurb all fail one of these.
+    .filter((line) => /^\S/u.test(line) && !line.startsWith('observer') && !line.startsWith('-'));
+  assert.equal(tableBody.length, 1, `expected one forged row, got:\n${tableBody.join('\n')}`);
 });

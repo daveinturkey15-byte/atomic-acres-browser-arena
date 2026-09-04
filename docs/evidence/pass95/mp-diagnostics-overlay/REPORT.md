@@ -184,3 +184,40 @@ That 1.870 m divergence row is the shape of finding this lane was built to produ
 - **No upload path.** `src/match-diagnostics-upload.ts` is consented aggregated telemetry; this bundle is a raw trace a friend chooses to send directly, and it must not acquire a network side effect by accident.
 - **No publish, no `acceptance/pass-*.json` change, no PR merge** — a feature worktree edits and tests only.
 - **Port 4207 was released.** The `vite preview` started for the boot check (pid 85360) was stopped at the end of this lane; nothing of mine is left listening.
+
+---
+
+## Adversarial verification pass (added by the verifier, not the build lane)
+
+A separate adversarial pass re-ran every gate quoted above and tried to refute them. Full record:
+`docs/evidence/pass95/mp-diagnostics-overlay/VERIFY.md`. Verdict **SHIP-WITH-FIXES, do not publish**
+— every quoted gate reproduced at the stated numbers, the size ratchet is genuinely untouched
+(the ratchet test file has no diff against base at all), and `OPEN-1` is confirmed a real
+publish blocker.
+
+Two claims above were corrected on the branch rather than accepted:
+
+- **"Bundles are untrusted input" was true of parsing and false of rendering.** A crafted bundle
+  put a newline in `peers[].peer` and an ESC byte in a trace `kind`; both reached the report
+  verbatim, letting the sender of a bundle forge an extra table row and a second `VERDICT:` line.
+  Fixed with `safeLabel`/`safeCount` plus three contract tests replaying the payloads.
+- **The boot check is not runnable as quoted.** It needs a `vite preview` on 4207 started
+  separately (its own docblock says so; the quote above omits it) and used to die on a raw
+  Playwright stack. It now prints the command to run. With the preview up it passes exactly as
+  quoted, `errors: []`.
+
+Five TODOs were recorded rather than fixed, the first two being the ones worth acting on before
+this feature is offered to friends:
+
+- **TODO-V1** `forgetNetcodePeer()` and `resetNetcodeDiagnosticsRuntime()` have **zero production
+  call sites**. Peer rows are cleared only on a role change, so a departed guest is never forgotten
+  and persists into later overlays and bundles.
+- **TODO-V2** `observeNetcodeInbound` runs before any validation and `peerFor()` caps nothing, so a
+  peer sending varying `by` ids creates unbounded peer records and can put ids the game never
+  admitted into a bundle.
+- **TODO-V3** `observeOutboundToHost` allocates a Map iterator on every client send, which the
+  "always on and allocation-free" framing does not cover.
+- **TODO-V4** the divergence table truncates peer ids to 14 characters, so two peers sharing a
+  prefix render identically in the table meant to tell them apart.
+- **TODO-V5** the `+31` line-count figure above is `+30`; measured 37,261, not 37,262. The ceiling
+  is unaffected.

@@ -35,7 +35,29 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text().slice(0, 200)}`); });
 
-await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+// PASS 95 verification: this script does NOT start its own server, and with no
+// preview running it died on a raw Playwright ERR_CONNECTION_REFUSED stack. The
+// docblock above says to start one, but a gate whose failure mode is an
+// unhandled exception reads as "the FEATURE broke" rather than "you forgot the
+// server", so the setup mistake is named instead. The guard wraps the real
+// navigation rather than probing first with fetch(): vite binds ::1 only here,
+// where a fetch to `localhost` resolves to 127.0.0.1 and fails against a server
+// Chrome reaches perfectly well - a preflight that disagrees with the check it
+// guards would red this gate on a machine where the overlay is fine.
+try {
+  await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+} catch (error) {
+  const why = error instanceof Error ? error.message.split('\n')[0] : String(error);
+  process.stderr.write([
+    `netcode overlay boot check: could not load ${URL} (${why}).`,
+    'This check needs a PREVIEW server (not dev - HMR kills long-lived contexts):',
+    '  npx vite build && npx vite preview --port 4207 --strictPort',
+    'then re-run: node scripts/qa/netcode-overlay-boot-check.mjs',
+    '',
+  ].join('\n'));
+  await browser.close();
+  process.exit(1);
+}
 await page.waitForTimeout(6_000);
 
 const before = await page.locator('#netcode-diagnostics-overlay').count();
