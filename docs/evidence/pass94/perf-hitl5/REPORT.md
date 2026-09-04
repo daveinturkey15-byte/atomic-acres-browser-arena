@@ -546,3 +546,79 @@ hoisted into `src/minimap-static-layers.ts`.
 - OPEN (unchanged from lane 3): the WebGPU node-material per-object update
   (offender 3 above, about 3.5 ms/frame at the spawn pose) is the second
   largest cost after the HUD and is untouched by graph sharing.
+
+## Perf lane 5 - HUD style recalc (Codex, HF-491)
+
+Worktree `C:/Users/david/projects/aa-claude-perf`, branch
+`contrib/dave-gaming-pc/claude/perf-hitl5`, implementation heads `917840ce` and
+`232d1729`. Target: keep the five frame-driven HUD properties visually
+identical while making their invalidation boundary the eight sway clusters plus
+the health fill, resolved once after the HUD shell is built.
+
+**Method.** The existing `scripts/qa/perf-hitl5-bisect-cdp.mjs` was run against
+the rebuilt `dist` on port `4215`, one headless installed Chrome at a time,
+`PASS73_NATIVE_WEBGPU=1`, HIGH/WebGPU, Solo, `nuketown2`, 2560x1440, bots
+frozen, ComfyUI left running. Each pose used the same `baseline`,
+`hud-hidden`, `style-writes` and `hud-var-writes` ladder with 8 s samples,
+4 s settle and 8 s warmup. In the table, `(program)` is the existing CDP CPU
+profile bucket for Blink style/layout/paint; the HUD-write self-time estimate
+is the within-session `baseline - hud-var-writes` delta.
+
+### Before/after measurements
+
+| pose | build | rung | JS busy ms/frame | `(program)` ms/frame | HUD-write delta vs baseline | p50 frame ms | pipelines |
+|---|---|---|---:|---:|---:|---:|---:|
+| spawn | BEFORE `c5f64b77` | baseline | 20.18 | 8.59 | — | 25.40 | 0 |
+| spawn | BEFORE `c5f64b77` | hud-hidden | 15.91 | 2.36 | — | 16.60 | 0 |
+| spawn | BEFORE `c5f64b77` | style-writes | 14.69 | 2.61 | — | 15.60 | 0 |
+| spawn | BEFORE `c5f64b77` | hud-var-writes | 15.14 | 2.69 | **5.90** | 15.70 | 0 |
+| spawn | AFTER `232d1729` | baseline | 13.37 | 4.37 | — | 16.20 | 0 |
+| spawn | AFTER `232d1729` | hud-hidden | 14.27 | 1.92 | — | 14.90 | 0 |
+| spawn | AFTER `232d1729` | style-writes | 15.16 | 2.88 | — | 16.50 | 0 |
+| spawn | AFTER `232d1729` | hud-var-writes | 17.44 | 2.86 | **1.51** | 18.70 | 0 |
+| street | BEFORE `c5f64b77` | baseline | 17.96 | 9.71 | — | 24.00 | 0 |
+| street | BEFORE `c5f64b77` | hud-hidden | 15.71 | 3.36 | — | 16.40 | 0 |
+| street | BEFORE `c5f64b77` | style-writes | 15.22 | 2.82 | — | 16.80 | 0 |
+| street | BEFORE `c5f64b77` | hud-var-writes | 15.28 | 2.88 | **6.83** | 16.20 | 0 |
+| street | AFTER `232d1729` | baseline | 18.88 | 8.63 | — | 22.50 | 0 |
+| street | AFTER `232d1729` | hud-hidden | 17.99 | 2.42 | — | 18.50 | 0 |
+| street | AFTER `232d1729` | style-writes | 20.23 | 3.34 | — | 21.90 | 0 |
+| street | AFTER `232d1729` | hud-var-writes | 21.52 | 4.32 | **4.31** | 23.10 | 0 |
+
+### Contract and claim states
+
+- VERIFIED: `--hud-sway-x`, `--hud-sway-y`, `--hud-breathe`, `--hud-gait`
+  and `--hud-health` are `inherits: false` in
+  `src/ui/pass77-instrument-hud.css`.
+- VERIFIED: `HUD_MOTION_TARGETS` in `src/ui/surface-registry.ts` contains eight
+  sway consumers and `#health-fill`; `createHudMotionTargets()` resolves those
+  nine references once after shell construction. The frame path contains no
+  `querySelector` for these writes, and the unit test observed exactly nine
+  distinct targets at most for a frame write.
+- VERIFIED: the existing dirty flag remains in `writeHudProperty`; continuous
+  `--hud-breathe` writes are fanned out only to the eight sway targets, while
+  health writes only to `#health-fill`.
+- VERIFIED: the focused HUD unit set passed 15 files / 184 tests; `npx tsc
+  --noEmit` and `npm run build` passed; the isolated native headless browser
+  target-contract test passed 1/1; every perf rung at both poses reported
+  `pipes+0` and healthy WebGPU completion telemetry.
+- VERIFIED: within-session `(program)` deltas fell from 5.90 to 1.51 ms/frame
+  at spawn and from 6.83 to 4.31 ms/frame at street. This is the measured
+  invalidation-boundary mechanism, not an absolute FPS claim.
+- OPEN: before/after are separate short sessions with variable GPU/renderer
+  contention, so the JS busy and p50 rows are not an absolute improvement
+  claim. PASS 93's p50 <= 14 ms and JS busy <= 10 ms/frame gates were not
+  reached consistently at both poses.
+- VERIFIED: the new browser contract itself passed under installed headless
+  Chrome on 4215. OPEN: the full `pass64-hud-menu.spec.ts` run timed out at its
+  10-minute bound; the isolated first attempt also showed the existing
+  WebGL2 `startSolo()` admission stalled in `warmup` for 60 s with an adapter
+  present. No HUD failure is inferred from that admission result.
+- OPEN: the lane-4 second offender, WebGPU node-material per-object update
+  (about 3.5 ms/frame at spawn), was profiled only by the existing aggregate
+  CDP attribution and not changed. No uniform-group sharing or frustum-skip
+  patch is claimed without a material-level probe and a measured correctness
+  fence.
+- OPEN: `pipeline:preflight` passed the lockfile verifier but the contribution
+  guard refused the worktree because of 46 pre-existing untracked evidence
+  paths. They were preserved and excluded from both commits.
