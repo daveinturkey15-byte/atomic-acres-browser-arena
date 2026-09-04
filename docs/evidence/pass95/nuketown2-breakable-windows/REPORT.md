@@ -99,3 +99,12 @@ Size ratchet: `src/legacy-main.ts` 37231 lines ≤ ceiling 37396, untouched.
 
 - `src/nuketown2-breakable-windows.test.ts` (new, only change)
 - `docs/evidence/pass95/nuketown2-breakable-windows/REPORT.md` (this file)
+
+## Luna review follow-ups
+
+- TODO (owner evidence): run a two-peer host/guest break and replay the same
+  nonce to prove the live replicated pane state converges; the static ingress
+  path is verified, but this review intentionally ran no browser or network.
+- TODO (owner evidence): capture the actual shard burst and aperture in the
+  headed visual review; source wiring to the existing pooled debris/flash/audio
+  catalogue is verified, but rendered output is not claimed here.
