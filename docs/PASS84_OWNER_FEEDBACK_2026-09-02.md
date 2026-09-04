@@ -1416,3 +1416,22 @@ additive so the two merge without touching each other's rows.)*
     door's approach, under this map's 2.24 m band).
   - Drop-out semantics kept and asserted through `computeFallDamage` rather than
     restated: the exterior flight is free, a rail vault costs 6.
+- **Browser gates and the two owner captures — OPEN, not run, and not skipped
+  quietly.** The machine rule for this lane forbids launching a headless browser
+  unless ComfyUI's queue is empty AND `nvidia-smi` reports at least 3,000 MiB
+  free. The queue was empty for the whole twenty-minute wait; free VRAM never
+  left the 739–1,050 MiB band (`docs/evidence/pass94/nuketown2-handedness/
+  gpu-wait.txt`, one sample a minute, 12:24–12:44 BST), so **no headless browser
+  was started**. Still owed on this branch: `qa:pass74:arena-boot-smoke`,
+  `qa:stock-boot`, and the two hardware captures from
+  `nuketown2-north-yard` / `nuketown2-south-yard`.
+  - What stands in for them *mechanically* meanwhile — and only mechanically,
+    it is not a picture: `docs/evidence/pass94/nuketown2-handedness/
+    handedness-frame-report.txt` projects the BUILT house and garage into those
+    two cameras and reports the garage 11.0 degrees RIGHT of aim in both yards,
+    18.9 m out, with both stations standing on an authored spawn point, plus the
+    same verdict from all twelve spawns. The two captures are expected to LOOK
+    like that; if they do not, the report is wrong and so is the gate.
+  - The capture command, ready to run: `npx vite build --outDir dist-vr-i4`,
+    then `node scripts/qa/capture-arena-viewpoints.mjs --serve-dist dist-vr-i4
+    --arenas nuketown2 --label pass94-handedness --sha <head>`.
