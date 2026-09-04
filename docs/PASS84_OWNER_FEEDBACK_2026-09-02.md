@@ -1335,3 +1335,25 @@ assets and textures and lighting need to be tip top, raid can come next"
   before the first pipeline, add an honest stock-flags boot spec to the cut
   ritual. The Nuke Town tip-top branch (Luna verdict DO-NOT-SHIP: identical
   siding on both houses, stray marker cubes) waits behind the hotfix.
+
+## PASS 93 publish record — 2026-09-04 08:10 BST (hotfix)
+
+- **Published** by `scripts/orchestration/publish_pass93.py` (exit 0) from head
+  `1aad84ab` (roll `2dcc3214` on the HF-454 hotfix merge `9e1e0344`; Opus
+  follow-up `1aad84ab` keeps device-feature negotiation observable). gh-pages
+  channels exactly `['pass92', 'pass93']` (pass91 retired per HF-400); root
+  chooser generation `2ff646727518`.
+- **Content:** PASS 92 + the Chrome 153 hotfix only: the WGSL swizzle rewrite
+  now composes every chained swizzle (`.xyz.xy`, `.xyz.z`, `(mat4*vec4).xyz.y`
+  in the ray-traced post composite that Nuke Town Rebuild deploys with) and is
+  installed on the negotiated device before the first pipeline; new honest
+  gate `npm run qa:stock-boot` (installed Chrome, no unsafe flag, real menu →
+  Solo for nuketown2 + atomic-acres). The Nuke Town tip-top branch is NOT in
+  this pass.
+- **Gates at the cut:** tsc 0; release tests 83/83; plan test 9/9; full suite
+  578 files / 5662 tests; identity guard OK; freshness clean; boot smoke 13/13
+  (8.0 min); stock-flags boot 4/4 (nuketown2 55 s, atomic-acres 1.1 min).
+- **Cut environment:** run in `aa-claude-hotfix` because `aa-omp-pass84`'s
+  shared node_modules was half-reinstalled by an elevated Codex run and cannot
+  be repaired unelevated (EPERM on the rolldown binding); the integration
+  branch is checked out in `aa-claude-hotfix` until the owner repairs it.
