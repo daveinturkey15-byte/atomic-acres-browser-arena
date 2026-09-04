@@ -41,6 +41,7 @@ import {
 import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
 import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
 import type { GraphicsRuntime } from '../pass65-settings';
 // HF-358: WebGPU water presentation comes from the ocean-tsl factory driven by
 // the shared frozen ocean-spectrum band table — one table for CPU buoyancy and
@@ -134,6 +135,7 @@ export function pass64LinearSourceStages(
   const screenSpace = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
   const optional = builtOptionalStages ?? screenSpacePostStages(screenSpace);
   const stages = ['scene-pass-linear-hdr'];
+  if (optional.includes('taa-temporal-resolve')) stages.push('taa-temporal-resolve');
   if (optional.includes('motion-blur-velocity-smear')) stages.push('motion-blur-velocity-smear');
   // HF-418. Derived from LINEAR_SOURCE_STAGE_ORDER rather than appended by
   // hand, because that is how the ray-traced stage came to be missing from this
@@ -996,10 +998,11 @@ function configureHdrPipeline(
     gtaoPass.thickness.value = 1;
     gtaoPass.distanceExponent.value = 1;
     gtaoPass.distanceFallOff.value = 1;
-    // Temporal filtering stays OFF: it rotates the sample pattern per frame
-    // and is only stable underneath a TRAA resolve this chain does not run;
-    // without one it reads as shimmer and breaks deterministic review frames.
-    gtaoPass.useTemporalFiltering = false;
+    // r185 rotates the GTAO sample pattern per frame. It is stable only when
+    // our TAA resolve owns the history; BALANCED/PERFORMANCE therefore retain
+    // the source's non-temporal path, while QUALITY/MAX turn it on together
+    // with TAA.
+    gtaoPass.useTemporalFiltering = screenSpaceRuntime.taaResolve.enabled;
   }
   // High/Ultra AO tiers run the upstream depth/normal-aware spatial denoise
   // over the raw GTAO target (the documented non-TRAA path). Low keeps the
@@ -1049,12 +1052,12 @@ function configureHdrPipeline(
   // energy on the visible side of roofs, walls and portal frames rather than
   // allowing the low-resolution bloom chain to smear across their silhouettes.
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
-  const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
+  const emissiveBloom = bloom(screenSpace.sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
   const contactOcclusion = occlusionSample
       ? mix(float(1), occlusionSample, contactOcclusionStrength)
       : float(1);
     // HF-364 linear composite order, matching LINEAR_SOURCE_STAGE_ORDER:
-    //   [motion blur] -> [+SSGI bounce] -> *contact occlusion
+    //   [TAA] -> [motion blur] -> [+SSGI bounce] -> *contact occlusion
     //   -> +bloom -> [+godray shafts] -> [depth of field]
     // GI is added BEFORE the occlusion multiply so GTAO darkens bounced light
     // exactly as it darkens direct light; reflections and shafts are added
@@ -1367,6 +1370,7 @@ export function createPass64TslSceneSystems(
         ),
         depthOfField: screenSpaceTelemetry(constructedScreenSpace.depthOfField, liveScreenSpace().depthOfField),
         motionBlur: screenSpaceTelemetry(constructedScreenSpace.motionBlur, liveScreenSpace().motionBlur),
+        taaResolve: screenSpaceTelemetry(constructedScreenSpace.taaResolve, liveScreenSpace().taaResolve),
         upscaling: Object.freeze({ ...constructedScreenSpace.upscaling }),
       }),
       linearSourceStages: hdr.linearSourceStages,
@@ -1475,12 +1479,14 @@ export function createPass64TslSceneSystems(
     },
     setReviewCamera: (reviewCamera) => {
       activeReviewCamera = reviewCamera;
+      hdr.screenSpace.setReviewCamera(true);
       applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed, activeGraphics);
       setAnimationTime(root, reviewCamera.fixedTimeMs);
       root.userData.tslReviewCameraId = reviewCamera.id;
     },
     clearReviewCamera: () => {
       activeReviewCamera = null;
+      hdr.screenSpace.setReviewCamera(false);
       delete root.userData.tslReviewCameraId;
     },
     update: (timeMs) => {
@@ -1540,7 +1546,16 @@ export function assertRuntimeTslTraversal(audit: RuntimeTslTraversal): void {
     throw new Error(`WebGPU TSL review failed closed: compiled pipeline ledger mismatch (${compiled.join(', ')})`);
   }
   const materialPipelines = new Set(audit.nodeMaterialPipelineIds);
-  const missingMaterials = expected.filter((id) => id !== PIPELINE.hdr && !materialPipelines.has(id));
+  // TAA is an admission-only fullscreen NodeMaterial. It is compiled through
+  // the exact ScenePass output graph, but it is intentionally not attached to
+  // a scene mesh, so the mesh traversal cannot observe it. The pipeline ledger
+  // and exact precompile fence still require its ID; only this mesh-material
+  // projection excludes it.
+  const missingMaterials = expected.filter((id) => (
+    id !== PIPELINE.hdr
+    && id !== TAA_RESOLVE_PIPELINE_ID
+    && !materialPipelines.has(id)
+  ));
   if (missingMaterials.length > 0) {
     throw new Error(`WebGPU TSL review failed closed: node-material traversal missing ${missingMaterials.join(', ')}`);
   }
