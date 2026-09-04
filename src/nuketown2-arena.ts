@@ -2867,52 +2867,29 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge mailbox', [GARAGE_X1 + 0.6, 1.35, VERGE_FURNITURE_Z], [0.32, 0.3, 0.5], m.sign);
   pair(builder, 'verge mailbox flag', [GARAGE_X1 + 0.78, 1.42, VERGE_FURNITURE_Z], [0.04, 0.18, 0.08], m.busTrim,
     { solid: false, shots: false });
-  // Second residential mailbox, out past the verge planter.
-  pair(builder, 'verge parcel mailbox pedestal', [16.6, 0.50, VERGE_FURNITURE_Z], [0.32, 1.00, 0.32], m.trim);
-  pair(builder, 'verge parcel mailbox', [16.6, 1.15, VERGE_FURNITURE_Z], [0.36, 0.30, 0.36], m.sign,
-    { solid: false, shots: true });
-
-  // Curbside wheelie bins waiting for collection, standing on the drive apron.
-  // HF-467: both bins were `reinforced` - a wheelie bin that stops a sniper.
-  // A moulded plastic bin is the cheapest penetrable family the shared table
-  // ships, which is `wood`; there is no plastic id and inventing one would add
-  // a material with no arena but this asking for it.
-  pair(builder, 'verge wheelie bin 0', [6.6, 0.50, VERGE_FURNITURE_Z], [0.52, 1.00, 0.55], m.planter,
-    { ballisticMaterial: 'wood' });
-  pair(builder, 'verge wheelie bin 1', [7.4, 0.50, VERGE_FURNITURE_Z], [0.52, 1.00, 0.55], m.sign,
-    { ballisticMaterial: 'wood' });
-  pair(builder, 'verge wheelie bin lid 0', [6.6, 1.03, VERGE_FURNITURE_Z], [0.56, 0.06, 0.59], m.rubber,
-    { solid: false, shots: false });
-  pair(builder, 'verge wheelie bin lid 1', [7.4, 1.03, VERGE_FURNITURE_Z], [0.56, 0.06, 0.59], m.rubber,
-    { solid: false, shots: false });
-
-  // Public street waste bin, at the closed end of the cul-de-sac.
-  pair(builder, 'verge street bin', [-13.9, 0.45, VERGE_FURNITURE_Z], [0.48, 0.90, 0.48], m.sign);
-  pair(builder, 'verge street bin lid', [-13.9, 0.93, VERGE_FURNITURE_Z], [0.52, 0.06, 0.52], m.rubber,
-    { solid: false, shots: false });
-
-  // Fire hydrant on the cul-de-sac's own verge.
-  // INTEGRATION (candidate 4b): -10.5 -> -12.6. HF-477 re-stationed the hydrant
-  // on the verge furniture line at x = -10.5, and the techniques lane's
-  // appliance bank stands on the same line spanning x [-11.3, -9.5] - so the
-  // hydrant's cap ended up 1 cm above the cabinet's top face on a zero-area
-  // touch, which `find-coplanar-pairs` reported as two FINDINGS. Moved into the
-  // gap between the bank and the street waste bin at -13.9; nothing else on the
-  // line moves, and the hydrant is still on the kerb side of the same verge.
-  pair(builder, 'verge hydrant body', [-12.6, 0.42, VERGE_FURNITURE_Z], [0.32, 0.84, 0.32], m.busTrim);
-  pair(builder, 'verge hydrant cap', [-12.6, 0.88, VERGE_FURNITURE_Z], [0.22, 0.12, 0.22], m.trim,
-    { solid: false, shots: false });
-  pair(builder, 'verge hydrant nozzles', [-12.6, 0.55, VERGE_FURNITURE_Z], [0.44, 0.12, 0.12], m.sign,
-    { solid: false, shots: false });
-
-  // Street name blade and speed limit sign post, out at the stem end.
-  pair(builder, 'verge street sign post', [8.6, 1.4, VERGE_FURNITURE_Z], [0.12, 2.8, 0.12], m.trim);
-  pair(builder, 'verge street name blade', [8.6, 2.65, VERGE_FURNITURE_Z], [0.90, 0.22, 0.08], m.sign,
-    // HF-467: the blade is the same pressed plate as the sign next to it.
-    { solid: false, shots: true, ballisticMaterial: 'thin-metal' });
-  pair(builder, 'verge speed limit sign', [8.6, 2.10, VERGE_FURNITURE_Z], [0.45, 0.60, 0.06], m.trim,
-    // HF-467: a 6 cm sign plate. `thin-metal`, like the hoarding.
-    { solid: false, shots: true, ballisticMaterial: 'thin-metal' });
+  // ---- HF-491 DECLUTTER, 2026-09-04 -----------------------------------------
+  // REMOVED from this line: the second (parcel) mailbox, two wheelie bins and
+  // their lids, the public street bin and lid, the fire hydrant (body, cap,
+  // nozzles) and the street-name / speed-limit sign post. Eleven paired
+  // emitters, 22 bodies, all of them municipal street furniture that NO
+  // BO2-2025 reference image contains.
+  //
+  // The falsifier that removed them is FINDINGS Q4's own native-resolution read
+  // of `nt2025-aerial-boii.jpg`: "I looked along both verges at native
+  // resolution ... and found kerbs, pavements, the appliance banks, ornamental
+  // plants, chain-and-post edging and a manhole cover - NO mailbox posts."
+  // That sentence is a census of the reference verge, and every body listed
+  // above is absent from it. FINDINGS grades mailboxes OPEN rather than absent,
+  // so ONE letterbox is kept at the end of each drive (the pair above, which
+  // `nuketown2-fidelity.test.ts` names) and the redundant second one goes.
+  //
+  // WHY DELETE RATHER THAN HIDE (owner HF-491: "it's busy, cluttered; thin out
+  // the clutter, streamline it"). A hidden emitter still costs geometry, a
+  // collider, a draw call and a line in the size ratchet. The reference verge
+  // reads as open ground with isolated masses; ours read as a continuous run of
+  // waist-high furniture, which is what ate the 4.7 m strip either side of the
+  // road and made the corridor read narrow at eye level even though its
+  // authored width matches the reference (see REPORT.md's corridor table).
   // The drive is edged rather than open, so crossing the last few metres to a
   // front door is not a walk across a blank apron.
   // HF-467: kerb-family edging, `reinforced` by fall-through. `concrete`.
@@ -2948,14 +2925,20 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // dressing-only copy as well would put TWO banks on one lawn. The colour
   // placement is the one both lanes and FINDINGS agree on, and the fidelity
   // case below measures it on the built prop.
-  // Entry planter urn, between the appliance bank and the drive.
-  pair(builder, 'verge entry planter urn', [3.8, 0.30, VERGE_FURNITURE_Z], [0.60, 0.60, 0.60], m.block);
-  pair(builder, 'verge entry planter shrub', [3.8, 0.70, VERGE_FURNITURE_Z], [0.48, 0.35, 0.48], m.planter,
-    { solid: false, shots: false });
-  // Landscaped front planter, on the cul-de-sac half of the line.
-  pair(builder, 'verge front planter', [-9.0, 0.25, VERGE_FURNITURE_Z], [2.2, 0.50, VERGE_FURNITURE_DEPTH], m.block);
-  pair(builder, 'verge front planter soil', [-9.0, 0.40, VERGE_FURNITURE_Z], [2.0, 0.08, 0.64], m.planter,
-    { solid: false, shots: false });
+  // INTEGRATION (HITL 5): the layout lane (04d2ef43) re-authored the bank here
+  // against its accuracy-2 base; candidate 4b had already deduplicated it onto
+  // the techniques-lane prop, so this merge keeps the single shipped bank and
+  // takes the layout lane's deletions below verbatim.
+  // HF-491: the entry planter urn + shrub (x = 3.8) and the landscaped front
+  // planter + soil (x = -9.0) are REMOVED. With them the furniture line carried
+  // a body roughly every 2.5 m of its 36 m; the reference dresses each lawn
+  // with ONE appliance bank plus ornamentals, not a continuous parade. What is
+  // left on the line is deliberate and each piece has a job: the letterbox
+  // (reference kerb prop, OPEN but retained), the drive edge, the front hedge
+  // (first rung of the front climb chain), the outer verge planter, the HF-437
+  // low wall and kerb planter (the widened strip's COVER - these two are load
+  // bearing for the verge-cover gate and are NOT clutter), the colour-coded
+  // appliance bank (the map's cheapest chirality anchor) and the town sign.
   // The town sign at the closed end of the cul-de-sac: two posts and a board,
   // the one authored landmark that tells you which end you are looking at -
   // and under HF-477 the two ends are genuinely different, so it finally has

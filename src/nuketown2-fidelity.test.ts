@@ -30,6 +30,7 @@ import {
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
   NUKETOWN2_HANDEDNESS,
+  NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_UPPER_Y0,
   nuketown2HandedSpan,
   nuketown2HandedX as hx,
@@ -2570,5 +2571,108 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(node.userData.ballisticSurfaceId, node.name).toBeUndefined();
     });
     expect(forged).toBe(audit.drawCalls);
+  });
+});
+
+/**
+ * HF-491 (owner, 2026-09-04 17:20) - THE CORRIDOR AND THE CLUTTER CEILING.
+ *
+ * "the shape of the map hasn't changed but the assets have - it needs to be
+ *  WIDER IN THE MIDDLE, have BITS EITHER SIDE OF THE ROAD like it does in the
+ *  game; it's busy, cluttered; thin out the clutter".
+ *
+ * Two things are gated here and they answer different halves of that.
+ *
+ * 1. THE CORRIDOR IS ALREADY REFERENCE-CORRECT AND MUST NOT DRIFT. Measured off
+ *    the first-party minimaps (see NUKETOWN2_FRONT_VERGE_DEPTH's header): the
+ *    two house front walls stand 0.553 L apart and the house block is 0.303 L
+ *    wide along the street, so the reference corridor is 1.825 house-widths.
+ *    Widening ours past that would move us AWAY from BO2, so the band is
+ *    two-sided. This test is the thing that stops a later "make it wider" pass
+ *    from silently overshooting the reference.
+ *
+ * 2. THE FURNITURE LINE HAS A CEILING. What the owner reads as narrow is the
+ *    verge FILL, not the verge width: a continuous run of waist-high municipal
+ *    props down a 4.7 m strip closes the corridor at eye level while every
+ *    authored number stays correct. FINDINGS Q4's native-resolution census of
+ *    `nt2025-aerial-boii.jpg` lists what a reference verge actually carries -
+ *    kerbs, pavements, appliance banks, ornamental plants, chain-and-post
+ *    edging, a manhole cover - and the classes asserted absent below are the
+ *    ones no BO2-2025 image contains at all.
+ */
+describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
+  /** Reference, from the minimaps: front wall to front wall, in street lengths. */
+  const REFERENCE_CORRIDOR_L = 0.553;
+  /** Reference, from the minimaps: house block along the street, in street lengths. */
+  const REFERENCE_HOUSE_WIDTH_L = 0.303;
+
+  it('holds the street corridor at the reference width - not narrower AND NOT WIDER', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const roof = map.root.getObjectByName('nuketown2 north house roof deck') as THREE.Mesh | undefined;
+    expect(roof, 'north house roof deck is the house-width carrier').toBeTruthy();
+    const houseWidth = (roof!.geometry as THREE.BoxGeometry).parameters.width;
+
+    // The corridor IS twice the house-front offset, because both houses sit on
+    // the same front line by construction (NUKETOWN2_HOUSE_LAYOUT is a
+    // 180-degree pair about the origin).
+    const corridor = 2 * Math.abs(NUKETOWN2_HOUSE_FRONT_Z);
+
+    const referenceCorridor = REFERENCE_CORRIDOR_L * NUKETOWN2_STREET_LENGTH;      // 19.91 m
+    const referenceHouseWidth = REFERENCE_HOUSE_WIDTH_L * NUKETOWN2_STREET_LENGTH; // 10.91 m
+    const referenceRatio = REFERENCE_CORRIDOR_L / REFERENCE_HOUSE_WIDTH_L;         // 1.825
+
+    // Absolute width: within 5 % of the measured reference, the same tolerance
+    // the aspect ratio is held to in NUKETOWN2_BOUNDS' header.
+    expect(Math.abs(corridor - referenceCorridor) / referenceCorridor).toBeLessThan(0.05);
+    expect(Math.abs(houseWidth - referenceHouseWidth) / referenceHouseWidth).toBeLessThan(0.05);
+
+    // The RATIO is the scale-free form and is held tighter, because it survives
+    // any future change to the absolute anchor (which is authored from the old
+    // cut's playable area, not from a published scalar).
+    const ratio = corridor / houseWidth;
+    expect(Math.abs(ratio - referenceRatio) / referenceRatio,
+      `corridor ${corridor.toFixed(2)} m / house width ${houseWidth.toFixed(2)} m = `
+      + `${ratio.toFixed(3)} house-widths, reference ${referenceRatio.toFixed(3)}`)
+      .toBeLessThan(0.03);
+  });
+
+  it('keeps the front verge open - no street-furniture class the reference does not have', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const names: string[] = [];
+    map.root.traverse((o) => { if (o.name) names.push(o.name); });
+
+    // Classes deleted by HF-491. Each is absent from FINDINGS Q4's census of the
+    // reference verge, and a hidden emitter still costs a draw call, so the
+    // assertion is on the EMITTER, not on its visibility.
+    for (const gone of [
+      'parcel mailbox', 'wheelie bin', 'street bin', 'hydrant',
+      'street sign post', 'street name blade', 'speed limit',
+      'entry planter', 'front planter',
+    ]) {
+      expect(names.filter((n) => n.includes(gone)), `verge class "${gone}" is deleted, not hidden`)
+        .toHaveLength(0);
+    }
+
+    // Ceiling on the whole line, set AT the post-cut count of 43 bodies (the
+    // furniture pairs plus the verge lawn/frontage decals that share the prefix),
+    // down from 79 before HF-491. A ratchet AT the current value is the
+    // non-weakening form: it has zero headroom, so a later pass that wants one
+    // more `pair(builder, 'verge ...')` must argue for it in a diff.
+    const vergeBodies = names.filter((n) => n.includes(' verge '));
+    expect(vergeBodies.length, `verge bodies:\n${vergeBodies.sort().join('\n')}`)
+      .toBeLessThanOrEqual(43);
+
+    // Load-bearing pieces that are NOT clutter and must survive any later
+    // declutter pass: the HF-437 cover pair, the climb-chain hedge, the
+    // chirality anchor and the one retained letterbox. The chirality anchor is
+    // the techniques-lane prop (`nuketown2 <half> lawn appliance bank cabinet`,
+    // src/nuketown2-yard-props.ts) - candidate 4b deduplicated the two banks
+    // onto it, so that is the name the shipped bank carries.
+    for (const kept of [
+      'verge low wall', 'verge kerb planter', 'verge front hedge',
+      'lawn appliance bank cabinet', 'verge mailbox',
+    ]) {
+      expect(names.some((n) => n.includes(kept)), `"${kept}" is load-bearing and must stay`).toBe(true);
+    }
   });
 });
