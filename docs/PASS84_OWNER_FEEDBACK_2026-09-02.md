@@ -2101,3 +2101,42 @@ assets and textures and lighting need to be tip top, raid can come next"
 ## HF-501 - owner 2026-09-04 20:40: 'muse spark contributor 1.3 is so cheap, use a bunch of it, get all the stuff I asked for done for the next pass'
 
 - Muse Spark promoted from reviewer to builder: a second worker pool (3 workers, 75-minute jobs, queue muse-queue-build) running eight bounded PASS 95 lanes on their own branches - breakable upstairs windows, lobby all-players 5-4-3-2-1 countdown, gamepad support, yard-prop/interior graph sharing, ground-projected horizon environment, load-time rehearsal-scope re-land, Raid slice 2, Farcrysis slice 2. Luna reviews Muse output before any merge.
+
+## HF-497 - owner 2026-09-04 19:20: HITL 5 approved; publish PASS 94
+
+- **Owner statement:** “this version is good now ... lets get it live on github and at
+  the front of the menu” after playing candidate 5, head `3e2fd273`, served on `:4300`
+  by pid `1608`.
+- **Owner lane:** PASS 94 release integration; menu order and release channel topology.
+- **Affected maps/modes:** all player-facing menu routes; Nuke Town Rebuild (`nuketown2`)
+  first in the chooser, old Raid retired, Raid 2 preview near the top; published live
+  and safe-backup channels.
+- **Mechanical falsifier:** the PASS 94 source candidate is not stamped PASS 94, does
+  not stage `channels/pass94` with exactly `channels/pass93` as the sole safe backup,
+  or the exact required release/build/browser/live gates are red or absent.
+- **Required evidence:** exact source/head, release tests, full Vitest transcript plus
+  isolated reruns for known load-sensitive tests, last build identity/freshness proof,
+  native-WebGPU boot smoke, stock-flag real-menu probe asserting first card and active
+  arena id, publisher dry-run and receipt, exact Pages topology, and cache-busted live
+  root/channel/release-index/identity/stock probe.
+- **Status:** `CLAIMED` owner approval was supplied as the release instruction;
+  `BLOCKED` publication attempt at `09980a5a` because isolated
+  `src/nuketown2-pipeline-budget.test.ts` timed out in two required tests. No live URL
+  or published record exists.
+
+### PASS 94 publication attempt record — BLOCKED (not published)
+
+- **Head:** `09980a5a3c58fd70c980be4056e3cefbee872d5d` on
+  `contrib/dave-gaming-pc/claude/pass93-candidate`; HF-495 is included.
+- **Gates:** `tsc` 0; release Vitest 11/11 files and 127/127 tests; publish-plan
+  contract 9/9; full Vitest 599 passed, 1 skipped, 3 failed; audio isolated 8/8;
+  gameplay property isolated 2/2; HF-477 pipeline budget isolated 2 required timeouts.
+- **Live URL:** `OPEN` — no PASS 94 publication was performed.
+- **What is in source:** candidate 5 at `3e2fd273`, HF-495 map order at `09980a5a`, PASS
+  94 release identity/changelog/channel cut, Chrome 153 hardening, killstreak tuning,
+  bot/spawn, minimap, vehicle, audio, and menu work.
+- **Deferred to PASS 95:** perf lane 3, roadside bays, Nuke horizon, sound redesign,
+  rooflines/stairs, circular turning head, liveried vehicles, clustered lighting.
+- **Claim state:** `BLOCKED`; the publisher, build-last gate, Pages topology and live
+  smoke remain unrun until the red HF-477 gate is repaired and rerun without weakening
+  its timeout or assertions.
