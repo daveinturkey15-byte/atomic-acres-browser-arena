@@ -260,7 +260,7 @@ handoff caveat rather than a claimed preflight pass.
 |---|---|
 | `npx tsc --noEmit` | **[VERIFIED] clean after the r185 public-TSL repair** |
 | `npx vitest run` with the requested lighting/material/profile/precompile/pipeline/fidelity/ratchet paths plus SH-L2 tests | **[VERIFIED] 17 files, 186 passed** |
-| Existing baked-indirect tests | **[VERIFIED] 4 files included, 26 + 15 SH-L2 predecessor node tests also green** |
+| Existing baked-indirect tests | **[VERIFIED] 4 files included; 2,921 lines across the complete `baked-indirect*.ts` source/test surface; 26 + 15 SH-L2 predecessor node tests also green** |
 | `src/legacy-main-size-ratchet.test.ts` | **[VERIFIED] 5 passed; 37,100 lines against the unchanged 37,100 ceiling** |
 | `git diff --check` | **[VERIFIED] clean before the post-repair commit** |
 | `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` | **[OPEN] lockfile passed; guard rejected uppercase harness slug** |
