@@ -35,6 +35,7 @@
 - **VERIFIED:** Port 4221 had no remaining listening connection after the run.
 - **VERIFIED:** No diff was run against another branch or capture side.
 - **OPEN:** `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` timed out after 120 seconds with exit 124; it was not converted into a pass claim.
+- **OPEN:** The required handoff rerun reached `pipeline-guard.mjs` after the lockfile check passed, then failed because its lowercase-slug validator rejects the mandated `Codex` harness spelling (`harness must be a lowercase ASCII slug`). The verifier was not weakened.
 - **OPEN:** The existing `node --test scripts/qa/arena-viewpoint-regression.test.mjs` result was 16/17 because its pre-existing fixture directories `artifacts/viewpoint-regression/base-c736d48c` and `head-55833a07` are absent on this branch. The failing fixture assertion was preserved.
 
 ### Warm-up conclusion
