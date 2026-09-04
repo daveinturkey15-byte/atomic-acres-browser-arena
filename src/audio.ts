@@ -52,6 +52,7 @@ import {
   DEFAULT_ACOUSTIC_SPACE,
   acousticProfile,
   arenaAcousticSpace,
+  distanceLowpassHz,
   weaponReportLayering,
   type AcousticSpace,
 } from './audio-immersion';
@@ -59,6 +60,10 @@ import {
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
 ) as Record<WeaponId, number>);
+
+/** The bus stays at its pinned settings coefficient; authored note gain makes
+ * the bed audible, while the combat ducker keeps it out of the report space. */
+const GAME_MUSIC_PERFORMANCE_GAIN = 2.25;
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 
@@ -568,6 +573,66 @@ const SHOT_TAIL_REFERENCE = Object.freeze({
  */
 const SHOT_TAIL_BUDGET_SECONDS = 1;
 
+/** Final-stage dynamics: a true safety limiter, not a colour compressor. */
+export const MASTER_LIMITER_PROFILE = Object.freeze({
+  thresholdDb: -1,
+  kneeDb: 0,
+  ratio: 20,
+  attackSeconds: 0.001,
+  releaseSeconds: 0.1,
+});
+
+/** Two short feedback delays and allpass diffusion; no convolution or assets. */
+export const SHARED_REVERB_PROFILE = Object.freeze({
+  earlyDelaySeconds: 0.037,
+  lateDelaySeconds: 0.089,
+  feedback: 0.31,
+  returnGain: 0.12,
+  sends: Object.freeze({ sfx: 0.075, movement: 0.09, announcements: 0.08, ambience: 0.16 }),
+});
+
+type WeaponAcousticClass = 'pistol' | 'rifle' | 'shotgun' | 'machine-gun' | 'special';
+type WeaponAcousticCharacter = Readonly<{
+  kind: WeaponAcousticClass;
+  clickHz: number;
+  crackGain: number;
+  bodyGain: number;
+  tailGain: number;
+  bodyCutoffScale: number;
+}>;
+
+/** Numeric voice characters keep the report distinct without changing the
+ * weapon profile audit's all-positive numeric schema. */
+const WEAPON_ACOUSTIC_CHARACTERS: Readonly<Record<WeaponId, WeaponAcousticCharacter>> = Object.freeze({
+  carbine: { kind: 'rifle', clickHz: 3_900, crackGain: 1.02, bodyGain: 1, tailGain: 1, bodyCutoffScale: 1 },
+  smg: { kind: 'machine-gun', clickHz: 4_800, crackGain: 0.88, bodyGain: 0.82, tailGain: 0.72, bodyCutoffScale: 1.1 },
+  lmg: { kind: 'machine-gun', clickHz: 3_300, crackGain: 0.93, bodyGain: 1.06, tailGain: 1.2, bodyCutoffScale: 0.92 },
+  scattergun: { kind: 'shotgun', clickHz: 2_700, crackGain: 1.16, bodyGain: 1.2, tailGain: 1.3, bodyCutoffScale: 0.78 },
+  sniper: { kind: 'rifle', clickHz: 3_100, crackGain: 1.14, bodyGain: 1.2, tailGain: 1.42, bodyCutoffScale: 0.84 },
+  railgun: { kind: 'special', clickHz: 2_200, crackGain: 1, bodyGain: 1, tailGain: 1, bodyCutoffScale: 1 },
+  pistol: { kind: 'pistol', clickHz: 5_400, crackGain: 0.8, bodyGain: 0.68, tailGain: 0.52, bodyCutoffScale: 1.18 },
+  magnum: { kind: 'pistol', clickHz: 3_600, crackGain: 1.04, bodyGain: 1.12, tailGain: 0.92, bodyCutoffScale: 0.94 },
+  'machine-pistol': { kind: 'machine-gun', clickHz: 4_900, crackGain: 0.86, bodyGain: 0.78, tailGain: 0.68, bodyCutoffScale: 1.08 },
+  'mini-uzi': { kind: 'machine-gun', clickHz: 5_100, crackGain: 0.84, bodyGain: 0.8, tailGain: 0.64, bodyCutoffScale: 1.12 },
+  mp5: { kind: 'machine-gun', clickHz: 4_600, crackGain: 0.9, bodyGain: 0.84, tailGain: 0.72, bodyCutoffScale: 1.08 },
+  m4a1: { kind: 'rifle', clickHz: 4_100, crackGain: 1, bodyGain: 0.98, tailGain: 0.95, bodyCutoffScale: 1 },
+  'ak-47': { kind: 'rifle', clickHz: 3_450, crackGain: 1.05, bodyGain: 1.08, tailGain: 1.1, bodyCutoffScale: 0.94 },
+  minigun: { kind: 'machine-gun', clickHz: 4_200, crackGain: 0.78, bodyGain: 0.74, tailGain: 0.66, bodyCutoffScale: 1.14 },
+  'm14-ebr': { kind: 'rifle', clickHz: 3_700, crackGain: 1.08, bodyGain: 1.04, tailGain: 1.12, bodyCutoffScale: 0.93 },
+  'slug-shotgun': { kind: 'shotgun', clickHz: 2_500, crackGain: 1.12, bodyGain: 1.16, tailGain: 1.22, bodyCutoffScale: 0.8 },
+  'flashlight-pistol': { kind: 'pistol', clickHz: 5_000, crackGain: 0.84, bodyGain: 0.72, tailGain: 0.58, bodyCutoffScale: 1.15 },
+  'explosive-crossbow': { kind: 'special', clickHz: 2_900, crackGain: 0.68, bodyGain: 0.58, tailGain: 0.5, bodyCutoffScale: 1.2 },
+  flamethrower: { kind: 'special', clickHz: 1_900, crackGain: 0.5, bodyGain: 0.62, tailGain: 0.75, bodyCutoffScale: 0.9 },
+  'crimson-flamethrower': { kind: 'special', clickHz: 2_100, crackGain: 0.52, bodyGain: 0.66, tailGain: 0.8, bodyCutoffScale: 0.88 },
+  'flare-gun': { kind: 'pistol', clickHz: 3_200, crackGain: 0.72, bodyGain: 0.86, tailGain: 0.9, bodyCutoffScale: 0.95 },
+});
+
+type ReverbGraph = Readonly<{
+  input: GainNode;
+  returnGain: GainNode;
+  nodes: readonly AudioNode[];
+}>;
+
 /**
  * HF-376 shaping shared by both transient primitives. Every field is optional
  * and every default reproduces a plain, well-behaved one-shot, so a call site
@@ -624,7 +689,14 @@ type MinigunDriveLoop = {
   gain: GainNode;
 };
 
-type ChopperRotorLoop = MinigunDriveLoop & { panner: PannerNode };
+type ChopperRotorLoop = MinigunDriveLoop & {
+  panner: PannerNode;
+  /** Numeric history avoids allocating a position object in the frame sync. */
+  lastX: number;
+  lastY: number;
+  lastZ: number;
+  lastUpdateSeconds: number;
+};
 
 type ContinuousVoiceScope = 'arena' | 'combat-feedback';
 
@@ -640,6 +712,9 @@ export class ArenaAudio {
   private contextSource: 'uninitialized' | 'failed' | BrowserAudioContextResolution['source'] = 'uninitialized';
   private listenerPoseMode: AudioListenerPoseMode = 'unavailable';
   private master: GainNode | null = null;
+  private gameMusicDucker: GainNode | null = null;
+  private reverbGraph: ReverbGraph | null = null;
+  private readonly reverbSendGains = new Map<AudioBusId, GainNode>();
   private outputAnalyser: AnalyserNode | null = null;
   private outputTimeDomain: Float32Array<ArrayBuffer> | null = null;
   private outputFrequencyDb: Float32Array<ArrayBuffer> | null = null;
@@ -667,6 +742,7 @@ export class ArenaAudio {
   // the music permanently rather than drop a single note. The cap is respected
   // because two is all that can ever exist, which chiptune-music.test.ts proves.
   private musicChannels: Readonly<Record<'lead' | 'bass', { osc: OscillatorNode; gain: GainNode }>> | null = null;
+  private musicArenaFilter: BiquadFilterNode | null = null;
   private musicLoopStartedAtSeconds = 0;
   private musicScheduledUntilSeconds = 0;
   private musicRunning = false;
@@ -842,11 +918,11 @@ export class ArenaAudio {
         candidate = new resolution.constructor();
         this.context = candidate;
         const compressor = this.context.createDynamicsCompressor();
-        compressor.threshold.value = -12;
-        compressor.knee.value = 8;
-        compressor.ratio.value = 6;
-        compressor.attack.value = 0.002;
-        compressor.release.value = 0.18;
+        compressor.threshold.value = MASTER_LIMITER_PROFILE.thresholdDb;
+        compressor.knee.value = MASTER_LIMITER_PROFILE.kneeDb;
+        compressor.ratio.value = MASTER_LIMITER_PROFILE.ratio;
+        compressor.attack.value = MASTER_LIMITER_PROFILE.attackSeconds;
+        compressor.release.value = MASTER_LIMITER_PROFILE.releaseSeconds;
         this.master = this.context.createGain();
         this.master.gain.value = 0.34;
         this.master.connect(compressor);
@@ -864,11 +940,14 @@ export class ArenaAudio {
         }
         this.buses.set('master', this.master);
         this.busIdentity.set(this.master, 'master');
+        this.createSharedReverb();
         this.weapons = this.createBus('sfx', 0.78);
         this.feedback = this.weapons;
-        this.movement = this.createBus('movement', 0.34);
-        this.ui = this.createBus('ui', 0.42);
-        this.announcements = this.createBus('announcements', 0.5);
+        // Fixed mix target: movement sits below gunfire, while readable
+        // confirmations get a little more headroom than the old flat split.
+        this.movement = this.createBus('movement', 0.3);
+        this.ui = this.createBus('ui', 0.45);
+        this.announcements = this.createBus('announcements', 0.55);
         this.ambience = this.createBus('ambience', 0.12);
         // Owner 2026-08-30 music halving (see GAME_MUSIC_BUS_GAIN).
         // Owner 2026-08-30: third halving alongside the game-music bus.
@@ -903,12 +982,21 @@ export class ArenaAudio {
         }
         this.stopSources(this.combatFeedbackSources);
         this.disconnectNodes(this.combatFeedbackNodes);
+        if (this.reverbGraph) {
+          for (const node of this.reverbGraph.nodes) {
+            try { node.disconnect(); } catch { /* partial browser node */ }
+          }
+        }
+        try { this.gameMusicDucker?.disconnect(); } catch { /* partial browser node */ }
         this.resetCombatFeedbackState();
         for (const node of [...this.buses.values()]) {
           try { node.disconnect(); } catch { /* partial browser node */ }
         }
         this.context = null;
         this.master = null;
+        this.gameMusicDucker = null;
+        this.reverbGraph = null;
+        this.reverbSendGains.clear();
         this.outputAnalyser = null;
         this.outputTimeDomain = null;
         this.outputFrequencyDb = null;
@@ -941,6 +1029,7 @@ export class ArenaAudio {
   }
 
   dispose(): void {
+    this.stopGameMusic();
     this.stopMinigunDrive();
     this.stopAllChopperRotors();
     this.stopSources(this.arenaSources);
@@ -971,6 +1060,14 @@ export class ArenaAudio {
     this.ui = null;
     this.announcements = null;
     this.ambience = null;
+    this.gameMusicDucker = null;
+    if (this.reverbGraph) {
+      for (const node of this.reverbGraph.nodes) {
+        try { node.disconnect(); } catch { /* partial browser node */ }
+      }
+    }
+    this.reverbGraph = null;
+    this.reverbSendGains.clear();
     this.buses.clear();
     this.busIdentity.clear();
     for (const chain of this.footstepChains) {
@@ -1270,10 +1367,17 @@ export class ArenaAudio {
     const bus = this.buses.get('game-music');
     if (!bus) return;
     try {
+      const arenaDefinition = ARENA_AUDIO_DEFINITIONS[this.activeArena ?? 'atomic-acres'];
+      const arenaFilter = this.context.createBiquadFilter();
+      arenaFilter.type = 'lowpass';
+      arenaFilter.frequency.value = arenaDefinition.airLowpassHz;
+      arenaFilter.Q.value = 0.42;
+      arenaFilter.connect(bus);
+      this.musicArenaFilter = arenaFilter;
       const build = (wave: OscillatorType): { osc: OscillatorNode; gain: GainNode } => {
         const gain = this.context!.createGain();
         gain.gain.value = 0;
-        gain.connect(bus);
+        gain.connect(arenaFilter);
         const osc = this.context!.createOscillator();
         osc.type = wave;
         // A real starting frequency matters: an oscillator left at its 440 Hz
@@ -1316,12 +1420,15 @@ export class ArenaAudio {
     // remainder of the current shuffle cycle plus the track that just finished,
     // so the next match neither replays it nor re-rolls the cycle from nothing.
     this.musicTrack = null;
-    if (!channels) return;
-    for (const channel of [channels.lead, channels.bass]) {
-      try { channel.osc.stop(); } catch { /* may not have started */ }
-      try { channel.osc.disconnect(); } catch { /* partial browser node */ }
-      try { channel.gain.disconnect(); } catch { /* partial browser node */ }
+    if (channels) {
+      for (const channel of [channels.lead, channels.bass]) {
+        try { channel.osc.stop(); } catch { /* may not have started */ }
+        try { channel.osc.disconnect(); } catch { /* partial browser node */ }
+        try { channel.gain.disconnect(); } catch { /* partial browser node */ }
+      }
     }
+    try { this.musicArenaFilter?.disconnect(); } catch { /* partial browser node */ }
+    this.musicArenaFilter = null;
   }
 
   /**
@@ -1482,10 +1589,11 @@ export class ArenaAudio {
     try {
       channel.osc.frequency.setValueAtTime(event.frequencyHz, atSeconds);
       channel.gain.gain.setValueAtTime(0, atSeconds);
-      channel.gain.gain.linearRampToValueAtTime(event.gain, peak);
+      const noteGain = Math.min(0.72, event.gain * GAME_MUSIC_PERFORMANCE_GAIN);
+      channel.gain.gain.linearRampToValueAtTime(noteGain, peak);
       // Ramp to a small floor rather than 0: exponential ramps reject zero, and a
       // hard cut to silence on a square wave clicks audibly.
-      channel.gain.gain.setValueAtTime(event.gain, Math.max(peak, end - release));
+      channel.gain.gain.setValueAtTime(noteGain, Math.max(peak, end - release));
       channel.gain.gain.linearRampToValueAtTime(0.0001, end);
     } catch {
       // A browser can reject a param schedule if the time has already passed.
@@ -1954,6 +2062,7 @@ export class ArenaAudio {
 
   shot(weapon: WeaponId, remote = false, distance = 0, emitter?: SpatialPoint): void {
     if (!this.context || !this.weapons) return;
+    this.duckGameMusicForCombat(0.18);
     const railgunSpatial = weapon === 'railgun' && remote && emitter
       ? this.createRailgunSpatialDestinations(emitter, distance)
       : null;
@@ -1974,6 +2083,7 @@ export class ArenaAudio {
       : remote ? Math.max(0.08, 0.55 * layering.bodyGainScale) : layering.directGainScale;
     const attenuation = spatialAttenuation * WEAPON_REPORT_GAIN[weapon];
     const profile = WEAPON_REPORT_PROFILES[weapon];
+    const character = WEAPON_ACOUSTIC_CHARACTERS[weapon];
     // Tail factors are expressed relative to open ground at 0 m, so that case
     // reproduces the previous mix and every space reads only as a difference
     // from it. Clamped because a runaway tail would both dominate the mix and
@@ -1991,6 +2101,25 @@ export class ArenaAudio {
     const detuneCents = roundRobinDetune(variant, 42);
     const variantGain = 1 + roundRobinDetune(variant + 3, 0.07);
 
+    // LAYER 0 - mechanism / muzzle click. It is intentionally absent from the
+    // railgun path: that report has a pinned ten-voice contract. Small arms
+    // need this dry high-frequency event before the crack or body arrives;
+    // otherwise every class starts as the same low synth sweep.
+    if (weapon !== 'railgun') {
+      this.noise({
+        duration: character.kind === 'shotgun' ? 0.009 : 0.006,
+        volume: (remote ? 0.055 : 0.075) * attenuation * variantGain,
+        filter: 'highpass',
+        frequency: character.clickHz,
+        q: character.kind === 'machine-gun' ? 0.65 : 1.05,
+        texture: 'crackle',
+        attack: 0.0002,
+        punch: 0.1,
+        punchSeconds: 0.0015,
+        drive: 0.42,
+      }, weaponDestination);
+    }
+
     // LAYER 1 - pressure body. Sawtooth into saturation, with the pitch fall
     // front-loaded so it lands as a thump that has a pitch rather than as a
     // pitch that slides. `punch` is what gives it a discernible attack and a
@@ -1999,7 +2128,7 @@ export class ArenaAudio {
       profile.body,
       profile.bodyEnd,
       profile.duration,
-      0.22 * attenuation * variantGain,
+      0.22 * attenuation * character.bodyGain * variantGain,
       'sawtooth',
       weaponDestination,
       0,
@@ -2018,7 +2147,7 @@ export class ArenaAudio {
       profile.crack,
       profile.crack * profile.crackEndRatio,
       profile.crackDuration,
-      0.075 * attenuation * layering.crackGainScale * variantGain,
+      0.075 * attenuation * character.crackGain * layering.crackGainScale * variantGain,
       'square',
       weaponDestination,
       0,
@@ -2031,11 +2160,11 @@ export class ArenaAudio {
     // one weapon sound like a short tube and another like a long one.
     this.noise({
       duration: profile.duration,
-      volume: profile.noise * attenuation * variantGain,
+      volume: profile.noise * attenuation * character.bodyGain * variantGain,
       filter: 'lowpass',
       // Air absorption compounds with the weapon's own voicing rather than
       // replacing it: a muffled LMG is still an LMG.
-      frequency: Math.min(profile.lowpass, layering.bodyCutoffHz),
+      frequency: Math.min(profile.lowpass, layering.bodyCutoffHz * character.bodyCutoffScale),
       q: 0.7,
       texture: 'pink',
       // The band closes as the burst decays, which is the muzzle gas cooling
@@ -2082,7 +2211,7 @@ export class ArenaAudio {
     ));
     this.noise({
       duration: tailSeconds,
-      volume: (remote ? 0.055 : 0.082) * attenuation * tailGainScale,
+      volume: (remote ? 0.055 : 0.082) * attenuation * character.tailGain * tailGainScale,
       filter: 'bandpass',
       frequency: profile.tail,
       q: layering.tailQ,
@@ -2275,18 +2404,24 @@ export class ArenaAudio {
    * with its own texture, a resonant body with the right decay, and material
    * debris (dust, splinters, shards, dirt) that arrives slightly late.
    */
-  impact(surface: ImpactSurface, distance = 0): void {
-    const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
+  impact(surface: ImpactSurface, distance = 0, emitter?: SpatialPoint): void {
+    this.duckGameMusicForCombat(0.12);
+    const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    const attenuation = Math.max(0.08, 1 - Math.min(1, safeDistance / 34));
     const variant = (this.stepVariant + this.reportVariant) % 8;
     const detuneCents = roundRobinDetune(variant, 90);
     const profile = IMPACT_MATERIAL_PROFILES[surface];
+    const destination = emitter
+      ? this.createImpactSpatialDestination(emitter, safeDistance) ?? this.feedback
+      : this.feedback;
+    const directCutoffHz = distanceLowpassHz(safeDistance, this.currentAcousticSpace());
     // Strike: the moment of contact. Texture is the material's grain - glass
     // and concrete shatter into grains, metal and wood do not.
     this.noise({
       duration: profile.strikeSeconds,
       volume: profile.strikeVolume * attenuation,
       filter: 'bandpass',
-      frequency: profile.strikeHz,
+      frequency: Math.min(profile.strikeHz, directCutoffHz),
       q: profile.strikeQ,
       texture: profile.strikeTexture,
       frequencyEndHz: profile.strikeHz * profile.strikeFallRatio,
@@ -2297,7 +2432,7 @@ export class ArenaAudio {
       resonanceHz: profile.resonanceHz,
       resonanceQ: profile.resonanceQ,
       resonanceGainDb: profile.resonanceGainDb,
-    }, this.feedback);
+    }, destination);
     // Body: what the material does after being hit. Metal rings on inharmonic
     // partials, wood knocks hollow and dies, soil just absorbs.
     this.tone(
@@ -2305,7 +2440,7 @@ export class ArenaAudio {
       profile.bodySeconds,
       profile.bodyVolume * attenuation,
       profile.bodyWave,
-      this.feedback,
+      destination,
       0.004,
       { attack: 0.0006, punch: profile.bodyPunch, drive: profile.drive * 0.5, detuneCents },
     );
@@ -2317,7 +2452,7 @@ export class ArenaAudio {
         profile.bodySeconds * 0.7,
         profile.bodyVolume * 0.45 * attenuation,
         'sine',
-        this.feedback,
+        destination,
         0.006,
         { attack: 0.001, punch: 0.5, detuneCents: detuneCents * 1.6 },
       );
@@ -2337,7 +2472,7 @@ export class ArenaAudio {
         attack: 0.002,
         punch: 0.4,
         punchSeconds: profile.debrisSeconds * 0.25,
-      }, this.feedback);
+      }, destination);
     }
   }
 
@@ -2348,7 +2483,55 @@ export class ArenaAudio {
   shedDoorMotion(distance = 0): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
     this.impact('metal', distance);
+    this.shedPerforation(distance);
     this.sweep(118, 72, 0.13, 0.032 * attenuation, 'triangle', this.feedback, 0.012);
+  }
+
+  /** Thin sheet perforation: sharp puncture, flexing panel and falling chips. */
+  shedPerforation(distance = 0): void {
+    const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / 42));
+    this.metallicClick(2_900, 0.012, 0.052 * attenuation, { resonanceQ: 10, drive: 0.58 });
+    this.noise({
+      duration: 0.18,
+      volume: 0.046 * attenuation,
+      filter: 'bandpass',
+      frequency: 1_350,
+      q: 1.8,
+      texture: 'grit',
+      frequencyEndHz: 520,
+      delay: 0.016,
+      attack: 0.001,
+      punch: 0.42,
+      punchSeconds: 0.028,
+    }, this.feedback);
+    this.noise({
+      duration: 0.12,
+      volume: 0.022 * attenuation,
+      filter: 'highpass',
+      frequency: 3_800,
+      q: 0.55,
+      texture: 'crackle',
+      delay: 0.052,
+      attack: 0.002,
+      punch: 0.36,
+    }, this.feedback);
+  }
+
+  /** Vehicle body hit: low panel flex under a bright metal contact. */
+  vehicleHit(distance = 0): void {
+    const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / 60));
+    this.impact('metal', distance);
+    this.sweep(92, 38, 0.28, 0.11 * attenuation, 'sine', this.feedback, 0.008, {
+      attack: 0.003,
+      punch: 0.46,
+      punchSeconds: 0.06,
+      drive: 0.28,
+      pitchBias: 0.64,
+    });
+  }
+
+  glassShatter(distance = 0): void {
+    this.impact('glass', distance);
   }
 
   testBayDoorThump(distance = 0): void {
@@ -2595,17 +2778,28 @@ export class ArenaAudio {
    * shooter least able to survive being a loop, so the round-robin now moves
    * the pitch, the timing of the scuff and the gain of every layer.
    */
-  footstep(surface: FootstepSurface | SpatialFootstepSurface, sprinting = false, crouched = false): void {
+  footstep(
+    surface: FootstepSurface | SpatialFootstepSurface,
+    sprinting = false,
+    crouched = false,
+    velocity = sprinting ? 1 : crouched ? 0.32 : 0.72,
+  ): void {
     this.stepVariant = (this.stepVariant + 1) % 4;
     const variation = [0.94, 1.04, 0.98, 1.08][this.stepVariant]!;
     const detuneCents = roundRobinDetune(this.stepVariant, 120);
-    const base = (sprinting ? 82 : crouched ? 54 : 68) * variation;
+    // The runtime can provide normalized horizontal velocity, while the gait
+    // defaults preserve the existing call sites. A slow walk has less heel
+    // energy and a shorter body; velocity is part of the sound, not just the
+    // interval at which legacy-main requests it.
+    const speed = Math.max(0, Math.min(1.25, Number.isFinite(velocity) ? velocity : 0));
+    const speedScale = 0.42 + speed * 0.58;
+    const base = (sprinting ? 82 : crouched ? 54 : 68) * variation * speedScale;
     const profile = FOOTSTEP_MATERIAL_PROFILES[surface];
     // Heel strike. Sprinting lands harder and brighter; crouching barely lands
     // at all, which is the stealth affordance the old flat scalar blurred.
     this.noise({
       duration: sprinting ? 0.075 : 0.055,
-      volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.heelVolume,
+      volume: (crouched ? 0.022 : sprinting ? 0.052 : 0.034) * profile.heelVolume * speedScale,
       filter: surface === 'soil' || surface === 'grass' ? 'lowpass' : 'bandpass',
       frequency: profile.heelHz * variation,
       q: profile.heelQ,
@@ -2624,7 +2818,7 @@ export class ArenaAudio {
       base + profile.bodyHz * 0.2,
       Math.max(32, profile.bodyHz * 0.48),
       sprinting ? 0.075 : 0.06,
-      (crouched ? 0.018 : 0.034) * profile.bodyVolume,
+      (crouched ? 0.018 : 0.034) * profile.bodyVolume * speedScale,
       profile.bodyWave,
       this.movement,
       0.002,
@@ -2636,7 +2830,7 @@ export class ArenaAudio {
     if (profile.scuffVolume > 0) {
       this.noise({
         duration: sprinting ? 0.05 : 0.07,
-        volume: (crouched ? 0.007 : sprinting ? 0.016 : 0.011) * profile.scuffVolume,
+        volume: (crouched ? 0.007 : sprinting ? 0.016 : 0.011) * profile.scuffVolume * speedScale,
         filter: 'bandpass',
         frequency: profile.scuffHz,
         q: 0.7,
@@ -2652,7 +2846,7 @@ export class ArenaAudio {
     // makes a running enemy audible before they are visible.
     if (sprinting) {
       this.noise({
-        duration: 0.06, volume: 0.012, filter: 'highpass', frequency: 3_400, q: 0.6,
+        duration: 0.06, volume: 0.012 * speedScale, filter: 'highpass', frequency: 3_400, q: 0.6,
         delay: 0.022 + this.stepVariant * 0.005,
         texture: 'crackle', attack: 0.001, punch: 0.35,
       }, this.movement);
@@ -2676,6 +2870,29 @@ export class ArenaAudio {
       duration: 0.09, volume: 0.026 * strength, filter: 'highpass', frequency: 2_200, q: 0.7, delay: 0.012,
       texture: 'crackle', frequencyEndHz: 1_100, attack: 0.001, punch: 0.3,
     }, this.movement);
+  }
+
+  /** Launch cue: a short air rush plus a low body lift, scaled by velocity. */
+  jump(launchSpeed = 1): void {
+    const strength = Math.max(0.2, Math.min(1.25, Number.isFinite(launchSpeed) ? Math.abs(launchSpeed) : 0.2));
+    this.noise({
+      duration: 0.085,
+      volume: 0.025 * strength,
+      filter: 'bandpass',
+      frequency: 1_050 + strength * 1_200,
+      q: 0.7,
+      frequencyEndHz: 2_600 + strength * 1_400,
+      texture: 'pink',
+      attack: 0.006,
+      punch: 0.62,
+      punchSeconds: 0.024,
+    }, this.movement);
+    this.sweep(72, 118 + strength * 34, 0.12, 0.028 * strength, 'sine', this.movement, 0.004, {
+      attack: 0.003,
+      punch: 0.36,
+      punchSeconds: 0.026,
+      pitchBias: 0.42,
+    });
   }
 
   grenadeBounce(strength: number): void {
@@ -2822,6 +3039,7 @@ export class ArenaAudio {
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
     if (!this.weapons) return true;
+    this.duckGameMusicForCombat(0.8);
     // HF-376 re-authored legacy blast. Four layers with real weight rather
     // than a sawtooth glide under one lowpassed hiss: a saturated pressure
     // body, a sub that outlasts it, the broadband blast itself, and debris
@@ -2866,6 +3084,7 @@ export class ArenaAudio {
     const admission = admitExplosionAudioMix(this.explosionAudioGate, now);
     this.explosionAudioGate = admission.state;
     if (!admission.admitted) return false;
+    this.duckGameMusicForCombat(0.8);
     const distance = Math.max(0, Math.hypot(
       point.x - this.listenerPosition.x,
       point.y - this.listenerPosition.y,
@@ -3188,8 +3407,16 @@ export class ArenaAudio {
       this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, this.weapons);
       return;
     }
-    this.sweep(178, 72, 0.09, 0.13, 'square', this.weapons);
-    this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, this.weapons);
+    // Drone: a narrow propeller whine over a small electric motor body. The
+    // sine/triangle pairing keeps it airborne and avoids the square-wave beep
+    // that made every support call read like UI.
+    this.sweep(420, 185, 0.16, 0.095, 'sawtooth', this.weapons, 0, {
+      attack: 0.001, punch: 0.28, punchSeconds: 0.018, drive: 0.28,
+    });
+    this.tone(1_260, 0.12, 0.045, 'triangle', this.weapons, 0.012, {
+      attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
+    });
+    this.noise({ duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15, texture: 'pink' }, this.weapons);
   }
 
   /** HF-337: positional support gunfire at the firing chopper/drone world position. Reuses the railgun spatial-chain pattern. */
@@ -3207,8 +3434,13 @@ export class ArenaAudio {
       this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, weaponDestination);
       return;
     }
-    this.sweep(178, 72, 0.09, 0.13, 'square', weaponDestination);
-    this.noise({ duration: 0.1, volume: 0.16, filter: 'bandpass', frequency: 3_100, q: 0.9 }, weaponDestination);
+    this.sweep(420, 185, 0.16, 0.095, 'sawtooth', weaponDestination, 0, {
+      attack: 0.001, punch: 0.28, punchSeconds: 0.018, drive: 0.28,
+    });
+    this.tone(1_260, 0.12, 0.045, 'triangle', weaponDestination, 0.012, {
+      attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
+    });
+    this.noise({ duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15, texture: 'pink' }, weaponDestination);
   }
 
   /**
@@ -3300,6 +3532,45 @@ export class ArenaAudio {
     return panner;
   }
 
+  /** Optional positional path for world impacts. Legacy callers without a
+   * point retain the dry feedback path, while ballistics callers can opt into
+   * the same inverse falloff, HRTF pan and bounded spatial-chain budget. */
+  private createImpactSpatialDestination(emitter: SpatialPoint, distance: number): PannerNode | null {
+    if (distance > 180 || !this.context || !this.feedback
+      || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
+      || this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      this.voicesDropped += 1;
+      return null;
+    }
+    const panner = this.context.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 1.5;
+    panner.maxDistance = 180;
+    panner.rolloffFactor = 0.55;
+    panner.positionX.value = emitter.x;
+    panner.positionY.value = emitter.y;
+    panner.positionZ.value = emitter.z;
+    panner.connect(this.feedback);
+    this.busIdentity.set(panner, 'sfx');
+    this.spatialReportDestinations.add(panner);
+    this.spatialReportDistances.set(panner, distance);
+    this.railgunSpatialNodes.push(panner);
+    this.spatialChains += 1;
+    const cleanup = () => {
+      const index = this.railgunSpatialNodes.indexOf(panner);
+      if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
+      this.busIdentity.delete(panner);
+      try { panner.disconnect(); } catch { /* already disconnected */ }
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+      const timerIndex = this.railgunSpatialTimers.indexOf(timer);
+      if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
+    };
+    const timer = setTimeout(cleanup, 480);
+    this.railgunSpatialTimers.push(timer);
+    return panner;
+  }
+
   syncChopperRotors(sources: readonly Readonly<{
     id: string;
     position: SpatialPoint;
@@ -3355,7 +3626,16 @@ export class ArenaAudio {
           panner.disconnect();
           continue;
         }
-        loop = { source, filter, gain, panner };
+        loop = {
+          source,
+          filter,
+          gain,
+          panner,
+          lastX: entry.position.x,
+          lastY: entry.position.y,
+          lastZ: entry.position.z,
+          lastUpdateSeconds: this.context.currentTime,
+        };
         const voiceEnded = source.onended;
         source.onended = (event) => {
           this.spatialChains = Math.max(0, this.spatialChains - 1);
@@ -3373,7 +3653,25 @@ export class ArenaAudio {
       loop.panner.positionX.value = entry.position.x;
       loop.panner.positionY.value = entry.position.y;
       loop.panner.positionZ.value = entry.position.z;
-      loop.source.frequency.value = entry.phase === 'inbound' ? 36 : entry.phase === 'outbound' ? 34 : 38;
+      const baseRotorHz = entry.phase === 'inbound' ? 36 : entry.phase === 'outbound' ? 34 : 38;
+      const elapsed = this.context.currentTime - loop.lastUpdateSeconds;
+      const dx = entry.position.x - loop.lastX;
+      const dy = entry.position.y - loop.lastY;
+      const dz = entry.position.z - loop.lastZ;
+      const distanceForDoppler = Math.max(0.001, listenerDistance);
+      const radialVelocity = elapsed > 0.001
+        ? (dx * (entry.position.x - this.listenerPosition.x)
+          + dy * (entry.position.y - this.listenerPosition.y)
+          + dz * (entry.position.z - this.listenerPosition.z)) / distanceForDoppler / elapsed
+        : 0;
+      // Positive radial velocity means the source is moving away. Limit the
+      // ratio so an anomalous network step cannot turn a rotor into a click.
+      const doppler = Math.max(0.82, Math.min(1.18, 343 / (343 + radialVelocity)));
+      loop.source.frequency.value = baseRotorHz * doppler;
+      loop.lastX = entry.position.x;
+      loop.lastY = entry.position.y;
+      loop.lastZ = entry.position.z;
+      loop.lastUpdateSeconds = this.context.currentTime;
       // HF-337: altitude-aware gain with blade-slap layer
       loop.gain.gain.value = (entry.phase === 'inbound' ? 0.015 : entry.phase === 'outbound' ? 0.012 : 0.018) * altitudeAttenuation;
       const voice = this.activeVoices.get(loop.source);
@@ -3441,6 +3739,38 @@ export class ArenaAudio {
         voice.delaySeconds,
       );
     }
+  }
+
+  /** Short authored match bookends; no asset or long-lived voice required. */
+  matchStinger(kind: 'start' | 'end-win' | 'end-loss' | 'end-draw'): void {
+    if (kind === 'start') {
+      this.sweep(220, 440, 0.22, 0.085, 'triangle', this.announcements, 0, {
+        attack: 0.003, punch: 0.35, punchSeconds: 0.04,
+      });
+      this.sweep(330, 660, 0.28, 0.07, 'sine', this.ui, 0.09, {
+        attack: 0.004, punch: 0.42, punchSeconds: 0.05,
+      });
+      return;
+    }
+    const win = kind === 'end-win';
+    const draw = kind === 'end-draw';
+    const first = win ? 392 : draw ? 294 : 330;
+    const second = win ? 494 : draw ? 294 : 247;
+    const third = win ? 659 : draw ? 220 : 196;
+    this.tone(first, 0.15, 0.07, 'triangle', this.announcements, 0, { attack: 0.004, punch: 0.36 });
+    this.tone(second, 0.17, 0.065, draw ? 'sine' : 'triangle', this.announcements, 0.12, { attack: 0.004, punch: 0.4 });
+    this.tone(third, 0.24, 0.07, win ? 'sine' : 'triangle', this.announcements, 0.25, { attack: 0.006, punch: 0.46 });
+    this.noise({
+      duration: 0.18,
+      volume: 0.018,
+      filter: 'highpass',
+      frequency: win ? 2_400 : 1_200,
+      q: 0.6,
+      texture: 'pink',
+      delay: 0.26,
+      attack: 0.006,
+      punch: 0.5,
+    }, this.ui);
   }
 
   adrenalineState(active: boolean): void {
@@ -3722,10 +4052,78 @@ export class ArenaAudio {
     };
   }
 
+  /**
+   * Cheap shared room return. The delays are deliberately short and diffuse
+   * through allpass sections; this gives hard surfaces a tail without a
+   * convolution impulse response or a second voice per event. Partial test
+   * contexts may not expose createDelay, in which case the dry graph remains
+   * fully functional.
+   */
+  private createSharedReverb(): void {
+    const context = this.context;
+    const master = this.master;
+    if (!context || !master || typeof context.createDelay !== 'function') return;
+    try {
+      const input = context.createGain();
+      const earlyDelay = context.createDelay(0.2);
+      const earlyAllpass = context.createBiquadFilter();
+      const earlyFeedback = context.createGain();
+      const lateDelay = context.createDelay(0.3);
+      const lateAllpass = context.createBiquadFilter();
+      const lateFeedback = context.createGain();
+      const returnGain = context.createGain();
+      earlyAllpass.type = 'allpass';
+      earlyAllpass.frequency.value = 1_180;
+      earlyAllpass.Q.value = 0.62;
+      lateAllpass.type = 'allpass';
+      lateAllpass.frequency.value = 740;
+      lateAllpass.Q.value = 0.48;
+      earlyFeedback.gain.value = SHARED_REVERB_PROFILE.feedback;
+      lateFeedback.gain.value = SHARED_REVERB_PROFILE.feedback * 0.82;
+      returnGain.gain.value = SHARED_REVERB_PROFILE.returnGain;
+      input.connect(earlyDelay).connect(earlyAllpass).connect(earlyFeedback).connect(earlyDelay);
+      earlyAllpass.connect(lateDelay).connect(lateAllpass).connect(lateFeedback).connect(lateDelay);
+      lateAllpass.connect(returnGain).connect(master);
+      earlyDelay.delayTime.value = SHARED_REVERB_PROFILE.earlyDelaySeconds;
+      lateDelay.delayTime.value = SHARED_REVERB_PROFILE.lateDelaySeconds;
+      const nodes = [input, earlyDelay, earlyAllpass, earlyFeedback, lateDelay, lateAllpass, lateFeedback, returnGain] as const;
+      this.reverbGraph = Object.freeze({ input, returnGain, nodes });
+    } catch {
+      this.reverbGraph = null;
+    }
+  }
+
+  private duckGameMusicForCombat(durationSeconds: number): void {
+    const ducker = this.gameMusicDucker;
+    const now = this.context?.currentTime;
+    if (!ducker || now === undefined || !Number.isFinite(now)) return;
+    const duration = Math.max(0.08, Math.min(1.2, durationSeconds));
+    ducker.gain.cancelScheduledValues(now);
+    ducker.gain.setValueAtTime(Math.min(1, ducker.gain.value), now);
+    ducker.gain.setTargetAtTime(0.24, now, 0.012);
+    ducker.gain.setTargetAtTime(1, now + duration, 0.12);
+  }
+
   private createBus(id: Exclude<AudioBusId, 'master'>, gainValue: number): GainNode {
     const bus = this.context!.createGain();
     bus.gain.value = gainValue;
-    bus.connect(this.master!);
+    if (id === 'game-music' && typeof this.context!.createDelay === 'function') {
+      // Keep the historical game-music bus coefficient for settings and
+      // telemetry, then duck it through a separate gain during combat.
+      const ducker = this.context!.createGain();
+      ducker.gain.value = 1;
+      bus.connect(ducker).connect(this.master!);
+      this.gameMusicDucker = ducker;
+    } else {
+      bus.connect(this.master!);
+    }
+    const reverbSend = SHARED_REVERB_PROFILE.sends[id as keyof typeof SHARED_REVERB_PROFILE.sends];
+    if (this.reverbGraph && reverbSend !== undefined) {
+      const send = this.context!.createGain();
+      send.gain.value = reverbSend;
+      bus.connect(send).connect(this.reverbGraph.input);
+      this.reverbSendGains.set(id, send);
+    }
     this.buses.set(id, bus);
     this.busIdentity.set(bus, id);
     return bus;
@@ -3782,9 +4180,9 @@ export class ArenaAudio {
   private busBaseGain(id: AudioBusId): number {
     if (id === 'master') return 0.34;
     if (id === 'sfx') return 0.78;
-    if (id === 'movement') return 0.34;
-    if (id === 'ui') return 0.42;
-    if (id === 'announcements') return 0.5;
+    if (id === 'movement') return 0.3;
+    if (id === 'ui') return 0.45;
+    if (id === 'announcements') return 0.55;
     if (id === 'ambience') return 0.12;
     if (id === 'menu-music') return 0.18;
     // 2026-08-29: this fallthrough silently REVERTED the chiptune restage at
