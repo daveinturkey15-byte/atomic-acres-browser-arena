@@ -4486,6 +4486,7 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
         reflectionScale: graphicsRuntime.reflectionScale,
         reflectionQuality: graphicsRuntime.reflectionQuality,
         environmentIntensity: graphicsRuntime.environmentIntensity,
+        groundProjectedEnv: graphicsRuntime.groundProjectedEnv,
         screenSpace: graphicsRuntime.screenSpace,
       };
       // HF-364: the grade chain's order receipt has to know which optional
@@ -28812,6 +28813,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     reflectionScale: live.reflectionScale,
     reflectionQuality: live.reflectionQuality,
     environmentIntensity: live.environmentIntensity,
+    groundProjectedEnv: live.groundProjectedEnv,
     screenSpace: live.screenSpace,
   });
   // Rebind the complete retained arena presentation after the profile state is

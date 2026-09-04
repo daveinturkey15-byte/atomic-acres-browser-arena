@@ -109,6 +109,13 @@ export type AdvancedGraphicsValues = Readonly<{
    * the quality select feel like it did nothing.
    */
   ambientLife: number;
+  /**
+   * HF-479 technique #4. Whether horizon arenas (nuketown2, skyline-terminal)
+   * draw the ground-projected environment backdrop behind the atmosphere
+   * composite. Presentation-only: the projection re-samples the arena's own
+   * admitted sky, so gameplay authority never sees it.
+   */
+  groundProjectedEnv: boolean;
 }>;
 
 export type GraphicsAdvancedKey = keyof AdvancedGraphicsValues;
@@ -550,6 +557,14 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     unit: 'multiplier',
     applyMode: 'live', runtimeConsumer: 'ambient-particles',
   }),
+  // HF-479 technique #4. The off switch for the ground-projected environment
+  // backdrop. Live-apply (visibility + uniforms, no rebuild) in the
+  // atmosphere family next to the air it sits behind.
+  control({
+    key: 'groundProjectedEnv', id: 'graphics-ground-projected-env', category: 'atmosphere', label: 'Grounded horizon',
+    description: 'Sets the sky down onto the horizon on open maps so it meets the ground instead of floating. Turn it off for the flat sky.',
+    kind: 'toggle', applyMode: 'live', runtimeConsumer: 'atmosphere-runtime',
+  }),
 ]);
 
 const runtimeEvidence = (
@@ -660,6 +675,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   // tell 'the setting is on' from 'the materials actually changed'.
   wetSurfaces: runtimeEvidence('src/weather/rain-presentation.ts', 'this.applyWetness(this.presentation.wetSurfaces ? this.wetness : 0)', 'settings.graphics.wetSurfaces + sampleWeather().rain.wetSurfaces'),
   ambientLife: runtimeEvidence('src/particles/index.ts', 'this.densityScale * this.ambientLifeScale', 'settings.graphics.ambientLife + sampleWeather().particles.ambientLifeScale + .liveParticles'),
+  groundProjectedEnv: runtimeEvidence('src/rendering/ground-projected-env.ts', 'applyGroundProjectedEnvState', 'settings.graphics.groundProjectedEnv + pass64 ground-projected-env mesh.visible'),
 });
 
 /**
@@ -752,7 +768,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     // Wet surfaces are two material writes per adopted surface on a 2.5 s
     // scan, so they survive the low-spec preset; the air is thinned instead
     // because ambient instances are per-frame fill rate.
-    wetSurfaces: true, ambientLife: 0.6,
+    wetSurfaces: true, ambientLife: 0.6, groundProjectedEnv: true,
   }),
   // ===================================================================
   // BALANCED — HF-418. The rung between Performance and Quality.
@@ -854,7 +870,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.24, vignette: 0.14,
     depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
     weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
-    wetSurfaces: true, ambientLife: 0.8,
+    wetSurfaces: true, ambientLife: 0.8, groundProjectedEnv: true,
   }),
   // QUALITY — the auto-selected default on 8-core/8 GB machines. Since HF-438
   // it also carries the retired RAY TRACED rung's trace at the LIGHT tier, on
@@ -896,7 +912,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     // performance dial - the instance count is - so there is no reason for the
     // default preset to hide a state the arenas were authored to reach.
     weatherIntensity: 'storm', rainDensity: 1, windStrength: 1, lightning: true,
-    wetSurfaces: true, ambientLife: 1,
+    wetSurfaces: true, ambientLife: 1, groundProjectedEnv: true,
   }),
   // HF-438 (owner 2026-09-03, verbatim: "I don't think we should have a ray
   // tracing AND an RTX mode"). The RAY TRACED preset is RETIRED as a rung: its
@@ -953,7 +969,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     // Ambient instances are bounded by the family capacity at the ULTRA tier
     // this preset already selects, so 1.5x asks the arena profiles for more
     // of a ceiling that is already paid for rather than raising the ceiling.
-    wetSurfaces: true, ambientLife: 1.5,
+    wetSurfaces: true, ambientLife: 1.5, groundProjectedEnv: true,
   }),
 });
 

@@ -54,6 +54,16 @@ import {
   type ArenaEnvironmentObservation,
   type ArenaIblState,
 } from './arena-environment-ibl';
+// HF-479 technique #4: the ground-projected environment backdrop. Per-arena
+// radius/height uniforms over the arena's own admitted sky, one BackSide
+// sphere behind the atmosphere composite, settings off switch in the registry.
+import {
+  GROUND_PROJECTED_ENV_PIPELINE,
+  applyGroundProjectedEnvState,
+  createGroundProjectedEnvMesh,
+  setGroundProjectedEnvSource,
+  type GroundProjectedEnvMesh,
+} from './ground-projected-env';
 // HF-364: the screen-space raymarched stack (volumetric shafts, SSR, SSGI,
 // depth of field, motion blur). The tier tables and the combat-safety proofs
 // live in screen-space-post-profile.ts; the node graph lives in
@@ -89,6 +99,11 @@ export type Pass65TslGraphicsOptions = Readonly<{
   reflectionScale: number;
   reflectionQuality: 'off' | 'low' | 'high' | 'ultra';
   environmentIntensity: number;
+  /**
+   * HF-479 technique #4: the Grounded-horizon settings switch. Optional like
+   * `screenSpace`: absent means on, and the construction default says so.
+   */
+  groundProjectedEnv?: boolean;
   screenSpace?: GraphicsRuntime['screenSpace'];
 }>;
 
@@ -109,6 +124,7 @@ const DEFAULT_TSL_GRAPHICS_OPTIONS: Pass65TslGraphicsOptions = Object.freeze({
   reflectionScale: 1,
   reflectionQuality: 'high',
   environmentIntensity: 1,
+  groundProjectedEnv: true,
   screenSpace: SCREEN_SPACE_POST_DISABLED,
 });
 
@@ -240,6 +256,7 @@ const PIPELINE = Object.freeze({
   dust: 'pass64.atmosphere-dust.tsl.v1',
   grass: 'pass64.grass.tsl.v1',
   water: 'pass64.water.tsl.v1',
+  groundProjectedEnv: GROUND_PROJECTED_ENV_PIPELINE,
 });
 
 type AtmosphereReviewLayout = Readonly<{
@@ -1257,6 +1274,23 @@ export function createPass64TslSceneSystems(
     activeGraphics.reflectionScale,
     activeIblState,
   );
+  // HF-479 technique #4. The ground-projected backdrop lives in the scene root
+  // so the cold-session exact-ScenePass precompile reaches it with no fence
+  // change; it re-samples the admitted scene.background, so it binds AFTER
+  // the sky is mounted and never regenerates anything.
+  const groundProjectedEnvMesh: GroundProjectedEnvMesh = createGroundProjectedEnvMesh();
+  const syncGroundProjectedEnv = (): void => {
+    const background = scene.background as THREE.Texture | null;
+    setGroundProjectedEnvSource(
+      groundProjectedEnvMesh,
+      background && background.isTexture ? background : null,
+    );
+    applyGroundProjectedEnvState(
+      groundProjectedEnvMesh,
+      activeDefinition.id,
+      activeGraphics.groundProjectedEnv !== false,
+    );
+  };
   const root = new THREE.Group();
   root.name = 'Pass 64 WebGPU TSL presentation systems';
   root.userData.pass64TslPresentation = true;
@@ -1271,6 +1305,7 @@ export function createPass64TslSceneSystems(
     makeDust(definition),
     makeGrass(definition.id),
     makeWater(definition.id, graphics.oceanWaveAmplitude),
+    groundProjectedEnvMesh,
   );
   scene.add(root);
   const hdr = configureHdrPipeline(renderPipeline, scene, camera, definition, graphics, volumetricLight);
@@ -1284,6 +1319,7 @@ export function createPass64TslSceneSystems(
   let adaptedScreenSpace = constructedScreenSpace;
   const liveScreenSpace = (): GraphicsRuntime['screenSpace'] => adaptedScreenSpace;
   applyArenaSystemLayout(root, definition, definition.reviewCameras[0]?.seed ?? 6401, graphics);
+  syncGroundProjectedEnv();
   // Cold-compile attribution for the arena coverage fence. The transition
   // profiler can only see `coverage-submit-fence` as one number (measured
   // 3.4 s atomic-acres, 2.3 s high-seas, 9.8 s farcrysis on an RTX 5080 at the
@@ -1453,10 +1489,12 @@ export function createPass64TslSceneSystems(
       // environment work to wait for. Publishing the receipt in the same tick
       // is the contract those callers are written against.
       if (canSyncArenaEnvironmentIbl()) await syncArenaEnvironmentIbl();
+      syncGroundProjectedEnv();
       publishActualGraphics();
     },
     applyArenaEnvironment: async () => {
       await syncArenaEnvironmentIbl();
+      syncGroundProjectedEnv();
       publishActualGraphics();
     },
     observeArenaEnvironment: arenaEnvironmentObservation,
@@ -1471,6 +1509,7 @@ export function createPass64TslSceneSystems(
       // reflections back on after turning them off, which the old
       // environmentTexture guard made unrecoverable).
       if (canSyncArenaEnvironmentIbl()) await syncArenaEnvironmentIbl();
+      syncGroundProjectedEnv();
       publishActualGraphics();
     },
     setReviewCamera: (reviewCamera) => {

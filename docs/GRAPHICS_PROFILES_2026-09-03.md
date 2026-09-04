@@ -222,6 +222,7 @@ unchanged; only the presets' control sets moved.
 | `lightning` | Flash events | **off** | on | on | on | on |
 | `wetSurfaces` | Writes wetness into arena materials | on | on | on | on | on |
 | `ambientLife` | Fraction of the authored ambient population kept alive | 0.6 | 0.8 | 1.0 | 1.15 | 1.5 |
+| `groundProjectedEnv` | Ground-projected horizon backdrop on open maps (one draw, no target) | on | on | on | on | on |
 
 **Control-set fingerprints** (FNV-1a over the key-sorted control set; pinned by
 `src/graphics-profile-contract.test.ts`, which fails if a preset changes and
@@ -229,12 +230,18 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `445a9754` |
-| `balanced` | `0753ee34` |
-| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
-| `max` (HF-438 full tier) | `03ee2e10` |
+| `performance` | `5c415dec` |
+| `balanced` | `3954f3cc` |
+| `high` (QUALITY, HF-438 light tier) | `6197b09d` |
+| `max` (HF-438 full tier) | `a259ea68` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
+> **PASS 95 re-fingerprint (HF-479).** Every hash changed, and not because a
+> measured value moved: the ground-projected-environment lane added ONE new
+> control, `groundProjectedEnv`, switched on at every rung (one BackSide draw
+> call, no render target, no MRT change — the frame cost is a fullscreen
+> equirect fetch on background pixels only). Same precedent as the PASS 89
+> `bakedIndirect` note below.
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
 > changed because the fold moved real values into those presets; `performance`
 > and `balanced` are untouched. The retired `raytraced` row and the pre-fold
@@ -551,12 +558,12 @@ file after the 2026-08-31 IBL first-arena bug, where a row pointed at a real
 symbol in a real file inside a function the first arena of every page load
 never reached, and nine unit tests passed over the top of it for weeks).
 
-**Measured at head (VERIFIED): 1 of 40 controls has a live observation.**
+**Measured at head (VERIFIED): 1 of 41 controls has a live observation.**
 
 | Strength | Count | Controls |
 |---|---|---|
 | **Live, fail-closed observation of the running scene** | 1 | `environmentIntensity` |
-| **Source grep only** — proves the consumer EXISTS, not that it RAN | 39 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife` |
+| **Source grep only** — proves the consumer EXISTS, not that it RAN | 40 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife`, `groundProjectedEnv` |
 
 This lane did **not** fix the verifiers (out of scope — the brief asks for the
 list, not the repair). The list above is that report. The highest-value

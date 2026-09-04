@@ -3,7 +3,7 @@ export type TslMigrationStatus = 'legacy-isolated' | 'tsl-authored' | 'verified'
 export type TslMigrationEntry = Readonly<{
   id: string;
   owner: string;
-  legacyMaterial: 'ShaderMaterial' | 'RawShaderMaterial';
+  legacyMaterial: 'ShaderMaterial' | 'RawShaderMaterial' | 'none';
   replacementPipelineId: string;
   status: TslMigrationStatus;
   verification: string;
@@ -113,6 +113,23 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     descriptor: descriptor(
       ['MeshStandardNodeMaterial positionNode', 'view-independent water colorNode'],
       ['bounded wave displacement', 'presentation-only perimeter plane', 'no recursive reflection pass'],
+    ),
+  }),
+  Object.freeze({
+    // HF-479 technique #4. New authoring, not a migration: no legacy GLSL
+    // owner exists, so `legacyMaterial` is 'none'. It still belongs in this
+    // ledger because the traversal gate derives the compiled set from here —
+    // a pipeline outside this list is invisible to the cold-session precompile
+    // reach the brief requires.
+    id: 'ground-projected-environment',
+    owner: 'src/rendering/ground-projected-env.ts',
+    legacyMaterial: 'none',
+    replacementPipelineId: 'pass64.ground-projected-env.tsl.v1',
+    status: 'verified',
+    verification: 'projection node math, uniform-only arena data, horizon review cameras',
+    descriptor: descriptor(
+      ['MeshBasicNodeMaterial colorNode', 'ground-plane projection of the admitted equirect sky'],
+      ['BackSide sphere inside the far plane', 'depth write disabled', 'per-arena uniforms, settings off switch'],
     ),
   }),
 ]);

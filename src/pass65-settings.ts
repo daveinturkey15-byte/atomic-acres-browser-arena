@@ -119,6 +119,8 @@ export type GraphicsRuntime = Readonly<{
   reflectionScale: number;
   reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
+  /** HF-479 technique #4: the Grounded-horizon settings switch, resolved. */
+  groundProjectedEnv: boolean;
   /**
    * HF-364 — the resolved screen-space raymarched stack (volumetric shafts,
    * SSR, SSGI, depth of field, motion blur) plus the FSR 1 upscaler. The tier
@@ -438,6 +440,7 @@ export function resolveGraphicsRuntime(
       reflectionScale: 0,
       reflectionQuality: 'off',
       environmentIntensity: 0,
+      groundProjectedEnv: false,
       // The compatibility route has no RenderPipeline and therefore no linear
       // post graph at all; every screen-space effect is structurally absent
       // rather than merely turned down.
@@ -483,6 +486,7 @@ export function resolveGraphicsRuntime(
     reflectionScale: settings.reflectionQuality === 'off' ? 0 : settings.reflectionQuality === 'low' ? 0.62 : 1,
     reflectionQuality: settings.reflectionQuality,
     environmentIntensity: lightingScale(settings.indirectLighting) * settings.environmentIntensity,
+    groundProjectedEnv: settings.groundProjectedEnv,
     // Volumetric shafts raymarch the sun shadow map, so the shadow setting is a
     // hard capability input here rather than a taste preference: with shadows
     // off there is nothing to occlude the volume and the resolver reports why.

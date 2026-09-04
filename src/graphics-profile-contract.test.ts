@@ -45,14 +45,17 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: '445a9754',
-  balanced: '0753ee34',
+  performance: '5c415dec',
+  balanced: '3954f3cc',
   // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
   // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
   // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
   // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
-  high: '430da2ad',
-  max: '03ee2e10',
+  // HF-479 (PASS 95): every rung gains the `groundProjectedEnv` toggle (on).
+  // Re-fingerprinted with graphicsControlSetHashes(); the new row is measured
+  // in docs/GRAPHICS_PROFILES_2026-09-03.md. One draw call, no target.
+  high: '6197b09d',
+  max: 'a259ea68',
 });
 
 describe('HF-418 graphics ladder', () => {
