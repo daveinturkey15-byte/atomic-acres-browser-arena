@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+// Captures HF-388 first-person arm framing and per-skin differentiation evidence in installed Chrome HEADLESS with a real WebGPU device.
+//
+// Usage: node scripts/qa/capture-hf388-arms.mjs --url http://127.0.0.1:41941 --tag before
+//
+// Flags (no environment variables are read):
+//   --url <url>                 base URL of the app under test (default: http://127.0.0.1:41941)
+//   --tag <tag>                 run tag, used in the output path (default: run)
+//   --width <n>                 viewport width (default: 2560)
+//   --height <n>                viewport height (default: 1440)
+//   --only <what>               'bots' runs only the per-skin bot pass (default: '' full run)
+//   --arena <id>                arena to deploy into (default: gun-range)
+//   --teleport x,y,z,yaw,pitch  player station to prove before measuring (default: '' spawn)
+//   --weapons <list>            comma-separated weapons to frame (default: carbine,pistol,lmg)
+//   --skip-bots                 skip the per-skin bot pass (flag, no value)
+//
+// Writes to: artifacts/hf388/<tag>/ — one <pose>.png per measured pose, per-skin-lineup.png,
+//   per-skin-lineup-t2.png, skin-<skinId>.png per distinct bot skin, and summary.json.
+//
+// Exit codes: no explicit process.exit() call; 0 on success, non-zero on unhandled exception.
 // HF-388 first-person arm framing + per-skin differentiation evidence.
 //
 // Why this exists alongside capture-pass79-arms-frames.mjs: that script
