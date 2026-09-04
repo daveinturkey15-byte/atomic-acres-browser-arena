@@ -19568,8 +19568,14 @@ function tryFire(now: number): void {
   );
   weaponView.root.updateWorldMatrix(true, true);
   const muzzleWorldPosition = weaponView.muzzleWorldPosition();
-  const muzzleInsideSurface = muzzleWorldPosition !== null
-    && viewmodelMuzzleInsideSurfaceClip(muzzleWorldPosition, currentViewmodelSurfaceClipPlanes());
+  if (muzzleWorldPosition === null) {
+    refuseFire('viewmodel-muzzle-unavailable');
+    return;
+  }
+  const muzzleInsideSurface = viewmodelMuzzleInsideSurfaceClip(
+    muzzleWorldPosition,
+    currentViewmodelSurfaceClipPlanes(),
+  );
   if (muzzleInsideSurface) {
     refuseFire('viewmodel-muzzle-clip');
     return;
