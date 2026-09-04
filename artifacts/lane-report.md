@@ -167,3 +167,36 @@ thin-metal panels, the sibling of the shed's authority the research specifies
 - **VERIFIED:** `npx tsc --noEmit` passed.
 - **VERIFIED:** requested CPU-only focused Vitest set passed: 16 files, 223 tests, 0 failures.
 - **CONSTRAINT:** no install/CI/rebuild, build, browser, preview, or GPU command was run.
+
+## Follow-ups
+
+The three Muse re-review TODO reassessment items (thin-metal-REVIEW-2.md) landed as
+three commits on this branch, each gated before its commit.
+
+- **DONE F-06 (0d570e09):** new receipt test builds the real nuketown2 arena
+  (`buildNuketown2`), snapshots the scene's geometry/material/texture inventory
+  before and after `createAndAttachThinMetalPerforationRuntime` →
+  `removeFromParent()` + `disposeThinMetalPerforationRuntime`, asserts the cold
+  presentation adds exactly 2 meshes / 2 geometries / 2 materials / 1 stencil
+  texture, that every created GPU resource's `dispose` fires exactly once, and
+  that the inventory counts return to baseline.
+- **DONE F-08 (46fd135a):** `ThinMetalPerforationRuntime` now tracks its own
+  `lastMatchEpoch` (set at creation, advanced by reset);
+  `resetThinMetalPerforationRuntime` drops the caller-supplied shed
+  `priorEpoch` and guards on that tracked epoch. In `src/legacy-main.ts` the
+  thin-metal reset call is hoisted above the `if (interactiveWorldRuntime)`
+  guard, so a thin-metal reset lands even with no shed runtime. Pinned by a
+  no-shed-runtime reset test and a legacy-main source assertion.
+- **DONE F-10 (2cfec655):** `applyPanelImpact` bumps `revision` only when
+  `opensHole`, so an over-budget hit still counts (`hits`) but neither bumps
+  the revision nor triggers the revision-gated broadcast. Pinned by a test
+  walking hits 1–5: two silent dents, two mint broadcasts, then a silent
+  over-budget hit at the per-panel cap.
+
+### Follow-up gates
+
+- **VERIFIED:** `npx tsc --noEmit` exit code 0 (run before each commit).
+- **VERIFIED:** `npx vitest run src/thin-metal-perforation*.test.ts src/destructible-shed-*.test.ts src/ballistics.test.ts src/protocol*.test.ts src/legacy-main-size-ratchet.test.ts` — 8 files, 109 tests, 0 failures (final run; per-commit runs passed 106 → 108 → 109).
+- **VERIFIED:** `git -c credential.helper= -c "credential.helper=!gh auth git-credential" push origin HEAD` — `9e2405d7..2cfec655`.
+- **VERIFIED:** `git status -sb` — `## contrib/dave-gaming-pc/claude/thin-metal-perforation...origin/contrib/dave-gaming-pc/claude/thin-metal-perforation` (in sync, clean).
+- **CONSTRAINT:** no install/CI/rebuild, build, browser, preview, or GPU command was run.
