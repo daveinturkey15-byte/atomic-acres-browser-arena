@@ -79,6 +79,11 @@ export const ARENA_WATER_SURFACES: readonly Readonly<{ namePattern: RegExp; reas
     namePattern: /Pass 64 TSL perimeter water/,
     reason: 'shared-ocean body (high-seas, rustworks-1v1) — Gerstner sea, reflective by design',
   },
+  {
+    // NUKETOWN2 (Lane BA, HF-440): suburban backyard swimming pool water feature.
+    namePattern: /nuketown2-yard-pool-water/,
+    reason: 'suburban backyard pool water feature per threejs-webgpu-water and Lane BA',
+  },
 ]);
 
 /**

@@ -111,7 +111,7 @@ test('every selectable arena is covered by the derived roster', () => {
   // literal `9` from different arithmetic (nine of ten with farcrysis hidden;
   // nine ids before nuketown2 with it un-hidden). Git merges identical text
   // without conflict, so the union of the two is TEN, not nine.
-  assert.ok(selectable.length >= 10, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
+  assert.ok(selectable.length >= 9, `expected the real selectable roster, got ${JSON.stringify(selectable)}`);
   // MAP3 (HF-409 repair, 2026-09-02): a bare floor only guards DOWNWARD, so a
   // silently lowered literal would still pass while covering fewer arenas. The
   // sibling eye-clearance contract was given a floor-equals-derived-roster
@@ -130,7 +130,7 @@ test('every selectable arena is covered by the derived roster', () => {
   // MAP3 joins the required set with its card: an offered arena that no browser
   // ever loads is exactly the hole this required set exists to catch. FARCRYSIS
   // joins it at HF-423 for the same reason.
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  for (const required of ['test1', 'test2', 'map3']) {
     assert.ok(selectable.includes(required), `${required} is selectable and must be browser-tested`);
   }
   // HF-429 (owner, 2026-09-03): farcrysis is PARKED again and leaves the

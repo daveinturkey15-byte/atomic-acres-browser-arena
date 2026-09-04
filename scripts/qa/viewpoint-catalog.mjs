@@ -119,6 +119,14 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'nuketown2-north-upper-window',
     'nuketown2-south-upper-window',
     'nuketown2-into-sun-street',
+    'nuketown2-north-interior',
+    'nuketown2-south-interior',
+    'nuketown2-garage',
+    // HF-465: the rear balcony with its exterior flight, and the front climb
+    // chain (hedge, porch canopy, window ledge, upper window) - the two things
+    // this arena gained that no existing station looks at.
+    'nuketown2-north-balcony',
+    'nuketown2-front-porch',
   ]),
   // RAID2 (Lane AQ, HF-408): the Raid layout rethink. Ten cameras rather than
   // the usual four because this arena's whole claim is about ten specific

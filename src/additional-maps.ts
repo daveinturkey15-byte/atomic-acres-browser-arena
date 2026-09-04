@@ -32,6 +32,8 @@ export type Builder = {
   raycastMeshes: THREE.Object3D[];
   shotSurfaces: BallisticSurface[];
   ballisticSurfaceSequence: number;
+  /** Optional dynamic panes owned by the arena's existing glass authority. */
+  breakableWindows?: BreakableWindow[];
 };
 
 export const GUN_RANGE_FIRING_LINE_Z = 1.2;
@@ -144,6 +146,15 @@ export function box(
     builder.shotSurfaces.push(surface);
     mesh.userData.ballisticSurfaceId = surface.id;
     mesh.userData.ballisticMaterial = surface.material;
+    if (options.breakableWindowId) {
+      mesh.userData.breakableWindowId = options.breakableWindowId;
+      mesh.userData.dynamic = true;
+      builder.breakableWindows?.push({
+        id: options.breakableWindowId,
+        mesh,
+        broken: false,
+      });
+    }
   }
   if (solid) {
     builder.colliders.push(bounds);

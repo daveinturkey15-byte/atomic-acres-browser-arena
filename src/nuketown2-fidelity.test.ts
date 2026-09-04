@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { isBlocked } from './collision';
-import { movementProfile } from './gameplay';
+import { deriveGlassDynamicColliders } from './glass-collider-bounds';
+import { FALL_DAMAGE_SAFE_SPEED, computeFallDamage, movementProfile } from './gameplay';
 import type { ArenaMap } from './map';
 import {
+  NUKETOWN2_BALCONY,
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
+  NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_DOORWAYS,
   NUKETOWN2_HOUSE_STAIR,
@@ -18,17 +21,33 @@ import {
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_WINDOWS,
+  NUKETOWN2_YARD_STAIR,
   buildNuketown2,
 } from './nuketown2-arena';
-import { NUKETOWN2_GROUND_STOREY_H, NUKETOWN2_UPPER_Y0 } from './nuketown2-layout';
+import {
+  NUKETOWN2_GROUND_FLOOR_TOP,
+  NUKETOWN2_GROUND_STOREY_H,
+  NUKETOWN2_HANDEDNESS,
+  NUKETOWN2_UPPER_Y0,
+  nuketown2HandedSpan,
+  nuketown2HandedX as hx,
+} from './nuketown2-layout';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
   createOverdriveState,
   overdrivePositionForArena,
 } from './overdrive';
+import {
+  minimapPlayerViewPoint,
+  playerUpRotationRadians,
+  playerUpScaleX,
+  worldToMinimap,
+  worldToTacticalMap,
+} from './minimap';
 import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
+import { NUKETOWN_LAWN_KEEPOUT_MARGIN_M, nuketownRebuildLawnRegions } from './nuketown-lawn-field';
 
 /**
  * NUKE TOWN REBUILD fidelity guard (HF-407, re-derived end to end under HF-426).
@@ -66,36 +85,81 @@ const STANDING_RADIUS_M = STANCE_SHAPES.stand.radius;
  * point: a route a player has to hop up is not a route a player walks, and the
  * stair, the doors and the landing all have to be walkable standing.
  */
-async function walkStanding(
+type StandingWalkProbe = {
+  trace: Array<{ x: number; y: number; z: number }>;
+  frameCount: number;
+  maxConsecutiveUngroundedFrames: number;
+  slopeAdjustedFrames: number;
+  waypointFrames: number[];
+  completed: boolean;
+};
+
+async function walkStandingDetailed(
   map: ArenaMap,
   startEye: readonly [number, number, number],
   route: ReadonlyArray<readonly [number, number]>,
-): Promise<Array<{ x: number; y: number; z: number }>> {
+  frameBudget: number,
+): Promise<StandingWalkProbe> {
   const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
   try {
     const dt = 1 / 120;
     physics.teleportEye({ x: startEye[0], y: startEye[1], z: startEye[2] });
     const trace: Array<{ x: number; y: number; z: number }> = [];
+    const waypointFrames: number[] = [];
     let vy = 0;
+    let frameCount = 0;
+    let consecutiveUngroundedFrames = 0;
+    let maxConsecutiveUngroundedFrames = 0;
+    let slopeAdjustedFrames = 0;
+    let completed = true;
     for (const waypoint of route) {
-      for (let step = 0; step < 1400; step += 1) {
+      let reached = false;
+      for (let step = 0; step < 1400 && frameCount < frameBudget; step += 1) {
         const eye = physics.eyePosition();
         const dx = waypoint[0] - eye.x;
         const dz = waypoint[1] - eye.z;
         const distance = Math.hypot(dx, dz);
-        if (distance < 0.2) break;
+        if (distance < 0.2) {
+          reached = true;
+          break;
+        }
         const advance = Math.min(distance, 3.6 * dt);
         vy += -24.5 * dt;
         const result = physics.move({ x: (dx / distance) * advance, y: vy * dt, z: (dz / distance) * advance }, dt);
+        frameCount += 1;
         if (result.grounded) vy = 0;
+        if (result.grounded) consecutiveUngroundedFrames = 0;
+        else {
+          consecutiveUngroundedFrames += 1;
+          maxConsecutiveUngroundedFrames = Math.max(maxConsecutiveUngroundedFrames, consecutiveUngroundedFrames);
+        }
+        if (result.slopeAdjusted) slopeAdjustedFrames += 1;
       }
+      if (!reached) completed = false;
       const eye = physics.eyePosition();
       trace.push({ x: eye.x, y: eye.y, z: eye.z });
+      waypointFrames.push(frameCount);
+      if (!reached) break;
     }
-    return trace;
+    return {
+      trace,
+      frameCount,
+      maxConsecutiveUngroundedFrames,
+      slopeAdjustedFrames,
+      waypointFrames,
+      completed,
+    };
   } finally {
     physics.dispose();
   }
+}
+
+async function walkStanding(
+  map: ArenaMap,
+  startEye: readonly [number, number, number],
+  route: ReadonlyArray<readonly [number, number]>,
+): Promise<Array<{ x: number; y: number; z: number }>> {
+  return (await walkStandingDetailed(map, startEye, route, 10_000)).trace;
 }
 /**
  * Eye height for a player standing on the upper floor slab: slab top 3.3 m plus
@@ -104,6 +168,7 @@ async function walkStanding(
  */
 const UPPER_FLOOR_EYE_Y = 4.96;
 const sprintSpeed = movementProfile({ crouched: false, prone: false, ads: false, sprinting: true, grounded: true }).maxSpeed;
+const STAIR_TRAVERSAL_FRAME_BUDGET = 2_400;
 
 const width = NUKETOWN2_BOUNDS.maxX - NUKETOWN2_BOUNDS.minX;
 const depth = NUKETOWN2_BOUNDS.maxZ - NUKETOWN2_BOUNDS.minZ;
@@ -252,6 +317,27 @@ function planFootprint(mesh: THREE.Mesh): { x0: number; x1: number; z0: number; 
   };
 }
 
+/**
+ * HF-473. `nuketown2-arena.ts` exports its geometry-description tables in the
+ * AUTHORED frame - the frame its own builder writes in - and the world is that
+ * frame mirrored on x by `NUKETOWN2_HANDEDNESS`. This gate is where the two
+ * meet, so the conversion lives here, once, and every probe below uses it.
+ */
+/** The authored x centre of the house's internal door, read, never re-typed. */
+const INTERNAL_DOOR_CENTRE_X = NUKETOWN2_DOORWAYS
+  .find((door) => door.id === 'house internal door')!.centre;
+const WORLD_BUILDING_FOOTPRINTS = NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => {
+  const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
+  return { ...footprint, x0, x1 };
+});
+const WORLD_GROUND_DRESSING = NUKETOWN2_GROUND_DRESSING.map((piece) => {
+  const [x0, x1] = nuketown2HandedSpan(piece.x0, piece.x1);
+  return { ...piece, x0, x1 };
+});
+/** An authored window's x span, in the world. */
+const worldWindowSpan = (win: { x0: number; x1: number }): readonly [number, number] =>
+  nuketown2HandedSpan(win.x0, win.x1);
+
 describe('Nuke Town Rebuild fidelity', () => {
   it('has the reference SHAPE, at the previous cut\'s area: 36 m of street by 84 m across it', () => {
     // (1) Area is the anchor, and it is held.
@@ -357,7 +443,18 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(map.physicalCover.filter((cover) => cover.id.includes('truck'))).toHaveLength(1);
     // The cargo box is centred on the world origin ALONG the street, which is
     // load-bearing: the core's x is the box's own centre.
-    expect(truck!.bounds.minX).toBeCloseTo(-NUKETOWN2_CENTRAL_TRUCK.boxLength / 2, 10);
+    // HF-473: the authored interval, put through the same mirror the truck's
+    // own bodies go through. Asserted as the mirrored interval rather than as
+    // a re-typed number, so the two cannot drift apart.
+    const truckSpan = nuketown2HandedSpan(
+      -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2,
+      NUKETOWN2_CENTRAL_TRUCK.cabX + NUKETOWN2_CENTRAL_TRUCK.cabLength / 2,
+    );
+    expect(truck!.bounds.minX).toBeCloseTo(truckSpan[0], 10);
+    expect(truck!.bounds.maxX).toBeCloseTo(truckSpan[1], 10);
+    // The cargo box's own centre is still the world origin along the street,
+    // which is what lets the 2x core ride it: mirroring x cannot move x = 0.
+    expect(hx(0), 'the cargo box centre is a fixed point of the mirror').toBeCloseTo(0, 12);
     // HF-432 item 5: the truck stands where the REFERENCE has it, 0.076 L
     // south of the road centre-line, and the 2x core follows it because
     // OVERDRIVE_POSITION is per-arena now. HF-426 had to centre it on the
@@ -377,7 +474,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.cabLength - 0.145 * L)).toBeLessThan(TOL);
     // The 2x-damage core floats 0.60 m over the box roof, inside the pickup
     // window, and the box deck is LOW so the interior cannot claim through it.
-    expect(NUKETOWN2_CENTRAL_TRUCK.roofY).toBeCloseTo(3.15, 10);
+    expect(NUKETOWN2_CENTRAL_TRUCK.roofY).toBeCloseTo(3.25, 10);
     expect(NUKETOWN2_CENTRAL_TRUCK.deckY).toBeCloseTo(0.05, 10);
 
     // The property, measured rather than assumed: no clear standing run along
@@ -420,9 +517,11 @@ describe('Nuke Town Rebuild fidelity', () => {
     // AND in the wall plane at standing eye height.
     const t = NUKETOWN2_CENTRAL_TRUCK;
     const mouths: Array<{ id: string; x: number; z: number; plane: { x: number; z: number } }> = [
-      { id: 'rear end', x: -t.boxLength / 2 - 0.6, z: t.z, plane: { x: -t.boxLength / 2 + 0.075, z: t.z } },
-      { id: 'left flank', x: 0, z: t.z - t.width / 2 - 0.6, plane: { x: 0, z: t.z - (t.width / 2 - 0.075) } },
-      { id: 'right flank', x: 0, z: t.z + t.width / 2 + 0.6, plane: { x: 0, z: t.z + (t.width / 2 - 0.075) } },
+      // HF-473: every x below is AUTHORED and put through the handedness
+      // mirror, exactly as `streetVehicle()` does when it emits the body.
+      { id: 'rear end', x: hx(-t.boxLength / 2 - 0.6), z: t.z, plane: { x: hx(-t.boxLength / 2 + 0.075), z: t.z } },
+      { id: 'left flank', x: hx(0), z: t.z - t.width / 2 - 0.6, plane: { x: hx(0), z: t.z - (t.width / 2 - 0.075) } },
+      { id: 'right flank', x: hx(0), z: t.z + t.width / 2 + 0.6, plane: { x: hx(0), z: t.z + (t.width / 2 - 0.075) } },
     ];
     for (const mouth of mouths) {
       expect(isBlocked({ x: mouth.x, y: 1.7, z: mouth.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} mouth outside`).toBe(false);
@@ -430,7 +529,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     // ...and a standing player WALKS in through the left mouth and out the
     // right one, on the real physics, no jump.
-    const through = await walkStanding(map, [0, 1.7, t.z - t.width / 2 - 1.8], [[0, t.z + t.width / 2 + 1.8]]);
+    const through = await walkStanding(map, [hx(0), 1.7, t.z - t.width / 2 - 1.8], [[hx(0), t.z + t.width / 2 + 1.8]]);
     expect(Math.abs(through[0]!.z - (t.z + t.width / 2 + 1.8)), `side-to-side walk ended at ${JSON.stringify(through[0])}`).toBeLessThan(0.45);
 
     // REVIEW ADDITION (Opus, PASS 92). The walk above proves the openings work
@@ -450,7 +549,11 @@ describe('Nuke Town Rebuild fidelity', () => {
       const pierLow = worldBox(`truck box flank ${flank} pier 0`);
       const pierHigh = worldBox(`truck box flank ${flank} pier 1`);
       expect(header.min.y - t.deckY, `flank ${flank} opening clear height`).toBeGreaterThanOrEqual(STANDING_CAPSULE_M);
-      expect(pierHigh.min.x - pierLow.max.x, `flank ${flank} opening clear width`)
+      // The mirror swaps which authored pier ends up at the lower world x, so
+      // the gap is measured between the two bodies rather than assumed from
+      // the authored names (HF-473).
+      const gap = Math.max(pierHigh.min.x - pierLow.max.x, pierLow.min.x - pierHigh.max.x);
+      expect(gap, `flank ${flank} opening clear width`)
         .toBeGreaterThanOrEqual(2 * STANDING_RADIUS_M);
     }
     expect(t.deckY, 'step from the road onto the cargo deck, against the autostep')
@@ -461,7 +564,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(meshNames.some((name) => name.includes('coach body'))).toBe(true);
     expect(meshNames.some((name) => name.includes('coach floor'))).toBe(false);
     expect(meshNames.some((name) => name.includes('coach deck'))).toBe(false);
-    expect(isBlocked({ x: NUKETOWN2_STREET_COACH.x, y: 1.7, z: NUKETOWN2_STREET_COACH.z }, map.colliders, PLAYER_RADIUS),
+    expect(isBlocked({ x: hx(NUKETOWN2_STREET_COACH.x), y: 1.7, z: NUKETOWN2_STREET_COACH.z }, map.colliders, PLAYER_RADIUS),
       'the coach must be solid, not a room').toBe(true);
     const coach = map.physicalCover.find((cover) => cover.id === 'nuketown2-street-coach');
     expect(coach, 'exactly one coach').toBeDefined();
@@ -500,6 +603,187 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(meshNames.some((name) => name.includes('car body'))).toBe(true);
   }, 60_000);
 
+
+  // -------------------------------------------------------------------------
+  // HF-473 - HANDEDNESS. Owner, 2026-09-04, having played the reference on
+  // Steam: "the garage is always on the RIGHT of the house from behind it,
+  // whereas here both garages are on the LEFT."
+  //
+  // R4 (docs/research/2026-09-04/R4-bo2-nuketown-accuracy.md section 3) had
+  // already shown that the reference and this arena agree about the RELATION -
+  // the map is 180-degree rotationally symmetric, so both houses necessarily
+  // agree with each other - and that nothing in the arena said WHICH end, so
+  // the question could only be settled by looking at the reference. It has
+  // been. The correction is a MIRROR, not another rotation: the arena already
+  // has a rotation, and applying a second one changes nothing.
+  //
+  // These two cases are the gate that stops it silently coming back, and they
+  // measure BUILT WORLD GEOMETRY rather than the constants that produced it.
+  // -------------------------------------------------------------------------
+
+  /** World-space plan centre of the first mesh whose name ends with `suffix`. */
+  const worldPlanCentre = (map: ArenaMap, suffix: string): { x: number; z: number } => {
+    map.root.updateMatrixWorld(true);
+    let found: THREE.Mesh | undefined;
+    map.root.traverse((node) => {
+      if (found === undefined && node instanceof THREE.Mesh && node.name.endsWith(suffix)) found = node;
+    });
+    expect(found, `mesh "${suffix}"`).toBeDefined();
+    const box = new THREE.Box3().setFromObject(found!);
+    return { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 };
+  };
+
+  /**
+   * Camera-right in this engine's convention. `src/minimap.ts` states it in
+   * two places (`playerFacingGeometry`, `playerRelativeMinimapOffset`): yaw 0
+   * looks down -z and its right is +x, i.e. right = forward x up. Written as
+   * the cross product rather than as a rotation so it cannot pick up a sign by
+   * accident.
+   */
+  const rightOf = (forward: { x: number; z: number }): { x: number; z: number } => ({
+    x: -forward.z,
+    z: forward.x,
+  });
+  /** The yaw a player holds to look along `forward`, per the same convention. */
+  const yawFacing = (forward: { x: number; z: number }): number => Math.atan2(-forward.x, -forward.z);
+
+  it('puts each garage on the RIGHT of its own house, seen from that house own back-yard spawn', () => {
+    // The falsifier for HF-473, stated as arithmetic: stand on a real spawn,
+    // look at your own house, and the garage wing must be on your right. The
+    // cross product sign is the whole claim; nothing here reads a literal x.
+    const map = buildNuketown2(new THREE.Scene());
+    expect(rightOf({ x: 0, z: -1 }), 'yaw 0 looks down -z and its right is +x')
+      .toEqual({ x: 1, z: 0 });
+
+    for (const [team, house] of NUKETOWN2_HOUSE_LAYOUT.entries()) {
+      const half = team === 0 ? 'north' : 'south';
+      const houseCentre = worldPlanCentre(map, `${half} house roof deck`);
+      const garageCentre = worldPlanCentre(map, `${half} garage roof`);
+      // The two are the built bodies, so this also proves the wing is attached
+      // to an END of its house rather than to its middle.
+      expect(Math.abs(garageCentre.x - houseCentre.x), `${half} garage is a wing on an end`)
+        .toBeGreaterThan(NUKETOWN2_SECTION.houseWidth / 2);
+      expect(Math.sign(houseCentre.z), `${half} house is on its own side of the street`)
+        .toBe(Math.sign(house.z));
+
+      const spawns = NUKETOWN2_SPAWN_LAYOUT[team]!;
+      expect(spawns.length, `${half} spawn count`).toBeGreaterThanOrEqual(6);
+      for (const [x, z] of spawns) {
+        const forward = { x: houseCentre.x - x, z: houseCentre.z - z };
+        // Every spawn really is BEHIND its house: looking at the house from it
+        // means looking toward the street.
+        expect(Math.sign(forward.z), `spawn (${x}, ${z}) stands behind its house`).toBe(house.facing);
+        const right = rightOf(forward);
+        const toGarage = { x: garageCentre.x - x, z: garageCentre.z - z };
+        const side = toGarage.x * right.x + toGarage.z * right.z;
+        expect(side, `garage is on the RIGHT from ${half} spawn (${x}, ${z})`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('agrees with NUKETOWN2_HANDEDNESS on every handed feature, and the minimap agrees with the world', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const houseCentre = worldPlanCentre(map, 'north house roof deck');
+    const garageCentre = worldPlanCentre(map, 'north garage roof');
+    const garageSide = Math.sign(garageCentre.x - houseCentre.x);
+
+    // The flag and the built world are the same statement. Authored, the wing
+    // hangs off the +x end of the north house, so the world side IS the flag.
+    expect(garageSide, 'the built garage side is NUKETOWN2_HANDEDNESS').toBe(NUKETOWN2_HANDEDNESS);
+
+    // THE HALF-MIRROR GATE. Every other handed body has to be on the side the
+    // garage is on, or on the opposite side, and which of the two is fixed by
+    // what the feature IS - not by a number anyone can edit independently.
+    const onGarageSide = [
+      'north garage bench',            // the wing own workbench
+      'north verge mailbox',           // the letterbox at the end of THAT drive
+      'north verge drive edge',        // the kerb edging of the drive
+      'north car body',                // the car parked on the apron
+    ];
+    for (const suffix of onGarageSide) {
+      const centre = worldPlanCentre(map, suffix);
+      expect(Math.sign(centre.x - houseCentre.x), `${suffix} is on the garage side`).toBe(garageSide);
+    }
+    // ...and the stair, which stands against the BLIND wall precisely because
+    // the garage is on the other one (see NUKETOWN2_HOUSE_STAIR).
+    const stairCentre = worldPlanCentre(map, 'north house stair landing');
+    expect(Math.sign(stairCentre.x - houseCentre.x), 'the flight is on the blind wall')
+      .toBe(-garageSide);
+    // The driveway apron decal is authored in the same table the lawn field
+    // reads, so it is checked from that table rather than from a mesh name.
+    const drive = WORLD_GROUND_DRESSING.find((piece) => piece.id === 'street driveway')!;
+    expect(Math.sign((drive.x0 + drive.x1) / 2 - houseCentre.x), 'the driveway apron follows the garage')
+      .toBe(garageSide);
+
+    // THE MINIMAP. Atomic Acres shipped a back-to-front minimap once (owner,
+    // HF-473: "the top-right minimap was back-to-front months ago"), so a
+    // handedness fix in the world that the map contradicts is half a fix.
+    //
+    // `worldToMinimap` alone is a LEFT-handed pixel space (+x right AND +z up,
+    // which is a view from BELOW). Both consumers correct it - the player-up
+    // HUD with playerUpScaleX() = -1, the static Tri-Pass board with
+    // width - x - and this asserts both corrections, on the same three world
+    // points the case above used.
+    expect(playerUpScaleX(), 'the player-up map reflects the raw pixel space').toBe(-1);
+    const bounds = map.bounds;
+    const W = 220;
+    const H = 220;
+    const spawn = NUKETOWN2_SPAWN_LAYOUT[0]![0]!;
+    const forward = { x: houseCentre.x - spawn[0], z: houseCentre.z - spawn[1] };
+    const [playerX, playerY] = worldToMinimap(spawn[0], spawn[1], bounds, W, H);
+    const view = {
+      width: W,
+      height: H,
+      playerX,
+      playerY,
+      rotation: playerUpRotationRadians(yawFacing(forward)),
+      scaleX: playerUpScaleX(),
+    };
+    const onScreen = (x: number, z: number): [number, number] => {
+      const [px, py] = worldToMinimap(x, z, bounds, W, H);
+      return minimapPlayerViewPoint(px, py, view);
+    };
+    // The house is dead ahead, so it is ABOVE the player on a player-up map...
+    const eye = onScreen(spawn[0], spawn[1]);
+    const house = onScreen(houseCentre.x, houseCentre.z);
+    expect(house[1], 'the house is ahead, so up-screen').toBeLessThan(eye[1]);
+    // ...and the garage, which the case above proved is to the RIGHT in the
+    // world, must read RIGHT on the map.
+    //
+    // MEASURED AS A SIGN, NOT AS A HALF-SCREEN, AND THAT IS DELIBERATE. This
+    // minimap paints a 36 x 84 m arena into a SQUARE canvas (the HUD CSS says
+    // so in as many words), so `worldToMinimap` scales x by 6.1 px/m and z by
+    // 2.6 px/m. A non-uniform scale composed with the player-up rotation is
+    // not a similarity, so BEARINGS are stretched: the garage sits 12 degrees
+    // right of the player's forward in the world and lands a few pixels LEFT
+    // of the centre line on the map. What such a scale cannot do is change
+    // chirality - its determinant, with the scaleX = -1 reflection, is
+    // positive - so the SIGN of the screen-space cross product is exactly the
+    // sign of the world-space one, and that equality is the claim HF-473
+    // actually makes. The bearing stretch is a real, separate defect and it is
+    // reported OPEN rather than asserted here, because asserting it would
+    // freeze it in place.
+    const garage = onScreen(garageCentre.x, garageCentre.z);
+    // Screen y runs DOWN, so `ahead x right` is positive when the second point
+    // is to the right of the first.
+    const screenCross = (house[0] - eye[0]) * (garage[1] - eye[1])
+      - (house[1] - eye[1]) * (garage[0] - eye[0]);
+    const toGarage = { x: garageCentre.x - spawn[0], z: garageCentre.z - spawn[1] };
+    const worldCross = forward.x * toGarage.z - forward.z * toGarage.x;
+    expect(Math.sign(worldCross), 'the garage is RIGHT in the world').toBe(1);
+    expect(Math.sign(screenCross), 'the minimap agrees with the world about which side')
+      .toBe(Math.sign(worldCross));
+
+    // The static board is a bird eye view, so with +z drawn UP, +x must be
+    // drawn LEFT; the pair (+x right, +z up) is only reachable by looking up
+    // from underneath, which is exactly the defect the owner remembers.
+    const [originX, originY] = worldToTacticalMap(0, 0, bounds, W, H);
+    const [eastX] = worldToTacticalMap(10, 0, bounds, W, H);
+    const [, northY] = worldToTacticalMap(0, 10, bounds, W, H);
+    expect(eastX, 'the tactical board draws +x to the left of the origin').toBeLessThan(originX);
+    expect(northY, 'the tactical board draws +z above the origin').toBeLessThan(originY);
+  });
+
   it('builds two two-storey houses facing each other over the road, each with a garage it opens into', () => {
     const map = buildNuketown2(new THREE.Scene());
     expect(map.houseTelemetry.houses).toBe(2);
@@ -528,7 +812,145 @@ describe('Nuke Town Rebuild fidelity', () => {
     // cut now, and this probe stands in the doorway itself: house-side, garage
     // side, and the threshold between them.
     for (const x of [3.6, 4.35, 5.1]) {
-      expect(isBlocked({ x, y: 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
+      expect(isBlocked({ x, y: NUKETOWN2_GROUND_FLOOR_TOP + 1.7, z: -18.7 }, map.colliders, PLAYER_RADIUS), `garage link doorway at x=${x}`).toBe(false);
+    }
+  });
+
+  it('pins distinct blue and yellow house siding and excludes debug marker cubes', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const north = map.root.getObjectByName('nuketown2 north house wall west') as THREE.Mesh | undefined;
+    const south = map.root.getObjectByName('nuketown2 south house wall west') as THREE.Mesh | undefined;
+    expect(north, 'north house siding mesh').toBeDefined();
+    expect(south, 'south house siding mesh').toBeDefined();
+
+    const colourOf = (mesh: THREE.Mesh): THREE.Color => {
+      const material = mesh.material as THREE.Material & { color?: THREE.Color };
+      if (!material.color) throw new Error(`${mesh.name}: siding material has no base colour`);
+      return material.color;
+    };
+    const northColour = colourOf(north!);
+    const southColour = colourOf(south!);
+    expect(northColour.getHex(), 'north house keeps the blue base').toBe(0x46809f);
+    expect(southColour.getHex(), 'south house keeps the yellow base').toBe(0xf4be36);
+    expect(northColour.equals(southColour), 'house siding bases must differ').toBe(false);
+    const rgbDistance = Math.hypot(
+      northColour.r - southColour.r,
+      northColour.g - southColour.g,
+      northColour.b - southColour.b,
+    );
+    expect(rgbDistance, 'house siding colour margin').toBeGreaterThan(0.45);
+
+    const forbidden = new Set<string>();
+    map.root.traverse((node) => {
+      if (/(?:^|[-_ ])(?:debug|marker)(?:$|[-_ ])/i.test(node.name)) forbidden.add(node.name);
+      const material = node instanceof THREE.Mesh
+        ? node.material as THREE.Material & { color?: THREE.Color }
+        : undefined;
+      const hex = material?.color?.getHex();
+      if (hex === 0xff00ff) forbidden.add(`${node.name}:magenta`);
+      if (hex === 0x9d6bff) forbidden.add(`${node.name}:purple-marker`);
+    });
+    expect([...forbidden], 'Nuke Town must not ship QA marker cubes').toEqual([]);
+  });
+
+  it('raises every interior slab and cuts outdoor ground and lawn from structures and carriageway', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const overlap = (first: { x0: number; x1: number; z0: number; z1: number },
+      second: { x0: number; x1: number; z0: number; z1: number }): number => (
+      Math.max(0, Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0))
+      * Math.max(0, Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0))
+    );
+    // HF-473: NUKETOWN2_BUILDING_FOOTPRINTS is an AUTHORED table (the ground
+    // builder cuts with it before `centred()` mirrors the tiles), so it is put
+    // through the same mirror here before being compared against built,
+    // world-frame geometry.
+    const footprints = [
+      ...WORLD_BUILDING_FOOTPRINTS,
+      ...WORLD_BUILDING_FOOTPRINTS.map((footprint) => ({
+        x0: -footprint.x1,
+        x1: -footprint.x0,
+        z0: -footprint.z1,
+        z1: -footprint.z0,
+      })),
+      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
+    ];
+    const floors = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && (node.name.endsWith('house floor') || node.name.endsWith('garage floor'))
+    ));
+    expect(floors, 'two house floors and two garage floors').toHaveLength(4);
+    for (const floor of floors) {
+      const floorBox = new THREE.Box3().setFromObject(floor);
+      expect(floorBox.max.y, `${floor.name} top`).toBeGreaterThanOrEqual(0.05);
+      expect(floorBox.max.y, `${floor.name} uses the raised floor datum`)
+        .toBeCloseTo(NUKETOWN2_GROUND_FLOOR_TOP, 6);
+    }
+    const lowerInteriorEdges = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh
+      && (node.name.includes('ground partition') || node.name.includes('ground baseboard'))
+    ));
+    expect(lowerInteriorEdges.length, 'ground partition and skirting are present').toBeGreaterThan(0);
+    for (const edge of lowerInteriorEdges) {
+      const edgeBox = new THREE.Box3().setFromObject(edge);
+      expect(edgeBox.min.y, `${edge.name} has no gap above the floor`).toBeLessThanOrEqual(NUKETOWN2_GROUND_FLOOR_TOP);
+      expect(edgeBox.max.y, `${edge.name} reaches the raised floor`).toBeGreaterThanOrEqual(NUKETOWN2_GROUND_FLOOR_TOP);
+    }
+
+    const dressingIds = new Set(NUKETOWN2_GROUND_DRESSING.map((piece) => piece.id));
+    const outdoorBoxes = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh
+      && (node.name.includes('ground tile') || [...dressingIds].some((id) => node.name.includes(id)))
+    ));
+    expect(outdoorBoxes.length, 'ground tiles and authored dressing remain auditable').toBeGreaterThan(0);
+    for (const outdoor of outdoorBoxes) {
+      const plan = planFootprint(outdoor);
+      for (const footprint of footprints) {
+        expect(overlap(plan, footprint), `${outdoor.name} inside ${JSON.stringify(footprint)}`).toBe(0);
+      }
+    }
+
+    // The instanced field has no BoxGeometry to inspect, so audit its canonical
+    // lawn regions directly from the same dressing table the builder consumes.
+    for (const region of nuketownRebuildLawnRegions(WORLD_GROUND_DRESSING)) {
+      for (const footprint of footprints) {
+        expect(overlap({ x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ }, footprint),
+          `lawn region inside ${JSON.stringify(footprint)}`).toBe(0);
+      }
+    }
+  });
+
+  it('keeps every instanced grass root outside the collider-driven cover keep-outs', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const lawnMeshes: THREE.InstancedMesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.InstancedMesh && node.name.startsWith('nuketown2-lawn-region-')) lawnMeshes.push(node);
+    });
+    expect(lawnMeshes.length, 'Nuke Town lawn regions').toBeGreaterThan(0);
+
+    // Ground tiles are the only builder colliders with the exact [-1.4, 0]
+    // floor slab band. The lawn builder receives every collider after that
+    // ground prefix, so this reconstructs its actual keep-out input rather
+    // than maintaining a second cover table in the test.
+    const keepOuts = map.colliders.filter((bounds) => !(
+      Math.abs((bounds.minY ?? 0) + 1.4) < 1e-9
+      && Math.abs((bounds.maxY ?? 0)) < 1e-9
+    ));
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    for (const mesh of lawnMeshes) {
+      for (let index = 0; index < mesh.count; index += 1) {
+        mesh.getMatrixAt(index, matrix);
+        position.setFromMatrixPosition(matrix);
+        mesh.localToWorld(position);
+        const overlap = keepOuts.find((bounds) => (
+          position.x > bounds.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.x < bounds.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.z > bounds.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.z < bounds.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+        ));
+        expect(overlap, `${mesh.name}[${index}] grass root clips a solid`).toBeUndefined();
+      }
     }
   });
 
@@ -546,6 +968,13 @@ describe('Nuke Town Rebuild fidelity', () => {
     const map = buildNuketown2(new THREE.Scene());
     const stair = NUKETOWN2_HOUSE_STAIR;
     const cx = stair.x0 + stair.width / 2;
+    const rampMeshes = map.root.children.filter((node): node is THREE.Mesh => node.name.includes('house stair ramp'));
+    expect(rampMeshes, 'one collision-only ramp per house flight').toHaveLength(2);
+    for (const ramp of rampMeshes) {
+      expect(ramp.userData.collisionOnly, `${ramp.name} collision-only registration`).toBe(true);
+      expect(ramp.visible, `${ramp.name} remains in the parity scene graph`).toBe(true);
+      expect((ramp.material as THREE.Material).visible, `${ramp.name} is not rendered`).toBe(false);
+    }
 
     // The authored flight has to be walkable BY THE ENGINE'S OWN NUMBERS, not
     // by eye: the riser inside autostep, the going wider than the autostep
@@ -554,19 +983,28 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(STANDING_RADIUS_M).toBeCloseTo(0.38, 10);
     expect(stair.riser).toBeLessThan(CHARACTER_PHYSICS_CONFIG.autostepHeight);
     expect(stair.going).toBeGreaterThan(CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth);
-    expect(stair.riser * stair.risers).toBeCloseTo(3.3, 10);
+    expect(stair.riser * stair.risers).toBeCloseTo(NUKETOWN2_UPPER_Y0 - NUKETOWN2_GROUND_FLOOR_TOP, 10);
 
     for (const house of NUKETOWN2_HOUSE_LAYOUT) {
       const s = house.facing;   // north house +1, south house is its exact negation
-      const at = (x: number, z: number) => [s * x, s * z] as const;
-      const trace = await walkStanding(map, [s * (cx + 2.6), 1.7, s * -21.0], [
+      // HF-473: `cx` and every offset below are AUTHORED (the flight is
+      // against the house's blind wall and climbs inboard); `hx` puts them in
+      // the world, and `s` then takes the 180-degree partner, exactly as
+      // `pair()` does.
+      const at = (x: number, z: number) => [s * hx(x), s * z] as const;
+      const upProbe = await walkStandingDetailed(map, [s * hx(cx + 2.6), 1.7, s * -21.0], [
         at(cx + 2.6, -22.2),    // along the back wall, behind the flight
         at(cx, -22.2),          // square on to the bottom tread
         at(cx, -17.0),          // up the flight and onto the landing
         at(cx, -13.0),          // through the head of the stair into the FRONT upper room
-        at(-2.7, -13.0),        // across to the internal door
-        at(-2.7, -19.5),        // and back into the BACK upper room
-      ]);
+        at(INTERNAL_DOOR_CENTRE_X, -13.0),   // across to the internal door
+        at(INTERNAL_DOOR_CENTRE_X, -19.5),   // and back into the BACK upper room
+      ], STAIR_TRAVERSAL_FRAME_BUDGET);
+      const trace = upProbe.trace;
+      expect(upProbe.completed, `${house.id} up stair completed within the frame budget`).toBe(true);
+      expect(upProbe.frameCount, `${house.id} up stair frame budget`).toBeLessThanOrEqual(STAIR_TRAVERSAL_FRAME_BUDGET);
+      expect(upProbe.maxConsecutiveUngroundedFrames, `${house.id} up stair ground contact`).toBeLessThanOrEqual(1);
+      expect(upProbe.slopeAdjustedFrames, `${house.id} up stair used the smooth ramp`).toBeGreaterThan(0);
       const label = (index: number) => `${house.id} waypoint ${index} at ${JSON.stringify(trace[index])}`;
       // Still on the ground floor for the approach.
       expect(trace[1]!.y, label(1)).toBeLessThan(2.0);
@@ -578,18 +1016,27 @@ describe('Nuke Town Rebuild fidelity', () => {
       // ...and back through the internal door into the BACK upper room.
       expect(trace[5]!.y, label(5)).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
       expect(Math.sign(trace[5]!.z - house.z), label(5)).toBe(-house.facing);
-      expect(Math.hypot(trace[5]!.x - s * -2.7, trace[5]!.z - s * -19.5), label(5)).toBeLessThan(0.8);
+      expect(Math.hypot(trace[5]!.x - s * hx(INTERNAL_DOOR_CENTRE_X), trace[5]!.z - s * -19.5), label(5))
+        .toBeLessThan(0.8);
 
       // HF-435: ...and DOWN again. The owner: "being able to walk up and down
       // stairs". The up-route above proves the climb; this one starts in the
       // FRONT upper room, takes the landing, and descends the whole flight
       // walking (no jump), ending on the back-room ground floor.
-      const down = await walkStanding(map, [s * cx, NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
+      const downProbe = await walkStandingDetailed(map, [s * hx(cx), NUKETOWN2_UPPER_Y0 + 1.7, s * -13.5], [
         at(cx, -14.8),          // out of the front upper room toward the landing
         at(cx, -17.0),          // onto the landing, turned down the flight
-        at(cx, -21.5),          // down the flight, treads 0.30 m each
+        at(cx, -21.5),          // down the smooth flight
         at(cx + 2.4, -22.3),    // off the bottom tread into the BACK room
-      ]);
+      ], STAIR_TRAVERSAL_FRAME_BUDGET);
+      const down = downProbe.trace;
+      expect(downProbe.completed, `${house.id} down stair completed within the frame budget`).toBe(true);
+      expect(downProbe.frameCount, `${house.id} down stair frame budget`).toBeLessThanOrEqual(STAIR_TRAVERSAL_FRAME_BUDGET);
+      expect(downProbe.maxConsecutiveUngroundedFrames, `${house.id} down stair ground contact`).toBeLessThanOrEqual(1);
+      expect(downProbe.slopeAdjustedFrames, `${house.id} down stair used the smooth ramp`).toBeGreaterThan(0);
+      if (process.env.NUKETOWN2_STAIR_PROBE_REPORT === '1') {
+        console.log(`STAIR-PROBE ${house.id} up=${JSON.stringify({ frames: upProbe.frameCount, maxUngrounded: upProbe.maxConsecutiveUngroundedFrames, slopeAdjusted: upProbe.slopeAdjustedFrames, waypoints: upProbe.waypointFrames })} down=${JSON.stringify({ frames: downProbe.frameCount, maxUngrounded: downProbe.maxConsecutiveUngroundedFrames, slopeAdjusted: downProbe.slopeAdjustedFrames, waypoints: downProbe.waypointFrames })}`);
+      }
       const downLabel = (index: number) => `${house.id} down waypoint ${index} at ${JSON.stringify(down[index])}`;
       // REVIEW TIGHTENING (Opus, PASS 92). The original pair of assertions only
       // said "ended up low", which a capsule that fell through a hole in the
@@ -613,9 +1060,14 @@ describe('Nuke Town Rebuild fidelity', () => {
     // standing capsule, and a landing at least a capsule diameter deep, all
     // computed from the same NUKETOWN2_STAIRWELL numbers the build used.
     const well = NUKETOWN2_STAIRWELL;
+    expect(well.rampBottomY, 'ramp bottom meets the raised floor').toBe(NUKETOWN2_GROUND_FLOOR_TOP);
+    expect(well.rampTopY, 'ramp top meets the upper landing').toBe(NUKETOWN2_UPPER_Y0);
+    expect(well.landingOverlap, 'ramp bottom/top landing overlap').toBeGreaterThan(0);
+    expect(well.rampAngleRadians, 'ramp stays below the controller slope ceiling')
+      .toBeLessThan(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);
     const deckUnderside = NUKETOWN2_WINDOWS.find((entry) => entry.id === 'upper front')!.headY;
     for (let i = 0; i < NUKETOWN2_HOUSE_STAIR.risers - 1; i += 1) {
-      const top = NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
+      const top = NUKETOWN2_GROUND_FLOOR_TOP + NUKETOWN2_HOUSE_STAIR.riser * (i + 1);
       const centreZ = well.footZ + NUKETOWN2_HOUSE_STAIR.going * (i + 0.5);
       const ceiling = centreZ < well.wellZ0 ? NUKETOWN2_GROUND_STOREY_H : deckUnderside;
       // REVIEW TIGHTENING (Opus, PASS 92). The rule this arena DERIVED is
@@ -637,44 +1089,68 @@ describe('Nuke Town Rebuild fidelity', () => {
     // HF-435, owner after PASS 91: "go out of windows and putting glass on the
     // windows."
     //
-    // GROUND floor: the pane is a real collider (a shoulder does not cross it)
-    // and a real glass ballistic surface (a bullet pays the glass entry cost
-    // and crosses). UPSTAIRS: no collider across the opening, sill at or below
+    // GROUND floor: the pane is a real dynamic collider (a shoulder does not
+    // cross an intact pane) and a real glass ballistic surface (a bullet pays
+    // the glass entry cost and crosses). UPSTAIRS: no collider across the opening, sill at or below
     // 1.1 m over the floor, and a standing capsule that hops the sill crosses
     // the wall plane and DROPS outside - probed on the real physics.
     const map = buildNuketown2(new THREE.Scene());
     const names = map.root.children.map((node) => node.name);
+    const glassColliders = deriveGlassDynamicColliders(map.breakableWindows);
+    expect(map.breakableWindows, 'ground and upper panes register with glass authority').toHaveLength(8);
+    expect(glassColliders, 'all intact ground and upper panes derive movement colliders').toHaveLength(8);
 
     for (const [index, win] of NUKETOWN2_WINDOWS.entries()) {
       const width = win.x1 - win.x0;
       expect(width, `${win.id} opening width`).toBeGreaterThanOrEqual(1.0);
-      const wx = (win.x0 + win.x1) / 2;
+      const worldSpan = worldWindowSpan(win);
+      const wx = (worldSpan[0] + worldSpan[1]) / 2;
       if (win.pane) {
-        // The pane: present, a movement collider spanning sill to head, and
-        // glass for gunfire - in BOTH houses (the partner is the exact
-        // 180-degree image).
+        // The pane: present, a dynamic movement collider spanning sill to head,
+        // and glass for gunfire - in BOTH houses (the partner is the exact
+        // 180-degree image). The pane is deliberately absent from static
+        // colliders so the shared breakable-window lifecycle can open it.
         const paneName = `house front window glass ${index}`;
         expect(names.filter((name) => name.endsWith(paneName)), paneName).toHaveLength(2);
-        const collider = map.colliders.find((bounds) => (
+        expect(map.breakableWindows.filter((pane) => pane.id.includes(`nuketown2-ground-window-${index}`)),
+          `${win.id} panes register with glass authority`).toHaveLength(2);
+        const collider = glassColliders.find((entry) => (
+          entry.id.includes(`nuketown2-ground-window-${index}`)
+          && Math.abs(entry.bounds.maxX - entry.bounds.minX - width) < 0.01
+          && Math.abs((entry.bounds.minY ?? 0) - win.sillTop) < 0.01
+          && Math.abs((entry.bounds.maxY ?? 0) - win.headY) < 0.01
+        ))?.bounds;
+        expect(collider, `${win.id} dynamic pane movement collider`).toBeDefined();
+        expect(map.colliders.some((bounds) => (
           Math.abs((bounds.maxX - bounds.minX) - width) < 0.01
           && Math.abs((bounds.minY ?? 0) - win.sillTop) < 0.01
           && Math.abs((bounds.maxY ?? 0) - win.headY) < 0.01
-        ));
-        expect(collider, `${win.id} pane movement collider`).toBeDefined();
+        )), `${win.id} pane must not return as a static invisible wall`).toBe(false);
         const surface = map.shotSurfaces.find((entry) => entry.id.includes(paneName));
         expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
         expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
         // NOT walk-through, in both houses.
         for (const sign of [1, -1] as const) {
-          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, map.colliders, PLAYER_RADIUS),
+          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, [...map.colliders, ...glassColliders.map((entry) => entry.bounds)], PLAYER_RADIUS),
             `${win.id} pane blocks a standing capsule`).toBe(true);
         }
       } else {
-        // Upstairs: sill height at or below the brief's 1.1 m, and NOTHING
-        // across the opening - a capsule standing on the sill (eye sill + 1.7)
-        // is unobstructed at the wall plane.
+        // Upstairs: the lower drop-out remains an opening, while the authored
+        // upper sash is a breakable glass surface. Its dynamic collider is
+        // intentionally separate from static map colliders, so the existing
+        // drop-out route remains available after the pane breaks.
         expect(win.sillTop - NUKETOWN2_UPPER_Y0, `${win.id} sill height over the floor`)
           .toBeLessThanOrEqual(1.1);
+        const windowKey = win.id === 'upper front' ? 'upper-front' : 'upper-back';
+        expect(map.breakableWindows.filter((pane) => pane.id.includes(`nuketown2-${windowKey}-window`)),
+          `${win.id} panes register with glass authority`).toHaveLength(2);
+        expect(glassColliders.filter((entry) => entry.id.includes(`nuketown2-${windowKey}-window`)),
+          `${win.id} intact panes derive movement colliders`).toHaveLength(2);
+        const surface = map.shotSurfaces.find((entry) => entry.id.includes(`house ${windowKey.replace('-', ' ')} window glass`));
+        expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
+        expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
+        // No STATIC collider returns across the drop-out opening. The active
+        // dynamic glass collider is consumed only by the shared live authority.
         expect(isBlocked({ x: wx, y: win.sillTop + 1.7, z: win.wallZ }, map.colliders, PLAYER_RADIUS),
           `${win.id} opening is clear`).toBe(false);
       }
@@ -688,7 +1164,8 @@ describe('Nuke Town Rebuild fidelity', () => {
       for (const house of NUKETOWN2_HOUSE_LAYOUT) {
         const s = house.facing;   // north +1, south is its exact negation
         for (const win of NUKETOWN2_WINDOWS.filter((entry) => !entry.pane)) {
-          const wx = s * (win.x0 + win.x1) / 2;
+          const span = worldWindowSpan(win);
+          const wx = s * (span[0] + span[1]) / 2;
           const wallZ = s * win.wallZ;
           // OUTWARD is the direction off the wall away from the room: +s for
           // the front wall (toward the road), -s for the back wall (into the
@@ -752,26 +1229,31 @@ describe('Nuke Town Rebuild fidelity', () => {
     // below this one.
     const map = buildNuketown2(new THREE.Scene());
 
+    // HF-465: every probe below measures from the doorway's OWN floor. The
+    // rear-balcony door is the first opening on this map that is not on the
+    // ground floor, and measured from 0 it would have reported the
+    // ground-floor back door's lintel instead of its own head.
     /** Lowest solid overhead at (x, z); 0 if anything stands at floor level. */
-    const clearHeight = (x: number, z: number): number => {
+    const clearHeight = (x: number, z: number, floorY: number): number => {
       let lowest = Number.POSITIVE_INFINITY;
       for (const bounds of map.colliders) {
         const minY = bounds.minY ?? 0;
         const maxY = bounds.maxY ?? minY + 3;
         if (x <= bounds.minX || x >= bounds.maxX || z <= bounds.minZ || z >= bounds.maxZ) continue;
-        if (maxY <= 0.25) continue;                 // floor slabs, kerbs, ground decals
-        if (minY < 0.25) return 0;                  // a solid, not an opening
+        if (maxY <= floorY + 0.25) continue;        // floor slabs, kerbs, ground decals
+        if (minY < floorY + 0.25) return 0;         // a solid, not an opening
         if (minY < lowest) lowest = minY;
       }
-      return lowest;
+      return lowest - floorY;
     };
     /** Free width of the opening at chest height, along its own span axis. */
-    const clearWidth = (x: number, z: number, span: 'x' | 'z'): number => {
+    const clearWidth = (x: number, z: number, span: 'x' | 'z', floorY: number): number => {
+      const chest = floorY + 1.0;
       const solid = (px: number, pz: number) => map.colliders.some((bounds) => {
         const minY = bounds.minY ?? 0;
         const maxY = bounds.maxY ?? minY + 3;
         return px > bounds.minX && px < bounds.maxX && pz > bounds.minZ && pz < bounds.maxZ
-          && minY < 1.0 && maxY > 1.0;
+          && minY < chest && maxY > chest;
       });
       let low = 0;
       let high = 0;
@@ -791,12 +1273,13 @@ describe('Nuke Town Rebuild fidelity', () => {
 
     for (const door of NUKETOWN2_DOORWAYS) {
       for (const sign of [1, -1] as const) {          // the door AND its 180-degree partner
-        const x = sign * (door.span === 'x' ? door.centre : door.at);
+        // HF-473: whichever of `centre`/`at` is the x quantity is AUTHORED.
+        const x = sign * hx(door.span === 'x' ? door.centre : door.at);
         const z = sign * (door.span === 'x' ? door.at : door.centre);
         const label = `${door.id}${sign === 1 ? '' : ' (partner)'}`;
-        expect(clearHeight(x, z), `${label} head`).toBeCloseTo(door.headY, 6);
-        expect(clearHeight(x, z), `${label} head`).toBeGreaterThanOrEqual(HEAD_FLOOR);
-        expect(clearWidth(x, z, door.span), `${label} width`).toBeGreaterThanOrEqual(door.width - 0.03);
+        expect(clearHeight(x, z, door.floorY), `${label} head`).toBeCloseTo(door.headY, 6);
+        expect(clearHeight(x, z, door.floorY), `${label} head`).toBeGreaterThanOrEqual(HEAD_FLOOR);
+        expect(clearWidth(x, z, door.span, door.floorY), `${label} width`).toBeGreaterThanOrEqual(door.width - 0.03);
         // Two capsule widths plus a body of slack: a door two players use.
         expect(door.width, `${label} authored width`).toBeGreaterThanOrEqual(4 * STANDING_RADIUS_M + 0.2);
       }
@@ -804,11 +1287,11 @@ describe('Nuke Town Rebuild fidelity', () => {
       // physics, with gravity and no jump. A door that measures right and
       // catches on the frame is exactly the defect being fixed.
       const through: [number, number] = door.span === 'x' ? [0, 1] : [1, 0];
-      const centreX = door.span === 'x' ? door.centre : door.at;
+      const centreX = hx(door.span === 'x' ? door.centre : door.at);
       const centreZ = door.span === 'x' ? door.at : door.centre;
       const near: [number, number] = [centreX - through[0] * 1.6, centreZ - through[1] * 1.6];
       const far: [number, number] = [centreX + through[0] * 1.6, centreZ + through[1] * 1.6];
-      const trace = await walkStanding(map, [near[0], 1.7, near[1]], [far]);
+      const trace = await walkStanding(map, [near[0], door.floorY + 1.7, near[1]], [far]);
       expect(
         Math.hypot(trace[0]!.x - far[0], trace[0]!.z - far[1]),
         `${door.id} walk-through ended at ${JSON.stringify(trace[0])}`,
@@ -890,7 +1373,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(NUKETOWN2_RARE_GUN_SITES).toHaveLength(2);
     for (const [index, site] of NUKETOWN2_RARE_GUN_SITES.entries()) {
       const house = NUKETOWN2_HOUSE_LAYOUT[index]!;
-      expect(site.position[0]).toBeCloseTo(house.x, 10);
+      // The site is a WORLD export (railgun-authority reads it directly);
+      // NUKETOWN2_HOUSE_LAYOUT is AUTHORED. HF-473.
+      expect(site.position[0]).toBeCloseTo(hx(house.x), 10);
       // In the FRONT upper room, toward the street: the house mid-line is where
       // the internal partition stands.
       expect(Math.sign(site.position[2] - house.z)).toBe(house.facing);
@@ -1194,7 +1679,7 @@ describe('Nuke Town Rebuild fidelity', () => {
   it('gives the 2x-damage core to the truck roof and to nobody else', () => {
     // THE OWNER'S FIRST KEPT FEATURE, measured against the REAL rule rather than
     // against the geometry the rule is supposed to imply. An early cut asserted
-    // only "roofY is 3.15 and the body is centred" and shipped a core that could
+    // only "roofY is fixed and the body is centred" and shipped a core that could
     // be taken from INSIDE the vehicle - which is exactly the case
     // src/overdrive.ts' v6 height-window tightening exists to prevent.
     const EYE = 1.7; // movementProfile(standing).eyeHeight
@@ -1225,14 +1710,14 @@ describe('Nuke Town Rebuild fidelity', () => {
     // Standing on the CAB roof: REJECTED by radius. The cab roof is a real
     // walkable surface on the climb route, and it is 0.25 m below the box roof,
     // so height alone would admit it.
-    expect(claimFrom(t.cabRoofY, t.cabX, t.z), 'cab roof').toBe(false);
+    expect(claimFrom(t.cabRoofY, hx(t.cabX), t.z), 'cab roof').toBe(false);
     // Standing on any roof-access tread: REJECTED - not by height (the top tread
     // is well inside the height window) but by RADIUS, because every tread
     // footprint is more than 1.65 m from the core in plan. Climbing half way
     // must not be a way to take the core out of a covered position.
     const treadZ = t.z - (t.width / 2 + 2.45) / 2;
     for (const [top, x0, x1] of [[0.80, 7.0, 8.2], [1.75, 5.8, 7.0], [2.60, 4.6, 5.8]] as const) {
-      for (const x of [x0, x1, (x0 + x1) / 2]) {
+      for (const x of [hx(x0), hx(x1), hx((x0 + x1) / 2)]) {
         for (const z of [treadZ - 0.55, treadZ, treadZ + 0.55]) {
           expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
         }
@@ -1244,7 +1729,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // The other half of the same defect: a core on a roof nobody can reach is
     // not a feature. Simulated on the REAL CharacterPhysics against the REAL
     // built colliders - jump apex from flat ground is 6.35^2 / (2 x 24.5) =
-    // 0.82 m and autostep is 0.42 m, so a 3.15 m roof with nothing beside it is
+    // 0.82 m and autostep is 0.42 m, so a 3.25 m roof with nothing beside it is
     // unreachable.
     const map = buildNuketown2(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
@@ -1257,10 +1742,12 @@ describe('Nuke Town Rebuild fidelity', () => {
       // so the climb is contested rather than handed to whichever team the
       // truck's 0.076 L offset put it nearer.
       const treadZ = t.z - (t.width / 2 + 2.45) / 2;
+      // Authored x, mirrored (HF-473) - the treads themselves are emitted
+      // through `pair()` and moved with the map.
       const route: Array<[number, number]> = [
-        [7.6, treadZ], [6.4, treadZ], [5.2, treadZ], [t.cabX, t.z], [0, t.z],
+        [hx(7.6), treadZ], [hx(6.4), treadZ], [hx(5.2), treadZ], [hx(t.cabX), t.z], [hx(0), t.z],
       ];
-      physics.teleportEye({ x: 9.6, y: 1.9, z: treadZ });
+      physics.teleportEye({ x: hx(9.6), y: 1.9, z: treadZ });
       let vy = 0;
       for (const waypoint of route) {
         for (let step = 0; step < 420; step += 1) {
@@ -1287,6 +1774,195 @@ describe('Nuke Town Rebuild fidelity', () => {
       physics.dispose();
     }
   }, 60_000);
+
+
+  // -------------------------------------------------------------------------
+  // HF-465 - THE REAR BALCONY, ITS EXTERIOR FLIGHT AND THE FRONT CLIMB CHAIN.
+  // R4 section 5: the reference's house has a rear balcony with a staircase
+  // down to the back lawn (the second of its three routes upstairs), a ledge
+  // under the second-storey window, and a front window that is an ENTRY. Ours
+  // had none of the three; grep for balcony or ledge returned nothing.
+  // -------------------------------------------------------------------------
+
+  it('gives every house a SECOND way upstairs: yard, exterior flight, balcony, door', async () => {
+    // The claim, walked rather than measured: a STANDING capsule on the real
+    // CharacterPhysics, gravity on and NO JUMP, starts on the back lawn at the
+    // foot of the exterior flight, climbs it, crosses the deck and walks in
+    // through the balcony door into the upper back room. The interior stair
+    // probe above is route one; this is route two.
+    const map = buildNuketown2(new THREE.Scene());
+    const bal = NUKETOWN2_BALCONY;
+    const flight = NUKETOWN2_YARD_STAIR;
+
+    // The flight is walkable BY THE ENGINE'S OWN NUMBERS before it is walked,
+    // exactly as the interior stair is.
+    expect(flight.riser).toBeLessThan(CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    expect(flight.going).toBeGreaterThan(CHARACTER_PHYSICS_CONFIG.autostepMinimumWidth);
+    expect(flight.riser * flight.risers, 'the flight spans exactly the upper floor')
+      .toBeCloseTo(NUKETOWN2_UPPER_Y0, 10);
+    expect(flight.width, 'the flight is wider than a standing capsule')
+      .toBeGreaterThan(2 * STANDING_RADIUS_M);
+    expect(flight.rampAngleRadians, 'the flight stays below the controller slope ceiling')
+      .toBeLessThan(CHARACTER_PHYSICS_CONFIG.maximumSlopeClimbDegrees * Math.PI / 180);
+    // Nothing is over it, so STAIR_MAX_FEET_UNDER_CEILING - the rule the
+    // interior flight had to be re-derived against - cannot bite here.
+    for (let i = 0; i < flight.risers; i += 1) {
+      const x = hx(flight.topX - flight.going * (i + 0.5));
+      const feet = bal.deckTop - flight.riser * (i + 1);
+      const ceiling = map.colliders.reduce((lowest, bounds) => {
+        const minY = bounds.minY ?? 0;
+        if (x <= bounds.minX || x >= bounds.maxX) return lowest;
+        if (flight.centreZ <= bounds.minZ || flight.centreZ >= bounds.maxZ) return lowest;
+        if (minY < feet + 0.05) return lowest;
+        return Math.min(lowest, minY);
+      }, Number.POSITIVE_INFINITY);
+      expect(ceiling - feet, `exterior tread ${i} headroom`)
+        .toBeGreaterThanOrEqual(STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    }
+
+    const ramps = map.root.children.filter((node): node is THREE.Mesh => node.name.includes('yard stair ramp'));
+    expect(ramps, 'one collision-only ramp per exterior flight').toHaveLength(2);
+    for (const ramp of ramps) {
+      expect(ramp.userData.collisionOnly, `${ramp.name} collision-only registration`).toBe(true);
+      expect((ramp.material as THREE.Material).visible, `${ramp.name} is not rendered`).toBe(false);
+    }
+
+    // The back wall's own z, read from the doorway table rather than re-typed.
+    const backWallZ = NUKETOWN2_DOORWAYS.find((door) => door.id === 'house balcony door')!.at;
+    for (const house of NUKETOWN2_HOUSE_LAYOUT) {
+      const s = house.facing;
+      const at = (x: number, z: number) => [s * hx(x), s * z] as const;
+      const probe = await walkStandingDetailed(map,
+        [s * hx(flight.footX - 1.4), 1.7, s * flight.centreZ], [
+          at(flight.footX, flight.centreZ),          // onto the bottom of the flight
+          at(flight.topX + 0.5, flight.centreZ),     // up it and onto the deck
+          at(bal.centreX, backWallZ - 0.85),         // across the deck, square on to the door
+          at(bal.centreX, backWallZ + 1.6),          // through it, into the upper back room
+        ], STAIR_TRAVERSAL_FRAME_BUDGET);
+      expect(probe.completed, `${house.id} exterior flight completed within the frame budget`).toBe(true);
+      expect(probe.maxConsecutiveUngroundedFrames, `${house.id} exterior flight ground contact`)
+        .toBeLessThanOrEqual(1);
+      expect(probe.slopeAdjustedFrames, `${house.id} exterior flight used the smooth ramp`)
+        .toBeGreaterThan(0);
+      const onDeck = probe.trace[1]!;
+      expect(onDeck.y, `${house.id} reached the deck`).toBeGreaterThan(bal.deckTop + 1.6);
+      const inside = probe.trace[3]!;
+      expect(inside.y, `${house.id} stood in the upper back room`).toBeGreaterThan(NUKETOWN2_UPPER_Y0 + 1.6);
+      // ...and it really is the BACK upper room, on the yard side of the
+      // house's own mid-line.
+      expect(Math.sign(inside.z - house.z), `${house.id} ended in the BACK upper room`).toBe(-house.facing);
+    }
+  }, 180_000);
+
+  it('makes the balcony cover you shoot over and a drop that costs something', () => {
+    // R4 section 5.1 and 5.4. The rail is a COVER CLASS decision and the vault
+    // off it is a GAMEPLAY CONTRACT, so both are asserted against the arena's
+    // own numbers and the shipped fall-damage curve rather than restated.
+    const bal = NUKETOWN2_BALCONY;
+    // Above the map's waist-high cover class, so it breaks a crouched line...
+    expect(bal.railHeight, 'the rail is at least waist-high cover').toBeGreaterThan(0.95);
+    // ...and under the standing eye `isBlocked` itself models (1.65 m of body
+    // beneath the eye), so a standing player shoots across it.
+    expect(bal.railHeight, 'a standing player shoots over the rail').toBeLessThan(1.65);
+    // The soffit clears a standing player walking under the deck - the back
+    // door's own approach runs beneath it.
+    expect(bal.deckTop - bal.slabThickness, 'deck soffit over the back-door approach')
+      .toBeGreaterThan(STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    // A deck you can turn on and pass someone on, not a Juliet balcony.
+    expect(bal.projection, 'deck depth against the standing capsule')
+      .toBeGreaterThan(2 * (2 * STANDING_RADIUS_M));
+
+    // DROP-OUT SEMANTICS. The free-fall height that costs nothing is
+    // v^2 / 2g from the shipped safe speed and the shipped gravity; the vault
+    // is higher than that, so it costs - and the cost comes from
+    // `computeFallDamage`, called, not restated.
+    const g = Math.abs(CHARACTER_PHYSICS_CONFIG.gravity);
+    const freeHeight = (FALL_DAMAGE_SAFE_SPEED * FALL_DAMAGE_SAFE_SPEED) / (2 * g);
+    expect(freeHeight, 'the no-damage fall height, derived').toBeCloseTo(2.05, 2);
+    expect(bal.deckTop, 'the rail vault is a real drop').toBeGreaterThan(freeHeight);
+    const vaultDamage = computeFallDamage(Math.sqrt(2 * g * bal.deckTop));
+    expect(vaultDamage, 'vaulting the rail costs something').toBeGreaterThan(0);
+    expect(vaultDamage, 'vaulting the rail is a fast exit, not a punishment').toBeLessThan(10);
+    // The exterior flight is the FREE route off the same deck.
+    expect(computeFallDamage(0), 'walking the flight down is free').toBe(0);
+  });
+
+  it('makes the front window a two-way opening: every climb in the chain is inside one move', () => {
+    // R4 section 5.3. The ledge exists so the upper front window - the
+    // position Activision's own guide calls the map's biggest - is contestable
+    // from outside instead of being a sniper's box.
+    //
+    // TWO THINGS ARE ASSERTED, and R4's table only states the first: each step
+    // is inside what a player takes in ONE move, AND each step stands directly
+    // over the one below it in plan. A chain of correct heights that do not
+    // overlap is a jump puzzle, not a route.
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const worldBox = (suffix: string): THREE.Box3 => {
+      let found: THREE.Mesh | undefined;
+      map.root.traverse((node) => {
+        if (found === undefined && node instanceof THREE.Mesh && node.name.endsWith(suffix)) found = node;
+      });
+      expect(found, `body "${suffix}"`).toBeDefined();
+      return new THREE.Box3().setFromObject(found!);
+    };
+
+    const jump = movementProfile({ crouched: false, prone: false, ads: false, sprinting: false, grounded: true }).jumpVelocity;
+    const g = Math.abs(CHARACTER_PHYSICS_CONFIG.gravity);
+    const oneMove = (jump * jump) / (2 * g) + CHARACTER_PHYSICS_CONFIG.autostepHeight;
+    expect(oneMove, 'apex plus autostep, derived from the shipped profile').toBeGreaterThan(1.2);
+
+    const hedge = worldBox('north verge front hedge');
+    // The chain climbs a WING; the bay over the doorway is deliberately higher
+    // (see the porch canopy comment in nuketown2-arena.ts).
+    const canopy = worldBox('north porch canopy wing 0');
+    const canopyHead = worldBox('north porch canopy head');
+    const ledge = worldBox('north window ledge sill');
+    const sillTop = NUKETOWN2_WINDOWS.find((win) => win.id === 'upper front')!.sillTop;
+
+    const rungs: Array<{ id: string; top: number; box: THREE.Box3 | null }> = [
+      { id: 'ground', top: 0, box: null },
+      { id: 'verge front hedge', top: hedge.max.y, box: hedge },
+      { id: 'porch canopy', top: canopy.max.y, box: canopy },
+      { id: 'window ledge sill', top: ledge.max.y, box: ledge },
+      { id: 'upper front window sill', top: sillTop, box: null },
+    ];
+    for (let i = 1; i < rungs.length; i += 1) {
+      const step = rungs[i]!.top - rungs[i - 1]!.top;
+      expect(step, `${rungs[i - 1]!.id} -> ${rungs[i]!.id} rise`).toBeGreaterThan(0);
+      expect(step, `${rungs[i - 1]!.id} -> ${rungs[i]!.id} is inside one move`)
+        .toBeLessThanOrEqual(oneMove);
+    }
+    // ...and the plan overlap that makes it a route rather than a leap.
+    const overlaps = (a: THREE.Box3, b: THREE.Box3): boolean => (
+      Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x) > 0.2
+      && Math.min(a.max.z, b.max.z) - Math.max(a.min.z, b.min.z) > 0.2
+    );
+    expect(overlaps(hedge, canopy), 'the canopy overhangs the hedge').toBe(true);
+    expect(overlaps(canopy, ledge), 'the ledge stands over the canopy').toBe(true);
+    // The ledge is under the window it serves, and against the same wall.
+    const upperWindow = NUKETOWN2_WINDOWS.find((win) => win.id === 'upper front')!;
+    const [wx0, wx1] = nuketown2HandedSpan(upperWindow.x0, upperWindow.x1);
+    expect(ledge.min.x, 'the ledge runs past the window jamb').toBeLessThanOrEqual(wx0);
+    expect(ledge.max.x, 'the ledge runs past the far window jamb').toBeGreaterThanOrEqual(wx1);
+    expect(ledge.max.y, 'the ledge sits under the sill, not across the opening')
+      .toBeLessThanOrEqual(upperWindow.sillTop);
+
+    // THE CANOPY IS NOT A CEILING OVER THE FRONT DOOR'S APPROACH. It projects
+    // over the porch, so a standing player walking out has to clear it with
+    // the autostep up-cast the controller performs before it moves.
+    const frontDoor = NUKETOWN2_DOORWAYS.find((door) => door.id === 'house front door')!;
+    const doorCentreX = hx(frontDoor.centre);
+    expect(doorCentreX, 'the head bay covers the doorway').toBeGreaterThan(canopyHead.min.x);
+    expect(doorCentreX, 'the head bay covers the doorway').toBeLessThan(canopyHead.max.x);
+    expect(canopyHead.min.y, 'the canopy soffit over the front door approach')
+      .toBeGreaterThanOrEqual(STANDING_CAPSULE_M + CHARACTER_PHYSICS_CONFIG.autostepHeight);
+    // ...and no wing overhangs that approach at the lower height.
+    for (const wing of [worldBox('north porch canopy wing 0'), worldBox('north porch canopy wing 1')]) {
+      expect(doorCentreX > wing.min.x && doorCentreX < wing.max.x,
+        'a 2.15 m wing must not cross the front door approach').toBe(false);
+    }
+  });
 
   it('keeps the ground dressing out of the buildings', () => {
     // The gate NOTHING else can be: asphalt, aprons and lawns are

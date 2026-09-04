@@ -52,7 +52,7 @@ export const LEDGER_PATH = resolve(HERE, '../../docs/eye-clearance/ledger.json')
  * the roster itself legitimately shrinks, in the same commit as the registry
  * edit that shrank it.
  */
-export const MINIMUM_EYE_CLEARANCE_ARENAS = 10;
+export const MINIMUM_EYE_CLEARANCE_ARENAS = 9;
 
 /**
  * A ceiling of -1 means "this arena has never been measured". It is below the

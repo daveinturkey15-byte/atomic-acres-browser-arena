@@ -108,9 +108,10 @@ test('the floors track the real roster and cannot collapse silently', () => {
   );
   // The arenas that were invisible to hardcoded gates, named so a future
   // truncation of the scrape is a failure rather than a shrug.
-  for (const required of ['atomic-acres', 'test1', 'test2', 'map3']) {
+  for (const required of ['test1', 'test2', 'map3']) {
     assert.ok(selectableArenaIds().includes(required), `${required} is selectable and must be swept`);
   }
+  assert.ok(hiddenArenaIds().includes('atomic-acres'), 'the original Nuketown is parked, not removed');
   assert.ok(!selectableArenaIds().includes('farcrysis'), 'farcrysis is selectable:false');
   assert.ok(allArenaIds().includes('farcrysis'), 'farcrysis still exists and boot sweeps must open it');
 });

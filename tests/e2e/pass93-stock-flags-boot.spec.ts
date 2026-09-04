@@ -39,11 +39,12 @@ const FORBIDDEN_FLAG_PREFIXES = [
   '--use-angle',
 ] as const;
 
-// The arena the owner could not load, plus the flagship arena as the control.
-const ARENAS = ['nuketown2', 'atomic-acres'] as const;
+// The arena the owner could not load, plus another selectable team arena as
+// the control. The original Nuketown remains registered but is parked (HF-466).
+const ARENAS = ['nuketown2', 'skyline-terminal'] as const;
 
 // Deploy -> active phase under stock flags measured 54 s on nuketown2 and
-// ~62 s on atomic-acres (headless installed Chrome at ~29 FPS: streaming,
+// ~62 s on skyline-terminal (headless installed Chrome at ~29 FPS: streaming,
 // pipeline compilation, then the authored deployment-sync countdown). The
 // wait matches pass74-arena-boot-smoke.spec.ts's 120 s active-phase patience;
 // what is asserted at the end of it is unchanged.

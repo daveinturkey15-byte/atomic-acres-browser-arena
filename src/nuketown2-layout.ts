@@ -34,6 +34,57 @@
  * (3,016 → 3,024 m², +0.3 %) so this is a re-proportioning and not a resize.
  */
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * HANDEDNESS — HF-473 (owner, 2026-09-04 11:15 BST).
+ *
+ * "when I play Black Ops 2 on Steam the garage is always on the RIGHT of the
+ *  house from behind it, whereas here both garages are on the LEFT."
+ *
+ * R4 (`docs/research/2026-09-04/R4-bo2-nuketown-accuracy.md` §3) had already
+ * reached the structural half of this: the reference map is 180-degree
+ * ROTATIONALLY symmetric, and so is ours, so both houses necessarily agree with
+ * each other about which end their garage is on — but nothing in the arena said
+ * WHICH end, and R4 had to leave that OPEN because no source it could open
+ * states it. The owner played the reference and settled it.
+ *
+ * The correction is therefore a MIRROR of the whole authored layout across the
+ * street axis, NOT a rotation. A rotation is what the map already has (it is
+ * what `pair()` emits) and applying another one changes nothing; only a
+ * reflection changes chirality. Because every solid in this arena is
+ * axis-aligned, that reflection is exactly `x -> -x`, applied once, at the
+ * emitters — see the "TWO FRAMES" note at the top of `nuketown2-arena.ts`.
+ *
+ *   +1  the AUTHORED frame: the north house's garage is on the +x
+ *       (cul-de-sac) end of its house, which reads as garage-on-the-LEFT from
+ *       that house's own back yard. This is what shipped through PASS 93 and
+ *       what the owner rejected.
+ *   -1  the mirror of it: garage-on-the-RIGHT from each house's back yard,
+ *       which is what the reference does.
+ *
+ * CLAIM-STATE: VERIFIED against the owner's own play session on 2026-09-04
+ * (HF-473), not against a pixel. FALSIFIER: stand in either back yard in the
+ * reference, look at that house, and see the garage on the LEFT — then this is
+ * `1` again, and every handed feature follows it in one edit because nothing
+ * downstream hard-codes a side. `nuketown2-fidelity.test.ts` proves that:
+ * "puts each garage on the RIGHT of its own house, seen from that house's back
+ * yard" measures the cross product on the BUILT geometry, and the minimap
+ * projection is checked to agree with the world.
+ */
+export const NUKETOWN2_HANDEDNESS: 1 | -1 = -1;
+
+/** Authored x -> world x. The whole mirror is this one multiplication. */
+export function nuketown2HandedX(x: number): number {
+  return x * NUKETOWN2_HANDEDNESS;
+}
+
+/** Authored [x0, x1] -> world [x0, x1], re-sorted so x0 <= x1 still holds. */
+export function nuketown2HandedSpan(x0: number, x1: number): readonly [number, number] {
+  const a = x0 * NUKETOWN2_HANDEDNESS;
+  const b = x1 * NUKETOWN2_HANDEDNESS;
+  return a <= b ? [a, b] as const : [b, a] as const;
+}
+
 /** The ratio base for every number in this file and in the reference schematic. */
 export const NUKETOWN2_STREET_LENGTH = 36;
 
@@ -68,6 +119,31 @@ export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -18, maxX: 18, minZ: -42, 
  */
 export const NUKETOWN2_STREET_HALF_WIDTH = 5.3;
 
+/** Half-width of the open turning head at the centre of the carriageway. */
+export const NUKETOWN2_TURNING_HEAD_HALF = 8;
+
+/**
+ * Plan union that owns the carriageway floor. The ground builder cuts these
+ * exact rectangles before emitting the real road slabs, so visual geometry and
+ * the coplanar-pair instrument share one source of truth.
+ */
+export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
+  Object.freeze({
+    id: 'street' as const,
+    x0: NUKETOWN2_BOUNDS.minX,
+    x1: NUKETOWN2_BOUNDS.maxX,
+    z0: -NUKETOWN2_STREET_HALF_WIDTH,
+    z1: NUKETOWN2_STREET_HALF_WIDTH,
+  }),
+  Object.freeze({
+    id: 'turning-head' as const,
+    x0: -NUKETOWN2_TURNING_HEAD_HALF,
+    x1: NUKETOWN2_TURNING_HEAD_HALF,
+    z0: -NUKETOWN2_TURNING_HEAD_HALF,
+    z1: NUKETOWN2_TURNING_HEAD_HALF,
+  }),
+]);
+
 /**
  * Kerb line to house front - THE STRIP THE OWNER CALLED TOO NARROW ("the
  * areas on the side of the main street need to be a bit wider", PASS 91).
@@ -94,6 +170,14 @@ export const NUKETOWN2_HOUSE_FRONT_Z = -(NUKETOWN2_STREET_HALF_WIDTH + NUKETOWN2
 export const NUKETOWN2_GROUND_STOREY_H = 3.0;
 export const NUKETOWN2_FLOOR_T = 0.3;
 export const NUKETOWN2_UPPER_Y0 = NUKETOWN2_GROUND_STOREY_H + NUKETOWN2_FLOOR_T;
+
+/**
+ * The ground-floor interior slab is deliberately raised above the outdoor
+ * ground plane. Its bottom may sink into the surrounding world floor, but its
+ * top is the one authoritative indoor walking surface.
+ */
+export const NUKETOWN2_GROUND_FLOOR_T = 0.16;
+export const NUKETOWN2_GROUND_FLOOR_TOP = NUKETOWN2_GROUND_FLOOR_T / 2;
 
 const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 const HOUSE_FRONT_Z = NUKETOWN2_HOUSE_FRONT_Z;
@@ -144,7 +228,10 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
   // window the reference's analyses call its strongest position, 0.7 m above the
   // upper floor slab. 3.9 m of the 6.5 m half-depth, so it is at the window
   // rather than in the middle of the room.
-  position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.9] as const),
+  // World frame: the authored x is mirrored by NUKETOWN2_HANDEDNESS (HF-473),
+  // because railgun-authority.ts spawns the weapon at this exact point and a
+  // site left in the authored frame would put it in the far upper room.
+  position: Object.freeze([nuketown2HandedX(house.x), UPPER_Y0 + 0.7, house.z + house.facing * 3.9] as const),
 })));
 
 /**
@@ -171,7 +258,7 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
  * height-and-radius rule over the arena's own core position, so with a
  * standing eye height of 1.70 m:
  *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - coreY| <= 1.90
- *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
+ *     gives roofY <= 3.95. Authored 3.25, dy 1.10.
  *   - a player STANDING IN THE CARGO BOX must NOT claim, because a core you can
  *     take from inside cover is not a contested position at all - and because
  *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
@@ -187,7 +274,7 @@ export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
   /** 0.0764 L south of the road centre-line; reference 0.076 L. */
   z: 2.75,
   deckY: 0.05,
-  roofY: 3.15,
+  roofY: 3.25,
   cabRoofY: 2.9,
   /** Cab centre along the street: box half plus cab half. */
   cabX: 6.5 / 2 + 5.2 / 2,
