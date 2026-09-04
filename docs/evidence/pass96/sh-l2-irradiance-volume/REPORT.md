@@ -174,16 +174,18 @@ bounce** it is fatal and silent: `dot(normal, sun)` comes out negative on every
 sun-facing surface, every bounce returns black, and the volume bakes to pure
 sky. A plausible-looking result that is entirely wrong.
 
-Fixed in this lane's tracer only (`dot(n, dir) < 0 ? n : -n`). **The shared
-intersector was deliberately not changed** - the ray-traced lane depends on the
-existing convention and this lane has no business changing it underneath.
+Fixed in the shared `analytic-proxy-scene` box path: exterior hits now publish
+the outward geometric face normal, while an interior exit selects the far face.
+The ray-traced reflection tests still pass because the mirror reflection
+formula is sign-symmetric; the diffuse bake now consumes the same shared,
+outward-normal contract.
 
 > **Gotcha (Symptom -> Cause -> Correction -> Verify).** A baked GI volume looks
 > plausible but is pure sky and ignores every albedo -> the shared intersector
 > returns normals oriented along the ray, so every diffuse N.L is negative ->
-> flip the hit normal against the incident direction in the diffuse consumer ->
-> bake the same geometry twice with different albedos; identical output means
-> the bounce is dead.
+> fix the shared box intersector to return the outward face normal, then verify
+> exterior and interior hits plus a coloured diffuse bake; the existing mirror
+> trace must remain unchanged.
 
 ---
 
@@ -230,16 +232,13 @@ the SH-L2 shared entry contributes zero IDs, and the Nuke Town feature row also
 contributes zero IDs. The pass64 traversal assertion still fails closed if this
 shared graph ever acquires an unregistered pipeline.
 
-**[OPEN] Browser evidence.** The one permitted capture attempt did reach
-installed Chrome WebGPU, but it is invalid acceptance evidence: the harness
-mutated a named profile without switching it to `custom`, so both states
-resolved to Low (`20x4x44:l2:1ca40182:76:0.280`), and the pre-repair graph
-reported `inputs.diffuseColor.mul is not a function`. The four diagnostic PNGs
-and manifest are retained only as failure evidence under
-`capture-2026-09-04/`; their measured off-to-low deltas are **not claimed**.
-The graph repair now uses the public r185 TSL nodes from the same WebGPU module,
-but a valid on/off capture remains OPEN because the one-pair limit has been
-consumed.
+**[VERIFIED] Historical invalid browser evidence.** The earlier attempt reached
+installed Chrome WebGPU but is retained only as failure evidence: it mutated a
+named profile without switching it to `custom`, so both states resolved to Low
+(`20x4x44:l2:1ca40182:76:0.280`), and the pre-repair graph reported
+`inputs.diffuseColor.mul is not a function`. Its four diagnostic PNGs and
+manifest remain under `capture-2026-09-04/`; their off-to-low deltas are **not
+claimed**. The valid post-repair pair is recorded in the review section below.
 
 Diagnostic measurements only, not visual acceptance: the interior station
 pair has mean absolute RGB difference **0.4507 / 255** (normalized 0.001767),
@@ -252,6 +251,46 @@ on `dave-gaming-pc`, but the repository preflight's branch-convention check is
 not applicable to this Claude-named feature branch. This remains an explicit
 handoff caveat rather than a claimed preflight pass.
 
+## Review fixes + capture (claim-state)
+
+**[VERIFIED] Finding 1 - real arena deringing.** The runtime test now bakes the
+authored Nuke Town occluder set with the real sky-lux photometry, evaluates all
+42 fixed dering directions across RGB at eight fixed arena positions, and
+asserts unclamped L2 is never below the matching L1 result. It observed zero
+demotions; no wall-clock value is asserted.
+
+**[VERIFIED] Finding 2 - shared normals and mirror regression.** The shared
+`analytic-proxy-scene` intersector test covers both exterior sides and an
+interior exit, with outward normals and negative incident-normal cosine on
+exterior hits. The rerun included `whitted-tracer.test.ts` (mirror/reflection
+coverage); the focused raytracing set passed 65/65, so the sign-symmetric mirror
+trace remains green while diffuse consumers receive outward normals.
+
+**[VERIFIED] Finding 3 - geometry-sensitive digest.** The SH-L2 digest now
+includes quantized per-occluder kind, centre, half-extents, yaw and albedo, plus
+seed and bounce/albedo mode. A same-count moved-shape case and a same-count
+recoloured-shape case both produce different digests.
+
+**[VERIFIED] Native capture pair.** On `http://127.0.0.1:4213`, with
+`PASS73_NATIVE_WEBGPU=1`, installed Chrome headless, `--mute-audio`, stock QA
+WebGPU flags, fixed time `42000`, seed `83031`, and identical camera poses:
+the route asserted `renderProfile=blender` (QUALITY route) and displayed
+preset `high`, with active-match receipts before each screenshot. SH-L2 was
+OFF at strength `0.000` and HIGH at `0.550`; receipts and PNGs are in
+`capture-2026-09-05/manifest.json`.
+
+Interior station: HIGH SH-L2 adds a visibly warmer/brighter indirect response
+through the room and window recess; mean absolute RGB difference is
+**32.9718 / 255**.
+
+Shadowed exterior: HIGH SH-L2 lifts the occluded building/yard faces while
+preserving the direct sun contrast; mean absolute RGB difference is
+**29.3359 / 255**.
+
+**[VERIFIED] Review-fix tests.** `npx tsc --noEmit` passed; the corrected
+PowerShell-expanded requested gate set passed 17 files / 218 tests, and the
+focused SH-L2/proxy/raytracing set passed 4 files / 65 tests.
+
 ---
 
 ## 7. Gates
@@ -259,10 +298,10 @@ handoff caveat rather than a claimed preflight pass.
 | Gate | Result |
 |---|---|
 | `npx tsc --noEmit` | **[VERIFIED] clean after the r185 public-TSL repair** |
-| `npx vitest run` with the requested lighting/material/profile/precompile/pipeline/fidelity/ratchet paths plus SH-L2 tests | **[VERIFIED] 17 files, 186 passed** |
+| `npx vitest run` with the requested lighting/material/profile/precompile/pipeline/fidelity/ratchet paths plus SH-L2 tests | **[VERIFIED] 17 files, 218 passed** |
 | Existing baked-indirect tests | **[VERIFIED] 4 files included; 2,921 lines across the complete `baked-indirect*.ts` source/test surface; 26 + 15 SH-L2 predecessor node tests also green** |
 | `src/legacy-main-size-ratchet.test.ts` | **[VERIFIED] 5 passed; 37,100 lines against the unchanged 37,100 ceiling** |
 | `git diff --check` | **[VERIFIED] clean before the post-repair commit** |
 | `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` | **[OPEN] lockfile passed; guard rejected uppercase harness slug** |
 | Same preflight with lowercase `codex` | **[OPEN] guard rejected the intentional `.../claude/...` branch prefix** |
-| Native capture pair | **[OPEN] the only attempt exposed a harness/profile-state error and a pre-repair TSL graph error; no valid visual delta claimed** |
+| Native capture pair | **[VERIFIED] 4213, WebGPU, QUALITY/blender route, displayed HIGH, SH-L2 OFF vs HIGH; manifest records receipts and mean RGB deltas** |

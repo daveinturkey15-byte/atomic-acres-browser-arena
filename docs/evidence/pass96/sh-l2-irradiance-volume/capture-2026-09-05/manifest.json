@@ -1,0 +1,220 @@
+{
+  "schema": "sh-l2-review-capture/1",
+  "capturedAt": "2026-09-04T23:34:04.079Z",
+  "base": "http://127.0.0.1:4213",
+  "env": "PASS73_NATIVE_WEBGPU=1",
+  "browser": "installed Chrome headless",
+  "flags": [
+    "--mute-audio",
+    "--use-angle=d3d11",
+    "--enable-unsafe-webgpu",
+    "--ignore-gpu-blocklist"
+  ],
+  "profile": {
+    "route": "quality",
+    "renderProfile": "blender",
+    "displayedPreset": "high"
+  },
+  "captures": [
+    {
+      "state": "off",
+      "name": "interior-station",
+      "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\off-interior-station.png",
+      "receipt": {
+        "camera": "pass65-offline-menu-preview-capture",
+        "frame": 216,
+        "fixedTimeMs": 42000,
+        "seed": 83031,
+        "shL2": "20x4x44:l2:9ef414ef:76:0.000"
+      },
+      "profile": {
+        "backend": "webgpu",
+        "renderProfile": "blender",
+        "graphicsPreset": "high",
+        "requestedTier": "off"
+      },
+      "live": {
+        "tier": "off",
+        "receipt": "20x4x44:l2:9ef414ef:76:0.000",
+        "matchPhase": "active",
+        "gameStarted": true
+      }
+    },
+    {
+      "state": "off",
+      "name": "shadowed-exterior",
+      "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\off-shadowed-exterior.png",
+      "receipt": {
+        "camera": "pass65-offline-menu-preview-capture",
+        "frame": 235,
+        "fixedTimeMs": 42000,
+        "seed": 83031,
+        "shL2": "20x4x44:l2:9ef414ef:76:0.000"
+      },
+      "profile": {
+        "backend": "webgpu",
+        "renderProfile": "blender",
+        "graphicsPreset": "high",
+        "requestedTier": "off"
+      },
+      "live": {
+        "tier": "off",
+        "receipt": "20x4x44:l2:9ef414ef:76:0.000",
+        "matchPhase": "active",
+        "gameStarted": true
+      }
+    },
+    {
+      "state": "on",
+      "name": "interior-station",
+      "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\on-interior-station.png",
+      "receipt": {
+        "camera": "pass65-offline-menu-preview-capture",
+        "frame": 218,
+        "fixedTimeMs": 42000,
+        "seed": 83031,
+        "shL2": "20x4x44:l2:9ef414ef:76:0.550"
+      },
+      "profile": {
+        "backend": "webgpu",
+        "renderProfile": "blender",
+        "graphicsPreset": "high",
+        "requestedTier": "high"
+      },
+      "live": {
+        "tier": "high",
+        "receipt": "20x4x44:l2:9ef414ef:76:0.550",
+        "matchPhase": "active",
+        "gameStarted": true
+      }
+    },
+    {
+      "state": "on",
+      "name": "shadowed-exterior",
+      "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\on-shadowed-exterior.png",
+      "receipt": {
+        "camera": "pass65-offline-menu-preview-capture",
+        "frame": 238,
+        "fixedTimeMs": 42000,
+        "seed": 83031,
+        "shL2": "20x4x44:l2:9ef414ef:76:0.550"
+      },
+      "profile": {
+        "backend": "webgpu",
+        "renderProfile": "blender",
+        "graphicsPreset": "high",
+        "requestedTier": "high"
+      },
+      "live": {
+        "tier": "high",
+        "receipt": "20x4x44:l2:9ef414ef:76:0.550",
+        "matchPhase": "active",
+        "gameStarted": true
+      }
+    }
+  ],
+  "comparisons": {
+    "interior-station": {
+      "off": {
+        "state": "off",
+        "name": "interior-station",
+        "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\off-interior-station.png",
+        "receipt": {
+          "camera": "pass65-offline-menu-preview-capture",
+          "frame": 216,
+          "fixedTimeMs": 42000,
+          "seed": 83031,
+          "shL2": "20x4x44:l2:9ef414ef:76:0.000"
+        },
+        "profile": {
+          "backend": "webgpu",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "requestedTier": "off"
+        },
+        "live": {
+          "tier": "off",
+          "receipt": "20x4x44:l2:9ef414ef:76:0.000",
+          "matchPhase": "active",
+          "gameStarted": true
+        }
+      },
+      "on": {
+        "state": "on",
+        "name": "interior-station",
+        "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\on-interior-station.png",
+        "receipt": {
+          "camera": "pass65-offline-menu-preview-capture",
+          "frame": 218,
+          "fixedTimeMs": 42000,
+          "seed": 83031,
+          "shL2": "20x4x44:l2:9ef414ef:76:0.550"
+        },
+        "profile": {
+          "backend": "webgpu",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "requestedTier": "high"
+        },
+        "live": {
+          "tier": "high",
+          "receipt": "20x4x44:l2:9ef414ef:76:0.550",
+          "matchPhase": "active",
+          "gameStarted": true
+        }
+      },
+      "meanAbsDiffRgb255": 32.9718
+    },
+    "shadowed-exterior": {
+      "off": {
+        "state": "off",
+        "name": "shadowed-exterior",
+        "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\off-shadowed-exterior.png",
+        "receipt": {
+          "camera": "pass65-offline-menu-preview-capture",
+          "frame": 235,
+          "fixedTimeMs": 42000,
+          "seed": 83031,
+          "shL2": "20x4x44:l2:9ef414ef:76:0.000"
+        },
+        "profile": {
+          "backend": "webgpu",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "requestedTier": "off"
+        },
+        "live": {
+          "tier": "off",
+          "receipt": "20x4x44:l2:9ef414ef:76:0.000",
+          "matchPhase": "active",
+          "gameStarted": true
+        }
+      },
+      "on": {
+        "state": "on",
+        "name": "shadowed-exterior",
+        "file": "C:\\Users\\david\\projects\\aa-claude-shl2\\docs\\evidence\\pass96\\sh-l2-irradiance-volume\\capture-2026-09-05\\on-shadowed-exterior.png",
+        "receipt": {
+          "camera": "pass65-offline-menu-preview-capture",
+          "frame": 238,
+          "fixedTimeMs": 42000,
+          "seed": 83031,
+          "shL2": "20x4x44:l2:9ef414ef:76:0.550"
+        },
+        "profile": {
+          "backend": "webgpu",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "requestedTier": "high"
+        },
+        "live": {
+          "tier": "high",
+          "receipt": "20x4x44:l2:9ef414ef:76:0.550",
+          "matchPhase": "active",
+          "gameStarted": true
+        }
+      },
+      "meanAbsDiffRgb255": 29.3359
+    }
+  }
+}
