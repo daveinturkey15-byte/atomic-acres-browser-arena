@@ -870,7 +870,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     //     asserting something the reference does not have.
     const northUpper = colourOf(named('nuketown2 north house wall west upper'), 'north upper siding mesh');
     const southUpper = colourOf(named('nuketown2 south house wall west upper'), 'south upper siding mesh');
-    expect(northUpper.getHex(), 'north house is the terracotta-orange one').toBe(0xb35a3c);
+    expect(northUpper.getHex(), 'north house is the terracotta-orange one').toBe(0x9f6147);
     expect(southUpper.getHex(), 'south house is the white/cream one').toBe(0xeae3cf);
     expect(northUpper.equals(southUpper), 'house siding bases must differ').toBe(false);
     expect(margin(northUpper, southUpper), 'house siding colour margin').toBeGreaterThan(0.45);

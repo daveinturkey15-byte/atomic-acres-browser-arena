@@ -127,11 +127,20 @@ export const definition = createProceduralArenaVisualDefinition({
     // rotations of each other, the arena's rotational symmetry is broken and
     // one team has something the other does not.
     camera('nuketown2-south-yard', [hx(10), 1.75, 29], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
-    // Along the street centre-line, from the west end of the road into the
-    // truck's open cargo box. The bulkhead at x = +3.17 should close the far
-    // half of this frame; that is the property the fidelity test measures
-    // numerically as the street-centre run, and this is what it looks like.
-    camera('nuketown2-street-centre', [hx(-15), 1.7, 0], [hx(17), 1.6, 0.4], 'geometry', 1.08),
+    // Along the street centre-line. HF-477 turned this into the LOLLIPOP frame
+    // without moving it: the camera stands at the closed end of the cul-de-sac
+    // and looks straight down the stem, so the bulb's kerb ring, the coach and
+    // truck standing in it, and the green classic parked out in the stem are
+    // all in one shot. The street-centre run the fidelity gate measures
+    // numerically is this line, and the body that now closes it is the classic.
+    // HF-477 moved the EYE, not the aim. At authored x = -15 the station stood
+    // 1.1 m from the truck's rear doors, because the truck moved into the bulb
+    // and the bulb moved to this end - the frame was the inside of a box van.
+    // Backed onto the verge behind the bulb's closed kerb and raised to
+    // standing-on-the-verge height, it now frames the whole lollipop: kerb
+    // ring, coach and truck standing in the head, and the green classic out in
+    // the stem beyond them.
+    camera('nuketown2-street-centre', [hx(-14.5), 3.4, -6.5], [hx(8.0), 1.0, 1.5], 'geometry', 1.08),
     // The reference's strongest position: the north upper front window at
     // (-1.25, 4.5, -12.6), looking across the turning head at the south house's
     // driveway. Interior looking out through a real opening, so it is also the

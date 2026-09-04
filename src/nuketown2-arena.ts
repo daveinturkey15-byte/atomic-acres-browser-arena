@@ -1102,15 +1102,24 @@ function nuketown2Materials(): Nuketown2Materials {
   // measured mean, corrected for one stated contaminant, and the correction -
   // not the number - is the contract:
   //   ORANGE  measured #a85e46 (nt2025-street-boii.jpg, the upper wall band).
-  //           That band is crossed by a dark mullion grid and the frame carries
-  //           the map's own haze, both of which pull a mean toward grey, so the
-  //           hue is held at the measured 15 deg and the chroma lifted 14 %.
+  //           The first cut of this pass authored 0xb35a3c - the measured hue
+  //           with the chroma lifted 14 %, on the argument that the mullion grid
+  //           crossing that band and the frame's own haze pull a mean toward
+  //           grey. THE CAPTURES REFUTED IT. On this arena's own key and
+  //           exposure (docs/evidence/pass94/nuketown2-accuracy2) a lifted
+  //           terracotta rendered as a bright safety-orange in daylight and as
+  //           a fire-engine red on the shadow side - a saturated albedo comes
+  //           back hotter here than it reads in a hazy reference frame, not
+  //           cooler. So the correction goes the other way: the measured HUE is
+  //           held at 17.7 deg and the chroma and value are taken DOWN 5 % from
+  //           the measurement rather than up, which is what puts a terracotta
+  //           on the wall instead of an orange.
   //   CREAM   measured #e4e2b4 (same frame, ground storey) and #feffeb (the
   //           white house's wall in the aerial, blown out). Authored between
   //           the shipped map's own `cream` 0xe7dbc1 and `white` 0xf0e4c9,
   //           which is the family both measurements sit in.
   // Exact hexes are OPEN and recorded as such in this lane's report.
-  const sidingA = createNuketown2LapSidingMaterial(0xb35a3c, 'nuketown2-siding-orange-upper');
+  const sidingA = createNuketown2LapSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper');
   const sidingB = createNuketown2LapSidingMaterial(0xeae3cf, 'nuketown2-siding-cream');
   // The white house's PALE BLUE-GREY ROOF GLAZING - the aerial's single
   // strongest identifying feature for that house, measured #aebdc0 and #b6c6c9
