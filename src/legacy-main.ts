@@ -814,6 +814,13 @@ import { admitRemoteMelee, createRemoteMeleeAdmissionState, meleeActionHitsPoint
 import { admitRemoteSnapshotMovement, remoteCanClaimTimedPickup } from './remote-movement-admission';
 import { admitRemoteBaseDamage, deriveAuthoritativeShotOutcomes, deriveRemoteShotBaseDamage, maximumRemoteExplosiveBaseDamage, resolveRemotePoweredDamage } from './remote-hit-admission';
 import {
+  countdownSecondsRemaining,
+  countdownTickDue,
+  decideLobbyCountdownStart,
+  shouldAutoSendLoaded,
+  waitingRoomGuidance,
+} from './lobby-countdown';
+import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
   MAX_SHOT_FIRE_AGE_MS,
@@ -6160,6 +6167,14 @@ let privateMatchActiveAtEpochMs: number | null = null;
 let hostTimeMapping: HostTimeMapping = createHostTimeMapping();
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
+/**
+ * feat(lobby): all-players countdown — host-side 60 s READY wait. Armed when
+ * the host broadcasts a waiting snapshot with guests present; cleared on any
+ * other phase. Feeds decideLobbyCountdownStart and the waiting-room HUD.
+ */
+let lobbyReadyWaitStartEpochMs: number | null = null;
+/** performance.now() of the last host countdown tick rebroadcast. */
+let lastLobbyCountdownTickHostTimeMs = 0;
 let localDhv: Dhv = 10;
 let localResumeToken = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
@@ -8154,6 +8169,13 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   }
   privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
+  // feat(lobby): all-players countdown — arm the 60 s READY wait while guests
+  // wait in the room; clear it the moment the phase moves on.
+  if (phase === 'waiting' && privateLobbySnapshot.members.some((member) => member.id !== player.id && member.connected)) {
+    if (lobbyReadyWaitStartEpochMs === null) lobbyReadyWaitStartEpochMs = Date.now();
+  } else {
+    lobbyReadyWaitStartEpochMs = null;
+  }
   if (privateLobbySnapshot.testBayDoor && selectedArena.id === 'gun-range' && matchState.phase === 'active') {
     // hostSnapshot advances the canonical door to the reliable envelope's
     // exact host timestamp. Apply that exact state to the leaf, movement,
@@ -10326,8 +10348,15 @@ function hostStartPrivateMatch(): void {
     return;
   }
   const candidate = hostSnapshot('waiting');
-  if (!canHostCommitStart(candidate, pendingGuest)) {
-    setStatus('Every connected guest must be ready before the host starts.', 'warn');
+  // feat(lobby): all-players countdown — after the host-side 60 s READY wait
+  // the host may force-start; the holdouts are named in the status line.
+  const timeoutStart = decideLobbyCountdownStart({
+    role: network.role, snapshot: candidate, hasPendingGuests: pendingGuest,
+    waitingSinceEpochMs: lobbyReadyWaitStartEpochMs, nowEpochMs: Date.now(),
+  }).reason === 'ok-timeout';
+  if (!timeoutStart && !canHostCommitStart(candidate, pendingGuest)) {
+    const holdouts = candidate.members.filter((member) => member.connected && !member.ready && member.id !== candidate.hostId);
+    setStatus(holdouts.length > 0 ? `Waiting for READY: ${holdouts.map((member) => member.name.trim() === '' ? member.id : member.name).join(', ')}.` : 'Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
   const hostMember = hostLobbyMembers.get(player.id);
@@ -10336,10 +10365,11 @@ function hostStartPrivateMatch(): void {
     hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
   }
   const current = hostSnapshot('waiting');
-  if (!canHostStart(current, pendingGuest)) {
+  if (!timeoutStart && !canHostStart(current, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
+  if (timeoutStart) setStatus('Starting after the 60 s READY wait — unready players deploy with the team.', 'warn');
   clearStoredHostMatchCheckpoint();
   privateMatchActiveAtHostTimeMs = performance.now() + LOBBY_START_LEAD_MS;
   privateMatchActiveAtEpochMs = Date.now() + LOBBY_START_LEAD_MS;
@@ -10815,8 +10845,38 @@ function scheduleLobbyCountdownRefresh(): void {
   lobbyCountdownRefreshScheduled = true;
   window.setTimeout(() => {
     lobbyCountdownRefreshScheduled = false;
+    // feat(lobby): all-players countdown — the host rebroadcasts the SAME
+    // shared match-start timestamp ~1/s mid-countdown; late joiners admitted
+    // during the countdown receive it on admission instead of a fresh one.
+    if (network.role === 'host' && privateLobbySnapshot?.phase === 'countdown'
+      && countdownTickDue(lastLobbyCountdownTickHostTimeMs, performance.now())) {
+      lastLobbyCountdownTickHostTimeMs = performance.now();
+      broadcastHostLobby('countdown');
+      return;
+    }
     renderPrivateLobby();
   }, 250);
+}
+/**
+ * feat(lobby): all-players countdown — the explicit loaded/ready message,
+ * sent once per arena boot. The manual READY toggle stays authoritative
+ * afterwards; the solo path never sends.
+ */
+let lobbyLoadedReadySent = false;
+function maybeAutoSendLobbyLoadedReady(localConnected: boolean, arenaSynchronized: boolean): void {
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' || !arenaSynchronized) {
+    lobbyLoadedReadySent = false;
+    return;
+  }
+  if (lobbyLoadedReadySent) return;
+  if (!shouldAutoSendLoaded({
+    role: network.role, phase, localReady: localLobbyReady, localConnected, arenaSynchronized,
+  })) return;
+  lobbyLoadedReadySent = true;
+  const loaded: LobbyReadyMessage = { type: 'lobby-ready', by: player.id, ready: true, nonce: randomNonce() };
+  if (network.role === 'host') updateHostReady(loaded);
+  else if (network.role === 'client') network.send(loaded);
 }
 
 function renderPrivateLobby(): void {
@@ -10841,8 +10901,11 @@ function renderPrivateLobby(): void {
   // The hosted 5-4-3-2-1: the phase carries the host's shared epoch, so every
   // client counts the same five seconds from one authoritative instant. Re-render
   // on a short local tick while the phase lasts; it stops itself otherwise.
+  // feat(lobby): all-players countdown — every client renders 5-4-3-2-1 from
+  // the shared match-start timestamp via countdownSecondsRemaining, never
+  // from a local timer.
   const countdownRemainS = snapshot?.phase === 'countdown' && snapshot.activeAtEpochMs !== null
-    ? Math.max(1, Math.min(5, Math.ceil((snapshot.activeAtEpochMs - Date.now()) / 1000)))
+    ? countdownSecondsRemaining(snapshot.activeAtEpochMs, Date.now())
     : null;
   element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active'
     ? 'MATCH IN PROGRESS'
@@ -10920,6 +10983,7 @@ function renderPrivateLobby(): void {
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   trackLobbyArenaSyncDeadline(lobbyArenaSynchronized, snapshot?.config.arenaId ?? null);
   localLobbyReady = localMember?.ready ?? localLobbyReady;
+  maybeAutoSendLobbyLoadedReady(localMember?.connected ?? false, lobbyArenaSynchronized);
   const ready = element<HTMLButtonElement>('#lobby-ready');
   ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
   ready.classList.toggle('primary', localLobbyReady);
@@ -10929,6 +10993,13 @@ function renderPrivateLobby(): void {
   // HF-323: disable START control while a guest admission is in flight or connection is pending
   const pendingGuest = hostHasPendingGuestConnection();
   start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest);
+  if (start.disabled && network.role === 'host' && snapshot && lobbyArenaSynchronized) {
+    // feat(lobby): all-players countdown — the 60 s READY timeout unlocks START.
+    start.disabled = !decideLobbyCountdownStart({
+      role: network.role, snapshot, hasPendingGuests: pendingGuest,
+      waitingSinceEpochMs: lobbyReadyWaitStartEpochMs, nowEpochMs: Date.now(),
+    }).ok;
+  }
   const resetLobby = element<HTMLButtonElement>('#lobby-reset');
   resetLobby.disabled = network.role !== 'host';
   resetLobby.title = network.role === 'host'
@@ -10983,6 +11054,16 @@ function renderPrivateLobby(): void {
         : isFfa
           ? 'Ready up. The host controls match start.'
           : 'Choose your squad and ready up. The host controls match start.';
+  // feat(lobby): all-players countdown — name who is not ready and show the
+  // host-side 60 s force-start wait; other phases keep their existing lines.
+  if (snapshot && lobbyArenaSynchronized) {
+    const countdownGuidance = waitingRoomGuidance({
+      role: network.role, phase: snapshot.phase, members: snapshot.members,
+      arenaSynchronized: lobbyArenaSynchronized, hasPendingGuest: pendingGuest,
+      waitingSinceEpochMs: lobbyReadyWaitStartEpochMs, nowEpochMs: Date.now(),
+    });
+    if (countdownGuidance !== null) element<HTMLElement>('#lobby-guidance').textContent = countdownGuidance;
+  }
 }
 
 /**
