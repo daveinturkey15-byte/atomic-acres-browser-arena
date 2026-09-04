@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// Boots atomic-acres on real WebGPU in installed Chrome over CDP and captures deterministic capture-camera frames from named map poses so bulky obstructing props can be identified visually.
+// Usage: node scripts/qa/hf383-capture.mjs [BASE] [OUT]
+//   [BASE]  (default http://127.0.0.1:41912)  Base URL of the running dev server.
+//   [OUT]   (default artifacts/hf383)         Output directory for captured PNG frames.
+// Writes: $OUT/<view-name>.png  (overview, streetWestEye, streetEastEye, diagNWtoSE, diagSEtoNW, diagNEtoSW, northYardToHouse, southYardToHouse, aquaFrontDoorAcrossRoad, busEndEast)
+// Exit codes: 0 on success; non-zero on unhandled exception (Playwright timeout, CDP, or arena-load errors). No explicit process.exit calls.
 // HF-383 lane scratch tool: boots atomic-acres on real WebGPU in installed
 // Chrome over CDP and captures deterministic capture-camera frames from named
 // map poses so bulky obstructing props can be identified visually.
