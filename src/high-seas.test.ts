@@ -199,11 +199,16 @@ describe('High Seas clean-room arena geometry', () => {
     expect(map.physicsSafetyFloorY).toBe(HIGH_SEAS_SAFETY_FLOOR_Y);
   });
 
-  it('places six supported and well-separated opposed spawns at main-deck eye height', () => {
+  it('places eight supported and well-separated opposed spawns at main-deck eye height', () => {
     const map = buildHighSeas(new THREE.Scene());
     const support = map.root.userData.highSeasSupportAudit as SupportAudit;
-    expect(map.spawns[0]).toHaveLength(6);
-    expect(map.spawns[1]).toHaveLength(6);
+    // PASS 94 (HF-456): six became eight when the spawn-distribution lane widened
+    // every arena's tables. The pin follows the authored reality rather than
+    // becoming a floor - src/spawn-layout-quality.test.ts owns the >= 8 floor -
+    // and every clearance, support, 6 m separation and 180-degree mirror check
+    // below runs over all eight, so the two new points are proved, not admitted.
+    expect(map.spawns[0]).toHaveLength(8);
+    expect(map.spawns[1]).toHaveLength(8);
     for (const team of [0, 1] as const) {
       for (const spawn of map.spawns[team]) {
         expect(spawn.y).toBeCloseTo(4.9);

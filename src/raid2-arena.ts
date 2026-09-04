@@ -806,11 +806,37 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // spread 19-30 m: span 20.0 m (20% of the long axis), cross-team minimum 64 m,
   // ZERO spawn-to-spawn sightlines, 12/12 points legal, envelope/floor/reachable
   // all 100%.
+  // PASS 94 integration (HF-456 x the item-16 mirror contract). The
+  // spawn-distribution lane raised this arena to eight points per team and
+  // authored the two new ones FREELY - team 0 at [-34, -33] and [-48, -18],
+  // team 1 at [30, 30] and [31, 16]. Raid is an X MIRROR by contract
+  // (src/raid2-fidelity.test.ts item 16: the two flanks differ in KIND, a pool
+  // terrace against a motor drive, so a 180-degree rotation would demand they be
+  // equal and they are not), and every team-0 point needs a team-1 partner
+  // within 2 m of its x mirror. Those four points had no partners at all, and
+  // the exact mirrors of team 0's two were not legal ground: [34, -33] is inside
+  // geometry and [48, -18] has no floor under it.
+  //
+  // Re-solved by scripts/qa/solve-raid2-mirrored-spawns.ts over the cells where
+  // BOTH halves of the pair pass the full constraint set, with cross-team
+  // separation held at the existing 64 m (no new pair inboard of |x| = 32), the
+  // mean nearest-neighbour held over the lane's own 7 m floor, and item 18's
+  // ZERO enemy-LOS pairs at any range - which is stricter than the shared
+  // `enemy-spawn-in-sight` failure and is what rules most candidates out. Of 51
+  // mirrorable cells the pair below is the widest-spread fully legal one:
+  //
+  //   points per team               6 -> 8
+  //   mean nearest-neighbour             7.65 m  (gate floor 7)
+  //   spread                     0.200 -> 0.200  (gate floor 0.18)
+  //   cross-team separation              64 m, unchanged
+  //   enemy line-of-sight pairs          0
+  //   measureSpawnLayout: 16 points, 0 failures, 0 unreachable, 0 without floor
   const team0: [number, number][] = [
-    [-32, -16], [-38, -10], [-41, -2], [-48, 2], [-33, 2], [-39, 4], [-34, -33], [-48, -18],
+    [-32, -16], [-38, -10], [-41, -2], [-48, 2], [-33, 2], [-39, 4], [-48, -14], [-32, -5],
   ];
+  /** The exact x mirror of `team0`, which is what item 16 measures. */
   const team1: [number, number][] = [
-    [32, -16], [38, -10], [41, -2], [48, 2], [33, 2], [39, 4], [30, 30], [31, 16],
+    [32, -16], [38, -10], [41, -2], [48, 2], [33, 2], [39, 4], [48, -14], [32, -5],
   ];
 
   return {

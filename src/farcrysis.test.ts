@@ -255,7 +255,11 @@ describe('farcrysis arena', () => {
     const report = farcrysisHITL(arena);
     // PASS 85 Lane R: 8 -> 12. Four points per team became six, solved from the
     // arena's own geometry (src/farcrysis-spawns.test.ts holds the layout).
-    expect(report.spawnCount).toBe(12);
+    // PASS 94 HF-456: 12 -> 16. Six per team became eight, solved the same way by
+    // the spawn-distribution lane; src/farcrysis-spawns.test.ts still holds and
+    // re-checks the layout itself, and this stays the census that notices a
+    // table changing size at all.
+    expect(report.spawnCount).toBe(16);
     expect(report.coverCount).toBeGreaterThanOrEqual(FARCRYSIS_COVER_MIN);
     expect(Array.isArray(report.violations)).toBe(true);
     expect(report.maxSightline).toBeGreaterThanOrEqual(0);
