@@ -110,6 +110,42 @@ function cellEdge(x: number, cells: number): number {
   return Math.min(f, 1 - f);
 }
 
+/**
+ * A joint width authored in MILLIMETRES, converted to the half-width in cell
+ * units that `smooth(0, w, cellEdge(...))` wants.
+ *
+ * This function exists because the first draft of this module got it wrong on
+ * three of four surfaces and the contact sheet showed it: the limestone bed
+ * joint was written down as 7 mm and authored at 0.87 mm (0.37 of a texel), so
+ * the cover family - the one a player reads at range - baked with no course
+ * lines in it at all. The timber board gap was 3.1 mm against a recorded 9, and
+ * the mosaic grout 2 mm against a recorded 8. Every one of them passed review,
+ * because a bare threshold like `0.0029` carries no unit and cannot be checked
+ * by eye. Now the millimetre IS the authored value and the cell fraction is
+ * derived from it, so the number in the comment and the number in the bake are
+ * the same number.
+ */
+function jointHalfWidth(millimetres: number, tileMetres: number, cells: number): number {
+  return (millimetres / 2 / 1000) / (tileMetres / cells);
+}
+
+/**
+ * The finest authored feature of each set, in millimetres, in ONE place.
+ * `RAID2_SURFACES` publishes these and fidelity band 32 measures them against
+ * the set's own mm/texel, so an intent and a bake cannot drift apart again.
+ */
+export const FEATURE_MM = Object.freeze({
+  travertineJoint: 20,
+  limestoneJoint: 7,
+  timberGap: 9,
+  mosaicGrout: 8,
+});
+
+const TRAVERTINE_JOINT_W = jointHalfWidth(FEATURE_MM.travertineJoint, 3.0, 2);
+const LIMESTONE_JOINT_W = jointHalfWidth(FEATURE_MM.limestoneJoint, 1.2, PERIODS.limestoneCourse);
+const TIMBER_GAP_W = jointHalfWidth(FEATURE_MM.timberGap, 1.8, PERIODS.timberGrain);
+const MOSAIC_GROUT_W = jointHalfWidth(FEATURE_MM.mosaicGrout, 1.0, PERIODS.mosaicGrout);
+
 /** One reusable sample object: the forge copies immediately (documented). */
 const scratch = { albedo: [1, 1, 1] as [number, number, number], height: 0.5, roughness: 0.9, ao: 1 };
 
@@ -137,8 +173,8 @@ function emit(r: number, g: number, b: number, height: number, roughness: number
  */
 export const travertineSurface: SurfaceDescription = (u, v, noise) => {
   const joint = clamp01(
-    (1 - smooth(0, 0.0067, cellEdge(u, 2)))
-    + (1 - smooth(0, 0.0067, cellEdge(v, 2))),
+    (1 - smooth(0, TRAVERTINE_JOINT_W, cellEdge(u, 2)))
+    + (1 - smooth(0, TRAVERTINE_JOINT_W, cellEdge(v, 2))),
   );
   // Bedding veins, wandering because the field is sampled through a displaced
   // coordinate rather than straight.
@@ -169,9 +205,12 @@ export const stuccoSurface: SurfaceDescription = (u, v, noise) => {
   const grain = 1 - noise.worley(u * PERIODS.stuccoGrain, v * PERIODS.stuccoGrain, PERIODS.stuccoGrain);
   // A plinth wash that only opens toward the bottom of the wall (v is up).
   const wash = smooth(0.3, 0, v) * smooth(0.4, 0.75, noise.fbm(u * PERIODS.stuccoWash, v * PERIODS.stuccoWash, PERIODS.stuccoWash, 3));
-  const tone = clamp01(0.94 + (trowel - 0.5) * 0.20 + grain * 0.06 - wash * 0.26);
+  // The wash is deliberately weaker than it first read. `worldTiled` gives a
+  // 3.4 m wall about one 3 m tile, so anything strong here prints a plinth band
+  // every three metres up the elevation - a tile, not weathering.
+  const tone = clamp01(0.94 + (trowel - 0.5) * 0.20 + grain * 0.06 - wash * 0.17);
   return emit(
-    tone * (1 - wash * 0.06), tone, tone * (1 + wash * 0.08),
+    tone * (1 - wash * 0.04), tone, tone * (1 + wash * 0.05),
     0.6 + (trowel - 0.5) * 0.34 + grain * 0.22,
     0.80 + grain * 0.14 + wash * 0.06,
     1 - grain * 0.14 - wash * 0.12,
@@ -186,14 +225,14 @@ export const stuccoSurface: SurfaceDescription = (u, v, noise) => {
  * is chipping at the arrises, which LIGHTENS, never a dark crack.
  */
 export const limestoneSurface: SurfaceDescription = (u, v, noise) => {
-  const course = 1 - smooth(0, 0.0029, cellEdge(v, PERIODS.limestoneCourse));
-  const perp = 1 - smooth(0, 0.0029, cellEdge(u + Math.floor(v * PERIODS.limestoneCourse) * 0.37, PERIODS.limestoneCourse / 2));
+  const course = 1 - smooth(0, LIMESTONE_JOINT_W, cellEdge(v, PERIODS.limestoneCourse));
+  const perp = 1 - smooth(0, LIMESTONE_JOINT_W, cellEdge(u + Math.floor(v * PERIODS.limestoneCourse) * 0.37, PERIODS.limestoneCourse / 2));
   const joint = clamp01(course + perp);
   const chip = smooth(0.78, 1, 1 - noise.worley(u * PERIODS.limestoneChip, v * PERIODS.limestoneChip, PERIODS.limestoneChip));
   const bed = noise.fbm(u * 2, v * 2, 2, 3);
   // Chips expose fresh stone, so they read LIGHTER than the face - the
   // opposite of the "draw every crack dark" tell.
-  const tone = clamp01(0.93 + (bed - 0.5) * 0.10 + chip * 0.10 - joint * 0.22);
+  const tone = clamp01(0.95 + (bed - 0.5) * 0.12 + chip * 0.12 - joint * 0.26);
   return emit(tone, tone, tone * 1.01,
     0.72 - joint * 0.6 - chip * 0.25,
     0.52 + chip * 0.3 + joint * 0.24,
@@ -210,7 +249,7 @@ export const timberSurface: SurfaceDescription = (u, v, noise) => {
   // different field than u=0 and the tile seams. Fidelity band 30 measured
   // exactly that: a 0.065 albedo step down every board edge of the deck.
   const board = Math.floor(u * PERIODS.timberGrain) % PERIODS.timberGrain;
-  const gap = 1 - smooth(0, 0.0026, cellEdge(u, PERIODS.timberGrain));
+  const gap = 1 - smooth(0, TIMBER_GAP_W, cellEdge(u, PERIODS.timberGrain));
   // Grain runs ALONG the board: sampled with a long axis and a short one.
   const grain = noise.fbm((u + board * 0.31) * 24, v * 2, 24, 3);
   const knot = smooth(0.86, 1, 1 - noise.worley(u * PERIODS.timberKnot, v * PERIODS.timberKnot, PERIODS.timberKnot));
@@ -249,8 +288,8 @@ export const courtSurface: SurfaceDescription = (u, v, noise) => {
  */
 export const poolMosaicSurface: SurfaceDescription = (u, v, noise) => {
   const grout = clamp01(
-    (1 - smooth(0, 0.008, cellEdge(u, PERIODS.mosaicGrout)))
-    + (1 - smooth(0, 0.008, cellEdge(v, PERIODS.mosaicGrout))),
+    (1 - smooth(0, MOSAIC_GROUT_W, cellEdge(u, PERIODS.mosaicGrout)))
+    + (1 - smooth(0, MOSAIC_GROUT_W, cellEdge(v, PERIODS.mosaicGrout))),
   );
   // Per-tessera tone, so the mosaic is a field of slightly different tiles.
   // Wrapped for the same reason as the timber board index, before it bites.
@@ -323,22 +362,28 @@ export const RAID2_SURFACES: ReadonlyArray<Readonly<{
   /** The finest feature this description draws, as authored. */
   finestFeatureMm: number;
 }>> = Object.freeze([
-  Object.freeze({ id: 'raid2-travertine' as const, description: travertineSurface, finestFeatureMm: 20,
+  Object.freeze({ id: 'raid2-travertine' as const, description: travertineSurface, finestFeatureMm: FEATURE_MM.travertineJoint,
     options: { size: 512, seed: 0x2a11, tileMetres: 3.0, reliefMetres: 0.009, anisotropy: 8 } }),
   Object.freeze({ id: 'raid2-stucco' as const, description: stuccoSurface, finestFeatureMm: 94,
     options: { size: 512, seed: 0x2a22, tileMetres: 3.0, reliefMetres: 0.005 } }),
-  Object.freeze({ id: 'raid2-limestone' as const, description: limestoneSurface, finestFeatureMm: 7,
+  Object.freeze({ id: 'raid2-limestone' as const, description: limestoneSurface, finestFeatureMm: FEATURE_MM.limestoneJoint,
     options: { size: 512, seed: 0x2a33, tileMetres: 1.2, reliefMetres: 0.006 } }),
-  Object.freeze({ id: 'raid2-timber' as const, description: timberSurface, finestFeatureMm: 9,
+  Object.freeze({ id: 'raid2-timber' as const, description: timberSurface, finestFeatureMm: FEATURE_MM.timberGap,
     options: { size: 512, seed: 0x2a44, tileMetres: 1.8, reliefMetres: 0.007 } }),
   Object.freeze({ id: 'raid2-court' as const, description: courtSurface, finestFeatureMm: 100,
-    options: { size: 512, seed: 0x2a55, tileMetres: 4.0, reliefMetres: 0.003 } }),
-  Object.freeze({ id: 'raid2-pool-mosaic' as const, description: poolMosaicSurface, finestFeatureMm: 8,
+    // 256, not 512. A court is one continuous pour at 4 m per tile, so 512 px
+    // buys 7.8 mm/texel for a surface whose finest authored feature is 100 mm
+    // aggregate - it was paying a quarter of a second of boot for detail no
+    // frame can resolve. At 256 the aggregate still lands at 6.4 texels.
+    options: { size: 256, seed: 0x2a55, tileMetres: 4.0, reliefMetres: 0.003 } }),
+  Object.freeze({ id: 'raid2-pool-mosaic' as const, description: poolMosaicSurface, finestFeatureMm: FEATURE_MM.mosaicGrout,
     options: { size: 512, seed: 0x2a66, tileMetres: 1.0, reliefMetres: 0.004 } }),
   Object.freeze({ id: 'raid2-gravel' as const, description: gravelSurface, finestFeatureMm: 12,
     options: { size: 512, seed: 0x2a77, tileMetres: 1.5, reliefMetres: 0.012 } }),
   Object.freeze({ id: 'raid2-planting' as const, description: plantingSurface, finestFeatureMm: 60,
-    options: { size: 512, seed: 0x2a88, tileMetres: 1.2, reliefMetres: 0.03 } }),
+    // 256 for the same reason: a 60 mm leaf cluster reads at 12.8 texels there,
+    // and hedge is never the surface a player inspects at 5 m.
+    options: { size: 256, seed: 0x2a88, tileMetres: 1.2, reliefMetres: 0.03 } }),
 ]);
 
 /** Measured texel budget per set, so rule 2 is checkable rather than asserted in prose. */
