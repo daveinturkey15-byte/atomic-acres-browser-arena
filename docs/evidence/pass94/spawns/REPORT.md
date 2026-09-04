@@ -15,6 +15,9 @@ immutable preview is bound and Dave has not yet performed PASS 94 owner HITL.
 - VERIFIED: branch is `contrib/dave-gaming-pc/claude/spawn-distribution`, at the
   live PASS 93 head `399d05b1be6a2b87e7d8d3b788accb162ebd7907`; `origin/main`
   `506d6142ce09b8317279a8c705d2de25fa2ab84b` is its ancestor.
+- VERIFIED: the branch-compatible contribution preflight passed after commit:
+  lockfile dry-run, clean worktree, origin/main ancestry, and available tool/auth
+  checks all passed with `--harness claude`.
 - VERIFIED: all 11 registry rows were audited, including parked `farcrysis`;
   the offered roster is 10 arenas and `map3` remains explore/no-bots.
 - VERIFIED: focused TypeScript and Vitest gates passed: 7 files, 244 tests.
@@ -29,6 +32,9 @@ immutable preview is bound and Dave has not yet performed PASS 94 owner HITL.
   raid2 report zero. This is outside the spawn-system scope and was not weakened
   or edited.
 - OPEN: immutable preview binding, Dave's PASS 94 owner HITL and publication.
+- OPEN: invoking the same preflight as `--harness codex` is rejected by the
+  existing guard because the user-mandated branch namespace is `.../claude/...`;
+  the branch was not renamed.
 
 ## Before/after audit
 
@@ -135,6 +141,15 @@ node scripts/qa/verify-spawn-deploys.mjs ... --port 4297 ... --bot-watch-ms 9000
 npx tsx scripts/qa/audit-walkable-surface-parity.ts --json artifacts/qa/pass94-walkable-surface-parity.json
   exit 1: pre-existing fall-through findings on six non-Nuke/Town-zero arenas;
   this remains OPEN and is not a spawn table or selection assertion
+```
+
+```text
+npm run pipeline:preflight -- --machine dave-gaming-pc --harness codex
+  OPEN: guard requires contrib/dave-gaming-pc/codex/<short-outcome>, but the
+  mandated branch is contrib/dave-gaming-pc/claude/spawn-distribution
+
+npm run pipeline:preflight -- --machine dave-gaming-pc --harness claude
+  VERIFIED: ok:true; clean:true; containsOriginMain:true; dirtyPathCount:0
 ```
 
 The parity command was run as requested; no threshold was changed.
