@@ -1796,3 +1796,15 @@ assets and textures and lighting need to be tip top, raid can come next"
   loop catalogue, logos/tidy), asks the owning session to fast-forward and
   restart the app, and verifies each criterion against the live API and
   screenshots; owner sign-off per criterion.
+
+## HF-485 — first reference-grounded score, 2026-09-04 16:20
+
+- Gemini critic (research branch 6e749637,
+  docs/evidence/pass94/gemini-reference-critic/candidate3-REVIEW.md) scored
+  the HITL-3 captures AGAINST the BO2-2025 references: **43 / 100**
+  (layout 11/25, materials 7/25, lighting 10/20, dressing 4/15, hygiene
+  11/15) — "an early blockout of BO1 tract housing rather than the
+  retro-futuristic Nuketown 2025 show-town". Top changes it names (+22, +16,
+  …) are exactly the accuracy-2, techniques and lighting lanes in flight. This
+  number is the hill-climb baseline; HITL 4 gets the same critic (GEM-5) and
+  the delta is the first quality event of the loop.
