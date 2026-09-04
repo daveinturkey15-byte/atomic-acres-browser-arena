@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+// Lane R (Pass 87, HF-423): collects farcrysis admission evidence by running N
+// paired farcrysis vs atomic-acres browser boots and writing the admission
+// receipt the publish guard reads.
+//
+// Usage: node scripts/qa/collect-farcrysis-admission-evidence.mjs
+//   --dist <dir>  built bundle directory (default: dist)
+//   --runs <n>    paired run rounds (default: 3)
+//   --out <path>  receipt output path (default: docs/evidence/pass87/lane-r/farcrysis-admission.json)
+//   Env vars: none read.
+//
+// Writes: receipt JSON at --out (creating its directory); per-run probe reports
+// under artifacts/qa/farcrysis-load/ via the child probe.
+//
+// Exit codes: no explicit process.exit call; 0 on success, 1 on unhandled throw
+// (GPU memory refusal, probe or child failure).
+
 // Lane R (PASS 87, HF-423) — the ADMISSION RECEIPT the publish guard reads.
 //
 //   node scripts/qa/collect-farcrysis-admission-evidence.mjs \
