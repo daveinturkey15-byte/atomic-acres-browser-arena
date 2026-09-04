@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
   createBallisticSurface,
@@ -10,6 +10,10 @@ import {
 import { WEAPONS } from './gameplay';
 import { canonicalSha256 } from './canonical-state';
 import { isStateTrafficMessage } from './protocol';
+import {
+  createAndAttachThinMetalPerforationRuntime,
+  rollbackThinMetalPerforationRuntime,
+} from './thin-metal-perforation-runtime';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 import {
   THIN_METAL_MAX_HOLES_PER_ARENA,
@@ -255,6 +259,27 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     expect(hitAt(guest, surfaces[4]!, { x: 7.7, y: 2.7, z: -0.45 })?.accepted).toBe(true);
     const minted = guest.panelStates().find((state) => state.panelId.endsWith('#4'))?.holes[0];
     expect(minted?.id).toBe(4);
+  });
+
+  it('restores the prior scene root and disposes a failed successor', () => {
+    const scene = new THREE.Scene();
+    const placements = thinMetalPanelPlacements(
+      [{ surfaceName: 'verge street name blade', hitsToOpen: 3 }],
+      [bladeSurface('rollback:1')],
+    );
+    const previous = createAndAttachThinMetalPerforationRuntime(
+      { id: 'nuketown2', thinMetalPanels: placements }, 4, true, scene,
+    )!;
+    const next = createAndAttachThinMetalPerforationRuntime(
+      { id: 'nuketown2', thinMetalPanels: placements }, 4, true, scene,
+    )!;
+    const dispose = vi.spyOn(next.authority, 'dispose');
+    previous.authority.root.removeFromParent();
+    expect(rollbackThinMetalPerforationRuntime(previous, next, scene)).toBe(previous);
+    expect(previous.authority.root.parent).toBe(scene);
+    expect(next.authority.root.parent).toBeNull();
+    expect(dispose).toHaveBeenCalledOnce();
+    previous.authority.dispose();
   });
 
   it('requires sub-threshold and non-penetrating hits to be ignored', () => {

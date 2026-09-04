@@ -68,7 +68,17 @@ export function commitThinMetalPerforationRuntime(
 
 export function rollbackThinMetalPerforationRuntime(
   previous: ThinMetalPerforationRuntime | null,
+  next: ThinMetalPerforationRuntime | null,
+  scene: THREE.Scene,
 ): ThinMetalPerforationRuntime | null {
+  if (previous) {
+    scene.add(previous.authority.root);
+    previous.authority.root.visible = true;
+  }
+  if (next) {
+    next.authority.root.removeFromParent();
+    next.authority.dispose();
+  }
   return previous;
 }
 
