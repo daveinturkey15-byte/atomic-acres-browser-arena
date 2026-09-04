@@ -33,10 +33,13 @@ import {
 import { evaluateMpSoakBundle, formatMpSoakTable, MP_SOAK_THRESHOLDS } from './mp-soak-assertions.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const PORTS = Object.freeze({ dist: 4227, peer: 4228 });
+const PORTS = Object.freeze({ dist: 4230, peer: 4231 });
 const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate');
 const PLAY_DURATION_MS = MP_SOAK_THRESHOLDS.playDurationMs;
-const HARD_TIMEOUT_MS = 235_000;
+// Keep the browser lifetime below the five-minute owner fence while allowing
+// the already-installed Chrome/WebGPU stack to finish a cold boot and the
+// full 180-second play clock.
+const HARD_TIMEOUT_MS = 299_000;
 const DAMAGE_RTT_MS = MP_SOAK_THRESHOLDS.rttMs;
 const positionBoundM = MP_SOAK_THRESHOLDS.positionBoundM;
 const QA_SEED = 'hf499-mp-soak-20260904';
@@ -52,7 +55,7 @@ const renderer = arg('--renderer', 'webgpu');
 const renderProfile = arg('--render', 'performance');
 
 for (const port of Object.values(PORTS)) {
-  if (port < 4227 || port > 4229) throw new Error(`invalid QA port ${port}`);
+  if (port < 4230 || port > 4232) throw new Error(`invalid QA port ${port}`);
 }
 
 const startedAtEpochMs = Date.now();
@@ -111,17 +114,11 @@ function recordScenario(role, name, result) {
   return result;
 }
 
-function summarizeScenario(result) {
-  if (result === null || typeof result !== 'object') return { ok: Boolean(result), value: result ?? null };
-  const copy = {};
-  for (const [key, value] of Object.entries(result)) {
-    if (key === 'trace' && Array.isArray(value)) copy[key] = value.slice(0, 40);
-    else if (key === 'steps' && Array.isArray(value)) copy[key] = value.slice(0, 20);
-    else if (key.endsWith('ByPeer') || key === 'sequence' || key === 'hpByPeer' || key === 'aliveByPeer') copy[key] = value;
-    else if (value === null || typeof value !== 'object') copy[key] = value;
-    else if (Array.isArray(value)) copy[key] = value.slice(0, 10);
-  }
-  return copy;
+function summarizeScenario(result, depth = 0) {
+  if (result === null || typeof result !== 'object') return result ?? null;
+  if (depth >= 4) return '[evidence-depth-limit]';
+  if (Array.isArray(result)) return result.slice(0, 40).map((value) => summarizeScenario(value, depth + 1));
+  return Object.fromEntries(Object.entries(result).slice(0, 80).map(([key, value]) => [key, summarizeScenario(value, depth + 1)]));
 }
 
 async function runScenario(role, name, task) {
@@ -194,6 +191,43 @@ async function scenarioStairFire(role) {
     return debug.stageHouseRamp('interior');
   });
   if (!staged) return { ok: false, staged: false, reason: 'interior house stair staging unavailable' };
+  const bodyPosition = staged.foot.map((value, index) => value + ((staged.top[index] - value) * 0.5));
+  const placed = await peer.page.evaluate(({ bodyPosition, uphill }) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    if (typeof debug?.teleportPlayer !== 'function') return { ok: false, reason: 'debug teleport unavailable' };
+    const yaw = Math.atan2(-uphill[0], -uphill[2]);
+    debug.teleportPlayer(bodyPosition[0], bodyPosition[1], bodyPosition[2], yaw, 0);
+    return { ok: true, yaw };
+  }, { bodyPosition, uphill: staged.uphill });
+  if (!placed.ok) return { ok: false, staged: true, placed, reason: placed.reason };
+
+  const targetId = before.selfId;
+  const convergenceStartedAt = Date.now();
+  let hostPosition = null;
+  let hostPositionErrorM = null;
+  while (Date.now() - convergenceStartedAt <= ACK_BUDGET_MS) {
+    const hostView = await viewOf(peers.host.page);
+    hostPosition = hostView?.players?.[targetId]?.position ?? null;
+    if (Array.isArray(hostPosition) && hostPosition.length === 3) {
+      hostPositionErrorM = Math.hypot(...hostPosition.map((value, index) => value - bodyPosition[index]));
+      if (hostPositionErrorM <= positionBoundM) break;
+    }
+    await sleep(20);
+  }
+  if (hostPositionErrorM === null || hostPositionErrorM > positionBoundM) {
+    return {
+      ok: false,
+      staged: true,
+      placed,
+      reason: 'host did not observe the arena stair body position',
+      stairAnchors: { foot: staged.foot, top: staged.top, uphill: staged.uphill },
+      bodyPosition,
+      hostPosition,
+      hostPositionErrorM,
+    };
+  }
+
+  const fireStartedAt = await peer.page.evaluate(() => performance.now());
   await peer.page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     const weapon = debug.snapshot().player.weapon;
@@ -203,7 +237,22 @@ async function scenarioStairFire(role) {
   await sleep(ACK_BUDGET_MS);
   const after = await viewOf(peer.page);
   const fired = Number(after?.players?.[after.selfId]?.ammo) < Number(before?.players?.[before.selfId]?.ammo);
-  return { ok: fired, staged: true, fired, weapon: after?.players?.[after.selfId]?.weapon ?? null, ammoBefore: before?.players?.[before.selfId]?.ammo ?? null, ammoAfter: after?.players?.[after.selfId]?.ammo ?? null };
+  const trace = (await traceOf(peer.page)).entries.filter((entry) => entry.atMs >= fireStartedAt).slice(0, 40);
+  return {
+    ok: fired,
+    staged: true,
+    placed,
+    fired,
+    stairAnchors: { foot: staged.foot, top: staged.top, uphill: staged.uphill },
+    bodyPosition,
+    hostPosition,
+    hostPositionErrorM,
+    weapon: after?.players?.[after.selfId]?.weapon ?? null,
+    ammoBefore: before?.players?.[before.selfId]?.ammo ?? null,
+    ammoAfter: after?.players?.[after.selfId]?.ammo ?? null,
+    fireBlock: after?.players?.[after.selfId]?.fireBlock ?? null,
+    trace,
+  };
 }
 
 async function runGuestScenarios(role) {
@@ -233,8 +282,14 @@ async function runGuestScenarios(role) {
   bundle.scenarios.guests[role].respawnCheckpoint = summarizeScenario({ dead: dead?.players?.[dead.selfId] ?? null, after: current?.players?.[current.selfId] ?? null, result: respawn });
   const reloadAfterDeath = await runScenario(role, 'reloadAfterDeath', () => scenarioReload(guest, host, role));
   bundle.scenarios.guests[role].reloadAfterDeath = reloadAfterDeath?.ok === true;
-  const stair = await runScenario(role, 'stairFire', () => scenarioStairFire(role));
-  bundle.scenarios.guests[role].stairFire = stair?.ok === true;
+}
+
+async function runStairScenarios() {
+  await Promise.all(PEERS.filter((role) => role !== 'host').map(async (role) => {
+    const stair = await runScenario(role, 'stairFire', () => scenarioStairFire(role));
+    bundle.scenarios.guests[role].stairFireResult = summarizeScenario(stair);
+    bundle.scenarios.guests[role].stairFire = stair?.ok === true;
+  }));
 }
 
 async function damageAfterRejoin() {
@@ -383,11 +438,19 @@ async function main() {
   await peers.host.page.click('#lobby-start');
   await Promise.all(PEERS.map((role) => peers[role].page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true && window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active' && window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2, undefined, { timeout: 180_000 })));
 
+  // All three arenas are active before this point. Run the geometry probe once
+  // before the timed sampling window so its deliberate local teleport cannot be
+  // misclassified as a replication failure.
+  bundle.timing.activeAtEpochMs = Date.now();
+  await runStairScenarios();
   const playStart = Date.now();
   bundle.timing.startedAtEpochMs = playStart;
   await Promise.all([sampleReplication(playStart), scriptedPlay(playStart)]);
   bundle.timing.playDurationMs = Date.now() - playStart;
   bundle.completed = true;
+  // The final kill may have been acknowledged locally before its score message
+  // reaches every peer. Give the host-authoritative scoreboard one measured RTT.
+  await sleep(DAMAGE_RTT_MS);
   await scoreboardAtEnd();
   for (const role of PEERS) {
     bundle.consoleErrors[role] = [...peers[role].errors.page, ...peers[role].errors.console];
