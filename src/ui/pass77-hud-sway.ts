@@ -397,16 +397,58 @@ function serialise(value: number): string {
  *
  *   hudSway = applyHudSway(hudRoot, hudSway, { yaw, pitch, speed, deltaMs });
  */
+/**
+ * HF-491 (perf lane 4): the last string actually written for each custom
+ * property, per target.
+ *
+ * WHY THIS EXISTS. `--hud-sway-x/y`, `--hud-breathe`, `--hud-gait` and
+ * `--hud-health` are REGISTERED custom properties (`@property` in
+ * pass77-instrument-hud.css) that inherit into the whole HUD subtree, so a
+ * write to the HUD root invalidates style for all 245 HUD elements - even
+ * when the value written is byte-identical to the one already there, because
+ * `setProperty` marks the declaration dirty before the value is compared.
+ * Measured on Nuke Town Rebuild at the spawn pose (CDP profile,
+ * `bisect/lane4-diag-spawn-nuketown2.json`): no-oping the per-frame
+ * `setProperty` calls moved p50 30.9 -> 19.5 ms and the profile's `(program)`
+ * (Blink style/layout, no JS frame) 12.8 -> 4.8 ms/frame. Hiding the HUD
+ * subtree entirely gave the same 4.0 ms/frame `(program)`, so the writes, not
+ * the HUD's paint, are what cost.
+ *
+ * Skipping an identical write is invisible by construction: the computed
+ * value is the one already in the declaration.
+ */
+const lastWrittenHudProperties = new WeakMap<HudSwayTarget, Map<string, string>>();
+
+function writeHudProperty(target: HudSwayTarget, property: string, value: string): void {
+  let written = lastWrittenHudProperties.get(target);
+  if (!written) {
+    written = new Map();
+    lastWrittenHudProperties.set(target, written);
+  } else if (written.get(property) === value) return;
+  written.set(property, value);
+  target.style.setProperty(property, value);
+}
+
+/**
+ * Write a HUD custom property only when its serialised value changed.
+ *
+ * Exported so the frame loop's own per-frame writes (`--hud-health`) ride the
+ * same dirty-flag path rather than growing a second, divergent cache.
+ */
+export function setHudProperty(target: HudSwayTarget, property: string, value: string): void {
+  writeHudProperty(target, property, value);
+}
+
 export function applyHudSway(
   target: HudSwayTarget,
   state: HudSwayState,
   sample: HudSwaySample,
 ): HudSwayState {
   const next = sampleHudSway(state, sample);
-  target.style.setProperty('--hud-sway-x', serialise(next.swayX));
-  target.style.setProperty('--hud-sway-y', serialise(next.swayY));
-  target.style.setProperty('--hud-breathe', serialise(next.breathe));
-  target.style.setProperty('--hud-gait', serialise(next.gait));
+  writeHudProperty(target, '--hud-sway-x', serialise(next.swayX));
+  writeHudProperty(target, '--hud-sway-y', serialise(next.swayY));
+  writeHudProperty(target, '--hud-breathe', serialise(next.breathe));
+  writeHudProperty(target, '--hud-gait', serialise(next.gait));
   return next.state;
 }
 
@@ -417,8 +459,8 @@ export function applyHudSway(
  * reduced-motion switches; this exists for the runtime-side cases.
  */
 export function releaseHudSway(target: HudSwayTarget): void {
-  target.style.setProperty('--hud-sway-x', '0');
-  target.style.setProperty('--hud-sway-y', '0');
-  target.style.setProperty('--hud-breathe', '0');
-  target.style.setProperty('--hud-gait', '0');
+  writeHudProperty(target, '--hud-sway-x', '0');
+  writeHudProperty(target, '--hud-sway-y', '0');
+  writeHudProperty(target, '--hud-breathe', '0');
+  writeHudProperty(target, '--hud-gait', '0');
 }
