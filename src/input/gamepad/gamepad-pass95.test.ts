@@ -224,8 +224,59 @@ describe('PASS 95 poll reuses buffers (no per-frame allocation)', () => {
     tick();
     expect(internal.scratchSamples).toBe(samples);
   });
+  it('reuses the same frame, vector and snapshot identities across 1000 polls', () => {
+    const pads: (GamepadLike | null)[] = [null, null, null, null];
+    let clock = 7500;
+    const runtime = new GamepadInputRuntime({ getGamepads: () => pads, storage: new FakeStorage(), now: () => clock });
+    const tick = (): GamepadFrame => { clock += 16; return runtime.poll(clock); };
+    const pad = makePad();
+    pads[0] = pad;
+    tick(); // connect baseline: held buttons seed as held, not pressed
+    press(pad, 0);
+    const first = tick();
+    expect(first.pressed('jump')).toBe(true);
+    const firstMove = first.move;
+    const firstLook = first.look;
+    const firstDpad = first.dpad;
+    const firstDpadPressed = first.dpadPressed;
+    const heldFn = first.held;
+    const pressedFn = first.pressed;
+    const releasedFn = first.released;
+    const valueFn = first.value;
+    const internal = runtime as unknown as {
+      actionHeld: boolean[];
+      actionWas: boolean[];
+      actionValue: number[];
+      scratchSamples: unknown[];
+      samplePool: unknown[];
+    };
+    const { actionHeld, actionWas, actionValue, scratchSamples } = internal;
+    const sampleZero = internal.samplePool[0];
+    for (let i = 0; i < 1000; i += 1) {
+      const frame = tick();
+      // Same live frame and sub-objects every poll: no frame, vector,
+      // d-pad, closure or snapshot allocation in steady state.
+      expect(frame).toBe(first);
+      expect(frame.move).toBe(firstMove);
+      expect(frame.look).toBe(firstLook);
+      expect(frame.dpad).toBe(firstDpad);
+      expect(frame.dpadPressed).toBe(firstDpadPressed);
+      expect(frame.held).toBe(heldFn);
+      expect(frame.pressed).toBe(pressedFn);
+      expect(frame.released).toBe(releasedFn);
+      expect(frame.value).toBe(valueFn);
+    }
+    expect(internal.actionHeld).toBe(actionHeld);
+    expect(internal.actionWas).toBe(actionWas);
+    expect(internal.actionValue).toBe(actionValue);
+    expect(internal.scratchSamples).toBe(scratchSamples);
+    expect(internal.samplePool[0]).toBe(sampleZero);
+    // Held edge settled after the first press frame; the live view is stable.
+    expect(first.held('jump')).toBe(true);
+    expect(first.pressed('jump')).toBe(false);
+  });
 
-  it('keeps a retained frame valid after later polls', () => {
+  it('returns a live view: the frame tracks the latest poll, so retainers copy values', () => {
     const pads: (GamepadLike | null)[] = [null, null, null, null];
     let clock = 8000;
     const runtime = new GamepadInputRuntime({ getGamepads: () => pads, storage: new FakeStorage(), now: () => clock });
@@ -236,11 +287,20 @@ describe('PASS 95 poll reuses buffers (no per-frame allocation)', () => {
     press(pad, 0);
     const first = tick();
     expect(first.pressed('jump')).toBe(true);
+    expect(first.held('jump')).toBe(true);
+    // Copy what must survive: the frame itself is reused by the next poll.
+    const heldCopy = first.held('jump');
+    const pressedCopy = first.pressed('jump');
     release(pad, 0);
     tick();
-    tick();
-    expect(first.pressed('jump')).toBe(true);
-    expect(first.held('jump')).toBe(true);
+    const latest = tick();
+    expect(latest).toBe(first);
+    expect(runtime.latestFrame()).toBe(first);
+    // The live view reflects the release; the copies keep the snapshot.
+    expect(first.held('jump')).toBe(false);
+    expect(first.pressed('jump')).toBe(false);
+    expect(heldCopy).toBe(true);
+    expect(pressedCopy).toBe(true);
   });
 });
 

@@ -136,3 +136,63 @@ size ratchet:
   Options/menu review after the allocation correction. Static mapping,
   deadzone, arbitration, persistence, and menu tests are green, but those
   player-visible checks were not run here.
+
+## Blocking finding fixed (w5-380)
+
+Supersedes the OPEN bullet above: the steady-state poll now performs zero
+transient allocations, and the allocation gate asserts it by identity.
+
+Claim-states:
+
+- VERIFIED — `npx tsc --noEmit` exits 0.
+- VERIFIED — `npx vitest run src/input/gamepad/gamepad-pass95.test.ts`:
+  13/13 pass, including the new identity-reuse test (same frame, move, look,
+  dpad, dpadPressed, callback and snapshot-array identities across 1000
+  connected polls) and the rewritten live-view ownership test.
+- VERIFIED — `npx vitest run src/input src/legacy-main-size-ratchet.test.ts`:
+  10 files, 83 tests pass (ratchet green).
+- VERIFIED — settings gates (`graphics-settings-registry`, `pass65-settings`,
+  `pass65-settings-inventory`, `advanced-graphics-controls`): 4 files,
+  42 tests pass.
+- DESIGNED (needs a capture) — Bluetooth/mobile pad behaviour and the headed
+  Options/menu review remain owner-HITL evidence, as before; no
+  browsers/GPU per lane rules.
+
+What changed and why:
+
+- `src/input/gamepad/gamepad-input.ts` — the poll builds no per-frame
+  objects: sticks shape into two preallocated vectors (`shapeStickInto`,
+  same math as `shapeStick`), per-action held/was/value land in three
+  preallocated arrays, d-pad state mutates two preallocated records, edge
+  baselines keep swapping the preallocated button-buffer pair, and `poll()`
+  returns one reused live frame whose held/pressed/released/value callbacks
+  are bound once in the constructor. Layout identity is compared field-wise
+  (no per-poll key string); the effective layout is rebuilt only when the
+  base layout or the bindings identity changes — this cache also caught and
+  fixed a real staleness bug during verification (multi-pad promotion kept
+  the old layout; `gamepad-input.test.ts` "follows the pad the player is
+  actually using" failed until the base-layout comparison was added).
+  `samplePads()` reuses a preallocated sample pool and treats any axis past
+  the deadzone as activity (a superset of the old layout-mapped check —
+  promotion only needs "this pad is in use") with no closures, array
+  methods, or freezes. `anyInput` keeps the legacy semantics exactly
+  (any physical button past the digital threshold, or fire/ads past the
+  trigger threshold).
+- `src/input/gamepad/hotplug.ts` — the `reduceHotplug()` poll path drops the
+  per-poll `Set` for indexed loops and returns the input state object
+  untouched in steady state. Connect/disconnect/promotion transitions still
+  allocate, rarely, by construction.
+- `src/input/gamepad/gamepad-pass95.test.ts` — the "no per-frame allocation"
+  test now asserts what it names: identical object identities across 1000
+  polls. The old retained-frame test asserted snapshot isolation, which is
+  exactly what forced the per-frame allocation; the frame is now documented
+  (in `gamepad-input.ts`) as a live view valid only until the next poll —
+  the game loop (`pollGamepad` in `src/legacy-main.ts`) and
+  `GamepadMenuNav.update` only read it within the same tick — and the
+  replacement test pins that contract: the live view tracks the latest poll
+  and retainers copy primitives.
+
+Intentional contract change (not a weakened gate): retaining a
+`GamepadFrame` reference across polls now observes latest values instead of
+a snapshot. No in-repo caller retains frames across polls; the new tests pin
+both the reuse and the copy-to-retain pattern.

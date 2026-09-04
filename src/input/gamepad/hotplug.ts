@@ -90,17 +90,36 @@ function removePad(state: HotplugState, index: number, at: number): HotplugState
 export function reduceHotplug(state: HotplugState, event: HotplugEvent): HotplugState {
   if (event.type === 'connected') return addPad(state, event.index, event.id, event.at);
   if (event.type === 'disconnected') return removePad(state, event.index, event.at);
+  // Poll path: zero transient allocations in steady state. No Set, no array
+  // methods, no closures — linear scans over tiny (<=8) lists, and the input
+  // state object is returned untouched when nothing changed. addPad/removePad
+  // /withActive still allocate on real transitions (connect, disconnect, or
+  // activity promotion), which are rare by construction.
+  const pads = event.pads;
   let next = state;
-  const present = new Set<number>();
-  for (const pad of event.pads) {
+  for (let i = 0; i < pads.length; i += 1) {
+    const pad = pads[i];
     if (!pad.connected) continue;
-    present.add(pad.index);
     next = addPad(next, pad.index, pad.id, event.at);
   }
-  for (const index of next.connected) {
-    if (!present.has(index)) next = removePad(next, index, event.at);
+  // Removal scan without a presence Set. Removal shifts the array, so the
+  // index only advances when the slot was kept.
+  let slot = 0;
+  while (slot < next.connected.length) {
+    const index = next.connected[slot];
+    let present = false;
+    for (let j = 0; j < pads.length; j += 1) {
+      const pad = pads[j];
+      if (pad.connected && pad.index === index) { present = true; break; }
+    }
+    if (present) { slot += 1; continue; }
+    next = removePad(next, index, event.at);
   }
-  const busy = event.pads.find((pad) => pad.connected && pad.active && pad.index !== next.activeIndex);
+  let busy: HotplugPadSample | null = null;
+  for (let k = 0; k < pads.length; k += 1) {
+    const pad = pads[k];
+    if (pad.connected && pad.active && pad.index !== next.activeIndex) { busy = pad; break; }
+  }
   if (busy) next = withActive(next, busy.index, event.at);
   return next;
 }
