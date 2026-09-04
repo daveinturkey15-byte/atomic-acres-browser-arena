@@ -7,6 +7,7 @@ import type { ArenaMap, PracticeTarget } from './map';
 import type { Team } from './protocol';
 import type { ArenaVerticalNavigation } from './vertical-navigation';
 import { applyFarcrysisArtwork } from './farcrysis-art';
+import { collapseFarcrysisMaterialVocabulary } from './farcrysis-material-vocabulary';
 import { addInteractables, buildFuelDrumInstances, FUEL_DRUM_HEIGHT, FUEL_DRUM_RADIUS } from './farcrysis-physics';
 import {
   buildPalmStandInstances,
@@ -1086,6 +1087,17 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   root.userData.verticalNavigation = verticalNavigation;
   root.userData.farcrysisColliderAudit = Object.freeze(builder.colliderAudit.map((entry) => Object.freeze({ ...entry })));
   root.userData.farcrysisTerrainPlateCount = terrainPlates.length;
+
+  // PASS 94 rework slice 1 - the arena's ONE material vocabulary.
+  //
+  // LAST line of the build on purpose. Every name-keyed material mutator
+  // (applyFarcrysisTextures' classifier, applyFarcrysisShadeLift's emissive
+  // patterns, the crate-shard polygonOffset tiering) has already run, so the
+  // differences they author are IN the render state and the collapse key
+  // separates them without knowing any of those classifiers. Moving this call
+  // earlier reintroduces exactly the merge it is written to avoid - see rule 2
+  // in src/farcrysis-material-vocabulary.ts.
+  root.userData.farcrysisMaterialVocabulary = collapseFarcrysisMaterialVocabulary(root);
 
   return {
     id: 'farcrysis',
