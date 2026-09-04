@@ -1,3 +1,8 @@
+// Generates UI-INVENTORY.md: scans the menu-shell UI sources for element ids, groups them by the markup function that renders each, and writes a checkbox inventory for owner triage.
+// Usage: node scripts/qa/gen-ui-inventory.mjs
+// Flags/env: none (reads no process.argv flags or process.env variables).
+// Writes: UI-INVENTORY.md (repo root, overwritten on every run).
+// Exit codes: 0 on success; no explicit process.exit calls (non-zero only on unhandled exception).
 // Generates UI-INVENTORY.md: every element id in the menu shell, grouped by the
 // markup function (panel/section) that renders it, each with a [ ] checkbox so
 // the owner can mark elements to remove. Run: node scripts/qa/gen-ui-inventory.mjs
