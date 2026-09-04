@@ -1,4 +1,13 @@
 /**
+ * Derives the arena roster (all ids, selectable, hidden, default `--arenas` values) by scraping `src/map-selection.ts` and `src/arena-identity.ts`, for import by every QA script and gate; running it directly is a no-op.
+ *
+ * Usage: node scripts/qa/arena-roster.mjs
+ * Flags/env vars read: none — this file reads no process.argv or process.env entries.
+ * Writes: none — read-only (reads `src/map-selection.ts` and `src/arena-identity.ts` only).
+ * Exit codes: no process.exit calls — run directly it exits 0; as a module it throws when a scrape yields fewer ids than the floors.
+ */
+
+/**
  * One derivation of the arena roster, for every QA script and gate.
  *
  * PASS 85, Lane N (QA corpus streamline).
