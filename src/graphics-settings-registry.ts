@@ -67,6 +67,12 @@ export type AdvancedGraphicsValues = Readonly<{
   ambientOcclusion: AmbientOcclusionQuality;
   screenSpaceReflections: ScreenSpaceTier;
   screenSpaceGi: ScreenSpaceTier;
+  /**
+   * HF-486 — SSR temporal-denoise off switch. Rides `screenSpaceReflections`:
+   * true filters the SSR term through one history buffer, false renders the
+   * single-frame SSR path exactly as before.
+   */
+  ssrTemporalDenoise: boolean;
   rayTracing: RayTracingTier;
   reflectionQuality: ReflectionQualityTier;
   environmentIntensity: number;
@@ -333,6 +339,15 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'screen-space-gi',
   }),
+  // HF-486 — SSR temporal denoise. The off switch the brief requires: with
+  // SSR on and this off, the graph builds the single-frame SSR path exactly
+  // as before (no history buffer, no blend). Pipeline-rebuild because the
+  // history buffer and the velocity MRT attachment exist or do not.
+  control({
+    key: 'ssrTemporalDenoise', id: 'graphics-ssr-temporal-denoise', category: 'lighting', label: 'Reflection smoothing',
+    description: 'Steadies puddle and metal reflections across frames. Off restores the raw single-frame reflections.',
+    kind: 'toggle', applyMode: 'pipeline-rebuild', runtimeConsumer: 'screen-space-reflections',
+  }),
   // HF-398: CLASSIC RECURSIVE RAY TRACING. This one is genuinely ray tracing —
   // real world-space rays intersecting real world-space geometry, recursing at
   // reflective and refractive surfaces and casting shadow rays — which is why
@@ -597,6 +612,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   ),
   screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
   screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
+  ssrTemporalDenoise: runtimeEvidence('src/rendering/ssr-temporal-denoise.ts', 'resolveSsrTemporalDenoiseTuning', 'render.atomicSignal.advancedGraphics.screenSpace.ssrDenoise'),
   // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
   // field echoing the requested tier. The scene assembler rebuilds the linear
   // stage list from a hard-coded order this lane does not own, so the trace can
@@ -738,7 +754,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
     shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', ambientOcclusion: 'off',
-    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', ssrTemporalDenoise: false, rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.1, vignette: 0.08,
@@ -848,7 +864,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
     shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
-    screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
+    screenSpaceReflections: 'off', screenSpaceGi: 'off', ssrTemporalDenoise: false, rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.24, vignette: 0.14,
@@ -887,7 +903,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
     shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'high',
-    screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'high',
+    screenSpaceReflections: 'low', screenSpaceGi: 'off', ssrTemporalDenoise: true, rayTracing: 'reflections', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
@@ -940,7 +956,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
     shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
-    screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'reflections', reflectionQuality: 'ultra',
+    screenSpaceReflections: 'high', screenSpaceGi: 'high', ssrTemporalDenoise: true, rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,

@@ -184,6 +184,13 @@ export type Pass64TslSceneSystems = Readonly<{
    * without shadows) resolves to disabled here, so telemetry cannot claim it.
    */
   screenSpace: GraphicsRuntime['screenSpace'];
+  /**
+   * HF-486 — SSR temporal-denoise built-graph receipt: whether the history
+   * stage was constructed, how many history targets it holds (0 off, 1 on —
+   * never more), and whether the buffer holds a previous frame yet. Read off
+   * the built graph, never the request.
+   */
+  ssrDenoiseStatus(): Readonly<{ enabled: boolean; historyTargets: number; historyValid: boolean }>;
   /** Re-anchors the existing atmosphere uniforms without rebuilding the graph. */
   setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
   /**
@@ -946,6 +953,8 @@ function configureHdrPipeline(
   linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
+  refreshSsrDenoiseHistory(renderer: { copyTextureToTexture(source: unknown, target: unknown): void }): void;
+  ssrDenoiseStatus(): Readonly<{ enabled: boolean; historyTargets: number; historyValid: boolean }>;
   beforeRender(): void;
   dispose(): void;
 }> {
@@ -1139,6 +1148,9 @@ function configureHdrPipeline(
         // term into the band the combat ceiling is stated in.
         atmosphereSkyColor.setHex(next.fog.color);
         screenSpace.setAtmosphere(atmosphereSkyColor, next.lighting.sunIntensity);
+        // HF-486. A committing arena is a new world: its first frame must not
+        // sample the previous arena's reflections. The next refresh re-primes.
+        screenSpace.invalidateSsrDenoiseHistory();
         // The committing arena has already installed its sun by the time a
         // definition is applied, so this is where the shaft stage learns
         // whether it has a shadow map to raymarch. Recompose only when the
@@ -1161,6 +1173,19 @@ function configureHdrPipeline(
         },
         beforeRender() {
           screenSpace.beforeRender();
+        },
+        // HF-486. Pre-frame copy of last frame's SSR output into the denoise
+        // history (a texture copy, not a pipeline). No-op when the denoise is
+        // off; allocation-free after the first sized refresh.
+        refreshSsrDenoiseHistory(renderer: { copyTextureToTexture(source: unknown, target: unknown): void }): void {
+          screenSpace.refreshSsrDenoiseHistory(renderer);
+        },
+        ssrDenoiseStatus(): Readonly<{ enabled: boolean; historyTargets: number; historyValid: boolean }> {
+          return Object.freeze({
+            enabled: screenSpace.ssrDenoise.enabled,
+            historyTargets: screenSpace.ssrDenoise.historyTargets(),
+            historyValid: screenSpace.ssrDenoise.historyValid(),
+          });
         },
         dispose() {
           screenSpace.dispose();
@@ -1394,6 +1419,7 @@ export function createPass64TslSceneSystems(
       ...graphics.ambientOcclusion,
     }),
     screenSpace: constructedScreenSpace,
+    ssrDenoiseStatus: () => hdr.ssrDenoiseStatus(),
     setAtmosphere: (skyColor, sunWhite) => hdr.setAtmosphere(skyColor, sunWhite),
     // A getter, not a snapshot: the shaft stage can be added or removed by an
     // arena commit, and a frozen list would keep asserting a stage order the
@@ -1488,6 +1514,11 @@ export function createPass64TslSceneSystems(
       // The shaft tint tracks the live sun colour, so it has to be refreshed on
       // the same cadence as the rest of the presentation rather than only when
       // a setting changes.
+      // HF-486. Pre-frame denoise-history copy (last frame's SSR output into
+      // the history buffer). Guarded on the renderer because headless/test
+      // systems construct without one; then the history never validates and
+      // the blend weight stays exactly 0 (the old path).
+      if (renderer) hdr.refreshSsrDenoiseHistory(renderer);
       hdr.beforeRender();
     },
     dispose: () => {

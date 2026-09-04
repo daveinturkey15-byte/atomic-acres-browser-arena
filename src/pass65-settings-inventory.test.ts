@@ -42,6 +42,7 @@ describe('Pass 65 setting inventory', () => {
     for (const key of [
       'graphics.bakedIndirect',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.ssrTemporalDenoise',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
     ]) {
@@ -53,6 +54,7 @@ describe('Pass 65 setting inventory', () => {
       'graphics.antiAliasing', 'graphics.geometryDetail', 'graphics.ambientOcclusion',
       'graphics.bakedIndirect',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.ssrTemporalDenoise',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
     ]);

@@ -195,6 +195,7 @@ unchanged; only the presets' control sets moved.
 | `indirectLighting` | Scalar on environment contribution (0 / 0.62 / 1) | low | **high** | high | high | high |
 | `ambientOcclusion` | GTAO: resolution scale, samples, radius, denoise | off | off | off | **high** (0.5 scale, 12 spl, denoise) | **ultra** (0.75, 16 spl) |
 | `screenSpaceReflections` | Depth-buffer march; **adds normal + material MRT attachments** | off | **off** | low (½-res, 6 m) | **off** (superseded by the trace) | high (¾-res, 12 m, binary refine) |
+| `ssrTemporalDenoise` | Temporal smoothing of the SSR term; one history buffer, fused blend | off | off | **on** (strength 0.55, history weight capped 0.85) | off | **on** (strength 0.55, history weight capped 0.85) |
 | `screenSpaceGi` | Room-scale bounce gather — the expensive one | off | off | off | off | high (2×12, 8 m) |
 | `rayTracing` | World-space recursive trace against the analytic proxy set | off | off | off | **reflections** | off |
 | `reflectionQuality` | Baked PMREM probe resolution (load-time cost only) | low | **high** | high | **ultra (512)** | ultra |
@@ -229,12 +230,24 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `445a9754` |
-| `balanced` | `0753ee34` |
-| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
-| `max` (HF-438 full tier) | `03ee2e10` |
+| `performance` | `6990222a` |
+| `balanced` | `1265dfaa` |
+| `high` (QUALITY, HF-438 light tier) | `87a2c804` |
+| `max` (HF-438 full tier) | `62d82ed1` |
+| `high` (pre-denoise, historical) | `430da2ad` |
+| `max` (pre-denoise, historical) | `03ee2e10` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
+> **PASS 96 re-fingerprint (HF-486).** Every fingerprint above is new because
+> ONE new control, `ssrTemporalDenoise`, joined the control set (tiers:
+> `performance`/`balanced` off, `high`/`max` on; the toggle rides SSR and its
+> off state restores the single-frame SSR path). Per-frame cost is a defended
+> estimate, not a capture: ~0.35 ms at 1440p on the RTX 5080 (8 taps at SSR
+> resolutionScale plus one SSR-sized texture copy per frame, zero new
+> pipelines). A full headed capture of the ladder with the denoise live is an
+> OPEN ITEM, not a claim made here. Pre-denoise rows are kept as historical
+> record only — they pin nothing.
+>
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
 > changed because the fold moved real values into those presets; `performance`
 > and `balanced` are untouched. The retired `raytraced` row and the pre-fold
@@ -551,12 +564,12 @@ file after the 2026-08-31 IBL first-arena bug, where a row pointed at a real
 symbol in a real file inside a function the first arena of every page load
 never reached, and nine unit tests passed over the top of it for weeks).
 
-**Measured at head (VERIFIED): 1 of 40 controls has a live observation.**
+**Measured at head (VERIFIED): 1 of 41 controls has a live observation.**
 
 | Strength | Count | Controls |
 |---|---|---|
 | **Live, fail-closed observation of the running scene** | 1 | `environmentIntensity` |
-| **Source grep only** — proves the consumer EXISTS, not that it RAN | 39 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife` |
+| **Source grep only** — proves the consumer EXISTS, not that it RAN | 40 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `ssrTemporalDenoise`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife` |
 
 This lane did **not** fix the verifiers (out of scope — the brief asks for the
 list, not the repair). The list above is that report. The highest-value

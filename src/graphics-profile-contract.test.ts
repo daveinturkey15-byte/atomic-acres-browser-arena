@@ -45,14 +45,16 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: '445a9754',
-  balanced: '0753ee34',
-  // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
-  // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
-  // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
-  // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
-  high: '430da2ad',
-  max: '03ee2e10',
+  // HF-486 (PASS 96): the SSR temporal-denoise toggle `ssrTemporalDenoise`
+  // joined the control set, so every fingerprint is new. Re-fingerprinted
+  // with graphicsControlSetHashes() per the tripwire procedure; tiers are
+  // performance/balanced off, high/max on, argued in graphics-settings-registry.ts.
+  // HF-438 fold (PASS 92, historical): QUALITY carries the trace at the light
+  // tier (rayTracing reflections, AO high); MAX at the full tier.
+  performance: '6990222a',
+  balanced: '1265dfaa',
+  high: '87a2c804',
+  max: '62d82ed1',
 });
 
 describe('HF-418 graphics ladder', () => {

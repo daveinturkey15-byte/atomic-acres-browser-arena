@@ -49,6 +49,9 @@ const OFF_AND_ON: Readonly<Record<string, readonly [unknown, unknown]>> = Object
   // composite stage; removing it takes them away. Topology, like SSR.
   bakedIndirect: ['off', 'high'],
   screenSpaceReflections: ['off', 'high'],
+  // HF-486. The denoise toggle is a pipeline-rebuild owner (history buffer +
+  // velocity MRT exist or do not), so it needs its on/off pair here.
+  ssrTemporalDenoise: [false, true],
   screenSpaceGi: ['off', 'high'],
   rayTracing: ['off', 'reflections'],
   volumetricLightShafts: ['off', 'high'],

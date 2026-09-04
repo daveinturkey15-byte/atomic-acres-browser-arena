@@ -55,6 +55,12 @@ import {
   assertRayTracingCombatSafety,
   resolveRayTracingTuning,
 } from './raytracing/raytracing-profile';
+import {
+  SSR_TEMPORAL_DENOISE_MAXIMUM_STRENGTH,
+  SSR_TEMPORAL_DENOISE_OFF,
+  resolveSsrTemporalDenoiseTuning,
+  type SsrTemporalDenoiseTuning,
+} from './ssr-temporal-denoise';
 
 export type ScreenSpaceTier = LightingTier;
 export type SpatialUpscalingMode = 'off' | 'fsr1-quality' | 'fsr1-balanced' | 'fsr1-performance';
@@ -206,6 +212,13 @@ export type ScreenSpacePostRuntime = Readonly<{
   bakedIndirect: BakedIndirectTuning;
   godrays: GodraysTuning;
   reflections: ScreenSpaceReflectionTuning;
+  /**
+   * HF-486 — temporal denoise for the SSR term above. Strictly inside the SSR
+   * stage: same additive composite, same stage name, no new stage. Enabled
+   * means the graph built the history buffer and the fused blend; strength is
+   * the history weight before gating, capped by SSR_TEMPORAL_DENOISE_MAXIMUM.
+   */
+  ssrDenoise: SsrTemporalDenoiseTuning;
   globalIllumination: ScreenSpaceGiTuning;
   depthOfField: DepthOfFieldTuning;
   motionBlur: MotionBlurTuning;
@@ -512,6 +525,14 @@ export function assertScreenSpacePostCombatSafety(runtime: ScreenSpacePostRuntim
   if (runtime.reflections.intensity > SSR_MAXIMUM_INTENSITY) {
     throw new Error(`HF-364 SSR intensity ${runtime.reflections.intensity} exceeds ${SSR_MAXIMUM_INTENSITY}`);
   }
+  // HF-486. The denoise may only ever withhold the fresh frame down to the
+  // (1 - MAXIMUM) floor: a strength above the ceiling would let history swamp
+  // a new signal, which is how a temporal filter turns into target smear.
+  if (runtime.ssrDenoise.strength > SSR_TEMPORAL_DENOISE_MAXIMUM_STRENGTH) {
+    throw new Error(
+      `HF-486 SSR denoise strength ${runtime.ssrDenoise.strength} exceeds ${SSR_TEMPORAL_DENOISE_MAXIMUM_STRENGTH}`,
+    );
+  }
   if (runtime.globalIllumination.giIntensity > SSGI_MAXIMUM_GI_INTENSITY) {
     throw new Error(`HF-364 SSGI intensity ${runtime.globalIllumination.giIntensity} exceeds ${SSGI_MAXIMUM_GI_INTENSITY}`);
   }
@@ -535,6 +556,13 @@ export type ScreenSpacePostSelection = Readonly<{
   bakedIndirect: BakedIndirectTier;
   volumetricLightShafts: ScreenSpaceTier;
   screenSpaceReflections: ScreenSpaceTier;
+  /**
+   * HF-486 — SSR temporal denoise off switch. Optional so callers that predate
+   * the toggle keep compiling; omitted means on wherever SSR runs (the filter
+   * is strictly inside the SSR stage). The registry always passes an explicit
+   * value; `false` restores the single-frame SSR path exactly.
+   */
+  ssrTemporalDenoise?: boolean;
   screenSpaceGi: ScreenSpaceTier;
   depthOfField: boolean;
   depthOfFieldStrength: number;
@@ -561,10 +589,17 @@ export function resolveScreenSpacePostRuntime(
   selection: ScreenSpacePostSelection,
   capability: Readonly<{ shadowsEnabled: boolean }>,
 ): ScreenSpacePostRuntime {
+  // HF-486. Resolved before the literal because the denoise rides SSR: it is
+  // only enabled when the march it filters is enabled.
+  const reflections = resolveScreenSpaceReflectionTuning(selection.screenSpaceReflections);
   const runtime: ScreenSpacePostRuntime = Object.freeze({
     bakedIndirect: resolveBakedIndirectTuning(selection.bakedIndirect),
     godrays: resolveGodraysTuning(selection.volumetricLightShafts, capability),
-    reflections: resolveScreenSpaceReflectionTuning(selection.screenSpaceReflections),
+    reflections,
+    // The toggle defaults to on wherever SSR runs: the filter is strictly
+    // inside the SSR stage (same additive term, same stage name), so callers
+    // that predate the toggle keep today's picture, only steadier.
+    ssrDenoise: resolveSsrTemporalDenoiseTuning(reflections.enabled, selection.ssrTemporalDenoise ?? true),
     globalIllumination: resolveScreenSpaceGiTuning(selection.screenSpaceGi),
     depthOfField: resolveDepthOfFieldTuning(selection.depthOfField, selection.depthOfFieldStrength),
     motionBlur: resolveMotionBlurTuning(selection.motionBlur),
@@ -612,7 +647,7 @@ export function screenSpaceTopologyKey(screenSpace: ScreenSpacePostRuntime): str
     // at the same fixed grid and differ only in what was traced into them.
     screenSpace.bakedIndirect.enabled ? 'baked' : '-',
     screenSpace.godrays.enabled ? 'shafts' : '-',
-    screenSpace.reflections.enabled ? 'ssr' : '-',
+    screenSpace.reflections.enabled ? (screenSpace.ssrDenoise.enabled ? 'ssr+denoise' : 'ssr') : '-',
     screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
     screenSpace.depthOfField.enabled ? 'dof' : '-',
     screenSpace.motionBlur.enabled ? 'motion' : '-',
@@ -631,6 +666,7 @@ export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze(
   bakedIndirect: resolveBakedIndirectTuning('off'),
   godrays: GODRAYS_OFF,
   reflections: SSR_OFF,
+  ssrDenoise: SSR_TEMPORAL_DENOISE_OFF,
   globalIllumination: SSGI_OFF,
   depthOfField: resolveDepthOfFieldTuning(false, 0),
   motionBlur: MOTION_BLUR_OFF,

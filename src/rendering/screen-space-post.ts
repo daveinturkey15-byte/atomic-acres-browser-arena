@@ -24,13 +24,19 @@
 import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
 import {
+  abs,
   float,
   int,
   max,
   min,
+  mix,
   nodeObject,
+  screenSize,
+  screenUV,
   smoothstep,
+  texture,
   uniform,
+  vec2,
   vec4,
 } from 'three/tsl';
 import type { pass } from 'three/tsl';
@@ -46,6 +52,16 @@ import {
   GODRAYS_SHAFT_LIGHT_WITHOUT_SHADOWS_REASON,
   type ScreenSpacePostRuntime,
 } from './screen-space-post-profile';
+import {
+  createSsrTemporalDenoiseHistory,
+  SSR_DENOISE_DEPTH_EDGE_FAR,
+  SSR_DENOISE_DEPTH_EDGE_NEAR,
+  SSR_DENOISE_VELOCITY_DEAD_ZONE_UV,
+  SSR_DENOISE_VELOCITY_KNEE_UV,
+  type SsrDenoiseCopyRenderer,
+  type SsrDenoiseHistorySource,
+  type SsrTemporalDenoiseHistory,
+} from './ssr-temporal-denoise';
 import {
   type RayTracedLightGraph,
   RAY_TRACED_LIGHT_STAGE,
@@ -155,7 +171,10 @@ export function screenSpaceMrtRequirement(runtime: ScreenSpacePostRuntime): Scre
     normal: runtime.reflections.enabled || runtime.globalIllumination.enabled || runtime.rayTracing.enabled
       || runtime.bakedIndirect.enabled,
     material: runtime.reflections.enabled || runtime.rayTracing.enabled,
-    velocity: runtime.motionBlur.enabled,
+    // HF-486: the SSR temporal denoise reprojects its history buffer with the
+    // same NDC motion vectors the blur reads, so it requests the attachment
+    // too. Off means no attachment, exactly like the blur's disabled default.
+    velocity: runtime.motionBlur.enabled || runtime.ssrDenoise.enabled,
   });
 }
 
@@ -300,6 +319,26 @@ export type ScreenSpacePostGraph = Readonly<{
    * arena's stale shadow map at full gain.
    */
   refreshShaftStage(): boolean;
+  /**
+   * HF-486 — SSR temporal-denoise state. `enabled` mirrors the tuning the
+   * graph was built with; `historyTargets` is 0 when off and 1 when on
+   * (never more); `historyValid` reports whether the buffer holds a previous
+   * frame yet. Built at construction so the deploy-time precompile covers it;
+   * nothing here allocates after build.
+   */
+  ssrDenoise: Readonly<{
+    enabled: boolean;
+    historyTargets(): number;
+    historyValid(): boolean;
+  }>;
+  /**
+   * Copies last frame's SSR output into the denoise history. Call pre-frame
+   * (the assembler does, in `update()`); no-op when the denoise is off.
+   * Allocation-free after the first sized refresh.
+   */
+  refreshSsrDenoiseHistory(renderer: SsrDenoiseCopyRenderer): void;
+  /** Drops history validity (arena switch, definition apply). No-op when off. */
+  invalidateSsrDenoiseHistory(): void;
   /** Wraps a finished linear-HDR colour in the bokeh pass, or returns it unchanged. */
   applyDepthOfField(linearHdr: Node<'vec4'>): Node<'vec4'>;
   /** Pushes a new runtime into the live uniforms. Topology is unchanged. */
@@ -401,6 +440,15 @@ export function buildScreenSpacePostGraph(
 
   // --- screen-space reflections --------------------------------------------
   const ssrGain = uniform(runtime.reflections.enabled ? 1 : 0);
+  // HF-486. Graph-scope denoise state: the uniforms are cheap JS nodes (same
+  // as ssrGain above), while the history target is allocated only when the
+  // tuning and a velocity attachment are both present (assigned below).
+  const denoiseStrength = uniform(runtime.ssrDenoise.enabled ? runtime.ssrDenoise.strength : 0);
+  // Gated to 0 until the history holds a previous frame (see refresh), so an
+  // empty or stale buffer can never contribute to the picture.
+  const denoiseValid = uniform(0);
+  const denoiseResolutionScale = uniform(runtime.reflections.resolutionScale);
+  let denoiseHistory: SsrTemporalDenoiseHistory | null = null;
   let reflectionLight: Node<'vec3'> | null = null;
   let ssrNode: {
     dispose?: () => void;
@@ -410,6 +458,8 @@ export function buildScreenSpacePostGraph(
     thickness: { value: number };
     intensity: { value: number };
     screenEdgeFade: { value: number };
+    /** SSR output target: the history refresh copies from its texture. */
+    getRenderTarget(): { texture: SsrDenoiseHistorySource };
   } | null = null;
   if (runtime.reflections.enabled && sources.sceneNormal) {
     const material = sources.sceneMaterial ? nodeObject(sources.sceneMaterial) : null;
@@ -434,7 +484,79 @@ export function buildScreenSpacePostGraph(
     node.screenEdgeFade.value = runtime.reflections.screenEdgeFade;
     ssrNode = node as unknown as typeof ssrNode;
     disposables.push(node as unknown as DisposableNode);
-    reflectionLight = nodeObject(node as unknown as Node<'vec4'>).rgb.mul(ssrGain);
+    // --- HF-486 SSR temporal denoise ---------------------------------------
+    // One fused stage in our likeness of upstream's
+    // `temporalReproject() + recurrentDenoise()` chain (r185
+    // webgpu_postprocessing_ssr_denoise): the history buffer is reprojected
+    // with the existing velocity MRT attachment, clamped to the neighbourhood
+    // box of the CURRENT frame, vetoed on disocclusion, and blended under a
+    // strength uniform — all arithmetic fused into this composite expression.
+    // Zero new pipelines (the refresh below is a texture copy, not a pass),
+    // one history buffer, at most 8 taps. With the toggle off
+    // `denoisedReflection` stays null and the line below is the old path,
+    // byte for byte.
+    const denoiseVelocityNode = sources.sceneVelocity;
+    if (runtime.ssrDenoise.enabled && denoiseVelocityNode !== null) {
+      denoiseHistory = createSsrTemporalDenoiseHistory({ width: 1, height: 1 });
+    }
+    let denoisedReflection: Node<'vec3'> | null = null;
+    if (denoiseHistory !== null && denoiseVelocityNode !== null) {
+      const historyTexture = denoiseHistory.texture() as THREE.Texture;
+      // The SSR result as a sampleable texture: same signal the composite
+      // reads below, so the box below bounds exactly what is on screen.
+      const ssrResolved = node.getTextureNode();
+      const ssrTexel = vec2(float(1).div(screenSize.x), float(1).div(screenSize.y)).div(denoiseResolutionScale);
+      const tapC = nodeObject(ssrResolved.sample(screenUV)) as unknown as Node<'vec4'>;
+      const tapL = nodeObject(ssrResolved.sample(screenUV.sub(vec2(ssrTexel.x, float(0))))) as unknown as Node<'vec4'>;
+      const tapR = nodeObject(ssrResolved.sample(screenUV.add(vec2(ssrTexel.x, float(0))))) as unknown as Node<'vec4'>;
+      const tapD = nodeObject(ssrResolved.sample(screenUV.sub(vec2(float(0), ssrTexel.y)))) as unknown as Node<'vec4'>;
+      const tapU = nodeObject(ssrResolved.sample(screenUV.add(vec2(float(0), ssrTexel.y)))) as unknown as Node<'vec4'>;
+      const boxMin = min(tapC.rgb, tapL.rgb, tapR.rgb, tapD.rgb, tapU.rgb);
+      const boxMax = max(tapC.rgb, tapL.rgb, tapR.rgb, tapD.rgb, tapU.rgb);
+      // NDC motion vectors halve into UV units, exactly as the blur gate does.
+      const denoiseVelocityUv = nodeObject(denoiseVelocityNode).xy.mul(float(0.5));
+      const denoiseSpeed = denoiseVelocityUv.length();
+      const motionGate = float(1).sub(smoothstep(
+        float(SSR_DENOISE_VELOCITY_DEAD_ZONE_UV), float(SSR_DENOISE_VELOCITY_KNEE_UV), denoiseSpeed,
+      ));
+      const reprojectedUv = screenUV.sub(denoiseVelocityUv);
+      // Reprojection validity as a feathered boxcar (no boolean ops): 0
+      // outside [0,1], 1 inside, feathered over 0.1% of the frame.
+      const validityEdge = float(0.001);
+      const validX = smoothstep(float(0), validityEdge, reprojectedUv.x)
+        .mul(float(1).sub(smoothstep(float(1).sub(validityEdge), float(1), reprojectedUv.x)));
+      const validY = smoothstep(float(0), validityEdge, reprojectedUv.y)
+        .mul(float(1).sub(smoothstep(float(1).sub(validityEdge), float(1), reprojectedUv.y)));
+      const historyRaw = texture(historyTexture, reprojectedUv);
+      // `texture()` is untyped; the history buffer is RGBA by construction.
+      const historyTap = nodeObject(historyRaw) as unknown as Node<'vec4'>;
+      const clampedHistory = min(max(historyTap.rgb, boxMin), boxMax);
+      // Depth edge guard on the same depth-delta signal and band as bloom's,
+      // so a reflection can never bleed across a silhouette being aimed past.
+      const fullTexel = vec2(float(1).div(screenSize.x), float(1).div(screenSize.y));
+      const depthRight = sources.sceneDepth.sample(screenUV.add(vec2(fullTexel.x, float(0))));
+      const depthUp = sources.sceneDepth.sample(screenUV.add(vec2(float(0), fullTexel.y)));
+      const depthDisc = max(abs(sources.sceneDepth.sub(depthRight)), abs(sources.sceneDepth.sub(depthUp)));
+      const depthGate = float(1).sub(smoothstep(
+        float(SSR_DENOISE_DEPTH_EDGE_NEAR), float(SSR_DENOISE_DEPTH_EDGE_FAR), depthDisc,
+      ));
+      // Receivers stay method-capable nodes (`float(1)`, gate expressions);
+      // uniforms travel as arguments only, exactly as ssrGain does below.
+      const historyWeightFactors = float(1).mul(denoiseStrength).mul(denoiseValid)
+        .mul(motionGate).mul(depthGate).mul(validX.mul(validY));
+      // Every factor above is a scalar float by construction (two float
+      // uniforms, three smoothstep gates, feathered validity); the loose
+      // method overloads type the chain as vec4, so the scalar is named once.
+      const historyWeight = historyWeightFactors as unknown as Node<'float'>;
+      denoisedReflection = mix(tapC.rgb, clampedHistory, historyWeight) as unknown as Node<'vec3'>;
+    }
+    if (denoisedReflection === null) {
+      reflectionLight = nodeObject(node as unknown as Node<'vec4'>).rgb.mul(ssrGain);
+    } else {
+      // Still additive, still behind ssrGain: the blend only moves energy the
+      // march already produced, so it can never darken a sightline either.
+      reflectionLight = denoisedReflection.mul(ssrGain);
+    }
     stages.push(SSR_STAGE);
   }
 
@@ -591,6 +713,22 @@ export function buildScreenSpacePostGraph(
     sceneColor,
     bounceLight,
     reflectionLight,
+    // HF-486. Built at construction (precompile-covered); the refresh below
+    // is the only per-frame denoise work and it is one texture copy.
+    ssrDenoise: Object.freeze({
+      enabled: denoiseHistory !== null,
+      historyTargets: () => denoiseHistory?.targetCount() ?? 0,
+      historyValid: () => denoiseHistory?.isValid() ?? false,
+    }),
+    refreshSsrDenoiseHistory(renderer: SsrDenoiseCopyRenderer): void {
+      if (denoiseHistory === null || ssrNode === null) return;
+      const result = denoiseHistory.refresh(renderer, ssrNode.getRenderTarget().texture);
+      denoiseValid.value = result.valid ? 1 : 0;
+    },
+    invalidateSsrDenoiseHistory(): void {
+      denoiseHistory?.invalidate();
+      denoiseValid.value = 0;
+    },
     atmosphereLight: aerialPerspective?.light ?? null,
     setAtmosphere(skyColor: THREE.Color, sunWhite: number): void {
       atmosphereSkyColor.copy(skyColor);
@@ -679,6 +817,12 @@ export function buildScreenSpacePostGraph(
         ssrNode.thickness.value = next.reflections.thickness;
         ssrNode.intensity.value = next.reflections.intensity;
       }
+      // HF-486. Strength and SSR scale are live uniforms; presence is topology
+      // (key fragment `ssr+denoise`), so a toggle rebuilds instead of landing
+      // here. A tier change that moves resolutionScale without a rebuild lands
+      // the new texel size here with it.
+      denoiseStrength.value = next.ssrDenoise.enabled ? next.ssrDenoise.strength : 0;
+      denoiseResolutionScale.value = next.reflections.resolutionScale;
       if (godraysNode && next.godrays.enabled) {
         godraysNode.resolutionScale = next.godrays.resolutionScale;
         godraysNode.raymarchSteps.value = next.godrays.raymarchSteps;
@@ -758,6 +902,7 @@ export function buildScreenSpacePostGraph(
       bakedIndirectRuntime = null;
       depthOfFieldNode = null;
       ssgiNode = null;
+      denoiseHistory?.dispose();
       ssrNode = null;
       godraysNode = null;
       shaftLight = null;

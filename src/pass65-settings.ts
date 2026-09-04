@@ -497,6 +497,7 @@ export function resolveGraphicsRuntime(
       // exists rather than a new control; this is its only runtime wiring.
       volumetricQuality: settings.volumetricQuality,
       screenSpaceReflections: settings.screenSpaceReflections,
+      ssrTemporalDenoise: settings.ssrTemporalDenoise,
       screenSpaceGi: settings.screenSpaceGi,
       depthOfField: settings.depthOfField,
       depthOfFieldStrength: settings.depthOfFieldStrength,
