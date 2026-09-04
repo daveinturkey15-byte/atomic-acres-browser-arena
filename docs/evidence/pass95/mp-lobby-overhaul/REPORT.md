@@ -263,9 +263,10 @@ evidence file (not this lane's).
   muted audio (1 passed, 35.5 s).
 - **OPEN** — the real active-match host-loss handoff was not proven in this time box.
   The custom three-context lane test reached no reliable successor assertion before its
-  360,000 ms test timeout; the lane CDP QA driver also timed out at its 180,000 ms
-  active-match wait (served bundle `legacy-main-DYK9fcer.js`, backend `webgpu`, no page
-  errors). First successor snapshot: **N/A**; one 40 Hz snapshot interval is 25 ms, so
+  360,000 ms test timeout; the lane CDP QA driver timed out twice at its 180,000 ms
+  active-match wait, including a retry with `map=atomic-acres` (served bundle
+  `legacy-main-DYK9fcer.js`, backend `webgpu`, no page errors). First successor snapshot:
+  **N/A**; one 40 Hz snapshot interval is 25 ms, so
   the designed one-interval claim remains OPEN rather than being inferred.
 - **OPEN** — because no successor snapshot was observed, score/loadout/position
   preservation and deterministic successor reconnection remain unverified by browser
