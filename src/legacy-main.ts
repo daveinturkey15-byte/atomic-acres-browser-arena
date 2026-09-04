@@ -4322,7 +4322,7 @@ function applyLightingConditionUniforms(force = false): void {
     fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
   }
-  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex());
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex()), pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
   // A deterministic review camera owns the exposure while it is set -- that is
   // the capture contract every viewpoint baseline in the repo rests on -- and it
   // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here

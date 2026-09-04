@@ -187,6 +187,21 @@ describe('the uniform-write gate compares the writes, not one of their inputs', 
   });
 });
 
+describe('a lighting epoch refreshes atmosphere inputs with the applied write', () => {
+  const region = lightingRegion(legacyMainSource());
+
+  it('re-issues the fog colour and live sun intensity after the write gate opens', () => {
+    const fogWrite = 'scene.fog.color.setHex(conditionedFogBaseColorHex())';
+    const atmosphereWrite = 'pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);';
+    const fogIndex = region.indexOf(fogWrite);
+    const atmosphereIndex = region.indexOf(atmosphereWrite);
+    expect(fogIndex).toBeGreaterThan(-1);
+    expect(atmosphereIndex).toBeGreaterThan(fogIndex);
+    expect(region.slice(region.indexOf('lightingConditionsAppliedWrites = writes;'), atmosphereIndex))
+      .toContain('lightingConditionsUniformWrites += 1;');
+  });
+});
+
 /**
  * The brief's multiplayer rule is "friends must share a sky". `?tod=` used to
  * win over the replicated value unconditionally, so a guest could type one

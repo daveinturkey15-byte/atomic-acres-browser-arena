@@ -261,9 +261,9 @@ export type ScreenSpacePostGraph = Readonly<{
    */
   atmosphereLight: Node<'vec3'> | null;
   /**
-   * HF-481 — the arena's sky colour and its exposure-referred white. Called on
-   * every arena commit, never per frame: these are authored numbers, not
-   * animated ones, and the per-frame refresh of camera and sun happens in
+   * HF-481 — the current haze colour and exposure-referred sun white. Called
+   * on arena commits and lighting epochs; the closure-owned values are copied
+   * in place, while the per-frame refresh of camera and sun happens in
    * `beforeRender`.
    */
   setAtmosphere(skyColor: THREE.Color, sunWhite: number): void;
