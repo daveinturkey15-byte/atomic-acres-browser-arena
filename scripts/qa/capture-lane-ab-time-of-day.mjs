@@ -1,4 +1,21 @@
 #!/usr/bin/env node
+// Lane AB (PASS 87) time-of-day A/B: drives installed headless Chrome over CDP, sandwiches each early/midday/late excursion between interleaved identity frames per arena, and judges shadow mass, 5th-percentile luma, washout, draw calls and p50 frame time against the authored look.
+// Usage: node scripts/qa/capture-lane-ab-time-of-day.mjs [--serve-dist <dir>] [--arenas <a,b>] [--out <dir>] [--frame-samples <n>] [--viewport <WxH>] [--url <url>]
+// Flags (the script reads no environment variables):
+//   --arenas        comma-separated arena ids; default: all ten arena cameras (atomic-acres, skyline-terminal, rustworks-1v1, gun-range, farcrysis, high-seas, test1, test2, nuketown2, raid2, map3)
+//   --out           output directory, created if missing, relative to cwd; default: artifacts/lane-ab
+//   --frame-samples requestAnimationFrame samples per sampled capture; default: 240 (clamped to >= 60)
+//   --viewport      review-frame WxH; default: 1280x720
+//   --url           base URL of the build to capture; default: http://127.0.0.1:41933
+//   --serve-dist    dist directory to serve first via `npx vite preview` on port 41933; default: none (capture --url as-is)
+// Writes:
+//   <out>/report.json and <out>/<arena>/*.png (warmup, control-a/b, per-state identity/excursion pairs) under the --out directory (default: artifacts/lane-ab).
+// Exit codes:
+//   0  clean — no findings
+//   1  a safety finding, or a per-arena capture error
+//   2  invalid environment (WebGPU requested but not granted, Microsoft software adapter, or served dist never came up)
+//   3  instrument finding (a pinned null-experiment arena moved beyond tolerance); 3 overrides 1, 2 overrides both
+
 // Lane AB (PASS 87) — TIME OF DAY x WEATHER capture and combat-safety judgement.
 //
 // WHAT MAKES THIS AN A/B AND NOT A GALLERY
