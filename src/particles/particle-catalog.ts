@@ -227,10 +227,20 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
     0.55, 20, 12, 4,
   ),
   // Jet apron: fuel haze and grit funnelled between terminal and hangar.
+  //
+  // HF-481 lane LOOK (skyline-terminal look pass, 2026-09-04): the same shipped-
+  // invisible air Nuke Town Rebuild had. A 0.014 m mote at the 12 m reading
+  // distance subtends 1.20 px at the 1280x720 review viewport, drawn additively
+  // at opacity 0.08 - a sub-pixel rumour, and the PASS 94 captures agree. The
+  // fix is RADIUS and ALPHA, not density, mirroring 9ab96d5b: motes 0.014 ->
+  // 0.026 m (1.20 -> 2.23 px) at the motes family's own ceiling of 0.11, drift
+  // 0.038 -> 0.055 m at 0.15 under its 0.16 ceiling. Both DENSITIES are
+  // unchanged, so instance count, draw count, buffers and per-frame budget are
+  // byte-identical to what shipped. Measured in ambient-visibility.test.ts.
   'skyline-terminal': arena(
     'skyline-terminal', 'apron-fuel-haze-and-grit',
-    { density: 0.62, colorWarm: 0xdfe4ec, colorCool: 0xb8c4d4, radiusM: 0.014, riseMps: 0.09, swirlMps: 0.22, windPull: 0.72, opacity: 0.08 },
-    { density: 0.42, kind: 'lint', colorWarm: 0xd7d9d2, colorCool: 0x8f948f, radiusM: 0.038, fallMps: 0.42, windPull: 0.92, flutterMps: 0.62, spinRadiansPerSecond: 2.2, opacity: 0.1 },
+    { density: 0.62, colorWarm: 0xdfe4ec, colorCool: 0xb8c4d4, radiusM: 0.026, riseMps: 0.09, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
+    { density: 0.42, kind: 'lint', colorWarm: 0xd7d9d2, colorCool: 0x8f948f, radiusM: 0.055, fallMps: 0.42, windPull: 0.92, flutterMps: 0.62, spinRadiansPerSecond: 2.2, opacity: 0.15 },
     0.4, 22, 14, 4,
   ),
   // North-sea rig: salt mist and rust flakes off the deck, hard one-way wind.

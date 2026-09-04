@@ -76,16 +76,17 @@ describe('ambient air is visible at the reading distance', () => {
   /**
    * MEASURED 2026-09-04, every arena, at the reading distance (px):
    *
-   *   atomic-acres 1.37 | skyline-terminal 1.20 | rustworks-1v1 1.54
+   *   atomic-acres 1.37 | skyline-terminal 2.23 | rustworks-1v1 1.54
    *   gun-range 1.03 | farcrysis 1.29 | high-seas 1.46 | test1 1.37
    *   test2 1.29 | map3 1.29 | raid2 1.29 | nuketown2 2.23
    *
-   * TEN OF ELEVEN ARENAS STILL HAVE SUB-PIXEL MOTES. Only Nuke Town Rebuild is
-   * fixed, because only Nuke Town Rebuild is this lane's. The loop below
-   * therefore holds DRIFT to the floor for every arena — that family already
-   * clears it everywhere — and holds motes only above zero, so it states the
-   * truth instead of either failing ten arenas this lane may not edit or
-   * pretending they pass. The remaining ten are an OPEN item in
+   * NINE OF ELEVEN ARENAS STILL HAVE SUB-PIXEL MOTES. Nuke Town Rebuild was
+   * fixed by its own lane and skyline-terminal by the terminal look pass, which
+   * also holds a terminal-only block below to the same floor. The loop keeps
+   * holding DRIFT to the floor for every arena - that family already clears it
+   * everywhere - and motes only above zero, so it states the truth instead of
+   * either failing nine arenas no lane may edit or pretending they pass. The
+   * remaining nine are an OPEN item in
    * `docs/evidence/pass94/quality-gap/REPORT.md`, not a silent exemption.
    */
   it('holds every ambient family of every arena above the floor', () => {
@@ -101,6 +102,32 @@ describe('ambient air is visible at the reading distance', () => {
     }
   });
 });
+
+describe('skyline-terminal ambient air is visible at the reading distance', () => {
+  // Skyline-terminal look pass, 2026-09-04: the same radius-and-alpha fix Nuke
+  // Town Rebuild got in 9ab96d5b, densities unchanged. Motes 0.014 -> 0.026 m
+  // (1.20 -> 2.23 px at the reading distance) at the motes ceiling of 0.11;
+  // drift 0.038 -> 0.055 m at 0.15 under its 0.16 ceiling.
+  const profile = ARENA_PARTICLE_PROFILES['skyline-terminal'];
+
+  it('draws motes big enough to see', () => {
+    expect(subtendedPixels(profile.motes.radiusM, READING_DISTANCE_M))
+      .toBeGreaterThanOrEqual(MINIMUM_SUBTENDED_PX);
+  });
+
+  it('draws drift big enough to see, at a longer distance than the motes', () => {
+    expect(subtendedPixels(profile.drift.radiusM, READING_DISTANCE_M * 2))
+      .toBeGreaterThanOrEqual(MINIMUM_SUBTENDED_PX);
+  });
+
+  it('spends no extra instances on the terminal fix', () => {
+    // Radius and alpha only. Density is what costs instances, draws and
+    // buffer, and it is byte-identical to what PASS 94 shipped.
+    expect(profile.motes.density).toBe(0.62);
+    expect(profile.drift.density).toBe(0.42);
+  });
+});
+
 
 describe('making the air visible did not make it a smoke screen', () => {
   it('keeps every ambient alpha inside its own family ceiling', () => {
