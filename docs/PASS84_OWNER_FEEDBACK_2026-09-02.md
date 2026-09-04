@@ -1760,3 +1760,13 @@ assets and textures and lighting need to be tip top, raid can come next"
   upstream link to the project's Three.js knowledge directory. To be written
   into AKP (dave-gaming-pc scope), the vault, every harness adapter, and the
   ingestion hub, and enforced.
+
+## HF-482 — owner 2026-09-04 14:45: "are you using Meta Muse Spark 1.3? only 5p used, super cheap, try more"
+
+- Muse Spark 1.3 was wired (OMP provider `meta-contributor`, api.meta.ai,
+  1M context, image input; Hermes default) but unused by the orchestrator
+  until now; the 5p came from an earlier test. Contributor tier: Meta trains on
+  the traffic (owner-accepted; local/friends project). Now in use: MUSE-1
+  whole-candidate skeptic review (reads today's entire diff in one context),
+  and a Luna job adding Muse as a reference critic in the loop runner (receipt
+  admission test, one real round, beast-run critic route if admitted).
