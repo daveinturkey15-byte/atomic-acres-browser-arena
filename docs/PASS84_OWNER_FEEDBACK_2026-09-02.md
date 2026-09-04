@@ -1600,3 +1600,41 @@ assets and textures and lighting need to be tip top, raid can come next"
   the skills-ingestion hub (register, pipeline, script) in the vault.
 - Also running: Luna round 2, spawns, Qwen benchmark, cockpit NOW/Models&Plans;
   Qwen header chain; Alibaba token plan wired into OMP.
+
+## HF-475 — blitz outcomes, 2026-09-04 12:50 (ten Opus lanes, 69 min)
+
+- **I1 ballistics** (`nuketown2-ballistics` d8eaa1df): 30 unshootable
+  "reinforced" fallbacks rated (concrete/wood/thin-metal/vehicle/glass),
+  trim/partition/road misclassifications fixed, roster-derived ballistics gate
+  with shrink-only ledgers (test2 135 / raid2 105 / test1 58 / map3 21 debts
+  now pinned), material classes shatter/perforate/penetrate/stop, perforation
+  charged from remaining energy, glass-authority test for all 8 panes, wallbang
+  lab gains thin-metal + steel lanes. 201/201 tests. OPEN: browser probes (GPU
+  held by the local model), holes on non-shed sheet metal (signs, truck box).
+- **I4 handedness + balconies** (`nuketown2-handedness`, 10 commits): ours WAS
+  the mirror; `NUKETOWN2_HANDEDNESS = -1` applied at the four solid-authoring
+  seams; rear balcony, exterior flight, ledge, canopy per R4. OPEN: browser
+  gates and the two backyard captures (GPU).
+- **I2 vehicle forge** (`vehicle-forge`, 4 commits): src/vehicle-forge/ lofted
+  bodies from data specs; street vehicles dressed with forged skins;
+  presentation-only. OPEN: boot smoke and GPU captures.
+- **I3 loop runner** (`reference-loop-runner` 00673bc0): perceptual pre-check,
+  probe-token receipt, adapters; local Qwen NOT admitted as a critic (failed a
+  four-row task). **I6** skill `photoreal-procedural-scene-forge` installed
+  under AKP governance (vault eedc437, AKP 28608fc). **Raid** and **Farcrysis**
+  plans written (research branch da95b7d4). **CP3** cockpit Usage/Quality tabs
+  + digest pushed (04860a5) — owner must restart the cockpit. **CP4**
+  auto-research spec (Karpathy autoresearch confirmed real; the "NVIDIA AVO"
+  reference resolution is in the doc). **CP5**: skills-wipe ROOT CAUSE
+  CONFIRMED (Codex writes `.system` skills into its skills root on every
+  start) and FIXED (Codex gets a private root with a junction to the shared
+  store; relinker idempotent + locked); AKP gotcha 17835e6; owner decision:
+  lift Codex's AKP quarantine. **HUB**: vault Ingestion/ register (52 rows),
+  pipeline, script; AKP tools row.
+- **Cross-cutting gap:** every browser gate in the blitz was OPEN because the
+  local model held VRAM continuously (header chain). GPU lock set 12:48 for
+  the candidate gates; a day-time policy is needed (small model, night-only
+  chain, or a VRAM-aware scheduler).
+- **Integrator launched 12:50:** PASS 94 candidate = PASS 93 + killstreaks +
+  spawns + handedness (incl. round 2) + ballistics + vehicle forge; honest
+  gates; HITL on :4300.
