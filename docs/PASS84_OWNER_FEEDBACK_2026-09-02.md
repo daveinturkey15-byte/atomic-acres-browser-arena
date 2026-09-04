@@ -1878,3 +1878,21 @@ assets and textures and lighting need to be tip top, raid can come next"
   shockwave ring) — "maybe in map background going on etc". Fits Nuke Town's
   own lore (BO2 Nuketown ends in a detonation): a background/end-of-match nuke
   event lane. Consent banner on the site was not accepted (owner action).
+
+## HF-491 — owner 2026-09-04 17:20: HITL 4 verdict + 90–100 minute sprint
+
+- Owner played HITL 4 (http://localhost:4300, 7733d37b): "coming along but a lot
+  of problems and regression": FPS really bad; sound really bad; bots not in
+  there; minimap cluttered; map shape unchanged while assets changed — needs to
+  be wider in the middle with bits either side of the road like the real
+  Nuketown; busy/cluttered overall. "Accelerate: more parallelism, better
+  orchestration, more Opus, a Fable or two on high, Lunas, Geminis, lots of
+  Muse Spark; thin out the clutter, streamline/refactor; a decent version in
+  the next 90–100 minutes; make a plan."
+- Plan (T0 = 17:25): lanes in parallel — perf triage + fix (Fable high),
+  bots/spawn regression (Opus), layout wider-middle + roadside bays per BO2
+  (Opus), minimap declutter (Luna), audio regression probe (Luna), clutter
+  thinning (Muse audit → Opus/Luna fix); 4b integrator told to finish and
+  serve; HITL 5 integrator (Fable high) at ~T+70 merges everything green and
+  serves on :4300 with captures. Nuke-event (Luna xhigh) and daily frontier
+  scan (Luna) run beside the sprint, not in it.
