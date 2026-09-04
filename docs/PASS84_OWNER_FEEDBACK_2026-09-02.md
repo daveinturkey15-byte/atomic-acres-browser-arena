@@ -2043,3 +2043,10 @@ assets and textures and lighting need to be tip top, raid can come next"
   17.5; PASS 93 67–79 / 12.3–13.8. Better than 4b, not PASS 93 → perf lane 3
   (Luna) then HITL 5b (Luna). Known: every forged vehicle renders cream
   (pre-existing in 4b; falsifier written for 5b). Gemini 63/100.
+
+## HF-495 — owner 2026-09-04 19:10: "bring nuke town rebuild up to be the first map in the selection, and kill off old raid and put preview one up near top"
+
+- Routed to Codex/Luna (HF-493/494): catalog order change in
+  src/map-selection.ts — nuketown2 first; old Raid unselectable (HF-466
+  pattern, byte-preserved for links/history); raid2 preview second or third;
+  contract pins rewritten honestly. Lands in HITL 5b if pushed in time.
