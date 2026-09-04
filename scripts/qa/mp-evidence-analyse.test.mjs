@@ -282,7 +282,7 @@ test('a hostile bundle cannot forge a table row or repaint the terminal', () => 
 
   assert.ok(!report.includes(ESC), 'no escape byte may reach the terminal');
   assert.equal(
-    (report.match(/VERDICT:/gu) ?? []).length,
+    (report.match(/^VERDICT:/gmu) ?? []).length,
     1,
     'a bundle must not be able to add a second VERDICT line',
   );
@@ -295,4 +295,13 @@ test('a hostile bundle cannot forge a table row or repaint the terminal', () => 
     // rule, the NOTE continuation and the section blurb all fail one of these.
     .filter((line) => /^\S/u.test(line) && !line.startsWith('observer') && !line.startsWith('-'));
   assert.equal(tableBody.length, 1, `expected one forged row, got:\n${tableBody.join('\n')}`);
+});
+
+test('the divergence table preserves distinct peer ids beyond the display width', () => {
+  const first = peerRow({ peer: 'shared-prefix-peer-001' });
+  const second = peerRow({ peer: 'shared-prefix-peer-002' });
+  const entry = { source: 'ids', bundle: bundle({ peers: [first, second] }) };
+  const report = formatReport([entry], divergenceRows([entry]), []);
+  assert.match(report, /shared-prefix-peer-001/u);
+  assert.match(report, /shared-prefix-peer-002/u);
 });

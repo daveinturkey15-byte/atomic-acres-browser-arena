@@ -221,3 +221,24 @@ this feature is offered to friends:
   prefix render identically in the table meant to tell them apart.
 - **TODO-V5** the `+31` line-count figure above is `+30`; measured 37,261, not 37,262. The ceiling
   is unaffected.
+
+## Follow-ups
+
+- **VERIFIED** — OPEN-1 is closed: `netcode-diagnostics-overlay` is present in the typed
+  `surface-registry` inventory with `kind=diagnostics-overlay`, `toggleCode=F3`, `zIndex=70`,
+  and `pointerEvents=none`; the registry test also verifies the lazy source contract.
+- **VERIFIED** — TODO-V1 is closed: runtime reset is wired to private-lobby reset and peer
+  removal/expiry, and runtime tests cover session identity changes and departed peers.
+- **VERIFIED** — TODO-V2 is closed: diagnostic peer allocation is bounded at 16 admitted rows;
+  malformed samples cannot grow the table past that cap, covered by `netcode-diagnostics.test.ts`.
+- **VERIFIED** — TODO-V3 is closed: the host peer id is cached and invalidated on session/peer
+  lifecycle changes; the fallback lookup is limited to cache misses.
+- **VERIFIED** — TODO-V4 is closed: evidence reports retain complete peer ids, with a hostile
+  shared-prefix regression test proving both rows remain distinguishable.
+- **VERIFIED** — TODO-V5 is corrected: the measured legacy source is 37,261 lines, `+30` from
+  the recorded 37,231 baseline; the existing ceiling is unchanged.
+- **VERIFIED** — quoted TypeScript, diagnostics/network Vitest, evidence-contract, surface-registry,
+  and menu-preview gates passed on 2026-09-04 (63 + 86 + 15 + 14 tests, respectively).
+- **OPEN** — real WAN correctness, live-room bundle round-trip, recording overhead, and visual
+  legibility at the requested desktop/laptop/ultrawide/high-DPI matrix remain capture work; no
+  synthetic pass is being promoted to those claims.
