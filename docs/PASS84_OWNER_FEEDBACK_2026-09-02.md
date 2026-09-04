@@ -1902,3 +1902,17 @@ assets and textures and lighting need to be tip top, raid can come next"
 - Done 17:28: llama-server on :8090 stopped, Qwen header chain halted
   (STOP + gpu.lock), Qwen removed from the sprint and the beast-run recipe.
   QA browsers stay headless and short; ComfyUI (:8188) is never touched.
+
+## HF-467 status — thin-metal perforation, 2026-09-04 17:45
+
+- GLM 5.3 Flash built the sibling module (1bd382e8, 105 tests); Muse Spark
+  review DO-NOT-SHIP (stale-envelope replay, subset envelope, hole-id reuse on
+  host succession, predicate type); Codex Luna fixed all four plus a rollback
+  leak (d0f28e21..59a188e0, 223 tests) and hoisted the legacy-main wiring into
+  a runtime module (3571e48c; legacy-main 37,477 → 37,362 lines, ceiling
+  untouched). Muse re-review queued; ships in PASS 94 only if it clears.
+- Nuke Town sprint (HF-491): layout lane 7ade1887 measured our street
+  corridor already at the BO2 ratio (1.818 vs 1.825) — the "narrow" feel was
+  the filled verges; 36 verge bodies deleted (79 → 43), two-sided ratio band
+  and a zero-headroom verge ceiling added; roadside bays landing on a follow-on
+  lane.
