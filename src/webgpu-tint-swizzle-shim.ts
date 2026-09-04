@@ -34,9 +34,11 @@
  * by repeating the rewrite until it no longer changes the text. WGSL has no
  * string literals and three emits no comments containing the pattern, so a
  * plain textual rewrite is safe. Installed before renderer init on the
- * WebGPU route (legacy-main) AND inside WebGpuRenderRuntime.create itself,
- * so no device creation path can miss it; the wrap is idempotent and
- * degrades to a no-op wherever navigator.gpu is absent.
+ * WebGPU route (legacy-main, navigator.gpu wrap) AND on the exact device
+ * WebGpuRenderRuntime.create negotiates (device wrap, after requestDevice),
+ * so no device creation path can miss it while adapter/device negotiation
+ * stays observable; both wraps are idempotent and degrade to a no-op
+ * wherever navigator.gpu or createShaderModule is absent.
  */
 
 const SWIZZLE_FAMILIES = ['xyzw', 'rgba', 'stpq'] as const;
@@ -97,37 +99,54 @@ export function isTintSwizzleShimInstalled(): boolean {
   return Boolean(gpu && (gpu as ShimmedGpu).__tintSwizzleShim);
 }
 
-/** Wrap navigator.gpu so every created shader module has chained swizzles
- * flattened before Tint parses it. Must run before renderer.init(); returns
- * true when this call performed the wrap, false when it was already in
- * place or there is no navigator.gpu to wrap. */
+type ShimmedDevice = { __tintSwizzleShim?: boolean; createShaderModule?: unknown };
+
+/**
+ * Wrap `createShaderModule` on ONE device object so every shader module it
+ * creates has chained swizzles flattened before Tint parses it. This is the
+ * whole workaround; the navigator.gpu wrap below only exists to reach devices
+ * this module never sees. Applied by WebGpuRenderRuntime.create to the exact
+ * device it negotiated, after requestDevice returned - so adapter and device
+ * negotiation stays untouched and observable (device-feature tests inject a
+ * fake gpu and spy on requestDevice), and a device without createShaderModule
+ * (a test fake) is simply left alone. Returns true when this call wrapped it.
+ */
+export function installTintSwizzleShimOnDevice(device: unknown): boolean {
+  const shimmed = device as ShimmedDevice | null | undefined;
+  if (!shimmed || shimmed.__tintSwizzleShim || typeof shimmed.createShaderModule !== 'function') return false;
+  shimmed.__tintSwizzleShim = true;
+  const gpuDevice = device as GPUDevice;
+  const createShaderModule = gpuDevice.createShaderModule.bind(gpuDevice);
+  gpuDevice.createShaderModule = ((descriptor: GPUShaderModuleDescriptor) => {
+    telemetry.modulesSeen += 1;
+    const code = descriptor.code;
+    if (typeof code === 'string') {
+      const rewritten = rewriteChainedSwizzles(code);
+      if (rewritten !== code) {
+        telemetry.modulesRewritten += 1;
+        return createShaderModule({ ...descriptor, code: rewritten });
+      }
+    }
+    return createShaderModule(descriptor);
+  }) as GPUDevice['createShaderModule'];
+  return true;
+}
+
+/** Wrap navigator.gpu so every device it hands out gets the shim above.
+ * Must run before renderer.init(); returns true when this call performed the
+ * wrap, false when it was already in place or there is no navigator.gpu. */
 export function installTintSwizzleShim(): boolean {
   const gpu = typeof navigator !== 'undefined' ? navigator.gpu : undefined;
-  if (!gpu || (gpu as ShimmedGpu).__tintSwizzleShim) return false;
+  if (!gpu || (gpu as ShimmedGpu).__tintSwizzleShim || typeof gpu.requestAdapter !== 'function') return false;
   (gpu as unknown as { __tintSwizzleShim: boolean }).__tintSwizzleShim = true;
   const requestAdapter = gpu.requestAdapter.bind(gpu);
   gpu.requestAdapter = (async (...args: Parameters<GPU['requestAdapter']>) => {
     const adapter = await requestAdapter(...args);
-    if (!adapter) return adapter;
+    if (!adapter || typeof adapter.requestDevice !== 'function') return adapter;
     const requestDevice = adapter.requestDevice.bind(adapter);
     adapter.requestDevice = (async (...deviceArgs: Parameters<GPUAdapter['requestDevice']>) => {
       const device = await requestDevice(...deviceArgs);
-      const wrappedDevice = device as GPUDevice & { __tintSwizzleShim?: boolean };
-      if (wrappedDevice.__tintSwizzleShim) return device;
-      wrappedDevice.__tintSwizzleShim = true;
-      const createShaderModule = device.createShaderModule.bind(device);
-      device.createShaderModule = ((descriptor: GPUShaderModuleDescriptor) => {
-        telemetry.modulesSeen += 1;
-        const code = descriptor.code;
-        if (typeof code === 'string') {
-          const rewritten = rewriteChainedSwizzles(code);
-          if (rewritten !== code) {
-            telemetry.modulesRewritten += 1;
-            return createShaderModule({ ...descriptor, code: rewritten });
-          }
-        }
-        return createShaderModule(descriptor);
-      }) as GPUDevice['createShaderModule'];
+      installTintSwizzleShimOnDevice(device);
       return device;
     }) as GPUAdapter['requestDevice'];
     return adapter;

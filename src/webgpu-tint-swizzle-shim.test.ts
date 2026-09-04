@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import {
   TINT_CHAINED_SWIZZLE_PATTERN,
   composeSwizzles,
+  installTintSwizzleShimOnDevice,
   rewriteChainedSwizzles,
 } from './webgpu-tint-swizzle-shim';
 
@@ -73,6 +74,23 @@ describe('Chrome 153 Tint chained-swizzle shim', () => {
       expect(repaired.length).toBeLessThan(source.length);
       expect(repaired.replace(/\.[xyzwrgbastpq]{1,4}\b/g, '')).toBe(source.replace(/\.[xyzwrgbastpq]{1,4}\b/g, ''));
     }
+  });
+
+  it('wraps createShaderModule on the negotiated device only, and leaves fakes alone', () => {
+    // WebGpuRenderRuntime.create applies the shim to the device it negotiated,
+    // AFTER requestDevice: adapter/device feature negotiation is never wrapped
+    // (render-runtime-device-features.test.ts injects a fake gpu and spies on
+    // requestDevice), and a device without createShaderModule is untouched.
+    expect(installTintSwizzleShimOnDevice(undefined)).toBe(false);
+    expect(installTintSwizzleShimOnDevice({ features: { has: () => false } })).toBe(false);
+
+    const created: string[] = [];
+    const device = { createShaderModule: (descriptor: { code: string }) => { created.push(descriptor.code); return {}; } };
+    expect(installTintSwizzleShimOnDevice(device)).toBe(true);
+    expect(installTintSwizzleShimOnDevice(device), 'idempotent').toBe(false);
+    device.createShaderModule({ code: 'let a = v.xyz.xy; let b = v.xy.x;' });
+    device.createShaderModule({ code: 'let c = v.xy;' });
+    expect(created).toEqual(['let a = v.xy; let b = v.x;', 'let c = v.xy;']);
   });
 
   it('pins the three internals this shim exists for (upgrade tripwire)', () => {
