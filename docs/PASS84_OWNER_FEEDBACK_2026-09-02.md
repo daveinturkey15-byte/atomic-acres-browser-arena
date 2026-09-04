@@ -1435,3 +1435,65 @@ additive so the two merge without touching each other's rows.)*
   - The capture command, ready to run: `npx vite build --outDir dist-vr-i4`,
     then `node scripts/qa/capture-arena-viewpoints.mjs --serve-dist dist-vr-i4
     --arenas nuketown2 --label pass94-handedness --sha <head>`.
+
+---
+
+## PASS 94 lane TECHNIQUES — the owner's shared 3D techniques, applied to the Rebuild
+
+Owner ask: *"can we be using the cool three.js techniques from the threads I
+shared (Fable, Opus, GLM and more) — get it really nice?"*
+
+Branch `contrib/dave-gaming-pc/claude/nuketown2-techniques`, head `d74174e4`,
+based on `nuketown2-handedness` @ `5f5ecc47` (the brief's `pass93-candidate`
+does not exist on origin — see the report's section 0). Full write-up, register
+row mapping and evidence: `docs/evidence/pass94/nuketown2-techniques/REPORT.md`.
+
+Four new modules, all presentation-safe, plus one frame-loop instrument:
+
+- `src/nuketown2-vegetation.ts` — register rows 18/24/38. Clipped hedges that
+  clad the arena's own solid hedge/planter bodies, and a 54-trunk avenue in the
+  previously empty band between the perimeter wall and the forest ring. Two
+  species, three LOD levels each, layered GPU wind on the one existing hook.
+- `src/nuketown2-pool-water.ts` — register row 46. Replaces the pool's constant
+  colour with a real per-channel Beer-Lambert integral over an authored bed
+  depth and the view angle, backscatter upstream of it, depth-driven edge foam,
+  and local Fresnel transparency. Restated from published physics; no part of
+  the paid library was purchased, downloaded or read.
+- `src/nuketown2-yard-props.ts` — img2threejs. The BO2-2025 aerial's appliance
+  bank, glasshouse, garden pod and sand pit at three authored reading tiers.
+  Geometry is an exact 180-degree pair; the reference's yard identity is carried
+  by the hob COLOUR alone (red / blue), which FINDINGS Q4 calls the cheapest
+  chirality anchor in the reference.
+- `src/nuketown2-grime-decals.ts` — rows 47/48. Tyre scuff, oil, slab cracking,
+  court paint, stepping stones and wall grime on a -3 offset tier, only where
+  `find-coplanar-pairs.ts` honours an offset.
+
+Gates: `tsc` clean; coplanar **0 FINDINGS / 0 STREET / 0 HOUSE-INTERIOR**
+(boxes 726 -> 802, FENCED 170, BENIGN 26); 10 test files / 95 tests green
+including 33 new ones; WebGPU review captures 10 of 12 cameras on
+nvidia/blackwell with zero page or console errors; draw calls 356 -> 391
+(+9.8 %, under the 15 % ceiling) with the frame loop still at one entry point.
+
+**Three findings this lane hands over rather than absorbing:**
+
+1. **HF-465's two review cameras do not exist at runtime.**
+   `nuketown2-north-balcony` and `nuketown2-front-porch` return
+   `setArenaReviewCamera returned false - authored camera missing`. They are in
+   `viewpoint-catalog.mjs` and in `src/rendering/arenas/nuketown2.ts`, but the
+   runtime path rejects them. **PRE-EXISTING**: an identical run at base
+   `5f5ecc47` in a separate worktree fails on exactly the same two. This blocks
+   the handedness lane's own two owed captures.
+2. **The shared `node_modules` lost `@playwright/test` and `.bin` mid-pass.**
+   `aa-claude-chopper/node_modules` is junctioned by several worktrees; 350
+   packages remain and no install is running, so it was pruned rather than
+   being mid-install. `qa:pass74:arena-boot-smoke` and `qa:stock-boot` are
+   therefore **OPEN**. Not repaired — that tree is shared with live lanes.
+3. **The ground outside the perimeter wall is the biggest remaining art
+   problem.** `nuketown2-overhead` shows a vast pale sand-cream plain that now
+   occupies more of the frame than the map does, and the new avenue draws the
+   eye straight to it. Pre-existing ground-slab material; belongs to the
+   materials lane; highest-value visible fix in these frames.
+
+Not merged into this branch and owed at integration: `nuketown2-ballistics`,
+`vehicle-forge`, `spawn-distribution`. Re-run the coplanar instrument after the
+`vehicle-forge` merge in particular.
