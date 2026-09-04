@@ -1,3 +1,28 @@
+// Captures and reads back every menu surface that claims a release identity (release badge, features panel, project map) from a running built menu.
+//
+// Usage:
+//   node scripts/qa/capture-release-identity-surfaces.mjs
+//
+// Env (all optional):
+//   BASE_URL     default: http://127.0.0.1:41978          — base URL of the built menu (local preview server or live channel)
+//   LABEL        default: capture                        — prefix for output file names
+//   OUT_DIR      default: artifacts/qa/hf406              — output directory (created recursively if missing)
+//   MENU_QUERY   default: ?release=latest&renderer=webgpu — URL query appended to BASE_URL
+//   VIEWPORT     default: 1600x900                        — page viewport, width x height
+//
+// Writes:
+//   OUT_DIR (directory, created recursively)
+//   OUT_DIR/LABEL-menu-full.png
+//   OUT_DIR/LABEL-top-right.png
+//   OUT_DIR/LABEL-features-panel.png
+//   OUT_DIR/LABEL-project-map-overview.png
+//   OUT_DIR/LABEL-project-map-changes.png
+//   OUT_DIR/LABEL-project-map-structure.png
+//   OUT_DIR/LABEL-readback.json (machine-readable readback of badge, brand, features and project-map text)
+//
+// Exit codes:
+//   0 on success; non-zero on uncaught exception (browser launch failure, selector timeout) — no explicit process.exit calls
+
 // HF-406 — capture and READ BACK every menu surface that claims a release identity.
 //
 // Owner, 2026-09-02: "ensure the top right thing is an accurate update of both the
