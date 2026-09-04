@@ -2180,3 +2180,7 @@ assets and textures and lighting need to be tip top, raid can come next"
 ## PASS 94 status 22:10
 
 - Attempts 1 (killed with its launcher shell) and 2 (honest stop: pipeline-budget gate timed out at 100 % CPU from the overnight lanes) did not publish. Attempt 3 running with the Muse builder pool, GLM sweep and the Opus workflow paused; the workflow resumes from cache after the publish.
+
+## HF-507 - owner 2026-09-04 22:15: 'headless poll to each provider website every 20 minutes, keep the sessions live, show 5-hour and weekly resets; get that build out in parallel; no new pass needed soon - keep working till 6 am, then I test'
+
+- Luna lane 'provider-usage-web-poller' launched: per-provider persistent browser profiles (owner logs in once, headed; polling headless every 20 min via a scheduled task), readings into the shared store with source/age/reset countdowns on the NOW page, needs-login badges, never touches credentials. Overnight lanes resumed at full parallelism (Muse builders, GLM sweep, the Opus workflow from cache); PASS 94 attempt 3 continues but no longer holds anything back; the 06:00 candidate is the owner's test build.
