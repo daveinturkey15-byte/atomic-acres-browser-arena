@@ -25,6 +25,7 @@ import {
   classifyQuad,
   collectStations,
   createForgeMaterialSet,
+  FORGED_VEHICLE_TRIANGLE_BUDGETS,
   flankHalfWidth,
   latheGeometry,
   loftBody,
@@ -32,6 +33,7 @@ import {
 } from './index';
 import { COACH_SPEC, FORGED_VEHICLE_SPECS, SEDAN_SPEC, TRUCK_CAB_SPEC } from './specs';
 import type { VehicleSpec } from './geometry';
+import type { VehicleDressing } from './build';
 
 function positionsOf(geometry: THREE.BufferGeometry): Float32Array {
   return (geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
@@ -362,6 +364,49 @@ describe('vehicle-forge assembly', () => {
       expect(node.userData.ballisticSurfaceId, node.name).toBeUndefined();
       expect(node.userData.breakableWindowId, node.name).toBeUndefined();
     });
+  });
+
+  it('keeps dressed silhouettes inside their collider envelopes and triangle fences', () => {
+    const shared = {
+      wheelStyle: 'cover' as const,
+      bumperY: 0.34,
+      surfaceBands: [{ y0: 1.78, y1: 2.46, bucket: 'accent' as const, z0: 0.75, z1: 8.35, proud: 0.01 }],
+      stripe: { y: 1.75, bucket: 'chrome' as const, z0: 0.55, z1: 8.55, height: 0.045, proud: 0.014 },
+      grille: { y: 1.08, width: 1.36, height: 0.34, depth: 0.10, barCount: 5 },
+    };
+    const truck = {
+      wheelStyle: 'steel' as const,
+      bumperY: 0.42,
+      grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
+      mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
+      panelSeams: [
+        ...[-1, 1].flatMap((x) => [5.82, 7.44, 9.06, 10.68].map((z) => ({ x: x * 1.31, y: 1.62, z, height: 2.38 }))),
+      ],
+    };
+    const saloon = { wheelStyle: 'whitewall' as const, bumperY: 0.46 };
+    const cases: ReadonlyArray<readonly [VehicleSpec, VehicleDressing, number, number, number, number]> = [
+      [COACH_SPEC, shared, 2.6, 3.3, 9.1, FORGED_VEHICLE_TRIANGLE_BUDGETS.coach],
+      [TRUCK_CAB_SPEC, truck, 2.6, 2.9, 11.7, FORGED_VEHICLE_TRIANGLE_BUDGETS.truck],
+      [SEDAN_SPEC, saloon, 1.9, 1.88, 4.4, FORGED_VEHICLE_TRIANGLE_BUDGETS.saloon],
+    ];
+    for (const [spec, dressing, width, height, length, budget] of cases) {
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `bounds-${spec.id}`));
+      const bounds = new THREE.Box3().setFromObject(built.group);
+      expect(bounds.max.x - bounds.min.x, `${spec.id} width`).toBeLessThanOrEqual(width + 0.15 + 1e-5);
+      expect(bounds.max.y - bounds.min.y, `${spec.id} height`).toBeLessThanOrEqual(height + 0.15 + 1e-5);
+      expect(bounds.max.z - bounds.min.z, `${spec.id} length`).toBeLessThanOrEqual(length + 0.15 + 1e-5);
+      expect(bounds.min.z, `${spec.id} nose`).toBeGreaterThanOrEqual(-0.15 - 1e-5);
+      expect(built.triangles, `${spec.id} triangles`).toBeLessThanOrEqual(budget);
+    }
+  });
+
+  it('routes bumpers and saloon whitewalls through the existing chrome role', () => {
+    const materials = createForgeMaterialSet(0x173451, 'chrome-role-check', 0xf4eee0);
+    const built = buildForgedVehicle(SEDAN_SPEC, { wheelStyle: 'whitewall', bumperY: 0.46 }, materials);
+    const chrome = built.group.children.find((child) => child.name.endsWith(' chrome')) as THREE.Mesh | undefined;
+    expect(chrome, 'whitewall and bumper geometry share a chrome bucket').toBeDefined();
+    expect((chrome!.material as THREE.Material).userData.forgeRole).toBe('chrome');
+    expect(chrome!.name).not.toMatch(/purple/i);
   });
 
   it('exports nothing that returns a collider and registers no side effect', async () => {
