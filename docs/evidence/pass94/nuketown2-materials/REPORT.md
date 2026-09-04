@@ -354,3 +354,9 @@ lane markings each read as their own material rather than as a coloured box.
   Retain receipts showing the final SHA and zero console errors; do not merge
   on the existing capture receipt alone. This remains open here because this
   repair pass is explicitly browser/build-free.
+- **TODO (vegetation/techniques owner; larger visual treatment):** Replace the
+  hedge `lawn` variant's flat green treatment with a real foliage-mass
+  presentation owned by the vegetation/techniques lane. Preserve the existing
+  movement/shot authority and profile parity, then add a deterministic hedge
+  review capture plus the affected material/vegetation gate before closing
+  this handoff; a lawn variant alone cannot prove foliage mass.
